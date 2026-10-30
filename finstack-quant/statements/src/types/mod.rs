@@ -1,9 +1,15 @@
 //! Core types for financial statement modeling.
 
+mod forecast_params;
 mod model;
 mod node;
 mod value;
 
+pub use forecast_params::{
+    BootstrapParams, BoundsParams, CurvePctParams, DistributionParams, FadeToTargetParams,
+    ForecastBootstrapMode, ForecastFadeShape, ForecastParameters, ForecastTrendMethod,
+    GrowthPctParams, MeanRevertingParams, OverrideParams, SeasonalParams, TimeSeriesParams,
+};
 pub(crate) use model::validated_explicit_value_type;
 pub use model::{
     CapitalStructureSpec, DebtInstrumentSpec, FinancialModelSpec, FinancialStatementInstrument,

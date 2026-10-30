@@ -4857,6 +4857,39 @@
       }
     },
     {
+      "name": "contract-forecast-parameters",
+      "type": "registry:lib",
+      "title": "Forecast parameters contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust forecast_parameters contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/forecast_parameters.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/forecast_parameters.json"
+        },
+        {
+          "path": "src/generated/types/forecast_parameters.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/forecast_parameters.ts"
+        },
+        {
+          "path": "src/generated/meta/forecast_parameters.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/forecast_parameters.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-monte-carlo-config",
       "type": "registry:lib",
       "title": "Monte carlo config contract",

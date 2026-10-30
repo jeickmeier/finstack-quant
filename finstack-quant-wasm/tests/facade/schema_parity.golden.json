@@ -2122,6 +2122,13 @@
             "bytes": 383715
           },
           {
+            "path": "schemas/statements/1/forecast_parameters.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
+            "type_name": "ForecastParameters",
+            "kind": "input",
+            "bytes": 20392
+          },
+          {
             "path": "schemas/statements/1/metric_registry.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
             "type_name": "MetricRegistry",
@@ -4556,6 +4563,14 @@
             "type_name": "FinancialModelSpec",
             "kind": "input",
             "bytes": 383715
+          },
+          {
+            "domain": "statements",
+            "path": "schemas/statements/1/forecast_parameters.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
+            "type_name": "ForecastParameters",
+            "kind": "input",
+            "bytes": 20392
           },
           {
             "domain": "statements",
