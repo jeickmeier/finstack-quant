@@ -22,7 +22,8 @@
         "@finstack/finstack-table",
         "@finstack/table-envelope",
         "@finstack/enum-field",
-        "@finstack/contract-table-envelope"
+        "@finstack/contract-table-envelope",
+        "@finstack/analytics-report-presentation"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",
@@ -61,7 +62,8 @@
         "@finstack/finstack-format",
         "@finstack/finstack-chart",
         "@finstack/finstack-table",
-        "@finstack/enum-field"
+        "@finstack/enum-field",
+        "@finstack/analytics-report-presentation"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",
@@ -129,6 +131,22 @@
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
+    },
+    {
+      "name": "analytics-report-presentation",
+      "type": "registry:lib",
+      "title": "Analytics report presentation",
+      "description": "Shared dated point projection and named section markup for analytics reports.",
+      "files": [
+        {
+          "path": "lib/analytics-report-presentation.tsx",
+          "type": "registry:lib",
+          "target": "components/finstack/analytics/lib/analytics-report-presentation.tsx"
+        }
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
     }
   ]
 }

@@ -1,5 +1,10 @@
 "use client";
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  datedPoints,
+  ReportSection,
+  type DatedPoint,
+} from "@/components/finstack/analytics/lib/analytics-report-presentation";
+import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { areaY, defineChart, lineY } from "@tanstack/charts";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
@@ -70,26 +75,6 @@ interface Row {
   /** An integer count (Rust usize), shown as returned rather than through the host format. */
   count?: boolean;
 }
-interface DatedPoint {
-  series: string;
-  iso: string;
-  date: Date;
-  value: number;
-}
-const utc = (iso: string) => new Date(`${iso}T00:00:00Z`);
-/** Finite native values against their dates; non-finite entries are omitted, never replaced. */
-function datedPoints(
-  series: string,
-  dates: readonly string[],
-  values: readonly number[],
-): DatedPoint[] {
-  return dates.flatMap((iso, index) => {
-    const value = values[index];
-    return typeof value === "number" && Number.isFinite(value)
-      ? [{ series, iso, date: utc(iso), value }]
-      : [];
-  });
-}
 function datedChart(
   points: readonly DatedPoint[],
   mark: "line" | "area",
@@ -121,14 +106,6 @@ function datedChart(
       }),
     },
   });
-}
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
 }
 /** A two-column measure table; finite numbers use the host format, anything else is shown as returned. */
 function MeasureTable({
@@ -319,7 +296,7 @@ function ReportView({
         </p>
       </div>
       <div className="grid gap-6 @3xl:grid-cols-3">
-        <Section title={`${ticker} regression on ${benchmark}`}>
+        <ReportSection title={`${ticker} regression on ${benchmark}`}>
           <MeasureTable
             caption={`${ticker} regression on ${benchmark}`}
             rows={fields(report.greeks[selected], [
@@ -332,8 +309,8 @@ function ReportView({
             format={formatValue}
             density={density}
           />
-        </Section>
-        <Section title={`${ticker} beta estimate`}>
+        </ReportSection>
+        <ReportSection title={`${ticker} beta estimate`}>
           <MeasureTable
             caption={`${ticker} beta estimate`}
             rows={fields(report.beta[selected], [
@@ -347,15 +324,15 @@ function ReportView({
             format={formatValue}
             density={density}
           />
-        </Section>
-        <Section title={`${ticker} relative measures`}>
+        </ReportSection>
+        <ReportSection title={`${ticker} relative measures`}>
           <MeasureTable
             caption={`${ticker} relative measures`}
             rows={relative}
             format={formatValue}
             density={density}
           />
-        </Section>
+        </ReportSection>
       </div>
       <p className="text-xs text-muted-foreground">
         Decimal fractions and ratios as Rust returned them; alphas are
@@ -363,40 +340,40 @@ function ReportView({
       </p>
       {charts && series ? (
         <div className="grid gap-6 @3xl:grid-cols-2">
-          <Section title={`${ticker} cumulative outperformance`}>
+          <ReportSection title={`${ticker} cumulative outperformance`}>
             <FinstackChart
               definition={charts.outperformance}
               ariaLabel={`${ticker} cumulative outperformance`}
               height={240}
             />
-          </Section>
-          <Section title={`${ticker} drawdown difference`}>
+          </ReportSection>
+          <ReportSection title={`${ticker} drawdown difference`}>
             <FinstackChart
               definition={charts.drawdown}
               ariaLabel={`${ticker} drawdown difference`}
               height={240}
             />
-          </Section>
-          <Section title={`${ticker} rolling alpha`}>
+          </ReportSection>
+          <ReportSection title={`${ticker} rolling alpha`}>
             <FinstackChart
               definition={charts.alpha}
               ariaLabel={`${ticker} rolling alpha`}
               height={240}
             />
-          </Section>
-          <Section title={`${ticker} rolling beta`}>
+          </ReportSection>
+          <ReportSection title={`${ticker} rolling beta`}>
             <FinstackChart
               definition={charts.beta}
               ariaLabel={`${ticker} rolling beta`}
               height={240}
             />
-          </Section>
+          </ReportSection>
         </div>
       ) : (
         <p role="status">No ticker series returned</p>
       )}
       {multiFactor ? (
-        <Section title={`${ticker} multi-factor regression`}>
+        <ReportSection title={`${ticker} multi-factor regression`}>
           {multiFactor.ok ? (
             <MeasureTable
               caption={`${ticker} multi-factor regression`}
@@ -421,7 +398,7 @@ function ReportView({
               {multiFactor.error.message}
             </p>
           )}
-        </Section>
+        </ReportSection>
       ) : null}
     </section>
   );
