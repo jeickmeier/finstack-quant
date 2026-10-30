@@ -440,6 +440,12 @@ fn metric_metadata<'py>(py: Python<'py>, keys: Vec<String>) -> PyResult<Bound<'p
     serde_to_py(py, &metadata)
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "price_driver_fields")]
+#[pyfunction]
+fn price_driver_fields() -> Vec<&'static str> {
+    finstack_quant_valuations::instruments::pricing_overrides::MarketQuoteOverrides::price_driver_fields()
+}
+
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "list_models")]
 #[pyfunction]
 fn list_models() -> Vec<String> {
@@ -626,6 +632,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics_grouped, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(metric_metadata, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(price_driver_fields, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(metrics_for_instrument, m)?)?;
     Ok(())
 }
@@ -645,6 +652,7 @@ pub(crate) const EXPORTS: &[&str] = &[
     "list_standard_metrics_grouped",
     "metric_metadata",
     "metrics_for_instrument",
+    "price_driver_fields",
     "price_instrument",
 ];
 

@@ -92,6 +92,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "models",
     "metrics",
     "metricMetadata",
+    "priceDriverFields",
     "exportResult",
     // CashflowsApi
     "cashflowLadder",

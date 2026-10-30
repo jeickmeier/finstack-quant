@@ -339,6 +339,32 @@ def metric_metadata(keys: list[str]) -> list[dict[str, Any]]:
     """
     ...
 
+def price_driver_fields() -> list[str]:
+    """
+    Wire names of the mutually exclusive price-driving market quotes.
+
+    Validation rejects more than one of these on a
+    ``instrument_pricing_overrides.market_quotes`` object, so a host editor can
+    clear the others when one is entered. Other quotes, such as
+    ``implied_volatility``, are not in the set.
+
+    Returns
+    -------
+    list[str]
+        Field names as they appear on the wire, in precedence order.
+
+    Notes
+    -----
+    This function does not raise; the set is fixed.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import price_driver_fields
+    >>> price_driver_fields()[0]
+    'quoted_clean_price_pct'
+    """
+    ...
+
 class MetricPricingOverrides:
     """
     Metric-time pricing overrides merged into an instrument before pricing.

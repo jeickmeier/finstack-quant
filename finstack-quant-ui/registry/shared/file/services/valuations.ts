@@ -19,6 +19,7 @@ export type ValuationsNative = {
       | "listModelsGrouped"
       | "metricsForInstrument"
       | "metricMetadata"
+      | "priceDriverFields"
     >;
   };
 };
@@ -146,6 +147,8 @@ export function createValuationsService(
       context.result(() => instruments.metricsForInstrument(instrumentType)),
     metricMetadata: (keys) =>
       context.result(() => instruments.metricMetadata([...keys])),
+    priceDriverFields: () =>
+      context.result(() => instruments.priceDriverFields()),
     exportResult: (value) =>
       context.result(() =>
         exportValuation(value, native.valuations.valuationResultToJson),

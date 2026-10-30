@@ -415,6 +415,19 @@ pub fn metric_metadata(keys: JsValue) -> Result<JsValue, JsValue> {
     to_js_value(&metadata)
 }
 
+/// Wire names of the mutually exclusive price-driving market quotes.
+///
+/// Validation rejects more than one of these on a
+/// `instrument_pricing_overrides.market_quotes` object, so a host editor can
+/// clear the others when one is entered. Other quotes, such as
+/// `implied_volatility`, are not in the set.
+/// @returns Field names as they appear on the wire, in precedence order.
+/// @throws Error - Throws a `computation` error only if the names cannot cross the boundary.
+#[wasm_bindgen(js_name = priceDriverFields)]
+pub fn price_driver_fields() -> Result<JsValue, JsValue> {
+    to_js_value(&finstack_quant_valuations::instruments::pricing_overrides::MarketQuoteOverrides::price_driver_fields())
+}
+
 /// List every pricing model key registered in the standard pricer registry.
 ///
 /// The list is registry-derived rather than enum-derived, so it reflects real

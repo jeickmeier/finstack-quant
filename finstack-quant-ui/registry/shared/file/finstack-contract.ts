@@ -989,6 +989,8 @@ export interface ValuationsApi {
   metrics(instrumentType: string): Promise<Envelope<Record<string, string[]>>>;
   /** valuations.instruments.metricMetadata: native per-key interpretation (units, decoded coordinates, groups) for metric keys. */
   metricMetadata(keys: readonly string[]): Promise<Envelope<MetricMetadata[]>>;
+  /** valuations.instruments.priceDriverFields: wire names of the mutually exclusive price-driving market quotes. */
+  priceDriverFields(): Promise<Envelope<string[]>>;
   /** valuations.valuationResultToJson over the host-serialized result: native canonical JSON. */
   exportResult(value: ValuationResult): Promise<Envelope<string>>;
 }

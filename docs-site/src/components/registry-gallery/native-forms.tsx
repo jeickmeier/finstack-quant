@@ -8,6 +8,7 @@ import { CalibrationForm } from "@/components/finstack/calibration/components/ca
 import { useInstrumentValidator } from "@/hooks/valuations/use-instrument-validator/use-instrument-validator";
 import { useMarketValidator } from "@/hooks/core/use-market-validator/use-market-validator";
 import { useCalibrationValidator } from "@/hooks/calibration/use-calibrate/use-calibrate";
+import { usePriceDriverFields } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
 import * as bond from "@/lib/finstack/generated/instrument/bond";
 import data from "./data.json";
 import { WorkerPreview } from "./worker-preview";
@@ -27,6 +28,7 @@ function Forms({ name }: { name: string }) {
     json: JSON.stringify(data.market.supplemental),
     revision: 0,
   });
+  const priceDriverFields = usePriceDriverFields();
   const validate = useInstrumentValidator(),
     market = useMarketValidator(),
     calibration = useCalibrationValidator();
@@ -53,6 +55,7 @@ function Forms({ name }: { name: string }) {
           type={type}
           onTypeChange={setType}
           defaultJson={data.bond.request.instrumentJson}
+          priceDriverFields={priceDriverFields.data}
           validate={validate}
           onSubmit={submitted}
         />
