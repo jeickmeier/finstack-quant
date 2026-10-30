@@ -287,8 +287,11 @@ pub fn apply_scenario(
 ///   (`AttributionMethod::default()`, currently "parallel"). "metrics_based"
 ///   calculates the canonical registry's
 ///   applicable subset of default attribution metrics at the opening snapshot;
-///   metrics unsupported by the instrument type are omitted, while failures
-///   calculating selected metrics throw.
+///   metrics unsupported by the instrument type are omitted, and when a
+///   hazard curve of the instrument has no calibration recipe and that menu
+///   fails, the quote-space credit metrics are dropped with a note and
+///   credit-curve P&L flows to residual; any other failure calculating
+///   selected metrics throws.
 /// * `config_json` - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
 /// * `calendar_id` - Optional built-in holiday calendar (e.g. "nyse", "target") used to
 ///   business-day adjust `time_roll_forward` targets under `business_days` mode.

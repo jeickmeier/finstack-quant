@@ -103,7 +103,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::collect_period_cash;
+use finstack_quant_valuations::metrics::{collect_period_cash, MetricId};
 use finstack_quant_valuations::results::ValuationResult;
 use std::sync::Arc;
 
@@ -313,6 +313,13 @@ pub fn attribute_pnl_metrics_based(
 /// narrowed to what the instrument type supports: that menu is a superset, not
 /// a request. Prepared endpoints on the request are not used, because the
 /// method needs priced measures.
+///
+/// Quote-space credit metrics ([`QUOTE_SPACE_CREDIT_METRICS`]) replay a hazard
+/// curve's calibration recipe. When the default menu fails to price and one
+/// of the instrument's hazard curves has no recipe (it was built directly
+/// from hazard rates), the menu is priced again without those metrics and a
+/// note names the curves and the original failure; credit-curve P&L then
+/// flows to the residual. An explicit `metrics` list is never narrowed.
 pub(crate) fn attribute_request(request: &crate::AttributionRequest<'_>) -> Result<PnlAttribution> {
     let crate::AttributionRequest {
         instrument,
@@ -360,12 +367,49 @@ pub(crate) fn attribute_request(request: &crate::AttributionRequest<'_>) -> Resu
         .cloned()
         .unwrap_or_else(finstack_quant_calibration::recalibration::pricing_options)
         .with_config(config);
-    let val_t0 = metrics_instrument.price_with_metrics(
+    let mut menu_note = None;
+    let val_t0 = match metrics_instrument.price_with_metrics(
         market_t0,
         as_of_t0,
         &metrics,
         pricing_options.clone(),
-    )?;
+    ) {
+        Ok(valuation) => valuation,
+        Err(error) if request.metrics.is_none() => {
+            let curves = unreplayable_hazard_curves(metrics_instrument.as_ref(), market_t0)?;
+            let (dropped, kept): (Vec<_>, Vec<_>) = metrics
+                .into_iter()
+                .partition(|metric| QUOTE_SPACE_CREDIT_METRICS.contains(metric));
+            if curves.is_empty() || dropped.is_empty() {
+                return Err(error.into());
+            }
+            let valuation = metrics_instrument.price_with_metrics(
+                market_t0,
+                as_of_t0,
+                &kept,
+                pricing_options.clone(),
+            )?;
+            menu_note = Some(format!(
+                "Metrics-based attribution dropped {} from the default metric menu: \
+                 hazard curve(s) {} carry no calibration recipe (built directly from hazard \
+                 rates), so quote-space credit risk is unavailable ({error}); credit-curve P&L \
+                 flows to residual. Calibrate the hazard curve, or use parallel or waterfall \
+                 attribution, to attribute it.",
+                dropped
+                    .iter()
+                    .map(|metric| metric.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                curves
+                    .iter()
+                    .map(|curve| format!("'{curve}'"))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ));
+            valuation
+        }
+        Err(error) => return Err(error.into()),
+    };
     let val_t1 = instrument.price_with_metrics(market_t1, as_of_t1, &[], pricing_options)?;
 
     let mut attribution = attribute_pnl_metrics_based(
@@ -378,6 +422,10 @@ pub(crate) fn attribute_request(request: &crate::AttributionRequest<'_>) -> Resu
         as_of_t1,
     )?;
     attribution.meta.num_repricings = 2;
+    if let Some(note) = menu_note {
+        attribution.meta.num_repricings += 1;
+        note_warning(&mut attribution, note, instrument.id(), "credit_curves");
+    }
     if model_params_t0.is_some() {
         let closing_value_opening_params = instrument_t0.value(market_t1, as_of_t1)?;
         attribution.model_params_pnl = val_t1.value.checked_sub(closing_value_opening_params)?;
@@ -394,6 +442,36 @@ pub(crate) fn attribute_request(request: &crate::AttributionRequest<'_>) -> Resu
         attribution.meta.num_repricings += 1;
     }
     Ok(attribution)
+}
+
+/// Default-menu metrics that replay a hazard curve's calibration recipe
+/// (par-spread bumps re-bootstrapped through the recalibration provider).
+const QUOTE_SPACE_CREDIT_METRICS: [MetricId; 6] = [
+    MetricId::Cs01,
+    MetricId::BucketedCs01,
+    MetricId::CsGamma,
+    MetricId::CrossGammaRatesCredit,
+    MetricId::CrossGammaSpotCredit,
+    MetricId::CrossGammaCreditVol,
+];
+
+/// The instrument's credit curves that are hazard curves in `market` without
+/// a calibration recipe, in dependency order.
+fn unreplayable_hazard_curves(
+    instrument: &dyn Instrument,
+    market: &MarketContext,
+) -> Result<Vec<finstack_quant_core::types::CurveId>> {
+    Ok(instrument
+        .market_dependencies()?
+        .curves
+        .credit_curves
+        .into_iter()
+        .filter(|curve_id| {
+            market
+                .get_hazard(curve_id.as_str())
+                .is_ok_and(|hazard| hazard.hazard_calibration().is_none())
+        })
+        .collect())
 }
 
 fn note_warning(
