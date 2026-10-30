@@ -10,7 +10,7 @@ use crate::instruments::envelope::{instrument_load_error, MAX_JSON_BYTES};
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use crate::instruments::pricing_overrides::MetricPricingOverrides;
 use crate::instruments::Instrument;
-use crate::metrics::MetricId;
+use crate::metrics::{parse_key_rate_label, MetricId};
 use crate::results::ValuationResult;
 use finstack_quant_core::contract::{parse_json_value, LoadLimits};
 use finstack_quant_core::currency::Currency;
@@ -390,12 +390,51 @@ pub struct MetricMetadata {
     pub metric: String,
     /// Decoded coordinate labels in original order; empty for scalar metrics.
     pub components: Vec<String>,
+    /// How each entry of `components` orders along its axis, aligned with it.
+    pub coordinates: Vec<MetricCoordinate>,
     /// Native unit family; custom or calculator-dependent units remain unknown.
     pub unit: crate::metrics::MetricUnit,
     /// Native display group; absent for a non-standard base metric.
     pub group: Option<String>,
     /// Whether this is a DV01/CS01 bucket with nonempty identifier and bucket coordinates.
     pub bucketed: bool,
+}
+
+/// Where one coordinate label sits on its axis.
+///
+/// A host sorts by `group` and then by `value`, so maturity and strike order
+/// is not recovered by parsing label text.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MetricCoordinate {
+    /// Text the value is scoped by: the `{surface}::` of a vega row, empty for
+    /// a bare tenor or strike, and the whole label when it carries no number.
+    pub group: String,
+    /// Tenor in years (`3m` is 0.25, per [`parse_key_rate_label`]) or the
+    /// decimal strike; `None` when the label carries no number.
+    pub value: Option<f64>,
+}
+
+impl MetricCoordinate {
+    /// Read a decoded coordinate label: a tenor or decimal after any final `::`.
+    fn from_label(label: &str) -> Self {
+        let tail = label.rfind("::").map_or(0, |index| index + 2);
+        let (group, coordinate) = label.split_at(tail);
+        let value = parse_key_rate_label(coordinate)
+            .ok()
+            .or_else(|| coordinate.parse::<f64>().ok().filter(|v| v.is_finite()));
+        match value {
+            Some(value) => Self {
+                group: group.to_string(),
+                value: Some(value),
+            },
+            None => Self {
+                group: label.to_string(),
+                value: None,
+            },
+        }
+    }
 }
 
 /// Describe canonical metric keys without computing or transforming their values.
@@ -430,6 +469,10 @@ pub fn metric_metadata(keys: &[String]) -> finstack_quant_core::Result<Vec<Metri
             Ok(MetricMetadata {
                 key: key.clone(),
                 metric: base.to_string(),
+                coordinates: components
+                    .iter()
+                    .map(|label| MetricCoordinate::from_label(label))
+                    .collect(),
                 components,
                 unit: id.unit(),
                 group,
@@ -927,6 +970,26 @@ fn decode_pricing_envelope(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coordinates_order_tenors_strikes_and_vega_rows_by_value() {
+        let at = |label: &str| {
+            let coordinate = MetricCoordinate::from_label(label);
+            (coordinate.group, coordinate.value)
+        };
+        let bare = |value: f64| (String::new(), Some(value));
+        assert_eq!(at("3m"), bare(0.25));
+        assert_eq!(at("12m"), bare(1.0));
+        assert_eq!(at("0.75y"), bare(0.75));
+        assert_eq!(at("10y"), bare(10.0));
+        assert_eq!(at("0.004"), bare(0.004));
+        assert_eq!(at("-0.5"), bare(-0.5));
+        assert_eq!(at("S::0.25y"), ("S::".to_string(), Some(0.25)));
+        assert_eq!(at("USD-OIS"), ("USD-OIS".to_string(), None));
+        assert_eq!(at(""), (String::new(), None));
+        // A word that f64::from_str reads as a number is still text.
+        assert_eq!(at("inf"), ("inf".to_string(), None));
+    }
 
     #[test]
     fn tranche_field_units_list_every_scalar_field_in_struct_order() {
@@ -2023,6 +2086,19 @@ mod tests {
         assert_eq!(bucketed.unit, crate::metrics::MetricUnit::Currency);
         assert_eq!(bucketed.group.as_deref(), Some("Sensitivity"));
         assert_eq!(bucketed.components, vec!["A::B", "5y"]);
+        assert_eq!(
+            bucketed.coordinates,
+            vec![
+                MetricCoordinate {
+                    group: "A::B".to_string(),
+                    value: None
+                },
+                MetricCoordinate {
+                    group: String::new(),
+                    value: Some(5.0)
+                },
+            ]
+        );
         assert!(bucketed.bucketed);
 
         let custom = &metadata[2];

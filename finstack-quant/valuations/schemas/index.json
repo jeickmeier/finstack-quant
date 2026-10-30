@@ -1064,7 +1064,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
-      "bytes": 3353,
+      "bytes": 4630,
       "kind": "output",
       "path": "schemas/results/1/metric_metadata.schema.json",
       "summary": "Canonical per-key metric interpretation for host presentation.",

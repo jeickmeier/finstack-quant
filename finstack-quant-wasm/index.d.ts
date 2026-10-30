@@ -23171,7 +23171,7 @@ export interface ValuationInstrumentsNamespace {
    * console.log(ytm.unit, bucket.components, bucket.bucketed);
    * ```
    * @param keys - Canonical scalar or qualified wire keys in output order. Custom keys retain unknown units; malformed or obsolete encodings are rejected.
-   * @returns Ordered metadata records preserving original keys, decoded components, native unit families, display groups, and bucket eligibility.
+   * @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.
    * @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.
    */
   metricMetadata(keys: string[]): MetricMetadata[];

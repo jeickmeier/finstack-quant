@@ -388,10 +388,9 @@ host (inside the worker for browser consumers). Column presets target Table
 `labelFor` (`label.mjs`, also used by `registry-content` for item titles) turns a
 Rust wire or metric name into a sentence-case label with one set of upright
 market acronyms; it is typography only and adds no financial names.
-`compareTenorLabels` puts whole-label `Nm`/`Ny` tenors first in maturity order on
-Rust's year basis (a month is 1/12 year). Other labels compare run by run:
-numbers by value, an embedded tenor run such as vega's `SURF::0.25y` in years,
-and text by en-US collation; ties fall back to the full label.
+`compareCoordinates` sorts coordinate labels by the group and value Rust publishes
+on `MetricMetadata.coordinates` (a tenor in years or a decimal strike), then by
+the label text; nothing parses a label for its maturity.
 
 ## Controlled primitives
 

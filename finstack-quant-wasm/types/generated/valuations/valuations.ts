@@ -19863,6 +19863,24 @@ export interface PathStatistics {
   pik_exercise_rate: number;
 }
 /**
+ * Where one coordinate label sits on its axis.
+ *
+ * A host sorts by `group` and then by `value`, so maturity and strike order
+ * is not recovered by parsing label text.
+ */
+export interface MetricCoordinate {
+  /**
+   * Text the value is scoped by: the `{surface}::` of a vega row, empty for
+   * a bare tenor or strike, and the whole label when it carries no number.
+   */
+  group: string;
+  /**
+   * Tenor in years (`3m` is 0.25, per [`parse_key_rate_label`]) or the
+   * decimal strike; `None` when the label carries no number.
+   */
+  value?: number | null;
+}
+/**
  * The display unit of one scalar field of a result struct.
  */
 export interface MetricFieldUnit {
@@ -19891,6 +19909,10 @@ export interface MetricMetadata {
    * Decoded coordinate labels in original order; empty for scalar metrics.
    */
   components: string[];
+  /**
+   * How each entry of `components` orders along its axis, aligned with it.
+   */
+  coordinates: MetricCoordinate[];
   /**
    * Native display group; absent for a non-standard base metric.
    */

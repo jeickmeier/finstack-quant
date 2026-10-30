@@ -322,7 +322,9 @@ def metric_metadata(keys: list[str]) -> list[dict[str, Any]]:
     -------
     list[dict[str, Any]]
         One record per key with ``key``, ``metric``, ``components`` (decoded
-        coordinate labels in original order), ``unit`` (canonical unit family
+        coordinate labels in original order), ``coordinates`` (for each label,
+        the ``group`` and numeric ``value``, a tenor in years or a decimal
+        strike, that order it on its axis), ``unit`` (canonical unit family
         string), ``group`` (native display group or ``None``) and
         ``bucketed``. No prices are changed and a unit family does not imply
         a bump size or FX conversion.
