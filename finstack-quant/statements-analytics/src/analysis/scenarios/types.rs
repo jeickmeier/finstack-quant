@@ -49,7 +49,9 @@ impl ParameterSpec {
     /// # Arguments
     ///
     /// * `node_id` - Exact statement node identifier to vary.
-    /// * `period_id` - Forecast period whose node input is replaced.
+    /// * `period_id` - Forecast period whose node input is replaced. The
+    ///   replacement is a point override: it does not re-anchor the node's
+    ///   forecast in later periods (see [`crate::analysis::run_sensitivity`]).
     /// * `base_value` - Finite reference value in the node's units used when
     ///   constructing percentage shocks; the model supplies the chart baseline.
     /// * `perturbations` - Non-empty finite absolute input values in the node's
@@ -74,7 +76,9 @@ impl ParameterSpec {
     ///
     /// * `node_id` - Exact statement node identifier whose input is shocked.
     /// * `period_id` - Forecast model period whose selected node input is
-    ///   replaced; execution rejects actual periods.
+    ///   replaced; execution rejects actual periods. The replacement is a
+    ///   point override that does not re-anchor the node's forecast in later
+    ///   periods (see [`crate::analysis::run_sensitivity`]).
     /// * `base_value` - Finite reference input in the node's units, such as a
     ///   decimal rate or monetary currency amount; each shock multiplies this
     ///   value by `1 + pct / 100`. The model supplies the chart baseline.
