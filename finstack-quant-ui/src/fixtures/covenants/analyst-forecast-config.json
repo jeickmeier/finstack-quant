@@ -1,0 +1,8 @@
+{
+  "stochastic": true,
+  "volatility": 0.25,
+  "num_paths": 2000,
+  "antithetic": true,
+  "random_seed": 7,
+  "breach_probability_threshold": 0.25
+}

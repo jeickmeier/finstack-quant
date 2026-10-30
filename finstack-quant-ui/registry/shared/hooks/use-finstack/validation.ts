@@ -10,7 +10,13 @@ export function useNativeValidator<
     | "validateCalibration"
     | "validateStatementModel"
     | "validateStatementFormula"
-    | "validateCheckSuiteSpec",
+    | "validateCheckSuiteSpec"
+    | "validatePortfolio"
+    | "validateSimmSensitivities"
+    | "validateCsa"
+    | "validateMertonModel"
+    | "validateScenarioSpec"
+    | "validateCovenantEngine",
 >(operation: K, label: string) {
   const worker = useFinstack();
   return useCallback(

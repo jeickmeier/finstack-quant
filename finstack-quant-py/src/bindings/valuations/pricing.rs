@@ -423,6 +423,15 @@ fn list_standard_metrics_grouped() -> std::collections::BTreeMap<String, Vec<Str
     finstack_quant_valuations::pricer::list_standard_metrics_grouped()
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "metrics_for_instrument")]
+#[pyfunction]
+#[pyo3(text_signature = "(instrument_type)")]
+fn metrics_for_instrument(
+    instrument_type: &str,
+) -> PyResult<std::collections::BTreeMap<String, Vec<String>>> {
+    finstack_quant_valuations::pricer::metrics_for_instrument(instrument_type).map_err(core_to_py)
+}
+
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "metric_metadata")]
 #[pyfunction]
 #[pyo3(text_signature = "(keys)")]
@@ -617,6 +626,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics_grouped, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(metric_metadata, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(metrics_for_instrument, m)?)?;
     Ok(())
 }
 
@@ -634,6 +644,7 @@ pub(crate) const EXPORTS: &[&str] = &[
     "list_standard_metrics",
     "list_standard_metrics_grouped",
     "metric_metadata",
+    "metrics_for_instrument",
     "price_instrument",
 ];
 

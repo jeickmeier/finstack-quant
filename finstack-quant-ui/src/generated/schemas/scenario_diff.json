@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Variance-style diff between two evaluated scenarios.",
+  "properties": {
+    "baseline": {
+      "description": "Baseline scenario name.",
+      "type": "string"
+    },
+    "comparison": {
+      "description": "Comparison scenario name.",
+      "type": "string"
+    },
+    "variance": {
+      "$ref": "#/$defs/d_269cb9f662b304e22f4b",
+      "description": "Underlying variance report."
+    }
+  },
+  "required": [
+    "baseline",
+    "comparison",
+    "variance"
+  ],
+  "title": "ScenarioDiff",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
+  "$defs": {
+    "d_269cb9f662b304e22f4b": {
+      "description": "Full variance report between a baseline and comparison.",
+      "properties": {
+        "baseline_label": {
+          "description": "Label for the baseline scenario (e.g. `\"management_case\"`).",
+          "type": "string"
+        },
+        "comparison_label": {
+          "description": "Label for the comparison scenario (e.g. `\"bank_case\"`).",
+          "type": "string"
+        },
+        "rows": {
+          "description": "Per-metric, per-period variance rows.",
+          "items": {
+            "$ref": "#/$defs/d_6c0c22732e35fffea2da"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "baseline_label",
+        "comparison_label",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "d_63e97a92b406f022729d": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    },
+    "d_6c0c22732e35fffea2da": {
+      "description": "One row of variance output.\n\nRepresents variance for a single `(metric, period)` pair.",
+      "properties": {
+        "abs_var": {
+          "description": "Absolute variance: `comparison - baseline`.",
+          "format": "double",
+          "type": "number"
+        },
+        "baseline": {
+          "description": "Baseline value.",
+          "format": "double",
+          "type": "number"
+        },
+        "comparison": {
+          "description": "Comparison value.",
+          "format": "double",
+          "type": "number"
+        },
+        "metric": {
+          "description": "Metric / node identifier (e.g. `\"revenue\"`).",
+          "type": "string"
+        },
+        "pct_var": {
+          "description": "Percentage variance (fraction): `abs_var / baseline`.\n\nWhen the baseline is effectively zero this is `None` (Options\nserialize as JSON `null`) rather than a spurious `0.0`, which\npreviously hid meaningful absolute deltas whenever the\ndenominator was small. Reporting layers should interpret a\n`None` as \"undefined / not meaningful\" and fall back to the\nabsolute variance.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "period": {
+          "$ref": "#/$defs/d_63e97a92b406f022729d",
+          "description": "Period identifier (e.g. `\"2025Q1\"`)."
+        }
+      },
+      "required": [
+        "period",
+        "metric",
+        "baseline",
+        "comparison",
+        "abs_var"
+      ],
+      "type": "object"
+    }
+  }
+}

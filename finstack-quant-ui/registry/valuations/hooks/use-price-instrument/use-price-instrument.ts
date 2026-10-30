@@ -40,7 +40,7 @@ export function usePriceInstrument(request: PriceRequest, enabled = true) {
 }
 /** Registry options are immutable within one initialized worker session. */
 function useOptions<T>(
-  operation: "models" | "metrics" | "calendars",
+  operation: "models" | "calendars",
   fetch: (client: FinstackClient) => Promise<T>,
 ) {
   return useWorkerQuery((worker) => ({
@@ -54,9 +54,14 @@ function useOptions<T>(
 export function useModels() {
   return useOptions("models", (client) => client.call("models"));
 }
-/** Metrics grouped by native category, without local classifications. */
-export function useMetrics() {
-  return useOptions("metrics", (client) => client.call("metrics"));
+/** Standard metrics Rust registers for one instrument type, grouped by native category; null disables the query. */
+export function useMetrics(instrumentType: string | null) {
+  return useWorkerQuery((worker) => ({
+    queryKey: ["finstack", worker.session, "metrics", instrumentType] as const,
+    queryFn: () => worker.client!.call("metrics", instrumentType!),
+    enabled: worker.status === "ready" && instrumentType !== null,
+    ...workerQueryPolicy,
+  }));
 }
 /** Native display text for an exact amount under its returned rounding stamp; the request is snapshotted without mutation. */
 export function useMoneyFormat(request: MoneyFormatRequest | null) {

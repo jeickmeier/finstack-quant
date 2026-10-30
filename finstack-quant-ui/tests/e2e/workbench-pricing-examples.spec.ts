@@ -1,5 +1,6 @@
 import { test, expect } from "playwright/test";
 import scenarios from "../valuations/scenario-table/cases.json" with { type: "json" };
+import tranches from "../valuations/scenario-table/tranche-analytics.json" with { type: "json" };
 
 const examples = [
   { type: "bond", id: "US912828XG33", model: "discounting", featured: 3 },
@@ -256,5 +257,52 @@ test("structured-credit scenario prices use the completed native request", async
     String(scenarios.cases[0]!.table.cells[0]!.price),
   );
   await expect(scenario).toContainText("trancheScenarioTable");
+  // The native ScenarioGrid editor is seeded from the host grid.
+  await expect(
+    results.getByRole("button", { name: "Run scenarios" }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("structured-credit tranche analytics take no default price and solve OAS on request", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=pricing-workbench&theme=light&density=compact&focus=1&instrument=structured_credit",
+  );
+  const results = page.getByRole("region", { name: "Results", exact: true });
+  await expect(page.locator(".finstack-workbench__state")).toHaveText("Priced");
+  await results.getByRole("tab", { name: "Scenarios" }).click();
+  const tranche = results.getByRole("region", {
+    name: "CLONOTES-A tranche analytics",
+  });
+  const fixed = tranches.cases.find((entry) => entry.name === "fixed")!;
+  // Short native values only: the gallery build may rewrite long float literals.
+  await expect(
+    tranche.getByRole("region", { name: "Break-even CDR" }),
+  ).toContainText(String(fixed.results.breakevenCdr.value));
+  await expect(
+    tranche.getByRole("table", { name: "CLONOTES-A tranche metrics" }),
+  ).toContainText("Severity01");
+  await expect(
+    tranche.getByRole("region", { name: "Discount margin" }),
+  ).toContainText("Enter a clean price");
+  await expect(
+    tranche.getByRole("button", { name: "Solve OAS" }),
+  ).toBeDisabled();
+  await tranche.getByLabel("Clean price").fill("100");
+  await expect(
+    tranche.getByRole("region", { name: "Discount margin" }).getByRole("alert"),
+  ).toContainText("is fixed-rate");
+  const oas = tranche.getByRole("region", { name: "Option-adjusted spread" });
+  await expect(oas).toContainText("OAS runs on request");
+  await expect(oas.getByText("OAS configuration")).toBeVisible();
+  await tranche.getByRole("button", { name: "Solve OAS" }).click();
+  await expect(oas).toContainText("Num paths");
+  await expect(oas).toContainText(
+    String((fixed.results.oas.value as { num_paths: number }).num_paths),
+  );
   expect(errors).toEqual([]);
 });

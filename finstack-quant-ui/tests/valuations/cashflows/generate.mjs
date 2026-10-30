@@ -46,6 +46,22 @@ for (const type of ["fx_swap", "xccy_swap", "equity_option"]) {
     },
   });
 }
+// The worker's CashflowsApi.cashflowLadder partition: one native call per row
+// currency, in first-appearance order, over each flow's row-currency native PV.
+function ladder(envelope) {
+  const groups = new Map();
+  for (const flow of envelope.flows)
+    groups.set(flow.currency, [...(groups.get(flow.currency) ?? []), flow]);
+  return [...groups].map(([currency, flows]) => ({
+    currency,
+    rows: native.calendarYearLadder(
+      flows.map((flow) => flow.date),
+      flows.map((flow) => flow.kind),
+      flows.map((flow) => flow.amount),
+      flows.map((flow) => flow.native_pv),
+    ),
+  }));
+}
 const cases = inputs.map(({ type, request }) => {
   const priced = native.priceInstrument(
     request.instrumentJson,
@@ -59,18 +75,23 @@ const cases = inputs.map(({ type, request }) => {
   let cashflows = null,
     error = null;
   try {
-    cashflows = JSON.stringify(
-      native.instrumentCashflows(
-        request.instrumentJson,
-        request.marketJson,
-        request.asOf,
-        request.model,
-      ),
+    cashflows = native.instrumentCashflows(
+      request.instrumentJson,
+      request.marketJson,
+      request.asOf,
+      request.model,
     );
   } catch (failure) {
     error = failure.message;
   }
-  return { type, request, pricedValue: priced.value, cashflows, error };
+  return {
+    type,
+    request,
+    pricedValue: priced.value,
+    cashflows,
+    ladder: cashflows && ladder(cashflows),
+    error,
+  };
 });
 const sources = await Promise.all(
   [...paths].map(async (path) => ({
@@ -84,7 +105,7 @@ await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({
     description:
-      "Serialized native cashflow envelopes; no inferred row schema or financial reconciliation.",
+      "Native cashflow envelope objects and their native calendar-year ladders per row currency; no inferred row schema or financial reconciliation.",
     sources,
     cases,
   }),

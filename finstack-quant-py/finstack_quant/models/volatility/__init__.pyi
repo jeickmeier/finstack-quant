@@ -23,6 +23,7 @@ from finstack_quant.models.volatility._volatility_arbitrage import (
     check_butterfly_grid as check_butterfly_grid,
     check_calendar_spread_grid as check_calendar_spread_grid,
     check_local_vol_density_grid as check_local_vol_density_grid,
+    check_surface as check_surface,
     check_surface_grid as check_surface_grid,
 )
 
@@ -38,6 +39,7 @@ __all__ = [
     "check_butterfly_grid",
     "check_calendar_spread_grid",
     "check_local_vol_density_grid",
+    "check_surface",
     "check_surface_grid",
     "convert_atm_volatility",
     "delta_to_strike",

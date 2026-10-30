@@ -1,10 +1,5 @@
 {
   "$defs": {
-    "DateWire": {
-      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
-      "format": "date",
-      "type": "string"
-    },
     "SaCcrAssetClass": {
       "description": "SA-CCR asset class for add-on computation.\n\nEach derivative trade is assigned to exactly one asset class.\nThe add-on formula and supervisory parameters differ by class.",
       "oneOf": [
@@ -159,7 +154,7 @@
       "type": "number"
     },
     "end_date": {
-      "$ref": "#/$defs/DateWire",
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
       "description": "Underlying end date used for supervisory duration; linear trade maturity."
     },
     "hedging_set": {
@@ -183,7 +178,7 @@
     "option_maturity_date": {
       "anyOf": [
         {
-          "$ref": "#/$defs/DateWire"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
         },
         {
           "type": "null"
@@ -203,7 +198,7 @@
       "description": "Option exercise type if applicable."
     },
     "start_date": {
-      "$ref": "#/$defs/DateWire",
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
       "description": "Underlying start date used for IR/credit supervisory duration."
     },
     "supervisory_category": {

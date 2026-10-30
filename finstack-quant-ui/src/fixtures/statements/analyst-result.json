@@ -1,6 +1,16 @@
 {
   "schema_version": 1,
   "nodes": {
+    "cash": {
+      "2024Q1": 86500000,
+      "2024Q2": 94200000,
+      "2024Q3": 101800000,
+      "2024Q4": 108300000,
+      "2025Q1": 113600000,
+      "2025Q2": 113600000,
+      "2025Q3": 113600000,
+      "2025Q4": 113600000
+    },
     "debt_repayments": {
       "2024Q1": 10000000,
       "2024Q2": 10000000,
@@ -31,7 +41,7 @@
       "2025Q3": 420000000,
       "2025Q4": 420000000
     },
-    "debt_closing": {
+    "total_debt": {
       "2024Q1": 410000000,
       "2024Q2": 440000000,
       "2024Q3": 430000000,
@@ -171,6 +181,16 @@
       "2025Q3": 44643974.637499966,
       "2025Q4": 48618571.50987498
     },
+    "ufcf": {
+      "2024Q1": 23322400,
+      "2024Q2": 26566000,
+      "2024Q3": 28292800,
+      "2024Q4": 32592050,
+      "2025Q1": 30692700,
+      "2025Q2": 32515040.0625,
+      "2025Q3": 34478959.17268747,
+      "2025Q4": 37232282.67060436
+    },
     "pretax_income": {
       "2024Q1": 20037500,
       "2024Q2": 24462500,
@@ -191,7 +211,7 @@
       "2025Q3": 8394546.539812492,
       "2025Q4": 9303314.30482062
     },
-    "fcf": {
+    "free_cash_flow": {
       "2024Q1": 25419187.5,
       "2024Q2": 28713312.5,
       "2024Q3": 30490637.5,
@@ -719,7 +739,7 @@
         "currency": "USD"
       }
     },
-    "debt_closing": {
+    "total_debt": {
       "2024Q1": {
         "amount": "410000000",
         "currency": "USD"
@@ -787,6 +807,40 @@
         "currency": "USD"
       }
     },
+    "cash": {
+      "2024Q1": {
+        "amount": "86500000",
+        "currency": "USD"
+      },
+      "2024Q2": {
+        "amount": "94200000",
+        "currency": "USD"
+      },
+      "2024Q3": {
+        "amount": "101800000",
+        "currency": "USD"
+      },
+      "2024Q4": {
+        "amount": "108300000",
+        "currency": "USD"
+      },
+      "2025Q1": {
+        "amount": "113600000",
+        "currency": "USD"
+      },
+      "2025Q2": {
+        "amount": "113600000",
+        "currency": "USD"
+      },
+      "2025Q3": {
+        "amount": "113600000",
+        "currency": "USD"
+      },
+      "2025Q4": {
+        "amount": "113600000",
+        "currency": "USD"
+      }
+    },
     "ltm_ebitda": {
       "2024Q4": {
         "amount": "187300000",
@@ -843,7 +897,7 @@
         "currency": "USD"
       }
     },
-    "fcf": {
+    "free_cash_flow": {
       "2024Q1": {
         "amount": "25419187.5",
         "currency": "USD"
@@ -874,6 +928,40 @@
       },
       "2025Q4": {
         "amount": "39354332.67060436",
+        "currency": "USD"
+      }
+    },
+    "ufcf": {
+      "2024Q1": {
+        "amount": "23322400",
+        "currency": "USD"
+      },
+      "2024Q2": {
+        "amount": "26566000",
+        "currency": "USD"
+      },
+      "2024Q3": {
+        "amount": "28292800",
+        "currency": "USD"
+      },
+      "2024Q4": {
+        "amount": "32592050",
+        "currency": "USD"
+      },
+      "2025Q1": {
+        "amount": "30692700",
+        "currency": "USD"
+      },
+      "2025Q2": {
+        "amount": "32515040.0625",
+        "currency": "USD"
+      },
+      "2025Q3": {
+        "amount": "34478959.17268747",
+        "currency": "USD"
+      },
+      "2025Q4": {
+        "amount": "37232282.67060436",
         "currency": "USD"
       }
     }
@@ -944,11 +1032,15 @@
       "type": "monetary",
       "currency": "USD"
     },
-    "debt_closing": {
+    "total_debt": {
       "type": "monetary",
       "currency": "USD"
     },
     "debt_opening": {
+      "type": "monetary",
+      "currency": "USD"
+    },
+    "cash": {
       "type": "monetary",
       "currency": "USD"
     },
@@ -966,12 +1058,26 @@
       "type": "monetary",
       "currency": "USD"
     },
-    "fcf": {
+    "free_cash_flow": {
+      "type": "monetary",
+      "currency": "USD"
+    },
+    "ufcf": {
       "type": "monetary",
       "currency": "USD"
     }
   },
   "node_sources": {
+    "cash": {
+      "2024Q1": "value",
+      "2024Q2": "value",
+      "2024Q3": "value",
+      "2024Q4": "value",
+      "2025Q1": "value",
+      "2025Q2": "forecast",
+      "2025Q3": "forecast",
+      "2025Q4": "forecast"
+    },
     "debt_repayments": {
       "2024Q1": "value",
       "2024Q2": "value",
@@ -1002,7 +1108,7 @@
       "2025Q3": "value",
       "2025Q4": "value"
     },
-    "debt_closing": {
+    "total_debt": {
       "2024Q1": "formula",
       "2024Q2": "formula",
       "2024Q3": "formula",
@@ -1142,6 +1248,16 @@
       "2025Q3": "formula",
       "2025Q4": "formula"
     },
+    "ufcf": {
+      "2024Q1": "formula",
+      "2024Q2": "formula",
+      "2024Q3": "formula",
+      "2024Q4": "formula",
+      "2025Q1": "formula",
+      "2025Q2": "formula",
+      "2025Q3": "formula",
+      "2025Q4": "formula"
+    },
     "pretax_income": {
       "2024Q1": "formula",
       "2024Q2": "formula",
@@ -1162,7 +1278,7 @@
       "2025Q3": "formula",
       "2025Q4": "formula"
     },
-    "fcf": {
+    "free_cash_flow": {
       "2024Q1": "formula",
       "2024Q2": "formula",
       "2024Q3": "formula",
@@ -1214,7 +1330,7 @@
     }
   },
   "meta": {
-    "num_nodes": 24,
+    "num_nodes": 26,
     "num_periods": 8,
     "numeric_mode": "float64",
     "parallel": false,

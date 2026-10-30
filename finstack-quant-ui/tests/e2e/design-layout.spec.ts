@@ -103,8 +103,8 @@ test("docs host preserves registry selected-control contrast", async ({
   await expect(
     workbench.getByRole("button", { name: "Print report", exact: true }),
   ).toBeEnabled();
-  // The cashflow JSON viewer lives behind the "Original JSON" disclosure.
-  await workbench.getByText("Original JSON", { exact: true }).click();
+  // The cashflow JSON viewer lives behind the "Envelope JSON" disclosure.
+  await workbench.getByText("Envelope JSON", { exact: true }).click();
   const formatted = workbench.getByRole("button", {
     name: "Formatted",
     exact: true,

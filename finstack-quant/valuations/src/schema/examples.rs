@@ -1,4 +1,4 @@
-//! Canonical example payloads for the result and component artifacts.
+//! Canonical example payloads for the input, result and component artifacts.
 //!
 //! Conventions, catalog rows and metric metadata are read from the registries
 //! compiled into the library; instrument payloads reuse each instrument's own
@@ -156,6 +156,23 @@ pub(super) fn oas_result() -> Result<Vec<Value>> {
         num_paths: 2_000,
         price_std_error: 0.04,
     })
+}
+
+/// The default OAS configuration: the values `OasConfig::default()` supplies
+/// when a caller omits the configuration.
+pub(super) fn oas_config() -> Result<Vec<Value>> {
+    example(&structured_credit::OasConfig::default())
+}
+
+/// One CPR against two CDRs at one severity, inheriting the deal's recovery
+/// lag: the grid behind the `scenario_table` example.
+pub(super) fn scenario_grid() -> Result<Vec<Value>> {
+    example_from_json::<structured_credit::ScenarioGrid>(json!({
+        "cprs": [0.15],
+        "cdrs": [0.02, 0.06],
+        "severities": [0.4],
+        "recovery_lag": null
+    }))
 }
 
 /// A two-cell prepayment/default grid for one mezzanine tranche.

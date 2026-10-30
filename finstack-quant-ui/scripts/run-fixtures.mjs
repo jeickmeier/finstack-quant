@@ -4,15 +4,23 @@ import { requireWasm } from "./require-wasm.mjs";
 
 // Regenerates (or, with --check, verifies) every native fixture the tests and
 // the gallery pin, in dependency order: results writes src/fixtures/results/
-// bond.json, which cashflows and details embed; curves writes the curve-link
-// market that market-browser extends; gen-gallery copies the fixtures into
-// docs-site last. Each generator runs in its own process so the WASM instances
-// do not share memory.
+// bond.json, which the scenario application, horizon return, templates, attribution,
+// cashflows and details embed (attribution also reads the scenario
+// application cases); curves writes the curve-link market that market-browser
+// extends; covenants reads the analyst result that statements writes;
+// gen-gallery copies the fixtures into docs-site last. Each generator runs in its own process so the
+// WASM instances do not share memory.
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const checking = process.argv.includes("--check");
 requireWasm(["pkg-node"]);
 const generators = [
   "tests/valuations/results/generate.mjs",
+  "tests/portfolio/generate.mjs",
+  "tests/portfolio/margin/generate.mjs",
+  "tests/scenarios/application/generate.mjs",
+  "tests/scenarios/horizon/generate.mjs",
+  "tests/scenarios/templates/generate.mjs",
+  "tests/attribution/generate.mjs",
   "tests/valuations/cashflows/generate.mjs",
   "tests/valuations/details/generate.mjs",
   "tests/core/curves/generate.mjs",
@@ -21,6 +29,11 @@ const generators = [
   "tests/calibration/generate.mjs",
   "tests/valuations/scenario-table/generate.mjs",
   "tests/statements/generate.mjs",
+  "tests/covenants/generate.mjs",
+  "tests/analytics/generate.mjs",
+  "tests/models/credit/generate.mjs",
+  "tests/models/risk/generate.mjs",
+  "tests/margin/generate.mjs",
   "scripts/gen-gallery.mjs",
 ];
 for (const script of generators) {

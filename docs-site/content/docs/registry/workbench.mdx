@@ -12,7 +12,7 @@ The embedded workbench stacks its panels on narrower screens.
 
 The workbench installs into the host application. One shared browser worker validates
 and prices the request. Amounts remain decimal strings while editing; results retain
-the last completed request until a new valuation succeeds. The catalogue supports every discovered instrument. Open a [canonical example](/docs/registry/instruments), select its model and supply its complete market. Market Edit mode validates complete snapshots natively before repricing; View links the stored-node table and chart. Cashflows retain original native text, including mixed currencies; unsupported exports leave successful pricing intact. Detail views preserve metadata and bigint seeds, with raw JSON for incompletely declared payloads.
+the last completed request until a new valuation succeeds. The catalogue supports every discovered instrument. Open a [canonical example](/docs/registry/instruments), select its model and supply its complete market. Market Edit mode validates complete snapshots natively before repricing; View links the stored-node table and chart. Cashflows show the native envelope object, including mixed currencies, with an Annual ladder view of the native calendar-year ladder per row currency; unsupported exports leave successful pricing intact. Detail views preserve metadata and bigint seeds, with raw JSON for incompletely declared payloads.
 
 ## Install locally
 
@@ -44,13 +44,60 @@ again before its result can replace the market. Native solver failures remain vi
 with their structured fields and any available diagnostics.
 
 This demo explicitly supplies illustrative view inputs: surface extent 0–1, cube
-absolute strike 0.05 with normal extent 0–0.1 and lognormal extent 0–2, and one FX
-coordinate (expiry 1 year, strike 1.1, forward 1.12). These are demo inputs, not
+absolute strike 0.05 with normal extent 0–0.1 and lognormal extent 0–2, cube slice
+strikes 0.03–0.07 with an arbitrage-check rate of 0.04 (continuously compounded) and
+10 repair passes, one FX
+coordinate (expiry 1 year, strike 1.1, forward 1.12), and an FX strike-grid spot of
+1.1 with continuously compounded domestic and foreign rates of 0.04 and 0.03. These are demo inputs, not
 recommended market parameters. Applications supply their own `surfaceOptions`,
 `cubeOptions` and `fxOptions`; omitting them keeps stored data available. Optional
 `scenario` inputs specify the native tranche ID, grid JSON and price extent for
-structured-credit detail views. Registry checks preserve native output and do not
+structured-credit detail views, plus optional registry metric ids valued on the
+tranche; the tranche analytics above the scenario prices take no default price
+and solve OAS only on request. Registry checks preserve native output and do not
 certify the upstream diagnostic quote association or deferred quote-space fits.
+
+## Market scenario
+
+The Market scenario input tab edits a complete `ScenarioSpec` with the generated
+form: every operation kind, with the market's curve ids as suggestions on the
+curve, surface and equity id fields (free text, never filtered by kind). A
+built-in template, or one component of it, loads through the native
+`buildFromTemplate` or `buildTemplateComponent`, or composes with the current
+scenario through `composeScenarios`; template ids are placeholders to map to
+the market's ids. **Add parallel shift** and **Add roll** append the operations
+Rust builds. Rust validates the spec as you edit. **Apply scenario** runs the
+native `applyScenario` on the last priced request's market and valuation date,
+then reprices the instrument with the same model and metrics on the shocked
+market, at the rolled date when the scenario rolls time. The measures grid shows
+that shocked valuation in its comparison column beside the base; no difference
+or P&L is computed. The Market scenario result tab shows the native report:
+counters, applied shocks, the time roll with its returned carry, warnings (an
+equity id missing from the market warns) and the policy stamp; a failure (a
+curve or surface id missing from the market) shows the native error. A
+`par_cds` shift on a hazard curve without a calibration recipe needs the
+`first_order_shift` bump mode. Optional `marketScenario` supplies the initial
+`ScenarioSpec` JSON; this demo seeds a 50bp USD-OIS shift, applied only on
+request.
+
+Below the report, **Horizon return** runs the native `computeHorizonReturn` of
+the last priced request under the applied scenario: the scenario's time roll
+sets the horizon. It shows Rust's total and annualized return (the annualized
+return reads "not defined" without a roll), factor contributions, the explain
+text and the factor attribution. The attribution method and the roll calendar
+are optional; blank leaves both to Rust. `metrics_based` fails on a hazard
+curve without a calibration recipe, and the native error is shown.
+
+## P&L explain
+
+The P&L explain result tab runs the native `attributePnlMany` on the last priced
+instrument. **Pin as T0** keeps the last priced request's market and valuation
+date; T1 is the last priced request (reprice on an edited or calibrated market)
+or the applied market scenario's shocked market and returned date. Choose a
+method: Rust requires one, and the waterfall runs in Rust's default factor
+order. The tab shows Rust's attribution with its explain text, residual verdict
+and share of total per factor; no P&L is computed in the browser. Pinning keeps
+only the market and date, so a changed instrument is repriced at T0 too.
 
 ## Print and publication output
 
@@ -58,8 +105,9 @@ After **Priced**, choose **Print report**. The workbench captures its completed
 request, waits for raw cashflows and fonts, and prints the existing instrument,
 market, valuation and measures with controls hidden. Select A4 or Letter in the
 browser dialog; the shared theme supplies 12 mm margins and a light presentation.
-Closing the dialog restores your tabs and disclosures. Cashflow text wraps on
-paper; its **Download** action retains the native JSON bytes and currency labels.
+Closing the dialog restores your tabs and disclosures. Envelope JSON wraps on
+paper; its **Download** action saves the host serialization of the returned
+cashflow envelope, with its currency labels.
 
 Chart wrappers expose the shared `FigureHandle` through `figureRef`. A 900 × 600
 layout with `scale: 2` produces a PNG of 1800 × 1200 pixels: place it at 6 × 4 inches

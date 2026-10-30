@@ -35,29 +35,29 @@ module, and live under `src/generated/types/` for type-only imports.
 
 ## Layout and extension
 
-| Path                                                 | Holds                                                                                                                                                                                                                           |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `registry/<category>/`                               | Item sources. `core`, `valuations`, `calibration`, `covenants`, `models` and `statements` follow the crates, beside `base`, `theme` and `shared`. Each `registry.json` lists files, install targets and `registryDependencies`. |
-| `components/ui/`                                     | Stock shadcn source, hash-pinned in `components/shadcn.json`. Never edited.                                                                                                                                                     |
-| `src/`                                               | Codec, host, views and format; `src/format/label.mjs` holds `labelFor`, the shared label function, also used by `gen-registry`; `src/generated/` is generator output.                                                           |
-| `scripts/`                                           | Generators, the fixture runner, checks and install gates.                                                                                                                                                                       |
-| `tests/<crate>/`                                     | Vitest suites and native fixture generators.                                                                                                                                                                                    |
-| `tests/shared/browser/`, `tests/valuations/browser/` | Standalone consumer harnesses run by `ui-harness`.                                                                                                                                                                              |
-| `tests/e2e/`, `tests/install/`, `tests/publishing/`  | The `ui-e2e`, `ui-install` and `ui-publish-check` gates.                                                                                                                                                                        |
-| `tests/browser/`                                     | Worker smoke, footprint gate, the harness runner and shared consumer helpers.                                                                                                                                                   |
+| Path                                                 | Holds                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `registry/<category>/`                               | Item sources. `core`, `valuations`, `calibration`, `covenants`, `scenarios`, `attribution`, `analytics`, `portfolio`, `margin`, `models` and `statements` follow the crates, beside `base`, `theme` and `shared`. Each `registry.json` lists files, install targets and `registryDependencies`. |
+| `components/ui/`                                     | Stock shadcn source, hash-pinned in `components/shadcn.json`. Never edited.                                                                                                                                                                                                                     |
+| `src/`                                               | Codec, host, views and format; `src/format/label.mjs` holds `labelFor`, the shared label function, also used by `gen-registry`; `src/generated/` is generator output.                                                                                                                           |
+| `scripts/`                                           | Generators, the fixture runner, checks and install gates.                                                                                                                                                                                                                                       |
+| `tests/<crate>/`                                     | Vitest suites and native fixture generators.                                                                                                                                                                                                                                                    |
+| `tests/shared/browser/`, `tests/valuations/browser/` | Standalone consumer harnesses run by `ui-harness`.                                                                                                                                                                                                                                              |
+| `tests/e2e/`, `tests/install/`, `tests/publishing/`  | The `ui-e2e`, `ui-install` and `ui-publish-check` gates.                                                                                                                                                                                                                                        |
+| `tests/browser/`                                     | Worker smoke, footprint gate, the harness runner and shared consumer helpers.                                                                                                                                                                                                                   |
 
 Sources import through the paths an installed consumer uses. `tsconfig.json`
 maps them back here; `vitest.config.mts` copies that table into prefix aliases
 in order, so a specific key must precede its prefix.
 
-| Import                    | Source                                                                                                                             |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `@/lib/finstack/form`     | `registry/shared/lib/finstack-form/form.tsx` (before the next row)                                                                 |
-| `@/lib/finstack/*`        | `src/*`                                                                                                                            |
-| `@/hooks/<crate>/*`       | `registry/<crate>/hooks/*` for `shared`, `core`, `valuations`, `calibration`, `models` and `statements`; a new crate adds its line |
-| `@/workers/*`             | `registry/shared/file/*`                                                                                                           |
-| `@/components/finstack/*` | `registry/*`                                                                                                                       |
-| `@/components/ui/*`       | `components/ui/*`                                                                                                                  |
+| Import                    | Source                                                                                                                                                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@/lib/finstack/form`     | `registry/shared/lib/finstack-form/form.tsx` (before the next row)                                                                                                                                              |
+| `@/lib/finstack/*`        | `src/*`                                                                                                                                                                                                         |
+| `@/hooks/<crate>/*`       | `registry/<crate>/hooks/*` for `shared`, `core`, `valuations`, `calibration`, `covenants`, `scenarios`, `attribution`, `analytics`, `portfolio`, `margin`, `models` and `statements`; a new crate adds its line |
+| `@/workers/*`             | `registry/shared/file/*`                                                                                                                                                                                        |
+| `@/components/finstack/*` | `registry/*`                                                                                                                                                                                                    |
+| `@/components/ui/*`       | `components/ui/*`                                                                                                                                                                                               |
 
 A new crate category also adds its directory name to the `include` list in
 `scripts/gen-registry.mjs`, then runs
@@ -74,12 +74,20 @@ To add an item (the gate that catches each omission is in brackets):
    `finstack-theme`, and a closure that reaches a stock shadcn component must
    contain `finstack-base` [`ui-check`: `check-registry`].
 3. Run `npm --prefix finstack-quant-ui run generate` [`ui-check`: generator
-   drift].
+   drift]. When that adds or removes a file under `src/generated/`, rewrite
+   the repository manifest from the repository root with
+   `uv run --no-sync python scripts/generation_digest.py --write-manifest`
+   [CI `gen-check` (`--check-manifest`); `ui-check` does not catch it].
 4. For a visual item, add
    `docs-site/src/components/registry-gallery/examples/<item>.tsx` and its key
    in `primitives.tsx` or `components.tsx` there [`ui-check`: `gen-gallery`].
+   An example that reads a native fixture names it in the hand-maintained
+   `sources` map of `scripts/gen-gallery.mjs`, which writes the gallery
+   `data.json` [local `ui-e2e`].
 5. Cover its behaviour in Vitest under `tests/<crate>/` [review only].
-6. Record its four screenshots with
+6. Rebuild the gallery export with `mise run ui-docs-build` (`ui-e2e` serves
+   that static export, so `ui-docs-install` alone tests a stale gallery), then
+   record its four screenshots with
    `mise run ui-e2e -- --update-snapshots -g "<item>"` and inspect them [local
    `ui-e2e`].
 7. Check it installs in isolation with
@@ -87,6 +95,18 @@ To add an item (the gate that catches each omission is in brackets):
    while iterating; `mise run ui-install` is the full local gate. Its worker
    role comes from the registry, and an install that needs extra files uses
    `tests/install/fixture/<item>.tsx` [local `ui-install`].
+8. When the item changes what an entry in the `displays` array or the
+   `deferred` map of `scripts/provenance.mjs` asserts (route, convention,
+   deferral), update that entry and rerun `generate`, which rewrites
+   `src/contract-provenance.json` [review only; `ui-check` catches an
+   unregenerated file].
+9. When a worker slice calls a new facade function or class, pick it as a
+   leaf in its `<Crate>Native` (never a whole sub-namespace) and run
+   `npm --prefix finstack-quant-ui run coverage`, which moves the key from
+   `planned` to `covered` in `facade-coverage.json`. That file also lists
+   each excluded key with its reason (`data-constructor` or `schema-form`);
+   `schema.*` keys, `*Json` wire twins and builders are excluded by rule, and
+   a dropped slice deletes its `planned` keys [`ui-check`: `coverage --check`].
 
 CI runs only `ui-check` (the Test UI job); the other gates are local.
 
@@ -150,9 +170,12 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the nine native fixture generators under
-`tests/**/generate.mjs` in dependency order (results → cashflows → details;
-curves → market-browser; cubes, calibration, scenario-table, statements), then
+`mise run ui-fixtures` runs the twenty native fixture generators under
+`tests/**/generate.mjs` in dependency order (results → scenario application,
+horizon return, scenario templates, attribution, cashflows → details;
+portfolio → portfolio margin; curves → market-browser; cubes, calibration,
+scenario-table; statements → covenants; analytics; models credit and risk;
+margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
 `mise run wasm-pkg` (release). `mise run ui-fixtures --check` verifies that every
@@ -188,9 +211,10 @@ valuations.valuationResultToJson)` emits integer tokens validated by Rust.
 All five detail variants use Rust-derived WASM host declarations and validation
 metadata. Monte Carlo has a dedicated view; the other four retain raw views.
 Path counts are plain numbers (Rust `wire::count`); only schema `int64`/`uint64`
-fields, such as seeds, arrive as bigint. Cashflow structure comes from the
-published Rust `instrument_cashflow` schema. Its presentation adapter preserves
-numeric tokens and the original JSON, including mixed-currency FX-swap rows.
+fields, such as seeds, arrive as bigint. Cashflows arrive as the facade's
+envelope object, validated against the published Rust `instrument_cashflow`
+schema, including mixed-currency FX-swap rows. Its JSON view is `serializeHost`
+text of that object; the facade returns no cashflow text.
 
 `src/contract-provenance.json` records canonical schema pointers, exact facade
 signatures and inputs, conventions, raw routes and deferred gaps. It includes
@@ -204,8 +228,8 @@ manifest and `gen-check`; `ui-check` verifies their drift and manifest coverage.
 
 The scoped tests price all five result-detail variants using the actual facade,
 transport an actual derived seed above 2^53, validate a u64::MAX transport-boundary
-mutation through Rust (not a claim of pricing with that seed), compare original
-cashflow text byte for byte, and preserve the published Float64Array return.
+mutation through Rust (not a claim of pricing with that seed), structured-clone
+the cashflow envelope object, and preserve the published Float64Array return.
 These are Node structured-clone tests. PR-003 owns the production browser-worker
 proof; static export and installation remain later gates. Full `gen-check` and
 Rust schema gates are separate library-wide validation and are not implied by a
@@ -398,7 +422,8 @@ the consumer's source directory (`src/` when the application has one).
 The worker uses the consumer's standard `@/lib/finstack` alias for the installed
 codec. The shared registry index owns these worker files.
 The contract (`workers/finstack-contract.ts`) groups the API by crate
-(`CoreApi`, `ValuationsApi`, `CalibrationApi`, `ModelsApi`, `StatementsApi`), and
+(`CoreApi`, `ValuationsApi`, `CashflowsApi`, `CovenantsApi`, `CalibrationApi`,
+`ModelsApi`, `StatementsApi`), and
 each method's comment names the facade call it wraps. The service
 (`workers/finstack-service.ts`) is a composer over `workers/services/<crate>.ts`,
 which share `workers/services/context.ts`. A new crate adds its interface to the
@@ -411,6 +436,10 @@ test in `tests/shared/worker.test.mjs` lists every method exactly, so the new
 methods join it there; it is the tripwire that fails when a spread is missing.
 The Node test worker (`tests/shared/worker/node.mjs`) passes the whole facade
 and needs no edit.
+Only `finstack.worker.ts` imports the facade as a value; every facade member a
+service calls is a leaf of its `<Crate>Native` Pick, which
+`scripts/coverage.mjs --check` holds equal to `covered` in
+`facade-coverage.json`.
 
 Use `FinstackQueryProvider` around a standalone feature, or `FinstackProvider`
 inside the application's existing `QueryClientProvider`. `useFinstack` exposes
@@ -424,10 +453,99 @@ reset or changing that URL creates a fresh worker and query session.
 `marketJson`, `asOf`, `model`, `metrics`, `metricPricingOverrides`, `marketHistory`). JSON
 strings remain unchanged, including wide integer tokens. Results are structured
 clone values; export through the worker's `exportResult` method for native
-canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns original native JSON
-text. `CashflowViewer` accepts that text plus optional loading/error props and needs no provider. It presents native rows in a table, with exact JSON copy/download in a secondary disclosure;
+canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns the native cashflow
+envelope object. `CashflowViewer` accepts that object as `cashflows` plus optional loading/error props and needs no provider. It presents native rows in a table, with `serializeHost` JSON copy/download in a secondary **Envelope JSON** disclosure;
 unsupported export preserves caller pricing/model state and shows the native error. The workbench owns one cashflow query for both display and its print snapshot.
+`useCashflowLadder` (the individual `use-cashflow-ladder` item, beside
+`use-cashflows`) takes that envelope object; the worker partitions its flows by
+row currency in first-appearance order and calls `cashflows.calendarYearLadder`
+once per currency over each flow's `native_pv`, the row-currency PV before FX
+conversion and any scenario price shock (Rust requires PVs in the units of the
+amounts). `CashflowViewer`'s optional `ladder` (and `ladderError`) props add a
+Schedule / Annual ladder toggle with one table per currency headed Native PV;
+nothing is summed or converted across currencies.
+`useDiffStatementScenarios` (`use-diff-statement-scenarios`) sends the scenario
+set, the `serializeHost` text of its evaluated results, baseline/comparison
+pairs, metric ids and periods; the worker calls
+`statements_analytics.scenarioDiff` once per pair, in pair order, and a metric
+missing at a period fails the request with the native error.
+`useTraceStatementScenario` (`use-trace-statement-scenario`) returns
+`scenarioSetTrace`'s lineage, root first; its `useTraceStatementScenarios`
+runs one query per scenario. The workbench scenario panel defaults each
+scenario's baseline to the entry before it in that lineage and shows Rust's
+`abs_var` as delta columns and the shown pair's `VarianceReport` in
+`VarianceTable`; capital-structure rows have no native diff and show none.
+`useCreditAssessment` (`use-credit-assessment`) and `usePlSummaryReport`
+(`use-pl-summary-report`) send the `serializeHost` text of an evaluated
+result; the worker calls `statements_analytics.creditAssessment` at the
+requested period and `plSummaryReport` over the line items and periods in
+request order. The workbench's Metrics & ratios tab asks for the active
+period's assessment and a P&L summary of the income-statement lines over every
+reported period, and shows both in `CreditAssessmentReport`: the returned
+values, the two ratios charted over Rust's series with the periods Rust leaves
+without a value listed instead of plotted, and the summary through
+`TableEnvelope`.
+`useEvaluateDcf` (`use-evaluate-dcf`) and `useDcfSensitivity`
+(`use-dcf-sensitivity`) pass the model, WACC, `TerminalValueSpec` and the
+optional UFCF node, net-debt override and `DcfOptions` JSON to
+`statements_analytics.evaluateDcf` (plus the market and as-of date, which
+Rust requires together) and `dcfSensitivity` (which takes no market)
+positionally, leaving every unset optional argument unset. The workbench's
+Valuation tab composes `DcfAssumptionsForm` (the terminal-value union is the
+one hand-written wire shape; the options are a schema form over the generated
+`dcf_options` contract, checked structurally and validated by Rust when the
+model is valued, because the facade has no standalone `DcfOptions` parse) and
+`DcfReport`, which shows the valuation, bridge fields, per-period present
+values, terminal value and the native tornado through `TornadoChart` as
+returned.
+`useEvaluateLbo` (`use-evaluate-lbo`) passes the model and `LboConfig` JSON
+to `statements_analytics.evaluateLbo`. The Valuation tab's `LboReport` edits
+the config with a schema form over the generated `lbo_config` contract (string
+`*_node` fields as id-comboboxes; checked structurally and validated by Rust on
+evaluation, as there is no standalone `LboConfig` parse) and shows the
+returned sources and uses, entry and exit values, MOIC and the LBO check
+report. Returns are MOIC only: IRR is not part of the native result.
+`useRunSensitivity` (`use-run-sensitivity`) builds each parameter with
+`statements_analytics.parameterSpecWithPercentages` (the base value is the
+evaluated cell, a missing or non-finite one sent as NaN), runs
+`runSensitivity` and returns its `generateTornadoEntries` at the target metric
+and period, or a null tornado for a `full_grid` run, which Rust cannot rank.
+`useGoalSeek` (`use-goal-seek`) passes the target, driver, update flag and an
+optional bracket to `goalSeek`, leaving an unset bracket unset. Below the
+Scenarios tab's scenario set, `StatementSensitivity` shows the native tornado
+and the target metric in every returned scenario, and `GoalSeekForm` solves
+only on Solve; Apply to model is a second, explicit action that commits the
+returned model through the workbench (no undo), blocked once the model has
+changed since the solve.
+`useRunVariance` (`use-run-variance`), `useVarianceBridge`
+(`use-variance-bridge`) and `useBacktestForecast` (`use-backtest-forecast`)
+pass two host-serialized results to `statements_analytics.runVariance` (with
+a `VarianceConfig`) and `varianceBridge` (target, period, drivers, labels),
+and two aligned series to `backtestForecast`. When a roll forward is accepted
+the workbench keeps the pre-roll model and result; the Forecast tab's "Since
+last roll forward" section then compares them over the periods the roll
+reported (forecast before, actual after), offering only nodes present in both
+results: `VarianceTable` for the variance, `VarianceBridgeChart` (baseline,
+one signed bar from zero per driver contribution in Rust's order, Rust's
+unexplained residual and the comparison; no cumulative positioning, since the
+contributions are raw driver deltas) and `ForecastBacktest` for the pre-roll
+forecast against the reported values.
+`useEvaluateMonteCarlo` (`use-evaluate-monte-carlo`) passes the model and
+`MonteCarloConfig` JSON to `statements.Evaluator#evaluateMonteCarlo` (the
+schema form keeps the `uint64` seed an exact integer token, so a seed above
+2^53 reaches Rust unchanged), and `useMonteCarloBreachProbability`
+(`use-monte-carlo-breach-probability`) passes host-serialized results, a
+metric and a threshold to `statements.monteCarloBreachProbability`, returning
+null when Rust reports none (results without path data). The workbench's
+Monte Carlo tab composes `StatementMonteCarlo`: the config form (starting
+empty), a fan of bands between the returned percentiles paired from the
+outside in (the unpaired middle one a line), the percentile table, the breach
+readout and the warnings, all as returned.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
+`useMetrics(instrumentType)` returns the standard metrics Rust registers for
+that type (`metricsForInstrument`), grouped by native category; `null` disables
+it. `PricingParamsForm` reports selected metrics the type does not offer and
+never drops them.
 `useInstrumentValidator` accepts canonical text and an optional abort signal;
 `SchemaForm` owns the 250ms debounce and prevents superseded responses from
 replacing the current validation state.
@@ -567,6 +685,32 @@ or WAL/writedown overlay is performed. Neither the component nor its panel
 requires a worker or workbench block. Native fixtures, including a factor-adjusted
 tranche, live in `tests/valuations/scenario-table/cases.json`.
 
+## Returned tranche analytics
+
+`TrancheAnalytics` (`@finstack/tranche-analytics`) presents one tranche's native
+`trancheMetrics`, `trancheBreakevenCdr`, `trancheDiscountMargin` and `trancheOas`
+results, each passed as `{value, error, loading}` so every tile shows its own
+native error. `TrancheMetrics` fields appear in Rust declaration order with the
+unit each Rust field documents (bp, years, decimal, percent of current balance,
+the returned currency); requested registry metrics stay raw. Break-even CDR,
+discount margin and OAS are returned decimals. The clean price is a controlled
+exact-decimal input, percent of current balance, with no default: the
+discount margin waits for one, and OAS runs only through `onSolveOas`.
+`use-tranche-analytics` holds the four query option builders and hooks
+(`TrancheRequest` plus an optional metrics price and metric ids, or a required
+`marketPricePct` for OAS and discount margin); the worker loads the deal once
+per call and frees it. OAS takes an optional complete `OasConfig` JSON
+(`configJson`) and otherwise uses Rust's default; with `onOasConfigChange` the
+component shows an OAS configuration disclosure over the generated
+`contract-oas-config`, seeded from its Rust example (`OasConfig::default()`,
+since the type carries no per-field schema defaults), and hands the applied
+JSON to the host. The workbench
+mounts it above the scenario prices for the configured `scenario.trancheId`,
+valuing `scenario.trancheMetrics` registry metric ids on the note. Native
+fixtures (fixed-rate `CLONOTES-A` and the floating `SENIOR` note of the CLO
+mezzanine regression golden) live in
+`tests/valuations/scenario-table/tranche-analytics.json`.
+
 The complete workbench is installed with `npx shadcn@4.21.0 add @finstack/pricing-workbench`.
 Embed `PricingWorkbench` inside `FinstackQueryProvider`. Supply an explicit
 a required `defaultRequest` (the caller owns example/default data) and optionally `defaultCalibrationJson` (a complete canonical
@@ -587,9 +731,17 @@ Evaluated market views take explicit domain inputs through public options:
     initialStrike: 0.05,
     initialConvention: "normal",
     colorDomains: { normal: [0, 0.1], black_lognormal: [0, 2] },
+    slice: {
+      initialStrikes: [0.03, 0.04, 0.05, 0.06, 0.07],
+      initialRate: 0.04,
+      repairIterations: 10,
+    },
   })}
   fxOptions={() => ({
     coordinates: [{ expiry: 1, strike: 1.1, forward: 1.12 }],
+    initialSpot: 1.1,
+    initialDomesticRate: 0.04,
+    initialForeignRate: 0.03,
     colorDomain: [0, 1],
   })}
   scenario={{ trancheId, gridJson, priceDomain: [80, 140] }}
@@ -597,11 +749,307 @@ Evaluated market views take explicit domain inputs through public options:
 ```
 
 Those numbers are illustrative caller inputs, not financial defaults. Use extents,
-strike, forward and coordinates appropriate to the supplied objects. Without
+strike, forward and coordinates appropriate to the supplied objects. The FX
+strike grid (`models.volatility.materializeFxDeltaSurface`) takes a spot in
+domestic per unit of foreign and continuously compounded decimal rates; the FX
+delta state carries no currency pair, so the workbench cannot look either up and
+leaves the fields empty unless `fxOptions` seeds them. The cube `slice` option
+mounts `vol-cube-slice`: a fixed-tenor or fixed-expiry slice that Rust
+materializes (`models.volatility.materializeCube{Tenor,Expiry}Slice[Normal]`) at
+the given absolute strikes, plus the selected node's native SABR smile. The
+smile's arbitrage check takes an explicit continuously compounded decimal rate
+and the repaired line appears only when `repairIterations` is supplied; neither
+is defaulted, and without `slice` no slice is shown. Without
 options, the market browser retains exact stored data. Scenario prices are fetched
 only when the detail panel is opened for a completed structured-credit request.
+The panel edits the native `ScenarioGrid` (`contract-scenario-grid`) seeded from
+`scenario.gridJson`: the supplied grid runs as given, an edited grid runs only on
+**Run scenarios**, and Rust validates the axis values and the cell cap.
 `calibrationChartOptions` forwards existing figure annotations, export refs and
 interaction callbacks; the workbench owns the shared report/chart selection.
+
+## Horizon return and P&L attribution
+
+`useHorizonReturn` (`@finstack/use-horizon-return`) calls
+`scenarios.computeHorizonReturn` on an instrument, its market and valuation
+date and a canonical `ScenarioSpec` (for example one edited in
+`market-scenario-builder`), then `horizonResultExplainText`. Omitted `method`,
+`calendarId` and the config stay unset, so Rust applies its default
+attribution method and a weekends-only roll calendar; an unknown calendar or a
+failing attribution (`metrics_based` needs a calibration recipe for every
+hazard curve) returns the native error. The display-only
+`HorizonReturnReport` shows Rust's summary (total and annualized return and
+factor contributions as decimal fractions; an undefined value, such as the
+annualized return without a time roll, reads "not defined", never zero), the
+horizon, the endpoint values, the explain text, the attribution and, in a
+disclosure, the scenario report. `PnlAttributionReport` (the `attribution`
+category) shows any returned `PnlAttribution`:
+total, mark-to-market and endpoint values, every factor bucket, a signed
+factor chart, the waterfall drawn only from Rust's `waterfall_steps`, the
+residual and the notes. Its optional `explain`, `residualWithinTolerance` and
+`pctOfTotal` props take Rust's `pnlAttributionExplainText`,
+`pnlAttributionResidualWithinTolerance` and `pnlAttributionPctOfTotal`;
+without the residual check no verdict is shown. In `pricing-workbench` the
+horizon return sits in the Market scenario results tab under the applied
+scenario, with method and roll-calendar choices.
+
+`useAttributePnlMany` (`@finstack/use-attribute-pnl-many`) calls
+`attribution.attributePnlMany` with one `AttributionInputs` built by splicing
+the two canonical market texts (through the worker's market cache) and the
+dates into JSON text, never parsing them, over the instrument envelopes in
+order (`attributePnl` takes an `AttributionSpec`, not an envelope). Each
+result comes back with `pnlAttributionExplainText`,
+`pnlAttributionResidualWithinTolerance` (the run's own tolerances) and
+`pnlAttributionPctOfTotal` per factor bucket, ready for
+`PnlAttributionReport`. Rust requires the method, so the request always
+carries one; every other input stays unset. `useDefaultWaterfallOrder` returns
+`defaultWaterfallOrder`, the factor order a `{waterfall: order}` method uses.
+The workbench's P&L explain results tab pins the last priced request's market
+and date as T0, takes T1 from the last priced request or the applied market
+scenario, and attributes the last priced instrument between them with a
+chosen method (none is preselected); a changed instrument is repriced at T0
+too, which the tab says. `metrics_based` fails on the workbench bond market
+(no calibration recipe for its hazard curve) and shows the native error.
+Native fixtures live in `tests/scenarios/horizon/` and `tests/attribution/`.
+
+## Returned portfolio valuation
+
+`useValuePortfolio` (`@finstack/use-value-portfolio`) values a host-supplied
+`PortfolioSpec` over a market: `portfolio.valuePortfolio` over the worker's
+cached `Portfolio` and `MarketContext` handles (each a four-entry LRU keyed on
+canonical JSON), then `aggregateMetrics` over the same market. It returns
+`{positionIds, entityIds, valuation, metrics}`; the ids come from the
+`Portfolio` handle in spec and registration order, because integer-like
+`position_values` and `by_entity` keys enumerate numerically in JavaScript.
+Omitted `metrics` and `strictRisk` are left to Rust (PV plus `dv01`; fail
+closed). A metric on the menu that an instrument cannot compute is listed on
+that position's `inapplicable_metrics` instead of thrown, unlike
+`priceInstrument`. `usePortfolioMetricsSeries` decodes one base metric with
+`portfolioMetricsSeries`, and `usePortfolioSpecValidator` validates spec text
+(`parsePortfolioSpecJson`, then `Portfolio.fromSpec` through the cache).
+
+The display-only `PortfolioSummary` (total, the stamped `fx_collapse_policy`
+as text, value by entity, degraded positions), `PositionsTable` (rows in spec
+order; the selected row's `valuation_result` through `ValuationSummary` and
+`MeasuresGrid`) and `PortfolioMetrics` (the bucketed series chart, aggregated
+totals by entity, raw metrics by position, unaggregated, skipped and degraded
+lists) take the returned report as props. The series chart keeps the order
+Rust returns, which is lexical (`10y`, `15y`, `1y`, …); tenor ordering is an
+open owner decision, so no sort is applied. Native fixtures (the gallery bond
+and swap book over the pricing market, and the host-parity deposit book) live
+in `tests/portfolio/`.
+
+`useScenarioPnlBatch` (`@finstack/use-scenario-pnl-batch`) calls
+`portfolio.scenarioPnlBatch` over the same cached handles with the
+`ScenarioSpec` texts joined into one JSON array (never parsed in TypeScript):
+Rust values the base once, then each scenario, and returns one
+`ScenarioPnlBatchItem` per scenario in input order with the book's
+`positionIds`. A batch fails whole with the earliest failing scenario's error.
+`useApplyScenarioAndRevalue` returns `applyScenarioAndRevalue`'s stressed
+valuation and report with the book's id orders, for `PortfolioSummary` and
+`PositionsTable`. The display-only `ScenarioPnlTable` shows positions (spec
+order) by scenarios (batch order) as returned, a total row from each
+scenario's returned `pnl.total`, a bar chart of those totals and each
+scenario's report; nothing is summed. Its fixture
+(`tests/portfolio/scenario-pnl.json`, the host-parity book under the parity
+scenarios) matches the batch the Py/WASM parity tests pin.
+
+`usePortfolioMargin` (`@finstack/use-portfolio-margin`) calls
+`portfolio.portfolioMargin` over the same cached handles on the requested date.
+Positions whose instruments carry a `margin_spec` form netting sets; the rest
+count toward `positions_without_margin`. An omitted `currentImCollateral`
+stays unset (none held); collateral under a CSA the book does not have, or
+conflicting margin terms within one netting set, return the native validation
+error. The display-only `PortfolioMarginReport` shows the returned
+`PortfolioMarginResult`: the totals as exact base-currency money, the two
+counts as returned (`total_positions` counts positions inside netting sets),
+netting sets in returned order with Rust's `is_approximate` flag beside an
+always-shown Indicative badge (SIMM sets use Rust's default SIMM version;
+cleared sets a standalone proxy), IM collateral by CSA in the netting sets'
+CSA order, degraded positions, and the selected set's `im_breakdown` and its
+SIMM sensitivities through `SimmSensitivityTable`. Rust serializes a zero
+variation margin as `-0`, and the report shows it as returned. Nothing is
+summed, netted or converted. The fixture (`tests/portfolio/margin/`: two swaps
+under the Rust USD regulatory CSA and a regulatory CSA-B, plus an unmargined
+deposit, over the pricing market) also pins collateral held and an unknown CSA.
+
+## Returned rating migration
+
+`useMigrationMatrix` (`@finstack/use-migration-matrix`) builds a
+`models.credit.migration.TransitionMatrix` from labelled rows with
+`TransitionMatrix.fromLabeled` (rows and columns share one label order; the
+last label is the absorbing default state) and returns its rows, default
+probabilities and horizon with the labels and default state of its
+`RatingScale`. `useMigrationProjection` estimates the generator with
+`GeneratorMatrix.fromTransitionMatrix` (an omitted `roundTripTol` stays unset,
+so Rust's default applies) and calls `models.credit.migration.project` once
+per requested horizon. Every handle is freed, including the fresh
+`RatingScale` each `scale` read returns. The display-only
+`TransitionMatrixHeatmap` draws the matrix and the generator as heatmaps and
+the projected default probabilities per origin state, or shows them as
+tables; it stamps the generator's `roundTripError` and `regularizationL1` and
+shows a projection error inline beside the matrix. Probabilities are coloured
+over `[0, 1]`; the generator's colour domain is the extent of its intensities,
+centred on zero, because its diagonal is negative. The native fixture (an
+illustrative eight-state one-year matrix) lives in `tests/models/credit/`.
+
+## Surface static arbitrage
+
+`useCheckSurface` (`@finstack/use-check-surface`) runs
+`core.VolSurface.fromJson` and `models.volatility.checkSurface` on a canonical
+stored surface with every check enabled (butterfly, calendar spread, local-vol
+density) and host-supplied forwards in the surface's strike units, one to
+broadcast or one per expiry; a tolerance is sent only when supplied, so Rust's
+default applies otherwise. The handle is freed. `SurfaceArbitrageBadge` shows
+the result as Passed, the violation count, Not checked (the native error; Rust
+checks only unshifted Black lognormal quotes on a strike axis) or Forwards not
+supplied (no request is made), with the returned counts by type and severity
+and every violation in a popover. Forwards are never inferred: `PricingWorkbench`
+mounts the badge beside a stored surface's chart only when `surfaceOptions`
+returns a `forwards` key, for example
+`surfaceOptions={() => ({ colorDomain: [0, 1], forwards: [175] })}`.
+
+## Merton structural credit
+
+`useMertonModelValidator` (`@finstack/use-merton-model-validator`) returns
+canonical `MertonModel` JSON (`models.credit.MertonModel.fromJson`, `toJson`).
+`useMertonReport` builds the model from that JSON, or from an equity
+calibration (`MertonModel.kmvDefaultPoint(shortTermDebt, longTermDebt)`, then
+`fromEquity` with it as total debt), and returns the default probabilities,
+distances to default, implied and debt spreads per requested horizon, the CDS
+par spread and implied equity at the requested maturity, and the
+`models.credit.pd.MasterScale.defaultCalibration()` grades of the default
+probabilities. A measure Rust rejects for the model (the debt spread of a
+first-passage barrier, a CDS recovery that contradicts a CreditGrades mean
+recovery) keeps its native error beside the rest of the report. Both handles
+are freed. `MertonCalculator` composes `SchemaForm` over the generated
+`merton_model` contract (Rust publishes no example, so the form starts from the
+caller's request) or an equity-calibration form with the horizon and CDS
+inputs, and shows the returned report. The native fixture (the facade example
+firm and a KMV calibration) is `tests/models/credit/merton.json`.
+
+## Credit scorecard
+
+`useCreditScore` (`@finstack/use-credit-score`) calls one
+`models.credit.scoring` function (`altmanZScore`, `altmanZPrime`,
+`altmanZDoublePrime`, `altmanEmScore`, `ohlsonOScore` or `zmijewskiScore`)
+with the request's named ratios in the facade's positional order (one explicit
+call per model, conversion only; `tests/models/credit/scorecard.test.tsx` pins
+each order against `index.d.ts`), then
+`models.credit.pd.MasterScale.defaultCalibration().mapScore` of the result. A result Rust cannot grade (the Altman models return no implied PD)
+keeps that native error beside the score; the scale handle is freed.
+`CreditScorecard` takes its fields, their order and their help from the
+generated input contracts (`altman_z_score_input`, `altman_z_prime_input`,
+`altman_z_double_prime_input` for Z'' and EM, `ohlson_o_score_input`,
+`zmijewski_input`); Rust publishes no example for them and the facade has no
+native parse of the input structs, so there is no validator and the form starts
+from the caller's ratios. The returned score, zone and implied PD are shown as
+Rust returned them. The native fixture (the inputs of the Rust unit tests, one
+per model) is `tests/models/credit/scorecard.json`.
+
+## Position risk report
+
+`usePositionRisk` (`@finstack/use-position-risk`) decomposes position VaR and
+ES with `models.factor.risk.parametricVarDecomposition` (weights and a
+position covariance) or `historicalVarDecomposition` (position-major scenario
+P&L). With a budget it calls `evaluateRiskBudget` over
+`positionComponentVar(decomposition, id)` of each position, the target shares
+and the returned portfolio VaR; for a historical source it also calls
+`buildStressAttribution` of the same P&L. Omitted confidence, incremental flag
+and utilization threshold are left to Rust; the budget and stress attribution
+keep their own native errors beside the decomposition. `PortfolioRiskReport`
+shows the result as returned: losses negative, the Euler residual stamp (none
+for a historical decomposition), component-VaR bars, the VaR and ES
+contribution tables, the budget's `has_breach` and per-position utilization
+(Rust returns no per-position breach flag, so none is drawn) and the tail
+contributions in Rust's largest-driver-first order. The native fixture (the
+three-sleeve inputs of the `portfolio_risk_decomposition` notebook, parametric
+and historical) is `tests/models/risk/cases.json`.
+
+`useFactorRisk` (`@finstack/use-factor-risk`) chains two worker calls:
+`portfolio.computeFactorSensitivities` of a host-supplied book over the cached
+`Portfolio` and `MarketContext` handles (`PortfolioApi`), then
+`models.factor.risk.decomposeFactors` of the returned matrix's JSON under the
+supplied factor covariance (`ModelsApi`). Omitted bump config and risk measure
+are left to Rust. Passed to `PortfolioRiskReport` as `factors`, the result is
+the Factor contributions section: total and residual risk, risk by factor and
+by position and factor, and the sensitivity matrix in the book's base
+currency. The fixture is the host-parity book at t0 under its one-factor
+`usd_rates` model (`factor` in `tests/models/risk/cases.json`); a richer factor
+set needs a Rust-owned example.
+
+## Indicative SIMM initial margin
+
+`useSimmSensitivitiesValidator` (`@finstack/use-simm-sensitivities-validator`)
+returns canonical `SimmSensitivitiesJson` text (`margin.SimmSensitivities.fromJson`,
+`validate`, `toJson`). `useSimmIm` builds the set and a
+`margin.SimmCalculator` (omitted `version` and `mporDays` stay unset, so Rust's
+defaults apply) and calls `calculateFromSensitivities` in the set's own base
+currency; both handles are freed per call. Rust accepts only USD-based sets,
+because SIMM concentration thresholds are in USD; another base currency
+returns the native error. The display-only `SimmSensitivityTable` lists a set
+by risk class as supplied, and `SimmReport` shows the returned amount, an
+always-shown Indicative badge beside the returned `approximation` flag, the
+component breakdown and the `simm_detail` drill-down; nothing is aggregated in
+TypeScript. `SimmCalculator` composes `SchemaForm` over the generated
+`simm_sensitivities_json` contract, a `DateInput`, the table and the report,
+with validation and calculation as caller callbacks. The native fixture (the
+schema example and a single USD 5Y IR delta of 1000, whose IM is 60000) is
+`src/fixtures/margin/simm.json`.
+
+## CSA and variation margin
+
+`useCsaPreset` (`@finstack/use-csa-preset`) returns a loader of the Rust
+regulatory CSAs (`margin.csaSpecUsdRegulatory`, `csaSpecEurRegulatory`, or
+`csaSpecRegulatory` for a currency, id and collateral curve), and
+`useCsaValidator` returns canonical `CsaSpec` text (`margin.csaSpecValidate`,
+then the `csa` of a `margin.VmCalculator` built from it). `useVm` builds a
+`VmCalculator` per call and runs `calculate` in the CSA's own base currency,
+returning the `VmResult` with Rust's `vmResultRequiresCall` decision and
+`vmResultNetMargin` (post minus collect; positive when the desk posts).
+`useMarginCalls` and `useMarginCallDates` run `generateMarginCalls` and
+`marginCallDates` on a calculator bound to the CSA. Every calculator is freed
+per call; a cleared amount is sent as `NaN` for Rust to reject. `CsaEditor`
+composes `SchemaForm` over the generated `csa_spec` contract (the Rust example
+by default) with an optional preset bar whose regulatory inputs start empty;
+the display-only `MarginCallTable` presents the returned result, decision, net
+margin, schedule and call dates. No threshold, MTA, rounding or call decision
+is computed in TypeScript. The native fixture (USD regulatory CSA on
+2024-06-17) is `src/fixtures/margin/vm.json`.
+
+## Covenant engine and compliance
+
+`useCovenantTemplate` (`@finstack/use-covenant-template`) returns a loader of
+the Rust covenant packages (`covenants.covLite`, `lboStandard`, `realEstate`,
+`projectFinance`) for typed thresholds, and `useCovenantEngineValidator`
+returns canonical `CovenantEngine` text (`covenants.validateCovenantEngineJson`).
+`useEvaluateCovenants` builds a `covenants.CovenantEngine` per call and runs
+`statements_analytics.evaluateCovenants` over an evaluated statement result:
+Rust tests every result period on its last day with the covenants applicable
+on that date (a window replaces the top-level specs on its dates), so the UI
+builds no rows; a metric an applicable covenant reads that the results lack is
+Rust's `not_found` error, a non-finite one its `validation` error. The engine
+is freed per call. `CovenantEngineEditor` composes `SchemaForm` over the
+generated `covenant_engine` contract (Rust publishes no example) with a
+template bar whose thresholds start empty (a blank one is sent as `NaN`),
+`IdCombobox` metric ids over the model's node ids through `renderField`, and a
+table of each spec's metric id with whether the model has that node. The
+statements workbench's Covenants tab (`covenants-panel.tsx`) composes the
+editor with `CovenantCompliance` and tests `defaultCovenantEngineJson` on open.
+
+`useForecastBreaches` runs `statements_analytics.forecastBreaches` on the same
+engine, model and result with an optional `CovenantForecastConfig` (omitted is
+Rust's deterministic maintenance-scope default; the config crosses as JSON
+text, so a `uint64` `random_seed` stays exact). Every result period is a test
+date and, without `reference_date`, the horizon starts the day before the first
+period. `CovenantBreachForecast` composes `SchemaForm` over the generated
+`covenant_forecast_config` contract (structure only; Rust validates it when it
+forecasts) with a table of the returned `FutureBreach` rows, and sits below the
+compliance grid in the Covenants tab. Covenant-lite packages are incurrence
+tests, so the maintenance default forecasts nothing for them. The native
+fixture (`src/fixtures/covenants/analyst-breach-forecast.json`) forecasts a
+tightened analyst engine (`analyst-covenants-tight.json`) deterministically
+and under the seeded stochastic `analyst-forecast-config.json`.
 
 ## Served gallery checks
 
@@ -682,10 +1130,11 @@ are copied from an absolute local path before registry resolution.
 Only after all independent installs pass does the gate run a separate composed
 workbench and table/chart selection consumer at root and deployment base paths.
 It exercises the real worker, edited inputs, wide integers, structured failures,
-font/worker/WASM assets, native-result agreement and exact cashflow output.
+font/worker/WASM assets, native-result agreement and native cashflow envelopes.
 Standalone chart and financial-wrapper checks use their public callbacks, tooltip
-props and shared SVG/PNG handles. `CashflowViewer` offers an exact-text JSON
-download; its presentation adapter parses numeric tokens losslessly, without reserializing exports or computing financial values.
+props and shared SVG/PNG handles. `CashflowViewer` validates the supplied envelope
+object against the Rust schema and offers its `serializeHost` JSON for copy and
+download, without computing financial values.
 
 Set `REGISTRY_INSTALL_EVIDENCE` and `REGISTRY_SMOKE_DIR` to retain matrix and
 composition reports, logs, screenshots and exports. Failed applications are kept
@@ -726,11 +1175,12 @@ market, valuation, measures and the cashflow table reuse the existing components
 Closing the dialog restores the prior tabs and disclosure state. Unsupported
 cashflow requests retain the native error. The cashflow table preserves row-currency
 amounts separately from reporting-currency PV and shows the supplied total without
-recalculating it. Original JSON remains available in a collapsed disclosure for
-exact copy/download; printed reports show the table instead of the raw export.
+recalculating it. Envelope JSON (the host serialization of the returned object)
+remains available in a collapsed disclosure for copy/download; printed reports
+show the table instead of the raw export.
 
 `mise run ui-publish-check` builds a fresh installed workbench consumer, generates
-four PDFs, verifies native download identity, checks offline SVG/PNG reopening
+four PDFs, verifies the envelope JSON view and download, checks offline SVG/PNG reopening
 and inspects PDF text/fonts/vectors/bounds with pinned pdfplumber. Evidence is
 written under `finstack-quant-ui/test-results/publishing` by default; set
 `REGISTRY_INSTALL_EVIDENCE` to retain it elsewhere. Visual page and desktop-editor

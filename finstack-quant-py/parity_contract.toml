@@ -600,8 +600,12 @@ public = [
 
 [crates.models.volatility]
 python_package = "finstack_quant.models.volatility"
-# `check_surface_grid` returns the typed `ArbitrageReport`; the per-check
-# `check_*_grid` functions return serde violation rows. `convert_atm_volatility`
+# `check_surface` (on a core `VolSurface`) and `check_surface_grid` return the
+# typed `ArbitrageReport`; the per-check `check_*_grid` functions return serde
+# violation rows. `check_surface` takes the serde shape of the Rust
+# `ArbitrageCheckConfig` (a dict / JSON text in Python, the schema-generated
+# object / JSON text in WASM; omitted fields take the Rust defaults), so the
+# config has no host class. `convert_atm_volatility`
 # takes the serde form of `VolatilityConvention` (`"normal"`, `"lognormal"`,
 # `{"shifted_lognormal": {"shift": s}}`). `delta_to_strike` / `strike_to_delta`
 # have one fixed convention (forward, premium-unadjusted call delta) — there is
@@ -616,8 +620,7 @@ python_package = "finstack_quant.models.volatility"
 # `SabrParameters::quote_convention` (the hosts' `implied_vol` returns the
 # beta-dependent vol, documented on each method),
 # `SabrParameters::effective_rates` (the shift is on `SabrParameters.shift`),
-# `ArbitrageCheckConfig` /
-# `check_surface` on a `VolSurface`, and `SviParams::{validate, butterfly_violation}`
+# and `SviParams::{validate, butterfly_violation}`
 # (validation runs in the constructor). `LocalVolSurface` is a class in Python
 # and a plain object with `localVol*` free functions in WASM; the Dupire
 # density check stays reachable through `check_local_vol_density_grid`.
@@ -635,6 +638,7 @@ public = [
     "check_butterfly_grid",
     "check_calendar_spread_grid",
     "check_local_vol_density_grid",
+    "check_surface",
     "check_surface_grid",
     "convert_atm_volatility",
     "delta_to_strike",
@@ -776,7 +780,7 @@ schema       = { python = "finstack_quant.valuations.schema",       status = "ex
 constants    = { python = "finstack_quant.valuations.constants",    status = "missing", note = "Rust-only numeric/convention constants; hosts see the values through APIs that consume them (e.g. theta_days_per_year defaults), not as a namespace" }
 error        = { python = "finstack_quant.valuations.error",        status = "missing", note = "Rust-only error types; hosts receive mapped exceptions (Python ValueError/KeyError, JS Error), not the enum" }
 market       = { python = "finstack_quant.valuations.market",       status = "exists", note = "Listed-product coverage metadata plus the read-only ConventionRegistry lookups (rate index, CDS, swaption, inflation swap, IR future, xccy) and their frozen convention records. Rust-only: resolve_vol_source internals and the market-object builders behind the calibration pipeline." }
-metrics      = { python = "finstack_quant.valuations.metrics",      status = "missing", note = "Rust-only MetricId/MetricRegistry plumbing; hosts enumerate metrics via list_standard_metrics* instead. The metrics::risk computation entry points are bound under instruments, not as a metrics namespace: MarketHistory, calculate_var (multi-instrument full-revaluation historical VaR/ES) and its VarResult (WASM valuations.instruments.calculateVar returning the VarResult object). VarConfig/VarMethod are its dict/JSON config argument." }
+metrics      = { python = "finstack_quant.valuations.metrics",      status = "missing", note = "Rust-only MetricId/MetricRegistry plumbing; hosts enumerate metrics via list_standard_metrics* (the whole registry) and metrics_for_instrument (the grouped metrics registered for one instrument type, WASM valuations.instruments.metricsForInstrument) instead. The metrics::risk computation entry points are bound under instruments, not as a metrics namespace: MarketHistory, calculate_var (multi-instrument full-revaluation historical VaR/ES) and its VarResult (WASM valuations.instruments.calculateVar returning the VarResult object). VarConfig/VarMethod are its dict/JSON config argument." }
 pricer       = { python = "finstack_quant.valuations.pricer",       status = "missing", note = "Rust-only pricer registry and JSON pricing entry points; hosts reach them through the flattened price_* / validate_* / instrument_envelope_from_spec helpers under instruments" }
 recalibration = { python = "finstack_quant.valuations.recalibration", status = "missing", note = "Rust-only quote-space recalibration contracts; the calibration crate implements them and hosts never name them" }
 results      = { python = "finstack_quant.valuations.results",      status = "missing", note = "Rust-only result envelope types; the host-facing ValuationResult wrapper is pinned in [crates.valuations.symbols]" }
@@ -1017,6 +1021,7 @@ public = [
     "list_standard_metrics",
     "list_standard_metrics_grouped",
     "metric_metadata",
+    "metrics_for_instrument",
     "pretty_instrument_json",
     "price_instrument",
     "tranche_breakeven_cdr",
@@ -1340,11 +1345,19 @@ templates                   = { python = "finstack_quant.statements_analytics", 
 #   same three entry points (classifyStage, computeEcl, computeEclWeighted);
 #   the two PDs are arguments there because the Python Exposure carries them.
 #   `stage` is required in every host (classify first).
-# - analysis::credit covenant forecasting (forecast_breaches,
-#   compute_credit_context with per-period
+# - analysis::credit: compute_credit_context with per-period
 #   reference_values, CreditContextMetrics including dscr_incl_fees,
-#   CorporateAnalysisBuilder.ltv_value_node — the last is bound on
-#   run_corporate_analysis), StatementsAdapter, compute_peer_multiples, and
+#   CorporateAnalysisBuilder.ltv_value_node (the last is bound on
+#   run_corporate_analysis), and the StatementsAdapter type itself. The two
+#   statement covenant entry points built on StatementsAdapter are bound in
+#   both hosts (plan RT-23 reversed the earlier Rust-only decision, so a host
+#   no longer zips statement rows itself): evaluate_covenants /
+#   evaluateCovenants (compliance at every result period end; covenant windows
+#   decide which metrics a date requires) and forecast_breaches /
+#   forecastBreaches. Python returns the evaluation as the long DataFrame of
+#   CovenantEngine.evaluate_series and the forecast as FutureBreach objects;
+#   WASM returns DatedCovenantReports rows and FutureBreach wire objects.
+# - compute_peer_multiples, and
 #   the comps/scenarios/reports/valuation typed result surfaces beyond the
 #   bound entry points. lbo_model_checks is reached in both hosts through the
 #   `check_mappings` of the LboConfig that evaluate_lbo / evaluateLbo take.
@@ -1431,11 +1444,13 @@ public = [
     "credit_assessment",
     "credit_assessment_report_text",
     "dcf_sensitivity",
+    "evaluate_covenants",
     "evaluate_dcf",
     "evaluate_lbo",
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",
     "explain_formula",
+    "forecast_breaches",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",

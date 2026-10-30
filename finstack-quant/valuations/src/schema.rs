@@ -728,8 +728,9 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::fixed_income::convertible::ConvertibleGreeks;
     use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
-        BorrowingBaseReport, EquityMetrics, OasResult, PoolStats, ScenarioTable,
-        SimulationDiagnostics, SimulationRun, StandardDealParams, TrancheCashflows, TrancheMetrics,
+        BorrowingBaseReport, EquityMetrics, OasConfig, OasResult, PoolStats, ScenarioGrid,
+        ScenarioTable, SimulationDiagnostics, SimulationRun, StandardDealParams, TrancheCashflows,
+        TrancheMetrics,
     };
     use crate::instruments::json_loader::InstrumentJson;
     use crate::instruments::MarketDependencies;
@@ -944,6 +945,24 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::enhanced_monte_carlo_result),
+        finstack_quant_core::schema_artifact!(
+            OasConfig,
+            "common",
+            "oas_config",
+            Input,
+            "Structured-credit OAS solver configuration: paths, stochastic dimensions and seed."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::oas_config),
+        finstack_quant_core::schema_artifact!(
+            ScenarioGrid,
+            "common",
+            "scenario_grid",
+            Input,
+            "Structured-credit CPR x CDR x severity grid swept by the tranche scenario table."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::scenario_grid),
         finstack_quant_core::schema_artifact!(
             OasResult,
             "results",

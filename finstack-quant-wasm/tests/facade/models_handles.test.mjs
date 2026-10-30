@@ -679,6 +679,38 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
   );
 });
 
+test('checkSurface runs the Rust arbitrage suite on a VolSurface handle', () => {
+  const surface = (vols, options) =>
+    new core.VolSurface('SPX-VOL', [1, 2], [90, 100, 110], vols, options);
+  const flat = surface([0.2, 0.2, 0.2, 0.2, 0.2, 0.2]);
+  // Omitted config fields take the Rust `ArbitrageCheckConfig` defaults.
+  const report = volatility.checkSurface(flat, { forward_prices: [100] });
+  assert.equal(report.passed, true);
+  assert.equal(report.vol_surface_id, 'SPX-VOL');
+  assert.deepEqual(report.violations, []);
+  assert.deepEqual(volatility.checkSurface(flat, '{"forward_prices":[100]}'), report);
+
+  const spiked = surface([0.2, 0.6, 0.2, 0.2, 0.6, 0.2]);
+  const butterfly = volatility.checkSurface(spiked, {
+    forward_prices: [100],
+    check_calendar_spread: false,
+    check_local_vol_density: false,
+  });
+  assert.equal(butterfly.passed, false);
+  assert.deepEqual(Object.keys(butterfly.counts_by_type), ['butterfly']);
+
+  assert.throws(() => volatility.checkSurface(flat, {}), kind('validation'));
+  assert.throws(
+    () => volatility.checkSurface(flat, { forward_prices: [100], forwards: [100] }),
+    kind('validation')
+  );
+  const normal = surface([0.01, 0.01, 0.01, 0.01, 0.01, 0.01], { quoteType: 'normal' });
+  assert.throws(
+    () => volatility.checkSurface(normal, { forward_prices: [100] }),
+    kind('validation')
+  );
+});
+
 test('LGD replay and uncorrelated factors use checked Rust construction', () => {
   assert.throws(() =>
     credit.lgd.WorkoutCosts.fromJson({ direct_cost_rate: -1, indirect_cost_rate: 0 })

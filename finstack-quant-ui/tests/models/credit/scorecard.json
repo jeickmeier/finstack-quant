@@ -1,0 +1,179 @@
+{
+  "description": "Native models.credit.scoring results, one per model, each graded with models.credit.pd.MasterScale.defaultCalibration().mapScore (Altman results carry no implied PD, so their grade is Rust's error). Inputs are those of the Rust unit tests in finstack-quant/models/src/credit/scoring/tests.rs.",
+  "altmanZScore": {
+    "request": {
+      "model": "altmanZScore",
+      "input": {
+        "working_capital_to_total_assets": 0.1,
+        "retained_earnings_to_total_assets": 0.2,
+        "ebit_to_total_assets": 0.15,
+        "market_equity_to_total_liabilities": 1.5,
+        "sales_to_total_assets": 1.8
+      }
+    },
+    "score": {
+      "model": "altmanZScore",
+      "result": {
+        "score": 3.5949999999999998,
+        "zone": "safe",
+        "implied_pd": null,
+        "model": "Altman Z-Score (1968)"
+      },
+      "grade": {
+        "ok": false,
+        "error": {
+          "name": "FinstackError",
+          "message": "scoring result has no implied PD; request an explicit calibration first",
+          "kind": "validation"
+        }
+      }
+    }
+  },
+  "altmanZPrime": {
+    "request": {
+      "model": "altmanZPrime",
+      "input": {
+        "working_capital_to_total_assets": 0.1,
+        "retained_earnings_to_total_assets": 0.2,
+        "ebit_to_total_assets": 0.15,
+        "book_equity_to_total_liabilities": 1,
+        "sales_to_total_assets": 1.5
+      }
+    },
+    "score": {
+      "model": "altmanZPrime",
+      "result": {
+        "score": 2.6241499999999998,
+        "zone": "grey",
+        "implied_pd": null,
+        "model": "Altman Z'-Score (Private)"
+      },
+      "grade": {
+        "ok": false,
+        "error": {
+          "name": "FinstackError",
+          "message": "scoring result has no implied PD; request an explicit calibration first",
+          "kind": "validation"
+        }
+      }
+    }
+  },
+  "altmanZDoublePrime": {
+    "request": {
+      "model": "altmanZDoublePrime",
+      "input": {
+        "working_capital_to_total_assets": 0.1,
+        "retained_earnings_to_total_assets": 0.2,
+        "ebit_to_total_assets": 0.15,
+        "book_equity_to_total_liabilities": 1
+      }
+    },
+    "score": {
+      "model": "altmanZDoublePrime",
+      "result": {
+        "score": 3.3659999999999997,
+        "zone": "safe",
+        "implied_pd": null,
+        "model": "Altman Z''-Score (Non-Manufacturer)"
+      },
+      "grade": {
+        "ok": false,
+        "error": {
+          "name": "FinstackError",
+          "message": "scoring result has no implied PD; request an explicit calibration first",
+          "kind": "validation"
+        }
+      }
+    }
+  },
+  "altmanEmScore": {
+    "request": {
+      "model": "altmanEmScore",
+      "input": {
+        "working_capital_to_total_assets": 0.2,
+        "retained_earnings_to_total_assets": 0.3,
+        "ebit_to_total_assets": 0.15,
+        "book_equity_to_total_liabilities": 1.2
+      }
+    },
+    "score": {
+      "model": "altmanEmScore",
+      "result": {
+        "score": 7.808,
+        "zone": "safe",
+        "implied_pd": null,
+        "model": "Altman EM-Score (1995)"
+      },
+      "grade": {
+        "ok": false,
+        "error": {
+          "name": "FinstackError",
+          "message": "scoring result has no implied PD; request an explicit calibration first",
+          "kind": "validation"
+        }
+      }
+    }
+  },
+  "ohlsonOScore": {
+    "request": {
+      "model": "ohlsonOScore",
+      "input": {
+        "log_total_assets_adjusted": 8,
+        "total_liabilities_to_total_assets": 0.4,
+        "working_capital_to_total_assets": 0.2,
+        "current_liabilities_to_current_assets": 0.5,
+        "liabilities_exceed_assets": 0,
+        "net_income_to_total_assets": 0.1,
+        "funds_from_operations_to_total_liabilities": 0.3,
+        "negative_net_income_two_years": 0,
+        "net_income_change": 0.1
+      }
+    },
+    "score": {
+      "model": "ohlsonOScore",
+      "result": {
+        "score": -3.250249999999999,
+        "zone": "grey",
+        "implied_pd": 0.03731790498544391,
+        "model": "Ohlson O-Score (1980)"
+      },
+      "grade": {
+        "ok": true,
+        "value": {
+          "grade": "B",
+          "central_pd": 0.04,
+          "input_pd": 0.03731790498544391,
+          "grade_index": 5
+        }
+      }
+    }
+  },
+  "zmijewskiScore": {
+    "request": {
+      "model": "zmijewskiScore",
+      "input": {
+        "net_income_to_total_assets": 0.1,
+        "total_liabilities_to_total_assets": 0.4,
+        "current_assets_to_current_liabilities": 2
+      }
+    },
+    "score": {
+      "model": "zmijewskiScore",
+      "result": {
+        "score": -2.5077,
+        "zone": "safe",
+        "implied_pd": 0.006075989496763018,
+        "model": "Zmijewski Probit (1984)"
+      },
+      "grade": {
+        "ok": true,
+        "value": {
+          "grade": "BB",
+          "central_pd": 0.01,
+          "input_pd": 0.006075989496763018,
+          "grade_index": 4
+        }
+      }
+    }
+  }
+}

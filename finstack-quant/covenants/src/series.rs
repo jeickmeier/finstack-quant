@@ -17,8 +17,9 @@ use crate::forward::{
     forecast_breaches_generic, forecast_covenant_generic, CovenantForecast, CovenantForecastConfig,
     FutureBreach, ModelTimeSeries,
 };
-use crate::metric::HashMapMetricSource;
+use crate::metric::{CovenantMetricId, CovenantMetricSource, HashMapMetricSource};
 use crate::report::CovenantReport;
+use finstack_quant_core::InputError;
 
 /// Covenant metric values observed (or projected) on one date.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -232,6 +233,113 @@ pub fn forecast_breaches(
 ) -> Result<Vec<FutureBreach>> {
     require_stochastic_reference_date(&config)?;
     forecast_breaches_generic(engine, series, series.periods(), config)
+}
+
+/// Evaluate an engine at the end of each period of a model time series.
+///
+/// This is the point-in-time counterpart of [`forecast_breaches_generic`]:
+/// each period is tested on its inclusive end date with the specifications
+/// applicable on that date (a matching covenant window replaces the top-level
+/// set), exactly as [`CovenantEngine::evaluate`] would. Metrics are read from
+/// `model` only when an applicable specification needs them, so a metric that
+/// is absent or non-finite in a period where no applicable covenant reads it
+/// does not fail the evaluation. Breach history is not updated.
+///
+/// # Arguments
+///
+/// * `engine` - Valid engine whose specifications, windows, waivers and
+///   threshold schedules are evaluated.
+/// * `model` - Time series supplying each period's end date and the metric
+///   values (ratios in turns, amounts in the reporting currency) read by the
+///   applicable covenants.
+/// * `periods` - Periods to evaluate, in output order. An empty slice yields
+///   an empty result without validating the engine.
+///
+/// # Returns
+///
+/// One [`DatedCovenantReports`] per period, in `periods` order, stamped with
+/// the period's end date.
+///
+/// # Errors
+///
+/// Returns the first error: a validation error for an invalid engine, an
+/// unknown period, or a non-finite value of a metric an applicable covenant
+/// reads, and `NotFound` when such a metric has no value in the period. No
+/// partial result is returned.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::dates::{create_date, Tenor};
+/// use time::Month;
+/// use finstack_quant_covenants::{
+///     evaluate_series_generic, Covenant, CovenantEngine, CovenantSpec, CovenantType,
+///     DatedMetricSeries, DatedMetrics,
+/// };
+///
+/// # fn main() -> finstack_quant_core::Result<()> {
+/// let mut engine = CovenantEngine::new();
+/// engine.add_spec(CovenantSpec::with_metric(
+///     Covenant::new(
+///         CovenantType::MaxDebtToEbitda { threshold: 4.5 },
+///         Tenor::quarterly(),
+///         "max_leverage",
+///     ),
+///     "debt_to_ebitda",
+/// ));
+/// let series = DatedMetricSeries::new(vec![DatedMetrics {
+///     date: create_date(2026, Month::June, 30)?,
+///     metrics: [("debt_to_ebitda".to_string(), 4.8)].into_iter().collect(),
+/// }])?;
+///
+/// let evaluated = evaluate_series_generic(&engine, &series, series.periods())?;
+/// assert!(!evaluated[0].reports["max_leverage"].passed);
+/// # Ok(())
+/// # }
+/// ```
+pub fn evaluate_series_generic<MTS: ModelTimeSeries>(
+    engine: &CovenantEngine,
+    model: &MTS,
+    periods: &[PeriodId],
+) -> Result<Vec<DatedCovenantReports>> {
+    if !periods.is_empty() {
+        engine.validate()?;
+    }
+    periods
+        .iter()
+        .map(|period| {
+            let as_of = model.period_end_date(period)?;
+            let source = PeriodMetricSource { model, period };
+            Ok(DatedCovenantReports {
+                as_of,
+                reports: engine.evaluate_specs(&engine.applicable_specs(as_of), &source, as_of)?,
+            })
+        })
+        .collect()
+}
+
+/// Metric values of one model period, read on demand.
+struct PeriodMetricSource<'a, MTS> {
+    model: &'a MTS,
+    period: &'a PeriodId,
+}
+
+impl<MTS: ModelTimeSeries> CovenantMetricSource for PeriodMetricSource<'_, MTS> {
+    fn get_metric(&self, metric: &CovenantMetricId) -> Result<f64> {
+        let name = metric.as_str();
+        let value = self.model.get_scalar(name, self.period).ok_or_else(|| {
+            Error::from(InputError::NotFound {
+                id: format!("metric '{name}' in period {}", self.period),
+            })
+        })?;
+        if !value.is_finite() {
+            return Err(Error::Validation(format!(
+                "metric '{name}' must be finite in period {}",
+                self.period
+            )));
+        }
+        Ok(value)
+    }
 }
 
 impl CovenantEngine {

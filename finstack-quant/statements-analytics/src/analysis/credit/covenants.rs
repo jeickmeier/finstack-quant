@@ -1,13 +1,14 @@
-//! Covenant forecasting bridge for statements.
+//! Covenant bridge for statements.
 //!
-//! This module provides the integration between financial statement forecasts
-//! and the covenant engine, allowing for future compliance checking.
+//! This module connects evaluated statement results to the covenant engine:
+//! [`evaluate_covenants`] tests compliance at every result period end and
+//! [`forecast_breaches`] projects breaches over the same periods.
 
 use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::Result;
 use finstack_quant_covenants::{
-    forecast_breaches_generic, CovenantEngine, CovenantForecastConfig, FutureBreach,
-    ModelTimeSeries,
+    evaluate_series_generic, forecast_breaches_generic, CovenantEngine, CovenantForecastConfig,
+    DatedCovenantReports, FutureBreach, ModelTimeSeries,
 };
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
@@ -61,6 +62,109 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
     }
 }
 
+/// Every period that carries a value in `results`, in ascending order.
+fn result_periods(results: &StatementResult) -> Vec<PeriodId> {
+    let mut periods: Vec<PeriodId> = results
+        .nodes
+        .values()
+        .flat_map(|map| map.keys().copied())
+        .collect();
+    periods.sort();
+    periods.dedup();
+    periods
+}
+
+/// Evaluate covenant compliance at the end of every statement result period.
+///
+/// Each period that carries a value in `results` is tested on its inclusive
+/// end date from the model calendar, with the specifications applicable on
+/// that date: a [`CovenantWindow`](finstack_quant_covenants::CovenantWindow)
+/// covering the date replaces the engine's top-level set, and waivers and
+/// threshold schedules apply as in
+/// [`CovenantEngine::evaluate`]. A metric is read only when an applicable
+/// covenant needs it, so a node that is missing or non-finite in a period
+/// where no applicable covenant reads it (for example a trailing ratio before
+/// four quarters of history, outside the window that tests it) does not fail
+/// the evaluation. The covenant engine's breach history is not updated.
+///
+/// This is the point-in-time twin of [`forecast_breaches`]: both read the same
+/// periods through [`StatementsAdapter`] and fail on the same missing or
+/// non-finite required inputs.
+///
+/// # Arguments
+///
+/// * `results` - Evaluated statement results; node ids are the covenant
+///   metric ids (`metric_id`, or each covenant type's conventional name), with
+///   ratios in turns (`3.5` means 3.5x) and amounts in the model currency.
+/// * `covenants` - Valid covenant engine whose specifications, windows,
+///   waivers and threshold schedules are evaluated.
+/// * `model` - Model whose period calendar gives each result period's test
+///   date (the day before the period's exclusive end).
+///
+/// # Returns
+///
+/// One [`DatedCovenantReports`] per result period in ascending period order,
+/// each with the reports of the covenants applicable on that date keyed by
+/// covenant instance key in engine order. Empty when `results` holds no
+/// values.
+///
+/// # Errors
+///
+/// Returns a validation error for an invalid engine, a result period missing
+/// from the model calendar, or a non-finite value of a metric an applicable
+/// covenant reads in that period, and `NotFound` when such a metric has no
+/// value in the period. No partial series is returned.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::dates::{PeriodId, Tenor};
+/// use finstack_quant_covenants::{Covenant, CovenantEngine, CovenantSpec, CovenantType};
+/// use finstack_quant_statements::builder::ModelBuilder;
+/// use finstack_quant_statements::evaluator::StatementResult;
+/// use finstack_quant_statements_analytics::analysis::evaluate_covenants;
+/// use indexmap::IndexMap;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let mut builder = ModelBuilder::new("borrower");
+/// builder.periods("2025Q1..Q2", None)?;
+/// let model = builder.build()?;
+/// let results = StatementResult {
+///     nodes: IndexMap::from([(
+///         "leverage".to_string(),
+///         IndexMap::from([
+///             (PeriodId::quarter(2025, 1)?, 3.0),
+///             (PeriodId::quarter(2025, 2)?, 4.2),
+///         ]),
+///     )]),
+///     ..StatementResult::default()
+/// };
+/// let mut engine = CovenantEngine::new();
+/// engine.add_spec(CovenantSpec::with_metric(
+///     Covenant::new(
+///         CovenantType::MaxDebtToEbitda { threshold: 4.0 },
+///         Tenor::quarterly(),
+///         "max_leverage",
+///     ),
+///     "leverage",
+/// ));
+///
+/// let series = evaluate_covenants(&results, &engine, &model)?;
+/// assert_eq!(series[0].as_of.to_string(), "2025-03-31");
+/// assert!(series[0].reports["max_leverage"].passed);
+/// assert!(!series[1].reports["max_leverage"].passed);
+/// # Ok(())
+/// # }
+/// ```
+pub fn evaluate_covenants(
+    results: &StatementResult,
+    covenants: &CovenantEngine,
+    model: &FinancialModelSpec,
+) -> Result<Vec<DatedCovenantReports>> {
+    let adapter = StatementsAdapter::new(results, model);
+    evaluate_series_generic(covenants, &adapter, &result_periods(results))
+}
+
 /// Forecast covenant breaches based on statement results.
 ///
 /// # Arguments
@@ -88,16 +192,8 @@ pub fn forecast_breaches(
     model: &FinancialModelSpec,
     config: CovenantForecastConfig,
 ) -> Result<Vec<FutureBreach>> {
-    let mut periods: Vec<PeriodId> = results
-        .nodes
-        .values()
-        .flat_map(|map| map.keys().cloned())
-        .collect();
-    periods.sort();
-    periods.dedup();
-
     let adapter = StatementsAdapter::new(results, model);
-    forecast_breaches_generic(covenants, &adapter, &periods, config)
+    forecast_breaches_generic(covenants, &adapter, &result_periods(results), config)
 }
 
 #[cfg(test)]

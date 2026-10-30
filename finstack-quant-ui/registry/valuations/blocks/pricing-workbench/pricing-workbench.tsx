@@ -15,12 +15,22 @@ import {
   VolCubeExplorer,
   type VolCubeExplorerProps,
 } from "@/components/finstack/models/components/vol-cube-explorer/vol-cube-explorer";
+import { VolSurfaceChart } from "@/components/finstack/core/components/vol-surface-chart/vol-surface-chart";
+import { SurfaceArbitrageBadge } from "@/components/finstack/models/components/surface-arbitrage-badge/surface-arbitrage-badge";
 import {
   FxSurfaceChart,
   type FxSurfaceChartProps,
 } from "@/components/finstack/models/components/fx-surface-chart/fx-surface-chart";
 import { ScenarioPanel } from "./scenario-panel";
+import { TranchePanel } from "./tranche-panel";
 import { CalibrationPanel } from "./calibration-panel";
+import {
+  MarketScenarioInputs,
+  MarketScenarioResults,
+  noComparison,
+  useMarketScenarioSession,
+} from "./market-scenario-panel";
+import { AttributionResults, useAttributionSession } from "./attribution-panel";
 import type { CalibrationFitChartProps } from "@/components/finstack/calibration/components/calibration-fit-chart/calibration-fit-chart";
 import { MeasuresGrid } from "@/components/finstack/valuations/components/measures-grid/measures-grid";
 import {
@@ -48,6 +58,7 @@ export function PricingWorkbench({
   fxOptions,
   calibrationChartOptions,
   scenario,
+  marketScenario,
   brand,
 }: {
   /** Complete initial instrument request and canonical market snapshot. Remount to load another document. */
@@ -71,8 +82,20 @@ export function PricingWorkbench({
     trancheId: string;
     gridJson: string;
     priceDomain: readonly [number, number];
+    /** Registry metric ids valued on the tranche by trancheMetrics; omitted means none. */
+    trancheMetrics?: readonly string[];
   };
-  surfaceOptions?: MarketContextBrowserProps["surfaceOptions"];
+  /** Initial ScenarioSpec JSON for the "Market scenario" tab; it is applied only on request. Defaults to an empty scenario. */
+  marketScenario?: string;
+  /** Stored-surface view options. A returned `forwards` key adds the native static-arbitrage badge (null or empty: forwards not supplied); forwards are host-supplied, never inferred. */
+  surfaceOptions?(surface: MarketContextStateWire["surfaces"][number]):
+    | (NonNullable<
+        ReturnType<NonNullable<MarketContextBrowserProps["surfaceOptions"]>>
+      > & {
+        /** Forward prices in the surface's strike units: one to broadcast or one per expiry. */
+        forwards?: readonly number[] | null;
+      })
+    | undefined;
   cubeOptions?(
     cube: MarketContextStateWire["vol_cubes"][number],
   ): Omit<VolCubeExplorerProps, "cube"> | undefined;
@@ -117,6 +140,7 @@ export function PricingWorkbench({
     shown,
     measureMetadata,
     cashflows,
+    cashflowLadder,
     cashflowModel,
     preparing,
     printMarket,
@@ -149,6 +173,18 @@ export function PricingWorkbench({
     exampleResultTabs,
     onInstrumentTypeChange,
   });
+  const marketScenarioSession = useMarketScenarioSession(
+    marketScenario,
+    completed?.request ?? null,
+  );
+  const attributionSession = useAttributionSession(
+    completed?.request ?? null,
+    marketScenarioSession,
+  );
+  // The shocked valuation fills the existing comparison columns; no difference is computed.
+  const comparison = printSnapshot
+    ? noComparison
+    : marketScenarioSession.comparison;
   const dimensionalCount = dimensionalMeasureCount({
     result: shown?.result,
     metadata: measureMetadata.data,
@@ -225,6 +261,9 @@ export function PricingWorkbench({
                   <span className="finstack-kbd">2</span> Market
                 </TabsTrigger>
                 <TabsTrigger value="calibrate">Calibrate</TabsTrigger>
+                <TabsTrigger value="market-scenario">
+                  Market scenario
+                </TabsTrigger>
               </TabsList>
               <div className="finstack-workbench__context">
                 {pricingContext}
@@ -375,6 +414,25 @@ export function PricingWorkbench({
                               />
                             ) : undefined;
                           }
+                          if (field === "surfaces") {
+                            const surface = (printMarket ?? market.state)
+                                .surfaces[index]!,
+                              options = surfaceOptions?.(surface);
+                            if (!options || !("forwards" in options))
+                              return undefined;
+                            const { forwards, ...chart } = options;
+                            return (
+                              <div className="space-y-2">
+                                <SurfaceArbitrageBadge
+                                  key={surface.id}
+                                  surface={surface}
+                                  forwards={forwards}
+                                  density={currentDensity}
+                                />
+                                <VolSurfaceChart surface={surface} {...chart} />
+                              </div>
+                            );
+                          }
                           if (field === "fx_delta_vol_surfaces") {
                             const surface = (printMarket ?? market.state)
                                 .fx_delta_vol_surfaces[index]!,
@@ -409,6 +467,17 @@ export function PricingWorkbench({
                   }}
                 />
               </TabsContent>
+              <TabsContent
+                value="market-scenario"
+                className="finstack-workbench__panel print:hidden"
+              >
+                <MarketScenarioInputs
+                  session={marketScenarioSession}
+                  curveIds={market?.state.curves.map((curve) => curve.id) ?? []}
+                  priced={completed !== null}
+                  density={currentDensity}
+                />
+              </TabsContent>
             </section>
             <section
               aria-label="Results"
@@ -432,6 +501,7 @@ export function PricingWorkbench({
                 <div className="finstack-workbench__summary-body">
                   <MeasuresGrid
                     {...measureGridProps}
+                    {...comparison}
                     content={printSnapshot ? "all" : "summary"}
                   />
                   {printSnapshot && shown && (
@@ -472,6 +542,12 @@ export function PricingWorkbench({
                     <TabsTrigger value="trace">
                       <span className="finstack-kbd">5</span> Trace
                     </TabsTrigger>
+                    <TabsTrigger value="market-scenario">
+                      Market scenario
+                    </TabsTrigger>
+                    <TabsTrigger value="pnl-explain">
+                      P&amp;L explain
+                    </TabsTrigger>
                     <TabsTrigger value="request">Request</TabsTrigger>
                     {scenario && type === "structured_credit" && (
                       <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
@@ -481,6 +557,7 @@ export function PricingWorkbench({
                 <TabsContent value="measures" className="print:hidden">
                   <MeasuresGrid
                     {...measureGridProps}
+                    {...comparison}
                     content="measures"
                     excludeDimensional
                   />
@@ -499,6 +576,8 @@ export function PricingWorkbench({
                     <DimensionalMeasures
                       result={shown?.result}
                       metadata={measureMetadata.data}
+                      compareTo={comparison.compareTo}
+                      comparisonMetadata={comparison.comparisonMetadata}
                     />
                   )}
                 </TabsContent>
@@ -511,7 +590,9 @@ export function PricingWorkbench({
                   ) : shown ? (
                     <CashflowViewer
                       density={currentDensity}
-                      text={cashflows.data}
+                      cashflows={cashflows.data}
+                      ladder={cashflowLadder.data ?? null}
+                      ladderError={cashflowLadder.error?.message}
                       loading={
                         cashflows.isFetching ||
                         cashflows.workerStatus === "starting"
@@ -547,6 +628,18 @@ export function PricingWorkbench({
                     </p>
                   )}
                 </TabsContent>
+                <TabsContent value="market-scenario" className="print:hidden">
+                  <MarketScenarioResults
+                    session={marketScenarioSession}
+                    density={currentDensity}
+                  />
+                </TabsContent>
+                <TabsContent value="pnl-explain" className="print:hidden">
+                  <AttributionResults
+                    session={attributionSession}
+                    density={currentDensity}
+                  />
+                </TabsContent>
                 <TabsContent value="request" className="print:hidden">
                   <details
                     open={instrumentOpen}
@@ -569,25 +662,43 @@ export function PricingWorkbench({
                 <TabsContent value="scenarios" className="print:hidden">
                   {scenario &&
                   completed?.instrumentType === "structured_credit" ? (
-                    <details
-                      onToggle={(event) =>
-                        setScenariosOpen(event.currentTarget.open)
-                      }
-                    >
-                      <summary>Scenario prices</summary>
-                      {scenariosOpen && (
-                        <ScenarioPanel
-                          request={{
-                            instrumentJson: completed.request.instrumentJson,
-                            marketJson: completed.request.marketJson,
-                            asOf: completed.request.asOf,
-                            trancheId: scenario.trancheId,
-                            gridJson: scenario.gridJson,
-                          }}
-                          priceDomain={scenario.priceDomain}
-                        />
-                      )}
-                    </details>
+                    <>
+                      <TranchePanel
+                        key={JSON.stringify([
+                          completed.request.instrumentJson,
+                          completed.request.marketJson,
+                          completed.request.asOf,
+                          scenario.trancheId,
+                        ])}
+                        request={{
+                          instrumentJson: completed.request.instrumentJson,
+                          marketJson: completed.request.marketJson,
+                          asOf: completed.request.asOf,
+                          trancheId: scenario.trancheId,
+                        }}
+                        metrics={scenario.trancheMetrics}
+                        density={currentDensity}
+                      />
+                      <details
+                        onToggle={(event) =>
+                          setScenariosOpen(event.currentTarget.open)
+                        }
+                      >
+                        <summary>Scenario prices</summary>
+                        {scenariosOpen && (
+                          <ScenarioPanel
+                            request={{
+                              instrumentJson: completed.request.instrumentJson,
+                              marketJson: completed.request.marketJson,
+                              asOf: completed.request.asOf,
+                              trancheId: scenario.trancheId,
+                              gridJson: scenario.gridJson,
+                            }}
+                            priceDomain={scenario.priceDomain}
+                          />
+                        )}
+                      </details>
+                    </>
                   ) : (
                     <p>Scenario prices are unavailable for this instrument.</p>
                   )}

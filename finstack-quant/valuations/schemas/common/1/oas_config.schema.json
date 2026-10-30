@@ -1,0 +1,79 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Structured-credit OAS solver configuration: paths, stochastic dimensions and seed.",
+  "examples": [
+    {
+      "credit_loading": 0.3,
+      "hw1f_mean_reversion": 0.05,
+      "hw1f_sigma": 0.01,
+      "num_paths": 256,
+      "prepay_beta": 7.0,
+      "seed": 42,
+      "stochastic_credit": true,
+      "stochastic_rates": false,
+      "tolerance": 1e-7
+    }
+  ],
+  "properties": {
+    "credit_loading": {
+      "description": "Credit factor loading for the lognormal default/prepayment shocks.",
+      "format": "double",
+      "type": "number"
+    },
+    "hw1f_mean_reversion": {
+      "description": "Hull-White 1F mean reversion `κ`, per year.",
+      "format": "double",
+      "type": "number"
+    },
+    "hw1f_sigma": {
+      "description": "Hull-White 1F short-rate volatility `σ`, absolute annual decimal\n(`0.01` = 100 bp).",
+      "format": "double",
+      "type": "number"
+    },
+    "num_paths": {
+      "description": "Number of Monte-Carlo scenarios (forced to 1 when neither dimension is\nstochastic, since every scenario is then identical).",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "prepay_beta": {
+      "description": "Rate-dependent prepayment sensitivity `β`.",
+      "format": "double",
+      "type": "number"
+    },
+    "seed": {
+      "description": "RNG seed (deterministic, reproducible results).",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "stochastic_credit": {
+      "description": "Couple a systematic stochastic-credit factor (correlated default/prepay stress).",
+      "type": "boolean"
+    },
+    "stochastic_rates": {
+      "description": "Couple a stochastic Hull-White short-rate path (rate paths + rate-dependent\nprepayment, stochastic discounting).",
+      "type": "boolean"
+    },
+    "tolerance": {
+      "description": "Brent solver tolerance.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "num_paths",
+    "stochastic_rates",
+    "stochastic_credit",
+    "hw1f_mean_reversion",
+    "hw1f_sigma",
+    "prepay_beta",
+    "credit_loading",
+    "seed",
+    "tolerance"
+  ],
+  "title": "OasConfig",
+  "type": "object"
+}

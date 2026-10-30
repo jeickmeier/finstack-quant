@@ -197,7 +197,7 @@ function PricingOverrides({
     </div>
   );
 }
-/** Independent controlled pricing controls. Supply groups from useModels/useMetrics within the shared provider. */
+/** Independent controlled pricing controls. Supply groups from useModels and useMetrics(instrumentType) within the shared provider. */
 export function PricingParamsForm({
   value,
   onValueChange,
@@ -215,12 +215,17 @@ export function PricingParamsForm({
   onValueChange(value: PricingParams): void;
   instrumentType: string;
   models: Readonly<Record<string, readonly string[]>>;
+  /** Native groups of the metrics registered for instrumentType (useMetrics(instrumentType)). */
   metrics: Readonly<Record<string, readonly string[]>>;
   /** Optional caller-owned history UI; the parent still owns value.marketHistory. */
   marketHistorySlot?: ReactNode;
   loading?: boolean;
   error?: string;
 }) {
+  const offered = new Set(Object.values(metrics).flat());
+  const unavailableMetrics = (value.metrics ?? []).filter(
+    (metric) => !offered.has(metric),
+  );
   return (
     <section
       aria-label="Pricing parameters"
@@ -273,6 +278,12 @@ export function PricingParamsForm({
             )}
             disabled={loading}
           />
+          {!loading && unavailableMetrics.length > 0 && (
+            <p role="status">
+              Selected metrics unavailable for {instrumentType}:{" "}
+              {unavailableMetrics.join(", ")}
+            </p>
+          )}
           <Button
             variant="outline"
             size="sm"

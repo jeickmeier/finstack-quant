@@ -1,0 +1,422 @@
+// @vitest-environment jsdom
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
+import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
+import { useCovenantEngineValidator } from "@/hooks/covenants/use-covenant-engine-validator/use-covenant-engine-validator";
+import { useCovenantTemplate } from "@/hooks/covenants/use-covenant-template/use-covenant-template";
+import {
+  evaluateCovenantsOptions,
+  useEvaluateCovenants,
+} from "@/hooks/covenants/use-evaluate-covenants/use-evaluate-covenants";
+import {
+  CovenantEngineEditor,
+  type CovenantTemplate,
+} from "@/components/finstack/covenants/components/covenant-engine-editor/covenant-engine-editor";
+import { CovenantCompliance } from "@/components/finstack/covenants/components/covenant-compliance/covenant-compliance";
+import {
+  unwrap,
+  type CovenantTemplateRequest,
+} from "@/workers/finstack-contract";
+import { serializeHost } from "../../src/codec.mjs";
+import { startWorker } from "../shared/worker/harness.mjs";
+import { budget } from "../shared/budget";
+import series from "../../src/fixtures/covenants/analyst-covenant-series.json";
+
+const native = createRequire(import.meta.url)(
+  "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
+);
+const read = (name: string) =>
+  readFileSync(
+    resolve(import.meta.dirname, "../../src/fixtures/", name),
+    "utf8",
+  );
+const modelJson = read("statements/analyst-model.json");
+const resultsJson = read("statements/analyst-result.json");
+const engineJson = read("covenants/analyst-covenants.json");
+const nodeIds = Object.keys(JSON.parse(modelJson).nodes);
+const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
+vi.mock("@/hooks/shared/use-finstack/client", () => ({
+  createClient: mock.createClient,
+}));
+type Resources = Record<
+  "covenantEngineConstructed" | "covenantEngineFreed",
+  number
+>;
+let harness: Awaited<ReturnType<typeof startWorker>>;
+const resources = () =>
+  (harness.proxy as unknown as { resources(): Promise<Resources> }).resources();
+/** CovenantEngine handles constructed and freed by one call. */
+async function counted<T>(call: () => Promise<T>) {
+  const before = await resources();
+  const value = await call();
+  const after = await resources();
+  return {
+    value,
+    engine: [
+      after.covenantEngineConstructed - before.covenantEngineConstructed,
+      after.covenantEngineFreed - before.covenantEngineFreed,
+    ],
+  };
+}
+beforeAll(async () => {
+  harness = await startWorker();
+}, budget(30000));
+afterAll(async () => harness?.close());
+beforeEach(() => {
+  vi.stubGlobal("Worker", class {});
+  const proxy = harness.proxy as unknown as Record<
+    string,
+    (request: unknown) => Promise<never>
+  >;
+  mock.createClient.mockReturnValue({
+    call: vi.fn(async (method: string, request: unknown) => {
+      if (method === "initialize")
+        return unwrap(await harness.proxy.initialize());
+      if (
+        [
+          "covenantTemplate",
+          "validateCovenantEngine",
+          "evaluateCovenants",
+        ].includes(method)
+      )
+        return unwrap(await proxy[method]!(request));
+      throw new Error(`Unexpected worker call ${method}`);
+    }),
+    close() {},
+  });
+});
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+it("returns each Rust package template as the facade does", async () => {
+  const requests: [CovenantTemplateRequest, unknown][] = [
+    [
+      { kind: "covLite", maxLeverage: 5, maxSeniorLeverage: 3 },
+      native.covLite(5, 3),
+    ],
+    [
+      {
+        kind: "lboStandard",
+        initialLeverage: 6,
+        interestCoverage: 2,
+        fixedChargeCoverage: 1.5,
+        maxCapex: 50_000_000,
+      },
+      native.lboStandard(6, 2, 1.5, 50_000_000),
+    ],
+    [
+      { kind: "realEstate", minDscr: 1.25, minDebtYield: 0.08, maxLtv: 0.65 },
+      native.realEstate(1.25, 0.08, 0.65),
+    ],
+    [
+      {
+        kind: "projectFinance",
+        minDscr: 1.2,
+        distributionLockupDscr: 1.1,
+        minLiquidity: 1_000_000,
+        maxNetLeverage: 4,
+      },
+      native.projectFinance(1.2, 1.1, 1_000_000, 4),
+    ],
+  ];
+  for (const [request, direct] of requests)
+    expect(unwrap(await harness.proxy.covenantTemplate(request))).toEqual(
+      direct,
+    );
+  // A cleared threshold crosses as NaN, which Rust rejects.
+  const cleared = await harness.proxy.covenantTemplate({
+    kind: "covLite",
+    maxLeverage: Number.NaN,
+    maxSeniorLeverage: 3,
+  });
+  expect(cleared.ok).toBe(false);
+  if (!cleared.ok) {
+    expect(cleared.error.kind).toBe("validation");
+    expect(cleared.error.message).toContain("max_leverage");
+  }
+});
+
+it("validates an engine natively and returns its canonical text", async () => {
+  expect(unwrap(await harness.proxy.validateCovenantEngine(engineJson))).toBe(
+    native.validateCovenantEngineJson(engineJson),
+  );
+  const unknown = await harness.proxy.validateCovenantEngine(
+    JSON.stringify({ ...JSON.parse(engineJson), extra: 1 }),
+  );
+  expect(unknown.ok).toBe(false);
+  if (!unknown.ok) expect(unknown.error.message).toContain("unknown field");
+});
+
+it("evaluates the analyst engine over every result period and frees the engine", async () => {
+  const call = await counted(
+    async () =>
+      await harness.proxy.evaluateCovenants({
+        engineJson,
+        modelJson,
+        resultsJson,
+      }),
+  );
+  expect(serializeHost(unwrap(call.value))).toBe(serializeHost(series));
+  expect(call.engine).toEqual([1, 1]);
+});
+
+it("returns Rust's not_found for a template metric the model lacks, freeing the engine", async () => {
+  const specs = unwrap(
+    await harness.proxy.covenantTemplate({
+      kind: "covLite",
+      maxLeverage: 5,
+      maxSeniorLeverage: 3,
+    }),
+  );
+  // covLite reads total_leverage, senior_leverage and negative_debt.
+  expect(specs.map((spec) => spec.metric_id)).toEqual([
+    "total_leverage",
+    "senior_leverage",
+    "negative_debt",
+  ]);
+  expect(nodeIds).not.toContain("total_leverage");
+  const missing = await counted(
+    async () =>
+      await harness.proxy.evaluateCovenants({
+        engineJson: JSON.stringify({ specs }),
+        modelJson,
+        resultsJson,
+      }),
+  );
+  expect(missing.value.ok).toBe(false);
+  if (!missing.value.ok) {
+    expect(missing.value.error.kind).toBe("not_found");
+    expect(missing.value.error.message).toContain(
+      "metric 'total_leverage' in period 2024Q1",
+    );
+  }
+  expect(missing.engine).toEqual([1, 1]);
+  // A malformed engine is rejected before any handle exists.
+  const malformed = await counted(
+    async () =>
+      await harness.proxy.evaluateCovenants({
+        engineJson: "{}",
+        modelJson,
+        resultsJson,
+      }),
+  );
+  expect(malformed.value.ok).toBe(false);
+  expect(malformed.engine).toEqual([0, 0]);
+});
+
+it("keys the evaluation on the worker session and the complete snapshotted request", () => {
+  const request = { engineJson, modelJson, resultsJson };
+  const options = evaluateCovenantsOptions(null, 4, request);
+  expect(options.queryKey).toEqual([
+    "finstack",
+    4,
+    "evaluateCovenants",
+    request,
+  ]);
+  expect(options.queryKey[3]).not.toBe(request);
+  expect(evaluateCovenantsOptions(null, 4, null).enabled).toBe(false);
+});
+
+it("lists each covenant's metric id and whether the model has that node", async () => {
+  render(
+    <CovenantEngineEditor
+      defaultJson={engineJson}
+      validate={async (json) => json}
+      onSubmit={() => {}}
+      metricIds={nodeIds}
+    />,
+  );
+  const metrics = within(
+    screen.getByRole("region", { name: "Covenant metrics" }),
+  );
+  await waitFor(() => expect(metrics.getAllByRole("row")).toHaveLength(4));
+  const rows = metrics
+    .getAllByRole("row")
+    .slice(1)
+    .map((row) =>
+      [...row.querySelectorAll("th,td")].map((cell) => cell.textContent),
+    );
+  expect(rows).toEqual([
+    ["Specs", "min_interest_coverage", "metric_id", "interest_coverage", "Yes"],
+    [
+      "Window 2024-10-01 to 2025-12-31",
+      "max_debt_to_ebitda",
+      "metric_id",
+      "leverage",
+      "Yes",
+    ],
+    [
+      "Window 2024-10-01 to 2025-12-31",
+      "min_interest_coverage",
+      "metric_id",
+      "interest_coverage",
+      "Yes",
+    ],
+  ]);
+  // Every metric id (top-level and windowed) is an id-combobox over the node ids.
+  const combos = screen
+    .getAllByRole("combobox", { name: /^Metric id/ })
+    .map((box) => (box as HTMLInputElement).value);
+  expect(combos).toEqual([
+    "interest_coverage",
+    "leverage",
+    "interest_coverage",
+  ]);
+  // Templates are hidden without a loader.
+  expect(
+    screen.queryByRole("form", { name: "Covenant package templates" }),
+  ).toBeNull();
+});
+
+it("sends a blank template threshold as NaN and shows the native error", async () => {
+  const loadTemplate = vi.fn(async (template: CovenantTemplate) => {
+    throw new Error(`rejected ${template.kind}`);
+  });
+  render(
+    <CovenantEngineEditor
+      validate={async (json) => json}
+      onSubmit={() => {}}
+      loadTemplate={loadTemplate}
+      metricIds={nodeIds}
+    />,
+  );
+  const templates = within(
+    screen.getByRole("form", { name: "Covenant package templates" }),
+  );
+  for (const label of ["Max leverage", "Max senior leverage"])
+    expect(templates.getByLabelText(label)).toHaveProperty("value", "");
+  await userEvent.type(templates.getByLabelText("Max leverage"), "5");
+  await userEvent.click(
+    templates.getByRole("button", { name: "Load template" }),
+  );
+  expect(loadTemplate).toHaveBeenCalledWith({
+    kind: "covLite",
+    maxLeverage: 5,
+    maxSeniorLeverage: Number.NaN,
+  });
+  expect((await templates.findByRole("alert")).textContent).toBe(
+    "rejected covLite",
+  );
+});
+
+function Connected({ defaultJson }: { defaultJson?: string }) {
+  const validate = useCovenantEngineValidator();
+  const loadTemplate = useCovenantTemplate();
+  const [engine, setEngine] = useState<string | null>(null);
+  const compliance = useEvaluateCovenants(
+    engine ? { engineJson: engine, modelJson, resultsJson } : null,
+  );
+  return (
+    <>
+      <CovenantEngineEditor
+        defaultJson={defaultJson}
+        validate={validate}
+        loadTemplate={loadTemplate}
+        onSubmit={setEngine}
+        metricIds={nodeIds}
+      />
+      {compliance.error ? (
+        <p role="alert">{compliance.error.message}</p>
+      ) : compliance.data ? (
+        <CovenantCompliance series={compliance.data} />
+      ) : null}
+    </>
+  );
+}
+async function submit() {
+  const button = await screen.findByRole("button", { name: "Use covenants" });
+  await waitFor(
+    async () => {
+      await userEvent.click(button);
+      expect(
+        screen.queryByRole("region", { name: "Covenant compliance" }) ??
+          screen.queryByRole("alert"),
+      ).toBeTruthy();
+    },
+    { timeout: budget(10000) },
+  );
+}
+it(
+  "loads a Rust template, flags its missing metrics and surfaces the native not_found on evaluation",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <Connected />
+      </FinstackQueryProvider>,
+    );
+    const templates = within(
+      await screen.findByRole("form", { name: "Covenant package templates" }),
+    );
+    await userEvent.type(templates.getByLabelText("Max leverage"), "5");
+    await userEvent.type(templates.getByLabelText("Max senior leverage"), "3");
+    await userEvent.click(
+      templates.getByRole("button", { name: "Load template" }),
+    );
+    const metrics = within(
+      screen.getByRole("region", { name: "Covenant metrics" }),
+    );
+    await waitFor(() => expect(metrics.getAllByRole("row")).toHaveLength(4), {
+      timeout: budget(5000),
+    });
+    expect(
+      metrics
+        .getAllByRole("row")
+        .slice(1)
+        .map((row) => {
+          const { cells } = row as HTMLTableRowElement;
+          return [cells[3]!.textContent, cells[4]!.textContent];
+        }),
+    ).toEqual([
+      ["total_leverage", "Missing"],
+      ["senior_leverage", "Missing"],
+      ["negative_debt", "Missing"],
+    ]);
+    await submit();
+    expect(screen.getByRole("alert").textContent).toContain(
+      "metric 'total_leverage' in period 2024Q1",
+    );
+  },
+  budget(30000),
+);
+it(
+  "validates and evaluates the supplied engine into the native compliance grid",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <Connected defaultJson={engineJson} />
+      </FinstackQueryProvider>,
+    );
+    await submit();
+    const grid = within(
+      screen.getByRole("region", { name: "Covenant compliance" }),
+    );
+    const header = grid.getAllByRole("row")[0]!;
+    expect(
+      [...header.querySelectorAll("th")]
+        .slice(1)
+        .map((cell) => cell.textContent),
+    ).toEqual(series.map((row) => row.as_of));
+  },
+  budget(30000),
+);

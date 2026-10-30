@@ -1,0 +1,492 @@
+{
+  "request": {
+    "scenarioJsons": [
+      "{\"id\":\"up_10bp\",\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"discount_curve_id\":null,\"bp\":10}]}",
+      "{\"id\":\"down_15bp\",\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"discount_curve_id\":null,\"bp\":-15}]}"
+    ]
+  },
+  "batch": {
+    "positionIds": ["POS-0", "POS-1"],
+    "items": [
+      {
+        "scenario_id": "up_10bp",
+        "pnl": {
+          "total": {
+            "amount": "-1487.415379039",
+            "currency": "USD"
+          },
+          "by_position": {
+            "POS-0": {
+              "amount": "-495.805126346",
+              "currency": "USD"
+            },
+            "POS-1": {
+              "amount": "-991.610252693",
+              "currency": "USD"
+            }
+          }
+        },
+        "report": {
+          "operations_applied": 1,
+          "user_operations": 1,
+          "expanded_operations": 1,
+          "changes": {
+            "market_targets": [
+              {
+                "kind": "curve",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS"
+              }
+            ],
+            "changed_instrument_indices": [],
+            "as_of_changed": false,
+            "portfolio_shape_changed": false,
+            "all_dirty": false
+          },
+          "applied_shocks": [
+            {
+              "applies_to": {
+                "scope": "market",
+                "target": {
+                  "kind": "curve",
+                  "curve_kind": "discount",
+                  "curve_id": "USD-OIS"
+                }
+              },
+              "shock": {
+                "kind": "uniform",
+                "value": 10,
+                "unit": "bp"
+              }
+            }
+          ],
+          "warnings": [],
+          "meta": {
+            "numeric_mode": "f64",
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "fx_policy_applied": null,
+            "version": "0.11.0"
+          }
+        }
+      },
+      {
+        "scenario_id": "down_15bp",
+        "pnl": {
+          "total": {
+            "amount": "2232.506516544",
+            "currency": "USD"
+          },
+          "by_position": {
+            "POS-0": {
+              "amount": "744.168838848",
+              "currency": "USD"
+            },
+            "POS-1": {
+              "amount": "1488.337677696",
+              "currency": "USD"
+            }
+          }
+        },
+        "report": {
+          "operations_applied": 1,
+          "user_operations": 1,
+          "expanded_operations": 1,
+          "changes": {
+            "market_targets": [
+              {
+                "kind": "curve",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS"
+              }
+            ],
+            "changed_instrument_indices": [],
+            "as_of_changed": false,
+            "portfolio_shape_changed": false,
+            "all_dirty": false
+          },
+          "applied_shocks": [
+            {
+              "applies_to": {
+                "scope": "market",
+                "target": {
+                  "kind": "curve",
+                  "curve_kind": "discount",
+                  "curve_id": "USD-OIS"
+                }
+              },
+              "shock": {
+                "kind": "uniform",
+                "value": -15,
+                "unit": "bp"
+              }
+            }
+          ],
+          "warnings": [],
+          "meta": {
+            "numeric_mode": "f64",
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "fx_policy_applied": null,
+            "version": "0.11.0"
+          }
+        }
+      }
+    ]
+  },
+  "revalue": {
+    "scenarioJson": "{\"id\":\"up_10bp\",\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"discount_curve_id\":null,\"bp\":10}]}",
+    "positionIds": ["POS-0", "POS-1"],
+    "entityIds": ["FUND"],
+    "view": {
+      "valuation": {
+        "as_of": "2025-01-15",
+        "position_values": {
+          "POS-0": {
+            "position_id": "POS-0",
+            "entity_id": "FUND",
+            "value_native": {
+              "amount": "999580.135143957",
+              "currency": "USD"
+            },
+            "value_base": {
+              "amount": "999580.135143957",
+              "currency": "USD"
+            },
+            "metric_scale": 1,
+            "risk_metrics_complete": true,
+            "valuation_result": {
+              "schema_version": 1,
+              "instrument_id": "DEP-0",
+              "as_of": "2025-01-15",
+              "value": {
+                "amount": "999580.1351439571909029128236",
+                "currency": "USD"
+              },
+              "measures": {
+                "dv01": -49.56822042062413
+              },
+              "meta": {
+                "numeric_mode": "f64",
+                "rounding": {
+                  "mode": "bankers",
+                  "ingest_scale_by_currency": {},
+                  "output_scale_by_currency": {},
+                  "tolerances": {
+                    "generic_epsilon": 1e-10
+                  },
+                  "version": 1
+                },
+                "fx_policy_applied": null,
+                "version": "0.11.0"
+              },
+              "covenants": null,
+              "provenance": {
+                "model": "discounting",
+                "requested_as_of": "2025-01-15",
+                "market_dependencies": {
+                  "curves": {
+                    "discount_curves": ["USD-OIS"],
+                    "forward_curves": [],
+                    "credit_curves": [],
+                    "inflation_curves": []
+                  },
+                  "market_scalar_ids": [],
+                  "volatility_dependencies": [],
+                  "fx_pairs": [],
+                  "series_ids": []
+                },
+                "sensitivity_bumps": {
+                  "rate_bump_bp": 1,
+                  "credit_spread_bump_bp": 1,
+                  "spot_bump_decimal": 0.01,
+                  "vol_bump_decimal": 0.01
+                }
+              }
+            }
+          },
+          "POS-1": {
+            "position_id": "POS-1",
+            "entity_id": "FUND",
+            "value_native": {
+              "amount": "1999160.270287914",
+              "currency": "USD"
+            },
+            "value_base": {
+              "amount": "1999160.270287914",
+              "currency": "USD"
+            },
+            "metric_scale": 1,
+            "risk_metrics_complete": true,
+            "valuation_result": {
+              "schema_version": 1,
+              "instrument_id": "DEP-1",
+              "as_of": "2025-01-15",
+              "value": {
+                "amount": "1999160.2702879143818058256473",
+                "currency": "USD"
+              },
+              "measures": {
+                "dv01": -99.13644084124826
+              },
+              "meta": {
+                "numeric_mode": "f64",
+                "rounding": {
+                  "mode": "bankers",
+                  "ingest_scale_by_currency": {},
+                  "output_scale_by_currency": {},
+                  "tolerances": {
+                    "generic_epsilon": 1e-10
+                  },
+                  "version": 1
+                },
+                "fx_policy_applied": null,
+                "version": "0.11.0"
+              },
+              "covenants": null,
+              "provenance": {
+                "model": "discounting",
+                "requested_as_of": "2025-01-15",
+                "market_dependencies": {
+                  "curves": {
+                    "discount_curves": ["USD-OIS"],
+                    "forward_curves": [],
+                    "credit_curves": [],
+                    "inflation_curves": []
+                  },
+                  "market_scalar_ids": [],
+                  "volatility_dependencies": [],
+                  "fx_pairs": [],
+                  "series_ids": []
+                },
+                "sensitivity_bumps": {
+                  "rate_bump_bp": 1,
+                  "credit_spread_bump_bp": 1,
+                  "spot_bump_decimal": 0.01,
+                  "vol_bump_decimal": 0.01
+                }
+              }
+            }
+          }
+        },
+        "total_base_currency": {
+          "amount": "2998740.405431871",
+          "currency": "USD"
+        },
+        "by_entity": {
+          "FUND": {
+            "amount": "2998740.405431871",
+            "currency": "USD"
+          }
+        },
+        "fx_collapse_policy": "cashflow_date"
+      },
+      "report": {
+        "operations_applied": 1,
+        "user_operations": 1,
+        "expanded_operations": 1,
+        "changes": {
+          "market_targets": [
+            {
+              "kind": "curve",
+              "curve_kind": "discount",
+              "curve_id": "USD-OIS"
+            }
+          ],
+          "changed_instrument_indices": [],
+          "as_of_changed": false,
+          "portfolio_shape_changed": false,
+          "all_dirty": false
+        },
+        "applied_shocks": [
+          {
+            "applies_to": {
+              "scope": "market",
+              "target": {
+                "kind": "curve",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS"
+              }
+            },
+            "shock": {
+              "kind": "uniform",
+              "value": 10,
+              "unit": "bp"
+            }
+          }
+        ],
+        "warnings": [],
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      }
+    }
+  },
+  "expected": {
+    "scenario_pnl_batch": [
+      {
+        "scenario_id": "up_10bp",
+        "pnl": {
+          "total": {
+            "amount": "-1487.415379039",
+            "currency": "USD"
+          },
+          "by_position": {
+            "POS-0": {
+              "amount": "-495.805126346",
+              "currency": "USD"
+            },
+            "POS-1": {
+              "amount": "-991.610252693",
+              "currency": "USD"
+            }
+          }
+        },
+        "report": {
+          "operations_applied": 1,
+          "user_operations": 1,
+          "expanded_operations": 1,
+          "changes": {
+            "market_targets": [
+              {
+                "kind": "curve",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS"
+              }
+            ],
+            "changed_instrument_indices": [],
+            "as_of_changed": false,
+            "portfolio_shape_changed": false,
+            "all_dirty": false
+          },
+          "applied_shocks": [
+            {
+              "applies_to": {
+                "scope": "market",
+                "target": {
+                  "kind": "curve",
+                  "curve_kind": "discount",
+                  "curve_id": "USD-OIS"
+                }
+              },
+              "shock": {
+                "kind": "uniform",
+                "value": 10,
+                "unit": "bp"
+              }
+            }
+          ],
+          "warnings": [],
+          "meta": {
+            "numeric_mode": "f64",
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "fx_policy_applied": null,
+            "version": "0.11.0"
+          }
+        }
+      },
+      {
+        "scenario_id": "down_15bp",
+        "pnl": {
+          "total": {
+            "amount": "2232.506516544",
+            "currency": "USD"
+          },
+          "by_position": {
+            "POS-0": {
+              "amount": "744.168838848",
+              "currency": "USD"
+            },
+            "POS-1": {
+              "amount": "1488.337677696",
+              "currency": "USD"
+            }
+          }
+        },
+        "report": {
+          "operations_applied": 1,
+          "user_operations": 1,
+          "expanded_operations": 1,
+          "changes": {
+            "market_targets": [
+              {
+                "kind": "curve",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS"
+              }
+            ],
+            "changed_instrument_indices": [],
+            "as_of_changed": false,
+            "portfolio_shape_changed": false,
+            "all_dirty": false
+          },
+          "applied_shocks": [
+            {
+              "applies_to": {
+                "scope": "market",
+                "target": {
+                  "kind": "curve",
+                  "curve_kind": "discount",
+                  "curve_id": "USD-OIS"
+                }
+              },
+              "shock": {
+                "kind": "uniform",
+                "value": -15,
+                "unit": "bp"
+              }
+            }
+          ],
+          "warnings": [],
+          "meta": {
+            "numeric_mode": "f64",
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "fx_policy_applied": null,
+            "version": "0.11.0"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -271,7 +271,7 @@
         "type": "monetary",
         "currency": "USD"
       },
-      "formula_text": "(debt_opening + debt_closing) * 0.01075"
+      "formula_text": "(debt_opening + total_debt) * 0.01075"
     },
     "pretax_income": {
       "node_id": "pretax_income",
@@ -427,8 +427,8 @@
         "method": "forward_fill"
       }
     },
-    "debt_closing": {
-      "node_id": "debt_closing",
+    "total_debt": {
+      "node_id": "total_debt",
       "name": "Debt, closing balance",
       "node_type": "calculated",
       "tags": ["debt", "balance_sheet"],
@@ -447,7 +447,42 @@
         "type": "monetary",
         "currency": "USD"
       },
-      "formula_text": "debt_closing - debt_draws + debt_repayments"
+      "formula_text": "total_debt - debt_draws + debt_repayments"
+    },
+    "cash": {
+      "node_id": "cash",
+      "name": "Cash and equivalents",
+      "node_type": "mixed",
+      "tags": ["balance_sheet"],
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "values": {
+        "2024Q1": {
+          "amount": "86500000",
+          "currency": "USD"
+        },
+        "2024Q2": {
+          "amount": "94200000",
+          "currency": "USD"
+        },
+        "2024Q3": {
+          "amount": "101800000",
+          "currency": "USD"
+        },
+        "2024Q4": {
+          "amount": "108300000",
+          "currency": "USD"
+        },
+        "2025Q1": {
+          "amount": "113600000",
+          "currency": "USD"
+        }
+      },
+      "forecast": {
+        "method": "forward_fill"
+      }
     },
     "ltm_ebitda": {
       "node_id": "ltm_ebitda",
@@ -468,7 +503,7 @@
       "value_type": {
         "type": "scalar"
       },
-      "formula_text": "debt_closing / ltm_ebitda"
+      "formula_text": "total_debt / ltm_ebitda"
     },
     "interest_coverage": {
       "node_id": "interest_coverage",
@@ -491,8 +526,8 @@
       },
       "formula_text": "revenue * 0.055"
     },
-    "fcf": {
-      "node_id": "fcf",
+    "free_cash_flow": {
+      "node_id": "free_cash_flow",
       "name": "Free cash flow, pre-financing",
       "node_type": "calculated",
       "tags": ["cash_flow", "headline"],
@@ -501,11 +536,22 @@
         "currency": "USD"
       },
       "formula_text": "ebitda - taxes - capex"
+    },
+    "ufcf": {
+      "node_id": "ufcf",
+      "name": "Unlevered free cash flow",
+      "node_type": "calculated",
+      "tags": ["cash_flow"],
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "formula_text": "ebitda - ebit * 0.235 - capex"
     }
   },
   "meta": {
     "entity": "Acme Software Holdings",
-    "reporting_currency": "USD",
+    "currency": "USD",
     "frequency": "quarterly"
   }
 }

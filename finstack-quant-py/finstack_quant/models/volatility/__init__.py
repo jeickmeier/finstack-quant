@@ -16,6 +16,7 @@ calibrate_svi = _volatility.calibrate_svi
 check_butterfly_grid = _volatility.check_butterfly_grid
 check_calendar_spread_grid = _volatility.check_calendar_spread_grid
 check_local_vol_density_grid = _volatility.check_local_vol_density_grid
+check_surface = _volatility.check_surface
 check_surface_grid = _volatility.check_surface_grid
 convert_atm_volatility = _volatility.convert_atm_volatility
 delta_to_strike = _volatility.delta_to_strike
@@ -50,6 +51,7 @@ __all__ = [
     "check_butterfly_grid",
     "check_calendar_spread_grid",
     "check_local_vol_density_grid",
+    "check_surface",
     "check_surface_grid",
     "convert_atm_volatility",
     "delta_to_strike",

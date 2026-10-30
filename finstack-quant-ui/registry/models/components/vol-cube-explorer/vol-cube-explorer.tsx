@@ -16,6 +16,10 @@ import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
+import {
+  VolCubeSlice,
+  type VolCubeSliceProps,
+} from "@/components/finstack/models/components/vol-cube-slice/vol-cube-slice";
 export interface CubePoint extends SurfacePoint {
   coordinate: CubeSampleRequest["coordinates"][number];
 }
@@ -40,6 +44,11 @@ export interface VolCubeExplorerProps extends Omit<
   >;
   /** Supplied sampling coordinates. Omit to sample the canonical expiry/tenor nodes. */
   coordinates?: readonly { expiry: number; tenor: number }[];
+  /** Explicit strikes (and optional rate and repair passes) for the Rust-materialized slice and node smile. Omit to show no slice. */
+  slice?: Pick<
+    VolCubeSliceProps,
+    "initialStrikes" | "initialAxis" | "initialRate" | "repairIterations"
+  >;
 }
 /** Checked native SABR evaluation with an explicit strike/convention and separate original parameters. */
 export function VolCubeExplorer(props: VolCubeExplorerProps) {
@@ -174,6 +183,16 @@ export function VolCubeExplorer(props: VolCubeExplorerProps) {
         }}
         description={`Native ${valueLabel} at absolute strike ${strike}. Samples use the selected checked evaluator; no coordinate clamping or forward-offset conversion.`}
       />
+      {props.slice ? (
+        <VolCubeSlice
+          {...props.slice}
+          cube={props.cube}
+          initialConvention={props.initialConvention}
+          colorDomains={props.colorDomains}
+          width={props.width}
+          height={props.height}
+        />
+      ) : null}
     </section>
   );
 }

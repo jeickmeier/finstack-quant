@@ -28,9 +28,17 @@ function WorkbenchRoute() {
             initialStrike: 0.05,
             initialConvention: "normal",
             colorDomains: { normal: [0, 0.1], black_lognormal: [0, 2] },
+            slice: {
+              initialStrikes: [0.03, 0.04, 0.05, 0.06, 0.07],
+              initialRate: 0.04,
+              repairIterations: 10,
+            },
           })}
           fxOptions={() => ({
             coordinates: [{ expiry: 1, strike: 1.1, forward: 1.12 }],
+            initialSpot: 1.1,
+            initialDomesticRate: 0.04,
+            initialForeignRate: 0.03,
             colorDomain: [0, 1],
           })}
           defaultInstrumentType={type}

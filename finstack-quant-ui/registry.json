@@ -10,6 +10,11 @@
     "registry/valuations/registry.json",
     "registry/calibration/registry.json",
     "registry/covenants/registry.json",
+    "registry/scenarios/registry.json",
+    "registry/attribution/registry.json",
+    "registry/analytics/registry.json",
+    "registry/portfolio/registry.json",
+    "registry/margin/registry.json",
     "registry/models/registry.json",
     "registry/statements/registry.json"
   ],
@@ -190,6 +195,237 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-oas-config",
+      "type": "registry:lib",
+      "title": "OAS config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust oas_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/oas_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/oas_config.json"
+        },
+        {
+          "path": "src/generated/types/oas_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/oas_config.ts"
+        },
+        {
+          "path": "src/generated/meta/oas_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/oas_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-scenario-grid",
+      "type": "registry:lib",
+      "title": "Scenario grid contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust scenario_grid contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/scenario_grid.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/scenario_grid.json"
+        },
+        {
+          "path": "src/generated/types/scenario_grid.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/scenario_grid.ts"
+        },
+        {
+          "path": "src/generated/meta/scenario_grid.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/scenario_grid.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-covenant-engine",
+      "type": "registry:lib",
+      "title": "Covenant engine contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust covenant_engine contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/covenant_engine.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/covenant_engine.json"
+        },
+        {
+          "path": "src/generated/types/covenant_engine.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/covenant_engine.ts"
+        },
+        {
+          "path": "src/generated/meta/covenant_engine.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/covenant_engine.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-covenant-forecast-config",
+      "type": "registry:lib",
+      "title": "Covenant forecast config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust covenant_forecast_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/covenant_forecast_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/covenant_forecast_config.json"
+        },
+        {
+          "path": "src/generated/types/covenant_forecast_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/covenant_forecast_config.ts"
+        },
+        {
+          "path": "src/generated/meta/covenant_forecast_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/covenant_forecast_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-covenant-report",
+      "type": "registry:lib",
+      "title": "Covenant report contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust covenant_report contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/covenant_report.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/covenant_report.json"
+        },
+        {
+          "path": "src/generated/types/covenant_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/covenant_report.ts"
+        },
+        {
+          "path": "src/generated/meta/covenant_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/covenant_report.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-dated-covenant-reports",
+      "type": "registry:lib",
+      "title": "Dated covenant reports contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust dated_covenant_reports contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/dated_covenant_reports.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/dated_covenant_reports.json"
+        },
+        {
+          "path": "src/generated/types/dated_covenant_reports.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/dated_covenant_reports.ts"
+        },
+        {
+          "path": "src/generated/meta/dated_covenant_reports.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/dated_covenant_reports.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-future-breach",
+      "type": "registry:lib",
+      "title": "Future breach contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust future_breach contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/future_breach.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/future_breach.json"
+        },
+        {
+          "path": "src/generated/types/future_breach.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/future_breach.ts"
+        },
+        {
+          "path": "src/generated/meta/future_breach.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/future_breach.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json"
         ]
       }
     },
@@ -3560,6 +3796,138 @@
       }
     },
     {
+      "name": "contract-csa-spec",
+      "type": "registry:lib",
+      "title": "Csa spec contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust csa_spec contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/csa_spec.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/csa_spec.json"
+        },
+        {
+          "path": "src/generated/types/csa_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/csa_spec.ts"
+        },
+        {
+          "path": "src/generated/meta/csa_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/csa_spec.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/csa_spec.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-im-result",
+      "type": "registry:lib",
+      "title": "Im result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust im_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/im_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/im_result.json"
+        },
+        {
+          "path": "src/generated/types/im_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/im_result.ts"
+        },
+        {
+          "path": "src/generated/meta/im_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/im_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-simm-sensitivities-json",
+      "type": "registry:lib",
+      "title": "Simm sensitivities json contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust simm_sensitivities_json contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/simm_sensitivities_json.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/simm_sensitivities_json.json"
+        },
+        {
+          "path": "src/generated/types/simm_sensitivities_json.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/simm_sensitivities_json.ts"
+        },
+        {
+          "path": "src/generated/meta/simm_sensitivities_json.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/simm_sensitivities_json.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-vm-result",
+      "type": "registry:lib",
+      "title": "Vm result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust vm_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/vm_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/vm_result.json"
+        },
+        {
+          "path": "src/generated/types/vm_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/vm_result.ts"
+        },
+        {
+          "path": "src/generated/meta/vm_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/vm_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-market-context-state",
       "type": "registry:lib",
       "title": "Market context state contract",
@@ -3589,6 +3957,369 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-altman-z-double-prime-input",
+      "type": "registry:lib",
+      "title": "Altman z double prime input contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust altman_z_double_prime_input contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/altman_z_double_prime_input.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/altman_z_double_prime_input.json"
+        },
+        {
+          "path": "src/generated/types/altman_z_double_prime_input.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/altman_z_double_prime_input.ts"
+        },
+        {
+          "path": "src/generated/meta/altman_z_double_prime_input.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/altman_z_double_prime_input.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/altman_z_double_prime_input.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-altman-z-prime-input",
+      "type": "registry:lib",
+      "title": "Altman z prime input contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust altman_z_prime_input contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/altman_z_prime_input.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/altman_z_prime_input.json"
+        },
+        {
+          "path": "src/generated/types/altman_z_prime_input.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/altman_z_prime_input.ts"
+        },
+        {
+          "path": "src/generated/meta/altman_z_prime_input.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/altman_z_prime_input.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/altman_z_prime_input.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-altman-z-score-input",
+      "type": "registry:lib",
+      "title": "Altman z score input contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust altman_z_score_input contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/altman_z_score_input.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/altman_z_score_input.json"
+        },
+        {
+          "path": "src/generated/types/altman_z_score_input.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/altman_z_score_input.ts"
+        },
+        {
+          "path": "src/generated/meta/altman_z_score_input.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/altman_z_score_input.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/altman_z_score_input.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-arbitrage-report",
+      "type": "registry:lib",
+      "title": "Arbitrage report contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust arbitrage_report contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/arbitrage_report.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/arbitrage_report.json"
+        },
+        {
+          "path": "src/generated/types/arbitrage_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/arbitrage_report.ts"
+        },
+        {
+          "path": "src/generated/meta/arbitrage_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/arbitrage_report.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/arbitrage_report.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-merton-model",
+      "type": "registry:lib",
+      "title": "Merton model contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust merton_model contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/merton_model.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/merton_model.json"
+        },
+        {
+          "path": "src/generated/types/merton_model.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/merton_model.ts"
+        },
+        {
+          "path": "src/generated/meta/merton_model.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/merton_model.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/merton_model.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-ohlson-o-score-input",
+      "type": "registry:lib",
+      "title": "Ohlson o score input contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust ohlson_o_score_input contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/ohlson_o_score_input.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/ohlson_o_score_input.json"
+        },
+        {
+          "path": "src/generated/types/ohlson_o_score_input.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/ohlson_o_score_input.ts"
+        },
+        {
+          "path": "src/generated/meta/ohlson_o_score_input.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/ohlson_o_score_input.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/ohlson_o_score_input.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-zmijewski-input",
+      "type": "registry:lib",
+      "title": "Zmijewski input contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust zmijewski_input contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/zmijewski_input.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/zmijewski_input.json"
+        },
+        {
+          "path": "src/generated/types/zmijewski_input.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/zmijewski_input.ts"
+        },
+        {
+          "path": "src/generated/meta/zmijewski_input.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/zmijewski_input.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/zmijewski_input.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-portfolio-margin-result",
+      "type": "registry:lib",
+      "title": "Portfolio margin result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust portfolio_margin_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/portfolio_margin_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/portfolio_margin_result.json"
+        },
+        {
+          "path": "src/generated/types/portfolio_margin_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/portfolio_margin_result.ts"
+        },
+        {
+          "path": "src/generated/meta/portfolio_margin_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/portfolio_margin_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-portfolio-result",
+      "type": "registry:lib",
+      "title": "Portfolio result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust portfolio_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/portfolio_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/portfolio_result.json"
+        },
+        {
+          "path": "src/generated/types/portfolio_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/portfolio_result.ts"
+        },
+        {
+          "path": "src/generated/meta/portfolio_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/portfolio_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/portfolio/1/portfolio_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-scenario-pnl-batch-item",
+      "type": "registry:lib",
+      "title": "Scenario pnl batch item contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust scenario_pnl_batch_item contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/scenario_pnl_batch_item.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/scenario_pnl_batch_item.json"
+        },
+        {
+          "path": "src/generated/types/scenario_pnl_batch_item.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/scenario_pnl_batch_item.ts"
+        },
+        {
+          "path": "src/generated/meta/scenario_pnl_batch_item.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/scenario_pnl_batch_item.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-scenario-revalue-view",
+      "type": "registry:lib",
+      "title": "Scenario revalue view contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust scenario_revalue_view contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/scenario_revalue_view.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/scenario_revalue_view.json"
+        },
+        {
+          "path": "src/generated/types/scenario_revalue_view.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/scenario_revalue_view.ts"
+        },
+        {
+          "path": "src/generated/meta/scenario_revalue_view.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/scenario_revalue_view.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json"
         ]
       }
     },
@@ -3659,6 +4390,303 @@
       }
     },
     {
+      "name": "contract-scenario-spec",
+      "type": "registry:lib",
+      "title": "Scenario spec contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust scenario_spec contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/scenario_spec.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/scenario_spec.json"
+        },
+        {
+          "path": "src/generated/types/scenario_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/scenario_spec.ts"
+        },
+        {
+          "path": "src/generated/meta/scenario_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/scenario_spec.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-bridge-chart",
+      "type": "registry:lib",
+      "title": "Bridge chart contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust bridge_chart contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/bridge_chart.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/bridge_chart.json"
+        },
+        {
+          "path": "src/generated/types/bridge_chart.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/bridge_chart.ts"
+        },
+        {
+          "path": "src/generated/meta/bridge_chart.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/bridge_chart.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-credit-assessment",
+      "type": "registry:lib",
+      "title": "Credit assessment contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust credit_assessment contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/credit_assessment.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/credit_assessment.json"
+        },
+        {
+          "path": "src/generated/types/credit_assessment.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/credit_assessment.ts"
+        },
+        {
+          "path": "src/generated/meta/credit_assessment.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/credit_assessment.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-dcf-options",
+      "type": "registry:lib",
+      "title": "Dcf options contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust dcf_options contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/dcf_options.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/dcf_options.json"
+        },
+        {
+          "path": "src/generated/types/dcf_options.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/dcf_options.ts"
+        },
+        {
+          "path": "src/generated/meta/dcf_options.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/dcf_options.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-dcf-sensitivity-result",
+      "type": "registry:lib",
+      "title": "Dcf sensitivity result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust dcf_sensitivity_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/dcf_sensitivity_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/dcf_sensitivity_result.json"
+        },
+        {
+          "path": "src/generated/types/dcf_sensitivity_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/dcf_sensitivity_result.ts"
+        },
+        {
+          "path": "src/generated/meta/dcf_sensitivity_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/dcf_sensitivity_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-forecast-metrics",
+      "type": "registry:lib",
+      "title": "Forecast metrics contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust forecast_metrics contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/forecast_metrics.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/forecast_metrics.json"
+        },
+        {
+          "path": "src/generated/types/forecast_metrics.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/forecast_metrics.ts"
+        },
+        {
+          "path": "src/generated/meta/forecast_metrics.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/forecast_metrics.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-lbo-config",
+      "type": "registry:lib",
+      "title": "Lbo config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust lbo_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/lbo_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/lbo_config.json"
+        },
+        {
+          "path": "src/generated/types/lbo_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/lbo_config.ts"
+        },
+        {
+          "path": "src/generated/meta/lbo_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/lbo_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-lbo-result",
+      "type": "registry:lib",
+      "title": "Lbo result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust lbo_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/lbo_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/lbo_result.json"
+        },
+        {
+          "path": "src/generated/types/lbo_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/lbo_result.ts"
+        },
+        {
+          "path": "src/generated/meta/lbo_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/lbo_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-scenario-diff",
+      "type": "registry:lib",
+      "title": "Scenario diff contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust scenario_diff contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/scenario_diff.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/scenario_diff.json"
+        },
+        {
+          "path": "src/generated/types/scenario_diff.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/scenario_diff.ts"
+        },
+        {
+          "path": "src/generated/meta/scenario_diff.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/scenario_diff.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-scenario-set",
       "type": "registry:lib",
       "title": "Scenario set contract",
@@ -3688,6 +4716,72 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-sensitivity-result",
+      "type": "registry:lib",
+      "title": "Sensitivity result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust sensitivity_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/sensitivity_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/sensitivity_result.json"
+        },
+        {
+          "path": "src/generated/types/sensitivity_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/sensitivity_result.ts"
+        },
+        {
+          "path": "src/generated/meta/sensitivity_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/sensitivity_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-variance-config",
+      "type": "registry:lib",
+      "title": "Variance config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust variance_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/variance_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/variance_config.json"
+        },
+        {
+          "path": "src/generated/types/variance_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/variance_config.ts"
+        },
+        {
+          "path": "src/generated/meta/variance_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/variance_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/variance_config.schema.json"
         ]
       }
     },
@@ -3763,6 +4857,72 @@
       }
     },
     {
+      "name": "contract-monte-carlo-config",
+      "type": "registry:lib",
+      "title": "Monte carlo config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust monte_carlo_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/monte_carlo_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/monte_carlo_config.json"
+        },
+        {
+          "path": "src/generated/types/monte_carlo_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/monte_carlo_config.ts"
+        },
+        {
+          "path": "src/generated/meta/monte_carlo_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/monte_carlo_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-monte-carlo-results",
+      "type": "registry:lib",
+      "title": "Monte carlo results contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust monte_carlo_results contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/monte_carlo_results.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/monte_carlo_results.json"
+        },
+        {
+          "path": "src/generated/types/monte_carlo_results.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/monte_carlo_results.ts"
+        },
+        {
+          "path": "src/generated/meta/monte_carlo_results.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/monte_carlo_results.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-rollup-spec",
       "type": "registry:lib",
       "title": "Rollup spec contract",
@@ -3825,6 +4985,39 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-table-envelope",
+      "type": "registry:lib",
+      "title": "Table envelope contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust table_envelope contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/table_envelope.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/table_envelope.json"
+        },
+        {
+          "path": "src/generated/types/table_envelope.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/table_envelope.ts"
+        },
+        {
+          "path": "src/generated/meta/table_envelope.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/table_envelope.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },

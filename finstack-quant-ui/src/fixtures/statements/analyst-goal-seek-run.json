@@ -1,0 +1,8 @@
+{
+  "targetNode": "ebitda",
+  "targetPeriod": "2025Q4",
+  "targetValue": 70000000,
+  "driverNode": "revenue",
+  "driverPeriod": "2025Q4",
+  "bounds": [100000000, 500000000]
+}

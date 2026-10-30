@@ -15,6 +15,7 @@ use finstack_quant_models::pde::{BlackScholesPde, Grid1D, PdeProblem1D, Solver1D
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::arbitrage::{
     check_local_vol_density_grid, check_surface, check_surface_grid, ArbitrageCheckConfig,
+    ArbitrageSeverity, DEFAULT_ARBITRAGE_TOLERANCE,
 };
 
 #[test]
@@ -215,4 +216,25 @@ fn pde_rejects_exercise_dates_that_would_be_silently_dropped() {
         .solve(&problem, 1.0)
         .unwrap();
     assert!(bermudan.interpolate(50.0_f64.ln()) > european + 4.0);
+}
+
+#[test]
+fn arbitrage_check_config_fills_omitted_fields_from_default_and_rejects_unknown_ones() {
+    let config: ArbitrageCheckConfig =
+        serde_json::from_str(r#"{"forward_prices":[100.0]}"#).unwrap();
+    assert_eq!(config.forward_prices, Some(vec![100.0]));
+    assert!(config.check_butterfly && config.check_calendar_spread);
+    assert!(config.check_local_vol_density);
+    assert_eq!(config.tolerance, DEFAULT_ARBITRAGE_TOLERANCE);
+    assert_eq!(config.min_severity, ArbitrageSeverity::Negligible);
+
+    let surface = VolSurface::builder("flat")
+        .expiries(&[1.0, 2.0])
+        .strikes(&[90.0, 100.0, 110.0])
+        .rows(&[vec![0.2; 3], vec![0.2; 3]])
+        .build()
+        .unwrap();
+    assert!(check_surface(&surface, &config).unwrap().passed);
+
+    assert!(serde_json::from_str::<ArbitrageCheckConfig>(r#"{"forwards":[100.0]}"#).is_err());
 }

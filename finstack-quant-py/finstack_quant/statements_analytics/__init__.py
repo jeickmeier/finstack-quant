@@ -43,6 +43,8 @@ credit_assessment = _sa.credit_assessment
 DependencyTracer = _sa.DependencyTracer
 DependencyTree = _sa.DependencyTree
 explain_formula = _sa.explain_formula
+evaluate_covenants = _sa.evaluate_covenants
+forecast_breaches = _sa.forecast_breaches
 run_checks = _sa.run_checks
 run_three_statement_checks = _sa.run_three_statement_checks
 run_credit_underwriting_checks = _sa.run_credit_underwriting_checks
@@ -215,11 +217,13 @@ __all__: list[str] = [
     "credit_assessment",
     "credit_assessment_report_text",
     "dcf_sensitivity",
+    "evaluate_covenants",
     "evaluate_dcf",
     "evaluate_lbo",
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",
     "explain_formula",
+    "forecast_breaches",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",

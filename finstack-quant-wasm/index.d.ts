@@ -23174,6 +23174,22 @@ export interface ValuationInstrumentsNamespace {
    */
   metricMetadata(keys: string[]): MetricMetadata[];
   /**
+   * List the standard metrics registered for one instrument type, grouped by
+   * display category.
+   * @example
+   * ```typescript
+   * import init, { valuations } from "finstack-quant-wasm";
+   * await init();
+   * const grouped = valuations.instruments.metricsForInstrument('structured_credit');
+   * const offersWal = Object.values(grouped).some((ids) => ids.includes('wal'));
+   * console.log(offersWal); // true
+   * ```
+   * @param instrumentType - Canonical instrument-type tag, matched exactly in snake case (for example `"bond"`, `"fx_option"` or `"structured_credit"`); the same tag an instrument envelope carries in its `type` field.
+   * @returns Applicable metric identifiers keyed by human-readable group name, each array sorted ascending.
+   * @throws Error - Throws a validation error when `instrumentType` is not a known instrument type, or a `TypeError` when it is not a string.
+   */
+  metricsForInstrument(instrumentType: string): Record<string, string[]>;
+  /**
    * Z-spread-equivalent discount margin for a floating-rate tranche, returned in
    * decimal units (`0.015` = 150 bp).
    *
@@ -28649,6 +28665,17 @@ export interface VolatilityNamespace {
     forwardPrices: NumericArray
   ): generated.models.ArbitrageViolation[];
   /**
+   * Run the configured butterfly, calendar-spread and local-vol density checks on a volatility surface.
+   * @param surface - `core.VolSurface` handle of unshifted Black lognormal volatilities on a strike axis (expiries in years, strikes in price units); it is read, not modified.
+   * @param config - `ArbitrageCheckConfig` as an object or JSON text. Every field is optional and an omitted one takes its Rust default: `check_butterfly`, `check_calendar_spread` and `check_local_vol_density` (default `true`); `forward_prices` (one finite positive forward to broadcast or one per expiry, required while any check is enabled); `tolerance` (non-negative, total-variance units, default `DEFAULT_ARBITRAGE_TOLERANCE` = 1e-10); `min_severity` (`"negligible"` default, `"minor"`, `"major"`, `"critical"`). Unknown fields are rejected.
+   * @returns The `ArbitrageReport` object (`vol_surface_id`, `violations` sorted most severe first, `passed`, `counts_by_type`, `counts_by_severity`).
+   * @throws Error - Throws a `validation` error if `config` has an unknown or mistyped field, the forwards are missing while a check is enabled, non-finite, non-positive or of the wrong length, the tolerance is negative or non-finite, or the surface is normal-quoted, shifted-Black or on a tenor axis.
+   */
+  checkSurface(
+    surface: VolSurface,
+    config: generated.models.ArbitrageCheckConfig | string
+  ): generated.models.ArbitrageReport;
+  /**
    * Run every static-arbitrage check on a strike by expiry volatility grid.
    * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
@@ -32551,6 +32578,54 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects malformed `results_json`, an `period` value that is not a valid statement period identifier, or failure to serialize the assessment to JavaScript.
    */
   creditAssessment(resultsJson: JsonInput, period: string): CreditAssessment;
+  /**
+   * Evaluate covenant compliance at the end of every statement result period.
+   *
+   * Each period that carries a value in `results` is tested on its last
+   * calendar day (from the model calendar) with the covenants applicable on
+   * that date: a covenant window covering the date replaces the engine's
+   * top-level specifications, and waivers and threshold schedules apply. A
+   * node is read only when an applicable covenant needs it, so a node that is
+   * missing or non-finite in a period where no applicable covenant reads it
+   * (for example a trailing ratio before four quarters of history, outside the
+   * window that tests it) does not throw. The engine's breach history is not
+   * updated.
+   *
+   * @param results - Evaluated `StatementResult` (object or JSON). Node ids are the covenant metric ids (`metric_id`, or each covenant type's conventional name); ratios in turns (`3.5` means 3.5x), amounts in the model currency.
+   * @param covenants - `CovenantEngine` handle whose specifications, windows, waivers and threshold schedules are evaluated.
+   * @param model - `FinancialModelSpec` (object or JSON) whose period calendar gives each result period's test date.
+   * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per result period in ascending period order, with the reports of the covenants applicable on that date keyed by covenant instance key in engine order. (Python returns the same reports as a long DataFrame.)
+   * @throws If `results` or `model` is malformed, a result period is missing from the model calendar, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).
+   */
+  evaluateCovenants(
+    results: StatementResult | string,
+    covenants: CovenantEngine,
+    model: JsonInput
+  ): generated.covenants.DatedCovenantReports[];
+  /**
+   * Forecast covenant breaches over every statement result period.
+   *
+   * Every period that carries a value in `results` is a test date (its last
+   * calendar day). Effective windows, waivers and threshold schedules are
+   * honored and non-numeric covenants are skipped. Deterministic breaches are
+   * always listed; in stochastic mode dates whose breach probability reaches
+   * `config.breach_probability_threshold` are listed too. Without
+   * `config.reference_date` the horizon starts the day before the first result
+   * period begins.
+   *
+   * @param results - Evaluated `StatementResult` (object or JSON) holding every metric the active numeric covenants read on each test date (ratios in turns).
+   * @param covenants - `CovenantEngine` handle whose effective specifications are forecast.
+   * @param model - `FinancialModelSpec` (object or JSON) whose period calendar gives the test dates and the default horizon start.
+   * @param config - Optional `CovenantForecastConfig` wire object; omitted means deterministic maintenance-scope forecasting.
+   * @returns `FutureBreach` wire objects sorted by breach date, then covenant id.
+   * @throws If `metrics` is empty or repeats a date, the engine or configuration is invalid or an observation is non-finite (kind `validation`), or a required metric is missing on a date (kind `not_found`).
+   */
+  forecastBreaches(
+    results: StatementResult | string,
+    covenants: CovenantEngine,
+    model: JsonInput,
+    config?: generated.covenants.CovenantForecastConfig | null
+  ): generated.covenants.FutureBreach[];
   /**
    * Run checks from a suite spec against a model.
    *

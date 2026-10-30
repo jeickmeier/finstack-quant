@@ -30,7 +30,23 @@ const sources = {
   cubes: "tests/core/cubes/cases.json",
   calibration: "tests/calibration/cases.json",
   scenarios: "tests/valuations/scenario-table/cases.json",
+  trancheAnalytics: "tests/valuations/scenario-table/tranche-analytics.json",
   cashflows: "tests/valuations/cashflows/cases.json",
+  marketScenario: "tests/scenarios/application/cases.json",
+  horizonReturn: "tests/scenarios/horizon/cases.json",
+  scenarioTemplates: "tests/scenarios/templates/cases.json",
+  pnlAttribution: "tests/attribution/cases.json",
+  performance: "tests/analytics/explicit.json",
+  benchmark: "tests/analytics/benchmark.json",
+  credit: "tests/models/credit/migration.json",
+  merton: "tests/models/credit/merton.json",
+  scorecard: "tests/models/credit/scorecard.json",
+  positionRisk: "tests/models/risk/cases.json",
+  simm: "src/fixtures/margin/simm.json",
+  vm: "src/fixtures/margin/vm.json",
+  portfolioValuation: "tests/portfolio/gallery.json",
+  scenarioPnl: "tests/portfolio/scenario-pnl.json",
+  portfolioMargin: "tests/portfolio/margin/cases.json",
   details: "tests/valuations/details/cases.json",
   irsInstrument:
     "../finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -39,12 +55,40 @@ const sources = {
   statementChecks: "src/fixtures/statements/analyst-checks.json",
   statementResult: "src/fixtures/statements/analyst-result.json",
   statementCheckReport: "src/fixtures/statements/analyst-check-report.json",
+  statementPlSummary: "src/fixtures/statements/analyst-pl-summary.json",
+  statementCreditAssessment:
+    "src/fixtures/statements/analyst-credit-assessment.json",
+  statementDcfAssumptions:
+    "src/fixtures/statements/analyst-dcf-assumptions.json",
+  statementDcf: "src/fixtures/statements/analyst-dcf.json",
+  statementDcfSensitivity:
+    "src/fixtures/statements/analyst-dcf-sensitivity.json",
+  statementLboConfig: "src/fixtures/statements/analyst-lbo-config.json",
+  statementLbo: "src/fixtures/statements/analyst-lbo.json",
+  statementSensitivityRun:
+    "src/fixtures/statements/analyst-sensitivity-run.json",
+  statementSensitivity: "src/fixtures/statements/analyst-sensitivity.json",
+  statementGoalSeekRun: "src/fixtures/statements/analyst-goal-seek-run.json",
+  statementGoalSeek: "src/fixtures/statements/analyst-goal-seek.json",
+  statementBridge: "src/fixtures/statements/analyst-bridge.json",
+  statementBacktest: "src/fixtures/statements/analyst-backtest.json",
+  statementMonteCarloConfig:
+    "src/fixtures/statements/analyst-monte-carlo-config.json",
+  statementMonteCarlo: "src/fixtures/statements/analyst-monte-carlo.json",
+  statementMonteCarloBreach:
+    "src/fixtures/statements/analyst-monte-carlo-breach.json",
+  statementScenarios: "src/fixtures/statements/analyst-scenarios.json",
+  statementScenarioDiff: "src/fixtures/statements/analyst-scenario-diff.json",
   statementRollForward2025Q2:
     "src/fixtures/statements/roll-forward-2025Q2.json",
   statementRollForward2025Q3:
     "src/fixtures/statements/roll-forward-2025Q3.json",
   statementRollForward2025Q4:
     "src/fixtures/statements/roll-forward-2025Q4.json",
+  covenantSeries: "src/fixtures/covenants/analyst-covenant-series.json",
+  covenantEngine: "src/fixtures/covenants/analyst-covenants.json",
+  covenantForecastConfig: "src/fixtures/covenants/analyst-forecast-config.json",
+  covenantBreachForecast: "src/fixtures/covenants/analyst-breach-forecast.json",
 };
 // The example maps are hand-written: an unmapped visual item renders a crashing gallery page.
 const exampleMaps = (
