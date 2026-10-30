@@ -35,7 +35,7 @@ export function priceOptions(
 export function usePriceInstrument(request: PriceRequest, enabled = true) {
   return useWorkerQuery((worker) => ({
     ...priceOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && enabled,
+    enabled,
   }));
 }
 /** Registry options are immutable within one initialized worker session. */
@@ -46,7 +46,6 @@ function useOptions<T>(
   return useWorkerQuery((worker) => ({
     queryKey: ["finstack", worker.session, operation],
     queryFn: () => fetch(worker.client!),
-    enabled: worker.status === "ready",
     ...workerQueryPolicy,
   }));
 }
@@ -59,7 +58,7 @@ export function useMetrics(instrumentType: string | null) {
   return useWorkerQuery((worker) => ({
     queryKey: ["finstack", worker.session, "metrics", instrumentType] as const,
     queryFn: () => worker.client!.call("metrics", instrumentType!),
-    enabled: worker.status === "ready" && instrumentType !== null,
+    enabled: instrumentType !== null,
     ...workerQueryPolicy,
   }));
 }
@@ -69,7 +68,7 @@ export function useMoneyFormat(request: MoneyFormatRequest | null) {
   return useWorkerQuery((worker) => ({
     queryKey: ["finstack", worker.session, "formatMoney", snapshot] as const,
     queryFn: () => worker.client!.call("formatMoney", snapshot!),
-    enabled: worker.status === "ready" && snapshot !== null,
+    enabled: snapshot !== null,
     ...workerQueryPolicy,
   }));
 }
@@ -79,7 +78,7 @@ export function useMetricMetadata(keys: readonly string[], enabled = true) {
   return useWorkerQuery((worker) => ({
     queryKey: ["finstack", worker.session, "metricMetadata", snapshot] as const,
     queryFn: () => worker.client!.call("metricMetadata", snapshot),
-    enabled: worker.status === "ready" && enabled,
+    enabled,
     ...workerQueryPolicy,
   }));
 }

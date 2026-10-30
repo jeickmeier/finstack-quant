@@ -33,8 +33,7 @@ export function cashflowLadderOptions(
 export function useCashflowLadder(
   cashflows: CashflowEnvelope | null | undefined,
 ) {
-  return useWorkerQuery((worker) => ({
-    ...cashflowLadderOptions(worker.client, worker.session, cashflows),
-    enabled: worker.status === "ready" && cashflows != null,
-  }));
+  return useWorkerQuery((worker) =>
+    cashflowLadderOptions(worker.client, worker.session, cashflows),
+  );
 }
