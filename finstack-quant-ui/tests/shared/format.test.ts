@@ -3,9 +3,7 @@ import { readFile } from "node:fs/promises";
 import init, { core } from "../../../finstack-quant-wasm/index.js";
 import type { MoneyValue } from "finstack-quant-wasm";
 import {
-  convertRate,
-  formatRate,
-  rateToWire,
+  formatPercent,
   formatMoney,
   formatRawMoney,
   groupDecimal,
@@ -18,7 +16,6 @@ import {
 } from "../../src/format/format";
 import {
   moneyColumn,
-  rateColumn,
   dateColumn,
   idColumn,
   signedColumn,
@@ -32,37 +29,12 @@ await init({
     ),
   ),
 });
-const presentation = {
-  source: "finstack-quant-wasm/index.d.ts#Rate",
-  wire: "decimal",
-  display: "bp",
-} as const;
-it("reverses 20-digit fractional presentation without a number conversion", () => {
-  const value = "0.12345678901234567890";
-  const display = formatRate(value, presentation);
-  expect(display).toEqual({ text: "1234.5678901234567890", unit: "bp" });
-  expect(rateToWire(display.text, presentation)).toBe("0.12345678901234567890");
-  expect(convertRate("12345678901234567890.12345", "decimal", "percent")).toBe(
-    "1234567890123456789012.345",
-  );
-  expect(convertRate("1234567890123456789012.345", "percent", "decimal")).toBe(
-    "12345678901234567890.12345",
-  );
-  expect(value).toBe("0.12345678901234567890");
-});
-it("formats small native numeric rates without exponent parsing loss", () => {
-  expect(formatRate(1e-7, presentation)).toEqual({ text: "0.001", unit: "bp" });
-});
-it("leaves unsupported-unit values and their spelling unchanged", () => {
-  expect(formatRate("0.12345678901234567890")).toEqual({
-    text: "0.12345678901234567890",
-    unit: null,
-  });
-  expect(rateToWire("001.2500")).toBe("001.2500");
-  expect(convertRate("001.2500", "decimal", "decimal")).toBe("001.2500");
-  expect(() => formatRate("0.1", { ...presentation, source: "" })).toThrow(
-    /source/,
-  );
+it("displays supplied fractions as exact percent digits", () => {
+  expect(formatPercent(0.25)).toBe("25");
+  expect(formatPercent(0.125)).toBe("12.5");
+  expect(formatPercent(1e-7)).toBe("0.00001");
+  expect(formatPercent(-0.05)).toBe("-5");
+  expect(formatPercent(0.07)).toBe("7");
 });
 it("groups decimal text exactly and preserves the wire string", () => {
   expect(groupDecimal("12345678901234567890.1234500")).toBe(
@@ -192,13 +164,12 @@ it("provides native Table v9 definitions with raw accessors and presentation met
   };
   const columns = [
     moneyColumn("money", (r: Row) => r.money),
-    rateColumn("rate", (r: Row) => r.rate, presentation),
     dateColumn("date", (r: Row) => r.date),
     idColumn("id", (r: Row) => r.id),
     signedColumn("delta", (r: Row) => r.delta),
   ];
   const nativeColumns: ColumnDef<{}, Row, any>[] = columns;
-  expect(nativeColumns).toHaveLength(5);
+  expect(nativeColumns).toHaveLength(4);
   for (const column of columns) {
     expect(column.meta.className).toBeTruthy();
     expect("accessorFn" in column).toBe(true);
@@ -213,13 +184,8 @@ it("provides native Table v9 definitions with raw accessors and presentation met
   ).toBe(true);
 });
 
-it("preserves canonical scientific decimal values in display conversion", () => {
+it("expands scientific decimal text when grouping", () => {
   expect(groupDecimal("1.2345e3")).toBe("1,234.5");
-  expect(formatRate("1.23e-7", presentation)).toEqual({
-    text: "0.00123",
-    unit: "bp",
-  });
-  expect(rateToWire("0.00123", presentation)).toBe("0.000000123");
 });
 
 it("orders tenor labels by Rust's year basis before other labels", () => {

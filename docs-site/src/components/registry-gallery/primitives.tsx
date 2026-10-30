@@ -5,7 +5,6 @@ import { Example as Example1 } from "./examples/field-frame";
 import { Example as Example2 } from "./examples/decimal-input";
 import { Example as Example3 } from "./examples/enum-field";
 import { Example as Example4 } from "./examples/money-input";
-import { Example as Example5 } from "./examples/rate-input";
 import { Example as Example6 } from "./examples/tenor-input";
 import { Example as Example7 } from "./examples/day-count-select";
 import { Example as Example8 } from "./examples/bdc-select";
@@ -29,7 +28,6 @@ const examples = {
   "decimal-input": Example2,
   "enum-field": Example3,
   "money-input": Example4,
-  "rate-input": Example5,
   "tenor-input": Example6,
   "day-count-select": Example7,
   "bdc-select": Example8,

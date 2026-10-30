@@ -7,14 +7,6 @@ export type RoundingStamp = Pick<
   ValuationResultWire["meta"]["rounding"],
   "mode" | "output_scale_by_currency"
 >;
-/** Presentation conventions explicitly documented by core.Rate; no field classification. */
-export type RateUnit = "decimal" | "percent" | "bp";
-/** A caller's source-backed choice of wire and display conventions. */
-export interface RatePresentation {
-  source: string;
-  wire: RateUnit;
-  display: RateUnit;
-}
 /** Existing native date operations, called in the worker or an initialized WASM host. */
 export type DateApi = Pick<CoreNamespace, "createDate" | "dateFromEpochDays">;
 
@@ -80,64 +72,13 @@ export function formatMoney(
   }
 }
 /**
- * Convert presentation units exactly using the published core.Rate convention.
- * @param value - Decimal text; fractional precision never passes through Number.
- * @param from - Explicit source unit: decimal, percent or basis points.
- * @param to - Explicit destination display unit.
- * @returns Exact decimal text; equivalent units return the original spelling.
+ * Display a supplied decimal fraction as percent digits.
+ * @param value - A decimal fraction as Rust returned it, such as `0.25`.
+ * @returns Exact percent digits with no sign appended, such as `25`.
  */
-export function convertRate(
-  value: string,
-  from: RateUnit,
-  to: RateUnit,
-): string {
-  if (from === to) return value;
-  // core.Rate documents decimal=1, percent=100, bp=10000. This is display scaling only.
-  const powers = { decimal: 0, percent: 2, bp: 4 };
-  if (!Object.hasOwn(powers, from) || !Object.hasOwn(powers, to))
-    throw new TypeError("Unsupported rate presentation unit");
-  // finstack-arith: TODO(boundary) RB-6 duplicates core.Rate unit scaling; the rate input path goes
-  const shift = powers[to] - powers[from];
-  const fraction = /^-?\d+(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(value);
-  if (!fraction)
-    throw new TypeError("Expected decimal text for rate presentation");
-  // finstack-arith: TODO(boundary) RB-6 duplicates core.Rate unit scaling; the rate input path goes
-  return new Big(value).times(`1e${shift}`).toFixed(
-    // finstack-arith: TODO(boundary) RB-6 duplicates core.Rate unit scaling; the rate input path goes
-    Math.max(
-      0,
-      // finstack-arith: TODO(boundary) RB-6 duplicates core.Rate unit scaling; the rate input path goes
-      (fraction[1]?.length ?? 0) - Number(fraction[2] ?? 0) - shift,
-    ),
-  );
-}
-/** Display an explicitly contracted rate, or preserve raw text with unavailable units. */
-export function formatRate(
-  value: string | number,
-  presentation?: RatePresentation,
-): { text: string; unit: RateUnit | null } {
-  if (!presentation) return { text: String(value), unit: null };
-  if (!presentation.source.trim())
-    throw new TypeError("Rate presentation requires its canonical source");
-  return {
-    text: convertRate(
-      // finstack-arith: writes a supplied number as plain decimal text; value unchanged
-      typeof value === "number" ? new Big(value).toFixed() : value,
-      presentation.wire,
-      presentation.display,
-    ),
-    unit: presentation.display,
-  };
-}
-/** Adapt edited display text back to wire units; missing metadata leaves it untouched. */
-export function rateToWire(
-  value: string,
-  presentation?: RatePresentation,
-): string {
-  if (!presentation) return value;
-  if (!presentation.source.trim())
-    throw new TypeError("Rate presentation requires its canonical source");
-  return convertRate(value, presentation.display, presentation.wire);
+export function formatPercent(value: number): string {
+  // finstack-arith: display scaling of a supplied fraction; never returned to Rust
+  return new Big(value).times(100).toFixed();
 }
 /** Add a plus sign only when the caller explicitly requests a supplied signed value. */
 export function formatSigned(value: string | number | bigint): string {
