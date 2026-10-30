@@ -11,6 +11,7 @@ export type StatementsNative = {
     | "parseFormula"
     | "Evaluator"
     | "statementResultRollup"
+    | "monteCarloBreachProbability"
   >;
   statements_analytics: Pick<
     typeof statements_analytics,
@@ -21,6 +22,20 @@ export type StatementsNative = {
     | "runCreditUnderwritingChecks"
     | "evaluateScenarioSet"
     | "evaluateScenarioSetWithMarket"
+    | "scenarioDiff"
+    | "scenarioSetTrace"
+    | "creditAssessment"
+    | "plSummaryReport"
+    | "evaluateDcf"
+    | "dcfSensitivity"
+    | "evaluateLbo"
+    | "parameterSpecWithPercentages"
+    | "runSensitivity"
+    | "generateTornadoEntries"
+    | "goalSeek"
+    | "runVariance"
+    | "varianceBridge"
+    | "backtestForecast"
   >;
 };
 /** StatementsApi over the statements and statements_analytics facade namespaces. */
@@ -132,6 +147,180 @@ export function createStatementsService(
           asOf,
         );
       });
+    },
+    diffStatementScenarios(request) {
+      return context.result(() =>
+        request.pairs.map((pair) =>
+          native.statements_analytics.scenarioDiff(
+            request.scenarioSetJson,
+            request.resultsJson,
+            pair.baseline,
+            pair.comparison,
+            [...request.metrics],
+            [...request.periods],
+          ),
+        ),
+      );
+    },
+    traceStatementScenario(request) {
+      return context.result(() =>
+        native.statements_analytics.scenarioSetTrace(
+          request.scenarioSetJson,
+          request.scenario,
+        ),
+      );
+    },
+    creditAssessment(request) {
+      return context.result(() =>
+        native.statements_analytics.creditAssessment(
+          request.resultsJson,
+          request.period,
+        ),
+      );
+    },
+    plSummaryReport(request) {
+      return context.result(() =>
+        native.statements_analytics.plSummaryReport(
+          request.resultsJson,
+          [...request.lineItems],
+          [...request.periods],
+        ),
+      );
+    },
+    evaluateDcf(request) {
+      return context.result(() =>
+        native.statements_analytics.evaluateDcf(
+          request.modelJson,
+          request.wacc,
+          request.terminalValue,
+          request.ufcfNode,
+          request.netDebtOverride,
+          request.optionsJson,
+          request.marketJson,
+          request.asOf,
+        ),
+      );
+    },
+    dcfSensitivity(request) {
+      return context.result(() =>
+        native.statements_analytics.dcfSensitivity(
+          request.modelJson,
+          request.wacc,
+          request.terminalValue,
+          request.ufcfNode,
+          request.netDebtOverride,
+          request.optionsJson,
+        ),
+      );
+    },
+    evaluateLbo(request) {
+      return context.result(() =>
+        native.statements_analytics.evaluateLbo(
+          request.modelJson,
+          request.configJson,
+        ),
+      );
+    },
+    runSensitivity(request) {
+      return context.result(() => {
+        const api = native.statements_analytics;
+        const config = {
+          mode: request.mode,
+          parameters: request.parameters.map((parameter) =>
+            api.parameterSpecWithPercentages(
+              parameter.nodeId,
+              parameter.periodId,
+              parameter.baseValue,
+              [...parameter.pctRange],
+            ),
+          ),
+          target_metrics: [request.targetMetric],
+        };
+        const result = api.runSensitivity(
+          request.modelJson,
+          JSON.stringify(config),
+        );
+        // Rust ranks only one-at-a-time runs; a full-grid result has no tornado.
+        const tornado =
+          request.mode === "full_grid"
+            ? null
+            : api.generateTornadoEntries(
+                result,
+                request.targetMetric,
+                request.period,
+              );
+        return { result, tornado };
+      });
+    },
+    goalSeek(request) {
+      return context.result(() =>
+        native.statements_analytics.goalSeek(
+          request.modelJson,
+          request.targetNode,
+          request.targetPeriod,
+          request.targetValue,
+          request.driverNode,
+          request.driverPeriod,
+          request.updateModel,
+          request.bounds === undefined
+            ? undefined
+            : [request.bounds[0], request.bounds[1]],
+        ),
+      );
+    },
+    runVariance(request) {
+      return context.result(() =>
+        native.statements_analytics.runVariance(
+          request.baseJson,
+          request.comparisonJson,
+          request.configJson,
+        ),
+      );
+    },
+    varianceBridge(request) {
+      return context.result(() =>
+        native.statements_analytics.varianceBridge(
+          request.baseJson,
+          request.comparisonJson,
+          request.targetMetric,
+          request.period,
+          [...request.drivers],
+          request.baselineLabel,
+          request.comparisonLabel,
+        ),
+      );
+    },
+    backtestForecast(request) {
+      return context.result(() =>
+        native.statements_analytics.backtestForecast(
+          [...request.actual],
+          [...request.forecast],
+        ),
+      );
+    },
+    evaluateMonteCarlo(request) {
+      return context.result(() => {
+        const evaluator = new native.statements.Evaluator();
+        try {
+          return evaluator.evaluateMonteCarlo(
+            request.modelJson,
+            request.configJson,
+          );
+        } finally {
+          evaluator.free();
+        }
+      });
+    },
+    monteCarloBreachProbability(request) {
+      // Rust's None (no path data for the metric) crosses as undefined; the envelope carries null.
+      return context.result(
+        () =>
+          native.statements.monteCarloBreachProbability(
+            request.resultsJson,
+            request.metric,
+            request.threshold,
+          ) ?? null,
+      );
     },
     rollupStatement(request) {
       return context.result(() =>

@@ -62,7 +62,7 @@ it("records full pricing inputs and the supported raw and typed routes", () => {
   ).toHaveLength(4);
   expect(
     inventory.entries.find((entry) => entry.id === "cashflow-viewer").route,
-  ).toBe("native-json-table");
+  ).toBe("native-envelope-table");
   expect(
     inventory.entries.find((entry) => entry.id === "fx-delta-pillars").api
       .returns,

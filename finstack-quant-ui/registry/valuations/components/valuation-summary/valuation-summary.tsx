@@ -105,7 +105,7 @@ export function ValuationSummary({
     .join(" and ");
   return (
     <div
-      className="space-y-2 font-sans text-foreground"
+      className="@container space-y-2 font-sans text-foreground"
       data-density={density}
       aria-busy={loading}
     >
@@ -121,7 +121,8 @@ export function ValuationSummary({
       )}
       <div
         className={
-          compareTo === undefined ? "grid gap-3" : "grid gap-3 lg:grid-cols-2"
+          // Side by side only where both prominent amounts fit; a narrow host (the workbench summary) stacks them.
+          compareTo === undefined ? "grid gap-3" : "grid gap-3 @2xl:grid-cols-2"
         }
       >
         <Summary

@@ -964,6 +964,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "check_butterfly_grid",
                 "check_calendar_spread_grid",
                 "check_local_vol_density_grid",
+                "check_surface",
                 "check_surface_grid",
                 "convert_atm_volatility",
                 "delta_to_strike",

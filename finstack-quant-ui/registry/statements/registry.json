@@ -49,7 +49,7 @@
       "type": "registry:component",
       "title": "Statement grid",
       "description": "Report-style table of evaluated statement values with historical and forecast columns and optional inline editing.",
-      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
+      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Each cell shows the evaluation layer Rust recorded in node_sources (value, forecast, formula or where mask) as a glyph with a legend and accessible text; results without node_sources, such as rollups, show no marker. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
       "files": [
         {
           "path": "components/statement-grid/statement-grid.tsx",
@@ -230,6 +230,431 @@
           "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "variance-table",
+      "type": "registry:component",
+      "title": "Variance table",
+      "description": "Displays a native statements_analytics variance report: baseline, comparison, variance and variance percent per metric and period.",
+      "docs": "Present a native VarianceReport (for example ScenarioDiff.variance) as is: rows in native order, baseline and comparison columns under their native labels, abs_var as the variance and pct_var as a percent of the fraction Rust returns, with an unset pct_var (baseline effectively zero) shown as n/m. Metric labels default to labelFor; a host may inject metricLabel and formatValue. It sorts, totals and computes nothing. No worker is required.",
+      "files": [
+        {
+          "path": "components/variance-table/variance-table.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/variance-table/variance-table.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/contract-scenario-diff"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "credit-assessment-report",
+      "type": "registry:component",
+      "title": "Credit assessment report",
+      "description": "Displays a native statements_analytics credit assessment: leverage, interest coverage and free cash flow at a period, the per-period series and an optional native P&L summary table.",
+      "docs": "Present a native CreditAssessment (statements_analytics.creditAssessment) as returned: tiles for leverage ratio, interest coverage and free cash flow at the assessed period, a line chart of the two ratios over the returned series (periods Rust returns without a value are left out of the chart and listed), and the series table with a dash for each missing value. A native P&L summary TableEnvelope (statements_analytics.plSummaryReport) renders below it through table-envelope when supplied. Free cash flow carries the host's model currency when one is passed; nothing is calculated, sorted or inferred. Accepts assessment, plSummary, currency, formatValue, loading, error, plSummaryLoading, plSummaryError and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/credit-assessment-report/credit-assessment-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/credit-assessment-report/credit-assessment-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/table-envelope",
+        "@finstack/contract-credit-assessment",
+        "@finstack/contract-table-envelope"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "tornado-chart",
+      "type": "registry:component",
+      "title": "Tornado chart",
+      "description": "Draws native tornado entries (statements_analytics TornadoEntry) as horizontal downside and upside bars from zero, in Rust's order, with the values in a table.",
+      "docs": "Present native TornadoEntry rows (for example DcfSensitivityResult.entries or generateTornadoEntries output) as returned: one band per parameter in Rust's order, a bar from zero to each returned downside and upside delta, and a table of the same values. Deltas Rust returns as non-finite are left out of the chart and shown in the table. Parameter labels default to labelFor; a host may inject parameterLabel and formatValue. It sorts, sums and computes nothing. Accepts entries, valueLabel, caption, parameterLabel, formatValue and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/tornado-chart/tornado-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/tornado-chart/tornado-chart.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "dcf-report",
+      "type": "registry:component",
+      "title": "DCF report",
+      "description": "Displays a native statements_analytics DCF valuation: enterprise and equity value, the returned bridge, per-period present values, the terminal value and an optional enterprise-value tornado.",
+      "docs": "Present a native CorporateValuationResult (statements_analytics.evaluateDcf) as returned: enterprise value, equity value and per-share value tiles; the enterprise-to-equity bridge fields (net debt, valuation discount, diluted shares) and the equity bridge inputs Rust used, in Rust's order; the explicit forecast periods with their free cash flow, discount years, discount factor and present value, and the explicit present value; the undiscounted terminal value, its discount years and present value, and the WACC. A supplied DcfSensitivityResult (statements_analytics.dcfSensitivity) adds the baseline enterprise value, the effective WACC and terminal-growth shocks with their clamp flags, and a tornado-chart of the returned deltas. Monetary amounts keep Rust's exact decimal text; nothing is summed, discounted or rearranged. Accepts result, sensitivity, loading, error, sensitivityLoading, sensitivityError, sensitivityNote, formatValue and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/dcf-report/dcf-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/dcf-report/dcf-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "@finstack/tornado-chart",
+        "@finstack/contract-dcf-sensitivity-result"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "dcf-assumptions-form",
+      "type": "registry:component",
+      "title": "DCF assumptions form",
+      "description": "Edits the arguments of a native statements_analytics DCF: WACC, the terminal-value method and its fields, the UFCF node, an optional net-debt override and the generated DcfOptions form.",
+      "docs": "Edit the evaluateDcf assumptions: WACC as a decimal, the TerminalValueSpec variant (Gordon growth, exit multiple or H-model, the one hand-written Rust wire union) and its fields, the UFCF node and the exit-multiple metric node as id-comboboxes over the supplied model node ids, an optional net-debt override, and the remaining DcfOptions in the schema form over the generated contract. A cleared required number is sent as NaN, never 0; an empty optional value and empty options stay unset so Rust applies its defaults. The facade has no standalone DcfOptions parse, so the options are checked structurally here and validated by Rust (unknown keys included) when the model is valued. Calculate passes the submission to the caller (usually the useEvaluateDcf and useDcfSensitivity requests). Accepts defaultAssumptions, nodeIds, onSubmit, submitLabel, disabled and density props.",
+      "files": [
+        {
+          "path": "components/dcf-assumptions-form/dcf-assumptions-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/dcf-assumptions-form/dcf-assumptions-form.tsx"
+        },
+        {
+          "path": "components/dcf-assumptions-form/dcf-options.ts",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/dcf-assumptions-form/dcf-options.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/schema-form",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/id-combobox",
+        "@finstack/contract-dcf-options",
+        "@finstack/finstack-codec",
+        "button"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "lbo-report",
+      "type": "registry:component",
+      "title": "LBO report",
+      "description": "Edits a Rust LboConfig with the generated schema form and displays the native statements_analytics LBO result: entry valuation, sources and uses, exit returns as MOIC and the optional check report.",
+      "docs": "Edit an LboConfig with the schema form over the generated lbo_config contract, every string *_node field as an id-combobox over the supplied model node ids. The facade has no standalone LboConfig parse, so the config is checked structurally here and validated by Rust (unknown keys included) when it is evaluated; Evaluate LBO passes the JSON to the caller (usually the useEvaluateLbo request). The native LboResult (statements_analytics.evaluateLbo) is shown as returned: equity check, exit equity proceeds and MOIC tiles, the sources and uses (debt, equity check, totals, entry enterprise value, the balanced flag), the entry and exit metrics, enterprise values and exit net debt, and the statement-check-report of the LBO checks when the config maps them. Returns are MOIC only: IRR is not part of the native result (Rust points to portfolio.mwrXirr). Nothing is calculated. Accepts defaultConfig, nodeIds, onSubmit, result, loading, error, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/lbo-report/lbo-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/lbo-report/lbo-report.tsx"
+        },
+        {
+          "path": "components/lbo-report/lbo-config.ts",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/lbo-report/lbo-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/schema-form",
+        "@finstack/id-combobox",
+        "@finstack/money-value",
+        "@finstack/statement-check-report",
+        "@finstack/contract-lbo-config",
+        "@finstack/contract-lbo-result",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "statement-sensitivity",
+      "type": "registry:component",
+      "title": "Statement sensitivity",
+      "description": "Edits a native statements_analytics sensitivity run of a statement model and presents its tornado and the target metric in every returned scenario.",
+      "docs": "Edit a sensitivity run: the SensitivityMode (the wire values read from the generated sensitivity_result contract), the target metric as an id-combobox, the tornado period, and each varied node and period with comma-separated percentage moves. Each parameter's base value is read from the supplied evaluated result (a missing or non-finite cell is sent as NaN, never defaulted) and passed with the moves to statements_analytics.parameterSpecWithPercentages; an empty move is NaN, so Rust rejects it. Run sensitivity passes the run to the caller (usually the useRunSensitivity request). The native tornado is shown through tornado-chart, parameter keys (node@period) labelled by node and period, and the target metric at the tornado period in the baseline and every returned scenario in Rust's order. A full-grid run has no tornado; the scenarios are still shown. Nothing is calculated. Accepts result, nodeIds, periods, defaultValues, onSubmit, data, loading, error, disabled and density props.",
+      "files": [
+        {
+          "path": "components/statement-sensitivity/statement-sensitivity.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/statement-sensitivity/statement-sensitivity.tsx"
+        },
+        {
+          "path": "components/statement-sensitivity/sensitivity.ts",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/statement-sensitivity/sensitivity.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-worker",
+        "@finstack/enum-field",
+        "@finstack/field-frame",
+        "@finstack/id-combobox",
+        "@finstack/finstack-table",
+        "@finstack/tornado-chart",
+        "@finstack/contract-sensitivity-result",
+        "button",
+        "input"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "goal-seek-form",
+      "type": "registry:component",
+      "title": "Goal seek form",
+      "description": "Edits the arguments of a native statements_analytics goal seek, shows the returned solution and applies the solved model on an explicit second action.",
+      "docs": "Edit statements_analytics.goalSeek arguments: target node and driver node as id-comboboxes over the supplied node ids, target and driver periods, the target value, and an optional lower and upper search bracket in the driver's units (both empty leave the bracket unset so Rust uses its own; a cleared number is sent as NaN, never 0). Solve passes the arguments to the caller (usually the useGoalSeek request); the native GoalSeekResult is shown as returned: solved value, residual, tolerance, evaluations and the converged flag. When onApply is supplied, Apply to model is a second, explicit action that hands the returned model (the input model with the solved driver written in) to the caller, such as the statements workbench's commit; there is no undo, and applyBlocked disables it with a reason. Nothing is calculated or defaulted. Accepts nodeIds, periods, defaultValues, onSubmit, result, loading, error, onApply, applyBlocked, disabled and density props.",
+      "files": [
+        {
+          "path": "components/goal-seek-form/goal-seek-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/goal-seek-form/goal-seek-form.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-worker",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/id-combobox",
+        "button"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "variance-bridge-chart",
+      "type": "registry:component",
+      "title": "Variance bridge chart",
+      "description": "Draws a native statements_analytics BridgeChart as returned: baseline, one signed bar per driver contribution in Rust's order, the unexplained residual and the comparison value.",
+      "docs": "Present a native BridgeChart (statements_analytics.varianceBridge) as returned: a bar from zero to the baseline value, one signed bar from zero per driver contribution in Rust's order, a bar for Rust's unexplained residual and one for the comparison value, coloured by kind, with the same values in a table. Nothing is accumulated or positioned cumulatively: Rust's contributions are raw deltas in driver units, which need not sum to the target's variance, so this is not a waterfall. Non-finite values are left out of the chart and shown in the table. Node labels default to labelFor; a host may inject metricLabel and formatValue. Accepts bridge, metricLabel, formatValue and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/variance-bridge-chart/variance-bridge-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/variance-bridge-chart/variance-bridge-chart.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-worker",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/contract-bridge-chart"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "forecast-backtest",
+      "type": "registry:component",
+      "title": "Forecast backtest",
+      "description": "Presents native statements_analytics forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE and counts) as returned.",
+      "docs": "Show a native ForecastMetrics (statements_analytics.backtestForecast) as returned: one tile per field in the generated forecast_metrics contract's order, labelled through labelFor with the first paragraph of Rust's description (MAPE and sMAPE are percentages in Rust). A null or non-finite metric, such as MAPE when every actual is zero, shows as n/m. Nothing is calculated. Accepts metrics, caption, loading, error and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/forecast-backtest/forecast-backtest.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/forecast-backtest/forecast-backtest.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/contract-forecast-metrics"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "statement-monte-carlo",
+      "type": "registry:component",
+      "title": "Statement Monte Carlo",
+      "description": "Edits a Rust MonteCarloConfig and presents native Monte Carlo statement results: a percentile fan, the percentile table, a breach probability and the warnings.",
+      "docs": "Edit a MonteCarloConfig with the schema form over the generated monte_carlo_config contract (path count, the uint64 seed kept as an exact integer, percentiles and include path data; the form starts empty, Rust's example is not preloaded); Simulate passes the structurally valid JSON to the caller (usually the useEvaluateMonteCarlo request), and Rust validates it. The native MonteCarloResults (statements.Evaluator.evaluateMonteCarlo) are shown as returned: for the chosen metric (the first returned by default), a fan of bands between the returned percentiles paired from the outside in, with the unpaired middle percentile as a line, over the forecast periods, the percentile table (percentiles shown as percents of Rust's fractions), the breach probability Rust reports for a threshold (statements.monteCarloBreachProbability; null when the results carry no path data) and the simulation warnings in a collapsed list. Nothing is simulated, interpolated or summed. Accepts defaultConfig, onSubmit, results, loading, error, defaultBreach, onBreach, breachProbability, breachLoading, breachError, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/statement-monte-carlo/statement-monte-carlo.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/statement-monte-carlo/statement-monte-carlo.tsx"
+        },
+        {
+          "path": "components/statement-monte-carlo/monte-carlo-config.ts",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/statement-monte-carlo/monte-carlo-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/schema-form",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/contract-monte-carlo-config",
+        "@finstack/contract-monte-carlo-results",
+        "@finstack/finstack-codec",
+        "button"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json"
         ]
       }
     },
@@ -459,11 +884,361 @@
       }
     },
     {
+      "name": "use-diff-statement-scenarios",
+      "type": "registry:hook",
+      "title": "useDiffStatementScenarios",
+      "description": "Diffs pairs of evaluated statement scenarios natively through the WASM worker.",
+      "docs": "One native ScenarioDiff per baseline/comparison pair, in pair order, from statements_analytics.scenarioDiff over the scenario set, its host-serialized results, the metric node ids and the periods. Keyed by the complete immutable request and worker session; null disables the diff. A metric missing at a period in either scenario fails the whole request with the native error.",
+      "files": [
+        {
+          "path": "hooks/use-diff-statement-scenarios/use-diff-statement-scenarios.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-diff-statement-scenarios/use-diff-statement-scenarios.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-trace-statement-scenario",
+      "type": "registry:hook",
+      "title": "useTraceStatementScenario",
+      "description": "Traces a statement scenario's inheritance lineage through the WASM worker.",
+      "docs": "Native statements_analytics.scenarioSetTrace lineage, root ancestor first and the scenario last, keyed by the immutable scenario set and scenario name in the current worker session. useTraceStatementScenario takes one request (null disables it); useTraceStatementScenarios runs one query per request, in request order.",
+      "files": [
+        {
+          "path": "hooks/use-trace-statement-scenario/use-trace-statement-scenario.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-trace-statement-scenario/use-trace-statement-scenario.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-credit-assessment",
+      "type": "registry:hook",
+      "title": "useCreditAssessment",
+      "description": "Assesses an evaluated statement result's credit natively through the WASM worker.",
+      "docs": "Native statements_analytics.creditAssessment of the host-serialized StatementResult at the requested period: leverage ratio, interest coverage and free cash flow there, plus the per-period series. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-credit-assessment/use-credit-assessment.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-credit-assessment/use-credit-assessment.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-pl-summary-report",
+      "type": "registry:hook",
+      "title": "usePlSummaryReport",
+      "description": "Builds a native P&L summary table from an evaluated statement result through the WASM worker.",
+      "docs": "Native statements_analytics.plSummaryReport TableEnvelope of the host-serialized StatementResult: one row per line item and period, line items in request order and periods in request order. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-pl-summary-report/use-pl-summary-report.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-pl-summary-report/use-pl-summary-report.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-evaluate-dcf",
+      "type": "registry:hook",
+      "title": "useEvaluateDcf",
+      "description": "Values a statement model with a native discounted cash flow through the WASM worker.",
+      "docs": "Native statements_analytics.evaluateDcf of the model with the WACC, TerminalValueSpec and the optional UFCF node, net-debt override, DcfOptions JSON, market and as-of date passed positionally as supplied; an omitted optional argument stays unset so Rust applies its default, and Rust requires the as-of date when a market is supplied. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-evaluate-dcf/use-evaluate-dcf.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-evaluate-dcf/use-evaluate-dcf.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-dcf-sensitivity",
+      "type": "registry:hook",
+      "title": "useDcfSensitivity",
+      "description": "Ranks a statement model's headline DCF assumptions by enterprise-value impact through the WASM worker.",
+      "docs": "Native statements_analytics.dcfSensitivity of the model with the WACC, TerminalValueSpec and the optional UFCF node, net-debt override and DcfOptions JSON passed positionally as supplied (the facade takes no market). Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-dcf-sensitivity/use-dcf-sensitivity.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-dcf-sensitivity/use-dcf-sensitivity.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-evaluate-lbo",
+      "type": "registry:hook",
+      "title": "useEvaluateLbo",
+      "description": "Evaluates a leveraged buyout of a statement model natively through the WASM worker.",
+      "docs": "Native statements_analytics.evaluateLbo of the model under the supplied LboConfig JSON: entry and exit enterprise values, sources and uses with the solved sponsor equity check, exit equity proceeds, MOIC and, when the config carries check_mappings, the LBO check report. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-evaluate-lbo/use-evaluate-lbo.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-evaluate-lbo/use-evaluate-lbo.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-run-sensitivity",
+      "type": "registry:hook",
+      "title": "useRunSensitivity",
+      "description": "Runs a native sensitivity analysis of a statement model and its tornado through the WASM worker.",
+      "docs": "Native statements_analytics.parameterSpecWithPercentages for each parameter (node, period, base value and percentage moves), runSensitivity over the SensitivityConfig of the mode, those parameters and the target metric, then generateTornadoEntries of the result at the target metric and period; a full_grid run, which Rust cannot rank, returns a null tornado. Returns {result, tornado}. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-run-sensitivity/use-run-sensitivity.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-run-sensitivity/use-run-sensitivity.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-goal-seek",
+      "type": "registry:hook",
+      "title": "useGoalSeek",
+      "description": "Solves a native goal seek on a statement model through the WASM worker.",
+      "docs": "Native statements_analytics.goalSeek of the model with the target node, period and value, the driver node and period, the updateModel flag and the optional [lower, upper] bracket passed positionally as supplied; an unset bracket stays unset so Rust uses its own. The returned GoalSeekResult carries the model with the solved driver written in when updateModel is true. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query, so a caller solves only on an explicit action. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-goal-seek/use-goal-seek.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-goal-seek/use-goal-seek.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-run-variance",
+      "type": "registry:hook",
+      "title": "useRunVariance",
+      "description": "Compares two evaluated statement results natively through the WASM worker.",
+      "docs": "Native statements_analytics.runVariance of a baseline and a comparison StatementResult (host-serialized) under a Rust VarianceConfig JSON: labels, metrics and periods. Returns the VarianceReport rows in Rust's order. Keyed by the complete request and worker session; null disables the query. Native errors (an empty metric list, mismatched metric types or a missing value) are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-run-variance/use-run-variance.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-run-variance/use-run-variance.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-variance-bridge",
+      "type": "registry:hook",
+      "title": "useVarianceBridge",
+      "description": "Explains one metric's variance between two evaluated statement results across driver nodes through the WASM worker.",
+      "docs": "Native statements_analytics.varianceBridge of a baseline and a comparison StatementResult with the target metric, period, driver node ids and the two display labels passed positionally. Returns the BridgeChart: both values, driver contributions in driver order and the unexplained residual. Keyed by the complete request and worker session; null disables the query. Native errors (a driver of another type or currency, a missing node) are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-variance-bridge/use-variance-bridge.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-variance-bridge/use-variance-bridge.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-backtest-forecast",
+      "type": "registry:hook",
+      "title": "useBacktestForecast",
+      "description": "Measures a forecast's accuracy against realized values through the WASM worker.",
+      "docs": "Native statements_analytics.backtestForecast of an actual and a forecast series aligned one-for-one in the same units. Returns ForecastMetrics (MAE, MAPE, sMAPE, RMSE and counts; a non-finite metric stays a number). Keyed by the complete request (non-finite values kept distinct) and worker session; null disables the query. Native errors (empty or unequal series, a non-finite value) are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-backtest-forecast/use-backtest-forecast.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-backtest-forecast/use-backtest-forecast.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-evaluate-monte-carlo",
+      "type": "registry:hook",
+      "title": "useEvaluateMonteCarlo",
+      "description": "Simulates a statement model's stochastic forecasts natively through the WASM worker.",
+      "docs": "Native statements.Evaluator.evaluateMonteCarlo of the model under a Rust MonteCarloConfig JSON (path count, the uint64 seed as an exact integer token, optional percentiles and include_path_data). Returns MonteCarloResults: percentile summaries per metric over the forecast periods, warnings and, when requested, the path table. Keyed by the complete request and worker session; null disables the query. Native errors (zero paths, a capital structure, a failing path) are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-evaluate-monte-carlo/use-evaluate-monte-carlo.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-evaluate-monte-carlo/use-evaluate-monte-carlo.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-monte-carlo-breach-probability",
+      "type": "registry:hook",
+      "title": "useMonteCarloBreachProbability",
+      "description": "Tests a breach threshold on native Monte Carlo statement paths through the WASM worker.",
+      "docs": "Native statements.monteCarloBreachProbability of host-serialized MonteCarloResults, a metric and a threshold in the metric's own units: the fraction of paths above the threshold in any forecast period, or null when Rust returns none (no path data for the metric, no forecast periods). Keyed by the complete request (a non-finite threshold kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-monte-carlo-breach-probability/use-monte-carlo-breach-probability.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-monte-carlo-breach-probability/use-monte-carlo-breach-probability.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
       "title": "Statements workbench",
       "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error, and a native breach forecast, statements_analytics.forecastBreaches, under a submitted CovenantForecastConfig), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -489,6 +1264,31 @@
           "path": "blocks/statements-workbench/rollup.tsx",
           "type": "registry:block",
           "target": "components/finstack/statements/blocks/statements-workbench/rollup.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/valuation-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/valuation-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/sensitivity-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/sensitivity-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/roll-forward-review.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/roll-forward-review.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/monte-carlo-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/monte-carlo-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/covenants-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/covenants-panel.tsx"
         }
       ],
       "registryDependencies": [
@@ -497,11 +1297,42 @@
         "@finstack/statement-chart",
         "@finstack/statement-explanation",
         "@finstack/statement-checks",
+        "@finstack/variance-table",
+        "@finstack/credit-assessment-report",
+        "@finstack/dcf-assumptions-form",
+        "@finstack/dcf-report",
+        "@finstack/lbo-report",
+        "@finstack/statement-sensitivity",
+        "@finstack/goal-seek-form",
+        "@finstack/variance-bridge-chart",
+        "@finstack/forecast-backtest",
+        "@finstack/statement-monte-carlo",
+        "@finstack/covenant-engine-editor",
+        "@finstack/covenant-compliance",
+        "@finstack/covenant-breach-forecast",
         "@finstack/use-evaluate-statement",
         "@finstack/use-statement-model-validator",
         "@finstack/use-statement-formula-validator",
         "@finstack/use-rollup-statement",
         "@finstack/use-evaluate-statement-scenarios",
+        "@finstack/use-diff-statement-scenarios",
+        "@finstack/use-trace-statement-scenario",
+        "@finstack/use-credit-assessment",
+        "@finstack/use-pl-summary-report",
+        "@finstack/use-evaluate-dcf",
+        "@finstack/use-dcf-sensitivity",
+        "@finstack/use-evaluate-lbo",
+        "@finstack/use-run-sensitivity",
+        "@finstack/use-goal-seek",
+        "@finstack/use-run-variance",
+        "@finstack/use-variance-bridge",
+        "@finstack/use-backtest-forecast",
+        "@finstack/use-evaluate-monte-carlo",
+        "@finstack/use-monte-carlo-breach-probability",
+        "@finstack/use-covenant-engine-validator",
+        "@finstack/use-covenant-template",
+        "@finstack/use-evaluate-covenants",
+        "@finstack/use-forecast-breaches",
         "@finstack/use-linked-selection",
         "@finstack/use-finstack",
         "@finstack/json-viewer",
@@ -526,13 +1357,30 @@
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json"
+          "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     }

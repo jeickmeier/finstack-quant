@@ -25,9 +25,16 @@ import {
   type PriceRequest,
   FinstackError,
   errorValue,
+  unwrap,
 } from "@/workers/finstack-contract";
 import { formatMoney, formatRawMoney } from "../../src/format/format";
 import { budget } from "../shared/budget";
+import { createContext } from "@/workers/services/context";
+import { createScenariosService } from "@/workers/services/scenarios";
+import { createAttributionService } from "@/workers/services/attribution";
+import { createModelsService } from "@/workers/services/models";
+import calibrationCases from "../calibration/cases.json";
+import marketScenarios from "../scenarios/application/cases.json";
 const bondDisplay = formatRawMoney(fixture.result.value);
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/hooks/shared/use-finstack/client", () => ({
@@ -49,6 +56,39 @@ const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
 let call: ReturnType<typeof vi.fn>, close: ReturnType<typeof vi.fn>;
+// The production ScenariosApi over the Node facade; its envelopes unwrap as the client does.
+const scenarioService = createScenariosService(
+  { scenarios: native },
+  createContext({
+    initialize: async () => undefined,
+    core: { MarketContext: native.MarketContext },
+    portfolio: { Portfolio: native.Portfolio },
+  }),
+);
+// The production AttributionApi over the Node facade.
+const attributionService = createAttributionService(
+  { attribution: native },
+  createContext({
+    initialize: async () => undefined,
+    core: { MarketContext: native.MarketContext },
+    portfolio: { Portfolio: native.Portfolio },
+  }),
+);
+// The production checkSurface over the Node facade's VolSurface and checkSurface.
+const modelsService = createModelsService(
+  {
+    core: { VolSurface: native.VolSurface },
+    models: {
+      volatility: { checkSurface: native.checkSurface },
+      credit: { migration: {} },
+    },
+  } as unknown as Parameters<typeof createModelsService>[0],
+  createContext({
+    initialize: async () => undefined,
+    core: { MarketContext: native.MarketContext },
+    portfolio: { Portfolio: native.Portfolio },
+  }),
+);
 beforeEach(() => {
   vi.stubGlobal("Worker", class {});
   call = vi.fn(async (method: string, request: any) => {
@@ -58,7 +98,7 @@ beforeEach(() => {
       case "models":
         return native.listModelsGrouped();
       case "metrics":
-        return native.listStandardMetricsGrouped();
+        return native.metricsForInstrument(request);
       case "metricMetadata":
         return native.metricMetadata(request);
       case "validate":
@@ -91,16 +131,32 @@ beforeEach(() => {
           deal.free();
         }
       }
+      case "buildMarketScenario":
+        return unwrap(await scenarioService.buildMarketScenario(request));
+      case "applyMarketScenario":
+        return unwrap(await scenarioService.applyMarketScenario(request));
+      case "horizonReturn":
+        return unwrap(await scenarioService.horizonReturn(request));
+      case "validateScenarioSpec":
+        return unwrap(await scenarioService.validateScenarioSpec(request));
+      case "listBuiltinTemplateMetadata":
+        return unwrap(await scenarioService.listBuiltinTemplateMetadata());
+      case "attributePnlMany":
+        return unwrap(await attributionService.attributePnlMany(request));
+      case "checkSurface":
+        return unwrap(await modelsService.checkSurface(request));
+      case "defaultWaterfallOrder":
+        return native.defaultWaterfallOrder();
+      case "calendars":
+        return native.availableCalendars();
       case "formatMoney":
         return formatMoney(request.value, request.rounding, native);
       case "cashflows":
-        return JSON.stringify(
-          native.instrumentCashflows(
-            request.instrumentJson,
-            request.marketJson,
-            request.asOf,
-            request.model,
-          ),
+        return native.instrumentCashflows(
+          request.instrumentJson,
+          request.marketJson,
+          request.asOf,
+          request.model,
         );
       case "price":
         try {
@@ -394,6 +450,63 @@ it(
   budget(15000),
 );
 
+it(
+  "adds the native static-arbitrage badge to a stored surface only when the host supplies forwards",
+  async () => {
+    const surface = calibrationCases.find((c) =>
+      c.source.includes("08_equity"),
+    )!.result.result.final_market.surfaces[0]!;
+    const market = JSON.parse(fixture.request.marketJson);
+    market.surfaces = [surface];
+    const surfaceOptions = vi.fn((stored: { id: string }) =>
+      stored.id === "AAPL-EQUITY-VOL"
+        ? { colorDomain: [0, 1] as const, forwards: [175] }
+        : undefined,
+    );
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench
+          defaultRequest={{
+            ...fixture.request,
+            marketJson: JSON.stringify(market),
+          }}
+          surfaceOptions={surfaceOptions}
+        />
+      </FinstackQueryProvider>,
+    );
+    await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
+    await userEvent.click(screen.getByRole("tab", { name: "View market" }));
+    fireEvent.change(
+      await screen.findByLabelText(
+        "Search market data",
+        {},
+        { timeout: budget(5000) },
+      ),
+      { target: { value: "AAPL-EQUITY-VOL" } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Inspect AAPL-EQUITY-VOL/ }),
+    );
+    const details = await screen.findByRole("button", {
+      name: "Arbitrage details",
+    });
+    await waitFor(
+      () => expect(details.parentElement!.textContent).toContain("Passed"),
+      { timeout: budget(5000) },
+    );
+    expect(
+      call.mock.calls
+        .filter(([method]) => method === "checkSurface")
+        .map(([, request]) => request),
+    ).toEqual([{ surface, forwards: [175] }]);
+    // The stored chart stays beside the badge.
+    expect(
+      screen.getAllByRole("img", { name: /AAPL-EQUITY-VOL/ }).length,
+    ).toBeGreaterThan(0);
+  },
+  budget(15000),
+);
+
 it.each(detailFixtures.cases)(
   "composes actual $type pricing with its returned $detailType route",
   async (entry) => {
@@ -439,7 +552,7 @@ it.each(detailFixtures.cases)(
   20000,
 );
 it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
-  "keeps $type pricing intact with exact cashflow output or its actual native export error",
+  "keeps $type pricing intact with the native cashflow envelope or its actual native export error",
   async (entry) => {
     mount(entry.request);
     const results = within(screen.getByRole("region", { name: "Results" }));
@@ -469,11 +582,13 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
       });
       await within(viewer).findByRole("table", { name: "Cashflow schedule" });
       fireEvent.click(
-        within(viewer).getByText("Original JSON", { exact: true }),
+        within(viewer).getByText("Envelope JSON", { exact: true }),
       );
       await waitFor(() => {
         showOriginal(viewer);
-        expect(viewer.querySelector("pre")!.textContent).toBe(entry.cashflows);
+        expect(viewer.querySelector("pre")!.textContent).toBe(
+          serializeHost(entry.cashflows),
+        );
       });
     }
     expect(JSON.parse(result.querySelector("pre")!.textContent!).value).toEqual(
@@ -627,6 +742,41 @@ it(
       { timeout: budget(5000) },
     );
     expect(prices()).toHaveLength(1);
+    // The ScenarioGrid editor is seeded from the host grid; an edit runs only on submit.
+    // Queries stay inside the disclosure: the whole workbench DOM is large.
+    const panel = within(toggle.closest("details")!);
+    const cpr = panel.getByLabelText(/^cprs 2$/i) as HTMLInputElement;
+    expect(Number(cpr.value)).toBe(scenarioCases.grid.cprs[1]);
+    fireEvent.change(cpr, { target: { value: "0.1" } });
+    const run = panel.getByRole("button", {
+      name: "Run scenarios",
+    }) as HTMLButtonElement;
+    await waitFor(() => expect(run.disabled).toBe(false), {
+      timeout: budget(5000),
+    });
+    const tables = () =>
+      call.mock.calls.filter(([method]) => method === "scenarioTable");
+    expect(tables()).toHaveLength(1);
+    fireEvent.click(run);
+    await waitFor(() => expect(tables()).toHaveLength(2), {
+      timeout: budget(5000),
+    });
+    const edited = tables()[1]![1];
+    expect({ ...edited, gridJson: undefined }).toEqual({
+      ...invocation,
+      gridJson: undefined,
+    });
+    expect(JSON.parse(edited.gridJson)).toEqual({
+      ...scenarioCases.grid,
+      cprs: [scenarioCases.grid.cprs[0], 0.1, scenarioCases.grid.cprs[2]],
+    });
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector('[aria-label="CLONOTES-A scenario prices"]'),
+        ).toBeTruthy(),
+      { timeout: budget(5000) },
+    );
   },
   budget(30000),
 );
@@ -762,3 +912,213 @@ it("keeps shortcuts within the focused workbench and leaves field typing intact"
   first.unmount();
   second.unmount();
 });
+it(
+  "prices the applied market scenario beside the base valuation and never subtracts them",
+  async () => {
+    const roll = marketScenarios.cases.find(
+      (entry) => entry.name === "roll-1m-25bp",
+    )!;
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench
+          defaultRequest={fixture.request}
+          marketScenario={roll.scenarioJson}
+        />
+      </FinstackQueryProvider>,
+    );
+    const results = screen.getByRole("region", { name: "Results" });
+    await within(results).findByTitle(
+      fixture.result.value.amount,
+      {},
+      { timeout: budget(3000) },
+    );
+    expect(within(results).queryByText("Comparison valuation")).toBeNull();
+    await userEvent.click(
+      within(screen.getByRole("tablist", { name: "Pricing inputs" })).getByRole(
+        "tab",
+        { name: "Market scenario" },
+      ),
+    );
+    const apply = screen.getByRole("button", { name: "Apply scenario" });
+    await waitFor(
+      () => expect((apply as HTMLButtonElement).disabled).toBe(false),
+      {
+        timeout: budget(3000),
+      },
+    );
+    expect(
+      call.mock.calls.filter(([method]) => method === "applyMarketScenario"),
+    ).toEqual([]);
+    await userEvent.click(apply);
+    await waitFor(() => expect(prices()).toHaveLength(2), {
+      timeout: budget(5000),
+    });
+    const [base, shocked] = prices();
+    expect(
+      call.mock.calls.filter(([method]) => method === "applyMarketScenario"),
+    ).toEqual([
+      [
+        "applyMarketScenario",
+        {
+          scenarioJson: roll.scenarioJson,
+          marketJson: base!.marketJson,
+          asOf: base!.asOf,
+          instrumentJson: base!.instrumentJson,
+        },
+      ],
+    ]);
+    // Same model, metrics and instrument; the rolled date and the shocked market.
+    expect(shocked).toEqual({
+      ...base,
+      asOf: "2025-02-03",
+      marketJson: shocked!.marketJson,
+    });
+    expect(shocked!.marketJson).not.toBe(base!.marketJson);
+    await within(results).findByTitle(
+      roll.shocked.value.amount,
+      {},
+      { timeout: budget(3000) },
+    );
+    expect(within(results).getByText("Comparison valuation")).toBeTruthy();
+    expect(
+      within(results).getByTitle(fixture.result.value.amount),
+    ).toBeTruthy();
+    expect(within(results).getByText("2025-02-03")).toBeTruthy();
+    await userEvent.click(
+      within(screen.getByRole("tablist", { name: "Result views" })).getByRole(
+        "tab",
+        { name: "Market scenario" },
+      ),
+    );
+    const timeRoll = await within(results).findByRole("region", {
+      name: "Time roll",
+    });
+    expect(within(timeRoll).getAllByTitle("4613.745264131")).toHaveLength(2);
+    // Rust's horizon return of the same base request under the applied
+    // scenario; method and calendar stay unset.
+    expect(
+      call.mock.calls.filter(([method]) => method === "horizonReturn"),
+    ).toEqual([
+      [
+        "horizonReturn",
+        {
+          instrumentJson: base!.instrumentJson,
+          marketJson: base!.marketJson,
+          asOf: base!.asOf,
+          scenarioJson: roll.scenarioJson,
+          method: null,
+          calendarId: null,
+        },
+      ],
+    ]);
+    const horizon = within(results).getByRole("region", {
+      name: "Horizon return",
+    });
+    const expected = native.computeHorizonReturn(
+      base!.instrumentJson,
+      base!.marketJson,
+      base!.asOf,
+      roll.scenarioJson,
+    );
+    await within(horizon).findByText(
+      String(expected.summary.annualized_return),
+      {},
+      { timeout: budget(5000) },
+    );
+    expect(within(horizon).getByText(/Horizon: 33 days/)).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Clear scenario" }),
+    );
+    await waitFor(() =>
+      expect(within(results).queryByText("Comparison valuation")).toBeNull(),
+    );
+    expect(prices()).toHaveLength(2);
+  },
+  budget(20000),
+);
+
+it(
+  "explains the P&L from a pinned T0 market to an edited, repriced market with Rust's attribution only",
+  async () => {
+    mount();
+    const results = screen.getByRole("region", { name: "Results" });
+    await within(results).findByTitle(
+      fixture.result.value.amount,
+      {},
+      { timeout: budget(3000) },
+    );
+    await userEvent.click(
+      within(screen.getByRole("tablist", { name: "Result views" })).getByRole(
+        "tab",
+        { name: "P&L explain" },
+      ),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Pin as T0" }));
+    expect(within(results).getByText(/T0 pinned at/).textContent).toBe(
+      `T0 pinned at ${fixture.request.asOf}`,
+    );
+    // Rust requires a method; none is preselected and nothing is requested.
+    expect(
+      within(results).getByText("Choose an attribution method."),
+    ).toBeTruthy();
+    await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Edit market" }));
+    fireEvent.change(screen.getAllByLabelText("Stored value 1")[0], {
+      target: { value: "0.985" },
+    });
+    await waitFor(() => expect(prices()).toHaveLength(2), {
+      timeout: budget(4000),
+    });
+    const [t0, t1] = prices();
+    await userEvent.click(
+      within(results).getByRole("radio", { name: "parallel" }),
+    );
+    await waitFor(
+      () =>
+        expect(
+          call.mock.calls.filter(([method]) => method === "attributePnlMany"),
+        ).toHaveLength(1),
+      { timeout: budget(4000) },
+    );
+    // The pinned market and date, and the last priced instrument, market and date.
+    expect(
+      call.mock.calls.filter(([method]) => method === "attributePnlMany"),
+    ).toEqual([
+      [
+        "attributePnlMany",
+        {
+          instrumentJsons: [t1!.instrumentJson],
+          marketT0Json: t0!.marketJson,
+          marketT1Json: t1!.marketJson,
+          asOfT0: t0!.asOf,
+          asOfT1: t1!.asOf,
+          method: "parallel",
+        },
+      ],
+    ]);
+    const [expected] = native.attributePnlMany(
+      `{"as_of_t0":"${t0!.asOf}","as_of_t1":"${t1!.asOf}","market_t0":${t0!.marketJson},"market_t1":${t1!.marketJson},"method":"parallel"}`,
+      [t1!.instrumentJson],
+    );
+    const report = within(results).getByRole("region", {
+      name: "P&L attribution",
+    });
+    expect(
+      await within(report).findAllByTitle(
+        expected.total_pnl.amount,
+        {},
+        { timeout: budget(4000) },
+      ),
+    ).not.toHaveLength(0);
+    expect(
+      within(report).getAllByTitle(expected.rates_curves_pnl.amount),
+    ).not.toHaveLength(0);
+    // The scenario source stays unavailable until a scenario is applied.
+    expect(
+      within(results)
+        .getByRole("radio", { name: "Applied market scenario" })
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
+  },
+  budget(20000),
+);

@@ -3298,6 +3298,7 @@
       "checkButterflyGrid",
       "checkCalendarSpreadGrid",
       "checkLocalVolDensityGrid",
+      "checkSurface",
       "checkSurfaceGrid",
       "convertAtmVolatility",
       "deltaToStrike",
@@ -3440,6 +3441,9 @@
     "kind": "function"
   },
   "models.volatility.checkLocalVolDensityGrid": {
+    "kind": "function"
+  },
+  "models.volatility.checkSurface": {
     "kind": "function"
   },
   "models.volatility.checkSurfaceGrid": {
@@ -4150,6 +4154,7 @@
       "creditAssessment",
       "creditAssessmentReportText",
       "dcfSensitivity",
+      "evaluateCovenants",
       "evaluateDcf",
       "evaluateLbo",
       "evaluateScenarioSet",
@@ -4157,6 +4162,7 @@
       "explainFormula",
       "explainFormulaText",
       "explanationToText",
+      "forecastBreaches",
       "forecastMetricsSummaryText",
       "generateTornadoEntries",
       "goalSeek",
@@ -4269,6 +4275,12 @@
     "kind": "function"
   },
   "statements_analytics.creditAssessment": {
+    "kind": "function"
+  },
+  "statements_analytics.evaluateCovenants": {
+    "kind": "function"
+  },
+  "statements_analytics.forecastBreaches": {
     "kind": "function"
   },
   "statements_analytics.runChecks": {
@@ -4540,6 +4552,7 @@
       "listStandardMetrics",
       "listStandardMetricsGrouped",
       "metricMetadata",
+      "metricsForInstrument",
       "pikScheduleModeAt",
       "poolAssetFixedRateBond",
       "poolAssetFloatingRateLoan",
@@ -4783,6 +4796,9 @@
     "kind": "function"
   },
   "valuations.instruments.metricMetadata": {
+    "kind": "function"
+  },
+  "valuations.instruments.metricsForInstrument": {
     "kind": "function"
   },
   "valuations.instruments.trancheDiscountMargin": {

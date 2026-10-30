@@ -123,20 +123,18 @@ try {
       );
     }
   }
-  const originalText = JSON.stringify(
-    valuations.instruments.instrumentCashflows(
-      requests.bond.instrumentJson,
-      requests.bond.marketJson,
-      requests.bond.asOf,
-      requests.bond.model,
-    ),
+  const nativeCashflows = valuations.instruments.instrumentCashflows(
+    requests.bond.instrumentJson,
+    requests.bond.marketJson,
+    requests.bond.asOf,
+    requests.bond.model,
   );
   assert.deepEqual(
     await page.evaluate(
       (request) => window.registryProbe.proxy.cashflows(request),
       requests.bond,
     ),
-    { ok: true, value: originalText },
+    { ok: true, value: nativeCashflows },
   );
   assert(
     assets.some(

@@ -93,6 +93,50 @@ it("preserves money precision, absent cells, and nonfinite sentinels", async () 
   ).toBeUndefined();
 });
 
+it("projects the native cell source of every evaluated cell, including a where mask", async () => {
+  const model = financialModelModule.codec.parse(
+    analystFixture,
+  ) as FinancialModelSpecWire;
+  model.nodes.masked_capex = {
+    node_id: "masked_capex",
+    node_type: "calculated",
+    value_type: { type: "monetary", currency: "USD" },
+    formula_text: "capex",
+    where_text: "revenue < 0 * revenue",
+  };
+  const modelJson = JSON.stringify(model);
+  const result = unwrap(await harness.proxy.evaluateStatement({ modelJson }));
+  expect(result).toEqual(new native.Evaluator().evaluate(modelJson));
+  const rows = statementRows(model, adaptStatementResult(result));
+  const source = (nodeId: string, periodId: string) =>
+    rows.find((row) => row.nodeId === nodeId)?.cells[periodId]?.source;
+  expect(source("revenue", "2024Q1")).toBe("value");
+  expect(source("revenue", "2025Q2")).toBe("forecast");
+  expect(source("ebitda", "2024Q1")).toBe("formula");
+  expect(
+    model.periods.map((period) => source("masked_capex", period.id)),
+  ).toEqual(model.periods.map(() => "where_masked"));
+  // Every returned cell carries the source Rust recorded for it.
+  for (const row of rows)
+    for (const [periodId, cell] of Object.entries(row.cells))
+      if (cell.present)
+        expect(cell.source).toBe(result.node_sources?.[row.nodeId]?.[periodId]);
+});
+
+it("evaluates the analyst model with the node ids Rust credit analytics read", () => {
+  const canonical: string = native.validateFinancialModelJson(analystFixture);
+  expect(JSON.parse(canonical).meta.currency).toBe("USD");
+  const resultsJson = JSON.stringify(
+    new native.Evaluator().evaluate(canonical),
+  );
+  const assessment = native.creditAssessment(resultsJson, "2025Q4");
+  expect(assessment.leverage_ratio).not.toBeNull();
+  expect(assessment.interest_coverage).not.toBeNull();
+  expect(assessment.free_cash_flow).not.toBeNull();
+  expect(Number.isFinite(assessment.leverage_ratio)).toBe(true);
+  expect(Number.isFinite(assessment.free_cash_flow)).toBe(true);
+});
+
 it("uses exact market and date inputs and rejects incomplete requests", async () => {
   const modelJson = unwrap(await harness.proxy.validateStatementModel(fixture));
   const request = { modelJson, marketJson: market, asOf: "2025-04-02" };
@@ -184,7 +228,7 @@ it("evaluates the complete analyst example, returned ratios, checks and supplied
     await harness.proxy.evaluateStatement({ modelJson: canonical }),
   );
   expect(result).toEqual(new native.Evaluator().evaluate(canonical));
-  expect(result.meta?.num_nodes).toBe(24);
+  expect(result.meta?.num_nodes).toBe(26);
   expect(result.meta?.num_periods).toBe(8);
   expect(result.nodes.leverage?.["2025Q4"]).toBeDefined();
   const report = unwrap(
@@ -278,7 +322,7 @@ it("routes scenario sets, rollups and data-gap checks to WASM", async () => {
   );
   const specJson = JSON.stringify({
     frequency: "annual",
-    methods: { debt_closing: "period_end", leverage: "formula" },
+    methods: { total_debt: "period_end", leverage: "formula" },
   });
   const annual = unwrap(
     await harness.proxy.rollupStatement({

@@ -8,6 +8,7 @@ import {
 import { PricingParamsForm } from "@/components/finstack/valuations/components/pricing-params-form/pricing-params-form";
 import { marketModule } from "@/components/finstack/core/components/market-context-form/market";
 import { useCashflows } from "@/hooks/valuations/use-cashflows/use-cashflows";
+import { useCashflowLadder } from "@/hooks/valuations/use-cashflow-ladder/use-cashflow-ladder";
 import { useMarketValidator } from "@/hooks/core/use-market-validator/use-market-validator";
 import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
 import { useInstrumentValidator } from "@/hooks/valuations/use-instrument-validator/use-instrument-validator";
@@ -167,6 +168,10 @@ export function useWorkbenchSession({
     },
     cashflowModel !== null,
   );
+  // The annual ladder aggregates exactly the envelope the viewer shows.
+  const cashflowLadder = useCashflowLadder(
+    cashflowModel === null ? null : cashflows.data,
+  );
   // A disabled query stays pending forever; only an active cashflow request can delay printing.
   const preparing =
     cashflows.isLoading ||
@@ -188,7 +193,7 @@ export function useWorkbenchSession({
   const validate = useInstrumentValidator();
   const validateMarket = useMarketValidator();
   const models = useModels(),
-    metrics = useMetrics();
+    metrics = useMetrics(type || null);
   const candidate = useMemo<PriceRequest | null>(
     () =>
       instrument &&
@@ -290,6 +295,7 @@ export function useWorkbenchSession({
     measureMetadata,
     moneyFormat,
     cashflows,
+    cashflowLadder,
     cashflowModel,
     preparing,
     printMarket,

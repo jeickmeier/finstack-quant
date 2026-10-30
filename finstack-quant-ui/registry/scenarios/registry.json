@@ -1,0 +1,320 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "market-scenario-builder",
+      "type": "registry:component",
+      "title": "Market scenario builder",
+      "description": "Full ScenarioSpec editor: built-in templates and components loaded or composed in Rust, add-parallel-shift and add-roll actions, and the generated form over every operation.",
+      "docs": "Composes schema-form over the generated scenario_spec contract (started from defaultJson, else the Rust schema example), with IdCombobox on the operation curve_id, discount_curve_id, vol_surface_id, surface_id and ids fields: free text with the supplied market ids as suggestions, never filtered by kind. When templates is supplied, a picker lists scenarios.listBuiltinTemplateMetadata (useListBuiltinTemplateMetadata) with the selected template's returned description, severity, event date, asset classes and tags; Load template replaces the document with scenarios.buildFromTemplate or, for a chosen component, buildTemplateComponent, and Compose with scenario merges the current scenario and the template through scenarios.composeScenarios (Rust's priority order, id and hazard-bump-mode rule). Template ids are placeholders the user maps to market ids. When buildMarketScenario is supplied (useBuildMarketScenario), Add parallel shift and Add roll append the operations Rust builds (scenarios.parallelBpMany, operationSpecTimeRollForward); a blank size is NaN and a blank roll mode is omitted, so Rust rejects or defaults them. Validation is native (connect validate to useScenarioSpecValidator); onSpecChange receives the canonical spec, or null while an edit is pending or rejected, and the canonical spec is shown as JSON. Every failure is the native error. Accepts defaultJson, validate, onSpecChange, curveIds, templates, templatesError, buildFromTemplate, buildTemplateComponent, composeScenarios, buildMarketScenario, disabled and density props.",
+      "files": [
+        {
+          "path": "components/market-scenario-builder/market-scenario-builder.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/scenarios/components/market-scenario-builder/market-scenario-builder.tsx"
+        },
+        {
+          "path": "components/market-scenario-builder/scenario-spec.ts",
+          "type": "registry:component",
+          "target": "components/finstack/scenarios/components/market-scenario-builder/scenario-spec.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/schema-form",
+        "@finstack/contract-scenario-spec",
+        "@finstack/finstack-codec",
+        "@finstack/finstack-form",
+        "@finstack/enum-field",
+        "@finstack/field-frame",
+        "@finstack/id-combobox",
+        "@finstack/decimal-input",
+        "@finstack/json-viewer",
+        "button",
+        "input"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "market-scenario-report",
+      "type": "registry:component",
+      "title": "Market scenario report",
+      "description": "Display of a native scenario application report: counters, applied shocks, time roll and carry, warnings and the policy stamp.",
+      "docs": "Display-only view of the ApplicationReport returned by scenarios.applyScenario: operation and effect counters, every applied shock, the time roll with its returned per-instrument and total carry, every warning variant shown generically by kind and fields, the ResultsMeta stamp and the report JSON. Values are shown as returned; nothing is summed or converted. Accepts report, loading and error props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/market-scenario-report/market-scenario-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/scenarios/components/market-scenario-report/market-scenario-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "@finstack/stamp-badge",
+        "@finstack/json-viewer"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "horizon-return-report",
+      "type": "registry:component",
+      "title": "Horizon return report",
+      "description": "Display of a native horizon total return: Rust's summary, horizon and endpoint values, explain text, the factor attribution and the scenario report.",
+      "docs": "Display-only view of the HorizonReport returned by scenarios.computeHorizonReturn (useHorizonReturn): total and annualized return and each factor contribution as the decimal fractions Rust computed (an undefined value, such as the annualized return without a time roll, reads \"not defined\", never zero), the horizon in calendar days, the exact initial and terminal values, the Rust explain text (scenarios.horizonResultExplainText), the attribution through pnl-attribution-report and the scenario application report through market-scenario-report in a disclosure. Nothing is computed here. Accepts report, explain, loading, error and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/horizon-return-report/horizon-return-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/scenarios/components/horizon-return-report/horizon-return-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "@finstack/pnl-attribution-report",
+        "@finstack/market-scenario-report"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-market-scenario",
+      "type": "registry:hook",
+      "title": "useMarketScenario",
+      "description": "Builds the canonical ScenarioSpec text of a market scenario from native operations through the WASM worker, as a query or on demand.",
+      "docs": "Rust-built operations (scenarios.operationSpecTimeRollForward and parallelBpMany per shift) validated and canonicalized by scenarios.parseScenarioSpec, returned as JSON text. Omitted options stay unset so Rust applies its defaults. Keyed on the complete request and worker session; native errors are returned unchanged. useBuildMarketScenario returns the same build as a callback for market-scenario-builder's add actions. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-market-scenario/use-market-scenario.ts",
+          "type": "registry:hook",
+          "target": "hooks/scenarios/use-market-scenario/use-market-scenario.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-apply-market-scenario",
+      "type": "registry:hook",
+      "title": "useApplyMarketScenario",
+      "description": "Applies a canonical scenario to a priced instrument's market through the WASM worker and returns the native report with the shocked pricing inputs.",
+      "docs": "scenarios.applyScenario on the supplied market and valuation date, with the instrument as a one-entry inventory only when scenarios.scenarioSpecRequiresInstruments says so. Returns the native ApplicationReport, the shocked market as canonical JSON, the rolled valuation date (else the supplied one) and the shocked instrument when scenarios.scenarioSpecMutatesInstruments says so (else the supplied one). Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider. No P&L is computed.",
+      "files": [
+        {
+          "path": "hooks/use-apply-market-scenario/use-apply-market-scenario.ts",
+          "type": "registry:hook",
+          "target": "hooks/scenarios/use-apply-market-scenario/use-apply-market-scenario.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-horizon-return",
+      "type": "registry:hook",
+      "title": "useHorizonReturn",
+      "description": "Computes a priced instrument's horizon total return under a canonical scenario through the WASM worker.",
+      "docs": "scenarios.computeHorizonReturn on the supplied instrument, market, valuation date and ScenarioSpec, then scenarios.horizonResultExplainText. Returns {report, explain}: the native HorizonReport (HorizonResult plus Rust's summary, whose undefined values are null) and its explain text. Omitted method and calendarId, and the config, stay unset so Rust applies its defaults (the default attribution method; a weekends-only roll calendar); an unknown calendar or an attribution failure (for example metrics_based on a hazard curve without a calibration recipe) returns the native error unchanged. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-horizon-return/use-horizon-return.ts",
+          "type": "registry:hook",
+          "target": "hooks/scenarios/use-horizon-return/use-horizon-return.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-scenario-spec-validator",
+      "type": "registry:hook",
+      "title": "useScenarioSpecValidator",
+      "description": "Validates a ScenarioSpec and returns its canonical text through the WASM worker.",
+      "docs": "scenarios.parseScenarioSpec (blank id, multiple time rolls, invalid identifiers, tenors or numbers, unknown fields), serialized: canonical ScenarioSpec text, or the native error. Pass it as schema-form's or market-scenario-builder's validate. Requires the shared Finstack provider.",
+      "files": [
+        {
+          "path": "hooks/use-scenario-spec-validator/use-scenario-spec-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/scenarios/use-scenario-spec-validator/use-scenario-spec-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-list-builtin-template-metadata",
+      "type": "registry:hook",
+      "title": "useListBuiltinTemplateMetadata",
+      "description": "Lists the built-in scenario templates' metadata through the WASM worker.",
+      "docs": "scenarios.listBuiltinTemplateMetadata: every built-in template's id, name, description, event date, severity, asset classes, tags and component ids, in registry order, as returned. Keyed on the worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-list-builtin-template-metadata/use-list-builtin-template-metadata.ts",
+          "type": "registry:hook",
+          "target": "hooks/scenarios/use-list-builtin-template-metadata/use-list-builtin-template-metadata.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-build-from-template",
+      "type": "registry:hook",
+      "title": "useBuildFromTemplate",
+      "description": "Builds a whole built-in scenario template through the WASM worker.",
+      "docs": "Returns a loader: templateId calls scenarios.buildFromTemplate and resolves to the returned ScenarioSpec, or rejects with the native error (unknown template). Template curve, surface and equity ids are placeholders. Pass it as market-scenario-builder's buildFromTemplate. Requires the shared Finstack provider.",
+      "files": [
+        {
+          "path": "hooks/use-build-from-template/use-build-from-template.ts",
+          "type": "registry:hook",
+          "target": "hooks/scenarios/use-build-from-template/use-build-from-template.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-build-template-component",
+      "type": "registry:hook",
+      "title": "useBuildTemplateComponent",
+      "description": "Builds one component of a built-in composite scenario template through the WASM worker.",
+      "docs": "Returns a loader: {templateId, componentId} calls scenarios.buildTemplateComponent and resolves to the returned ScenarioSpec, or rejects with the native error (unknown template or component). Pass it as market-scenario-builder's buildTemplateComponent. Requires the shared Finstack provider.",
+      "files": [
+        {
+          "path": "hooks/use-build-template-component/use-build-template-component.ts",
+          "type": "registry:hook",
+          "target": "hooks/scenarios/use-build-template-component/use-build-template-component.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-compose-scenarios",
+      "type": "registry:hook",
+      "title": "useComposeScenarios",
+      "description": "Composes ScenarioSpec texts into one scenario through the WASM worker.",
+      "docs": "Returns a composer: the ScenarioSpec texts are passed to scenarios.composeScenarios, which validates each, orders them by priority, joins their ids and rejects mixed hazard_bump_mode or more than one time roll; it resolves to the returned ScenarioSpec or rejects with the native error. Pass it as market-scenario-builder's composeScenarios. Requires the shared Finstack provider.",
+      "files": [
+        {
+          "path": "hooks/use-compose-scenarios/use-compose-scenarios.ts",
+          "type": "registry:hook",
+          "target": "hooks/scenarios/use-compose-scenarios/use-compose-scenarios.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    }
+  ]
+}

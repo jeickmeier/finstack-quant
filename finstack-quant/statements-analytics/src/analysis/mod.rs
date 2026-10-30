@@ -53,8 +53,8 @@ mod reports;
 
 pub use backtesting::{backtest_forecast, ForecastMetrics};
 pub use credit::{
-    compute_credit_context, forecast_breaches, CreditContextMetrics, CreditNumeratorNodes,
-    StatementsAdapter,
+    compute_credit_context, evaluate_covenants, forecast_breaches, CreditContextMetrics,
+    CreditNumeratorNodes, StatementsAdapter,
 };
 pub use goal_seek::{goal_seek, GoalSeekResult};
 pub use introspection::{

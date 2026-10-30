@@ -6,7 +6,7 @@ import {
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { CashflowRequest } from "@/workers/finstack-contract";
 export type { CashflowRequest } from "@/workers/finstack-contract";
-/** Snapshot the complete export request, preserving original JSON and model selection. */
+/** Snapshot the complete export request, preserving the request JSON and model selection. */
 export function cashflowOptions(
   client: FinstackClient | null,
   session: number,
@@ -21,7 +21,7 @@ export function cashflowOptions(
     queryFn: (ready) => ready.call("cashflows", snapshot),
   });
 }
-/** Original native JSON text or actual native error; supply a Finstack/Query provider. */
+/** Native cashflow envelope object or actual native error; supply a Finstack/Query provider. */
 export function useCashflows(request: CashflowRequest, enabled = true) {
   return useWorkerQuery((worker) => ({
     ...cashflowOptions(worker.client, worker.session, request),

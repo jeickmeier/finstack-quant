@@ -1,0 +1,134 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "performance-report",
+      "type": "registry:component",
+      "title": "Performance report",
+      "description": "Display of a native analytics.Performance report: lookback tiles, the summary table, cumulative, drawdown, rolling, monthly and annual return figures and drawdown episodes.",
+      "docs": "Display-only view of the report returned by usePerformanceReport (analytics.Performance over a host-supplied panel). A ticker control selects the per-ticker sections. Lookback tiles show MTD, QTD, YTD and FYTD to the returned reference date; the summary is the returned TableEnvelope; cumulative returns (every ticker), drawdown, rolling series, monthly returns (heatmap) and annual returns are drawn against each ticker's own active dates; drawdown episodes are listed largest first. Values are the decimal fractions and ratios Rust returns, with no units inferred; non-finite values are left out of figures and shown as returned elsewhere. The monthly colour domain is the caller's, else the extent of the returned values. Accepts report, loading, error, initialTicker, monthlyDomain, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/performance-report/performance-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/analytics/components/performance-report/performance-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/table-envelope",
+        "@finstack/enum-field",
+        "@finstack/contract-table-envelope"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "d3-scale@4.0.2",
+        "@types/d3-scale@4.0.9",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "benchmark-report",
+      "type": "registry:component",
+      "title": "Benchmark report",
+      "description": "Display of a native analytics.Performance benchmark report: regression, beta and relative-measure tables, outperformance and drawdown-difference areas, rolling alpha and beta and an optional multi-factor table.",
+      "docs": "Display-only view of the report returned by useBenchmarkReport (analytics.Performance against a named benchmark over a host-supplied panel). A fund control selects the ticker, defaulting to the first ticker that is not the benchmark. Key-value tables show the fund's greeks (alpha, beta, R squared, adjusted R squared, observations), its beta estimate with standard error and confidence bounds, and its tracking error, information ratio, Treynor, M squared, up and down capture, capture ratio and batting average. Cumulative outperformance and drawdown difference are drawn against the fund's own active dates, rolling alpha and beta against the returned window-end dates; the multi-factor regression (alpha, one beta per factor, R squared, adjusted R squared, residual volatility, observations) or its native error is shown when a factor panel was supplied. Values are the decimal fractions and ratios Rust returns, with no units inferred; non-finite values are left out of figures and shown as returned elsewhere. Accepts report, loading, error, initialTicker, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/benchmark-report/benchmark-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/analytics/components/benchmark-report/benchmark-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/enum-field"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "d3-scale@4.0.2",
+        "@types/d3-scale@4.0.9",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-performance-report",
+      "type": "registry:hook",
+      "title": "usePerformanceReport",
+      "description": "Builds a native analytics.Performance report of a host-supplied returns or price panel through the WASM worker.",
+      "docs": "analytics.Performance.fromReturns (or the price constructor) over the panel, then summary, cumulativeReturns, getDrawdownSeries, drawdownDetails, rollingSharpe, rollingVolatility and getActiveDatesForTicker per ticker, periodicReturns monthly and annual, lookbackReturns (with a core.FiscalConfig only when a fiscal-year start is supplied) and correlationMatrix. Omitted options (benchmark, frequency, risk-free rate, confidence, rolling window, episode count) stay unset so Rust applies its defaults; the lookback date defaults to the last active panel date. Every handle is freed. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-performance-report/use-performance-report.ts",
+          "type": "registry:hook",
+          "target": "hooks/analytics/use-performance-report/use-performance-report.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-benchmark-report",
+      "type": "registry:hook",
+      "title": "useBenchmarkReport",
+      "description": "Builds a native analytics.Performance benchmark report of a host-supplied returns or price panel through the WASM worker.",
+      "docs": "analytics.Performance.fromReturns (or the price constructor) with the named benchmark, then greeks, beta, trackingError, informationRatio, treynor, mSquared, upCapture, downCapture, captureRatio and battingAverage, and per ticker getActiveDatesForTicker, cumulativeReturnsOutperformance, drawdownDifference, rollingGreeks and, when a factor panel is supplied, multiFactorGreeks (a ticker's rejected regression is returned as its native error). Omitted options (frequency, risk-free rate, rolling window, factor return kind and rate) stay unset so Rust applies its defaults. The handle is freed. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-benchmark-report/use-benchmark-report.ts",
+          "type": "registry:hook",
+          "target": "hooks/analytics/use-benchmark-report/use-benchmark-report.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    }
+  ]
+}

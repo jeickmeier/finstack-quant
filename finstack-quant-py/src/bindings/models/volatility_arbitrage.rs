@@ -1,16 +1,21 @@
 //! Python bindings for `finstack_quant_models::volatility::arbitrage`.
 //!
 //! Exposes a function-based API for model-free volatility surface arbitrage
-//! detection. Vol surfaces are constructed internally from flat arrays so
-//! callers can work directly with numpy-friendly inputs without first
-//! building a `VolSurface` wrapper. The per-check functions return the serde
-//! rows of the Rust `ArbitrageViolation`; the combined `check_surface_grid`
-//! returns a typed `ArbitrageReport`.
+//! detection. `check_surface` runs the suite on a core `VolSurface` with the
+//! serde form of the Rust `ArbitrageCheckConfig`; the `*_grid` functions build
+//! the surface internally from flat arrays so callers can work directly with
+//! numpy-friendly inputs. The per-check functions return the serde rows of the
+//! Rust `ArbitrageViolation`; `check_surface` and `check_surface_grid` return
+//! a typed `ArbitrageReport`.
 
+use crate::bindings::core::market_data::curves::PyVolSurface;
 use crate::bindings::macros::wire_methods;
+use crate::bindings::module_utils::spec_from_py;
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_core::wire::serde_label;
-use finstack_quant_models::volatility::arbitrage::{self as model_arbitrage, ArbitrageReport};
+use finstack_quant_models::volatility::arbitrage::{
+    self as model_arbitrage, ArbitrageCheckConfig, ArbitrageReport,
+};
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
@@ -194,12 +199,27 @@ fn check_surface_grid(
         .map_err(core_to_py)
 }
 
+#[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "check_surface")]
+#[pyfunction]
+#[pyo3(text_signature = "(surface, config)")]
+fn check_surface(
+    py: Python<'_>,
+    surface: PyRef<'_, PyVolSurface>,
+    config: &Bound<'_, PyAny>,
+) -> PyResult<PyArbitrageReport> {
+    let config: ArbitrageCheckConfig = spec_from_py(py, config, "ArbitrageCheckConfig")?;
+    model_arbitrage::check_surface(&surface.inner, &config)
+        .map(|inner| PyArbitrageReport { inner })
+        .map_err(core_to_py)
+}
+
 /// Register volatility arbitrage functions on `finstack_quant.models.volatility`.
 pub fn register(_py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     parent.add_class::<PyArbitrageReport>()?;
     parent.add_function(wrap_pyfunction!(check_butterfly_grid, parent)?)?;
     parent.add_function(wrap_pyfunction!(check_calendar_spread_grid, parent)?)?;
     parent.add_function(wrap_pyfunction!(check_local_vol_density_grid, parent)?)?;
+    parent.add_function(wrap_pyfunction!(check_surface, parent)?)?;
     parent.add_function(wrap_pyfunction!(check_surface_grid, parent)?)?;
 
     Ok(())

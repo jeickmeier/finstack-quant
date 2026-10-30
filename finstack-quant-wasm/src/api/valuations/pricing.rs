@@ -378,6 +378,28 @@ pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
     to_js_value(&map)
 }
 
+/// List the standard metrics registered for one instrument type, grouped by
+/// display category.
+///
+/// The per-instrument counterpart to `listStandardMetricsGrouped`: each group
+/// keeps only the metrics the standard registry applies to `instrumentType`,
+/// and groups left empty are omitted. A listed metric is registered for the
+/// type; whether it computes under a given pricing model still depends on that
+/// model. Metrics outside every display group are not listed.
+///
+/// # Arguments
+///
+/// * `instrument_type` - Canonical instrument-type tag, matched exactly in snake case (for example `"bond"`, `"fx_option"` or `"structured_credit"`); the same tag an instrument envelope carries in its `type` field.
+/// @returns Applicable metric identifiers keyed by human-readable group name, each array sorted ascending.
+/// @throws Error - Throws a validation error when `instrumentType` is not a known instrument type, or a `TypeError` when it is not a string.
+#[wasm_bindgen(js_name = metricsForInstrument)]
+pub fn metrics_for_instrument(instrument_type: JsValue) -> Result<JsValue, JsValue> {
+    let instrument_type = js_string(&instrument_type, "instrumentType")?;
+    let map = finstack_quant_valuations::pricer::metrics_for_instrument(&instrument_type)
+        .map_err(to_js_err)?;
+    to_js_value(&map)
+}
+
 /// Describe canonical metric identifiers using Rust-owned units and coordinates.
 ///
 /// # Arguments

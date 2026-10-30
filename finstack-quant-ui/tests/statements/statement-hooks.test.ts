@@ -15,6 +15,8 @@ import { evaluateStatementScenariosOptions } from "@/hooks/statements/use-evalua
 import { runStatementChecksOptions } from "@/hooks/statements/use-run-statement-checks/use-run-statement-checks";
 import { explainStatementOptions } from "@/hooks/statements/use-explain-statement/use-explain-statement";
 import { traceStatementOptions } from "@/hooks/statements/use-trace-statement/use-trace-statement";
+import { diffStatementScenariosOptions } from "@/hooks/statements/use-diff-statement-scenarios/use-diff-statement-scenarios";
+import { traceStatementScenarioOptions } from "@/hooks/statements/use-trace-statement-scenario/use-trace-statement-scenario";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import { budget } from "../shared/budget";
 
@@ -59,7 +61,7 @@ const scenarioSetJson = JSON.stringify({
 });
 const specJson = JSON.stringify({
   frequency: "annual",
-  methods: { debt_closing: "period_end", leverage: "formula" },
+  methods: { total_debt: "period_end", leverage: "formula" },
 });
 const configJson = JSON.stringify({
   name: "growth",
@@ -372,5 +374,81 @@ it("keys explanation and trace queries by every request field and the worker ses
   expectKeyed(traceStatementOptions, {
     modelJson: analystModel,
     nodeId: "ebitda",
+  });
+});
+
+it(
+  "diffs scenario pairs in pair order and traces a lineage through the real worker",
+  async () => {
+    const { client, calls } = recordingClient();
+    const resultsJson = JSON.stringify(
+      native.evaluateScenarioSet(analystModel, scenarioSetJson),
+    );
+    const pairs = [
+      { baseline: "downside", comparison: "base" },
+      { baseline: "base", comparison: "downside" },
+    ];
+    const request = {
+      scenarioSetJson,
+      resultsJson,
+      pairs: pairs.map((pair) => ({ ...pair })),
+      metrics: ["revenue", "ebitda"],
+      periods: ["2025Q3", "2025Q4"],
+    };
+    const options = diffStatementScenariosOptions(client, 1, request);
+    request.pairs.reverse();
+    request.metrics.push("changed after snapshot");
+    const trace = { scenarioSetJson, scenario: "downside" };
+    const traceOptions = traceStatementScenarioOptions(client, 1, trace);
+    trace.scenario = "changed after snapshot";
+    const query = new QueryClient();
+    try {
+      expect(await query.fetchQuery(options)).toEqual(
+        pairs.map((pair) =>
+          native.scenarioDiff(
+            scenarioSetJson,
+            resultsJson,
+            pair.baseline,
+            pair.comparison,
+            ["revenue", "ebitda"],
+            ["2025Q3", "2025Q4"],
+          ),
+        ),
+      );
+      expect(await query.fetchQuery(traceOptions)).toEqual([
+        "base",
+        "downside",
+      ]);
+      expect(calls).toEqual([
+        [
+          "diffStatementScenarios",
+          {
+            scenarioSetJson,
+            resultsJson,
+            pairs,
+            metrics: ["revenue", "ebitda"],
+            periods: ["2025Q3", "2025Q4"],
+          },
+        ],
+        ["traceStatementScenario", { scenarioSetJson, scenario: "downside" }],
+      ]);
+    } finally {
+      query.clear();
+    }
+  },
+  budget(30000),
+);
+
+it("keys scenario diff and lineage queries by every request field and the worker session", () => {
+  expectKeyed(diffStatementScenariosOptions, {
+    scenarioSetJson,
+    resultsJson: analystResults,
+    pairs: [{ baseline: "base", comparison: "downside" }],
+    metrics: ["revenue"],
+    periods: ["2025Q3"],
+  });
+  expectKeyed(traceStatementScenarioOptions, {
+    scenarioSetJson,
+    scenario: "downside",
   });
 });

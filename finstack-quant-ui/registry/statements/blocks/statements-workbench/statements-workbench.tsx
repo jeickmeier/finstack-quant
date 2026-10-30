@@ -7,6 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { ForecastEditor } from "./forecast-editor";
 import { MetricEditor } from "./metric-editor";
 import { ScenarioPanel } from "./scenario-panel";
+import { ValuationPanel } from "./valuation-panel";
+import { SensitivityPanel } from "./sensitivity-panel";
+import { MonteCarloPanel } from "./monte-carlo-panel";
+import { CovenantsPanel } from "./covenants-panel";
+import { RollForwardReview, type EvaluatedModel } from "./roll-forward-review";
 import {
   annualRollupSpecJson,
   initialRollupMethods,
@@ -30,6 +35,9 @@ import {
 } from "@/hooks/statements/use-evaluate-statement/use-evaluate-statement";
 import { useStatementModelValidator } from "@/hooks/statements/use-statement-model-validator/use-statement-model-validator";
 import { useRollupStatement } from "@/hooks/statements/use-rollup-statement/use-rollup-statement";
+import { useCreditAssessment } from "@/hooks/statements/use-credit-assessment/use-credit-assessment";
+import { usePlSummaryReport } from "@/hooks/statements/use-pl-summary-report/use-pl-summary-report";
+import { CreditAssessmentReport } from "@/components/finstack/statements/components/credit-assessment-report/credit-assessment-report";
 import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
 import { useLinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
@@ -49,12 +57,23 @@ import type {
 /** Rust DecimalWire: the exact decimal text a monetary amount accepts. */
 const decimalPattern = new RegExp(contracts.decimal.schema.pattern);
 type Tab =
-  "statements" | "forecast" | "scenarios" | "ratios" | "checks" | "advanced";
+  | "statements"
+  | "forecast"
+  | "scenarios"
+  | "ratios"
+  | "valuation"
+  | "monte-carlo"
+  | "covenants"
+  | "checks"
+  | "advanced";
 const tabs: { id: Tab; label: string }[] = [
   { id: "statements", label: "Statements & editing" },
   { id: "forecast", label: "Forecast & roll forward" },
   { id: "scenarios", label: "Scenarios" },
   { id: "ratios", label: "Metrics & ratios" },
+  { id: "valuation", label: "Valuation" },
+  { id: "monte-carlo", label: "Monte Carlo" },
+  { id: "covenants", label: "Covenants" },
   { id: "checks", label: "Checks" },
   { id: "advanced", label: "Advanced" },
 ];
@@ -121,6 +140,7 @@ export function StatementsWorkbench({
   defaultCheckSuiteJson,
   defaultScenarioSetJson,
   defaultRollupSpecJson,
+  defaultCovenantEngineJson,
   selectedKey,
   onSelectedKeyChange,
   onModelAccepted,
@@ -139,6 +159,8 @@ export function StatementsWorkbench({
   defaultScenarioSetJson?: string;
   /** Optional native RollupSpec JSON whose methods seed the annual view; otherwise methods follow line tags. */
   defaultRollupSpecJson?: string;
+  /** Optional native CovenantEngine JSON that seeds the Covenants tab and is tested on open. */
+  defaultCovenantEngineJson?: string;
   selectedKey?: string | null;
   onSelectedKeyChange?: (key: string | null) => void;
   onModelAccepted?: (canonicalJson: string) => void;
@@ -165,6 +187,8 @@ export function StatementsWorkbench({
   const [actionError, setActionError] = useState<string | null>(null);
   const [rolling, setRolling] = useState(false);
   const [newForecastNode, setNewForecastNode] = useState("");
+  // The model and result held before the last accepted roll forward.
+  const [previousRoll, setPreviousRoll] = useState<EvaluatedModel | null>(null);
   const [revision, setRevision] = useState(0);
   const generation = useRef(0);
   const initialized = useRef(false);
@@ -371,9 +395,22 @@ export function StatementsWorkbench({
       ? model.meta.entity
       : (model?.id ?? "Financial statements");
   const currency =
-    typeof model?.meta?.reporting_currency === "string"
-      ? model.meta.reporting_currency
-      : null;
+    typeof model?.meta?.currency === "string" ? model.meta.currency : null;
+  // Credit assessment and P&L summary read the reported result: the active period and the income lines over every reported period.
+  const creditAssessment = useCreditAssessment(
+    tab === "ratios" && resultJson && activePeriod
+      ? { resultsJson: resultJson, period: activePeriod }
+      : null,
+  );
+  const plSummary = usePlSummaryReport(
+    tab === "ratios" && resultJson && model && sections.income.length
+      ? {
+          resultsJson: resultJson,
+          lineItems: sections.income,
+          periods: model.periods.map((period) => period.id),
+        }
+      : null,
+  );
   const forecastNodes = model
     ? Object.entries(model.nodes).filter(([, node]) => node.forecast)
     : [];
@@ -385,6 +422,8 @@ export function StatementsWorkbench({
   const nextForecast = model?.periods.find((period) => !period.is_actual);
   const rollForward = async () => {
     if (!onRollForward || !request || !nextForecast) return;
+    const before =
+      resultJson === null ? null : { modelJson: request.modelJson, resultJson };
     const token = ++generation.current;
     setRolling(true);
     setActionError(null);
@@ -401,7 +440,8 @@ export function StatementsWorkbench({
         throw new Error(
           `Updated financials must mark ${nextForecast.id} actual.`,
         );
-      if (token === generation.current) await commit(updated);
+      if (token === generation.current && (await commit(updated)) === null)
+        setPreviousRoll(before);
     } catch (error) {
       if (token === generation.current)
         setActionError(error instanceof Error ? error.message : String(error));
@@ -840,6 +880,15 @@ export function StatementsWorkbench({
                     Load updated financials
                   </Button>
                 </aside>
+                {previousRoll && request && resultJson && (
+                  <div className="lg:col-span-2">
+                    <RollForwardReview
+                      previous={previousRoll}
+                      current={{ modelJson: request.modelJson, resultJson }}
+                      density={density}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
@@ -857,6 +906,18 @@ export function StatementsWorkbench({
                 defaultScenarioSetJson={defaultScenarioSetJson}
                 density={density}
               />
+            )}
+            {model && request && result && (
+              <div className="mt-8 border-t border-border pt-6">
+                <SensitivityPanel
+                  modelJson={request.modelJson}
+                  result={result}
+                  nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
+                  periods={model.periods.map((period) => period.id)}
+                  onApply={(json) => commit(json, true)}
+                  density={density}
+                />
+              </div>
             )}
           </TabsContent>
           <TabsContent value="ratios">
@@ -926,7 +987,53 @@ export function StatementsWorkbench({
                     No calculated metrics are supplied yet. Add one above.
                   </p>
                 )}
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <CreditAssessmentReport
+                    assessment={creditAssessment.data}
+                    loading={creditAssessment.isFetching}
+                    error={creditAssessment.error?.message}
+                    plSummary={
+                      sections.income.length
+                        ? (plSummary.data ?? null)
+                        : undefined
+                    }
+                    plSummaryLoading={plSummary.isFetching}
+                    plSummaryError={plSummary.error?.message}
+                    currency={currency}
+                    density={density}
+                  />
+                </div>
               </div>
+            )}
+          </TabsContent>
+          <TabsContent value="valuation">
+            {model && request && (
+              <ValuationPanel
+                modelJson={request.modelJson}
+                nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
+                marketJson={marketJson}
+                asOf={asOf}
+                density={density}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="monte-carlo">
+            {model && request && (
+              <MonteCarloPanel
+                modelJson={request.modelJson}
+                density={density}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="covenants">
+            {model && result && resultJson && (
+              <CovenantsPanel
+                modelJson={request!.modelJson}
+                resultsJson={resultJson}
+                nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
+                defaultEngineJson={defaultCovenantEngineJson}
+                density={density}
+              />
             )}
           </TabsContent>
           <TabsContent value="checks">

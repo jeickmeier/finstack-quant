@@ -85,10 +85,52 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "validate",
     "cashflows",
     "scenarioTable",
+    "trancheMetrics",
+    "trancheOas",
+    "trancheDiscountMargin",
+    "trancheBreakevenCdr",
     "models",
     "metrics",
     "metricMetadata",
     "exportResult",
+    // CashflowsApi
+    "cashflowLadder",
+    // CovenantsApi
+    "covenantTemplate",
+    "validateCovenantEngine",
+    "evaluateCovenants",
+    "forecastBreaches",
+    // ScenariosApi
+    "buildMarketScenario",
+    "applyMarketScenario",
+    "horizonReturn",
+    "validateScenarioSpec",
+    "listBuiltinTemplateMetadata",
+    "buildFromTemplate",
+    "buildTemplateComponent",
+    "composeScenarios",
+    // AttributionApi
+    "attributePnlMany",
+    "defaultWaterfallOrder",
+    // AnalyticsApi
+    "performanceReport",
+    "benchmarkReport",
+    // PortfolioApi
+    "valuePortfolio",
+    "portfolioMetricsSeries",
+    "validatePortfolio",
+    "scenarioPnlBatch",
+    "applyScenarioAndRevalue",
+    "portfolioMargin",
+    "computeFactorSensitivities",
+    // MarginApi
+    "validateSimmSensitivities",
+    "simmIm",
+    "csaPreset",
+    "validateCsa",
+    "vm",
+    "marginCalls",
+    "marginCallDates",
     // CalibrationApi
     "validateCalibration",
     "dryRun",
@@ -96,6 +138,17 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     // ModelsApi
     "sampleCube",
     "sampleFxDelta",
+    "materializeFxSurface",
+    "cubeSlice",
+    "cubeSmile",
+    "checkSurface",
+    "migrationMatrix",
+    "migrationProjection",
+    "validateMertonModel",
+    "mertonReport",
+    "creditScore",
+    "positionRisk",
+    "decomposeFactors",
     // StatementsApi
     "validateStatementModel",
     "validateStatementFormula",
@@ -105,7 +158,21 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "traceStatement",
     "runStatementChecks",
     "evaluateStatementScenarios",
+    "diffStatementScenarios",
+    "traceStatementScenario",
     "rollupStatement",
+    "creditAssessment",
+    "plSummaryReport",
+    "evaluateDcf",
+    "dcfSensitivity",
+    "evaluateLbo",
+    "runSensitivity",
+    "goalSeek",
+    "runVariance",
+    "varianceBridge",
+    "backtestForecast",
+    "evaluateMonteCarlo",
+    "monteCarloBreachProbability",
   ];
   expect((await proxy.methods()).sort()).toEqual(expected.sort());
 });
@@ -120,16 +187,28 @@ it("compares real worker results and errors with the direct native facade", asyn
   const exported = unwrap(await proxy.exportResult(stochastic));
   expect(exported).toContain(`"seed":${stochastic.details.data.seed}`);
   const cashflows = unwrap(await proxy.cashflows(requests.bond));
-  expect(cashflows).toBe(
-    JSON.stringify(
-      native.instrumentCashflows(
-        requests.bond.instrumentJson,
-        requests.bond.marketJson,
-        requests.bond.asOf,
-        requests.bond.model,
-      ),
+  expect(cashflows).toEqual(
+    native.instrumentCashflows(
+      requests.bond.instrumentJson,
+      requests.bond.marketJson,
+      requests.bond.asOf,
+      requests.bond.model,
     ),
   );
+  // One native ladder per row currency of the returned envelope.
+  const ladder = unwrap(await proxy.cashflowLadder(cashflows));
+  expect(ladder).toEqual([
+    {
+      currency: "USD",
+      rows: native.calendarYearLadder(
+        cashflows.flows.map((flow) => flow.date),
+        cashflows.flows.map((flow) => flow.kind),
+        cashflows.flows.map((flow) => flow.amount),
+        cashflows.flows.map((flow) => flow.native_pv),
+      ),
+    },
+  ]);
+  expect(cashflows.flows.every((flow) => flow.currency === "USD")).toBe(true);
 });
 it("keys every pricing input, preserves snapshots, and forwards native history", async () => {
   const query = new QueryClient();
@@ -175,9 +254,12 @@ it("keys every pricing input, preserves snapshots, and forwards native history",
 });
 it("uses the exact native option registries and canonicalizes instrument text", async () => {
   expect(unwrap(await proxy.models())).toEqual(native.listModelsGrouped());
-  expect(unwrap(await proxy.metrics())).toEqual(
-    native.listStandardMetricsGrouped(),
-  );
+  for (const type of ["bond", "fx_option", "structured_credit"])
+    expect(unwrap(await proxy.metrics(type))).toEqual(
+      native.metricsForInstrument(type),
+    );
+  const unknown = await proxy.metrics("not_an_instrument");
+  expect(unknown.ok).toBe(false);
   expect(unwrap(await proxy.calendars())).toEqual(native.availableCalendars());
   expect(unwrap(await proxy.validate(requests.bond.instrumentJson))).toBe(
     native.validateInstrumentJson(requests.bond.instrumentJson),
@@ -335,13 +417,11 @@ it("keeps native instrument and override validation ahead of market errors", asy
   const bad = { ...requests.bond, instrumentJson: "{", marketJson: "{" };
   let error;
   try {
-    JSON.stringify(
-      native.instrumentCashflows(
-        bad.instrumentJson,
-        bad.marketJson,
-        bad.asOf,
-        bad.model,
-      ),
+    native.instrumentCashflows(
+      bad.instrumentJson,
+      bad.marketJson,
+      bad.asOf,
+      bad.model,
     );
   } catch (e) {
     error = errorValue(e);

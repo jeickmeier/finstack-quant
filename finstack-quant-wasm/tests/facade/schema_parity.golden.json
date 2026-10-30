@@ -1243,6 +1243,13 @@
             "bytes": 2756
           },
           {
+            "path": "schemas/margin/1/csa_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/margin/1/csa_spec.schema.json",
+            "type_name": "CsaSpec",
+            "kind": "input",
+            "bytes": 18748
+          },
+          {
             "path": "schemas/margin/1/ead_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/margin/1/ead_result.schema.json",
             "type_name": "EadResult",
@@ -1254,7 +1261,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/excess_collateral.schema.json",
             "type_name": "ExcessCollateral",
             "kind": "output",
-            "bytes": 21699
+            "bytes": 1118
           },
           {
             "path": "schemas/margin/1/exposure_profile.schema.json",
@@ -1282,7 +1289,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_sensitivities.schema.json",
             "type_name": "FrtbSensitivities",
             "kind": "input",
-            "bytes": 38075
+            "bytes": 19361
           },
           {
             "path": "schemas/margin/1/funding_config.schema.json",
@@ -1296,14 +1303,14 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/haircut01.schema.json",
             "type_name": "Haircut01",
             "kind": "output",
-            "bytes": 21660
+            "bytes": 1031
           },
           {
             "path": "schemas/margin/1/im_collateral_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/margin/1/im_collateral_result.schema.json",
             "type_name": "ImCollateralResult",
             "kind": "output",
-            "bytes": 22500
+            "bytes": 1967
           },
           {
             "path": "schemas/margin/1/im_decay_profile.schema.json",
@@ -1317,14 +1324,14 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
             "type_name": "ImResult",
             "kind": "output",
-            "bytes": 33817
+            "bytes": 13205
           },
           {
             "path": "schemas/margin/1/margin.schema.json",
             "$id": "https://finstack_quant.dev/schemas/margin/1/margin.schema.json",
             "type_name": "MarginEnvelope",
             "kind": "input",
-            "bytes": 54313
+            "bytes": 32809
           },
           {
             "path": "schemas/margin/1/margin_constants.schema.json",
@@ -1338,14 +1345,14 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_cost.schema.json",
             "type_name": "MarginFundingCost",
             "kind": "output",
-            "bytes": 21881
+            "bytes": 1252
           },
           {
             "path": "schemas/margin/1/margin_utilization.schema.json",
             "$id": "https://finstack_quant.dev/schemas/margin/1/margin_utilization.schema.json",
             "type_name": "MarginUtilization",
             "kind": "output",
-            "bytes": 21386
+            "bytes": 757
           },
           {
             "path": "schemas/margin/1/mva_result.schema.json",
@@ -1366,14 +1373,14 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/sa_ccr_netting_set_config.schema.json",
             "type_name": "SaCcrNettingSetConfig",
             "kind": "input",
-            "bytes": 3877
+            "bytes": 3763
           },
           {
             "path": "schemas/margin/1/sa_ccr_trade.schema.json",
             "$id": "https://finstack_quant.dev/schemas/margin/1/sa_ccr_trade.schema.json",
             "type_name": "SaCcrTrade",
             "kind": "input",
-            "bytes": 7120
+            "bytes": 7094
           },
           {
             "path": "schemas/margin/1/schedule_asset_class.schema.json",
@@ -1387,7 +1394,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
             "type_name": "SimmSensitivitiesJson",
             "kind": "input",
-            "bytes": 32001
+            "bytes": 12999
           },
           {
             "path": "schemas/margin/1/simm_version.schema.json",
@@ -1401,7 +1408,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json",
             "type_name": "VmResult",
             "kind": "output",
-            "bytes": 24565
+            "bytes": 4320
           },
           {
             "path": "schemas/margin/1/xva_result.schema.json",
@@ -2005,6 +2012,13 @@
             "type_name": "ScenarioEnvelope",
             "kind": "input",
             "bytes": 102983
+          },
+          {
+            "path": "schemas/scenarios/1/scenario_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
+            "type_name": "ScenarioSpec",
+            "kind": "input",
+            "bytes": 100598
           },
           {
             "path": "schemas/scenarios/1/template_metadata.schema.json",
@@ -2689,11 +2703,25 @@
             "bytes": 20481
           },
           {
+            "path": "schemas/common/1/oas_config.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
+            "type_name": "OasConfig",
+            "kind": "input",
+            "bytes": 2370
+          },
+          {
             "path": "schemas/common/1/rate_index_conventions.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
             "type_name": "RateIndexConventions",
             "kind": "component",
             "bytes": 10046
+          },
+          {
+            "path": "schemas/common/1/scenario_grid.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+            "type_name": "ScenarioGrid",
+            "kind": "input",
+            "bytes": 1521
           },
           {
             "path": "schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -3932,6 +3960,14 @@
           },
           {
             "domain": "margin",
+            "path": "schemas/margin/1/csa_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/margin/1/csa_spec.schema.json",
+            "type_name": "CsaSpec",
+            "kind": "input",
+            "bytes": 18748
+          },
+          {
+            "domain": "margin",
             "path": "schemas/margin/1/ead_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/margin/1/ead_result.schema.json",
             "type_name": "EadResult",
@@ -3944,7 +3980,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/excess_collateral.schema.json",
             "type_name": "ExcessCollateral",
             "kind": "output",
-            "bytes": 21699
+            "bytes": 1118
           },
           {
             "domain": "margin",
@@ -3976,7 +4012,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_sensitivities.schema.json",
             "type_name": "FrtbSensitivities",
             "kind": "input",
-            "bytes": 38075
+            "bytes": 19361
           },
           {
             "domain": "margin",
@@ -3992,7 +4028,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/haircut01.schema.json",
             "type_name": "Haircut01",
             "kind": "output",
-            "bytes": 21660
+            "bytes": 1031
           },
           {
             "domain": "margin",
@@ -4000,7 +4036,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/im_collateral_result.schema.json",
             "type_name": "ImCollateralResult",
             "kind": "output",
-            "bytes": 22500
+            "bytes": 1967
           },
           {
             "domain": "margin",
@@ -4016,7 +4052,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
             "type_name": "ImResult",
             "kind": "output",
-            "bytes": 33817
+            "bytes": 13205
           },
           {
             "domain": "margin",
@@ -4024,7 +4060,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/margin.schema.json",
             "type_name": "MarginEnvelope",
             "kind": "input",
-            "bytes": 54313
+            "bytes": 32809
           },
           {
             "domain": "margin",
@@ -4040,7 +4076,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_cost.schema.json",
             "type_name": "MarginFundingCost",
             "kind": "output",
-            "bytes": 21881
+            "bytes": 1252
           },
           {
             "domain": "margin",
@@ -4048,7 +4084,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/margin_utilization.schema.json",
             "type_name": "MarginUtilization",
             "kind": "output",
-            "bytes": 21386
+            "bytes": 757
           },
           {
             "domain": "margin",
@@ -4072,7 +4108,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/sa_ccr_netting_set_config.schema.json",
             "type_name": "SaCcrNettingSetConfig",
             "kind": "input",
-            "bytes": 3877
+            "bytes": 3763
           },
           {
             "domain": "margin",
@@ -4080,7 +4116,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/sa_ccr_trade.schema.json",
             "type_name": "SaCcrTrade",
             "kind": "input",
-            "bytes": 7120
+            "bytes": 7094
           },
           {
             "domain": "margin",
@@ -4096,7 +4132,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
             "type_name": "SimmSensitivitiesJson",
             "kind": "input",
-            "bytes": 32001
+            "bytes": 12999
           },
           {
             "domain": "margin",
@@ -4112,7 +4148,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json",
             "type_name": "VmResult",
             "kind": "output",
-            "bytes": 24565
+            "bytes": 4320
           },
           {
             "domain": "margin",
@@ -4484,6 +4520,14 @@
           },
           {
             "domain": "scenarios",
+            "path": "schemas/scenarios/1/scenario_spec.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
+            "type_name": "ScenarioSpec",
+            "kind": "input",
+            "bytes": 100598
+          },
+          {
+            "domain": "scenarios",
             "path": "schemas/scenarios/1/template_metadata.schema.json",
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
             "type_name": "TemplateMetadata",
@@ -4708,11 +4752,27 @@
           },
           {
             "domain": "valuations",
+            "path": "schemas/common/1/oas_config.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
+            "type_name": "OasConfig",
+            "kind": "input",
+            "bytes": 2370
+          },
+          {
+            "domain": "valuations",
             "path": "schemas/common/1/rate_index_conventions.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
             "type_name": "RateIndexConventions",
             "kind": "component",
             "bytes": 10046
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/scenario_grid.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+            "type_name": "ScenarioGrid",
+            "kind": "input",
+            "bytes": 1521
           },
           {
             "domain": "valuations",

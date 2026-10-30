@@ -1,0 +1,94 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "pnl-attribution-report",
+      "type": "registry:component",
+      "title": "P&L attribution report",
+      "description": "Display of a native single-instrument P&L attribution: totals, factor buckets, a signed factor chart, the Rust waterfall steps, the residual and notes.",
+      "docs": "Display-only view of a PnlAttribution as returned (by attribution.attributePnl / attributePnlMany, or inside scenarios.computeHorizonReturn): total, mark-to-market and endpoint values, every factor bucket as exact money with a signed bar chart of the returned amounts, the waterfall drawn only from Rust's waterfall_steps (pv_before to pv_after per step; nothing when the method returns none), the residual with the returned residual_pct and tolerances, notes, the policy stamp and the JSON. Optional explain, residualWithinTolerance and pctOfTotal props take Rust's pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotal; without residualWithinTolerance no verdict is shown. Nothing is summed, differenced or converted. Accepts attribution, loading, error and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/pnl-attribution-report/pnl-attribution-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/attribution/components/pnl-attribution-report/pnl-attribution-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "@finstack/stamp-badge",
+        "@finstack/json-viewer",
+        "badge"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-attribute-pnl-many",
+      "type": "registry:hook",
+      "title": "useAttributePnlMany",
+      "description": "Attributes the T0 to T1 P&L of priced instruments through the WASM worker.",
+      "docs": "attribution.attributePnlMany with one AttributionInputs (the two MarketContext texts canonicalized through the worker's market cache and spliced, never parsed; the dates; the AttributionMethod wire value, which Rust requires) over the instrument envelopes in order, then per result attribution.pnlAttributionExplainText, pnlAttributionResidualWithinTolerance against the run's own tolerances and pnlAttributionPctOfTotal per factor bucket. Returns one {attribution, explain, residualWithinTolerance, pctOfTotal} per instrument for PnlAttributionReport. Every other AttributionInputs option stays unset; a failing instrument fails the call with the native error (metrics_based, for example, needs a calibration recipe for every hazard curve). Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-attribute-pnl-many/use-attribute-pnl-many.ts",
+          "type": "registry:hook",
+          "target": "hooks/attribution/use-attribute-pnl-many/use-attribute-pnl-many.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-default-waterfall-order",
+      "type": "registry:hook",
+      "title": "useDefaultWaterfallOrder",
+      "description": "Reads Rust's default waterfall attribution factor order through the WASM worker.",
+      "docs": "attribution.defaultWaterfallOrder: the canonical snake_case factor names a waterfall AttributionMethod applies in order ({waterfall: order}). Immutable within one worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-default-waterfall-order/use-default-waterfall-order.ts",
+          "type": "registry:hook",
+          "target": "hooks/attribution/use-default-waterfall-order/use-default-waterfall-order.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    }
+  ]
+}

@@ -19,6 +19,12 @@
       "@/hooks/calibration/*": ["registry/calibration/hooks/*"],
       "@/hooks/models/*": ["registry/models/hooks/*"],
       "@/hooks/statements/*": ["registry/statements/hooks/*"],
+      "@/hooks/scenarios/*": ["registry/scenarios/hooks/*"],
+      "@/hooks/attribution/*": ["registry/attribution/hooks/*"],
+      "@/hooks/analytics/*": ["registry/analytics/hooks/*"],
+      "@/hooks/portfolio/*": ["registry/portfolio/hooks/*"],
+      "@/hooks/margin/*": ["registry/margin/hooks/*"],
+      "@/hooks/covenants/*": ["registry/covenants/hooks/*"],
       "@/workers/*": ["registry/shared/file/*"],
       "@/components/finstack/*": ["registry/*"],
       "@/components/ui/*": ["components/ui/*"]

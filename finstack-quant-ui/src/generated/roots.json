@@ -5,6 +5,41 @@
     "schema": "schemas/calibration.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
+    "source": "finstack-quant/valuations/schemas/common/1/oas_config.schema.json",
+    "schema": "schemas/oas_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+    "source": "finstack-quant/valuations/schemas/common/1/scenario_grid.schema.json",
+    "schema": "schemas/scenario_grid.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
+    "source": "finstack-quant/covenants/schemas/covenants/1/covenant_engine.schema.json",
+    "schema": "schemas/covenant_engine.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json",
+    "source": "finstack-quant/covenants/schemas/covenants/1/covenant_forecast_config.schema.json",
+    "schema": "schemas/covenant_forecast_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
+    "source": "finstack-quant/covenants/schemas/covenants/1/covenant_report.schema.json",
+    "schema": "schemas/covenant_report.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
+    "source": "finstack-quant/covenants/schemas/covenants/1/dated_covenant_reports.schema.json",
+    "schema": "schemas/dated_covenant_reports.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",
+    "source": "finstack-quant/covenants/schemas/covenants/1/future_breach.schema.json",
+    "schema": "schemas/future_breach.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
     "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_asian_option.schema.json",
     "schema": "schemas/commodity_asian_option.json"
@@ -395,9 +430,84 @@
     "schema": "schemas/yoy_inflation_swap.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/margin/1/csa_spec.schema.json",
+    "source": "finstack-quant/margin/schemas/margin/1/csa_spec.schema.json",
+    "schema": "schemas/csa_spec.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
+    "source": "finstack-quant/margin/schemas/margin/1/im_result.schema.json",
+    "schema": "schemas/im_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
+    "source": "finstack-quant/margin/schemas/margin/1/simm_sensitivities_json.schema.json",
+    "schema": "schemas/simm_sensitivities_json.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json",
+    "source": "finstack-quant/margin/schemas/margin/1/vm_result.schema.json",
+    "schema": "schemas/vm_result.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
     "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
     "schema": "schemas/market_context_state.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/altman_z_double_prime_input.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/altman_z_double_prime_input.schema.json",
+    "schema": "schemas/altman_z_double_prime_input.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/altman_z_prime_input.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/altman_z_prime_input.schema.json",
+    "schema": "schemas/altman_z_prime_input.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/altman_z_score_input.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/altman_z_score_input.schema.json",
+    "schema": "schemas/altman_z_score_input.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/arbitrage_report.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/arbitrage_report.schema.json",
+    "schema": "schemas/arbitrage_report.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/merton_model.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/merton_model.schema.json",
+    "schema": "schemas/merton_model.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/ohlson_o_score_input.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/ohlson_o_score_input.schema.json",
+    "schema": "schemas/ohlson_o_score_input.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/zmijewski_input.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/zmijewski_input.schema.json",
+    "schema": "schemas/zmijewski_input.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
+    "source": "finstack-quant/portfolio/schemas/portfolio/1/portfolio_margin_result.schema.json",
+    "schema": "schemas/portfolio_margin_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_result.schema.json",
+    "source": "finstack-quant/portfolio/schemas/portfolio/1/portfolio_result.schema.json",
+    "schema": "schemas/portfolio_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
+    "source": "finstack-quant/portfolio/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
+    "schema": "schemas/scenario_pnl_batch_item.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json",
+    "source": "finstack-quant/portfolio/schemas/portfolio/1/scenario_revalue_view.schema.json",
+    "schema": "schemas/scenario_revalue_view.json"
   },
   {
     "uri": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
@@ -410,9 +520,64 @@
     "schema": "schemas/valuation_result.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
+    "source": "finstack-quant/scenarios/schemas/scenarios/1/scenario_spec.schema.json",
+    "schema": "schemas/scenario_spec.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/bridge_chart.schema.json",
+    "schema": "schemas/bridge_chart.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/credit_assessment.schema.json",
+    "schema": "schemas/credit_assessment.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/dcf_options.schema.json",
+    "schema": "schemas/dcf_options.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
+    "schema": "schemas/dcf_sensitivity_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/forecast_metrics.schema.json",
+    "schema": "schemas/forecast_metrics.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/lbo_config.schema.json",
+    "schema": "schemas/lbo_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/lbo_result.schema.json",
+    "schema": "schemas/lbo_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/scenario_diff.schema.json",
+    "schema": "schemas/scenario_diff.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/scenario_set.schema.json",
     "schema": "schemas/scenario_set.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/sensitivity_result.schema.json",
+    "schema": "schemas/sensitivity_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/variance_config.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/variance_config.schema.json",
+    "schema": "schemas/variance_config.json"
   },
   {
     "uri": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
@@ -425,6 +590,16 @@
     "schema": "schemas/financial_model_spec.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
+    "source": "finstack-quant/statements/schemas/statements/1/monte_carlo_config.schema.json",
+    "schema": "schemas/monte_carlo_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
+    "source": "finstack-quant/statements/schemas/statements/1/monte_carlo_results.schema.json",
+    "schema": "schemas/monte_carlo_results.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
     "source": "finstack-quant/statements/schemas/statements/1/rollup_spec.schema.json",
     "schema": "schemas/rollup_spec.json"
@@ -433,5 +608,10 @@
     "uri": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
     "source": "finstack-quant/statements/schemas/statements/1/statement_result.schema.json",
     "schema": "schemas/statement_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
+    "source": "finstack-quant/core/schemas/table/1/table_envelope.schema.json",
+    "schema": "schemas/table_envelope.json"
   }
 ]

@@ -1,10 +1,35 @@
 import type { WorkerApi } from "./finstack-contract";
-import { createContext } from "./services/context";
+import { createContext, type ContextNative } from "./services/context";
 import { createCoreService, type CoreNative } from "./services/core";
 import {
   createValuationsService,
   type ValuationsNative,
 } from "./services/valuations";
+import {
+  createCashflowsService,
+  type CashflowsNative,
+} from "./services/cashflows";
+import {
+  createCovenantsService,
+  type CovenantsNative,
+} from "./services/covenants";
+import {
+  createScenariosService,
+  type ScenariosNative,
+} from "./services/scenarios";
+import {
+  createAttributionService,
+  type AttributionNative,
+} from "./services/attribution";
+import {
+  createAnalyticsService,
+  type AnalyticsNative,
+} from "./services/analytics";
+import {
+  createPortfolioService,
+  type PortfolioNative,
+} from "./services/portfolio";
+import { createMarginService, type MarginNative } from "./services/margin";
 import {
   createCalibrationService,
   type CalibrationNative,
@@ -16,8 +41,16 @@ import {
 } from "./services/statements";
 /** Dependencies are the published facade; injection permits the same service in a real Node worker. */
 export function createService(
-  native: { initialize(wasmUrl?: string): Promise<unknown> } & CoreNative &
+  native: ContextNative &
+    CoreNative &
     ValuationsNative &
+    CashflowsNative &
+    CovenantsNative &
+    ScenariosNative &
+    AttributionNative &
+    AnalyticsNative &
+    PortfolioNative &
+    MarginNative &
     CalibrationNative &
     ModelsNative &
     StatementsNative,
@@ -33,6 +66,13 @@ export function createService(
     },
     ...createCoreService(native, context),
     ...createValuationsService(native, context),
+    ...createCashflowsService(native, context),
+    ...createCovenantsService(native, context),
+    ...createScenariosService(native, context),
+    ...createAttributionService(native, context),
+    ...createAnalyticsService(native, context),
+    ...createPortfolioService(native, context),
+    ...createMarginService(native, context),
     ...createCalibrationService(native, context),
     ...createModelsService(native, context),
     ...createStatementsService(native, context),

@@ -20,7 +20,7 @@ mod json;
 pub use json::{
     instrument_envelope_from_spec, instrument_from_spec, list_models, list_models_grouped,
     list_standard_metrics, list_standard_metrics_grouped, metric_metadata, metric_value,
-    parse_boxed_instrument_from_json, parse_boxed_instruments_from_json,
+    metrics_for_instrument, parse_boxed_instrument_from_json, parse_boxed_instruments_from_json,
     parse_instrument_from_json, parse_typed_instrument_json, present_standard_option_greeks,
     pretty_instrument_json, price_instrument, validate_instrument_json,
     validate_typed_instrument_json, MetricMetadata, ParsedInstrument, STANDARD_OPTION_GREEKS,

@@ -19896,6 +19896,50 @@ export interface MetricMetadata {
   unit: MetricUnit;
 }
 /**
+ * Structured-credit OAS solver configuration: paths, stochastic dimensions and seed.
+ */
+export interface OasConfig {
+  /**
+   * Credit factor loading for the lognormal default/prepayment shocks.
+   */
+  credit_loading: number;
+  /**
+   * Hull-White 1F mean reversion `κ`, per year.
+   */
+  hw1f_mean_reversion: number;
+  /**
+   * Hull-White 1F short-rate volatility `σ`, absolute annual decimal
+   * (`0.01` = 100 bp).
+   */
+  hw1f_sigma: number;
+  /**
+   * Number of Monte-Carlo scenarios (forced to 1 when neither dimension is
+   * stochastic, since every scenario is then identical).
+   */
+  num_paths: number;
+  /**
+   * Rate-dependent prepayment sensitivity `β`.
+   */
+  prepay_beta: number;
+  /**
+   * RNG seed (deterministic, reproducible results).
+   */
+  seed: number;
+  /**
+   * Couple a systematic stochastic-credit factor (correlated default/prepay stress).
+   */
+  stochastic_credit: boolean;
+  /**
+   * Couple a stochastic Hull-White short-rate path (rate paths + rate-dependent
+   * prepayment, stochastic discounting).
+   */
+  stochastic_rates: boolean;
+  /**
+   * Brent solver tolerance.
+   */
+  tolerance: number;
+}
+/**
  * Structured-credit option-adjusted spread and its solver diagnostics.
  */
 export interface OasResult {
@@ -20057,6 +20101,29 @@ export interface ScenarioCell {
    * Total principal writedown in currency units.
    */
   writedown: number;
+}
+/**
+ * Structured-credit CPR x CDR x severity grid swept by the tranche scenario table.
+ */
+export interface ScenarioGrid {
+  /**
+   * Annual CDR values (decimal) to sweep.
+   */
+  cdrs: number[];
+  /**
+   * Annual CPR values (decimal) to sweep.
+   */
+  cprs: number[];
+  /**
+   * Recovery lag (months) applied in every scenario. When `None`, the deal's
+   * own recovery lag is used; set it to override (e.g. `Some(0)` for
+   * immediate recoveries).
+   */
+  recovery_lag?: number | null;
+  /**
+   * Loss severities (decimal); recovery = `1 - severity`.
+   */
+  severities: number[];
 }
 /**
  * Structured-credit scenario grid results for one tranche.

@@ -1,0 +1,198 @@
+{
+  "description": "Native models.credit.MertonModel reports at horizons 0.5 to 10 years with a 5-year CDS at 40% recovery, graded on models.credit.pd.MasterScale.defaultCalibration(): the facade example firm (assets 100, asset volatility 0.25, barrier 60, rate 0.03) as MertonModel JSON, and a KMV equity calibration (equity 50 at volatility 0.4, short-term debt 30, long-term debt 40, rate 0.03, one year).",
+  "model": {
+    "request": {
+      "source": {
+        "kind": "model",
+        "json": "{\"asset_value\":100,\"asset_vol\":0.25,\"debt_barrier\":60,\"risk_free_rate\":0.03,\"payout_rate\":0,\"barrier_type\":\"terminal\",\"dynamics\":\"geometric_brownian\"}"
+      },
+      "horizons": [0.5, 1, 2, 3, 5, 10],
+      "maturity": 5,
+      "recovery": 0.4
+    },
+    "report": {
+      "model": {
+        "asset_value": 100,
+        "asset_vol": 0.25,
+        "debt_barrier": 60,
+        "risk_free_rate": 0.03,
+        "payout_rate": 0,
+        "barrier_type": "terminal",
+        "dynamics": "geometric_brownian"
+      },
+      "defaultPoint": null,
+      "horizons": [0.5, 1, 2, 3, 5, 10],
+      "defaultProbabilities": [
+        0.0019500516120603815, 0.020759845258390343, 0.07525079984838666,
+        0.1207911503784265, 0.1833658439745175, 0.26423686540063307
+      ],
+      "distanceToDefault": [
+        2.8861305666443076, 2.038302495063963, 1.4377619824632548,
+        1.1710409915231685, 0.9026123156240909, 0.6303375950098661
+      ],
+      "grades": [
+        {
+          "grade": "BBB",
+          "central_pd": 0.002,
+          "input_pd": 0.0019500516120603815,
+          "grade_index": 3
+        },
+        {
+          "grade": "B",
+          "central_pd": 0.04,
+          "input_pd": 0.020759845258390343,
+          "grade_index": 5
+        },
+        {
+          "grade": "CCC",
+          "central_pd": 0.12,
+          "input_pd": 0.07525079984838666,
+          "grade_index": 6
+        },
+        {
+          "grade": "CCC",
+          "central_pd": 0.12,
+          "input_pd": 0.1207911503784265,
+          "grade_index": 6
+        },
+        {
+          "grade": "CCC",
+          "central_pd": 0.12,
+          "input_pd": 0.1833658439745175,
+          "grade_index": 6
+        },
+        {
+          "grade": "CC/C",
+          "central_pd": 0.4,
+          "input_pd": 0.26423686540063307,
+          "grade_index": 7
+        }
+      ],
+      "impliedSpread": {
+        "ok": true,
+        "value": [
+          0.002341431975701445, 0.012534132221441702, 0.023100760751164764,
+          0.025078398902654245, 0.02331114675646606, 0.01726193191771863
+        ]
+      },
+      "debtSpread": {
+        "ok": true,
+        "value": [
+          0.0001916002006336442, 0.0017667693194893695, 0.005247937922050362,
+          0.007304510501199079, 0.009019959105114038, 0.009375410256907477
+        ]
+      },
+      "maturity": 5,
+      "recovery": 0.4,
+      "cdsParSpread": {
+        "ok": true,
+        "value": 0.023936463273530044
+      },
+      "impliedEquity": {
+        "ok": true,
+        "value": [50.63484718383464, 0.4582212856376535]
+      }
+    }
+  },
+  "equity": {
+    "request": {
+      "source": {
+        "kind": "equity",
+        "equityValue": 50,
+        "equityVol": 0.4,
+        "shortTermDebt": 30,
+        "longTermDebt": 40,
+        "riskFreeRate": 0.03,
+        "payoutRate": 0,
+        "maturity": 1
+      },
+      "horizons": [0.5, 1, 2, 3, 5, 10],
+      "maturity": 5,
+      "recovery": 0.4
+    },
+    "report": {
+      "model": {
+        "asset_value": 98.52142065620828,
+        "asset_vol": 0.2030351296945777,
+        "debt_barrier": 50,
+        "risk_free_rate": 0.03,
+        "payout_rate": 0,
+        "barrier_type": "terminal",
+        "dynamics": "geometric_brownian"
+      },
+      "defaultPoint": 50,
+      "horizons": [0.5, 1, 2, 3, 5, 10],
+      "defaultProbabilities": [
+        9.826424658800987e-7, 0.00035356472194204966, 0.0076011012673561935,
+        0.022281120073663244, 0.05509499259367572, 0.11456521704562975
+      ],
+      "distanceToDefault": [
+        4.7569616433581805, 3.3867998941234205, 2.4275258716114743,
+        2.0087633180051814, 1.5973397929527562, 1.202601843195131
+      ],
+      "grades": [
+        {
+          "grade": "AAA",
+          "central_pd": 0.00004,
+          "input_pd": 9.826424658800987e-7,
+          "grade_index": 0
+        },
+        {
+          "grade": "AA",
+          "central_pd": 0.0002,
+          "input_pd": 0.00035356472194204966,
+          "grade_index": 1
+        },
+        {
+          "grade": "BB",
+          "central_pd": 0.01,
+          "input_pd": 0.0076011012673561935,
+          "grade_index": 4
+        },
+        {
+          "grade": "B",
+          "central_pd": 0.04,
+          "input_pd": 0.022281120073663244,
+          "grade_index": 5
+        },
+        {
+          "grade": "B",
+          "central_pd": 0.04,
+          "input_pd": 0.05509499259367572,
+          "grade_index": 5
+        },
+        {
+          "grade": "CCC",
+          "central_pd": 0.12,
+          "input_pd": 0.11456521704562975,
+          "grade_index": 6
+        }
+      ],
+      "impliedSpread": {
+        "ok": true,
+        "value": [
+          0.0000011791713067092048, 0.00021216133779023756,
+          0.002285546151132663, 0.004486279078189885, 0.006723145172355406,
+          0.0071215837117430516
+        ]
+      },
+      "debtSpread": {
+        "ok": true,
+        "value": [
+          5.350909831307663e-8, 0.000017641974605942912, 0.00033043361142499433,
+          0.0008690188584505668, 0.0018164456923322313, 0.002840470439343398
+        ]
+      },
+      "maturity": 5,
+      "recovery": 0.4,
+      "cdsParSpread": {
+        "ok": true,
+        "value": 0.00651346098323259
+      },
+      "impliedEquity": {
+        "ok": true,
+        "value": [55.87510959248689, 0.350798497799075]
+      }
+    }
+  }
+}

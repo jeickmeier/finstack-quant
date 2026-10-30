@@ -78,7 +78,7 @@ export function ValuationDetails({
           <Explanation value={result.explanation} density={density} />
         )}
         {result.covenants != null && (
-          <Covenants value={result.covenants} density={density} />
+          <Covenants reports={result.covenants} density={density} />
         )}
       </Suspense>
       <details>

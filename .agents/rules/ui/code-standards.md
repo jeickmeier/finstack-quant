@@ -34,6 +34,11 @@ prerequisites and duration.
 - Every Vitest timeout or hang allowance goes through `budget()` from
   `tests/shared/budget.ts`, never a bare millisecond value; a fixed wait that
   outlasts a component timer stays a literal tied to that timer.
+- The worker reaches the facade only through `<Crate>Native` Pick leaves
+  (never a whole sub-namespace), and only `finstack.worker.ts` value-imports
+  `finstack-quant-wasm`. A slice that wires a facade member runs
+  `npm --prefix finstack-quant-ui run coverage` so `facade-coverage.json`
+  records it; `ui-check` fails on any drift.
 - Generated files (`src/generated/`, registry `categories`/`meta`,
   `registry/theme/finstack-theme/theme.css`, `registry/theme/registry.json`,
   the gallery `inventory.json`, `data.json` and `imports.ts`) are regenerated

@@ -6,7 +6,7 @@ import data from "../data.json";
 export function Example({ density = "compact" }: ExampleProps) {
   return (
     <CovenantReport
-      value={JSON.parse(data.details.covenantReportsJson)}
+      reports={JSON.parse(data.details.covenantReportsJson)}
       density={density}
     />
   );

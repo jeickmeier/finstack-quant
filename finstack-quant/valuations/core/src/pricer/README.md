@@ -316,6 +316,7 @@ as-of date and model key, dispatch through the standard registry.
 | `parse_model_key` | `ModelKey` |
 | `list_models`, `list_models_grouped` | `Vec<String>` / `BTreeMap<String, Vec<String>>` |
 | `list_standard_metrics`, `list_standard_metrics_grouped` | same shapes |
+| `metrics_for_instrument` | `Result<BTreeMap<String, Vec<String>>>`: the grouped standard metrics registered for one instrument type |
 | `price_instrument` | `ValuationResult` from a `ParsedInstrument` |
 | `metric_value` | `f64` from a `ParsedInstrument` |
 | `present_standard_option_greeks` | `Vec<(&'static str, f64)>` from a `ParsedInstrument` |

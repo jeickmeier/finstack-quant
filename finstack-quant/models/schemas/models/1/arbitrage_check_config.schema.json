@@ -32,18 +32,22 @@
   "description": "Configuration for the arbitrage detection suite.",
   "properties": {
     "check_butterfly": {
+      "default": true,
       "description": "Run butterfly (strike convexity) check.",
       "type": "boolean"
     },
     "check_calendar_spread": {
+      "default": true,
       "description": "Run calendar spread (expiry monotonicity) check.",
       "type": "boolean"
     },
     "check_local_vol_density": {
+      "default": true,
       "description": "Run Dupire local vol density check.",
       "type": "boolean"
     },
     "forward_prices": {
+      "default": null,
       "description": "Optional per-expiry forward prices used by butterfly, calendar, and\nlocal-vol density checks.\n\nRequired when any check is enabled. Supply one finite positive value\nto broadcast across expiries or one such value per expiry.",
       "items": {
         "format": "double",
@@ -56,21 +60,16 @@
     },
     "min_severity": {
       "$ref": "#/$defs/ArbitrageSeverity",
+      "default": "negligible",
       "description": "Minimum severity to include in the report.\nViolations below this severity are filtered out."
     },
     "tolerance": {
+      "default": 1e-10,
       "description": "Tolerance for all checks (total-variance units).",
       "format": "double",
       "type": "number"
     }
   },
-  "required": [
-    "check_butterfly",
-    "check_calendar_spread",
-    "check_local_vol_density",
-    "tolerance",
-    "min_severity"
-  ],
   "title": "ArbitrageCheckConfig",
   "type": "object"
 }

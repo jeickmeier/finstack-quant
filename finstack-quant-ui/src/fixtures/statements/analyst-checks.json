@@ -38,7 +38,7 @@
       "name": "Free cash flow positive",
       "category": "credit_reasonableness",
       "severity": "warning",
-      "formula": "fcf > 0 * fcf",
+      "formula": "free_cash_flow > 0 * free_cash_flow",
       "message_template": "Negative free cash flow in {period}",
       "tolerance": null
     },
@@ -47,7 +47,7 @@
       "name": "Opening + draws - repayments = closing",
       "category": "accounting_identity",
       "severity": "error",
-      "formula": "debt_opening + debt_draws - debt_repayments == debt_closing",
+      "formula": "debt_opening + debt_draws - debt_repayments == total_debt",
       "message_template": "Debt corkscrew does not tie in {period}",
       "tolerance": 1
     }

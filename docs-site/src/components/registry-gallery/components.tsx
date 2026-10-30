@@ -34,6 +34,43 @@ import { Example as Example30 } from "./examples/statement-explanation";
 import { Example as Example31 } from "./examples/statement-checks";
 import { Example as Example32 } from "./examples/statement-check-report";
 import { Example as Example33 } from "./examples/statements-workbench";
+import { Example as Example34 } from "./examples/variance-table";
+import { Example as Example35 } from "./examples/tranche-analytics";
+import { Example as Example36 } from "./examples/vol-cube-slice";
+import { Example as Example37 } from "./examples/market-scenario-builder";
+import { Example as Example38 } from "./examples/market-scenario-report";
+import { Example as Example39 } from "./examples/performance-report";
+import { Example as Example40 } from "./examples/covenant-compliance";
+import { Example as Example41 } from "./examples/portfolio-summary";
+import { Example as Example42 } from "./examples/positions-table";
+import { Example as Example43 } from "./examples/portfolio-metrics";
+import { Example as Example44 } from "./examples/transition-matrix-heatmap";
+import { Example as Example45 } from "./examples/simm-sensitivity-table";
+import { Example as Example46 } from "./examples/simm-report";
+import { Example as Example47 } from "./examples/simm-calculator";
+import { Example as Example48 } from "./examples/pnl-attribution-report";
+import { Example as Example49 } from "./examples/horizon-return-report";
+import { Example as Example50 } from "./examples/scenario-pnl-table";
+import { Example as Example51 } from "./examples/benchmark-report";
+import { Example as Example52 } from "./examples/merton-calculator";
+import { Example as Example53 } from "./examples/csa-editor";
+import { Example as Example54 } from "./examples/margin-call-table";
+import { Example as Example55 } from "./examples/portfolio-margin-report";
+import { Example as Example56 } from "./examples/credit-scorecard";
+import { Example as Example57 } from "./examples/portfolio-risk-report";
+import { Example as Example58 } from "./examples/credit-assessment-report";
+import { Example as Example59 } from "./examples/tornado-chart";
+import { Example as Example60 } from "./examples/dcf-report";
+import { Example as Example61 } from "./examples/dcf-assumptions-form";
+import { Example as Example62 } from "./examples/lbo-report";
+import { Example as Example63 } from "./examples/statement-sensitivity";
+import { Example as Example64 } from "./examples/goal-seek-form";
+import { Example as Example65 } from "./examples/variance-bridge-chart";
+import { Example as Example66 } from "./examples/forecast-backtest";
+import { Example as Example67 } from "./examples/statement-monte-carlo";
+import { Example as Example68 } from "./examples/surface-arbitrage-badge";
+import { Example as Example69 } from "./examples/covenant-engine-editor";
+import { Example as Example70 } from "./examples/covenant-breach-forecast";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -69,6 +106,43 @@ const examples = {
   "statement-checks": Example31,
   "statement-check-report": Example32,
   "statements-workbench": Example33,
+  "variance-table": Example34,
+  "tranche-analytics": Example35,
+  "vol-cube-slice": Example36,
+  "market-scenario-builder": Example37,
+  "market-scenario-report": Example38,
+  "performance-report": Example39,
+  "covenant-compliance": Example40,
+  "portfolio-summary": Example41,
+  "positions-table": Example42,
+  "portfolio-metrics": Example43,
+  "transition-matrix-heatmap": Example44,
+  "simm-sensitivity-table": Example45,
+  "simm-report": Example46,
+  "simm-calculator": Example47,
+  "pnl-attribution-report": Example48,
+  "horizon-return-report": Example49,
+  "scenario-pnl-table": Example50,
+  "benchmark-report": Example51,
+  "merton-calculator": Example52,
+  "csa-editor": Example53,
+  "margin-call-table": Example54,
+  "portfolio-margin-report": Example55,
+  "credit-scorecard": Example56,
+  "portfolio-risk-report": Example57,
+  "credit-assessment-report": Example58,
+  "tornado-chart": Example59,
+  "dcf-report": Example60,
+  "dcf-assumptions-form": Example61,
+  "lbo-report": Example62,
+  "statement-sensitivity": Example63,
+  "goal-seek-form": Example64,
+  "variance-bridge-chart": Example65,
+  "forecast-backtest": Example66,
+  "statement-monte-carlo": Example67,
+  "surface-arbitrage-badge": Example68,
+  "covenant-engine-editor": Example69,
+  "covenant-breach-forecast": Example70,
 };
 export function ComponentDemo({
   name,

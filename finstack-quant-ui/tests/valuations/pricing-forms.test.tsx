@@ -225,6 +225,34 @@ it("keeps a new structural error and invalid accepted state when an older native
   expect(accepted.mock.calls.at(-1)?.[0]).toBeNull();
 });
 
+it("reports selected metrics the instrument type does not offer without dropping them", () => {
+  const onValueChange = vi.fn();
+  const props = {
+    value: { asOf: "2025-01-01", metrics: ["dv01", "wal"] },
+    onValueChange,
+    instrumentType: "fx_option",
+    models: {},
+    metrics: { Rates: ["dv01"] },
+  };
+  const { rerender } = render(
+    <PricingParamsForm {...props} loading sections={["metrics"]} />,
+  );
+  expect(screen.queryByText(/Selected metrics unavailable/)).toBeNull();
+  rerender(<PricingParamsForm {...props} sections={["metrics"]} />);
+  expect(
+    screen.getByText("Selected metrics unavailable for fx_option: wal"),
+  ).toBeTruthy();
+  expect(onValueChange).not.toHaveBeenCalled();
+  rerender(
+    <PricingParamsForm
+      {...props}
+      metrics={{ Rates: ["dv01"], Credit: ["wal"] }}
+      sections={["metrics"]}
+    />,
+  );
+  expect(screen.queryByText(/Selected metrics unavailable/)).toBeNull();
+});
+
 it("waits for model discovery before announcing unavailable selection", () => {
   const props = {
     value: { asOf: "2025-01-01", model: "discounting" },
