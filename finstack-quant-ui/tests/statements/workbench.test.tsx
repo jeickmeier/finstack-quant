@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -317,12 +318,15 @@ it("changes a native forecast method and calculates a newly added metric", async
     name: "Revenue forecast",
   });
   fireEvent.change(
-    within(revenueEditor).getByRole("textbox", { name: /Growth per period/ }),
+    within(revenueEditor).getByRole("textbox", { name: /^Rate/ }),
     { target: { value: "0.1" } },
   );
-  fireEvent.click(
-    within(revenueEditor).getByRole("button", { name: "Apply forecast" }),
+  const applyForecast = within(revenueEditor).getByRole<HTMLButtonElement>(
+    "button",
+    { name: "Apply forecast" },
   );
+  await waitFor(() => expect(applyForecast.disabled).toBe(false));
+  fireEvent.click(applyForecast);
   await waitFor(() => expect(accepted).toHaveBeenCalledTimes(2));
   const forecastModel = JSON.parse(accepted.mock.lastCall![0]);
   expect(forecastModel.nodes.revenue.forecast).toEqual({
@@ -1082,13 +1086,18 @@ it(
     await userEvent.click(
       await screen.findByRole("option", { name: "Fixed growth" }),
     );
-    fireEvent.change(
-      within(card).getByRole("textbox", { name: /Growth per period/ }),
-      { target: { value: "-0.1" } },
-    );
-    fireEvent.click(
-      within(card).getByRole("button", { name: "Save to scenario" }),
-    );
+    fireEvent.change(within(card).getByRole("textbox", { name: /^Rate/ }), {
+      target: { value: "-0.1" },
+    });
+    const save = within(card).getByRole<HTMLButtonElement>("button", {
+      name: "Save to scenario",
+    });
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
+    // Saving is asynchronous and only updates the draft, so let it settle.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve));
+    });
     fireEvent.click(screen.getByRole("button", { name: "Run scenarios" }));
 
     const comparison = await screen.findByRole("region", {

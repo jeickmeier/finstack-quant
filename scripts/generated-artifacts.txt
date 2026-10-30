@@ -222,6 +222,7 @@ finstack-quant-ui/src/generated/meta/equity_option.ts
 finstack-quant-ui/src/generated/meta/equity_total_return_future.ts
 finstack-quant-ui/src/generated/meta/financial_model_spec.ts
 finstack-quant-ui/src/generated/meta/forecast_metrics.ts
+finstack-quant-ui/src/generated/meta/forecast_parameters.ts
 finstack-quant-ui/src/generated/meta/forward_rate_agreement.ts
 finstack-quant-ui/src/generated/meta/future_breach.ts
 finstack-quant-ui/src/generated/meta/fx_barrier_option.ts
@@ -348,6 +349,7 @@ finstack-quant-ui/src/generated/schemas/equity_option.json
 finstack-quant-ui/src/generated/schemas/equity_total_return_future.json
 finstack-quant-ui/src/generated/schemas/financial_model_spec.json
 finstack-quant-ui/src/generated/schemas/forecast_metrics.json
+finstack-quant-ui/src/generated/schemas/forecast_parameters.json
 finstack-quant-ui/src/generated/schemas/forward_rate_agreement.json
 finstack-quant-ui/src/generated/schemas/future_breach.json
 finstack-quant-ui/src/generated/schemas/fx_barrier_option.json
@@ -471,6 +473,7 @@ finstack-quant-ui/src/generated/types/equity_option.ts
 finstack-quant-ui/src/generated/types/equity_total_return_future.ts
 finstack-quant-ui/src/generated/types/financial_model_spec.ts
 finstack-quant-ui/src/generated/types/forecast_metrics.ts
+finstack-quant-ui/src/generated/types/forecast_parameters.ts
 finstack-quant-ui/src/generated/types/forward_rate_agreement.ts
 finstack-quant-ui/src/generated/types/future_breach.ts
 finstack-quant-ui/src/generated/types/fx_barrier_option.ts

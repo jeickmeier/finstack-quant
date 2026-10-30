@@ -1367,6 +1367,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-forecast-parameters",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-monte-carlo-config",
       "type": "registry:lib"
     },

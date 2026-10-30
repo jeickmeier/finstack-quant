@@ -14,6 +14,7 @@
 - `MarketQuoteOverrides::price_driver_fields()` (Python and WASM `valuations.instruments.price_driver_fields` / `priceDriverFields`) publishes the mutually exclusive price-driving quote fields. `price_driver_count` reads the same definition, and `InstrumentForm` takes the list through `priceDriverFields` (connect `usePriceDriverFields`) instead of holding a copy.
 - `pricer::tranche_metric_field_units(currency)` (Python `tranche_metric_field_units`, WASM `valuations.instruments.trancheMetricFieldUnits`) publishes the unit and order of the scalar `TrancheMetrics` fields. `TrancheAnalytics` requires them as `metricUnits` (connect `useTrancheMetricFieldUnits`).
 - `MetricMetadata.coordinates`: for each entry of `components`, the `group` and numeric `value` (tenor in years or decimal strike) that order it on its axis. The UI sorts by these instead of parsing labels.
+- `statements::types::ForecastParameters`, published as the `forecast_parameters` schema, states each forecast method's parameters in the wire shape of `ForecastSpec`. The workbench forecast editor renders it with `SchemaForm` instead of a per-method field table, so its field labels are now the Rust parameter names and optional fields appear behind Add.
 
 ### Statements: rollup defaults decided in Rust
 

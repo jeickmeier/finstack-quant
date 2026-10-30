@@ -19,6 +19,15 @@
       "type_name": "FinancialModelSpec"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
+      "bytes": 20392,
+      "kind": "input",
+      "path": "schemas/statements/1/forecast_parameters.schema.json",
+      "summary": "One forecast method with its typed parameters, in the wire shape of ForecastSpec.",
+      "title": "ForecastParameters",
+      "type_name": "ForecastParameters"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
       "bytes": 4367,
       "kind": "input",
