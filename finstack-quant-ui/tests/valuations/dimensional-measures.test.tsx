@@ -12,10 +12,20 @@ import {
   DimensionalMeasures,
   dimensionalMeasureCount,
 } from "@/components/finstack/valuations/components/dimensional-measures/dimensional-measures";
+import { createRequire } from "node:module";
 import fixture from "../../src/fixtures/results/bond.json";
 
 afterEach(cleanup);
 
+const native = createRequire(import.meta.url)(
+  "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
+);
+/** Rust's coordinate for one label, read through a one-component native key. */
+function coordinate(label: string): MetricMetadata["coordinates"][number] {
+  const encoded = label === "" ? "_empty" : label.replaceAll(":", "_x3a");
+  const [probe] = native.metricMetadata([`probe::${encoded}`]);
+  return probe.coordinates[0];
+}
 function descriptor(
   key: string,
   metric: string,
@@ -26,6 +36,7 @@ function descriptor(
     key,
     metric,
     components,
+    coordinates: components.map(coordinate),
     unit,
     group: "Sensitivity",
     bucketed: false,

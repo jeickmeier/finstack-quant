@@ -110,61 +110,39 @@ export function epochToIso(days: number, dates: DateApi): string {
       : String(year).padStart(4, "0");
   return `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
-const pureTenor = /^\d+(?:\.\d+)?[my]$/;
-const labelToken = /(^-)?(\d+(?:\.\d+)?)([my](?![A-Za-z]))?|\D+/g;
 const labelCollator = new Intl.Collator("en-US", { numeric: true });
-// Text runs ignore case so that case never outranks a later numeric run.
+// Text runs ignore case so that case never outranks a later numeric value.
 const runCollator = new Intl.Collator("en-US", { sensitivity: "base" });
-/**
- * Split a label into number and text runs. A `-` at the very start of the label signs
- * its first number; any other `-` is text.
- * A number followed by `m` or `y` and then no letter is a tenor in years: `Ny` is N and
- * `Nm` is N/12, as parse_key_rate_label reads them and as vega writes `{expiry}y` rows.
- */
-function labelTokens(label: string): (number | string)[] {
-  return [...label.matchAll(labelToken)].map(([text, sign, digits, unit]) =>
-    digits === undefined
-      ? text
-      : // finstack-arith: TODO(boundary) RB-7 re-implements parse_key_rate_label tenor ordering
-        (sign ? -1 : 1) * (Number(digits) / (unit === "m" ? 12 : 1)),
-  );
+/** A coordinate label with Rust's `MetricCoordinate`, which orders it on its axis. */
+export interface AxisCoordinate {
+  label: string;
+  group: string;
+  value?: number | null;
 }
 /**
- * Order bucket and coordinate labels by maturity for display.
- * @param left - Label such as `3m`, `10y`, `SURF::0.25y` (a vega row), a curve id or a
- * strike such as `1.05`, exactly as returned.
- * @param right - Label compared with `left`.
- * @returns A negative, zero or positive number for `Array.prototype.sort`. Whole-label
- * `Nm` and `Ny` tenors come first. Labels then compare run by run: numbers by value
- * (a tenor run in years, months being N/12, so `12m` and `1y` tie), text with
- * case-insensitive en-US collation, a number before text, and a label whose runs end
- * first sorts first. Ties
- * fall back to en-US numeric collation of the full label, then code-unit order,
- * whatever the host locale.
+ * Order coordinates for display by the values Rust supplied.
+ * @param left - Coordinate label with its native group and value, as returned.
+ * @param right - Coordinate compared with `left`.
+ * @returns A negative, zero or positive number for `Array.prototype.sort`: by group
+ * with case-insensitive en-US collation, then by value with a number before none,
+ * then the label by en-US numeric collation and code-unit order, whatever the host
+ * locale. `12m` and `1y` tie on value, so the label decides.
  */
-export function compareTenorLabels(left: string, right: string): number {
-  const leftTenor = pureTenor.test(left);
-  if (leftTenor !== pureTenor.test(right)) return leftTenor ? -1 : 1;
-  const leftTokens = labelTokens(left);
-  const rightTokens = labelTokens(right);
-  for (let index = 0; index < leftTokens.length; index++) {
-    const a = leftTokens[index];
-    const b = rightTokens[index];
-    if (b === undefined) return 1;
-    const order =
-      typeof a === "number"
-        ? typeof b === "number"
-          ? // finstack-arith: TODO(boundary) RB-7 re-implements parse_key_rate_label tenor ordering
-            a - b
-          : -1
-        : typeof b === "number"
-          ? 1
-          : runCollator.compare(a, b);
-    if (order) return order;
+export function compareCoordinates(
+  left: AxisCoordinate,
+  right: AxisCoordinate,
+): number {
+  const group = runCollator.compare(left.group, right.group);
+  if (group) return group;
+  const a = left.value ?? null;
+  const b = right.value ?? null;
+  if (a !== b) {
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a < b ? -1 : 1;
   }
-  if (rightTokens.length > leftTokens.length) return -1;
   return (
-    labelCollator.compare(left, right) ||
-    (left < right ? -1 : left > right ? 1 : 0)
+    labelCollator.compare(left.label, right.label) ||
+    (left.label < right.label ? -1 : left.label > right.label ? 1 : 0)
   );
 }

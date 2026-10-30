@@ -2,7 +2,10 @@
 
 import { useId, useState } from "react";
 import type { MetricMetadata, ValuationResult } from "finstack-quant-wasm";
-import { compareTenorLabels } from "@/lib/finstack/format/format";
+import {
+  compareCoordinates,
+  type AxisCoordinate,
+} from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { MeasureValue } from "../../primitives/measure-value/measure-value";
 
@@ -24,6 +27,8 @@ type MeasureEntry = {
   metric: string;
   group: string | null;
   coordinates: readonly string[];
+  /** Rust's ordering of each coordinate, aligned with `coordinates`. */
+  axes: readonly AxisCoordinate[];
   unit: MetricMetadata["unit"];
   comparisonUnit: MetricMetadata["unit"] | undefined;
   bucketed: boolean;
@@ -32,6 +37,16 @@ type MeasureEntry = {
 };
 
 const metadataSource = "finstack_quant_valuations::pricer::metric_metadata";
+
+/** The distinct labels on one coordinate axis, in Rust's order. */
+function axisLabels(entries: readonly MeasureEntry[], axis: number): string[] {
+  const byLabel = new Map(
+    entries.map((entry) => [entry.axes[axis]!.label, entry.axes[axis]!]),
+  );
+  return [...byLabel.values()]
+    .sort(compareCoordinates)
+    .map(({ label }) => label);
+}
 
 function dimensionalEntries(props: DimensionalMeasuresProps): MeasureEntry[] {
   const primary = new Map(props.metadata?.map((entry) => [entry.key, entry]));
@@ -52,6 +67,10 @@ function dimensionalEntries(props: DimensionalMeasuresProps): MeasureEntry[] {
         metric: descriptor.metric,
         group: descriptor.group ?? null,
         coordinates: descriptor.components,
+        axes: descriptor.coordinates.map((coordinate, index) => ({
+          ...coordinate,
+          label: descriptor.components[index]!,
+        })),
         unit: primary.get(key)?.unit ?? descriptor.unit,
         comparisonUnit: comparison.get(key)?.unit,
         bucketed: descriptor.bucketed,
@@ -259,13 +278,9 @@ function CoordinateView({
     );
   }
 
-  const rows = [
-    ...new Set(entries.map((entry) => entry.coordinates[axisOffset])),
-  ].sort(compareTenorLabels);
-  const columns = [
-    // finstack-arith: position among the returned coordinate axes
-    ...new Set(entries.map((entry) => entry.coordinates[axisOffset + 1])),
-  ].sort(compareTenorLabels);
+  const rows = axisLabels(entries, axisOffset);
+  // finstack-arith: position among the returned coordinate axes
+  const columns = axisLabels(entries, axisOffset + 1);
   const cells = new Map<string, MeasureEntry>();
   let regular = rows.every(Boolean) && columns.every(Boolean);
   for (const entry of entries) {
@@ -403,11 +418,7 @@ function MetricSection({
   const first = entries[0];
   if (!first) return null;
   const threeDimensional = first.coordinates.length === 3;
-  const slices = threeDimensional
-    ? [...new Set(entries.map((entry) => entry.coordinates[0]))].sort(
-        compareTenorLabels,
-      )
-    : [];
+  const slices = threeDimensional ? axisLabels(entries, 0) : [];
   const activeSlice = slice && slices.includes(slice) ? slice : slices[0];
   const visible = threeDimensional
     ? entries.filter((entry) => entry.coordinates[0] === activeSlice)

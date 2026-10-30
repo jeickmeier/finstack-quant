@@ -406,7 +406,7 @@ pub fn metrics_for_instrument(instrument_type: JsValue) -> Result<JsValue, JsVal
 ///
 /// * `keys` - Canonical scalar or qualified wire keys in output order. Custom
 ///   keys retain unknown units; malformed or obsolete encodings are rejected.
-/// @returns Ordered metadata records preserving original keys, decoded components, native unit families, display groups, and bucket eligibility.
+/// @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.
 /// @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.
 #[wasm_bindgen(js_name = metricMetadata)]
 pub fn metric_metadata(keys: JsValue) -> Result<JsValue, JsValue> {

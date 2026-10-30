@@ -23,8 +23,8 @@ pub use json::{
     metrics_for_instrument, parse_boxed_instrument_from_json, parse_boxed_instruments_from_json,
     parse_instrument_from_json, parse_typed_instrument_json, present_standard_option_greeks,
     pretty_instrument_json, price_instrument, tranche_metric_field_units, validate_instrument_json,
-    validate_typed_instrument_json, MetricFieldUnit, MetricMetadata, ParsedInstrument,
-    STANDARD_OPTION_GREEKS,
+    validate_typed_instrument_json, MetricCoordinate, MetricFieldUnit, MetricMetadata,
+    ParsedInstrument, STANDARD_OPTION_GREEKS,
 };
 
 use crate::instruments::credit_derivatives::CREDIT;
