@@ -120,6 +120,13 @@ export const importHarnesses = {
       name: "use-evaluate-covenants",
       modules: modules.length,
     })),
+  "use-forecast-breaches": () =>
+    Promise.all([
+      import("@/hooks/covenants/use-forecast-breaches/use-forecast-breaches"),
+    ]).then((modules) => ({
+      name: "use-forecast-breaches",
+      modules: modules.length,
+    })),
   "use-market-scenario": () =>
     Promise.all([
       import("@/hooks/scenarios/use-market-scenario/use-market-scenario"),
@@ -600,6 +607,15 @@ export const importHarnesses = {
       name: "contract-covenant-engine",
       modules: modules.length,
     })),
+  "contract-covenant-forecast-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/covenant_forecast_config.json"),
+      import("@/lib/finstack/generated/types/covenant_forecast_config"),
+      import("@/lib/finstack/generated/meta/covenant_forecast_config"),
+    ]).then((modules) => ({
+      name: "contract-covenant-forecast-config",
+      modules: modules.length,
+    })),
   "contract-covenant-report": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/covenant_report.json"),
@@ -616,6 +632,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/dated_covenant_reports"),
     ]).then((modules) => ({
       name: "contract-dated-covenant-reports",
+      modules: modules.length,
+    })),
+  "contract-future-breach": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/future_breach.json"),
+      import("@/lib/finstack/generated/types/future_breach"),
+      import("@/lib/finstack/generated/meta/future_breach"),
+    ]).then((modules) => ({
+      name: "contract-future-breach",
       modules: modules.length,
     })),
   "contract-commodity-asian-option": () =>

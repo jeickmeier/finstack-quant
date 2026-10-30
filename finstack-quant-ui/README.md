@@ -1037,6 +1037,20 @@ table of each spec's metric id with whether the model has that node. The
 statements workbench's Covenants tab (`covenants-panel.tsx`) composes the
 editor with `CovenantCompliance` and tests `defaultCovenantEngineJson` on open.
 
+`useForecastBreaches` runs `statements_analytics.forecastBreaches` on the same
+engine, model and result with an optional `CovenantForecastConfig` (omitted is
+Rust's deterministic maintenance-scope default; the config crosses as JSON
+text, so a `uint64` `random_seed` stays exact). Every result period is a test
+date and, without `reference_date`, the horizon starts the day before the first
+period. `CovenantBreachForecast` composes `SchemaForm` over the generated
+`covenant_forecast_config` contract (structure only; Rust validates it when it
+forecasts) with a table of the returned `FutureBreach` rows, and sits below the
+compliance grid in the Covenants tab. Covenant-lite packages are incurrence
+tests, so the maintenance default forecasts nothing for them. The native
+fixture (`src/fixtures/covenants/analyst-breach-forecast.json`) forecasts a
+tightened analyst engine (`analyst-covenants-tight.json`) deterministically
+and under the seeded stochastic `analyst-forecast-config.json`.
+
 ## Served gallery checks
 
 The public namespace is

@@ -283,6 +283,12 @@
       "worker": "none"
     },
     {
+      "name": "covenant-breach-forecast",
+      "type": "registry:component",
+      "docs": "Composes schema-form over the generated covenant_forecast_config contract (started from defaultConfigJson; Rust publishes no example and an empty config takes Rust's deterministic maintenance-scope defaults; Rust validates the config when it forecasts, so the form checks structure only and a uint64 random_seed stays exact) and a finstack-table of native FutureBreach rows (statements_analytics.forecastBreaches) in the order supplied, which Rust sorts by breach date, then covenant id: date, covenant, Rust's test description, projected value, threshold, headroom and breach probability with every supplied digit (a host may inject formatValue), an unset value as a dash. Deterministic forecasts list breached dates with probability 1; a stochastic config also lists dates whose probability reaches its breach_probability_threshold. Connect onSubmit to the useForecastBreaches request. Accepts defaultConfigJson, onSubmit, breaches, loading, error, formatValue and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
       "name": "covenant-compliance",
       "type": "registry:component",
       "docs": "Present native DatedCovenantReports rows (statements_analytics.evaluateCovenants over statement results, or CovenantEngine#evaluateSeries over dated rows) as a grid: one column per test date in the order supplied, one row per covenant instance key in first-appearance order, each cell the returned verdict as Passed or Failed, or a dash when Rust returned no report for that covenant on that date. A date header button selects the date (the latest initially) and its reports render below through covenant-report. Nothing is computed, sorted or inferred. No worker is required.",
@@ -549,7 +555,7 @@
     {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error, and a native breach forecast, statements_analytics.forecastBreaches, under a submitted CovenantForecastConfig), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -616,6 +622,10 @@
     },
     {
       "name": "use-evaluate-covenants",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-forecast-breaches",
       "type": "registry:hook"
     },
     {
@@ -899,11 +909,19 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-covenant-forecast-config",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-covenant-report",
       "type": "registry:lib"
     },
     {
       "name": "contract-dated-covenant-reports",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-future-breach",
       "type": "registry:lib"
     },
     {
@@ -1591,6 +1609,14 @@
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenants.json",
       "sha256": "3d7aa1a9f985846d4e9b921ffc2590f61a14df31051968ed3df42006da1d1bb9"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/covenants/analyst-forecast-config.json",
+      "sha256": "3d22875ec75b92c4ba9ea8c9158f0d27459ec0bdc918bddf473711f174ec079e"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/covenants/analyst-breach-forecast.json",
+      "sha256": "01f0595f02dfe75fac819d6659ecd75d62e3d9a083b9b0e205b441093e0c495b"
     }
   ]
 }

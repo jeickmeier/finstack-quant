@@ -20,6 +20,11 @@
     "schema": "schemas/covenant_engine.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json",
+    "source": "finstack-quant/covenants/schemas/covenants/1/covenant_forecast_config.schema.json",
+    "schema": "schemas/covenant_forecast_config.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
     "source": "finstack-quant/covenants/schemas/covenants/1/covenant_report.schema.json",
     "schema": "schemas/covenant_report.json"
@@ -28,6 +33,11 @@
     "uri": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
     "source": "finstack-quant/covenants/schemas/covenants/1/dated_covenant_reports.schema.json",
     "schema": "schemas/dated_covenant_reports.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",
+    "source": "finstack-quant/covenants/schemas/covenants/1/future_breach.schema.json",
+    "schema": "schemas/future_breach.json"
   },
   {
     "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",

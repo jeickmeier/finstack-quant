@@ -61213,6 +61213,182 @@
       }
     ]
   },
+  "covenantForecastConfig": {
+    "stochastic": true,
+    "volatility": 0.25,
+    "num_paths": 2000,
+    "antithetic": true,
+    "random_seed": 7,
+    "breach_probability_threshold": 0.25
+  },
+  "covenantBreachForecast": {
+    "deterministic": [
+      {
+        "covenant_id": "min_interest_coverage",
+        "covenant_description": "Interest Coverage >= 5.50x",
+        "breach_date": "2024-03-31",
+        "projected_value": 4.500980666853461,
+        "threshold": 5.5,
+        "headroom": -0.18163987875391624,
+        "breach_probability": 1
+      },
+      {
+        "covenant_id": "min_interest_coverage",
+        "covenant_description": "Interest Coverage >= 5.50x",
+        "breach_date": "2024-06-30",
+        "projected_value": 4.924760601915184,
+        "threshold": 5.5,
+        "headroom": -0.10458898146996648,
+        "breach_probability": 1
+      },
+      {
+        "covenant_id": "min_interest_coverage",
+        "covenant_description": "Interest Coverage >= 5.50x",
+        "breach_date": "2024-09-30",
+        "projected_value": 5.10772520716386,
+        "threshold": 5.5,
+        "headroom": -0.07132268960657097,
+        "breach_probability": 1
+      },
+      {
+        "covenant_id": "max_debt_to_ebitda",
+        "covenant_description": "Debt/EBITDA <= 2.10x",
+        "breach_date": "2024-12-31",
+        "projected_value": 2.215696743192739,
+        "threshold": 2.1,
+        "headroom": -0.05509368723463748,
+        "breach_probability": 1
+      },
+      {
+        "covenant_id": "max_debt_to_ebitda",
+        "covenant_description": "Debt/EBITDA <= 2.10x",
+        "breach_date": "2025-03-31",
+        "projected_value": 2.166028611726778,
+        "threshold": 2.1,
+        "headroom": -0.031442196060370416,
+        "breach_probability": 1
+      }
+    ],
+    "stochastic": [
+      {
+        "covenant_id": "min_interest_coverage",
+        "covenant_description": "Interest Coverage >= 5.50x",
+        "breach_date": "2024-03-31",
+        "projected_value": 4.500980666853461,
+        "threshold": 5.5,
+        "headroom": -0.18163987875391624,
+        "breach_probability": 0.9635
+      },
+      {
+        "covenant_id": "min_interest_coverage",
+        "covenant_description": "Interest Coverage >= 5.50x",
+        "breach_date": "2024-06-30",
+        "projected_value": 4.924760601915184,
+        "threshold": 5.5,
+        "headroom": -0.10458898146996648,
+        "breach_probability": 0.7665
+      },
+      {
+        "covenant_id": "min_interest_coverage",
+        "covenant_description": "Interest Coverage >= 5.50x",
+        "breach_date": "2024-09-30",
+        "projected_value": 5.10772520716386,
+        "threshold": 5.5,
+        "headroom": -0.07132268960657097,
+        "breach_probability": 0.669
+      },
+      {
+        "covenant_id": "max_debt_to_ebitda",
+        "covenant_description": "Debt/EBITDA <= 2.10x",
+        "breach_date": "2024-12-31",
+        "projected_value": 2.215696743192739,
+        "threshold": 2.1,
+        "headroom": -0.05509368723463748,
+        "breach_probability": 0.543
+      },
+      {
+        "covenant_id": "min_interest_coverage",
+        "covenant_description": "Interest Coverage >= 5.50x",
+        "breach_date": "2024-12-31",
+        "projected_value": 5.985413513141599,
+        "threshold": 5.5,
+        "headroom": 0.08825700238938161,
+        "breach_probability": 0.413
+      },
+      {
+        "covenant_id": "max_debt_to_ebitda",
+        "covenant_description": "Debt/EBITDA <= 2.10x",
+        "breach_date": "2025-03-31",
+        "projected_value": 2.166028611726778,
+        "threshold": 2.1,
+        "headroom": -0.031442196060370416,
+        "breach_probability": 0.488
+      },
+      {
+        "covenant_id": "min_interest_coverage",
+        "covenant_description": "Interest Coverage >= 5.50x",
+        "breach_date": "2025-03-31",
+        "projected_value": 5.656254300261456,
+        "threshold": 5.5,
+        "headroom": 0.02840987277481023,
+        "breach_probability": 0.5165
+      },
+      {
+        "covenant_id": "max_debt_to_ebitda",
+        "covenant_description": "Debt/EBITDA <= 2.10x",
+        "breach_date": "2025-06-30",
+        "projected_value": 2.0224928898239174,
+        "threshold": 2.1,
+        "headroom": 0.03690814770289652,
+        "breach_probability": 0.39
+      },
+      {
+        "covenant_id": "min_interest_coverage",
+        "covenant_description": "Interest Coverage >= 5.50x",
+        "breach_date": "2025-06-30",
+        "projected_value": 5.92552804377565,
+        "threshold": 5.5,
+        "headroom": 0.07736873523193631,
+        "breach_probability": 0.469
+      },
+      {
+        "covenant_id": "max_debt_to_ebitda",
+        "covenant_description": "Debt/EBITDA <= 2.10x",
+        "breach_date": "2025-09-30",
+        "projected_value": 1.888721960602909,
+        "threshold": 2.1,
+        "headroom": 0.10060859018909095,
+        "breach_probability": 0.3075
+      },
+      {
+        "covenant_id": "min_interest_coverage",
+        "covenant_description": "Interest Coverage >= 5.50x",
+        "breach_date": "2025-09-30",
+        "projected_value": 6.408909502661806,
+        "threshold": 5.5,
+        "headroom": 0.16525627321123745,
+        "breach_probability": 0.3755
+      },
+      {
+        "covenant_id": "max_debt_to_ebitda",
+        "covenant_description": "Debt/EBITDA <= 2.10x",
+        "breach_date": "2025-12-31",
+        "projected_value": 1.9188563760404616,
+        "threshold": 2.1,
+        "headroom": 0.08625886855216121,
+        "breach_probability": 0.323
+      },
+      {
+        "covenant_id": "min_interest_coverage",
+        "covenant_description": "Interest Coverage >= 5.50x",
+        "breach_date": "2025-12-31",
+        "projected_value": 6.7977633750913595,
+        "threshold": 5.5,
+        "headroom": 0.2359569772893381,
+        "breach_probability": 0.3275
+      }
+    ]
+  },
   "pricingExamples": {
     "agency_cmo": {
       "instrument": {

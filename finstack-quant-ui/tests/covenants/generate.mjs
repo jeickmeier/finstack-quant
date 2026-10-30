@@ -36,3 +36,36 @@ await emit(
   new URL("covenants/analyst-covenant-series.json", fixtures),
   serializeHost(series),
 );
+
+// Breach forecasts (statements_analytics.forecastBreaches) of a tighter engine
+// over the same model: the analyst engine passes every date, so
+// analyst-covenants-tight.json raises interest coverage to 5.5x and lowers the
+// leverage limit to 2.1x. The deterministic default lists the breached dates;
+// the stochastic config (lognormal overlay, seeded Monte Carlo) also lists
+// passing dates whose breach probability reaches its threshold. Rust takes
+// every result period as a test date and starts the horizon the day before
+// the first period.
+const tightJson = await read("covenants/analyst-covenants-tight.json");
+const configJson = await read("covenants/analyst-forecast-config.json");
+const forecast = (config) => {
+  const tight = native.CovenantEngine.fromJson(tightJson);
+  try {
+    return config === undefined
+      ? native.statementsAnalyticsForecastBreaches(resultJson, tight, modelJson)
+      : native.statementsAnalyticsForecastBreaches(
+          resultJson,
+          tight,
+          modelJson,
+          config,
+        );
+  } finally {
+    tight.free();
+  }
+};
+await emit(
+  new URL("covenants/analyst-breach-forecast.json", fixtures),
+  serializeHost({
+    deterministic: forecast(undefined),
+    stochastic: forecast(configJson),
+  }),
+);
