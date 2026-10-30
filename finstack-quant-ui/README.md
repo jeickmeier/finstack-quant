@@ -200,6 +200,10 @@ add no curated label maps for those names. A composing editor presents the
 choices its own controls offer: instrument-form's desk-quote and term-sheet
 tables, the statements workbench's forecast and rollup method lists and the
 valuation-details raw-detail labels.
+`check-no-arithmetic` enforces this in `ui-check`: arithmetic in `registry/` or
+`src/` needs a `// finstack-arith: <reason>` comment or a reasoned glob in
+`scripts/no-arithmetic-allow.json`, and financial logic moves to Rust. The test
+for any line of JS: would Python get a different number or decision without it?
 
 Generated interfaces describe wire shapes and cannot express every runtime
 constraint (bounds, patterns or exclusive unions). They are not WASM host types.
