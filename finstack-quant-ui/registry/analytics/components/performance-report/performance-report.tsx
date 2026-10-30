@@ -1,5 +1,10 @@
 "use client";
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  datedPoints,
+  ReportSection,
+  type DatedPoint,
+} from "@/components/finstack/analytics/lib/analytics-report-presentation";
+import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { areaY, barY, colorLegend, defineChart, lineY } from "@tanstack/charts";
 import { scaleBand } from "@tanstack/charts/scales/band";
@@ -71,27 +76,7 @@ export interface PerformanceReportProps {
   formatValue?: (value: number) => string;
   density?: "compact" | "comfortable";
 }
-interface DatedPoint {
-  ticker: string;
-  iso: string;
-  date: Date;
-  value: number;
-}
 const lookbackKeys = ["mtd", "qtd", "ytd", "fytd"] as const;
-const utc = (iso: string) => new Date(`${iso}T00:00:00Z`);
-/** Finite native values against their dates; non-finite entries are omitted, never replaced. */
-function datedPoints(
-  ticker: string,
-  dates: readonly string[],
-  values: readonly number[],
-): DatedPoint[] {
-  return dates.flatMap((iso, index) => {
-    const value = values[index];
-    return typeof value === "number" && Number.isFinite(value)
-      ? [{ ticker, iso, date: utc(iso), value }]
-      : [];
-  });
-}
 /** Host display text for finite numbers; anything else is shown as is, never as zero. */
 function display(
   value: number | null | undefined,
@@ -110,7 +95,7 @@ function datedChart(
   const channels = {
     x: (p: DatedPoint) => p.date,
     y: (p: DatedPoint) => p.value,
-    key: (p: DatedPoint) => `${p.ticker}|${p.iso}`,
+    key: (p: DatedPoint) => `${p.series}|${p.iso}`,
   };
   return defineChart({
     marks: [
@@ -118,7 +103,7 @@ function datedChart(
         ? areaY(points, { ...channels, id: "dated-area" })
         : lineY(points, {
             ...channels,
-            z: (p: DatedPoint) => p.ticker,
+            z: (p: DatedPoint) => p.series,
             id: "dated-line",
           }),
     ],
@@ -131,7 +116,7 @@ function datedChart(
       use: tooltip,
       content: (marks) => ({
         rows: marks.map((m) => ({
-          label: `${m.datum.ticker} · ${m.datum.iso}`,
+          label: `${m.datum.series} · ${m.datum.iso}`,
           value: format(m.datum.value),
         })),
       }),
@@ -146,14 +131,6 @@ function derivedDomain(values: readonly number[]): HeatmapColors | null {
   return min < 0 && max > 0
     ? { palette: "diverging", domain: [min, 0, max] }
     : { palette: "sequential", domain: [min, max] };
-}
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
 }
 const numericEpisodeFields = new Set([
   "duration_days",
@@ -354,7 +331,7 @@ function ReportView({
           {report.activeDates[0] ?? "—"} to {report.activeDates.at(-1) ?? "—"}
         </p>
       </div>
-      <Section title={`Lookback returns to ${report.lookback.refDate}`}>
+      <ReportSection title={`Lookback returns to ${report.lookback.refDate}`}>
         <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
           {lookbackKeys.map((key) => (
             <section
@@ -380,40 +357,40 @@ function ReportView({
             ? `Fiscal year starts month ${fiscal.month}, day ${fiscal.day}.`
             : "Fiscal year is the calendar year (Rust default)."}
         </p>
-      </Section>
-      <Section title="Summary">
+      </ReportSection>
+      <ReportSection title="Summary">
         <TableEnvelope
           envelope={report.summary}
           caption="Performance summary by ticker (native units)"
           captionVisibility="sr-only"
           density={density}
         />
-      </Section>
-      <Section title="Cumulative returns">
+      </ReportSection>
+      <ReportSection title="Cumulative returns">
         <FinstackChart
           definition={cumulative}
           ariaLabel="Cumulative returns by ticker"
           height={280}
         />
-      </Section>
+      </ReportSection>
       {perTicker && series ? (
         <>
           <div className="grid gap-6 @3xl:grid-cols-2">
-            <Section title={`${ticker} drawdown`}>
+            <ReportSection title={`${ticker} drawdown`}>
               <FinstackChart
                 definition={perTicker.drawdown}
                 ariaLabel={`${ticker} drawdown`}
                 height={240}
               />
-            </Section>
-            <Section title={`${ticker} annual returns`}>
+            </ReportSection>
+            <ReportSection title={`${ticker} annual returns`}>
               <FinstackChart
                 definition={annual}
                 ariaLabel={`${ticker} annual returns`}
                 height={240}
               />
-            </Section>
-            <Section
+            </ReportSection>
+            <ReportSection
               title={`${ticker} rolling ${labelFor(series.rollingSharpe.value_column)}`}
             >
               <FinstackChart
@@ -421,8 +398,8 @@ function ReportView({
                 ariaLabel={`${ticker} rolling ${series.rollingSharpe.value_column}`}
                 height={240}
               />
-            </Section>
-            <Section
+            </ReportSection>
+            <ReportSection
               title={`${ticker} rolling ${labelFor(series.rollingVolatility.value_column)}`}
             >
               <FinstackChart
@@ -430,9 +407,9 @@ function ReportView({
                 ariaLabel={`${ticker} rolling ${series.rollingVolatility.value_column}`}
                 height={240}
               />
-            </Section>
+            </ReportSection>
           </div>
-          <Section title={`${ticker} monthly returns`}>
+          <ReportSection title={`${ticker} monthly returns`}>
             {"preset" in monthly && monthly.preset ? (
               <FinstackChart
                 {...monthly.preset}
@@ -442,8 +419,8 @@ function ReportView({
             ) : (
               <p role="status">{monthly.status}</p>
             )}
-          </Section>
-          <Section title={`${ticker} drawdown episodes`}>
+          </ReportSection>
+          <ReportSection title={`${ticker} drawdown episodes`}>
             <FinstackTable
               data={[...series.drawdownEpisodes]}
               columns={episodeColumns}
@@ -453,7 +430,7 @@ function ReportView({
               density={density}
               emptyState="No drawdown episodes returned"
             />
-          </Section>
+          </ReportSection>
         </>
       ) : (
         <p role="status">No ticker series returned</p>

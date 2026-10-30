@@ -211,6 +211,13 @@ export const importHarnesses = {
       name: "use-benchmark-report",
       modules: modules.length,
     })),
+  "analytics-report-presentation": () =>
+    Promise.all([
+      import("@/components/finstack/analytics/lib/analytics-report-presentation"),
+    ]).then((modules) => ({
+      name: "analytics-report-presentation",
+      modules: modules.length,
+    })),
   "use-value-portfolio": () =>
     Promise.all([
       import("@/hooks/portfolio/use-value-portfolio/use-value-portfolio"),

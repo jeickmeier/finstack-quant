@@ -677,6 +677,10 @@
       "type": "registry:hook"
     },
     {
+      "name": "analytics-report-presentation",
+      "type": "registry:lib"
+    },
+    {
       "name": "use-value-portfolio",
       "type": "registry:hook"
     },
