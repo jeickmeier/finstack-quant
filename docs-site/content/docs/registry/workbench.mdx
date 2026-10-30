@@ -85,8 +85,9 @@ the last priced request under the applied scenario: the scenario's time roll
 sets the horizon. It shows Rust's total and annualized return (the annualized
 return reads "not defined" without a roll), factor contributions, the explain
 text and the factor attribution. The attribution method and the roll calendar
-are optional; blank leaves both to Rust. `metrics_based` fails on a hazard
-curve without a calibration recipe, and the native error is shown.
+are optional; blank leaves both to Rust. On a hazard curve without a
+calibration recipe `metrics_based` drops the quote-space credit metrics, notes
+it, and leaves the credit P&L in the residual.
 
 ## P&L explain
 

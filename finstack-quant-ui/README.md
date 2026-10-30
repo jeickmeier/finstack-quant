@@ -776,8 +776,9 @@ date and a canonical `ScenarioSpec` (for example one edited in
 `market-scenario-builder`), then `horizonResultExplainText`. Omitted `method`,
 `calendarId` and the config stay unset, so Rust applies its default
 attribution method and a weekends-only roll calendar; an unknown calendar or a
-failing attribution (`metrics_based` needs a calibration recipe for every
-hazard curve) returns the native error. The display-only
+failing attribution returns the native error (`metrics_based` on a hazard
+curve without a calibration recipe drops the quote-space credit metrics with a
+note, and its credit P&L flows to the residual). The display-only
 `HorizonReturnReport` shows Rust's summary (total and annualized return and
 factor contributions as decimal fractions; an undefined value, such as the
 annualized return without a time roll, reads "not defined", never zero), the
@@ -808,8 +809,9 @@ The workbench's P&L explain results tab pins the last priced request's market
 and date as T0, takes T1 from the last priced request or the applied market
 scenario, and attributes the last priced instrument between them with a
 chosen method (none is preselected); a changed instrument is repriced at T0
-too, which the tab says. `metrics_based` fails on the workbench bond market
-(no calibration recipe for its hazard curve) and shows the native error.
+too, which the tab says. On the workbench bond market (no calibration recipe
+for its hazard curve) `metrics_based` attributes without credit sensitivities:
+Rust's note says so and the credit P&L flows to the residual.
 Native fixtures live in `tests/scenarios/horizon/` and `tests/attribution/`.
 
 ## Returned portfolio valuation

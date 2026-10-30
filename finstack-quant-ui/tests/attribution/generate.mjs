@@ -115,7 +115,7 @@ const workbench = [
     name: "waterfall",
     method: { waterfall: native.defaultWaterfallOrder() },
   },
-  // Fails on the workbench market: cs01 needs a calibration recipe for HZ.
+  // HZ has no calibration recipe: Rust drops the quote-space credit metrics with a note.
   { scenario: "usd-ois-50bp", name: "metrics_based", method: "metrics_based" },
   {
     scenario: "roll-1m-25bp",

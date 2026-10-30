@@ -358,7 +358,10 @@ def compute_horizon_return(
         the default attribution metrics (DV01, CS01, vega, ...) at the opening
         snapshot, using the same configuration and recalibration provider as
         the scenario engine. The canonical Rust registry omits metrics
-        unsupported by that instrument type. Selected metric failures raise
+        unsupported by that instrument type. When a hazard curve of the
+        instrument has no calibration recipe and that menu fails, the
+        quote-space credit metrics are dropped with a note and credit-curve
+        P&L flows to the residual. Other selected metric failures raise
         ``ValueError`` for invalid inputs, ``KeyError`` for missing data, or
         ``RuntimeError`` for computation failures.
     config : FinstackConfig | str | None, default None

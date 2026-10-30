@@ -109,17 +109,22 @@ it("pins Rust's bond figures: an all-rates parallel shock, and carry plus rates 
     expect(steps[index]!.pv_before).toEqual(steps[index - 1]!.pv_after);
   expect(rolled.residualWithinTolerance).toBe(true);
 });
-it("returns the native metrics_based failure on the workbench market unchanged", async () => {
-  const failed = await harness.proxy.attributePnlMany(
-    await request("usd-ois-50bp", "metrics_based"),
+it("returns Rust's metrics_based note for the workbench hazard curve without a calibration recipe", async () => {
+  const [result] = unwrap(
+    await harness.proxy.attributePnlMany(
+      await request("usd-ois-50bp", "metrics_based"),
+    ),
   );
-  expect(failed.ok).toBe(false);
-  if (!failed.ok) {
-    expect(failed.error.message).toBe(
-      workbench("usd-ois-50bp", "metrics_based").message,
-    );
-    expect(failed.error.message).toContain("lossless calibration recipe");
-  }
+  // Rust drops the quote-space credit metrics and says so; credit P&L stays in the residual.
+  expect(result!.attribution.meta.notes).toEqual(
+    workbench("usd-ois-50bp", "metrics_based").attribution.meta.notes,
+  );
+  expect(
+    result!.attribution.meta.notes.some((note) =>
+      note.includes("calibration recipe"),
+    ),
+  ).toBe(true);
+  expect(result!.attribution.credit_curves_pnl.amount).toBe("0");
 });
 it("returns Rust's default waterfall order", async () => {
   expect(unwrap(await harness.proxy.defaultWaterfallOrder())).toEqual(
