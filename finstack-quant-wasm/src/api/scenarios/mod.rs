@@ -53,7 +53,12 @@ pub fn parse_scenario_spec(json_str: JsValue) -> Result<JsValue, JsValue> {
 
 /// Compose multiple scenario specs (JSON array) into a single scenario.
 ///
-/// Specs are merged in priority order (lower number runs first).
+/// Specs are merged in priority order (lower number runs first; equal
+/// priorities keep input order). The composed spec takes its `id` and `name`
+/// from the inputs joined with `+` / `" + "`, its `description` from the
+/// present input descriptions joined with `" + "` (`null` when no input has
+/// one), and the lowest input `priority` (`0` for an empty array), all in
+/// execution order.
 ///
 /// # Errors
 ///

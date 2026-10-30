@@ -176,6 +176,42 @@ fn test_scenario_composition_different_priorities() {
 }
 
 #[test]
+fn test_scenario_composition_keeps_priority_and_descriptions() {
+    let spec = |id: &str, description: Option<&str>, priority: i32| ScenarioSpec {
+        id: id.into(),
+        name: None,
+        description: description.map(Into::into),
+        operations: Vec::new(),
+        priority,
+        resolution_mode: Default::default(),
+        hazard_bump_mode: Default::default(),
+    };
+
+    let composed = ScenarioSpec::compose(vec![
+        spec("credit", Some("Credit spreads widen"), 7),
+        spec("plain", None, 5),
+        spec("rates", Some("Rates up 100bp"), 3),
+    ])
+    .expect("compose should succeed");
+    // The composed spec sorts where its first-running input did, and keeps
+    // every present description in execution (priority) order.
+    assert_eq!(composed.priority, 3);
+    assert_eq!(
+        composed.description.as_deref(),
+        Some("Rates up 100bp + Credit spreads widen")
+    );
+
+    let undescribed =
+        ScenarioSpec::compose(vec![spec("a", None, -2), spec("b", None, 4)]).expect("compose");
+    assert_eq!(undescribed.priority, -2);
+    assert_eq!(undescribed.description, None);
+
+    let empty = ScenarioSpec::compose(Vec::new()).expect("empty compose");
+    assert_eq!(empty.priority, 0);
+    assert_eq!(empty.description, None);
+}
+
+#[test]
 fn test_warnings_missing_equity() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();

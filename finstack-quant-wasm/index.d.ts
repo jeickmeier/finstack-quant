@@ -34575,7 +34575,12 @@ export interface ScenariosNamespace {
   /**
    * Compose multiple structured scenario specs into a single scenario.
    *
-   * Specs are merged in priority order (lower number runs first).
+   * Specs are merged in priority order (lower number runs first; equal
+   * priorities keep input order). The composed spec takes its `id` and `name`
+   * from the inputs joined with `+` / `" + "`, its `description` from the
+   * present input descriptions joined with `" + "` (`null` when no input has
+   * one), and the lowest input `priority` (`0` for an empty array), all in
+   * execution order.
    * @returns Structured composed scenario specification.
    * @param specs - ScenarioSpec objects to validate and compose in priority order.
    * @throws Error - Rejects malformed structured specs, any input spec that fails `ScenarioSpec` validation (blank ID, non-finite numbers, invalid identifiers, tenors or operations; the message names the scenario), input specs with mixed `hazard_bump_mode` values, composition that contains more than one time-roll operation, or failure to convert the composed specification.
