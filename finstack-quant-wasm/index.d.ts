@@ -12933,10 +12933,10 @@ export interface MarginNamespace {
   /**
    * Regulatory CSA specification for any supported base currency.
    * @param currency - ISO-4217 base currency of the agreement; every CSA amount is in it.
-   * @param id - Identifier stamped on the specification.
+   * @param id - Identifier stamped on the specification; must be non-empty (an empty or whitespace-only id is rejected).
    * @param collateralCurve - Curve id used to discount and accrue interest on collateral, for example `"USD-OIS"`.
    * @returns The `CsaSpec` as a plain object.
-   * @throws Error - Throws for an unknown currency, or if the embedded margin registry has no regulatory terms for it or cannot be loaded.
+   * @throws Error - Throws a `validation` error for an empty or whitespace-only id or an empty collateral curve; throws for an unknown currency, or if the embedded margin registry has no regulatory terms for it or cannot be loaded.
    */
   csaSpecRegulatory(currency: string, id: string, collateralCurve: string): CsaSpec;
   /**

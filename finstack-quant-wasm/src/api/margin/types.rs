@@ -204,14 +204,15 @@ pub fn csa_spec_eur_regulatory() -> Result<JsValue, JsValue> {
 
 /// Regulatory CSA specification for any supported base currency.
 /// @param currency - ISO-4217 base currency of the agreement; every CSA amount is in it.
-/// @param id - Identifier stamped on the specification.
+/// @param id - Identifier stamped on the specification; must be non-empty (an empty or whitespace-only id is rejected).
 /// @param collateral_curve - Curve id used to discount and accrue interest on collateral, for example `"USD-OIS"`.
 /// @returns The `CsaSpec` as a plain object.
 ///
 /// # Errors
 ///
-/// Throws for an unknown currency, or if the embedded margin registry has no
-/// regulatory terms for it or cannot be loaded.
+/// Throws a `validation` error for an empty or whitespace-only id or an
+/// empty collateral curve; throws for an unknown currency, or if the embedded
+/// margin registry has no regulatory terms for it or cannot be loaded.
 #[wasm_bindgen(js_name = csaSpecRegulatory)]
 pub fn csa_spec_regulatory(
     currency: JsValue,

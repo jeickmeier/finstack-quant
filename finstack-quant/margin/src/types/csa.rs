@@ -478,12 +478,15 @@ mod tests {
 
     #[test]
     fn regulatory_constructors_return_validated_specs() {
-        let error = CsaSpec::regulatory_for_currency(Currency::USD, "", "USD-OIS")
-            .expect_err("an empty CSA id must fail at construction");
-        assert!(
-            error.to_string().contains("CSA id must not be empty"),
-            "{error}"
-        );
+        for id in ["", "   "] {
+            let error = CsaSpec::regulatory_for_currency(Currency::USD, id, "USD-OIS")
+                .expect_err("an empty or blank CSA id must fail at construction");
+            assert!(
+                matches!(error, finstack_quant_core::Error::Validation(_))
+                    && error.to_string().contains("CSA id must not be empty"),
+                "{error}"
+            );
+        }
     }
 
     #[test]
