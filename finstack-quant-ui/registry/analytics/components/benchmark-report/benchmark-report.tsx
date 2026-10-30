@@ -1,4 +1,5 @@
 "use client";
+import type { BenchmarkReportData } from "@/components/finstack/analytics/lib/analytics-report-types";
 import {
   datedPoints,
   ReportSection,
@@ -10,53 +11,12 @@ import { areaY, defineChart, lineY } from "@tanstack/charts";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { scaleUtc } from "d3-scale";
-import type {
-  BetaResult,
-  GreeksResult,
-  MultiFactorResult,
-} from "finstack-quant-wasm";
 import { formatRaw } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 
-/** One ticker's native relative series, each aligned with that ticker's own active dates. */
-export interface BenchmarkTickerData {
-  activeDates: readonly string[];
-  outperformance: readonly number[];
-  drawdownDifference: readonly number[];
-  rollingGreeks: {
-    dates: readonly string[];
-    alphas: readonly number[];
-    betas: readonly number[];
-  };
-  /** The native regression, or its native error; null without a factor panel. */
-  multiFactor:
-    | { ok: true; value: MultiFactorResult }
-    | { ok: false; error: { message: string } }
-    | null;
-}
-/** The native analytics.Performance results the worker's benchmarkReport returns. */
-export interface BenchmarkReportData {
-  tickerNames: readonly string[];
-  benchmarkIdx: number;
-  frequency: string;
-  activeDates: readonly string[];
-  /** Factor labels of the regression, else null. */
-  factorNames: readonly string[] | null;
-  greeks: readonly GreeksResult[];
-  beta: readonly BetaResult[];
-  trackingError: readonly number[];
-  informationRatio: readonly number[];
-  treynor: readonly number[];
-  mSquared: readonly number[];
-  upCapture: readonly number[];
-  downCapture: readonly number[];
-  captureRatio: readonly number[];
-  battingAverage: readonly number[];
-  tickers: readonly BenchmarkTickerData[];
-}
 export interface BenchmarkReportProps {
   /** The returned report; null while none is available. */
   report: BenchmarkReportData | null;

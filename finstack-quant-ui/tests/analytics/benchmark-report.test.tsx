@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { BenchmarkReportData } from "@/components/finstack/analytics/lib/analytics-report-types";
 import { createRequire } from "node:module";
 import {
   afterAll,
@@ -26,10 +27,7 @@ import {
   type BenchmarkReport as Report,
   type BenchmarkReportRequest,
 } from "@/hooks/analytics/use-benchmark-report/use-benchmark-report";
-import {
-  BenchmarkReport,
-  type BenchmarkReportData,
-} from "@/components/finstack/analytics/components/benchmark-report/benchmark-report";
+import { BenchmarkReport } from "@/components/finstack/analytics/components/benchmark-report/benchmark-report";
 import { unwrap } from "@/workers/finstack-contract";
 import { startWorker } from "../shared/worker/harness.mjs";
 import { budget } from "../shared/budget";

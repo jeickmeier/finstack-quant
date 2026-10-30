@@ -1,4 +1,8 @@
 "use client";
+import type {
+  PerformanceReportData,
+  PerformanceTickerData,
+} from "@/components/finstack/analytics/lib/analytics-report-types";
 import {
   datedPoints,
   ReportSection,
@@ -11,13 +15,7 @@ import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { scaleUtc } from "d3-scale";
-import type {
-  DatedSeries,
-  DrawdownEpisode,
-  LookbackReturns,
-  PeriodicReturn,
-} from "finstack-quant-wasm";
-import type { TableEnvelopeWire } from "@/lib/finstack/generated/types/table_envelope";
+import type { DrawdownEpisode } from "finstack-quant-wasm";
 import { formatRaw } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import {
@@ -29,35 +27,6 @@ import { EnumField } from "@/components/finstack/shared/primitives/enum-field/en
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { TableEnvelope } from "@/components/finstack/shared/table/table-envelope/table-envelope";
 
-/** One ticker's native series, each aligned with that ticker's own active dates. */
-export interface PerformanceTickerData {
-  activeDates: readonly string[];
-  cumulativeReturns: readonly number[];
-  drawdowns: readonly number[];
-  drawdownEpisodes: readonly DrawdownEpisode[];
-  rollingSharpe: Omit<DatedSeries, "values"> & { values: readonly number[] };
-  rollingVolatility: Omit<DatedSeries, "values"> & {
-    values: readonly number[];
-  };
-}
-/** The native analytics.Performance results the worker's performanceReport returns. */
-export interface PerformanceReportData {
-  tickerNames: readonly string[];
-  /** Index of the named benchmark; null when none was named. */
-  benchmarkIdx: number | null;
-  frequency: string;
-  activeDates: readonly string[];
-  /** Performance.summary() as returned. */
-  summary: TableEnvelopeWire;
-  tickers: readonly PerformanceTickerData[];
-  monthly: readonly (readonly PeriodicReturn[])[];
-  annual: readonly (readonly PeriodicReturn[])[];
-  lookback: {
-    refDate: string;
-    returns: LookbackReturns;
-    fiscalYearStart: { month: number; day: number } | null;
-  };
-}
 export interface PerformanceReportProps {
   /** The returned report; null while none is available. */
   report: PerformanceReportData | null;

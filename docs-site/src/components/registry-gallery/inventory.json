@@ -681,6 +681,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "analytics-report-types",
+      "type": "registry:lib"
+    },
+    {
       "name": "use-value-portfolio",
       "type": "registry:hook"
     },

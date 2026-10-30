@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { PerformanceReportData } from "@/components/finstack/analytics/lib/analytics-report-types";
 import { createRequire } from "node:module";
 import {
   afterAll,
@@ -26,10 +27,7 @@ import {
   type PerformanceReport as Report,
   type PerformanceReportRequest,
 } from "@/hooks/analytics/use-performance-report/use-performance-report";
-import {
-  PerformanceReport,
-  type PerformanceReportData,
-} from "@/components/finstack/analytics/components/performance-report/performance-report";
+import { PerformanceReport } from "@/components/finstack/analytics/components/performance-report/performance-report";
 import { unwrap } from "@/workers/finstack-contract";
 import { startWorker } from "../shared/worker/harness.mjs";
 import { budget } from "../shared/budget";

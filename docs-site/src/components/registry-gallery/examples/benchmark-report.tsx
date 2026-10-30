@@ -1,9 +1,7 @@
 "use client";
+import type { BenchmarkReportData } from "@/components/finstack/analytics/lib/analytics-report-types";
 import type { ExampleProps } from "./props";
-import {
-  BenchmarkReport,
-  type BenchmarkReportData,
-} from "@/components/finstack/analytics/components/benchmark-report/benchmark-report";
+import { BenchmarkReport } from "@/components/finstack/analytics/components/benchmark-report/benchmark-report";
 import data from "../data.json";
 // The native benchmark report of the tear-sheet panel with two illustrative
 // factors and every option left to Rust; this item needs no worker.
