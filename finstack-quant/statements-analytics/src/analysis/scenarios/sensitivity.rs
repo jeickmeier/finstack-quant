@@ -84,7 +84,7 @@ use indexmap::IndexMap;
 ///     PeriodId::quarter(2025, 1).expect("valid period fixture"),
 ///     100_000.0,
 ///     vec![-10.0, 0.0, 10.0],
-/// ));
+/// )?);
 /// config.add_target_metric("gross_profit");
 ///
 /// let result = run_sensitivity(&model, &config)?;
@@ -586,12 +586,10 @@ mod tests {
         };
 
         let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
-        config.add_parameter(ParameterSpec::with_percentages(
-            "revenue",
-            period,
-            100_000.0,
-            vec![-10.0, 0.0, 10.0],
-        ));
+        config.add_parameter(
+            ParameterSpec::with_percentages("revenue", period, 100_000.0, vec![-10.0, 0.0, 10.0])
+                .expect("finite shocks"),
+        );
         config.add_target_metric("gross_profit");
 
         let result = run_sensitivity(&model, &config).expect("sensitivity analysis should succeed");

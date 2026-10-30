@@ -82,26 +82,47 @@ impl ParameterSpec {
     /// * `base_value` - Finite reference input in the node's units, such as a
     ///   decimal rate or monetary currency amount; each shock multiplies this
     ///   value by `1 + pct / 100`. The model supplies the chart baseline.
-    /// * `pct_range` - Non-empty finite percentage figures, with `10.0` meaning
-    ///   a 10% increase and `-10.0` a 10% decrease. Execution rejects shocks
-    ///   whose converted absolute values overflow.
+    /// * `pct_range` - Finite percentage figures, with `10.0` meaning a 10%
+    ///   increase and `-10.0` a 10% decrease; a sensitivity run needs at least
+    ///   one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when `base_value` or a percentage is
+    /// not finite (`NaN` or infinite), or when a converted shock overflows to
+    /// a non-finite value.
     pub fn with_percentages(
         node_id: impl Into<String>,
         period_id: PeriodId,
         base_value: f64,
         pct_range: Vec<f64>,
-    ) -> Self {
+    ) -> finstack_quant_statements::Result<Self> {
+        let node_id = node_id.into();
+        if !base_value.is_finite() {
+            return Err(finstack_quant_statements::Error::invalid_input(format!(
+                "Sensitivity base value for '{node_id}@{period_id}' must be finite, got {base_value}"
+            )));
+        }
         let perturbations = pct_range
             .into_iter()
-            .map(|pct| base_value * (1.0 + pct / 100.0))
-            .collect();
+            .map(|pct| {
+                let value = base_value * (1.0 + pct / 100.0);
+                if value.is_finite() {
+                    Ok(value)
+                } else {
+                    Err(finstack_quant_statements::Error::invalid_input(format!(
+                        "Sensitivity shock {pct}% of '{node_id}@{period_id}' must be finite"
+                    )))
+                }
+            })
+            .collect::<finstack_quant_statements::Result<_>>()?;
 
-        Self {
-            node_id: node_id.into(),
+        Ok(Self {
+            node_id,
             period_id,
             base_value,
             perturbations,
-        }
+        })
     }
 }
 
