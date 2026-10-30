@@ -31,15 +31,16 @@ fn parse_periods(periods: &JsValue) -> Result<Vec<PeriodId>, JsValue> {
 /// @param net_debt_override - Flat net debt in model currency used instead of the model-derived equity bridge.
 /// @param options - Optional Rust `DcfOptions`; every field is optional and a missing one takes its Rust default (`mid_year_convention`, `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `exit_multiple_metric_node`, ...). Unknown keys are rejected (object or JSON).
 /// @param market - Optional `MarketContext` state used for statement evaluation, not for WACC discounting (object or JSON).
-/// @param as_of - Optional ISO 8601 valuation date; required when `market` is supplied.
+/// @param as_of - Optional ISO 8601 valuation date; required when `market` is supplied. With `market` it is also the statement visibility cutoff: an actual is hidden until its availability date, by default the period's exclusive end (the first day of the next period), so a quarter-end `"2025-03-31"` hides 2025Q1's actuals; pass `"2025-04-01"` or set the nodes' `availability_dates`. Only forecast periods ending after it are discounted.
 /// @returns `CorporateValuationResult`: enterprise value, terminal-value PV, net debt and equity value as `Money` wire objects, plus per-share value when shares are supplied, and the DCF working: `wacc`, per-period `periods` rows (flow, discount factor, present value), `pv_explicit`, the undiscounted `terminal_value` with its `terminal_discount_years`, and the `equity_bridge` (gross debt and cash separately).
 ///
 /// # Errors
 ///
 /// Throws with kind `validation` if an input is malformed, the model
-/// currency is missing, the WACC and terminal-value assumptions are
-/// inconsistent, or the valuation fails, and kind `not_found` if the UFCF or
-/// exit-multiple metric node is missing.
+/// currency is missing, `asOf` hides an actual that a value node needs, no
+/// forecast cash flow ends after `asOf`, the WACC and terminal-value
+/// assumptions are inconsistent, or the valuation fails, and kind `not_found`
+/// if the UFCF or exit-multiple metric node is missing.
 #[wasm_bindgen(js_name = evaluateDcf)]
 #[allow(clippy::too_many_arguments)]
 pub fn evaluate_dcf(

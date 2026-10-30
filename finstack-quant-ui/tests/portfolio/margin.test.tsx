@@ -68,12 +68,11 @@ it.each(["no-collateral", "usd-collateral-held"])(
   "runs the %s portfolio margin through the real worker exactly as the native fixture",
   async (name) => {
     const returned = unwrap(await harness.proxy.portfolioMargin(request(name)));
-    // The fixture stores JSON, where Rust's -0 variation margin stays "-0".
     expect(JSON.parse(JSON.stringify(returned))).toEqual(entry(name).result);
   },
   budget(15000),
 );
-it("pins Rust's margin figures: two netting sets, a counted deposit and a -0 variation margin", () => {
+it("pins Rust's margin figures: two netting sets, a counted deposit and a zero variation margin", () => {
   const run = result("usd-collateral-held");
   expect(run.netting_sets.map((set) => set.csa_id)).toEqual([
     "CSA-B",
@@ -84,7 +83,7 @@ it("pins Rust's margin figures: two netting sets, a counted deposit and a -0 var
     "282055.3783613904",
   ]);
   expect(run.netting_sets.every((set) => set.is_approximate)).toBe(true);
-  expect(run.netting_sets[0]!.variation_margin.amount).toBe("-0");
+  expect(run.netting_sets[0]!.variation_margin.amount).toBe("0");
   expect(run.total_margin.amount).toBe("846166.135084171");
   expect(run.total_positions).toBe(2);
   expect(run.positions_without_margin).toBe(1);
@@ -148,14 +147,14 @@ it("shows the returned totals, counts, netting sets and CSA collateral as return
   const sets = rowsOf(
     within(report).getByRole("table", { name: /netting set/ }),
   );
-  // Returned order; the -0 variation margin is shown as returned.
+  // Returned order; the zero variation margin is shown as returned.
   expect(sets.map((row) => row.cells[0]!.textContent)).toEqual([
     "CSA-Bbilateral · CSA CSA-B",
     "USD-REGULATORY-CSAbilateral · CSA USD-REGULATORY-CSA",
   ]);
   expect(
     sets[0]!.cells[4]!.querySelector("[title]")!.getAttribute("title"),
-  ).toBe("-0");
+  ).toBe("0");
   expect(sets[0]!.cells[1]!.textContent).toBe("simmApproximate");
   const csas = rowsOf(
     within(report).getByRole("table", { name: /collateral by CSA/ }),

@@ -1049,6 +1049,7 @@
           "description": "Jump-diffusion process (Merton 1976) with Poisson jumps.",
           "properties": {
             "jump_diffusion": {
+              "additionalProperties": false,
               "properties": {
                 "jump_intensity": {
                   "description": "Poisson jump arrival intensity (jumps per year).",
@@ -1084,6 +1085,7 @@
           "description": "CreditGrades model extension with stochastic-barrier survival adjustment.\n\n`default_probability()` applies the standard approximate CreditGrades\nsurvival function using the log-barrier volatility parameter.",
           "properties": {
             "credit_grades": {
+              "additionalProperties": false,
               "properties": {
                 "barrier_uncertainty": {
                   "description": "Log-normal barrier volatility `λ`: the standard deviation of the\nnatural log of the default barrier (Finger et al. 2002,\n\"CreditGrades Technical Document\"). Despite the field name, this\nis *not* a generic uncertainty scalar — it is the lognormal\ndispersion of the global recovery rate, entering the survival\nformula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.",
@@ -1492,6 +1494,7 @@
           "description": "Continuous barrier monitoring (Black-Cox extension).",
           "properties": {
             "first_passage": {
+              "additionalProperties": false,
               "properties": {
                 "barrier_growth_rate": {
                   "description": "Growth rate of the default barrier over time.",
@@ -4793,7 +4796,8 @@
       ]
     },
     "d_ee4323acfdb49e4fe15b": {
-      "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged.",
+      "additionalProperties": false,
+      "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. Unknown fields are rejected.",
       "properties": {
         "asset_value": {
           "description": "Current firm asset value `V_0`, in the issuer's reporting currency.\nStrictly positive.",

@@ -11930,16 +11930,16 @@ export interface VmCalculator extends WasmOwned {
    * @param exposure - Signed mark-to-market in `currency`: positive means the counterparty owes the desk.
    * @param postedCollateral - Signed collateral balance in `currency`: positive held, negative posted, including pending agreed calls.
    * @param currency - ISO-4217 code; must equal the CSA base currency.
-   * @param asOf - ISO-8601 calculation date; the settlement date is derived from it on the CSA calendar.
-   * @returns The `VmResult` as a plain object: `date`, `settlement_date`, and Money amounts `gross_exposure`, `threshold`, `independent_amount`, `net_exposure`, `collateral_balance`, `unrounded_call`, `mta`, `rounding_increment`, `post_amount` and `collect_amount`.
+   * @param asOf - ISO-8601 valuation date; a date that is not a business day of the CSA calendar is rolled to the next one (Following), and the settlement date is derived from that call date.
+   * @returns The `VmResult` as a plain object: `date` (the call date, a CSA business day), `settlement_date`, and Money amounts `gross_exposure`, `threshold`, `independent_amount`, `net_exposure`, `collateral_balance`, `unrounded_call`, `mta`, `rounding_increment`, `post_amount` and `collect_amount`.
    * @throws Error - Throws if the currency is unknown or differs from the CSA base currency, an amount is non-finite, the date is not ISO 8601, or the CSA calendar is not registered.
    */
   calculate(exposure: number, postedCollateral: number, currency: string, asOf: string): VmResult;
   /**
    * Run an exposure time series into a margin-call schedule.
-   * @param exposures - Array of `[date, exposure]` pairs: ISO-8601 date and signed exposure in the CSA base currency (positive means the counterparty owes the desk), processed in the order given.
+   * @param exposures - Array of `[date, exposure]` pairs: ISO-8601 date and signed exposure in the CSA base currency (positive means the counterparty owes the desk), processed in the order given; a date that is not a business day of the CSA calendar is rolled to the next one (Following).
    * @param initialCollateral - Collateral balance before the first date, in major units of the CSA base currency.
-   * @returns One `MarginCall` plain object per call (`call_date`, `settlement_date`, `call_type`, `amount`, `mtm_trigger`, `threshold`, `mta_applied`); dates without a call produce no entry.
+   * @returns One `MarginCall` plain object per call (`call_date` on a CSA business day, `settlement_date`, `call_type`, `amount`, `mtm_trigger`, `threshold`, `mta_applied`); dates without a call produce no entry.
    * @throws Error - Throws if `exposures` is not an array of `[string, number]` pairs, an amount is non-finite, a date is not ISO 8601, or the CSA calendar is not registered.
    */
   generateMarginCalls(
@@ -12933,10 +12933,10 @@ export interface MarginNamespace {
   /**
    * Regulatory CSA specification for any supported base currency.
    * @param currency - ISO-4217 base currency of the agreement; every CSA amount is in it.
-   * @param id - Identifier stamped on the specification.
+   * @param id - Identifier stamped on the specification; must be non-empty (an empty or whitespace-only id is rejected).
    * @param collateralCurve - Curve id used to discount and accrue interest on collateral, for example `"USD-OIS"`.
    * @returns The `CsaSpec` as a plain object.
-   * @throws Error - Throws for an unknown currency, or if the embedded margin registry has no regulatory terms for it or cannot be loaded.
+   * @throws Error - Throws a `validation` error for an empty or whitespace-only id or an empty collateral curve; throws for an unknown currency, or if the embedded margin registry has no regulatory terms for it or cannot be loaded.
    */
   csaSpecRegulatory(currency: string, id: string, collateralCurve: string): CsaSpec;
   /**
@@ -30946,7 +30946,7 @@ export interface Evaluator extends WasmOwned {
    * `Evaluator::evaluate_monte_carlo`).
    * @param model - `FinancialModelSpec` whose stochastic forecast nodes are simulated (object or JSON).
    * @param config - `MonteCarloConfig`: `n_paths`, `seed`, optional `percentiles` (fractions in `[0, 1]`) and `include_path_data` (object or JSON).
-   * @returns `MonteCarloResults` plain object with percentile summaries per metric and, when requested, the per-path table.
+   * @returns `MonteCarloResults` plain object with percentile summaries per metric, the distinct forecast-period `warnings` (each reported once however many paths raised it; actual periods are not simulated and are omitted) and, when requested, the per-path table.
    * @throws Error with kind `validation` if an input is malformed, `n_paths` is zero, the model has a capital structure, or a path fails to evaluate; kind `not_found` if a formula references a missing node.
    */
   evaluateMonteCarlo(
@@ -32387,10 +32387,10 @@ export interface StatementsAnalyticsNamespace {
    * Sensitivity parameter whose perturbations are percentage moves of a base value (twin of Python `ParameterSpec.with_percentages`).
    * @param nodeId - Node identifier to vary.
    * @param periodId - Period to vary, e.g. `"2025Q1"`.
-   * @param baseValue - Base value of the node in its own units.
+   * @param baseValue - Finite base value of the node in its own units.
    * @param pctRange - Percentage moves, e.g. `[-10, 0, 10]` for ±10%.
    * @returns Plain `ParameterSpec` object (`node_id`, `period_id`, `base_value`, absolute `perturbations`) for a `SensitivityConfig`.
-   * @throws Error - Throws with kind `validation` if `periodId` is not a valid period, and kind `invalid_type` if a number argument is not a number.
+   * @throws Error - Throws with kind `validation` if `periodId` is not a valid period, if `baseValue` or a percentage is not finite (`NaN` or infinite), or if a converted shock overflows, and kind `invalid_type` if a number argument is not a number.
    */
   parameterSpecWithPercentages(
     nodeId: string,
@@ -32416,14 +32416,14 @@ export interface StatementsAnalyticsNamespace {
    * Generate tornado chart entries for a sensitivity result.
    * @param resultJson - Result JSON produced by a prior call.
    * @param metricNode - Statement metric node identifier selected for the requested analysis.
-   * @param period - Model period label for the requested statement value or calculation.
+   * @param period - Required model period, such as `"2025Q4"`, at which the metric is read in the baseline and every scenario; a shock replaces one forecast cell, so the metric moves only in the shocked period and in later periods whose formulas read it.
    * @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key.
-   * @throws Error - Rejects malformed `result_json`, an invalid optional `period` identifier, or a full-grid run, a scenario that does not identify exactly one perturbed parameter, an absent unperturbed baseline, a missing target metric or period, non-finite metric values or impacts, or failure to convert the entries to JavaScript.
+   * @throws Error - Rejects malformed `result_json`, an invalid `period` identifier, or a full-grid run, a scenario that does not identify exactly one perturbed parameter, an absent unperturbed baseline, a missing target metric or period, non-finite metric values or impacts, or failure to convert the entries to JavaScript.
    */
   generateTornadoEntries(
     resultJson: JsonInput,
     metricNode: string,
-    period?: string | null
+    period: string
   ): TornadoEntry[];
   /**
    * Find the driver value that makes a target node reach a target value.
@@ -32574,8 +32574,8 @@ export interface StatementsAnalyticsNamespace {
    * Returns a structured JavaScript object.
    * @returns Credit-assessment result object from the statement results.
    * @param resultsJson - Evaluated statement-result JSON.
-   * @param period - Statement period identifier, such as `2025Q4` or `2025A`.
-   * @throws Error - Rejects malformed `results_json`, an `period` value that is not a valid statement period identifier, or failure to serialize the assessment to JavaScript.
+   * @param period - Statement period identifier, such as `2025Q4`, that is a period of the results in the model's own frequency: `2025` is the annual period, not the last quarter of a quarterly model.
+   * @throws Error - Rejects malformed `results_json`, a `period` value that is not a valid statement period identifier, a `period` at which no node of the results has a value (kind `validation`), or failure to serialize the assessment to JavaScript.
    */
   creditAssessment(resultsJson: JsonInput, period: string): CreditAssessment;
   /**
@@ -33003,9 +33003,9 @@ export interface StatementsAnalyticsNamespace {
    * @param netDebtOverride - Flat net debt in model currency used instead of the model-derived equity bridge.
    * @param options - Optional Rust `DcfOptions`; every field is optional and a missing one takes its Rust default (`mid_year_convention`, `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `exit_multiple_metric_node`, ...). Unknown keys are rejected (object or JSON).
    * @param market - Optional `MarketContext` state used for statement evaluation, not for WACC discounting (object or JSON).
-   * @param asOf - Optional ISO 8601 valuation date; required when `market` is supplied.
+   * @param asOf - Optional ISO 8601 valuation date; required when `market` is supplied. With `market` it is also the statement visibility cutoff: an actual is hidden until its availability date, by default the period's exclusive end (the first day of the next period), so a quarter-end `"2025-03-31"` hides 2025Q1's actuals; pass `"2025-04-01"` or set the nodes' `availability_dates`. Only forecast periods ending after it are discounted.
    * @returns `CorporateValuationResult`: enterprise value, terminal-value PV, net debt and equity value as `Money` wire objects, plus per-share value when shares are supplied, and the DCF working: `wacc`, per-period `periods` rows (flow, discount factor, present value), `pv_explicit`, the undiscounted `terminal_value` with its `terminal_discount_years`, and the `equity_bridge` (gross debt and cash separately).
-   * @throws Error - Throws with kind `validation` if an input is malformed, the model currency is missing, the WACC and terminal-value assumptions are inconsistent, or the valuation fails, and kind `not_found` if the UFCF or exit-multiple metric node is missing.
+   * @throws Error - Throws with kind `validation` if an input is malformed, the model currency is missing, `asOf` hides an actual that a value node needs, no forecast cash flow ends after `asOf`, the WACC and terminal-value assumptions are inconsistent, or the valuation fails, and kind `not_found` if the UFCF or exit-multiple metric node is missing.
    */
   evaluateDcf(
     model: JsonInput,
@@ -34575,7 +34575,12 @@ export interface ScenariosNamespace {
   /**
    * Compose multiple structured scenario specs into a single scenario.
    *
-   * Specs are merged in priority order (lower number runs first).
+   * Specs are merged in priority order (lower number runs first; equal
+   * priorities keep input order). The composed spec takes its `id` and `name`
+   * from the inputs joined with `+` / `" + "`, its `description` from the
+   * present input descriptions joined with `" + "` (`null` when no input has
+   * one), and the lowest input `priority` (`0` for an empty array), all in
+   * execution order.
    * @returns Structured composed scenario specification.
    * @param specs - ScenarioSpec objects to validate and compose in priority order.
    * @throws Error - Rejects malformed structured specs, any input spec that fails `ScenarioSpec` validation (blank ID, non-finite numbers, invalid identifiers, tenors or operations; the message names the scenario), input specs with mixed `hazard_bump_mode` values, composition that contains more than one time-roll operation, or failure to convert the composed specification.
@@ -34675,7 +34680,7 @@ export interface ScenariosNamespace {
    * @param marketJson - JSON-serialized `MarketContext`.
    * @param asOf - Valuation date (ISO 8601).
    * @param scenarioJson - JSON-serialized `ScenarioSpec`.
-   * @param method - `AttributionMethod` wire value: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }` or `{ taylor: {} }`, or the same value as JSON text. Omit for the Rust default (`AttributionMethod::default()`, currently "parallel"). "metrics_based" calculates the canonical registry's applicable subset of default attribution metrics at the opening snapshot; metrics unsupported by the instrument type are omitted, while failures calculating selected metrics throw.
+   * @param method - `AttributionMethod` wire value: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }` or `{ taylor: {} }`, or the same value as JSON text. Omit for the Rust default (`AttributionMethod::default()`, currently "parallel"). "metrics_based" calculates the canonical registry's applicable subset of default attribution metrics at the opening snapshot; metrics unsupported by the instrument type are omitted, and when a hazard curve of the instrument has no calibration recipe and that menu fails, the quote-space credit metrics are dropped with a note and credit-curve P&L flows to residual; any other failure calculating selected metrics throws.
    * @param configJson - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
    * @param calendarId - Optional built-in holiday calendar (e.g. "nyse", "target") used to business-day adjust `time_roll_forward` targets under `business_days` mode. Omit for a weekends-only calendar; unknown identifiers throw.
    * @returns The serde `HorizonResult` (`attribution`, `initial_value` and `terminal_value` as exact-decimal Money objects, `horizon_days`, null without a time roll, and `scenario_report`) plus `summary`: the Rust-computed `total_return`, `annualized_return`, `currency` and `factor_contributions` that Python exposes as `HorizonResult` accessors. Rust computes every derived value. Undefined derived values are null here and NaN in Python: total return and factor contributions require positive initial value and matching P&L currency; annualization also requires a positive horizon and total return at or above -100%.

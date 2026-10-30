@@ -384,3 +384,50 @@ fn drc_charge(positions: &[DrcPosition]) -> finstack_quant_core::Result<f64> {
             .drc,
     )
 }
+
+#[test]
+fn vm_margin_calls_land_on_csa_business_days() {
+    use time::macros::date;
+    // USD regulatory CSA: `usny` calendar, one-business-day settlement lag.
+    let calc = VmCalculator::new(CsaSpec::usd_regulatory().expect("registry"));
+    let calls = calc
+        .generate_margin_calls(
+            &[
+                // Juneteenth, a `usny` holiday: the call is made on Thursday.
+                (date!(2024 - 06 - 19), usd(1_000_000.0)),
+                // Saturday: the call is made on Monday.
+                (date!(2024 - 06 - 22), usd(3_000_000.0)),
+            ],
+            usd(0.0),
+        )
+        .expect("calls");
+    let dates: Vec<_> = calls
+        .iter()
+        .map(|call| (call.call_date, call.settlement_date))
+        .collect();
+    assert_eq!(
+        dates,
+        [
+            (date!(2024 - 06 - 20), date!(2024 - 06 - 21)),
+            (date!(2024 - 06 - 24), date!(2024 - 06 - 25)),
+        ]
+    );
+
+    let result = calc
+        .calculate(usd(1_000_000.0), usd(0.0), date!(2024 - 06 - 19))
+        .expect("vm");
+    assert_eq!(result.date, date!(2024 - 06 - 20));
+    assert_eq!(result.settlement_date, date!(2024 - 06 - 21));
+}
+
+#[test]
+fn vm_net_margin_without_transfer_is_positive_zero() {
+    let calc = VmCalculator::new(CsaSpec::usd_regulatory().expect("registry"));
+    let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
+        .expect("date");
+    // Under the 500,000 regulatory MTA: no post, no collect.
+    let result = calc.calculate(usd(100_000.0), usd(0.0), date).expect("vm");
+    assert!(!result.requires_call());
+    let wire = serde_json::to_value(result.net_margin()).expect("serializes");
+    assert_eq!(wire["amount"], "0", "{wire}");
+}

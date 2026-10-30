@@ -1006,7 +1006,12 @@ wire_methods!(PyCorporateAnalysis, CorporateAnalysis, "CorporateAnalysis");
 ///     lookups); DCF discounting stays WACC-only. Requires ``as_of``.
 /// as_of : datetime.date | str | None
 ///     DCF valuation date and, with ``market``, the statement visibility and
-///     market-data date. Defaults to the first forecast boundary.
+///     market-data date. Defaults to the first forecast boundary. As a
+///     visibility cutoff it hides each actual whose availability date (by
+///     default the period's exclusive end, the first day of the next period) is
+///     after it: a quarter-end ``"2025-03-31"`` hides 2025Q1's actuals, so pass
+///     ``"2025-04-01"`` or set the nodes' ``availability_dates``. Only forecast
+///     periods ending after ``as_of`` are discounted.
 ///
 /// Returns
 /// -------
@@ -1020,8 +1025,9 @@ wire_methods!(PyCorporateAnalysis, CorporateAnalysis, "CorporateAnalysis");
 /// ------
 /// ValueError
 ///     If ``market`` is set without ``as_of``, a payload or ``options`` is
-///     malformed, or the model, cash-flow node, exit-multiple node or DCF
-///     inputs are invalid.
+///     malformed, ``as_of`` hides an actual that a value node needs, no
+///     forecast cash flow ends after ``as_of``, or the model, cash-flow node,
+///     exit-multiple node or DCF inputs are invalid.
 /// KeyError
 ///     If ``ufcf_node`` or ``exit_multiple_metric_node`` is missing from the model.
 ///

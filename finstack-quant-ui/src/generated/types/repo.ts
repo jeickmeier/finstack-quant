@@ -1222,7 +1222,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Growth rate of the default barrier over time.
            */
           barrier_growth_rate: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -1249,7 +1248,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Volatility of log-jump size.
            */
           jump_vol: number;
-          [k: string]: unknown;
         };
       }
     | {
@@ -1267,7 +1265,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Mean recovery rate at default.
            */
           mean_recovery: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -1279,7 +1276,6 @@ export interface DEe4323Acfdb49E4Fe15B {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Hard threshold toggle configuration.

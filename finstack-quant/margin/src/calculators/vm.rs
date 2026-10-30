@@ -16,7 +16,8 @@ use tracing::{debug, warn};
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct VmResult {
-    /// Calculation date
+    /// Call date: the requested valuation date rolled to the next business
+    /// day of the CSA calendar (Following) when it is not one.
     #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
     pub date: Date,
 
@@ -69,12 +70,16 @@ pub struct VmResult {
 
 impl VmResult {
     /// Get net cash outflow: post minus collect, positive when the desk pays.
+    ///
+    /// At most one of the two amounts is non-zero. With no transfer the
+    /// result is a positive zero (`"0"` on the wire), never the Decimal
+    /// negative zero that negating a zero collect amount would produce.
     #[must_use]
     pub fn net_margin(&self) -> Money {
-        if self.post_amount.amount() > 0.0 {
-            self.post_amount
-        } else {
+        if self.collect_amount.amount() > 0.0 {
             self.collect_amount.checked_neg()
+        } else {
+            self.post_amount
         }
     }
 
@@ -165,11 +170,20 @@ impl VmCalculator {
     ///
     /// * `exposure` - Current mark-to-market exposure (positive = counterparty owes us)
     /// * `posted_collateral` - Signed collateral balance, positive held and negative posted, including pending agreed calls.
-    /// * `as_of` - Calculation date
+    /// * `as_of` - Valuation date. A date that is not a business day of the
+    ///   CSA calendar (`calendar_id`) is rolled Following, so the call is made
+    ///   on the next business day and settles `settlement_lag` business days
+    ///   after that.
     ///
     /// # Returns
     ///
-    /// [`VmResult`] with desk post and collect amounts.
+    /// [`VmResult`] with desk post and collect amounts, dated on the call
+    /// business day.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the CSA is invalid, an amount is not in
+    /// the CSA base currency, or the CSA calendar is not registered.
     pub fn calculate(
         &self,
         exposure: Money,
@@ -202,10 +216,11 @@ impl VmCalculator {
         let post = Money::new((-net_call.amount()).max(0.0), currency)?;
         let collect = Money::new(net_call.amount().max(0.0), currency)?;
 
-        let settlement_date = self.calculate_settlement_date(as_of)?;
+        let call_date = self.adjust_to_business_day(as_of)?;
+        let settlement_date = self.calculate_settlement_date(call_date)?;
 
         Ok(VmResult {
-            date: as_of,
+            date: call_date,
             gross_exposure: exposure,
             net_exposure: steps.required,
             post_amount: post,
@@ -224,12 +239,18 @@ impl VmCalculator {
     ///
     /// # Arguments
     ///
-    /// * `exposures` - Time series of (date, exposure) pairs
+    /// * `exposures` - Time series of (valuation date, exposure) pairs in the
+    ///   CSA base currency, processed in the order given. Each date is rolled
+    ///   Following on the CSA calendar, as in [`Self::calculate`]; two
+    ///   observations that roll onto the same business day each produce
+    ///   their own call, the later netting against the collateral the earlier
+    ///   one moved.
     /// * `initial_collateral` - Signed collateral balance: positive held, negative posted.
     ///
     /// # Returns
     ///
-    /// Vector of [`MarginCall`] events.
+    /// Vector of [`MarginCall`] events, each dated on a business day of the
+    /// CSA calendar.
     pub fn generate_margin_calls(
         &self,
         exposures: &[(Date, Money)],
@@ -245,9 +266,9 @@ impl VmCalculator {
                 let settlement_date = result.settlement_date;
 
                 if result.post_amount.amount() > 0.0 {
-                    debug!(date = %date, amount = result.post_amount.amount(), "VM post margin call");
+                    debug!(date = %result.date, amount = result.post_amount.amount(), "VM post margin call");
                     calls.push(MarginCall::vm_post(
-                        *date,
+                        result.date,
                         settlement_date,
                         result.post_amount,
                         *exposure,
@@ -256,9 +277,9 @@ impl VmCalculator {
                     ));
                     current_collateral = current_collateral.checked_sub(result.post_amount)?;
                 } else if result.collect_amount.amount() > 0.0 {
-                    debug!(date = %date, amount = result.collect_amount.amount(), "VM collect margin call");
+                    debug!(date = %result.date, amount = result.collect_amount.amount(), "VM collect margin call");
                     calls.push(MarginCall::vm_collect(
-                        *date,
+                        result.date,
                         settlement_date,
                         result.collect_amount,
                         *exposure,

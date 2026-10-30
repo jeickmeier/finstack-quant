@@ -488,7 +488,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/merton_model.schema.json",
-      "bytes": 5700,
+      "bytes": 5868,
       "kind": "input",
       "path": "schemas/models/1/merton_model.schema.json",
       "summary": "Merton structural credit model.",

@@ -132,7 +132,11 @@ fn build_inputs(
 ///       ``correlations``, ``fx``, ``volatility``, ``model_parameters``,
 ///       ``market_scalars`` (``default_waterfall_order()`` gives the full
 ///       canonical list; the order must start with ``carry``)
-///     * ``"metrics_based"``
+///     * ``"metrics_based"`` (without ``config["metrics"]`` it prices the
+///       default metric menu; when an instrument hazard curve has no
+///       calibration recipe and that menu fails, the quote-space credit
+///       metrics are dropped with a note in ``notes`` and credit-curve P&L
+///       flows to the residual)
 ///     * ``{"taylor": {"include_gamma": True, ...}}``
 /// config : dict | str, optional
 ///     Attribution config overrides (``tolerance_abs``, ``tolerance_pct``,

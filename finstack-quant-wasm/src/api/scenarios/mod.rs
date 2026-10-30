@@ -53,7 +53,12 @@ pub fn parse_scenario_spec(json_str: JsValue) -> Result<JsValue, JsValue> {
 
 /// Compose multiple scenario specs (JSON array) into a single scenario.
 ///
-/// Specs are merged in priority order (lower number runs first).
+/// Specs are merged in priority order (lower number runs first; equal
+/// priorities keep input order). The composed spec takes its `id` and `name`
+/// from the inputs joined with `+` / `" + "`, its `description` from the
+/// present input descriptions joined with `" + "` (`null` when no input has
+/// one), and the lowest input `priority` (`0` for an empty array), all in
+/// execution order.
 ///
 /// # Errors
 ///
@@ -282,8 +287,11 @@ pub fn apply_scenario(
 ///   (`AttributionMethod::default()`, currently "parallel"). "metrics_based"
 ///   calculates the canonical registry's
 ///   applicable subset of default attribution metrics at the opening snapshot;
-///   metrics unsupported by the instrument type are omitted, while failures
-///   calculating selected metrics throw.
+///   metrics unsupported by the instrument type are omitted, and when a
+///   hazard curve of the instrument has no calibration recipe and that menu
+///   fails, the quote-space credit metrics are dropped with a note and
+///   credit-curve P&L flows to residual; any other failure calculating
+///   selected metrics throws.
 /// * `config_json` - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
 /// * `calendar_id` - Optional built-in holiday calendar (e.g. "nyse", "target") used to
 ///   business-day adjust `time_roll_forward` targets under `business_days` mode.

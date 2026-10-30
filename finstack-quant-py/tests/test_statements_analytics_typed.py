@@ -14,6 +14,7 @@ from finstack_quant.statements import (
 )
 from finstack_quant.statements_analytics import (
     BridgeChart,
+    ParameterSpec,
     ScenarioDiff,
     ScenarioResults,
     ScenarioSet,
@@ -260,3 +261,12 @@ def test_monetary_goal_seek_round_trip_and_variance_currency_boundary() -> None:
     baseline, comparison = [Evaluator().evaluate(model) for model in models]
     with pytest.raises(ValueError, match="matching types and currencies"):
         run_variance(baseline, comparison, VarianceConfig("usd", "eur", ["revenue"], ["2025"]))
+
+
+@pytest.mark.parametrize("base_value", [float("nan"), float("inf"), float("-inf")])
+def test_percentage_parameter_spec_rejects_non_finite_base(base_value: float) -> None:
+    with pytest.raises(ValueError, match="must be finite"):
+        ParameterSpec.with_percentages("revenue", "2025Q2", base_value, [-10.0, 10.0])
+    config = SensitivityConfig("diagonal", [], [])
+    with pytest.raises(ValueError, match="must be finite"):
+        config.add_parameter("revenue", "2025Q2", base_value, pct=[-10.0, 10.0])

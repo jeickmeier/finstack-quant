@@ -829,10 +829,318 @@
       "scenarioJson": "{\"id\":\"roll-3m-50bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"time_roll_forward\",\"period\":\"3M\",\"apply_shocks\":true,\"roll_mode\":\"business_days\"},{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":50}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
       "method": "metrics_based",
       "calendarId": null,
-      "error": {
-        "kind": "computation",
-        "message": "Calibration error: Metric 'cs01' calculation failed: Calibration error: quote-space CS01 requires a lossless calibration recipe for hazard curve 'HZ' (a curve produced by the calibration pipeline, not one built directly from hazard rates) [instrument=US912828XG33, type=Bond, model=RatesCredit]"
-      }
+      "report": {
+        "attribution": {
+          "total_pnl": {
+            "amount": "8923.410832983",
+            "currency": "USD"
+          },
+          "mark_to_market_pnl": {
+            "amount": "8923.410832983",
+            "currency": "USD"
+          },
+          "pv_t0": {
+            "amount": "992091.570117712",
+            "currency": "USD"
+          },
+          "pv_t1": {
+            "amount": "1001014.980950695",
+            "currency": "USD"
+          },
+          "carry": {
+            "amount": "12654.15752991999",
+            "currency": "USD"
+          },
+          "rates_curves_pnl": {
+            "amount": "-3808.019346859281",
+            "currency": "USD"
+          },
+          "credit_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "inflation_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "correlations_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_translation_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "vol_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "cross_factor_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "model_params_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "market_scalars_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "residual": {
+            "amount": "77.272649922291",
+            "currency": "USD"
+          },
+          "carry_detail": {
+            "total": {
+              "amount": "12654.15752991999",
+              "currency": "USD"
+            },
+            "roll_down": {
+              "total": {
+                "amount": "12654.15752991999",
+                "currency": "USD"
+              }
+            }
+          },
+          "rates_detail": null,
+          "credit_detail": null,
+          "inflation_detail": null,
+          "correlations_detail": null,
+          "fx_detail": null,
+          "vol_detail": null,
+          "cross_factor_detail": null,
+          "model_params_detail": null,
+          "scalars_detail": null,
+          "sensitivity_steps": [
+            {
+              "factor": "Rates:USD-OIS",
+              "move_unit": "basis_point",
+              "buckets": [
+                {
+                  "tenor_years": 0.25,
+                  "sensitivity": {
+                    "amount": "-0.0570394655223936",
+                    "currency": "USD"
+                  },
+                  "market_move": 40.13702296227314
+                },
+                {
+                  "tenor_years": 0.5,
+                  "sensitivity": {
+                    "amount": "-1.126289745501708",
+                    "currency": "USD"
+                  },
+                  "market_move": 37.67123696157303
+                },
+                {
+                  "tenor_years": 1,
+                  "sensitivity": {
+                    "amount": "-96.7085813235026",
+                    "currency": "USD"
+                  },
+                  "market_move": 38.9041121789846
+                },
+                {
+                  "tenor_years": 2,
+                  "sensitivity": {
+                    "amount": "-0.2653747999574989",
+                    "currency": "USD"
+                  },
+                  "market_move": 43.34246664976893
+                },
+                {
+                  "tenor_years": 3,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 45.438357012340255
+                },
+                {
+                  "tenor_years": 5,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 48.29863048245696
+                },
+                {
+                  "tenor_years": 7,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 48.990215643583
+                },
+                {
+                  "tenor_years": 10,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 49.45753449793061
+                },
+                {
+                  "tenor_years": 15,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 49.63835633195371
+                },
+                {
+                  "tenor_years": 20,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 49.815068623895314
+                },
+                {
+                  "tenor_years": 30,
+                  "sensitivity": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "market_move": 49.95890419493103
+                }
+              ],
+              "explained_pnl": {
+                "amount": "-3818.581617124459",
+                "currency": "USD"
+              }
+            },
+            {
+              "factor": "RatesConvexity",
+              "move_unit": "basis_point",
+              "market_move": 38.902681590185864,
+              "explained_pnl": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "gamma_pnl": {
+                "amount": "10.56227026517806",
+                "currency": "USD"
+              }
+            }
+          ],
+          "meta": {
+            "method": "metrics_based",
+            "t0": "2025-01-01",
+            "t1": "2025-04-01",
+            "instrument_id": "US912828XG33",
+            "num_repricings": 3,
+            "tolerance_abs": 10,
+            "tolerance_pct": 1,
+            "residual_pct": 0.8659541891389033,
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "notes": [
+              "Rates attribution computed using key-rate (per-tenor) DV01 across 1 curve(s); non-parallel curve moves are attributed per tenor",
+              "Credit attribution skipped: no Cs01/BucketedCs01 metric in the T0 valuation while the credit curves moved; credit P&L set to zero (move flows to residual)",
+              "Volatility attribution has Vega but no measurable volatility-surface shift; vol P&L set to zero",
+              "Metrics-based attribution dropped cs01, bucketed_cs01, cross_gamma_rates_credit from the default metric menu: hazard curve(s) 'HZ' carry no calibration recipe (built directly from hazard rates), so quote-space credit risk is unavailable (Model failure: Metric 'cs01' calculation failed: Calibration error: quote-space CS01 requires a lossless calibration recipe for hazard curve 'HZ' (a curve produced by the calibration pipeline, not one built directly from hazard rates) [instrument=US912828XG33, type=Bond, model=RatesCredit]); credit-curve P&L flows to residual. Calibrate the hazard curve, or use parallel or waterfall attribution, to attribute it."
+            ]
+          },
+          "result_invalid": false
+        },
+        "initial_value": {
+          "amount": "992091.570117712",
+          "currency": "USD"
+        },
+        "terminal_value": {
+          "amount": "1001014.980950695",
+          "currency": "USD"
+        },
+        "horizon_days": 90,
+        "scenario_report": {
+          "operations_applied": 2,
+          "user_operations": 2,
+          "expanded_operations": 2,
+          "changes": {
+            "market_targets": [
+              {
+                "kind": "curve",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS"
+              }
+            ],
+            "changed_instrument_indices": [],
+            "as_of_changed": true,
+            "portfolio_shape_changed": false,
+            "all_dirty": true
+          },
+          "applied_shocks": [
+            {
+              "applies_to": {
+                "scope": "market",
+                "target": {
+                  "kind": "curve",
+                  "curve_kind": "discount",
+                  "curve_id": "USD-OIS"
+                }
+              },
+              "shock": {
+                "kind": "uniform",
+                "value": 50,
+                "unit": "bp"
+              }
+            }
+          ],
+          "warnings": [],
+          "meta": {
+            "numeric_mode": "f64",
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "fx_policy_applied": null,
+            "version": "0.11.0"
+          },
+          "time_roll": {
+            "old_date": "2025-01-01",
+            "new_date": "2025-04-01",
+            "days": 90,
+            "instrument_carry": [],
+            "total_carry": {},
+            "failed_instruments": []
+          }
+        },
+        "summary": {
+          "total_return": 0.008994543549971132,
+          "annualized_return": 0.036982234305995565,
+          "currency": "USD",
+          "factor_contributions": {
+            "carry": 0.012755029788650023,
+            "rates_curves": -0.003838374865343789,
+            "credit_curves": 0,
+            "inflation_curves": 0,
+            "correlations": 0,
+            "fx": 0,
+            "volatility": 0,
+            "model_parameters": 0,
+            "market_scalars": 0
+          }
+        }
+      },
+      "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3808.02\n  Credit: USD 0.00\n  Residual: USD 77.27\n"
     }
   ]
 }

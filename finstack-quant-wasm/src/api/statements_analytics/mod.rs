@@ -42,6 +42,13 @@ pub(super) fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue
 /// as a structured JavaScript object. `generateTornadoEntries` still takes the
 /// result as JSON, so pass `JSON.stringify(result)` when chaining the two.
 ///
+/// Each perturbation replaces its node's value in its one forecast period
+/// (Value > Forecast > Formula). It does not re-anchor the node's own
+/// forecast: later periods of a growth, seasonal or stochastic forecast keep
+/// their unshocked base. Formula nodes that read the shocked cell move, in its
+/// period and in later periods reached through `lag`, `ttm` or `cumsum`. Add
+/// one parameter per period to shock a whole forecast path.
+///
 /// # Errors
 ///
 /// Rejects malformed model or configuration JSON, invalid sensitivity modes or
@@ -219,14 +226,16 @@ pub fn scenario_comparison_table(
 /// `baseValue * (1 + pct / 100)`.
 /// @param node_id - Node identifier to vary.
 /// @param period_id - Period to vary, e.g. `"2025Q1"`.
-/// @param base_value - Base value of the node in its own units.
+/// @param base_value - Finite base value of the node in its own units.
 /// @param pct_range - Percentage moves, e.g. `[-10, 0, 10]` for ±10%.
 /// @returns Plain `ParameterSpec` object (`node_id`, `period_id`, `base_value`, absolute `perturbations`) for a `SensitivityConfig`.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if `periodId` is not a valid period, and kind
-/// `invalid_type` if a number argument is not a number.
+/// Throws with kind `validation` if `periodId` is not a valid period, if
+/// `baseValue` or a percentage is not finite (`NaN` or infinite), or if a
+/// converted shock overflows, and kind `invalid_type` if a number argument is
+/// not a number.
 #[wasm_bindgen(js_name = parameterSpecWithPercentages)]
 pub fn parameter_spec_with_percentages(
     node_id: JsValue,
@@ -243,7 +252,8 @@ pub fn parameter_spec_with_percentages(
             period_id,
             js_f64(&base_value, "baseValue")?,
             js_f64_seq(&pct_range, "pctRange")?,
-        ),
+        )
+        .map_err(to_js_err)?,
     )
 }
 
@@ -278,32 +288,31 @@ pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, 
 ///
 /// # Errors
 ///
-/// Rejects malformed `result_json`, an invalid optional `period` identifier, or
-/// a full-grid run, a scenario that does not identify exactly one perturbed
+/// Rejects malformed `result_json`, an invalid `period` identifier, or a
+/// full-grid run, a scenario that does not identify exactly one perturbed
 /// parameter, an absent unperturbed baseline, a missing target metric or period,
 /// non-finite metric values or impacts, or failure to convert the entries to
 /// JavaScript.
 /// @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key.
 /// @param result_json - Result JSON produced by a prior call.
 /// @param metric_node - Statement metric node identifier selected for the requested analysis.
-/// @param period - Model period label for the requested statement value or calculation.
+/// @param period - Required model period, such as `"2025Q4"`, at which the metric is read in the baseline and every scenario; a shock replaces one forecast cell, so the metric moves only in the shocked period and in later periods whose formulas read it.
 #[wasm_bindgen(js_name = generateTornadoEntries)]
 pub fn generate_tornado_entries(
     result_json: JsValue,
     metric_node: JsValue,
-    period: Option<JsValue>,
+    period: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result_json: &str = &json_text(&result_json, "resultJson")?;
     let metric_node: &str = &js_string(&metric_node, "metricNode")?;
-    let period = js_opt_string(period.as_ref(), "period")?;
+    let period: finstack_quant_core::dates::PeriodId =
+        js_string(&period, "period")?.parse().map_err(to_js_err)?;
     let result: finstack_quant_statements_analytics::analysis::SensitivityResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
-    let period_id: Option<finstack_quant_core::dates::PeriodId> =
-        period.map(|p| p.parse().map_err(to_js_err)).transpose()?;
     let entries = finstack_quant_statements_analytics::analysis::generate_tornado_entries(
         &result,
         metric_node,
-        period_id,
+        period,
     )
     .map_err(to_js_err)?;
     to_js_value(&entries)
@@ -658,11 +667,12 @@ pub fn credit_assessment_report_text(
 ///
 /// # Errors
 ///
-/// Rejects malformed `results_json`, an `period` value that is not a valid
-/// statement period identifier, or failure to serialize the assessment to
+/// Rejects malformed `results_json`, a `period` value that is not a valid
+/// statement period identifier, a `period` at which no node of the results has
+/// a value (kind `validation`), or failure to serialize the assessment to
 /// JavaScript.
 /// @param results_json - Evaluated statement-result JSON.
-/// @param period - Statement period identifier, such as `2025Q4` or `2025A`.
+/// @param period - Statement period identifier, such as `2025Q4`, that is a period of the results in the model's own frequency: `2025` is the annual period, not the last quarter of a quarterly model.
 #[wasm_bindgen(js_name = creditAssessment)]
 pub fn credit_assessment(results_json: JsValue, period: JsValue) -> Result<JsValue, JsValue> {
     let results_json: &str = &json_text(&results_json, "resultsJson")?;
@@ -671,7 +681,8 @@ pub fn credit_assessment(results_json: JsValue, period: JsValue) -> Result<JsVal
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let period: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
     let assessment =
-        finstack_quant_statements_analytics::analysis::CreditAssessment::compute(&results, period);
+        finstack_quant_statements_analytics::analysis::CreditAssessment::compute(&results, period)
+            .map_err(to_js_err)?;
     to_js_value(&assessment)
 }
 

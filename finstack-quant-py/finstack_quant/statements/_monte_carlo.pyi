@@ -322,7 +322,12 @@ class MonteCarloResults:
     @property
     def warnings(self) -> list[dict[str, Any]]:
         """
-        Warnings raised while evaluating paths, in their serde form.
+        Distinct warnings raised in the simulated forecast periods, in their serde form.
+
+        Each warning is reported once however many paths raised it, in a
+        canonical sorted order. Warnings in actual periods are omitted: those
+        periods are not simulated and every path repeats the deterministic
+        evaluation's.
 
         One dict per ``EvalWarning`` with a single snake_case variant key
         (``"division_by_zero"``, ``"non_finite_value"``, ...) whose value holds
@@ -333,8 +338,8 @@ class MonteCarloResults:
         Returns
         -------
         list[dict[str, Any]]
-            One dict per recorded warning; empty when every path evaluated
-            cleanly.
+            One dict per distinct forecast-period warning; empty when every
+            path evaluated its forecast periods cleanly.
 
         Notes
         -----

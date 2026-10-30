@@ -1252,7 +1252,8 @@ class CsaSpec:
         Raises
         ------
         ValueError
-            If ``currency`` is unknown or the embedded registry cannot be
+            If ``currency`` is unknown, ``id`` is empty or whitespace-only,
+            ``collateral_curve`` is empty, or the embedded registry cannot be
             loaded.
 
         Examples
