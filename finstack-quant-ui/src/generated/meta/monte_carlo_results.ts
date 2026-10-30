@@ -861,7 +861,7 @@ export default [
   {
     "path": "#/properties/warnings",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/warnings",
-    "description": "Warnings encountered while evaluating Monte Carlo paths."
+    "description": "Distinct warnings raised in the simulated forecast periods, each\nreported once however many paths raised it, in a canonical sorted\norder. Warnings in actual periods are omitted: those periods are not\nsimulated and every path repeats the deterministic evaluation's."
   },
   {
     "path": "#/properties/warnings/items",

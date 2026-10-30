@@ -877,7 +877,7 @@
       "type": "array"
     },
     "warnings": {
-      "description": "Warnings encountered while evaluating Monte Carlo paths.",
+      "description": "Distinct warnings raised in the simulated forecast periods, each\nreported once however many paths raised it, in a canonical sorted\norder. Warnings in actual periods are omitted: those periods are not\nsimulated and every path repeats the deterministic evaluation's.",
       "items": {
         "$ref": "#/$defs/EvalWarning"
       },

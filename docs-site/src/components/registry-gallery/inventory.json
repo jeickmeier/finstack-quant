@@ -1576,7 +1576,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo.json",
-      "sha256": "c53139c82b0c9759b5eb8529ea5ed0fd5f5c1e33e18e01c8e9f63577f72ea376"
+      "sha256": "50fa244f436b35d1392fe3252e494e4139d3abe74826210f0d31a280d0f9f251"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-breach.json",
