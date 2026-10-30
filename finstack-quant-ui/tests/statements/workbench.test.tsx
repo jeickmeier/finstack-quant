@@ -351,6 +351,7 @@ it("changes a native forecast method and calculates a newly added metric", async
     node_type: "calculated",
     formula_text: "revenue / total_debt",
     value_type: { type: "scalar" },
+    rollup: "formula",
   });
   const nativeResult = new native.Evaluator().evaluate(
     accepted.mock.lastCall![0],
@@ -927,33 +928,35 @@ it("rolls reported quarters up to native annual values with editable methods", a
     canonicalModel(),
     lastCall("rollupStatement").specJson,
   );
-  // A balance now tagged balance_sheet takes the year end, not four quarters' sum.
-  expect(rolled.nodes.debt_at_inception["2024"]).toBe(420_000_000);
-  // Draws and repayments are flows tagged only debt, so they still sum.
-  expect(rolled.nodes.debt_draws["2024"]).toBe(
-    ["2024Q1", "2024Q2", "2024Q3", "2024Q4"]
-      .map((period) => quarterly.nodes.debt_draws[period])
-      // finstack-arith: test-only expected flow total of the native quarterly values
-      .reduce((total, value) => total + value),
-  );
-  // The tag rule's period_end gives debt_opening the fourth quarter's opening;
-  // re-running its formula on annual inputs gives the year's first-quarter one.
+  // Every line's method is declared on its node, so an empty spec agrees with the view.
+  expect(
+    native.statementResultRollup(
+      JSON.stringify(quarterly),
+      canonicalModel(),
+      JSON.stringify({ frequency: "annual" }),
+    ).nodes,
+  ).toEqual(rolled.nodes);
+  // A value declared period_end takes the year end, not four quarters' sum.
+  expect(rolled.nodes.debt_at_inception).toEqual({
+    "2024": 420_000_000,
+    "2025": 420_000_000,
+  });
+  // Draws carry no declaration, so they sum.
+  expect(rolled.nodes.debt_draws).toEqual({
+    "2024": 40_000_000,
+    "2025": 55_000_000,
+  });
+  // debt_opening declares formula: closing debt less the year's flows is the
+  // year's opening balance, not the opening of its fourth quarter.
+  expect(rolled.nodes.debt_opening).toEqual({
+    "2024": 420_000_000,
+    "2025": 415_000_000,
+  });
   expect(rolled.nodes.debt_opening["2024"]).toBe(
-    quarterly.nodes.debt_opening["2024Q4"],
-  );
-  const openingByFormula = native.statementResultRollup(
-    JSON.stringify(quarterly),
-    canonicalModel(),
-    JSON.stringify({
-      frequency: "annual",
-      methods: {
-        ...JSON.parse(lastCall("rollupStatement").specJson).methods,
-        debt_opening: "formula",
-      },
-    }),
-  );
-  expect(openingByFormula.nodes.debt_opening["2024"]).toBe(
     quarterly.nodes.debt_opening["2024Q1"],
+  );
+  expect(rolled.nodes.debt_opening["2025"]).toBe(
+    quarterly.nodes.debt_opening["2025Q1"],
   );
   const revenue = within(income).getByRole("button", {
     name: "Revenue 2024, inspect value",
@@ -981,12 +984,26 @@ it("rolls reported quarters up to native annual values with editable methods", a
     }),
   );
   await userEvent.click(
-    await screen.findByRole("option", { name: "Recalculate formula (ratio)" }),
+    await screen.findByRole("option", { name: "Period end (balance)" }),
   );
   await waitFor(() =>
     expect(
       JSON.parse(lastCall("rollupStatement").specJson).methods.debt_opening,
-    ).toBe("formula"),
+    ).toBe("period_end"),
+  );
+  // Choosing Sum must reach native: an unlisted line would keep its declaration.
+  await userEvent.click(
+    screen.getByRole("combobox", {
+      name: "Debt, closing balance roll-up method",
+    }),
+  );
+  await userEvent.click(
+    await screen.findByRole("option", { name: "Sum (flow)" }),
+  );
+  await waitFor(() =>
+    expect(
+      JSON.parse(lastCall("rollupStatement").specJson).methods.total_debt,
+    ).toBe("sum"),
   );
   fireEvent.click(screen.getByRole("button", { name: "Reported" }));
   await within(
@@ -1012,8 +1029,15 @@ it("seeds the annual methods from a host RollupSpec without asking for the nativ
     await screen.findByRole("region", { name: "Income statement" }),
   ).findByRole("columnheader", { name: "2024 Historical" });
   expect(JSON.parse(lastCall("rollupStatement").specJson).methods).toEqual({
+    cash: "sum",
     total_debt: "period_end",
   });
+  // A line the host spec leaves out keeps its declaration, and the picker says so.
+  expect(
+    screen.getByRole("combobox", {
+      name: "Debt, opening balance roll-up method",
+    }).textContent,
+  ).toContain("Recalculate formula");
   expect(
     call.mock.calls.some(([method]) => method === "defaultRollupSpec"),
   ).toBe(false);

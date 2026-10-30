@@ -8,7 +8,8 @@ use crate::bindings::macros::wire_methods;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::dates::PeriodKind;
-use finstack_quant_statements::evaluator::{RollupMethod, RollupSpec as RustRollupSpec};
+use finstack_quant_statements::evaluator::RollupSpec as RustRollupSpec;
+use finstack_quant_statements::types::RollupMethod;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 

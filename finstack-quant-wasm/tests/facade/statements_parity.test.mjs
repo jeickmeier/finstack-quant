@@ -96,6 +96,16 @@ test('statements matches the cross-host golden', () => {
   const actual = {
     'rollup.default_for': rollupSpec,
     'rollup.annual': rolledUp.nodes,
+    'rollup.empty_spec': statements.statementResultRollup(
+      evaluate(INPUTS.rollup_model),
+      INPUTS.rollup_model,
+      { frequency: 'annual' }
+    ).nodes,
+    'rollup.spec_overrides': statements.statementResultRollup(
+      evaluate(INPUTS.rollup_model),
+      INPUTS.rollup_model,
+      { frequency: 'annual', methods: { cash: 'sum' } }
+    ).nodes.cash,
     'rollup.periods': rolledUp.periods,
     'result.get': orNull(statements.statementResultGet(result, 'profit', Q2)),
     'result.get_missing': orNull(statements.statementResultGet(result, 'nope', Q2)),

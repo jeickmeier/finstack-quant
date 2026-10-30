@@ -372,15 +372,34 @@
         "2025": 460.0
       },
       "score": {
-        "2025": 0.08695652173913043
+        "2025": 0.8395104895104896
       }
     },
     "rollup.default_for": {
       "frequency": "annual",
       "methods": {
         "cash": "period_end",
-        "margin": "formula",
-        "score": "formula"
+        "margin": "formula"
+      }
+    },
+    "rollup.empty_spec": {
+      "cash": {
+        "2025": 40.0
+      },
+      "debt_draws": {
+        "2025": 10.0
+      },
+      "ebitda": {
+        "2025": 115.0
+      },
+      "margin": {
+        "2025": 0.25
+      },
+      "revenue": {
+        "2025": 460.0
+      },
+      "score": {
+        "2025": 0.8395104895104896
       }
     },
     "rollup.periods": [
@@ -390,7 +409,10 @@
         "is_actual": false,
         "start": "2025-01-01"
       }
-    ]
+    ],
+    "rollup.spec_overrides": {
+      "2025": 100.0
+    }
   },
   "statements_analytics": {
     "company_get": [

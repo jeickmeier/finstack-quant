@@ -82,6 +82,12 @@ pub struct NodeSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value_type: Option<NodeValueType>,
 
+    /// How this line rolls up to a coarser reporting frequency. A rollup uses
+    /// its own per-line method first, then this; a line declaring nothing is
+    /// summed. Tags never choose a method.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollup: Option<RollupMethod>,
+
     /// Additional metadata
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub meta: IndexMap<String, serde_json::Value>,
@@ -105,6 +111,7 @@ impl NodeSpec {
             where_text: None,
             tags: Vec::new(),
             value_type: None,
+            rollup: None,
             meta: IndexMap::new(),
         }
     }
@@ -198,6 +205,35 @@ impl NodeSpec {
         self.tags = tags;
         self
     }
+
+    /// Declare how this line rolls up to a coarser reporting frequency.
+    ///
+    /// # Arguments
+    /// * `rollup` - `Sum` for flows, `PeriodEnd` for balances and trailing
+    ///   metrics, `Formula` for ratios; `Formula` needs a formula on this node
+    #[must_use = "builder methods take self by value and return the modified value"]
+    pub fn with_rollup(mut self, rollup: RollupMethod) -> Self {
+        self.rollup = Some(rollup);
+        self
+    }
+}
+
+/// How one node's values combine over the source periods of a target period.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum RollupMethod {
+    /// Sum the source periods: flows such as revenue, expenses and cash flows.
+    /// A missing source value leaves the target value missing.
+    Sum,
+    /// Take the last source period's value: balances such as cash, debt and
+    /// equity, and trailing metrics such as last-twelve-month EBITDA.
+    PeriodEnd,
+    /// Re-evaluate the node's formula (and `where` clause) on the rolled-up
+    /// values: ratios such as margins, leverage and coverage. Time-series
+    /// functions then run at the target frequency, so `lag(x, 1)` is the
+    /// prior target period.
+    Formula,
 }
 
 /// Node computation type.

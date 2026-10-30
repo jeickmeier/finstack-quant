@@ -72,17 +72,14 @@ pub fn statement_result_rollup(
     to_js_value(&result.rollup(&model, &spec).map_err(to_js_err)?)
 }
 
-/// Default rollup methods for a model, chosen from its node tags.
+/// List the rollup methods a model's lines declare.
 ///
 /// Free-function twin of Python `RollupSpec.default_for` (Rust
-/// `RollupSpec::default_for`). The first matching rule decides each node:
-/// tagged `balance_sheet` takes `period_end`; has a formula and is tagged
-/// `ratio` or `metric` takes `formula`; anything else sums and is not listed.
-/// A balance tagged only `debt` sums, because `debt` also marks flows such as
-/// draws and repayments.
-/// @param model - The `FinancialModelSpec` whose node tags and formulas choose the methods (object or JSON); nothing is evaluated.
+/// `RollupSpec::default_for`). Only each node's `rollup` field is read: a line
+/// that declares nothing is not listed and sums, whatever its tags say.
+/// @param model - The `FinancialModelSpec` whose node declarations are listed (object or JSON); nothing is evaluated.
 /// @param frequency - Target frequency stored on the spec: `"quarterly"`, `"semi_annual"` or `"annual"`. `statementResultRollup` checks it against the model's periods.
-/// @returns `RollupSpec` plain object with the `frequency` and the `period_end` and `formula` nodes in model order; `methods` is omitted when no node is listed.
+/// @returns `RollupSpec` plain object with the `frequency` and every declared node with its method in model order; `methods` is omitted when no node declares one.
 ///
 /// # Errors
 ///

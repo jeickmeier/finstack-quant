@@ -16,7 +16,7 @@
 - `MetricMetadata.coordinates`: for each entry of `components`, the `group` and numeric `value` (tenor in years or decimal strike) that order it on its axis. The UI sorts by these instead of parsing labels.
 - `statements::types::ForecastParameters`, published as the `forecast_parameters` schema, states each forecast method's parameters in the wire shape of `ForecastSpec`. The workbench forecast editor renders it with `SchemaForm` instead of a per-method field table, so its field labels are now the Rust parameter names and optional fields appear behind Add.
 
-### Statements: rollup defaults decided in Rust
+### Statements: rollup methods declared per line
 
 #### Changed
 
@@ -24,7 +24,8 @@
 
 #### Added
 
-- `RollupSpec::default_for(&model, frequency)` (Python `RollupSpec.default_for`, WASM `statements.rollupSpecDefaultFor`) chooses rollup methods from node tags: `balance_sheet` takes `period_end`, a formula tagged `ratio` or `metric` takes `formula`, and anything else sums. The statements workbench calls it instead of deciding in JavaScript, so every host starts from the same rule. Rolling up still sums unlisted nodes; a default is only applied when a host asks for it.
+- `NodeSpec.rollup` (Rust `NodeSpec::with_rollup`, Python `NodeSpec(..., rollup=...)`, WASM through the JSON model): each statement line declares its rollup method on the node. `StatementResult::rollup` resolves a line as its entry in `RollupSpec::methods`, then its declaration, then `sum`, so an empty spec gives every host the same numbers. A line resolving to `formula` with no formula is an error naming the node. `RollupMethod` moved from `statements::evaluator` to `statements::types`.
+- `RollupSpec::default_for(&model, frequency)` (Python `RollupSpec.default_for`, WASM `statements.rollupSpecDefaultFor`) lists the declared methods so a host can seed its choices. The tag rule it briefly carried is gone: `balance_sheet`, `ratio` and `metric` tags no longer choose a method anywhere, so a model that relied on them sums until its lines declare `rollup`. The statements workbench no longer decides in JavaScript, and it now sends an explicit `sum` so choosing Sum overrides a line's declaration.
 
 ### Analytics: one path per capability
 
