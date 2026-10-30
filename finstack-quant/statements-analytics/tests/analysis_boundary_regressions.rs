@@ -101,6 +101,7 @@ fn trailing_year_requires_consecutive_calendar_periods() {
         .insert("2025Q4".parse().unwrap(), 800.0);
     assert!(
         CreditAssessment::compute(&results, "2025Q4".parse().unwrap())
+            .unwrap()
             .leverage_ratio
             .is_none()
     );
@@ -112,7 +113,9 @@ fn trailing_year_requires_consecutive_calendar_periods() {
             .insert(p.parse().unwrap(), 100.0);
     }
     assert_eq!(
-        CreditAssessment::compute(&results, "2025Q4".parse().unwrap()).leverage_ratio,
+        CreditAssessment::compute(&results, "2025Q4".parse().unwrap())
+            .unwrap()
+            .leverage_ratio,
         Some(2.0)
     );
 }
@@ -268,4 +271,37 @@ fn dcf_opening_debt_is_available_on_the_inclusive_reporting_date() {
         Some(time::macros::date!(2024 - 12 - 31)),
     );
     assert!(result.unwrap_err().to_string().contains("USD"));
+}
+
+#[test]
+fn credit_assessment_rejects_a_period_outside_the_results() {
+    let model = {
+        let mut model_builder = ModelBuilder::new("quarterly credit");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
+            "total_debt",
+            &(1..=4)
+                .map(|q| {
+                    (
+                        PeriodId::quarter(2025, q).unwrap(),
+                        AmountOrScalar::scalar(300.0),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        );
+        model_builder.build().unwrap()
+    };
+    let results = Evaluator::new().evaluate(&model).unwrap();
+    assert!(CreditAssessment::compute(&results, PeriodId::quarter(2025, 4).unwrap()).is_ok());
+    // A period past the model and an annual id on a quarterly model are both
+    // unknown: neither may come back as an all-null or truncated assessment.
+    for period in [PeriodId::quarter(2030, 1).unwrap(), PeriodId::annual(2025)] {
+        let error = CreditAssessment::compute(&results, period).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("is not a period of the statement results"),
+            "{error}"
+        );
+    }
 }

@@ -312,7 +312,9 @@ def credit_assessment(results: Any, period: str) -> CreditAssessment:
         ``total_debt``, ``interest_expense`` and ``free_cash_flow`` nodes.
     period : str
         Period identifier for the assessment (``"2025Q4"``, ``"2025M03"``,
-        ``"FY2025"``). This is a ``PeriodId``, not a date.
+        ``"FY2025"``). This is a ``PeriodId``, not a date, and it must be a
+        period of ``results`` in the model's own frequency: ``"2025"`` is the
+        annual period, not the last quarter of a quarterly model.
 
     Returns
     -------
@@ -328,8 +330,8 @@ def credit_assessment(results: Any, period: str) -> CreditAssessment:
     Raises
     ------
     ValueError
-        If ``period`` is not a valid period identifier or ``results`` is
-        malformed JSON.
+        If ``period`` is not a valid period identifier, no node of ``results``
+        has a value at ``period``, or ``results`` is malformed JSON.
 
     Examples
     --------

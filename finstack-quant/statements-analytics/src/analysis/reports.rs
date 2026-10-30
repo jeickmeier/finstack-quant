@@ -382,9 +382,14 @@ pub struct CreditAssessmentPoint {
 /// # use finstack_quant_statements::evaluator::StatementResult;
 /// # use finstack_quant_core::dates::PeriodId;
 /// # use finstack_quant_statements_analytics::analysis::CreditAssessment;
-/// # let results = StatementResult::new();
-/// let assessment = CreditAssessment::compute(&results, PeriodId::quarter(2025, 4).expect("valid period fixture"));
+/// let q4 = PeriodId::quarter(2025, 4)?;
+/// let mut results = StatementResult::new();
+/// results.nodes.entry("total_debt".into()).or_default().insert(q4, 300.0);
+/// let assessment = CreditAssessment::compute(&results, q4)?;
 /// assert_eq!(assessment.period, "2025Q4");
+/// // A period the results do not contain is an error, not a null assessment.
+/// assert!(CreditAssessment::compute(&results, PeriodId::annual(2025)).is_err());
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -417,7 +422,28 @@ impl CreditAssessment {
     /// * `results` - Evaluated statement values with monetary/scalar metadata
     ///   preserved so ratios only compare like units and currencies.
     /// * `period` - Inclusive reporting period ending each trailing-year window.
-    pub fn compute(results: &StatementResult, period: PeriodId) -> Self {
+    ///   It must be a period of `results` (a period at which some node has a
+    ///   value), in the model's own frequency: `2025` is the annual period, not
+    ///   the last quarter of a quarterly model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when no node of `results` has a value at
+    /// `period`, so an unknown or wrong-frequency period never yields an
+    /// all-null assessment or a series truncated at a foreign period.
+    pub fn compute(
+        results: &StatementResult,
+        period: PeriodId,
+    ) -> finstack_quant_statements::Result<Self> {
+        if !results
+            .nodes
+            .values()
+            .any(|periods| periods.contains_key(&period))
+        {
+            return Err(finstack_quant_statements::Error::invalid_input(format!(
+                "Credit assessment period '{period}' is not a period of the statement results"
+            )));
+        }
         let mut periods: std::collections::BTreeSet<PeriodId> = std::collections::BTreeSet::new();
         for node in ["ebitda", "total_debt", "interest_expense", "free_cash_flow"] {
             if let Some(series) = results.get_node(node) {
@@ -441,7 +467,7 @@ impl CreditAssessment {
             })
             .collect();
 
-        Self {
+        Ok(Self {
             period: period.to_string(),
             leverage_ratio: leverage_at(results, &period),
             interest_coverage: interest_coverage_at(results, &period),
@@ -449,7 +475,7 @@ impl CreditAssessment {
                 .get("free_cash_flow", &period)
                 .filter(|value| value.is_finite()),
             series,
-        }
+        })
     }
 }
 
@@ -629,7 +655,7 @@ mod tests {
             );
 
         let period = PeriodId::quarter(2025, 4).expect("valid period fixture");
-        let assessment = CreditAssessment::compute(&results, period);
+        let assessment = CreditAssessment::compute(&results, period).expect("known period");
 
         assert_eq!(assessment.period, period.to_string());
         assert_eq!(assessment.leverage_ratio, Some(3.0));
@@ -662,7 +688,8 @@ mod tests {
         let assessment = CreditAssessment::compute(
             &results,
             PeriodId::quarter(2025, 4).expect("valid period fixture"),
-        );
+        )
+        .expect("known period");
 
         let q4 = assessment
             .series
@@ -774,7 +801,7 @@ mod tests {
             .entry("total_debt".into())
             .or_default()
             .insert(at, 4.0);
-        let assessment = CreditAssessment::compute(&results, at);
+        let assessment = CreditAssessment::compute(&results, at).expect("known period");
         assert_eq!(assessment.leverage_ratio, Some(1.0));
         assert_eq!(assessment.interest_coverage, Some(2.0));
         results
@@ -782,7 +809,12 @@ mod tests {
             .get_mut("ebitda")
             .expect("ebitda")
             .swap_remove(&"FY2024Q4".parse::<PeriodId>().expect("quarter"));
-        assert_eq!(CreditAssessment::compute(&results, at).leverage_ratio, None);
+        assert_eq!(
+            CreditAssessment::compute(&results, at)
+                .expect("known period")
+                .leverage_ratio,
+            None
+        );
     }
 
     #[test]
@@ -804,7 +836,9 @@ mod tests {
                 .or_default()
                 .insert(at, f64::from(days));
             assert_eq!(
-                CreditAssessment::compute(&results, at).leverage_ratio,
+                CreditAssessment::compute(&results, at)
+                    .expect("known period")
+                    .leverage_ratio,
                 Some(1.0)
             );
             // A gap near the beginning must not be replaced with a shorter
@@ -814,7 +848,12 @@ mod tests {
                 .get_mut("ebitda")
                 .expect("ebitda")
                 .swap_remove(&PeriodId::day(year, 1).expect("day"));
-            assert_eq!(CreditAssessment::compute(&results, at).leverage_ratio, None);
+            assert_eq!(
+                CreditAssessment::compute(&results, at)
+                    .expect("known period")
+                    .leverage_ratio,
+                None
+            );
         }
     }
 

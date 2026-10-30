@@ -32574,8 +32574,8 @@ export interface StatementsAnalyticsNamespace {
    * Returns a structured JavaScript object.
    * @returns Credit-assessment result object from the statement results.
    * @param resultsJson - Evaluated statement-result JSON.
-   * @param period - Statement period identifier, such as `2025Q4` or `2025A`.
-   * @throws Error - Rejects malformed `results_json`, an `period` value that is not a valid statement period identifier, or failure to serialize the assessment to JavaScript.
+   * @param period - Statement period identifier, such as `2025Q4`, that is a period of the results in the model's own frequency: `2025` is the annual period, not the last quarter of a quarterly model.
+   * @throws Error - Rejects malformed `results_json`, a `period` value that is not a valid statement period identifier, a `period` at which no node of the results has a value (kind `validation`), or failure to serialize the assessment to JavaScript.
    */
   creditAssessment(resultsJson: JsonInput, period: string): CreditAssessment;
   /**
