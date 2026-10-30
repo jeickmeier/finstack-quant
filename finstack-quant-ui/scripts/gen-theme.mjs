@@ -2,8 +2,6 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import prettier from "prettier";
-import { isDeepStrictEqual } from "node:util";
-import { withoutMetadata } from "./registry-metadata.mjs";
 import { mergeBrand, validateTokens } from "./check-tokens.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 export function themeOutput(tokens) {
@@ -458,41 +456,24 @@ export async function generateBrand(brandPath, outputPath) {
   );
   return { name: brand.name, tokens };
 }
-export async function generateTheme(check = false) {
-  const tokens = await readTokens();
-  const { css, item } = themeOutput(tokens);
-  const outputs = [
+/** Build default theme artifacts without writing the registry or stylesheet. */
+export async function themeArtifacts() {
+  const { css, item } = themeOutput(await readTokens());
+  return new Map([
     [
       "registry/theme/finstack-theme/theme.css",
       await prettier.format(css, { parser: "css" }),
     ],
     [
       "registry/theme/registry.json",
-      await prettier.format(
-        JSON.stringify({
-          $schema: "https://ui.shadcn.com/schema/registry.json",
-          items: [item],
-        }),
-        { parser: "json" },
-      ),
+      {
+        $schema: "https://ui.shadcn.com/schema/registry.json",
+        items: [item],
+      },
     ],
-  ];
-  for (const [file, content] of outputs) {
-    if (check) {
-      const actual = await readFile(path.join(root, file), "utf8");
-      if (
-        file.endsWith(".json")
-          ? !isDeepStrictEqual(
-              withoutMetadata(JSON.parse(actual)),
-              JSON.parse(content),
-            )
-          : actual !== content
-      )
-        throw new Error(`Theme drift: ${file}`);
-    } else await writeFile(path.join(root, file), content);
-  }
-  return outputs;
+  ]);
 }
+
 if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
@@ -520,7 +501,8 @@ if (
       }.`,
     );
   } else {
-    await generateTheme(args.includes("--check"));
-    console.log("Checked theme generation.");
+    throw new Error(
+      "Default theme generation is owned by scripts/gen-registry.mjs; use --brand <brand.json> --out <theme.css> for a custom brand.",
+    );
   }
 }

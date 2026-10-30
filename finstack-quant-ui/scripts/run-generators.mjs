@@ -3,11 +3,9 @@ import { fileURLToPath } from "node:url";
 
 const scripts = [
   "gen.mjs",
-  "gen-registry.mjs",
-  "gen-theme.mjs",
   "encoding-report.mjs",
   "catalogue-docs.mjs",
-  "gen-metadata.mjs",
+  "gen-registry.mjs",
   "gen-gallery.mjs",
 ];
 const check = process.argv.includes("--check") ? ["--check"] : [];

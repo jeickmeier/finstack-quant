@@ -55,10 +55,3 @@ export function itemMetadata(item, graph, inputs) {
     },
   };
 }
-/** Base generators own content; the final metadata pass owns these two derived fields and the WASM pin. */
-export function withoutMetadata(registry) {
-  return {
-    ...registry,
-    items: registry.items.map(({ meta, categories, ...item }) => item),
-  };
-}
