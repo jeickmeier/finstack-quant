@@ -5,7 +5,7 @@ use finstack_quant_statements::{
     types::{AmountOrScalar, FinancialModelSpec, ForecastMethod, ForecastSpec},
 };
 use finstack_quant_statements_analytics::analysis::{
-    run_sensitivity, ParameterSpec, SensitivityConfig, SensitivityMode,
+    generate_tornado_entries, run_sensitivity, ParameterSpec, SensitivityConfig, SensitivityMode,
 };
 
 fn quarter(q: u8) -> PeriodId {
@@ -53,4 +53,29 @@ fn sensitivity_shock_is_a_point_override_of_one_forecast_cell() {
     let cumulative_delta = shocked.get("cumulative_revenue", &quarter(3)).unwrap()
         - baseline.get("cumulative_revenue", &quarter(3)).unwrap();
     assert!((cumulative_delta + 55.0).abs() < 1e-9, "{cumulative_delta}");
+}
+
+/// The tornado period is explicit: the same shock is a full swing in the
+/// period it replaces and no swing in a period it cannot reach, so no default
+/// period (the first baseline period used to be the default) is meaningful.
+#[test]
+fn tornado_reads_the_metric_at_the_requested_period() {
+    let model = growth_model();
+    let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
+    config.add_parameter(ParameterSpec::new(
+        "revenue",
+        quarter(2),
+        105.0,
+        vec![94.5, 115.5],
+    ));
+    config.add_target_metric("cumulative_revenue");
+    let result = run_sensitivity(&model, &config).unwrap();
+
+    let shocked = generate_tornado_entries(&result, "cumulative_revenue", quarter(4)).unwrap();
+    assert_eq!(shocked[0].parameter_id, "revenue@2025Q2");
+    assert!((shocked[0].downside + 10.5).abs() < 1e-9, "{shocked:?}");
+    assert!((shocked[0].upside - 10.5).abs() < 1e-9, "{shocked:?}");
+
+    let actual = generate_tornado_entries(&result, "cumulative_revenue", quarter(1)).unwrap();
+    assert_eq!((actual[0].downside, actual[0].upside), (0.0, 0.0));
 }

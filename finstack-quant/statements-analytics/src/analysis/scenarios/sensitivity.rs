@@ -433,12 +433,15 @@ pub(crate) fn descending_f64(lhs: f64, rhs: f64) -> std::cmp::Ordering {
 ///
 /// * `result`      - Completed sensitivity analysis result.
 /// * `metric_node` - Node identifier for the metric to inspect.
-/// * `period_hint` - Optional period to look up; if `None`, uses the first
-///   available baseline period for the node in every scenario.
+/// * `period` - Model period at which the metric is read in the baseline and
+///   every scenario. It is required because no default is meaningful: a shock
+///   replaces one forecast cell (see [`run_sensitivity`]), so the metric moves
+///   only in the shocked period and in later periods whose formulas read it,
+///   and stays unchanged everywhere else (for example in actual periods).
 pub fn generate_tornado_entries(
     result: &SensitivityResult,
     metric_node: &str,
-    period_hint: Option<PeriodId>,
+    period: PeriodId,
 ) -> Result<Vec<TornadoEntry>> {
     if result.config.mode == SensitivityMode::FullGrid {
         return Err(Error::invalid_input("Tornado entries require diagonal or tornado sensitivity results; full-grid scenarios confound parameter impacts"));
@@ -455,9 +458,6 @@ pub fn generate_tornado_entries(
     let baseline = result.baseline.as_ref().ok_or_else(|| {
         Error::invalid_input("Tornado entries require the unperturbed sensitivity baseline")
     })?;
-    let period = period_hint
-        .or_else(|| baseline.nodes.get(metric_node)?.keys().next().copied())
-        .ok_or_else(|| Error::invalid_input(format!("Missing tornado metric '{metric_node}'")))?;
     let base = extract_metric_value(baseline, metric_node, period)?;
     let mut entries = Vec::new();
 
@@ -813,7 +813,7 @@ mod tests {
             scenarios,
             baseline: Some(make_results(100.0)),
         };
-        assert!(generate_tornado_entries(&result, &metric, Some(period)).is_err());
+        assert!(generate_tornado_entries(&result, &metric, period).is_err());
     }
 
     #[test]
@@ -873,8 +873,8 @@ mod tests {
             "tornado runs must carry the unperturbed baseline"
         );
 
-        let entries = generate_tornado_entries(&result, "gross_profit", Some(period))
-            .expect("tornado entries");
+        let entries =
+            generate_tornado_entries(&result, "gross_profit", period).expect("tornado entries");
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].parameter_id, "revenue@2025Q1");
         // Baseline gross profit = 60k; downside 54k, upside 66k.
@@ -1030,7 +1030,7 @@ mod tests {
             ));
         }
         let result = run_sensitivity(&model, &config).expect("sensitivity");
-        let entries = generate_tornado_entries(&result, "revenue", Some(first)).expect("entries");
+        let entries = generate_tornado_entries(&result, "revenue", first).expect("entries");
         let ids: Vec<_> = entries
             .iter()
             .map(|entry| entry.parameter_id.as_str())
@@ -1177,10 +1177,10 @@ mod tests {
             .map(|scenario| scenario.results.get("profit", &period).expect("profit"))
             .collect();
         assert_eq!(profits, vec![80.0, 60.0, 100.0, 80.0]);
-        assert!(generate_tornado_entries(&result, "profit", Some(period)).is_err());
+        assert!(generate_tornado_entries(&result, "profit", period).is_err());
         // Public JSON results can mislabel joint shocks as one-at-a-time runs.
         result.config.mode = SensitivityMode::Diagonal;
-        let error = generate_tornado_entries(&result, "profit", Some(period))
+        let error = generate_tornado_entries(&result, "profit", period)
             .expect_err("joint shocks must not masquerade as individual impacts");
         assert!(error.to_string().contains("exactly one"));
     }
@@ -1192,7 +1192,8 @@ mod tests {
             scenarios: vec![],
             baseline: None,
         };
-        assert!(generate_tornado_entries(&result, "profit", None).is_err());
+        let period = PeriodId::quarter(2025, 1).expect("period");
+        assert!(generate_tornado_entries(&result, "profit", period).is_err());
     }
 
     #[test]
@@ -1232,8 +1233,8 @@ mod tests {
             }
         };
         let mut result = make_result(100.0, 90.0, 110.0);
-        assert!(generate_tornado_entries(&result, "missing", None).is_err());
-        assert!(generate_tornado_entries(&result, "profit", Some(later_period)).is_err());
+        assert!(generate_tornado_entries(&result, "missing", period).is_err());
+        assert!(generate_tornado_entries(&result, "profit", later_period).is_err());
         result.scenarios[0]
             .results
             .nodes
@@ -1246,9 +1247,9 @@ mod tests {
             .get_mut("profit")
             .expect("metric")
             .insert(later_period, 90.0);
-        // An omitted period uses the baseline's first period consistently;
+        // A scenario missing the metric at the requested period is rejected;
         // it must not compare different periods across scenarios.
-        assert!(generate_tornado_entries(&result, "profit", None).is_err());
+        assert!(generate_tornado_entries(&result, "profit", period).is_err());
 
         for (base, minimum, maximum) in [
             (f64::NAN, 90.0, 110.0),
@@ -1257,13 +1258,15 @@ mod tests {
             (-f64::MAX, f64::MAX, f64::MAX),
             (0.0, -f64::MAX, f64::MAX),
         ] {
-            assert!(
-                generate_tornado_entries(&make_result(base, minimum, maximum), "profit", None)
-                    .is_err()
-            );
+            assert!(generate_tornado_entries(
+                &make_result(base, minimum, maximum),
+                "profit",
+                period
+            )
+            .is_err());
         }
         result.scenarios.clear();
-        assert!(generate_tornado_entries(&result, "profit", None)
+        assert!(generate_tornado_entries(&result, "profit", period)
             .expect("no varied parameter")
             .is_empty());
     }

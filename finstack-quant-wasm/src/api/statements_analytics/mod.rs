@@ -285,32 +285,31 @@ pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, 
 ///
 /// # Errors
 ///
-/// Rejects malformed `result_json`, an invalid optional `period` identifier, or
-/// a full-grid run, a scenario that does not identify exactly one perturbed
+/// Rejects malformed `result_json`, an invalid `period` identifier, or a
+/// full-grid run, a scenario that does not identify exactly one perturbed
 /// parameter, an absent unperturbed baseline, a missing target metric or period,
 /// non-finite metric values or impacts, or failure to convert the entries to
 /// JavaScript.
 /// @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key.
 /// @param result_json - Result JSON produced by a prior call.
 /// @param metric_node - Statement metric node identifier selected for the requested analysis.
-/// @param period - Model period label for the requested statement value or calculation.
+/// @param period - Required model period, such as `"2025Q4"`, at which the metric is read in the baseline and every scenario; a shock replaces one forecast cell, so the metric moves only in the shocked period and in later periods whose formulas read it.
 #[wasm_bindgen(js_name = generateTornadoEntries)]
 pub fn generate_tornado_entries(
     result_json: JsValue,
     metric_node: JsValue,
-    period: Option<JsValue>,
+    period: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result_json: &str = &json_text(&result_json, "resultJson")?;
     let metric_node: &str = &js_string(&metric_node, "metricNode")?;
-    let period = js_opt_string(period.as_ref(), "period")?;
+    let period: finstack_quant_core::dates::PeriodId =
+        js_string(&period, "period")?.parse().map_err(to_js_err)?;
     let result: finstack_quant_statements_analytics::analysis::SensitivityResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
-    let period_id: Option<finstack_quant_core::dates::PeriodId> =
-        period.map(|p| p.parse().map_err(to_js_err)).transpose()?;
     let entries = finstack_quant_statements_analytics::analysis::generate_tornado_entries(
         &result,
         metric_node,
-        period_id,
+        period,
     )
     .map_err(to_js_err)?;
     to_js_value(&entries)
