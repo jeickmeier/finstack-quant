@@ -31,7 +31,8 @@ use crate::{
     credit::scoring::AltmanZScoreInput, credit::scoring::OhlsonOScoreInput,
     credit::scoring::ScoringResult, credit::scoring::ZmijewskiInput, credit::CreditState,
     credit::DynamicRecoverySpec, credit::EndogenousHazardSpec, credit::MertonModel,
-    credit::RatingFactorTable, credit::SimulatedPaths, credit::ToggleExerciseModel,
+    credit::MertonReport, credit::MertonReportRequest, credit::RatingFactorTable,
+    credit::SimulatedPaths, credit::ToggleExerciseModel,
     fourier::characteristic_function::BlackScholesCf,
     fourier::characteristic_function::MertonJumpCf,
     fourier::characteristic_function::VarianceGammaCf, fourier::cos::CosConfig,
@@ -401,6 +402,20 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "merton_model",
         Input,
         "Merton structural credit model."
+    ),
+    finstack_quant_core::schema_artifact!(
+        MertonReport,
+        "models",
+        "merton_report",
+        Output,
+        "One-call Merton report: model, term structure, grades and CDS terms."
+    ),
+    finstack_quant_core::schema_artifact!(
+        MertonReportRequest,
+        "models",
+        "merton_report_request",
+        Input,
+        "Inputs of a Merton report: model source, horizons, CDS maturity and recovery."
     ),
     finstack_quant_core::schema_artifact!(
         MigrationSimulator,

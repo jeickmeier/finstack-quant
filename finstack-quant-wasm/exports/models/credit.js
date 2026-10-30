@@ -16,6 +16,7 @@ export const credit = {
   EndogenousHazardSpec: wasm.EndogenousHazardSpec,
   ToggleExerciseModel: wasm.ToggleExerciseModel,
   RatingFactorTable: wasm.RatingFactorTable,
+  mertonReport: wasm.mertonReport,
   moodysWarfFactor: wasm.moodysWarfFactor,
   // Submodules (Rust `credit::{lgd, liability_management, migration, pd,
   // recovery_waterfall, scoring}`)

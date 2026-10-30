@@ -1,0 +1,279 @@
+{
+  "$defs": {
+    "AssetDynamics": {
+      "description": "Asset dynamics specification for the Merton model.\n\nControls the stochastic process assumed for the firm's asset value.",
+      "oneOf": [
+        {
+          "const": "geometric_brownian",
+          "description": "Standard geometric Brownian motion (lognormal diffusion).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Jump-diffusion process (Merton 1976) with Poisson jumps.",
+          "properties": {
+            "jump_diffusion": {
+              "additionalProperties": false,
+              "properties": {
+                "jump_intensity": {
+                  "description": "Poisson jump arrival intensity (jumps per year).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "jump_mean": {
+                  "description": "Mean log-jump size.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "jump_vol": {
+                  "description": "Volatility of log-jump size.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "jump_intensity",
+                "jump_mean",
+                "jump_vol"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "jump_diffusion"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "CreditGrades model extension with stochastic-barrier survival adjustment.\n\n`default_probability()` applies the standard approximate CreditGrades\nsurvival function using the log-barrier volatility parameter.",
+          "properties": {
+            "credit_grades": {
+              "additionalProperties": false,
+              "properties": {
+                "barrier_uncertainty": {
+                  "description": "Log-normal barrier volatility `λ`: the standard deviation of the\nnatural log of the default barrier (Finger et al. 2002,\n\"CreditGrades Technical Document\"). Despite the field name, this\nis *not* a generic uncertainty scalar — it is the lognormal\ndispersion of the global recovery rate, entering the survival\nformula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "mean_recovery": {
+                  "description": "Mean recovery rate at default.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "barrier_uncertainty",
+                "mean_recovery"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "credit_grades"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MertonBarrierType": {
+      "description": "Barrier monitoring type for default determination.",
+      "oneOf": [
+        {
+          "const": "terminal",
+          "description": "Default only assessed at maturity (classic Merton).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Continuous barrier monitoring (Black-Cox extension).",
+          "properties": {
+            "first_passage": {
+              "additionalProperties": false,
+              "properties": {
+                "barrier_growth_rate": {
+                  "description": "Growth rate of the default barrier over time.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "barrier_growth_rate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "first_passage"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MertonModel": {
+      "additionalProperties": false,
+      "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. Unknown fields are rejected.",
+      "properties": {
+        "asset_value": {
+          "description": "Current firm asset value `V_0`, in the issuer's reporting currency.\nStrictly positive.",
+          "format": "double",
+          "type": "number"
+        },
+        "asset_vol": {
+          "description": "Asset volatility `sigma_V`, annualized and expressed as a decimal\nfraction (`0.25` is 25%). Strictly positive.",
+          "format": "double",
+          "type": "number"
+        },
+        "barrier_type": {
+          "$ref": "#/$defs/MertonBarrierType",
+          "description": "Whether default is tested only at maturity or continuously over the\nlife of the debt."
+        },
+        "debt_barrier": {
+          "description": "Default barrier `B`, the debt face value the asset value is compared\nagainst. Strictly positive and in the same currency as `asset_value`.",
+          "format": "double",
+          "type": "number"
+        },
+        "dynamics": {
+          "$ref": "#/$defs/AssetDynamics",
+          "description": "Stochastic process governing the asset value."
+        },
+        "payout_rate": {
+          "description": "Continuous payout (dividend) rate on assets, as a decimal fraction.\nReduces the drift of the asset process under the risk-neutral measure.",
+          "format": "double",
+          "type": "number"
+        },
+        "risk_free_rate": {
+          "description": "Continuously compounded risk-free rate `r`, as a decimal fraction.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "asset_value",
+        "asset_vol",
+        "debt_barrier",
+        "risk_free_rate",
+        "payout_rate",
+        "barrier_type",
+        "dynamics"
+      ],
+      "type": "object"
+    },
+    "MertonReportSource": {
+      "description": "Where a [`merton_report`] takes its model from.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A model already specified; it is used as supplied.",
+          "properties": {
+            "kind": {
+              "const": "model",
+              "type": "string"
+            },
+            "model": {
+              "$ref": "#/$defs/MertonModel",
+              "description": "The canonical model."
+            }
+          },
+          "required": [
+            "kind",
+            "model"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A model calibrated from equity with [`MertonModel::from_equity`], using\nthe KMV default point as the debt barrier.",
+          "properties": {
+            "equity_value": {
+              "description": "Market value of equity, in the firm's monetary unit.",
+              "format": "double",
+              "type": "number"
+            },
+            "equity_vol": {
+              "description": "Annualized equity-return volatility, as a decimal.",
+              "format": "double",
+              "type": "number"
+            },
+            "kind": {
+              "const": "equity",
+              "type": "string"
+            },
+            "long_term_debt": {
+              "description": "Liabilities maturing beyond one year.",
+              "format": "double",
+              "type": "number"
+            },
+            "maturity": {
+              "description": "Calibration horizon in years.",
+              "format": "double",
+              "type": "number"
+            },
+            "payout_rate": {
+              "description": "Continuous payout yield on assets, as a decimal.",
+              "format": "double",
+              "type": "number"
+            },
+            "risk_free_rate": {
+              "description": "Continuously compounded risk-free rate, as a decimal.",
+              "format": "double",
+              "type": "number"
+            },
+            "short_term_debt": {
+              "description": "Liabilities due within one year; a total-debt barrier is this with\nno long-term debt.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "equity_value",
+            "equity_vol",
+            "short_term_debt",
+            "long_term_debt",
+            "risk_free_rate",
+            "payout_rate",
+            "maturity"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/merton_report_request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Inputs of a Merton report: model source, horizons, CDS maturity and recovery.",
+  "properties": {
+    "horizons": {
+      "description": "Horizons in years for the term structure, in display order; each must be\nfinite and strictly positive.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "maturity": {
+      "description": "CDS and implied-equity maturity in years.",
+      "format": "double",
+      "type": "number"
+    },
+    "recovery": {
+      "description": "Recovery at default as a decimal fraction of par, for the implied and\nCDS spreads.",
+      "format": "double",
+      "type": "number"
+    },
+    "source": {
+      "$ref": "#/$defs/MertonReportSource",
+      "description": "Where the model comes from."
+    }
+  },
+  "required": [
+    "source",
+    "horizons",
+    "maturity",
+    "recovery"
+  ],
+  "title": "MertonReportRequest",
+  "type": "object"
+}

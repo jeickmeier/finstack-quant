@@ -2014,9 +2014,9 @@
     {
       "id": "merton-calculator",
       "route": "returned-model",
-      "convention": "Returned models.credit.MertonModel results of a model from canonical MertonModel JSON (natively validated) or from a KMV equity calibration (kmvDefaultPoint then fromEquity): default probabilities, distances to default, implied spreads (recovery as a fraction of par) and debt spreads per requested horizon, the CDS par spread and implied equity at the requested maturity, and models.credit.pd.MasterScale.defaultCalibration grades of the default probabilities. Decimals as returned (spreads per year, probabilities and volatilities as fractions), no unit inferred; a measure Rust rejects for the model shows its native error beside the rest.",
+      "convention": "Returned models.credit.MertonModel results of a model from canonical MertonModel JSON (natively validated) or from a KMV equity calibration Rust performs: default probabilities, distances to default, implied spreads (recovery as a fraction of par) and debt spreads per requested horizon, the CDS par spread and implied equity at the requested maturity, and models.credit.pd.MasterScale.defaultCalibration grades of the default probabilities. Decimals as returned (spreads per year, probabilities and volatilities as fractions), no unit inferred; a measure Rust rejects for the model shows its native error beside the rest.",
       "api": {
-        "name": "models.credit.MertonModel#defaultProbabilities",
+        "name": "models.credit.mertonReport",
         "source": "finstack-quant-wasm/index.d.ts",
         "owner": "MertonModel",
         "member": "defaultProbabilities",

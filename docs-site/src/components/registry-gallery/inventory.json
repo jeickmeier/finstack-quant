@@ -1468,7 +1468,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/models/credit/merton.json",
-      "sha256": "48b77a5c7a3318e00338c55d4a90b79a5e006e3a5b6754bb814ef92357aaf981"
+      "sha256": "df2c9c9525f842227bc207a537e9230a43dd4a69b1354a8e29208952b7631a4f"
     },
     {
       "path": "finstack-quant-ui/tests/models/credit/scorecard.json",

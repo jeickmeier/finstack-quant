@@ -2579,6 +2579,7 @@
       "ToggleExerciseModel",
       "lgd",
       "liabilityManagement",
+      "mertonReport",
       "migration",
       "moodysWarfFactor",
       "pd",
@@ -2678,6 +2679,9 @@
     "statics": ["defaultCalibration", "fromJson", "fromRegistryId"],
     "methods": ["free", "getFactor", "toJson"],
     "getters": ["agency", "defaultFactor", "methodology"]
+  },
+  "models.credit.mertonReport": {
+    "kind": "function"
   },
   "models.credit.moodysWarfFactor": {
     "kind": "function"

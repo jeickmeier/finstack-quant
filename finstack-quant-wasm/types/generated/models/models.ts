@@ -1072,6 +1072,49 @@ export type MertonBarrierType =
       };
     };
 /**
+ * Where a [`merton_report`] takes its model from.
+ */
+export type MertonReportSource =
+  | {
+      kind: "model";
+      /**
+       * The canonical model.
+       */
+      model: MertonModel;
+    }
+  | {
+      /**
+       * Market value of equity, in the firm's monetary unit.
+       */
+      equity_value: number;
+      /**
+       * Annualized equity-return volatility, as a decimal.
+       */
+      equity_vol: number;
+      kind: "equity";
+      /**
+       * Liabilities maturing beyond one year.
+       */
+      long_term_debt: number;
+      /**
+       * Calibration horizon in years.
+       */
+      maturity: number;
+      /**
+       * Continuous payout yield on assets, as a decimal.
+       */
+      payout_rate: number;
+      /**
+       * Continuously compounded risk-free rate, as a decimal.
+       */
+      risk_free_rate: number;
+      /**
+       * Liabilities due within one year; a total-debt barrier is this with
+       * no long-term debt.
+       */
+      short_term_debt: number;
+    };
+/**
  * Records how a captured dataset was selected from the full simulation.
  */
 export type PathSamplingMethod =
@@ -4222,6 +4265,19 @@ export interface MasterScaleResult {
   [k: string]: unknown;
 }
 /**
+ * Implied equity of a Merton model at the report's maturity.
+ */
+export interface MertonImpliedEquity {
+  /**
+   * Implied market value of equity, in the firm's monetary unit.
+   */
+  value: number;
+  /**
+   * Implied annualized equity volatility, as a decimal.
+   */
+  vol: number;
+}
+/**
  * Merton (1976) jump-diffusion characteristic function.
  */
 export interface MertonJumpCf {
@@ -4288,6 +4344,88 @@ export interface MertonModel {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
+}
+/**
+ * One-call Merton report: model, term structure, grades and CDS terms.
+ */
+export interface MertonReport {
+  /**
+   * [`MertonModel::cds_par_spread`] at `maturity`, decimal per year.
+   */
+  cds_par_spread?: number | null;
+  /**
+   * [`MertonModel::debt_spread`] per horizon, decimal per year.
+   */
+  debt_spread?: number[] | null;
+  /**
+   * KMV default point of an equity source; `None` for a supplied model.
+   */
+  default_point?: number | null;
+  /**
+   * Default probability per horizon, as a decimal.
+   */
+  default_probabilities: number[];
+  /**
+   * Distance to default per horizon, in standard deviations.
+   */
+  distance_to_default: number[];
+  /**
+   * Message of each rejected measure, by field name; empty when all computed.
+   */
+  errors: {
+    [k: string]: string;
+  };
+  /**
+   * Default-calibration master-scale grade of each default probability.
+   */
+  grades: MasterScaleResult[];
+  /**
+   * The requested horizons in years, in request order.
+   */
+  horizons: number[];
+  /**
+   * [`MertonModel::implied_equity`] at `maturity`.
+   */
+  implied_equity?: MertonImpliedEquity | null;
+  /**
+   * [`MertonModel::implied_spread`] per horizon, decimal per year.
+   */
+  implied_spread?: number[] | null;
+  /**
+   * The requested CDS and implied-equity maturity in years.
+   */
+  maturity: number;
+  /**
+   * The model the report was computed from.
+   */
+  model: MertonModel;
+  /**
+   * The requested recovery, as a decimal fraction of par.
+   */
+  recovery: number;
+}
+/**
+ * Inputs of a Merton report: model source, horizons, CDS maturity and recovery.
+ */
+export interface MertonReportRequest {
+  /**
+   * Horizons in years for the term structure, in display order; each must be
+   * finite and strictly positive.
+   */
+  horizons: number[];
+  /**
+   * CDS and implied-equity maturity in years.
+   */
+  maturity: number;
+  /**
+   * Recovery at default as a decimal fraction of par, for the implied and
+   * CDS spreads.
+   */
+  recovery: number;
+  /**
+   * Where the model comes from.
+   */
+  source: MertonReportSource;
 }
 /**
  * Simulator for generating rating paths from a generator matrix.

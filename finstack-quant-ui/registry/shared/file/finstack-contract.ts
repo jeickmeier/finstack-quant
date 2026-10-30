@@ -574,66 +574,10 @@ export interface BenchmarkTickerReport extends Omit<
 export interface BenchmarkReport extends Omit<BenchmarkReportData, "tickers"> {
   tickers: BenchmarkTickerReport[];
 }
-/** Where a Merton report's model comes from. */
-export type MertonSource =
-  | {
-      /** models.credit.MertonModel.fromJson of canonical MertonModel JSON. */
-      readonly kind: "model";
-      readonly json: string;
-    }
-  | {
-      /** MertonModel.kmvDefaultPoint(shortTermDebt, longTermDebt), then MertonModel.fromEquity with it as total debt (KMV iteration). */
-      readonly kind: "equity";
-      /** Market value of equity, in the firm's monetary unit. */
-      readonly equityValue: number;
-      /** Annualized equity-return volatility, decimal. */
-      readonly equityVol: number;
-      /** Liabilities due within one year; a total-debt barrier is this with no long-term debt. */
-      readonly shortTermDebt: number;
-      /** Liabilities maturing beyond one year. */
-      readonly longTermDebt: number;
-      /** Continuously compounded risk-free rate, decimal. */
-      readonly riskFreeRate: number;
-      /** Continuous payout yield on assets, decimal. */
-      readonly payoutRate: number;
-      /** Calibration horizon in years. */
-      readonly maturity: number;
-    };
-/** A Merton structural-credit report: one model, a horizon grid and the CDS terms. */
-export interface MertonReportRequest {
-  readonly source: MertonSource;
-  /** Horizons in years for default probability, distance to default and spreads, in display order. */
-  readonly horizons: readonly number[];
-  /** CDS and implied-equity maturity in years. */
-  readonly maturity: number;
-  /** Recovery at default as a fraction of par, for the implied and CDS spreads. */
-  readonly recovery: number;
-}
-/** The native MertonModel and MasterScale results of one request; nothing is computed in TypeScript. */
-export interface MertonReport {
-  /** The model's canonical JSON (MertonModel#toJson), parsed. */
-  model: modelsWire.MertonModel;
-  /** The KMV default point of an equity source, else null. */
-  defaultPoint: number | null;
-  /** The requested horizons, in request order; every per-horizon array aligns with them. */
-  horizons: number[];
-  /** defaultProbabilities(horizons). */
-  defaultProbabilities: number[];
-  /** distanceToDefault per horizon. */
-  distanceToDefault: number[];
-  /** MasterScale.defaultCalibration().mapPds(defaultProbabilities). */
-  grades: modelsWire.MasterScaleResult[];
-  /** impliedSpread(horizon, recovery) per horizon, or the native error. */
-  impliedSpread: Envelope<number[]>;
-  /** debtSpread per horizon, or the native error (Rust defines it for a terminal barrier only). */
-  debtSpread: Envelope<number[]>;
-  maturity: number;
-  recovery: number;
-  /** cdsParSpread(maturity, recovery), or the native error. */
-  cdsParSpread: Envelope<number>;
-  /** impliedEquity(maturity) as returned: [equity value, equity volatility], or the native error. */
-  impliedEquity: Envelope<number[]>;
-}
+/** The request of one native models.credit.mertonReport. */
+export type MertonReportRequest = modelsWire.MertonReportRequest;
+/** The native models.credit.mertonReport result. */
+export type MertonReport = modelsWire.MertonReport;
 /** One models.credit.scoring function and its named input ratios; altmanEmScore takes the Z''-Score ratios. */
 export type CreditScoreRequest =
   | {
@@ -1206,7 +1150,7 @@ export interface ModelsApi {
   ): Promise<Envelope<MigrationProjection>>;
   /** models.credit.MertonModel.fromJson + toJson: canonical MertonModel JSON text; the handle is freed. */
   validateMertonModel(json: string): Promise<Envelope<string>>;
-  /** MertonModel (fromJson, or kmvDefaultPoint + fromEquity) + default probabilities, distance to default, spreads, CDS par spread, implied equity and models.credit.pd.MasterScale.defaultCalibration().mapPds; per-field native errors are kept; both handles are freed. */
+  /** models.credit.mertonReport: the full report in one native call; a measure Rust rejects for the model is null with its message in errors. */
   mertonReport(request: MertonReportRequest): Promise<Envelope<MertonReport>>;
   /** One models.credit.scoring function over its input ratios in the facade's positional order, then models.credit.pd.MasterScale.defaultCalibration().mapScore of the result (kept as an envelope); the scale handle is freed. */
   creditScore(request: CreditScoreRequest): Promise<Envelope<CreditScore>>;

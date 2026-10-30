@@ -5,8 +5,6 @@ import type {
   CreditScoreRequest,
   CubeSlice,
   FxStrikeSurface,
-  MertonReport,
-  MertonReportRequest,
   MigrationMatrixRequest,
   ModelsApi,
   PositionRisk,
@@ -31,7 +29,7 @@ export type ModelsNative = {
       | "SabrSmile"
       | "checkSurface"
     >;
-    credit: Pick<typeof models.credit, "MertonModel"> & {
+    credit: Pick<typeof models.credit, "MertonModel" | "mertonReport"> & {
       migration: Pick<
         typeof models.credit.migration,
         "TransitionMatrix" | "GeneratorMatrix" | "project"
@@ -392,63 +390,8 @@ export function createModelsService(
         }
       });
     },
-    mertonReport(request: MertonReportRequest) {
-      return context.result((): MertonReport => {
-        const { MertonModel } = native.models.credit;
-        const { source } = request;
-        const defaultPoint =
-          source.kind === "equity"
-            ? MertonModel.kmvDefaultPoint(
-                source.shortTermDebt,
-                source.longTermDebt,
-              )
-            : null;
-        const model =
-          source.kind === "equity"
-            ? MertonModel.fromEquity(
-                source.equityValue,
-                source.equityVol,
-                defaultPoint!,
-                source.riskFreeRate,
-                source.payoutRate,
-                source.maturity,
-              )
-            : MertonModel.fromJson(source.json);
-        let scale:
-          | InstanceType<ModelsNative["models"]["credit"]["pd"]["MasterScale"]>
-          | undefined;
-        try {
-          const { maturity, recovery } = request;
-          const horizons = [...request.horizons];
-          const defaultProbabilities = Array.from(
-            model.defaultProbabilities(horizons),
-          );
-          scale = native.models.credit.pd.MasterScale.defaultCalibration();
-          return {
-            model: JSON.parse(model.toJson()),
-            defaultPoint,
-            horizons,
-            defaultProbabilities,
-            distanceToDefault: horizons.map((h) => model.distanceToDefault(h)),
-            grades: scale.mapPds(defaultProbabilities),
-            // Rust rejects some measures for some models (debtSpread needs a
-            // terminal barrier); each keeps its own native error.
-            impliedSpread: attempt(() =>
-              horizons.map((h) => model.impliedSpread(h, recovery)),
-            ),
-            debtSpread: attempt(() => horizons.map((h) => model.debtSpread(h))),
-            maturity,
-            recovery,
-            cdsParSpread: attempt(() => model.cdsParSpread(maturity, recovery)),
-            impliedEquity: attempt(() =>
-              Array.from(model.impliedEquity(maturity)),
-            ),
-          };
-        } finally {
-          scale?.free();
-          model.free();
-        }
-      });
+    mertonReport(request) {
+      return context.result(() => native.models.credit.mertonReport(request));
     },
     creditScore(request) {
       return context.result(() => {

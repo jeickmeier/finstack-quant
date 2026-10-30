@@ -538,8 +538,8 @@
       "name": "use-merton-report",
       "type": "registry:hook",
       "title": "useMertonReport",
-      "description": "Builds a native models.credit.MertonModel report graded on the default PD master scale through the WASM worker.",
-      "docs": "models.credit.MertonModel.fromJson of canonical MertonModel JSON, or MertonModel.kmvDefaultPoint(shortTermDebt, longTermDebt) then fromEquity with it as total debt; then defaultProbabilities over the horizons, distanceToDefault, impliedSpread(horizon, recovery) and debtSpread per horizon, cdsParSpread(maturity, recovery), impliedEquity(maturity), toJson, and models.credit.pd.MasterScale.defaultCalibration().mapPds of the default probabilities. A measure Rust rejects for the model keeps its native error beside the rest of the report. Both handles are freed. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "description": "Runs native models.credit.mertonReport, graded on the default PD master scale, through the WASM worker.",
+      "docs": "models.credit.mertonReport: one native call taking a MertonReportRequest (canonical MertonModel JSON, or an equity source Rust calibrates to the KMV default point) and returning the full MertonReport, graded on the default PD master scale. A measure Rust rejects for the model carries its message beside the rest; a rejected request is the hook error.",
       "files": [
         {
           "path": "hooks/use-merton-report/use-merton-report.ts",

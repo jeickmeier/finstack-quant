@@ -8,7 +8,6 @@ import type { MertonReportRequest } from "@/workers/finstack-contract";
 export type {
   MertonReport,
   MertonReportRequest,
-  MertonSource,
 } from "@/workers/finstack-contract";
 /** Key the report on the complete snapshotted source, horizons and CDS terms; nothing is defaulted or reordered. */
 export function mertonReportOptions(

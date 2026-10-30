@@ -1079,11 +1079,13 @@ public = [
     "EndogenousHazardSpec",
     "MertonBarrierType",
     "MertonModel",
+    "MertonReport",
     "RatingFactorTable",
     "SimulatedPaths",
     "ToggleExerciseModel",
     "lgd",
     "liability_management",
+    "merton_report",
     "migration",
     "moodys_warf_factor",
     "pd",
@@ -2060,7 +2062,7 @@ types = { CreditExposure = "CreditExposure", PortfolioLossConfig = "PortfolioLos
 
 [parity.modules."finstack_quant.models.credit"]
 js = "models.credit"
-types = { CreditState = "CreditState" }
+types = { CreditState = "CreditState", MertonReport = "MertonReport" }
 
 [parity.modules."finstack_quant.models.credit.lgd"]
 js = "models.credit.lgd"
