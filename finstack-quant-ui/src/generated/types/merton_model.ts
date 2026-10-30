@@ -27,7 +27,6 @@ export interface MertonModelWire {
            * Growth rate of the default barrier over time.
            */
           barrier_growth_rate: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -54,7 +53,6 @@ export interface MertonModelWire {
            * Volatility of log-jump size.
            */
           jump_vol: number;
-          [k: string]: unknown;
         };
       }
     | {
@@ -72,7 +70,6 @@ export interface MertonModelWire {
            * Mean recovery rate at default.
            */
           mean_recovery: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -84,5 +81,4 @@ export interface MertonModelWire {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
