@@ -1,6 +1,7 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
 import { schema } from './calibration/schema.js';
 
+// TODO(boundary) RB-9: replace this default with two raw exports, one per Rust call.
 // The cap/floor Hull-White calibrators take an optional projection curve
 // (`forward`). wasm-bindgen cannot borrow an optional class handle
 // (`Option<&T>`), so the raw functions take it as a required handle and the
@@ -9,8 +10,10 @@ import { schema } from './calibration/schema.js';
 // optional `DayCountContext` in `exports/core.js`.
 const projectionCurve = (discount, forward) =>
   forward === undefined || forward === null ? discount : forward;
+// wasm-bindgen cannot borrow the optional `forward`: resolved by `projectionCurve` above.
 const calibrateHullWhiteToCapFloors = (discount, quotes, config, forward = undefined) =>
   wasm.calibrateHullWhiteToCapFloors(discount, quotes, config, projectionCurve(discount, forward));
+// wasm-bindgen cannot borrow the optional `forward`: resolved by `projectionCurve` above.
 const bootstrapHullWhiteSigmaScheduleToCapFloors = (
   discount,
   quotes,
