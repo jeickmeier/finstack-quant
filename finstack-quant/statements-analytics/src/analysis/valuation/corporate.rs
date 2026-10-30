@@ -294,7 +294,12 @@ pub(crate) struct DcfEvalContext<'a> {
 /// * `market` - Optional market context for statement-level curve lookups
 /// * `as_of` - Optional DCF valuation date and statement visibility cutoff;
 ///   required when `market` is `Some`, otherwise defaults to the first forecast
-///   boundary
+///   boundary. As a visibility cutoff it hides each actual whose availability
+///   date (by default the period's exclusive end, the first day of the next
+///   period) is after it, so a quarter-end date such as `2025-03-31` hides
+///   2025Q1's actuals: pass the next period's first day (`2025-04-01`) or set
+///   the nodes' `availability_dates`. Only forecast periods ending after
+///   `as_of` are discounted
 ///
 /// # Returns
 ///
@@ -305,7 +310,8 @@ pub(crate) struct DcfEvalContext<'a> {
 /// # Errors
 ///
 /// Returns an error if `market` is provided without `as_of`, if the model
-/// cannot be evaluated, if `ufcf_node` has no forecast cash flows, if the
+/// cannot be evaluated (including a value node whose actual `as_of` hides),
+/// if `ufcf_node` has no forecast cash flows ending after `as_of`, if the
 /// model currency cannot be inferred, if monetary nodes use another currency
 /// or no opening balance is available without a net-debt override, if an
 /// exit-multiple metric node is missing or non-finite, or if the
@@ -862,8 +868,8 @@ pub(crate) fn evaluate_dcf_from_results_impl(
 
     if flows.is_empty() {
         return Err(finstack_quant_statements::Error::Eval(format!(
-            "No UFCF values found for node '{}'",
-            ufcf_node
+            "No UFCF values found for node '{ufcf_node}' in forecast periods ending after the \
+             valuation date {valuation_date}"
         )));
     }
 

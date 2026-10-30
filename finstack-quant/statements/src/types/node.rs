@@ -148,19 +148,25 @@ impl NodeSpec {
         self
     }
 
+    /// Date from which the explicit observation for `period` is visible: its
+    /// availability date, or the period's exclusive end when none is set.
+    pub(crate) fn explicit_value_available_on(
+        &self,
+        period: &finstack_quant_core::dates::Period,
+    ) -> finstack_quant_core::dates::Date {
+        self.availability_dates
+            .get(&period.id)
+            .copied()
+            .unwrap_or(period.end)
+    }
+
     /// Return whether an explicit observation is visible at the cutoff.
     pub(crate) fn explicit_value_is_visible(
         &self,
         period: &finstack_quant_core::dates::Period,
         cutoff: Option<finstack_quant_core::dates::Date>,
     ) -> bool {
-        cutoff.is_none_or(|as_of| {
-            self.availability_dates
-                .get(&period.id)
-                .copied()
-                .unwrap_or(period.end)
-                <= as_of
-        })
+        cutoff.is_none_or(|as_of| self.explicit_value_available_on(period) <= as_of)
     }
 
     /// Set the formula text.
