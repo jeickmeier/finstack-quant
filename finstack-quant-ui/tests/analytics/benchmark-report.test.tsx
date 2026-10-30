@@ -17,6 +17,8 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient } from "@tanstack/react-query";
+import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
 import {
   benchmarkReportOptions,
@@ -218,9 +220,63 @@ it("builds a price panel with the native constructor", async () => {
 it("keys the query on the worker session and the complete snapshotted request", () => {
   const { request } = entry("invariants");
   const options = benchmarkReportOptions(null, 2, request);
-  expect(options.queryKey).toEqual(["finstack", 2, "benchmarkReport", request]);
-  expect(options.queryKey[3]).not.toBe(request);
+  expect(options.queryKey).toEqual([
+    "finstack",
+    2,
+    "benchmarkReport",
+    JSON.stringify(request),
+  ]);
   expect(benchmarkReportOptions(null, 2, null).enabled).toBe(false);
+});
+it("isolates non-finite inputs and sessions while reusing identical requests", async () => {
+  const { request, report } = entry("invariants");
+  const call = vi.fn(async () => report);
+  const client = { call } as unknown as FinstackClient;
+  const queries = new QueryClient();
+  try {
+    for (const riskFreeRate of [null, Number.NaN, Infinity, -Infinity]) {
+      const input = { ...request, riskFreeRate };
+      const options = benchmarkReportOptions(client, 2, input);
+      await queries.query(options);
+      await queries.query(
+        benchmarkReportOptions(client, 2, structuredClone(input)),
+      );
+    }
+    expect(call).toHaveBeenCalledTimes(4);
+    await queries.query(
+      benchmarkReportOptions(client, 3, { ...request, riskFreeRate: null }),
+    );
+    expect(call).toHaveBeenCalledTimes(5);
+  } finally {
+    queries.clear();
+  }
+});
+it("sends the original numeric snapshot after the caller mutates its request", async () => {
+  const { request, report } = entry("invariants");
+  const input = {
+    ...request,
+    riskFreeRate: Number.NaN,
+    values: request.values.map((row) => [...row]),
+  };
+  input.values[0]![0] = Infinity;
+  const expected = structuredClone(input);
+  const call = vi.fn(async () => report);
+  const client = { call } as unknown as FinstackClient;
+  const options = benchmarkReportOptions(client, 2, input);
+  const key = options.queryKey[3];
+  input.riskFreeRate = 0;
+  input.values[0]![0] = 0;
+  const queries = new QueryClient();
+  try {
+    await queries.query(options);
+    expect(call).toHaveBeenCalledWith("benchmarkReport", expected);
+    expect(options.queryKey[3]).toBe(key);
+    expect(options.queryKey).not.toEqual(
+      benchmarkReportOptions(client, 2, input).queryKey,
+    );
+  } finally {
+    queries.clear();
+  }
 });
 const gallery = () => entry("tearSheet").report as BenchmarkReportData;
 it("shows the first non-benchmark fund's returned measures, figures and multi-factor regression", async () => {

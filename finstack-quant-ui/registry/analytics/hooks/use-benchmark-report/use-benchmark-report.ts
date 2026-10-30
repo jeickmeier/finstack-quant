@@ -1,4 +1,5 @@
 "use client";
+import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
   useWorkerQuery,
   workerQueryOptions,
@@ -16,10 +17,10 @@ export function benchmarkReportOptions(
   session: number,
   request: BenchmarkReportRequest | null,
 ) {
-  const snapshot = request === null ? null : structuredClone(request);
+  const { snapshot, key } = requestSnapshot(request);
   return workerQueryOptions({
     client,
-    queryKey: ["finstack", session, "benchmarkReport", snapshot] as const,
+    queryKey: ["finstack", session, "benchmarkReport", key] as const,
     ready: snapshot !== null,
     missing: "No benchmark panel supplied",
     queryFn: (ready) => ready.call("benchmarkReport", snapshot!),
