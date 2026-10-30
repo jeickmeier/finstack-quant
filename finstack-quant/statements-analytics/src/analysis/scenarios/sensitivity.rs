@@ -12,6 +12,18 @@ use indexmap::IndexMap;
 
 /// Run a sensitivity sweep over a statement model.
 ///
+/// # Shock semantics
+///
+/// Each perturbation is written as an explicit value of its node in its one
+/// forecast period, so under the Value > Forecast > Formula precedence it
+/// replaces that single cell. It does not re-anchor the node's own forecast:
+/// later periods of a growth (`growth_pct`, `curve_pct`), seasonal or
+/// stochastic forecast keep the base, elapsed steps and draws they have
+/// without the shock, exactly as for any explicit forecast-period value.
+/// Formula nodes that read the shocked cell do move, in its period and in
+/// later periods that reach it through `lag`, `ttm`, `cumsum` and similar
+/// functions. To shock a whole forecast path, add one parameter per period
+/// or perturb the forecast assumptions in the model itself.
 ///
 /// # Parallelism
 ///

@@ -1148,6 +1148,13 @@ def goal_seek(
 def run_sensitivity(model: Any, config: Any) -> SensitivityResult:
     """Run sensitivity analysis on a financial model.
 
+    Each perturbation replaces its node's value in its one forecast period
+    (Value > Forecast > Formula). It does not re-anchor the node's own
+    forecast: later periods of a growth, seasonal or stochastic forecast keep
+    their unshocked base. Formula nodes that read the shocked cell move, in
+    its period and in later periods reached through ``lag``, ``ttm`` or
+    ``cumsum``. Add one parameter per period to shock a whole forecast path.
+
     Parameters
     ----------
     model : FinancialModelSpec | str

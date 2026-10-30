@@ -42,6 +42,13 @@ pub(super) fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue
 /// as a structured JavaScript object. `generateTornadoEntries` still takes the
 /// result as JSON, so pass `JSON.stringify(result)` when chaining the two.
 ///
+/// Each perturbation replaces its node's value in its one forecast period
+/// (Value > Forecast > Formula). It does not re-anchor the node's own
+/// forecast: later periods of a growth, seasonal or stochastic forecast keep
+/// their unshocked base. Formula nodes that read the shocked cell move, in its
+/// period and in later periods reached through `lag`, `ttm` or `cumsum`. Add
+/// one parameter per period to shock a whole forecast path.
+///
 /// # Errors
 ///
 /// Rejects malformed model or configuration JSON, invalid sensitivity modes or

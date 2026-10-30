@@ -231,6 +231,10 @@ class ParameterSpec:
     """
     One parameter to vary in a sensitivity run.
 
+    Each perturbation replaces the node's value in ``period`` only; it does
+    not re-anchor the node's forecast in later periods (see
+    ``run_sensitivity``).
+
     The constructor stores the supplied values and does not raise.
 
     Parameters
