@@ -4309,7 +4309,6 @@ export interface D_6Be6B905Ad3884Deeab6 {
            * Growth rate of the default barrier over time.
            */
           barrier_growth_rate: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -4336,7 +4335,6 @@ export interface D_6Be6B905Ad3884Deeab6 {
            * Volatility of log-jump size.
            */
           jump_vol: number;
-          [k: string]: unknown;
         };
       }
     | {
@@ -4354,7 +4352,6 @@ export interface D_6Be6B905Ad3884Deeab6 {
            * Mean recovery rate at default.
            */
           mean_recovery: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -4366,7 +4363,6 @@ export interface D_6Be6B905Ad3884Deeab6 {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Hard threshold toggle configuration.

@@ -378,7 +378,6 @@ export type MertonBarrierType =
          * Growth rate of the default barrier over time.
          */
         barrier_growth_rate: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -402,7 +401,6 @@ export type AssetDynamics =
          * Volatility of log-jump size.
          */
         jump_vol: number;
-        [k: string]: unknown;
       };
     }
   | {
@@ -420,7 +418,6 @@ export type AssetDynamics =
          * Mean recovery rate at default.
          */
         mean_recovery: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -5008,7 +5005,7 @@ export interface EndogenousHazardSpec {
  *
  * Deserialization is routed through [`MertonModel::new_with_dynamics`] via
  * `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
- * invariants as one built in Rust. The serialized field set is unchanged.
+ * invariants as one built in Rust. Unknown fields are rejected.
  */
 export interface MertonModel {
   /**
@@ -5044,7 +5041,6 @@ export interface MertonModel {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Hard threshold toggle configuration.

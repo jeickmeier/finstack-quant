@@ -13,6 +13,7 @@
           "description": "Jump-diffusion process (Merton 1976) with Poisson jumps.",
           "properties": {
             "jump_diffusion": {
+              "additionalProperties": false,
               "properties": {
                 "jump_intensity": {
                   "description": "Poisson jump arrival intensity (jumps per year).",
@@ -48,6 +49,7 @@
           "description": "CreditGrades model extension with stochastic-barrier survival adjustment.\n\n`default_probability()` applies the standard approximate CreditGrades\nsurvival function using the log-barrier volatility parameter.",
           "properties": {
             "credit_grades": {
+              "additionalProperties": false,
               "properties": {
                 "barrier_uncertainty": {
                   "description": "Log-normal barrier volatility `λ`: the standard deviation of the\nnatural log of the default barrier (Finger et al. 2002,\n\"CreditGrades Technical Document\"). Despite the field name, this\nis *not* a generic uncertainty scalar — it is the lognormal\ndispersion of the global recovery rate, entering the survival\nformula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.",
@@ -87,6 +89,7 @@
           "description": "Continuous barrier monitoring (Black-Cox extension).",
           "properties": {
             "first_passage": {
+              "additionalProperties": false,
               "properties": {
                 "barrier_growth_rate": {
                   "description": "Growth rate of the default barrier over time.",
@@ -110,6 +113,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/models/1/merton_model.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Merton structural credit model.",
   "properties": {
     "asset_value": {

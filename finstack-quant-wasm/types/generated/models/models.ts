@@ -57,7 +57,6 @@ export type AssetDynamics =
          * Volatility of log-jump size.
          */
         jump_vol: number;
-        [k: string]: unknown;
       };
     }
   | {
@@ -75,7 +74,6 @@ export type AssetDynamics =
          * Mean recovery rate at default.
          */
         mean_recovery: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -1071,7 +1069,6 @@ export type MertonBarrierType =
          * Growth rate of the default barrier over time.
          */
         barrier_growth_rate: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -4291,7 +4288,6 @@ export interface MertonModel {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Simulator for generating rating paths from a generator matrix.
