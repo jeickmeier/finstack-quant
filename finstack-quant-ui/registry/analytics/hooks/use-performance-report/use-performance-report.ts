@@ -1,4 +1,5 @@
 "use client";
+import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
   useWorkerQuery,
   workerQueryOptions,
@@ -17,10 +18,10 @@ export function performanceReportOptions(
   session: number,
   request: PerformanceReportRequest | null,
 ) {
-  const snapshot = request === null ? null : structuredClone(request);
+  const { snapshot, key } = requestSnapshot(request);
   return workerQueryOptions({
     client,
-    queryKey: ["finstack", session, "performanceReport", snapshot] as const,
+    queryKey: ["finstack", session, "performanceReport", key] as const,
     ready: snapshot !== null,
     missing: "No performance panel supplied",
     queryFn: (ready) => ready.call("performanceReport", snapshot!),

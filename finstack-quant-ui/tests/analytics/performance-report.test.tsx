@@ -17,6 +17,8 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient } from "@tanstack/react-query";
+import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
 import {
   performanceReportOptions,
@@ -188,10 +190,59 @@ it("keys the query on the worker session and the complete snapshotted request", 
     "finstack",
     2,
     "performanceReport",
-    request,
+    JSON.stringify(request),
   ]);
-  expect(options.queryKey[3]).not.toBe(request);
   expect(performanceReportOptions(null, 2, null).enabled).toBe(false);
+});
+it("isolates non-finite inputs and sessions while reusing identical requests", async () => {
+  const { request, report } = entry("explicit");
+  const call = vi.fn(async () => report);
+  const client = { call } as unknown as FinstackClient;
+  const queries = new QueryClient();
+  try {
+    for (const riskFreeRate of [null, Number.NaN, Infinity, -Infinity]) {
+      const input = { ...request, riskFreeRate };
+      const options = performanceReportOptions(client, 2, input);
+      await queries.query(options);
+      await queries.query(
+        performanceReportOptions(client, 2, structuredClone(input)),
+      );
+    }
+    expect(call).toHaveBeenCalledTimes(4);
+    await queries.query(
+      performanceReportOptions(client, 3, { ...request, riskFreeRate: null }),
+    );
+    expect(call).toHaveBeenCalledTimes(5);
+  } finally {
+    queries.clear();
+  }
+});
+it("sends the original numeric snapshot after the caller mutates its request", async () => {
+  const { request, report } = entry("explicit");
+  const input = {
+    ...request,
+    riskFreeRate: Number.NaN,
+    values: request.values.map((row) => [...row]),
+  };
+  input.values[0]![0] = Infinity;
+  const expected = structuredClone(input);
+  const call = vi.fn(async () => report);
+  const client = { call } as unknown as FinstackClient;
+  const options = performanceReportOptions(client, 2, input);
+  const key = options.queryKey[3];
+  input.riskFreeRate = 0;
+  input.values[0]![0] = 0;
+  const queries = new QueryClient();
+  try {
+    await queries.query(options);
+    expect(call).toHaveBeenCalledWith("performanceReport", expected);
+    expect(options.queryKey[3]).toBe(key);
+    expect(options.queryKey).not.toEqual(
+      performanceReportOptions(client, 2, input).queryKey,
+    );
+  } finally {
+    queries.clear();
+  }
 });
 const explicit = () => entry("explicit").report as PerformanceReportData;
 it("shows the returned lookback, summary, figures and episodes of the selected ticker", async () => {
