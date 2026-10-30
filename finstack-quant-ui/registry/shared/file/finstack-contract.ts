@@ -1,3 +1,9 @@
+import type {
+  PerformanceReportData,
+  PerformanceTickerData,
+  BenchmarkReportData,
+  BenchmarkTickerData,
+} from "@/components/finstack/analytics/lib/analytics-report-types";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import type { RoundingStamp } from "@/lib/finstack/format/format";
 import type {
@@ -31,14 +37,9 @@ import type {
   ScenarioSpec,
   TemplateMetadata,
   PnlAttribution,
-  BetaResult,
   DatedSeries,
-  DrawdownEpisode,
-  GreeksResult,
   MultiFactorResult,
   RollingGreeks,
-  LookbackReturns,
-  PeriodicReturn,
   TableEnvelope,
   PortfolioMetrics,
   PortfolioMetricSeriesEntry,
@@ -503,37 +504,20 @@ export type PerformanceSeries = Omit<DatedSeries, "values"> & {
   values: number[];
 };
 /** One ticker's native series, each aligned with that ticker's own active dates. */
-export interface PerformanceTickerReport {
-  /** getActiveDatesForTicker: the dates `cumulativeReturns` and `drawdowns` align with. */
-  activeDates: string[];
-  cumulativeReturns: number[];
-  drawdowns: number[];
-  /** drawdownDetails, largest first. */
-  drawdownEpisodes: DrawdownEpisode[];
+export interface PerformanceTickerReport extends Omit<
+  PerformanceTickerData,
+  "rollingSharpe" | "rollingVolatility"
+> {
   rollingSharpe: PerformanceSeries;
   rollingVolatility: PerformanceSeries;
 }
-/** The native analytics.Performance results of one panel; nothing is computed in TypeScript. */
-export interface PerformanceReport {
-  tickerNames: string[];
-  /** getBenchmarkIdx when the request named a benchmark, else null. */
-  benchmarkIdx: number | null;
-  frequency: string;
-  activeDates: string[];
+/** Native report including the host table envelope and correlation matrix. */
+export interface PerformanceReport extends Omit<
+  PerformanceReportData,
+  "summary" | "tickers"
+> {
   summary: TableEnvelope;
-  /** In tickerNames order. */
   tickers: PerformanceTickerReport[];
-  /** periodicReturns("monthly"), ticker-major. */
-  monthly: PeriodicReturn[][];
-  /** periodicReturns("annual"), ticker-major. */
-  annual: PeriodicReturn[][];
-  lookback: {
-    /** The requested lookback date, else the last active panel date. */
-    refDate: string;
-    returns: LookbackReturns;
-    /** The fiscal-year start passed to Rust, else null (calendar year). */
-    fiscalYearStart: { month: number; day: number } | null;
-  };
   /** correlationMatrix rows in tickerNames order. */
   correlation: { matrix: number[][]; repaired: boolean };
 }
@@ -568,41 +552,20 @@ export interface BenchmarkReportRequest {
   } | null;
 }
 /** One ticker's native relative series, aligned with that ticker's own active dates. */
-export interface BenchmarkTickerReport {
-  /** getActiveDatesForTicker: the dates `outperformance` and `drawdownDifference` align with. */
-  activeDates: string[];
-  /** cumulativeReturnsOutperformance. */
-  outperformance: number[];
-  drawdownDifference: number[];
+export interface BenchmarkTickerReport extends Omit<
+  BenchmarkTickerData,
+  "rollingGreeks" | "multiFactor"
+> {
   /** rollingGreeks with its typed arrays copied out. */
   rollingGreeks: Omit<RollingGreeks, "alphas" | "betas"> & {
     alphas: number[];
     betas: number[];
   };
-  /** multiFactorGreeks of this ticker, or its native error; null without a factor panel. */
+  /** Full native error data is retained for transport consumers. */
   multiFactor: Envelope<MultiFactorResult> | null;
 }
-/** The native analytics.Performance benchmark-relative results of one panel; nothing is computed in TypeScript. */
-export interface BenchmarkReport {
-  tickerNames: string[];
-  /** getBenchmarkIdx. */
-  benchmarkIdx: number;
-  frequency: string;
-  activeDates: string[];
-  /** The factor labels of the request, else null. */
-  factorNames: string[] | null;
-  /** Per-ticker results in tickerNames order. */
-  greeks: GreeksResult[];
-  beta: BetaResult[];
-  trackingError: number[];
-  informationRatio: number[];
-  treynor: number[];
-  mSquared: number[];
-  upCapture: number[];
-  downCapture: number[];
-  captureRatio: number[];
-  battingAverage: number[];
-  /** In tickerNames order. */
+/** Native benchmark report with complete per-ticker transport data. */
+export interface BenchmarkReport extends Omit<BenchmarkReportData, "tickers"> {
   tickers: BenchmarkTickerReport[];
 }
 /** Where a Merton report's model comes from. */

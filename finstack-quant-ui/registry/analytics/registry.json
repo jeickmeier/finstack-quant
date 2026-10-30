@@ -23,7 +23,8 @@
         "@finstack/table-envelope",
         "@finstack/enum-field",
         "@finstack/contract-table-envelope",
-        "@finstack/analytics-report-presentation"
+        "@finstack/analytics-report-presentation",
+        "@finstack/analytics-report-types"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",
@@ -63,7 +64,8 @@
         "@finstack/finstack-chart",
         "@finstack/finstack-table",
         "@finstack/enum-field",
-        "@finstack/analytics-report-presentation"
+        "@finstack/analytics-report-presentation",
+        "@finstack/analytics-report-types"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",
@@ -78,7 +80,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -103,7 +106,8 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -128,7 +132,8 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -147,6 +152,29 @@
       "dependencies": ["react@19.2.8"],
       "categories": [],
       "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
+    },
+    {
+      "name": "analytics-report-types",
+      "type": "registry:lib",
+      "title": "Analytics report types",
+      "description": "Readonly display contracts shared by analytics reports and worker responses, without a worker dependency.",
+      "files": [
+        {
+          "path": "lib/analytics-report-types.ts",
+          "type": "registry:lib",
+          "target": "components/finstack/analytics/lib/analytics-report-types.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/contract-table-envelope"],
+      "dependencies": ["finstack-quant-wasm@0.11.0"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
     }
   ]
 }

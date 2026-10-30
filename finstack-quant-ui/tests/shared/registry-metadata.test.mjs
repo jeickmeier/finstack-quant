@@ -86,3 +86,15 @@ it("repins WASM dependencies and leaves others untouched", () => {
   ).toEqual(["react@19.2.8", "finstack-quant-wasm@4.5.6"]);
   expect(pinWasm(undefined, "4.5.6")).toBeUndefined();
 });
+
+it("installs display contracts without worker infrastructure", async () => {
+  const cwd = fileURLToPath(new URL("../../", import.meta.url));
+  const { items } = await loadRegistry({ cwd });
+  const graph = checkGraph(items);
+  for (const name of ["performance-report", "benchmark-report"]) {
+    const closure = graph.closures.get(name);
+    expect(closure.has("analytics-report-types")).toBe(true);
+    expect(closure.has("finstack-worker")).toBe(false);
+    expect(closure.has("use-finstack")).toBe(false);
+  }
+});
