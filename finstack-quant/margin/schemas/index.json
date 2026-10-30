@@ -227,7 +227,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json",
-      "bytes": 4320,
+      "bytes": 4428,
       "kind": "output",
       "path": "schemas/margin/1/vm_result.schema.json",
       "summary": "Variation margin calculation result.",

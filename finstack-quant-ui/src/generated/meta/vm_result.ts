@@ -1064,7 +1064,7 @@ export default [
   {
     "path": "#/properties/date",
     "source": "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json#/properties/date",
-    "description": "Calculation date"
+    "description": "Call date: the requested valuation date rolled to the next business\nday of the CSA calendar (Following) when it is not one."
   },
   {
     "path": "#/properties/gross_exposure",
