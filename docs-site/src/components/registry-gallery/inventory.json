@@ -73,12 +73,6 @@
       "worker": "none"
     },
     {
-      "name": "rate-input",
-      "type": "registry:ui",
-      "docs": "Controlled rate-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
-      "worker": "none"
-    },
-    {
       "name": "tenor-input",
       "type": "registry:ui",
       "docs": "Controlled tenor-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",

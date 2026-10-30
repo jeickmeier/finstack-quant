@@ -7,7 +7,7 @@ import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import type { MonteCarloResults } from "finstack-quant-wasm";
 import { Button } from "@/components/ui/button";
-import { formatRate, groupDecimal } from "@/lib/finstack/format/format";
+import { formatPercent, groupDecimal } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
@@ -17,12 +17,7 @@ import { FinstackTable } from "@/components/finstack/shared/table/finstack-table
 import { monteCarloConfigModule } from "./monte-carlo-config";
 
 /** Rust documents MonteCarloConfig percentiles and breach probabilities as fractions in [0, 1]; shown as percents. */
-const fraction = {
-  source: "statements::MonteCarloConfig::percentiles (fraction)",
-  wire: "decimal",
-  display: "percent",
-} as const;
-const percent = (value: number) => `${formatRate(value, fraction).text}%`;
+const percent = (value: number) => `${formatPercent(value)}%`;
 /** Every supplied digit, grouped; a non-finite native value shows as itself. */
 function exactValue(value: number): string {
   return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
