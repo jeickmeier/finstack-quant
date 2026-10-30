@@ -23,6 +23,7 @@ export function surfaceNodes(surface: StoredSurface): SurfaceNode[] {
       surface,
       expiry,
       secondary,
+      // finstack-arith: row-major index into the supplied flat grid
       value: surface.vols_row_major[row * surface.strikes.length + column]!,
       key: JSON.stringify([surface.id, expiry, secondary]),
     })),

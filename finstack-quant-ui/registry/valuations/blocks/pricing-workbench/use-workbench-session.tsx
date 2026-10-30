@@ -117,6 +117,7 @@ export function useWorkbenchSession({
         setMarketReady(false);
         setMarketDocument((current) => ({
           json: example.marketJson,
+          // finstack-arith: remount revision counter, not a value
           revision: current.revision + 1,
         }));
         setParams({
@@ -128,6 +129,7 @@ export function useWorkbenchSession({
         });
         setRequest(null);
         setCompleted(null);
+        // finstack-arith: remount revision counter, not a value
         setInstrumentRevision((current) => current + 1);
         setResultTab(exampleResultTabs?.[nextType] ?? defaultResultTab);
       }

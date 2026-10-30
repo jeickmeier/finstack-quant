@@ -121,6 +121,7 @@ export function StatementGrid({
   for (const period of model.periods) {
     const label = period.is_actual ? "Historical" : "Forecast";
     const last = groups.at(-1);
+    // finstack-arith: column span of the period group header
     if (last?.label === label) last.count += 1;
     else groups.push({ label, count: 1 });
   }

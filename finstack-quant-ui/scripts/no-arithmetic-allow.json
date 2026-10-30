@@ -1,0 +1,6 @@
+{
+  "registry/shared/chart/**": "Chart mechanics: pixel layout, text measurement, heatmap colour stops and the gallery figure's interaction counters. Plots supplied values, computes none.",
+  "registry/core/components/schema-form/**": "Form mechanics: array item ordinals, field sort comparator, schema recursion depth and remount revision.",
+  "registry/shared/lib/finstack-form/**": "Form mechanics: array item ordinals and move-up targets.",
+  "src/codec.mjs": "Lossless codec mechanics: the int64 and uint64 bounds its bigint validators enforce."
+}

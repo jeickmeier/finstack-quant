@@ -123,6 +123,7 @@ export function TornadoChart({
           <FinstackChart
             definition={chart.definition}
             ariaLabel={caption}
+            // finstack-arith: chart height in pixels from the bar count
             height={Math.max(160, 72 * entries.length + 96)}
           />
         </figure>

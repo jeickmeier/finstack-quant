@@ -120,6 +120,7 @@ function Value({
 function axisLabel(index: number, bucketed: boolean): string {
   if (bucketed && index === 0) return "Identifier";
   if (bucketed && index === 1) return "Bucket";
+  // finstack-arith: 1-based ordinal for a label
   return `Coordinate ${index + 1}`;
 }
 
@@ -165,12 +166,14 @@ function CoordinateTable({
         </caption>
         <thead className="bg-muted/50 text-muted-foreground">
           <tr>
+            {/* finstack-arith: position among the returned coordinate axes */}
             {Array.from({ length: dimensions - axisOffset }, (_, offset) => (
               <th
                 key={offset}
                 scope="col"
                 className="border-b border-border px-3 py-2 font-medium"
               >
+                {/* finstack-arith: position among the returned coordinate axes */}
                 {axisLabel(axisOffset + offset, bucketed)}
               </th>
             ))}
@@ -244,6 +247,7 @@ function CoordinateView({
   bucketed: boolean;
 }) {
   const axes = entries[0]?.coordinates.length ?? 0;
+  // finstack-arith: position among the returned coordinate axes
   if (axes - axisOffset !== 2) {
     return (
       <CoordinateTable
@@ -259,6 +263,7 @@ function CoordinateView({
     ...new Set(entries.map((entry) => entry.coordinates[axisOffset])),
   ].sort(compareTenorLabels);
   const columns = [
+    // finstack-arith: position among the returned coordinate axes
     ...new Set(entries.map((entry) => entry.coordinates[axisOffset + 1])),
   ].sort(compareTenorLabels);
   const cells = new Map<string, MeasureEntry>();
@@ -281,9 +286,11 @@ function CoordinateView({
   }
 
   if (rows.length === 1 || columns.length === 1) {
+    // finstack-arith: position among the returned coordinate axes
     const fixedAxis = rows.length === 1 ? axisOffset : axisOffset + 1;
     const fixed = rows.length === 1 ? rows[0] : columns[0];
     const labels = rows.length === 1 ? columns : rows;
+    // finstack-arith: position among the returned coordinate axes
     const variableAxis = rows.length === 1 ? axisOffset + 1 : axisOffset;
     return (
       <div className="overflow-hidden rounded-md border border-border bg-card">
@@ -345,6 +352,7 @@ function CoordinateView({
               className="sticky left-0 z-10 min-w-28 border-b border-r border-border bg-muted px-3 py-2 text-left font-medium text-muted-foreground"
             >
               {axisLabel(axisOffset, bucketed)} /{" "}
+              {/* finstack-arith: position among the returned coordinate axes */}
               {axisLabel(axisOffset + 1, bucketed)}
             </th>
             {columns.map((column) => (

@@ -67,6 +67,7 @@ export function CurveLinkExample({
   const link = useLinkedSelection({
     selectedKey: accepted,
     onSelectedKeyChange(key) {
+      // finstack-arith: demo interaction counter
       setProposals((count) => count + 1);
       if (!reject) setAccepted(key);
     },
@@ -76,6 +77,7 @@ export function CurveLinkExample({
     return reverse ? rows.reverse() : rows;
   }, [reverse, remove]);
   const notify = (value: string) => {
+    // finstack-arith: demo interaction counter
     setActivations((count) => count + 1);
     setDetail(value);
   };

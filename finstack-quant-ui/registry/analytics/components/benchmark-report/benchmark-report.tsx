@@ -340,6 +340,7 @@ function ReportView({
               rows={[
                 { measure: labelFor("alpha"), value: multiFactor.value.alpha },
                 ...multiFactor.value.betas.map((value, index) => ({
+                  // finstack-arith: 1-based ordinal for a label
                   measure: `Beta · ${report.factorNames?.[index] ?? index + 1}`,
                   value,
                 })),

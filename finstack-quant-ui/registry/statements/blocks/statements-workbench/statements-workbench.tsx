@@ -244,6 +244,7 @@ export function StatementsWorkbench({
           ];
         });
         setRequest(next);
+        // finstack-arith: remount revision counter, not a value
         setRevision((value) => value + 1);
         onModelAccepted?.(canonical);
         return null;

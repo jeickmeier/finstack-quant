@@ -168,6 +168,7 @@ function KnotPanel({
     () => [
       {
         label: panel.route.source.description,
+        // finstack-arith: concatenates two URL strings
         url: panel.route.source.uri + panel.route.source.pointer,
       },
       ...(props.sources ?? []),
