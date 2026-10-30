@@ -26,8 +26,7 @@ export function backtestForecastOptions(
 }
 /** Native statements_analytics.backtestForecast ForecastMetrics or structured failure. */
 export function useBacktestForecast(request: BacktestForecastRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...backtestForecastOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    backtestForecastOptions(worker.client, worker.session, request),
+  );
 }

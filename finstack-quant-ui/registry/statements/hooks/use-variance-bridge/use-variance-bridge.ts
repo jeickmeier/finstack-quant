@@ -28,8 +28,7 @@ export function varianceBridgeOptions(
 }
 /** Native statements_analytics.varianceBridge BridgeChart or structured failure. */
 export function useVarianceBridge(request: VarianceBridgeRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...varianceBridgeOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    varianceBridgeOptions(worker.client, worker.session, request),
+  );
 }

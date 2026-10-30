@@ -23,8 +23,7 @@ export function rollupStatementOptions(
 }
 /** Native rolled-up StatementResult or structured failure. */
 export function useRollupStatement(request: StatementRollupRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...rollupStatementOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    rollupStatementOptions(worker.client, worker.session, request),
+  );
 }

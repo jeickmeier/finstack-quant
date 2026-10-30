@@ -23,8 +23,7 @@ export function creditAssessmentOptions(
 }
 /** Native statements_analytics CreditAssessment or structured failure. */
 export function useCreditAssessment(request: CreditAssessmentRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...creditAssessmentOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    creditAssessmentOptions(worker.client, worker.session, request),
+  );
 }

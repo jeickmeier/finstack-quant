@@ -30,8 +30,7 @@ export function diffStatementScenariosOptions(
 export function useDiffStatementScenarios(
   request: StatementScenarioDiffRequest | null,
 ) {
-  return useWorkerQuery((worker) => ({
-    ...diffStatementScenariosOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    diffStatementScenariosOptions(worker.client, worker.session, request),
+  );
 }

@@ -24,8 +24,7 @@ export function runVarianceOptions(
 }
 /** Native statements_analytics.runVariance VarianceReport or structured failure. */
 export function useRunVariance(request: RunVarianceRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...runVarianceOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    runVarianceOptions(worker.client, worker.session, request),
+  );
 }
