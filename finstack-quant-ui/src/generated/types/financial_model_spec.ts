@@ -745,6 +745,10 @@ export type D_97Ce4Fbfee051Bc20729 = "cashflow_date" | "period_end" | "period_av
 export type D_75Eaaaa2F753Dbeee283 =
   "fees" | "interest" | "amortization" | "mandatory_prepayment" | "voluntary_prepayment" | "sweep" | "equity";
 /**
+ * How one node's values combine over the source periods of a target period.
+ */
+export type DFc17544530079D46D05E = "sum" | "period_end" | "formula";
+/**
  * Node value type classification.
  *
  * Determines whether a node represents monetary values (with a specific currency)
@@ -15542,6 +15546,12 @@ export interface D_7B4Cd44901322286925A {
    * Node computation type
    */
   node_type: "value" | "calculated" | "mixed";
+  /**
+   * How this line rolls up to a coarser reporting frequency. A rollup uses
+   * its own per-line method first, then this; a line declaring nothing is
+   * summed. Tags never choose a method.
+   */
+  rollup?: DFc17544530079D46D05E | null;
   /**
    * Tags for grouping/filtering
    */

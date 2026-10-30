@@ -11,9 +11,13 @@
 //!   on the rolled-up inputs (`formula`), since neither a sum nor a period-end
 //!   value of a ratio is the ratio of the period.
 //!
-//! Only `period_end` and `formula` nodes need to be listed in a
-//! [`RollupSpec`]; everything else sums. [`RollupSpec::default_for`] picks the
-//! methods from the model's node tags, so every host starts from the same rule.
+//! Each line declares its method on the node ([`NodeSpec::rollup`]), so every
+//! host gets the same numbers from the same model. A line resolves as: its
+//! entry in [`RollupSpec::methods`], then its declaration, then `sum`. Tags
+//! never choose a method. [`RollupSpec::default_for`] lists the declarations
+//! for a host that shows or edits them.
+//!
+//! [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
 
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
@@ -22,29 +26,11 @@ use crate::evaluator::formula_helpers::is_truthy;
 use crate::evaluator::results::{EvalStats, NumericMode, StatementResult};
 use crate::evaluator::Evaluator;
 use crate::evaluator::PeriodHistory;
-use crate::types::{FinancialModelSpec, NodeId, NodeValueType};
+use crate::types::{FinancialModelSpec, NodeId, NodeValueType, RollupMethod};
 use finstack_quant_core::dates::{Period, PeriodId, PeriodKind};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-
-/// How one node's values combine over the source periods of a target period.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum RollupMethod {
-    /// Sum the source periods: flows such as revenue, expenses and cash flows.
-    /// A missing source value leaves the target value missing.
-    Sum,
-    /// Take the last source period's value: balances such as cash, debt and
-    /// equity, and trailing metrics such as last-twelve-month EBITDA.
-    PeriodEnd,
-    /// Re-evaluate the node's formula (and `where` clause) on the rolled-up
-    /// values: ratios such as margins, leverage and coverage. Time-series
-    /// functions then run at the target frequency, so `lag(x, 1)` is the
-    /// prior target period.
-    Formula,
-}
 
 /// Specification for [`StatementResult::rollup`].
 ///
@@ -68,66 +54,61 @@ pub struct RollupSpec {
     /// (monthly into quarterly, semi-annual or annual; quarterly into
     /// semi-annual or annual; semi-annual into annual).
     pub frequency: PeriodKind,
-    /// Rollup method per node id. Nodes not listed are summed, so list
-    /// balances as `period_end` and ratios as `formula`.
+    /// Rollup method per node id, overriding the node's own declaration. A
+    /// node not listed uses its declared [`NodeSpec::rollup`], and sums when
+    /// it declares none.
+    ///
+    /// [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub methods: IndexMap<String, RollupMethod>,
 }
 
 impl RollupSpec {
-    /// Default rollup methods for a model, chosen from its node tags.
+    /// List the rollup methods a model's lines declare, so a host can seed
+    /// the method choices it shows.
     ///
-    /// The first matching rule decides each node:
-    ///
-    /// | Node | Method |
-    /// | --- | --- |
-    /// | Tagged `balance_sheet` | `period_end` |
-    /// | Has a formula and is tagged `ratio` or `metric` | `formula` |
-    /// | Anything else | `sum` (not listed in `methods`) |
-    ///
-    /// The tags are the model's own declaration, so a mistagged line rolls up
-    /// wrongly: a balance tagged only `debt` sums. `debt` alone says nothing,
-    /// because it also marks flows such as draws and repayments. A `ratio` or
-    /// `metric` formula that reads capital-structure (`cs.*`) values is still
-    /// listed as `formula`, which [`StatementResult::rollup`] rejects; override
-    /// such a node's method.
+    /// Only [`NodeSpec::rollup`] is read. A line that declares nothing is not
+    /// listed and sums, whatever its tags say. Passing the result to
+    /// [`StatementResult::rollup`] gives the same numbers as passing a spec
+    /// with no methods, because a line resolves to its declaration anyway.
     ///
     /// # Arguments
     ///
-    /// * `model` - Model whose node tags and formulas choose the methods. Only
-    ///   its nodes are read; nothing is evaluated.
+    /// * `model` - Model whose node declarations are listed. Only its nodes
+    ///   are read; nothing is evaluated.
     /// * `frequency` - Target frequency stored on the returned spec. It is not
     ///   checked against the model's periods here; [`StatementResult::rollup`]
     ///   does that.
     ///
     /// # Returns
     ///
-    /// A [`RollupSpec`] for `frequency` listing the `period_end` and `formula`
-    /// nodes in model order.
+    /// A [`RollupSpec`] for `frequency` listing every declared node with its
+    /// method, in model order.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use finstack_quant_core::dates::PeriodKind;
     /// use finstack_quant_statements::builder::ModelBuilder;
-    /// use finstack_quant_statements::evaluator::{RollupMethod, RollupSpec};
+    /// use finstack_quant_statements::evaluator::RollupSpec;
+    /// use finstack_quant_statements::types::RollupMethod;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut model = {
-    ///     let mut model_builder = ModelBuilder::new("defaults");
+    ///     let mut model_builder = ModelBuilder::new("declared");
     ///     model_builder.periods("2025Q1..Q4", None)?;
     ///     model_builder.value("revenue", &[]);
     ///     model_builder.value("cash", &[]);
     ///     model_builder.compute("margin", "revenue / revenue")?;
     ///     model_builder.build()?
     /// };
-    /// let mut tag = |id: &str, tag: &str| {
+    /// let mut declare = |id: &str, method: RollupMethod| {
     ///     if let Some(node) = model.get_node_mut(id) {
-    ///         node.tags.push(tag.to_string());
+    ///         node.rollup = Some(method);
     ///     }
     /// };
-    /// tag("cash", "balance_sheet");
-    /// tag("margin", "ratio");
+    /// declare("cash", RollupMethod::PeriodEnd);
+    /// declare("margin", RollupMethod::Formula);
     ///
     /// let spec = RollupSpec::default_for(&model, PeriodKind::Annual);
     /// assert_eq!(spec.methods.get("cash"), Some(&RollupMethod::PeriodEnd));
@@ -136,22 +117,14 @@ impl RollupSpec {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
     #[must_use]
     pub fn default_for(model: &FinancialModelSpec, frequency: PeriodKind) -> Self {
         let methods = model
             .nodes
             .iter()
-            .filter_map(|(node_id, node)| {
-                let tagged = |tag: &str| node.tags.iter().any(|node_tag| node_tag == tag);
-                let method = if tagged("balance_sheet") {
-                    RollupMethod::PeriodEnd
-                } else if node.formula_text.is_some() && (tagged("ratio") || tagged("metric")) {
-                    RollupMethod::Formula
-                } else {
-                    return None;
-                };
-                Some((node_id.as_str().to_string(), method))
-            })
+            .filter_map(|(node_id, node)| Some((node_id.as_str().to_string(), node.rollup?)))
             .collect();
         Self { frequency, methods }
     }
@@ -167,11 +140,13 @@ impl StatementResult {
     /// Roll these results up to a coarser frequency, such as quarterly to
     /// annual.
     ///
-    /// Each target period combines its source periods node by node: summed by
-    /// default, the last source value for `period_end` nodes, and the node's
-    /// formula re-evaluated on the rolled-up values for `formula` nodes (see
-    /// [`RollupMethod`]). Every target period must be complete: a model that
-    /// starts or ends mid-year cannot roll up to annual periods.
+    /// Each target period combines its source periods node by node, using the
+    /// node's entry in `spec.methods`, then its declared
+    /// [`NodeSpec::rollup`], then `sum`: the last source value for
+    /// `period_end` nodes, and the node's formula re-evaluated on the
+    /// rolled-up values for `formula` nodes (see [`RollupMethod`]). Every
+    /// target period must be complete: a model that starts or ends mid-year
+    /// cannot roll up to annual periods.
     ///
     /// The rolled-up result holds `nodes`, `monetary_nodes` and
     /// `node_value_types` for the target periods, those periods in `periods`,
@@ -184,9 +159,11 @@ impl StatementResult {
     /// # Arguments
     ///
     /// * `model` - The model these results were evaluated from. It supplies
-    ///   the periods, with their dates and actual/forecast split, and the
-    ///   formulas re-evaluated for `formula` nodes.
-    /// * `spec` - Target frequency and per-node rollup methods.
+    ///   the periods, with their dates and actual/forecast split, each line's
+    ///   declared rollup method, and the formulas re-evaluated for `formula`
+    ///   nodes.
+    /// * `spec` - Target frequency and per-node rollup methods, which override
+    ///   the methods the nodes declare.
     ///
     /// # Returns
     ///
@@ -198,8 +175,9 @@ impl StatementResult {
     /// Returns an invalid-input error if the target frequency is not a whole
     /// multiple of the model's frequency, the model mixes frequencies, a
     /// target period is incomplete, `spec.methods` names an unknown node, or
-    /// a `formula` node has no formula or reads capital-structure (`cs.*`)
-    /// values, which cannot be re-evaluated without rolled-up cashflows.
+    /// a node resolving to `formula` has no formula or reads capital-structure
+    /// (`cs.*`) values, which cannot be re-evaluated without rolled-up
+    /// cashflows.
     /// Formula evaluation errors, such as a `formula` node reading a value
     /// missing from these results, are propagated.
     ///
@@ -208,8 +186,8 @@ impl StatementResult {
     /// ```rust
     /// use finstack_quant_core::dates::{PeriodId, PeriodKind};
     /// use finstack_quant_statements::builder::ModelBuilder;
-    /// use finstack_quant_statements::evaluator::{Evaluator, RollupMethod, RollupSpec};
-    /// use finstack_quant_statements::types::AmountOrScalar;
+    /// use finstack_quant_statements::evaluator::{Evaluator, RollupSpec};
+    /// use finstack_quant_statements::types::{AmountOrScalar, RollupMethod};
     /// use indexmap::IndexMap;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -245,9 +223,11 @@ impl StatementResult {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
     pub fn rollup(&self, model: &FinancialModelSpec, spec: &RollupSpec) -> Result<StatementResult> {
         let buckets = bucket_periods(&model.periods, spec.frequency)?;
-        validate_methods(model, spec)?;
+        let methods = resolve_methods(model, spec)?;
 
         let prepared = Evaluator::new().prepare(model)?;
         let eval_order = &prepared.eval_order;
@@ -267,7 +247,7 @@ impl StatementResult {
                 EvaluationContext::new_with_history(target, Arc::clone(&history), Arc::default());
             for node_id in eval_order {
                 let node = node_id.as_str();
-                let value = match spec.methods.get(node).copied().unwrap_or(RollupMethod::Sum) {
+                let value = match methods.get(node).copied().unwrap_or(RollupMethod::Sum) {
                     RollupMethod::Sum => bucket
                         .sources
                         .iter()
@@ -415,15 +395,30 @@ fn target_period_id(source: PeriodId, target: PeriodKind, per_bucket: u16) -> Re
     Ok(label.parse()?)
 }
 
-/// Reject methods for unknown nodes and `formula` methods that cannot be
-/// re-evaluated.
-fn validate_methods(model: &FinancialModelSpec, spec: &RollupSpec) -> Result<()> {
+/// Resolve each node's method (its `spec` entry, then its declaration, then
+/// `sum`), rejecting spec entries for unknown nodes and resolved `formula`
+/// methods that cannot be re-evaluated.
+fn resolve_methods<'model>(
+    model: &'model FinancialModelSpec,
+    spec: &RollupSpec,
+) -> Result<IndexMap<&'model str, RollupMethod>> {
+    if let Some(node_id) = spec.methods.keys().find(|id| model.get_node(id).is_none()) {
+        return Err(Error::invalid_input(format!(
+            "Rollup method names unknown node '{node_id}'"
+        )));
+    }
+    let mut methods = IndexMap::with_capacity(model.nodes.len());
     let mut unrecomputable = Vec::new();
-    for (node_id, method) in &spec.methods {
-        let node = model.get_node(node_id).ok_or_else(|| {
-            Error::invalid_input(format!("Rollup method names unknown node '{node_id}'"))
-        })?;
-        if *method != RollupMethod::Formula {
+    for (node_id, node) in &model.nodes {
+        let node_id = node_id.as_str();
+        let method = spec
+            .methods
+            .get(node_id)
+            .copied()
+            .or(node.rollup)
+            .unwrap_or(RollupMethod::Sum);
+        methods.insert(node_id, method);
+        if method != RollupMethod::Formula {
             continue;
         }
         let formula = node.formula_text.as_deref().ok_or_else(|| {
@@ -440,7 +435,7 @@ fn validate_methods(model: &FinancialModelSpec, spec: &RollupSpec) -> Result<()>
                     .transpose()?
                     .unwrap_or(false);
         if reads_capital_structure {
-            unrecomputable.push(node_id.as_str());
+            unrecomputable.push(node_id);
         }
     }
     if !unrecomputable.is_empty() {
@@ -450,5 +445,5 @@ fn validate_methods(model: &FinancialModelSpec, spec: &RollupSpec) -> Result<()>
             unrecomputable.join(", ")
         )));
     }
-    Ok(())
+    Ok(methods)
 }

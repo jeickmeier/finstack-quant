@@ -89,7 +89,7 @@ export default [
   {
     "path": "#/properties/methods",
     "source": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json#/properties/methods",
-    "description": "Rollup method per node id. Nodes not listed are summed, so list\nbalances as `period_end` and ratios as `formula`."
+    "description": "Rollup method per node id, overriding the node's own declaration. A\nnode not listed uses its declared [`NodeSpec::rollup`], and sums when\nit declares none.\n\n[`NodeSpec::rollup`]: crate::types::NodeSpec::rollup"
   },
   {
     "path": "#/properties/methods/additionalProperties",

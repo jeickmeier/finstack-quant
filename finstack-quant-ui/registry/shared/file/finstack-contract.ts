@@ -367,7 +367,7 @@ export interface StatementRollupRequest {
   readonly resultsJson: string;
   readonly specJson: string;
 }
-/** The native default RollupSpec of `modelJson` at `frequency`, chosen from its node tags. */
+/** The rollup methods `modelJson` declares, as a native RollupSpec at `frequency`. */
 export interface StatementDefaultRollupRequest {
   readonly modelJson: string;
   readonly frequency: Parameters<typeof statements.rollupSpecDefaultFor>[1];
@@ -1208,7 +1208,7 @@ export interface StatementsApi {
   rollupStatement(
     request: StatementRollupRequest,
   ): Promise<Envelope<StatementResult>>;
-  /** statements.rollupSpecDefaultFor: rollup methods chosen from the model's node tags. */
+  /** statements.rollupSpecDefaultFor: the rollup methods the model's lines declare. */
   defaultRollupSpec(
     request: StatementDefaultRollupRequest,
   ): Promise<Envelope<ReturnType<typeof statements.rollupSpecDefaultFor>>>;

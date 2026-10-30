@@ -569,6 +569,7 @@
         "tags": [
           "balance_sheet"
         ],
+        "rollup": "period_end",
         "values": {
           "2025Q1": 10.0,
           "2025Q2": 20.0,
@@ -603,6 +604,7 @@
         "tags": [
           "ratio"
         ],
+        "rollup": "formula",
         "formula_text": "ebitda / revenue"
       },
       "score": {

@@ -40180,6 +40180,7 @@
         "name": "Revenue growth, QoQ",
         "node_type": "calculated",
         "tags": ["driver", "ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -40234,6 +40235,7 @@
         "name": "Gross margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -40293,6 +40295,7 @@
         "name": "EBITDA margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -40395,7 +40398,8 @@
         "node_id": "debt_at_inception",
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
-        "tags": ["debt", "balance_sheet"],
+        "tags": ["debt"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -40517,6 +40521,7 @@
         "name": "Debt, closing balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -40528,6 +40533,7 @@
         "name": "Debt, opening balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -40539,6 +40545,7 @@
         "name": "Cash and equivalents",
         "node_type": "mixed",
         "tags": ["balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -40574,6 +40581,7 @@
         "name": "LTM EBITDA",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -40585,6 +40593,7 @@
         "name": "Gross leverage (Debt / LTM EBITDA)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -40595,6 +40604,7 @@
         "name": "Interest coverage (EBITDA / interest)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51170,6 +51180,7 @@
         "name": "Revenue growth, QoQ",
         "node_type": "calculated",
         "tags": ["driver", "ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51224,6 +51235,7 @@
         "name": "Gross margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51287,6 +51299,7 @@
         "name": "EBITDA margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51393,7 +51406,8 @@
         "node_id": "debt_at_inception",
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
-        "tags": ["debt", "balance_sheet"],
+        "tags": ["debt"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -51522,6 +51536,7 @@
         "name": "Debt, closing balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -51533,6 +51548,7 @@
         "name": "Debt, opening balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -51544,6 +51560,7 @@
         "name": "Cash and equivalents",
         "node_type": "mixed",
         "tags": ["balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -51583,6 +51600,7 @@
         "name": "LTM EBITDA",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -51594,6 +51612,7 @@
         "name": "Gross leverage (Debt / LTM EBITDA)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51604,6 +51623,7 @@
         "name": "Interest coverage (EBITDA / interest)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51754,6 +51774,7 @@
         "name": "Revenue growth, QoQ",
         "node_type": "calculated",
         "tags": ["driver", "ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51808,6 +51829,7 @@
         "name": "Gross margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51875,6 +51897,7 @@
         "name": "EBITDA margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51985,7 +52008,8 @@
         "node_id": "debt_at_inception",
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
-        "tags": ["debt", "balance_sheet"],
+        "tags": ["debt"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -52121,6 +52145,7 @@
         "name": "Debt, closing balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -52132,6 +52157,7 @@
         "name": "Debt, opening balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -52143,6 +52169,7 @@
         "name": "Cash and equivalents",
         "node_type": "mixed",
         "tags": ["balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -52186,6 +52213,7 @@
         "name": "LTM EBITDA",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -52197,6 +52225,7 @@
         "name": "Gross leverage (Debt / LTM EBITDA)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -52207,6 +52236,7 @@
         "name": "Interest coverage (EBITDA / interest)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -52361,6 +52391,7 @@
         "name": "Revenue growth, QoQ",
         "node_type": "calculated",
         "tags": ["driver", "ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -52415,6 +52446,7 @@
         "name": "Gross margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -52486,6 +52518,7 @@
         "name": "EBITDA margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -52600,7 +52633,8 @@
         "node_id": "debt_at_inception",
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
-        "tags": ["debt", "balance_sheet"],
+        "tags": ["debt"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -52742,6 +52776,7 @@
         "name": "Debt, closing balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -52753,6 +52788,7 @@
         "name": "Debt, opening balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -52764,6 +52800,7 @@
         "name": "Cash and equivalents",
         "node_type": "mixed",
         "tags": ["balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -52811,6 +52848,7 @@
         "name": "LTM EBITDA",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -52822,6 +52860,7 @@
         "name": "Gross leverage (Debt / LTM EBITDA)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -52832,6 +52871,7 @@
         "name": "Interest coverage (EBITDA / interest)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },

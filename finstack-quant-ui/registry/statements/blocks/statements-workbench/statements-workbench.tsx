@@ -159,7 +159,7 @@ export function StatementsWorkbench({
   defaultCheckSuiteJson?: string;
   /** Optional native ScenarioSet JSON that seeds the Scenarios tab. */
   defaultScenarioSetJson?: string;
-  /** Optional native RollupSpec JSON whose methods seed the annual view; otherwise the native default for the model does. */
+  /** Optional native RollupSpec JSON whose methods seed the annual view; otherwise the methods the model declares do. */
   defaultRollupSpecJson?: string;
   /** Optional native CovenantEngine JSON that seeds the Covenants tab and is tested on open. */
   defaultCovenantEngineJson?: string;

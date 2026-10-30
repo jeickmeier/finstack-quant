@@ -1931,6 +1931,10 @@ export type ForecastMethod =
  */
 export type NodeType = "value" | "calculated" | "mixed";
 /**
+ * How one node's values combine over the source periods of a target period.
+ */
+export type RollupMethod = "sum" | "period_end" | "formula";
+/**
  * Node value type classification.
  *
  * Determines whether a node represents monetary values (with a specific currency)
@@ -2083,10 +2087,6 @@ export type TableColumnRole = "dimension" | "index" | "measure" | "attribute";
  * Aliases, whitespace padding and case variants are rejected.
  */
 export type PeriodKind = "daily" | "quarterly" | "monthly" | "weekly" | "semi_annual" | "annual";
-/**
- * How one node's values combine over the source periods of a target period.
- */
-export type RollupMethod = "sum" | "period_end" | "formula";
 /**
  * Numeric mode used for evaluation.
  */
@@ -7065,6 +7065,12 @@ export interface NodeSpec {
    */
   node_type: NodeType;
   /**
+   * How this line rolls up to a coarser reporting frequency. A rollup uses
+   * its own per-line method first, then this; a line declaring nothing is
+   * summed. Tags never choose a method.
+   */
+  rollup?: RollupMethod | null;
+  /**
    * Tags for grouping/filtering
    */
   tags?: string[];
@@ -7501,8 +7507,11 @@ export interface RollupSpec {
    */
   frequency: PeriodKind;
   /**
-   * Rollup method per node id. Nodes not listed are summed, so list
-   * balances as `period_end` and ratios as `formula`.
+   * Rollup method per node id, overriding the node's own declaration. A
+   * node not listed uses its declared [`NodeSpec::rollup`], and sums when
+   * it declares none.
+   *
+   * [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
    */
   methods?: {
     [k: string]: RollupMethod;

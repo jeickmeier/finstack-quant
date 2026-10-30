@@ -2119,7 +2119,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 383715
+            "bytes": 385073
           },
           {
             "path": "schemas/statements/1/forecast_parameters.schema.json",
@@ -2168,7 +2168,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
             "type_name": "RollupSpec",
             "kind": "input",
-            "bytes": 3759
+            "bytes": 3858
           },
           {
             "path": "schemas/statements/1/statement_result.schema.json",
@@ -2336,6 +2336,7 @@
           "RevolvingCredit",
           "RevolvingCreditFees",
           "RollRule",
+          "RollupMethod",
           "SabrParameters",
           "ScenarioPricingOverrides",
           "ScheduledFee",
@@ -2524,6 +2525,7 @@
           "RevolvingCredit",
           "RevolvingCreditFees",
           "RollRule",
+          "RollupMethod",
           "SabrParameters",
           "ScenarioPricingOverrides",
           "ScheduledFee",
@@ -4562,7 +4564,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 383715
+            "bytes": 385073
           },
           {
             "domain": "statements",
@@ -4618,7 +4620,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
             "type_name": "RollupSpec",
             "kind": "input",
-            "bytes": 3759
+            "bytes": 3858
           },
           {
             "domain": "statements",

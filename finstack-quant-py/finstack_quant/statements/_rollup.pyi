@@ -17,10 +17,11 @@ class RollupSpec:
         using canonical spellings only. It must be
         coarser than the model's periods and hold a whole number of them.
     methods : dict[str, str] or None
-        Rollup method per node id: ``"sum"`` (flows, the default for nodes not
-        listed), ``"period_end"`` (balances and trailing metrics such as LTM
-        EBITDA take the last source period) or ``"formula"`` (ratios
-        re-evaluate their formula on the rolled-up values).
+        Rollup method per node id, overriding the node's declared
+        :attr:`NodeSpec.rollup`: ``"sum"`` (flows), ``"period_end"`` (balances
+        and trailing metrics such as LTM EBITDA take the last source period) or
+        ``"formula"`` (ratios re-evaluate their formula on the rolled-up
+        values). A node not listed uses its declaration, and sums without one.
 
     Examples
     --------
@@ -40,8 +41,9 @@ class RollupSpec:
             Target frequency label (``"quarterly"``, ``"semi_annual"``,
             ``"annual"``; surrounding whitespace and ASCII case are ignored).
         methods : dict[str, str] or None, default None
-            Node id to ``"sum"``, ``"period_end"`` or ``"formula"``; nodes not
-            listed are summed.
+            Node id to ``"sum"``, ``"period_end"`` or ``"formula"``, overriding
+            the node's declared method; a node not listed uses its declaration
+            and sums without one.
 
         Raises
         ------
@@ -53,21 +55,18 @@ class RollupSpec:
     @staticmethod
     def default_for(model: FinancialModelSpec | str, frequency: str) -> RollupSpec:
         """
-        Default rollup methods for a model, chosen from its node tags.
+        List the rollup methods a model's lines declare.
 
-        The first matching rule decides each node: tagged ``balance_sheet``
-        takes ``"period_end"``; has a formula and is tagged ``ratio`` or
-        ``metric`` takes ``"formula"``; anything else sums and is not listed.
-        A balance tagged only ``debt`` sums, because ``debt`` also marks flows
-        such as draws and repayments, so tag balances ``balance_sheet``. A
-        ``ratio`` or ``metric`` formula reading ``cs.*`` values is still listed
-        as ``"formula"``, which :meth:`StatementResult.rollup` rejects.
+        Only each node's ``rollup`` is read: a line that declares nothing is not
+        listed and sums, whatever its tags say. Use it to seed the method
+        choices a host shows; :meth:`StatementResult.rollup` already applies
+        the declarations when given a spec with no methods.
 
         Parameters
         ----------
         model : FinancialModelSpec | str
-            Model whose node tags and formulas choose the methods, typed or its
-            canonical JSON. Nothing is evaluated.
+            Model whose node declarations are listed, typed or its canonical
+            JSON. Nothing is evaluated.
         frequency : str
             Target frequency stored on the spec (``"quarterly"``,
             ``"semi_annual"``, ``"annual"``; surrounding whitespace and ASCII
@@ -77,8 +76,8 @@ class RollupSpec:
         Returns
         -------
         RollupSpec
-            The ``frequency`` and the ``"period_end"`` and ``"formula"`` nodes
-            in model order.
+            The ``frequency`` and every declared node with its method, in model
+            order.
 
         Raises
         ------
@@ -96,8 +95,8 @@ class RollupSpec:
         >>> _ = b.value("cash", [("2025Q1", 10.0)])
         >>> _ = b.compute("margin", "revenue / revenue")
         >>> model = json.loads(b.build().to_json())
-        >>> model["nodes"]["cash"]["tags"] = ["balance_sheet"]
-        >>> model["nodes"]["margin"]["tags"] = ["ratio"]
+        >>> model["nodes"]["cash"]["rollup"] = "period_end"
+        >>> model["nodes"]["margin"]["rollup"] = "formula"
         >>> RollupSpec.default_for(json.dumps(model), "annual").methods
         {'cash': 'period_end', 'margin': 'formula'}
 
@@ -171,7 +170,7 @@ class RollupSpec:
     @property
     def methods(self) -> dict[str, str]:
         """
-        Rollup method label per listed node id; unlisted nodes are summed.
+        Rollup method label per listed node id; unlisted nodes use their declaration or sum.
 
         Returns
         -------

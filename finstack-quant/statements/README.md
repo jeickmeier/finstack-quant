@@ -263,13 +263,14 @@ graph size, numeric mode, parallel flag, warnings). Accessors: `get`,
 
 `rollup(&model, &RollupSpec)` rolls results up to a coarser frequency
 (monthly or quarterly into quarterly, semi-annual or annual, or semi-annual into
-annual). Nodes sum by
-default (flows); list balances and trailing metrics as `period_end` and ratios
-as `formula`, which re-evaluates the formula on the rolled-up values. Every
-target period must be complete, and the result's `periods` are the targets,
-each actual only when every source is. `RollupSpec::default_for(&model, frequency)`
-chooses the methods from node tags: `balance_sheet` takes `period_end`, a
-formula tagged `ratio` or `metric` takes `formula`, and anything else sums.
+annual). Each line declares its method on the node (`NodeSpec::rollup`):
+`period_end` for balances and trailing metrics, `formula` for ratios, which
+re-evaluates the formula on the rolled-up values, and `sum` for flows. A line
+resolves as its entry in `RollupSpec::methods`, then its declaration, then
+`sum`; tags never choose a method. Every target period must be complete, and
+the result's `periods` are the targets, each actual only when every source is.
+`RollupSpec::default_for(&model, frequency)` lists the declared methods so a
+host can seed its method choices.
 
 Tabular export returns `finstack_quant_core::table::TableEnvelope`:
 

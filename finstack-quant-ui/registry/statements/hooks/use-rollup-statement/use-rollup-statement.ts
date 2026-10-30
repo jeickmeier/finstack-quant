@@ -49,7 +49,7 @@ export function defaultRollupSpecOptions(
     queryFn: (ready) => ready.call("defaultRollupSpec", snapshot!),
   });
 }
-/** Native default RollupSpec for a model, chosen from its node tags, or structured failure. */
+/** Native RollupSpec listing the methods a model declares, or structured failure. */
 export function useDefaultRollupSpec(
   request: StatementDefaultRollupRequest | null,
 ) {

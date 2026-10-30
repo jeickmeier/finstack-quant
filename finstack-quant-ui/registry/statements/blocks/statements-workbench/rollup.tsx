@@ -18,14 +18,11 @@ export function hostRollupMethods(
   return { ...(JSON.parse(specJson) as RollupSpecWire).methods };
 }
 
-/** Native annual RollupSpec JSON; lines not listed sum. */
+/** Native annual RollupSpec JSON; a listed `sum` overrides the line's declared method. */
 export function annualRollupSpecJson(
   methods: Record<string, RollupMethod>,
 ): string {
-  const listed = Object.fromEntries(
-    Object.entries(methods).filter(([, method]) => method !== "sum"),
-  );
-  const spec: RollupSpecWire = { frequency: "annual", methods: listed };
+  const spec: RollupSpecWire = { frequency: "annual", methods };
   return JSON.stringify(spec);
 }
 
@@ -57,7 +54,7 @@ export function RollupMethodsEditor({
               key={id}
               label={`${node?.name ?? id} roll-up method`}
               layout="select"
-              value={methods[id] ?? "sum"}
+              value={methods[id] ?? node?.rollup ?? "sum"}
               onValueChange={(next) =>
                 onChange({ ...methods, [id]: next as RollupMethod })
               }

@@ -16,6 +16,7 @@ pub use model::{
     FINANCIAL_MODEL_CONTRACT,
 };
 pub use node::{
-    ForecastMethod, ForecastSpec, NodeId, NodeSpec, NodeType, NodeValueType, SeasonalMode,
+    ForecastMethod, ForecastSpec, NodeId, NodeSpec, NodeType, NodeValueType, RollupMethod,
+    SeasonalMode,
 };
 pub use value::{infer_series_value_type, AmountOrScalar};

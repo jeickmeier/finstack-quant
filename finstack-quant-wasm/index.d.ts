@@ -31848,9 +31848,9 @@ export interface StatementsNamespace {
   ): StatementResult;
   /**
    * Default rollup methods for a model, chosen from its node tags.
-   * @param model - The `FinancialModelSpec` whose node tags and formulas choose the methods (object or JSON); nothing is evaluated.
+   * @param model - The `FinancialModelSpec` whose node declarations are listed (object or JSON); nothing is evaluated.
    * @param frequency - Target frequency stored on the spec: `"quarterly"`, `"semi_annual"` or `"annual"`. `statementResultRollup` checks it against the model's periods.
-   * @returns `RollupSpec` plain object with the `frequency` and the `period_end` and `formula` nodes in model order; `methods` is omitted when no node is listed.
+   * @returns `RollupSpec` plain object with the `frequency` and every declared node with its method in model order; `methods` is omitted when no node declares one.
    * @throws Error - Throws with kind `validation` if the model is malformed or `frequency` is not a recognized label.
    */
   rollupSpecDefaultFor(
