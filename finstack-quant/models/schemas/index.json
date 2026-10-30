@@ -496,6 +496,24 @@
       "type_name": "MertonModel"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/merton_report.schema.json",
+      "bytes": 11329,
+      "kind": "output",
+      "path": "schemas/models/1/merton_report.schema.json",
+      "summary": "One-call Merton report: model, term structure, grades and CDS terms.",
+      "title": "MertonReport",
+      "type_name": "MertonReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/merton_report_request.schema.json",
+      "bytes": 10478,
+      "kind": "input",
+      "path": "schemas/models/1/merton_report_request.schema.json",
+      "summary": "Inputs of a Merton report: model source, horizons, CDS maturity and recovery.",
+      "title": "MertonReportRequest",
+      "type_name": "MertonReportRequest"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/migration_simulator.schema.json",
       "bytes": 3503,
       "kind": "component",

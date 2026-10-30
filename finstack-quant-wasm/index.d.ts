@@ -27018,6 +27018,17 @@ export interface ModelCreditNamespace {
    */
   migration: CreditMigrationNamespace;
   /**
+   * One Merton report: the model, its term structure, grades and CDS terms.
+   *
+   * An equity source takes the KMV default point (short-term debt plus half of
+   * long-term debt) as its barrier, and grades come from the default PD master
+   * scale, so every host gets the same numbers.
+   * @param request - `MertonReportRequest` object or JSON text: `source` (`{ kind: "model", model }` with canonical `MertonModel` JSON, or `{ kind: "equity", equity_value, equity_vol, short_term_debt, long_term_debt, risk_free_rate, payout_rate, maturity }` in the firm's monetary unit, decimals and years), `horizons` (years, finite and positive, in display order), `maturity` (CDS and implied-equity years) and `recovery` (decimal fraction of par).
+   * @returns `MertonReport` plain object; per-horizon arrays align with `horizons`, and a measure Rust rejects for this model is `null` with its message under its field name in `errors`.
+   * @throws Error - Throws with kind `validation` if the request is malformed or has an unknown field, a horizon is non-finite or not positive, or the equity calibration rejects its inputs.
+   */
+  mertonReport(request: generated.models.MertonReportRequest | string): generated.models.MertonReport;
+  /**
    * Moody's WARF rating factor for one credit rating.
    * @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`; agency notches are normalized by the Rust parser.
    * @returns The Moody's weighted-average rating factor for that rating (for example 610 for Baa3).

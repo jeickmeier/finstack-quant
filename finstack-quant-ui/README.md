@@ -923,16 +923,14 @@ returns a `forwards` key, for example
 
 `useMertonModelValidator` (`@finstack/use-merton-model-validator`) returns
 canonical `MertonModel` JSON (`models.credit.MertonModel.fromJson`, `toJson`).
-`useMertonReport` builds the model from that JSON, or from an equity
-calibration (`MertonModel.kmvDefaultPoint(shortTermDebt, longTermDebt)`, then
-`fromEquity` with it as total debt), and returns the default probabilities,
-distances to default, implied and debt spreads per requested horizon, the CDS
-par spread and implied equity at the requested maturity, and the
-`models.credit.pd.MasterScale.defaultCalibration()` grades of the default
-probabilities. A measure Rust rejects for the model (the debt spread of a
-first-passage barrier, a CDS recovery that contradicts a CreditGrades mean
-recovery) keeps its native error beside the rest of the report. Both handles
-are freed. `MertonCalculator` composes `SchemaForm` over the generated
+`useMertonReport` makes one native call, `models.credit.mertonReport`, with the
+model as canonical JSON or an equity source Rust calibrates to the KMV default
+point. It returns the default probabilities, distances to default, implied and
+debt spreads per requested horizon, the CDS par spread and implied equity at the
+requested maturity, and the default PD master-scale grades. A measure Rust
+rejects for the model (the debt spread of a first-passage barrier, a CDS recovery
+that contradicts a CreditGrades mean recovery) carries its message beside the
+rest of the report. `MertonCalculator` composes `SchemaForm` over the generated
 `merton_model` contract (Rust publishes no example, so the form starts from the
 caller's request) or an equity-calibration form with the horizon and CDS
 inputs, and shows the returned report. The native fixture (the facade example

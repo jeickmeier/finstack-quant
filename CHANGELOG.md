@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### UI boundary: rules decided in Rust
+
+#### Added
+
+- `models::credit::merton_report` (Python `models.credit.merton_report`, WASM `models.credit.mertonReport`) returns the full Merton report in one call. It owns the KMV default point of an equity source and the default master scale, so hosts cannot differ on them. A non-positive horizon now fails the whole report, and a measure rejected for the model is null with its message in `errors` rather than a structured error.
+
 ### Statements: rollup defaults decided in Rust
 
 #### Changed

@@ -4,6 +4,7 @@
 from finstack_quant.finstack_quant import models as _models
 
 MertonModel = _models.credit.MertonModel
+MertonReport = _models.credit.MertonReport
 AssetDynamics = _models.credit.AssetDynamics
 MertonBarrierType = _models.credit.MertonBarrierType
 SimulatedPaths = _models.credit.SimulatedPaths
@@ -12,6 +13,7 @@ EndogenousHazardSpec = _models.credit.EndogenousHazardSpec
 CreditState = _models.credit.CreditState
 ToggleExerciseModel = _models.credit.ToggleExerciseModel
 RatingFactorTable = _models.credit.RatingFactorTable
+merton_report = _models.credit.merton_report
 moodys_warf_factor = _models.credit.moodys_warf_factor
 lgd = _models.credit.lgd
 liability_management = _models.credit.liability_management
@@ -27,11 +29,13 @@ __all__ = [
     "EndogenousHazardSpec",
     "MertonBarrierType",
     "MertonModel",
+    "MertonReport",
     "RatingFactorTable",
     "SimulatedPaths",
     "ToggleExerciseModel",
     "lgd",
     "liability_management",
+    "merton_report",
     "migration",
     "moodys_warf_factor",
     "pd",
