@@ -32,10 +32,9 @@ export function traceStatementScenarioOptions(
 export function useTraceStatementScenario(
   request: StatementScenarioTraceRequest | null,
 ) {
-  return useWorkerQuery((worker) => ({
-    ...traceStatementScenarioOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    traceStatementScenarioOptions(worker.client, worker.session, request),
+  );
 }
 /** One native lineage query per request, in request order; each entry keeps its own status and error. */
 export function useTraceStatementScenarios(

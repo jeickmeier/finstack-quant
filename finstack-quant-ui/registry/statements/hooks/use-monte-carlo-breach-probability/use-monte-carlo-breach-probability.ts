@@ -32,12 +32,7 @@ export function monteCarloBreachProbabilityOptions(
 export function useMonteCarloBreachProbability(
   request: MonteCarloBreachRequest | null,
 ) {
-  return useWorkerQuery((worker) => ({
-    ...monteCarloBreachProbabilityOptions(
-      worker.client,
-      worker.session,
-      request,
-    ),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    monteCarloBreachProbabilityOptions(worker.client, worker.session, request),
+  );
 }

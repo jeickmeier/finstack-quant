@@ -24,8 +24,7 @@ export function evaluateStatementOptions(
 }
 /** Native StatementResult or structured failure. */
 export function useEvaluateStatement(request: StatementRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...evaluateStatementOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    evaluateStatementOptions(worker.client, worker.session, request),
+  );
 }

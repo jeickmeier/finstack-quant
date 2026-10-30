@@ -33,12 +33,7 @@ export function evaluateStatementScenariosOptions(
 export function useEvaluateStatementScenarios(
   request: StatementScenarioRequest | null,
 ) {
-  return useWorkerQuery((worker) => ({
-    ...evaluateStatementScenariosOptions(
-      worker.client,
-      worker.session,
-      request,
-    ),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    evaluateStatementScenariosOptions(worker.client, worker.session, request),
+  );
 }

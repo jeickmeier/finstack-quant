@@ -26,8 +26,7 @@ export function dcfSensitivityOptions(
 }
 /** Native statements_analytics.dcfSensitivity enterprise-value tornado or structured failure. */
 export function useDcfSensitivity(request: DcfSensitivityRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...dcfSensitivityOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    dcfSensitivityOptions(worker.client, worker.session, request),
+  );
 }

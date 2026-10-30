@@ -27,8 +27,7 @@ export function evaluateMonteCarloOptions(
 export function useEvaluateMonteCarlo(
   request: EvaluateMonteCarloRequest | null,
 ) {
-  return useWorkerQuery((worker) => ({
-    ...evaluateMonteCarloOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    evaluateMonteCarloOptions(worker.client, worker.session, request),
+  );
 }

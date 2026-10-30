@@ -25,8 +25,7 @@ export function goalSeekOptions(
 }
 /** Native statements_analytics.goalSeek GoalSeekResult or structured failure; the caller sets the request on an explicit Solve. */
 export function useGoalSeek(request: GoalSeekRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...goalSeekOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    goalSeekOptions(worker.client, worker.session, request),
+  );
 }

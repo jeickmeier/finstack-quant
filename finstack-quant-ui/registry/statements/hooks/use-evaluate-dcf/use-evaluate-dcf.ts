@@ -27,8 +27,7 @@ export function evaluateDcfOptions(
 }
 /** Native statements_analytics.evaluateDcf CorporateValuationResult or structured failure. */
 export function useEvaluateDcf(request: EvaluateDcfRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...evaluateDcfOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    evaluateDcfOptions(worker.client, worker.session, request),
+  );
 }

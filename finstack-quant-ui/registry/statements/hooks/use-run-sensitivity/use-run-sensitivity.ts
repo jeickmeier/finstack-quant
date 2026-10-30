@@ -29,8 +29,7 @@ export function runSensitivityOptions(
 }
 /** Native statements_analytics.runSensitivity result with its generateTornadoEntries tornado, or structured failure. */
 export function useRunSensitivity(request: RunSensitivityRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...runSensitivityOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    runSensitivityOptions(worker.client, worker.session, request),
+  );
 }

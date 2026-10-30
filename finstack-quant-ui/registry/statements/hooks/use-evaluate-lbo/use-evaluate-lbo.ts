@@ -24,8 +24,7 @@ export function evaluateLboOptions(
 }
 /** Native statements_analytics.evaluateLbo LboResult or structured failure. */
 export function useEvaluateLbo(request: EvaluateLboRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...evaluateLboOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    evaluateLboOptions(worker.client, worker.session, request),
+  );
 }

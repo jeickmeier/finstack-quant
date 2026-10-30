@@ -24,8 +24,7 @@ export function plSummaryReportOptions(
 }
 /** Native P&L summary TableEnvelope (one row per line item and period) or structured failure. */
 export function usePlSummaryReport(request: PlSummaryReportRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...plSummaryReportOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    plSummaryReportOptions(worker.client, worker.session, request),
+  );
 }

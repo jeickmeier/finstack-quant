@@ -23,8 +23,7 @@ export function runStatementChecksOptions(
 }
 /** Native CheckReport or structured failure. */
 export function useRunStatementChecks(request: StatementChecksRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...runStatementChecksOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    runStatementChecksOptions(worker.client, worker.session, request),
+  );
 }
