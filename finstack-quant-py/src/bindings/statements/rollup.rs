@@ -3,6 +3,7 @@
 //! The rollup itself is ``StatementResult.rollup`` (see `evaluator.rs`),
 //! mirroring Rust's `StatementResult::rollup`.
 
+use crate::bindings::extract::extract_model_ref;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, serde_json_to_py};
@@ -46,6 +47,16 @@ impl PyRollupSpec {
             .collect::<PyResult<_>>()?;
         Ok(Self {
             inner: RustRollupSpec { frequency, methods },
+        })
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._rollup", "RollupSpec.default_for")]
+    #[staticmethod]
+    fn default_for(model: &Bound<'_, PyAny>, frequency: &str) -> PyResult<Self> {
+        let model = extract_model_ref(model)?;
+        let frequency: PeriodKind = frequency.parse().map_err(core_to_py)?;
+        Ok(Self {
+            inner: RustRollupSpec::default_for(&model, frequency),
         })
     }
 

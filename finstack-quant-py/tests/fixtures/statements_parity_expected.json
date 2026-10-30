@@ -354,7 +354,35 @@
       "revenue",
       "profit",
       "margin"
-    ]
+    ],
+    "rollup.annual": {
+      "cash": {
+        "2025": 40.0
+      },
+      "debt_draws": {
+        "2025": 10.0
+      },
+      "ebitda": {
+        "2025": 115.0
+      },
+      "margin": {
+        "2025": 0.25
+      },
+      "revenue": {
+        "2025": 460.0
+      },
+      "score": {
+        "2025": 0.08695652173913043
+      }
+    },
+    "rollup.default_for": {
+      "frequency": "annual",
+      "methods": {
+        "cash": "period_end",
+        "margin": "formula",
+        "score": "formula"
+      }
+    }
   },
   "statements_analytics": {
     "company_get": [

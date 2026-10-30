@@ -5,8 +5,9 @@
 //! `FinancialModelSpec` is a function taking the object (or its JSON).
 
 use crate::utils::input::{from_js_json, js_f64, js_string, json_text};
+use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_core::dates::PeriodId;
+use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
 use finstack_quant_statements::checks::{CheckReport, Severity};
 use finstack_quant_statements::evaluator::{RollupSpec, StatementResult};
@@ -69,6 +70,29 @@ pub fn statement_result_rollup(
     let model = FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
     let spec: RollupSpec = from_js_json(&spec, "spec")?;
     to_js_value(&result.rollup(&model, &spec).map_err(to_js_err)?)
+}
+
+/// Default rollup methods for a model, chosen from its node tags.
+///
+/// Free-function twin of Python `RollupSpec.default_for` (Rust
+/// `RollupSpec::default_for`). The first matching rule decides each node:
+/// tagged `balance_sheet` takes `period_end`; has a formula and is tagged
+/// `ratio` or `metric` takes `formula`; anything else sums and is not listed.
+/// A balance tagged only `debt` sums, because `debt` also marks flows such as
+/// draws and repayments.
+/// @param model - The `FinancialModelSpec` whose node tags and formulas choose the methods (object or JSON); nothing is evaluated.
+/// @param frequency - Target frequency stored on the spec: `"quarterly"`, `"semi_annual"` or `"annual"`. `statementResultRollup` checks it against the model's periods.
+/// @returns `RollupSpec` plain object with the `frequency` and the `period_end` and `formula` nodes in model order; `methods` is omitted when no node is listed.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the model is malformed or `frequency` is
+/// not a recognized label.
+#[wasm_bindgen(js_name = rollupSpecDefaultFor)]
+pub fn rollup_spec_default_for(model: JsValue, frequency: JsValue) -> Result<JsValue, JsValue> {
+    let model = FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+    let frequency: PeriodKind = js_wire(&frequency, "frequency")?;
+    to_js_value(&RollupSpec::default_for(&model, frequency))
 }
 
 /// Monetary value of one node in one period.

@@ -83,7 +83,12 @@ def statements_cases() -> dict[str, Any]:
     registry = st.Registry.with_builtins()
     first = registry.metric_ids()[0]
 
+    rollup_model = json.dumps(INPUTS["rollup_model"])
+    rollup_spec = st.RollupSpec.default_for(rollup_model, "annual")
+
     return {
+        "rollup.default_for": doc(rollup_spec),
+        "rollup.annual": doc(st.Evaluator().evaluate(rollup_model).rollup(rollup_model, rollup_spec))["nodes"],
         "result.get": result.get("profit", Q2),
         "result.get_missing": result.get("nope", Q2),
         "result.get_or": result.get_or("nope", Q2, -1.0),

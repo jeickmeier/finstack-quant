@@ -85,7 +85,15 @@ test('statements matches the cross-host golden', () => {
   const registry = statements.Registry.withBuiltins();
   const first = registry.metricIds()[0];
 
+  const rollupSpec = statements.rollupSpecDefaultFor(INPUTS.rollup_model, 'annual');
+
   const actual = {
+    'rollup.default_for': rollupSpec,
+    'rollup.annual': statements.statementResultRollup(
+      evaluate(INPUTS.rollup_model),
+      INPUTS.rollup_model,
+      rollupSpec
+    ).nodes,
     'result.get': orNull(statements.statementResultGet(result, 'profit', Q2)),
     'result.get_missing': orNull(statements.statementResultGet(result, 'nope', Q2)),
     'result.get_or': statements.statementResultGetOr(result, 'nope', Q2, -1.0),

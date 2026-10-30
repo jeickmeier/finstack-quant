@@ -11,6 +11,7 @@ export type StatementsNative = {
     | "parseFormula"
     | "Evaluator"
     | "statementResultRollup"
+    | "rollupSpecDefaultFor"
     | "monteCarloBreachProbability"
   >;
   statements_analytics: Pick<
@@ -328,6 +329,14 @@ export function createStatementsService(
           request.resultsJson,
           request.modelJson,
           request.specJson,
+        ),
+      );
+    },
+    defaultRollupSpec(request) {
+      return context.result(() =>
+        native.statements.rollupSpecDefaultFor(
+          request.modelJson,
+          request.frequency,
         ),
       );
     },

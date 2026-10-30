@@ -3933,6 +3933,7 @@
       "normalize",
       "parseAndCompile",
       "parseFormula",
+      "rollupSpecDefaultFor",
       "schema",
       "statementResultAllPeriods",
       "statementResultGet",
@@ -4075,6 +4076,9 @@
     "kind": "function"
   },
   "statements.statementResultRollup": {
+    "kind": "function"
+  },
+  "statements.rollupSpecDefaultFor": {
     "kind": "function"
   },
   "statements.statementResultGetNode": {
