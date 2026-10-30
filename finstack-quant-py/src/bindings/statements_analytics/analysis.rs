@@ -139,8 +139,11 @@ fn run_sensitivity(
 ///     A typed sensitivity result or its JSON serialization.
 /// metric_node : str
 ///     Node to extract tornado entries for.
-/// period : str | None
-///     Optional period string to pin the tornado to.
+/// period : str
+///     Period at which the metric is read in the baseline and every scenario
+///     (e.g. ``"2025Q4"``). Required: a shock replaces one forecast cell, so
+///     the metric moves only in the shocked period and in later periods whose
+///     formulas read it.
 ///
 /// Returns
 /// -------
@@ -169,15 +172,14 @@ fn run_sensitivity(
 /// >>> [entry.parameter_id for entry in entries]
 /// ['revenue@2025Q2']
 #[pyfunction]
-#[pyo3(signature = (result, metric_node, period=None))]
+#[pyo3(text_signature = "(result, metric_node, period)")]
 fn generate_tornado_entries(
     result: &Bound<'_, PyAny>,
     metric_node: &str,
-    period: Option<&str>,
+    period: &str,
 ) -> PyResult<Vec<PyTornadoEntry>> {
     let result = extract_sensitivity_result(result)?;
-    let period_id: Option<finstack_quant_core::dates::PeriodId> =
-        period.map(parse_period_id).transpose()?;
+    let period_id = parse_period_id(period)?;
     Ok(
         finstack_quant_statements_analytics::analysis::generate_tornado_entries(
             &result,
