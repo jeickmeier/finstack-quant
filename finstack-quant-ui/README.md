@@ -39,7 +39,7 @@ module, and live under `src/generated/types/` for type-only imports.
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `registry/<category>/`                               | Item sources. `core`, `valuations`, `calibration`, `covenants`, `scenarios`, `attribution`, `analytics`, `portfolio`, `margin`, `models` and `statements` follow the crates, beside `base`, `theme` and `shared`. Each `registry.json` lists files, install targets and `registryDependencies`. |
 | `components/ui/`                                     | Stock shadcn source, hash-pinned in `components/shadcn.json`. Never edited.                                                                                                                                                                                                                     |
-| `src/`                                               | Codec, host, views and format; `src/format/label.mjs` holds `labelFor`, the shared label function, also used by `gen-registry`; `src/generated/` is generator output.                                                                                                                           |
+| `src/`                                               | Codec, host, views and format; `src/format/label.mjs` holds `labelFor`, the shared label function, also used by `registry-content`; `src/generated/` is generator output.                                                                                                                       |
 | `scripts/`                                           | Generators, the fixture runner, checks and install gates.                                                                                                                                                                                                                                       |
 | `tests/<crate>/`                                     | Vitest suites and native fixture generators.                                                                                                                                                                                                                                                    |
 | `tests/shared/browser/`, `tests/valuations/browser/` | Standalone consumer harnesses run by `ui-harness`.                                                                                                                                                                                                                                              |
@@ -60,7 +60,7 @@ in order, so a specific key must precede its prefix.
 | `@/components/ui/*`       | `components/ui/*`                                                                                                                                                                                               |
 
 A new crate category also adds its directory name to the `include` list in
-`scripts/gen-registry.mjs`, then runs
+`scripts/registry-content.mjs`, then runs
 `npm --prefix finstack-quant-ui run generate`; without it, the build,
 `check-registry`, the gallery and the install matrix never see the crate's items.
 
@@ -110,12 +110,16 @@ To add an item (the gate that catches each omission is in brackets):
 
 CI runs only `ui-check` (the Test UI job); the other gates are local.
 
-`npm run generate` runs `scripts/run-generators.mjs`: `gen`, `gen-registry`,
-`gen-theme`, `encoding-report`, `catalogue-docs`, `gen-metadata`,
-`gen-gallery`. `gen-registry` and `gen-theme` rewrite `registry.json` and
-`registry/theme/registry.json` without `categories` and `meta`, which only
-`gen-metadata` restores; running either alone leaves metadata drift that
-`ui-check` rejects. Native fixtures follow [Native fixtures](#native-fixtures).
+`npm run generate` runs `scripts/run-generators.mjs`: `gen`,
+`encoding-report`, `catalogue-docs`, `gen-registry`, `gen-gallery`.
+`gen-registry` is the sole writer of final registry manifests, the default
+stylesheet and the compiled WASM version. It collects authored manifests and
+proposed root/theme content in memory, validates the complete dependency graph,
+and derives metadata before writing each artifact once. `--check` computes the
+same final artifacts and compares their exact contents without writing.
+`registry-content.mjs` and `themeArtifacts` are content builders; the brand CLI
+remains `gen-theme.mjs --brand <brand.json> --out <theme.css>`.
+Native fixtures follow [Native fixtures](#native-fixtures).
 
 | Gate                             | Needs                                                  | Measured                                                               |
 | -------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------- |
@@ -377,7 +381,7 @@ source strings remain the caller's state. Grouping currently uses en-US.
 host (inside the worker for browser consumers). Column presets target Table
 9.2.4 and add formatting/alignment only.
 
-`labelFor` (`label.mjs`, also used by `gen-registry` for item titles) turns a
+`labelFor` (`label.mjs`, also used by `registry-content` for item titles) turns a
 Rust wire or metric name into a sentence-case label with one set of upright
 market acronyms; it is typography only and adds no financial names.
 `compareTenorLabels` puts whole-label `Nm`/`Ny` tenors first in maturity order on
@@ -1059,7 +1063,7 @@ The public namespace is
 for `components.json`, pinned CLI discovery and required local WASM installation.
 Every item includes generated registry/WASM versions and canonical schema IDs;
 visual categories are Primitive Components, Individual Components and Blocks.
-`scripts/gen-metadata.mjs` derives these fields from package metadata and the
+`scripts/gen-registry.mjs` derives these fields from package metadata and the
 existing schema/provenance inventory, and `ui-check` rejects drift.
 
 CI runs `mise run ui-check` in the `Test UI` job on every pull request. The

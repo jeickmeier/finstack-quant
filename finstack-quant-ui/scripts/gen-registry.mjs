@@ -1,208 +1,110 @@
-import { readFile, writeFile, readdir } from "node:fs/promises";
-import { basename } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { registrySchema } from "shadcn/schema";
 import prettier from "prettier";
-import { isDeepStrictEqual } from "node:util";
-import { wasmVersion, withoutMetadata } from "./registry-metadata.mjs";
-
-import ts from "typescript";
-import { shadcnItems } from "./shadcn.mjs";
-import { byCodeUnit } from "./order.mjs";
-import { labelFor } from "../src/format/label.mjs";
+import { checkGraph } from "./check-registry.mjs";
+import { itemMetadata, metadataInputs, pinWasm } from "./registry-metadata.mjs";
+import { registryContent } from "./registry-content.mjs";
+import { themeArtifacts } from "./gen-theme.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const read = (path) => readFile(`${root}${path}`, "utf8").then(JSON.parse);
-const wasm = `finstack-quant-wasm@${await wasmVersion(root)}`;
-const roots = await read("src/generated/roots.json");
-const modules = new Set(await readdir(`${root}src/generated/instrument`));
-const file = (path) => ({
-  path: `src/${path}`,
-  type: "registry:file",
-  target: `lib/finstack/${path}`,
-});
-const item = (
-  name,
-  description,
-  files,
-  registryDependencies = [],
-  dependencies = [],
-) => ({
-  name,
-  type: "registry:lib",
-  title: labelFor(name),
-  description,
-  files: files.map(file),
-  registryDependencies: registryDependencies.map((name) => `@finstack/${name}`),
-  dependencies,
-});
-const sharedMarker =
-  "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json";
-const contracts = [];
-for (const { schema } of roots) {
-  const name = basename(schema, ".json");
-  const files = [
-    `generated/${schema}`,
-    `generated/types/${name}.ts`,
-    `generated/meta/${name}.ts`,
-  ];
-  const instrument = modules.has(`${name}.ts`);
-  if (instrument)
-    files.push(
-      `generated/instrument/${name}.ts`,
-      `generated/examples/${name}.json`,
-    );
-  if (name === "financial_model_spec")
-    files.push(`generated/examples/${name}.json`);
-  const text = await readFile(`${root}src/generated/${schema}`, "utf8");
-  const dependencies = [];
-  if (instrument) dependencies.push("finstack-codec");
-  if (text.includes(sharedMarker)) dependencies.push("shared-schema-defs");
-  contracts.push({
-    ...item(
-      `contract-${name.replaceAll("_", "-")}`,
-      `Generated schema, wire types${instrument ? ", metadata, validator module and example" : " and metadata"} for the canonical Rust ${name} contract. Validation is structural; native validation remains required.`,
-      files,
-      dependencies,
-    ),
-    title: `${labelFor(name)} contract`,
-  });
-}
-const items = [
-  item(
-    "finstack-fixtures",
-    "Native bond valuation result fixture for examples and tests.",
-    ["fixtures/results/bond.json"],
-    ["contract-bond", "contract-market-context-state"],
-  ),
-  item(
-    "primitive-contracts",
-    "Canonical option lists and constraints for controlled primitives, projected from the Rust schemas.",
-    ["generated/primitive-contracts.json"],
-  ),
-  item(
-    "shared-schema-defs",
-    "Shared definition document, wire types and metadata referenced by wide instrument schemas.",
-    [
-      "generated/defs/shared.json",
-      "generated/types/shared.ts",
-      "generated/meta/shared.ts",
-    ],
-    ["finstack-codec"],
-  ),
-  item(
-    "finstack-format",
-    "Exact decimal, money, rate and date display formatting, field labels, tenor ordering and TanStack Table column presets.",
-    [
-      "format/format.ts",
-      "format/columns.ts",
-      "format/label.mjs",
-      "format/label.d.mts",
-    ],
-    ["contract-valuation-result"],
-    [
-      "big.js@7.0.1",
-      "@tanstack/react-table@9.2.4",
-      "@types/big.js@6.2.2",
-      wasm,
-    ],
-  ),
-  item(
-    "finstack-codec",
-    "Lossless JSON codec and JSON Schema validator construction for the generated contracts.",
-    ["codec.mjs", "codec.d.mts", "schema.mjs", "schema.d.mts"],
-    [],
-    ["lossless-json@4.3.1", "zod@4.6.5"],
-  ),
-  ...contracts,
-  item(
-    "instrument-catalogue",
-    "Lazy catalogue of every instrument contract; each loader imports its schema, metadata and example on demand.",
-    ["generated/instruments.ts", "generated/catalogue.json"],
-    contracts
-      .filter((entry) =>
-        entry.files.some((f) => f.path.includes("/instrument/")),
-      )
-      .map((entry) => entry.name),
-  ),
-  item(
-    "contract-manifest",
-    "Schema root, fixture and provenance manifests for the generated contracts.",
-    [
-      "generated/roots.json",
-      "generated/fixtures.json",
-      "contract-provenance.json",
-    ],
-  ),
-  item(
-    "finstack-views",
-    "Read-only projections of stored curve and value state for display, without interpolation.",
-    ["views.ts", "generated/curve-views.json"],
-  ),
-  item(
-    "finstack-host",
-    "Adapters between structured WASM results and lossless UI state, including canonical export.",
-    ["host.ts"],
-    ["finstack-codec"],
-    [wasm],
-  ),
-];
-for (const entry of items) {
-  const stock = new Set();
-  for (const source of entry.files ?? []) {
-    if (!/\.[cm]?[jt]sx?$/.test(source.path)) continue;
-    const content = await readFile(`${root}${source.path}`, "utf8");
-    for (const { fileName } of ts.preProcessFile(content, true, true)
-      .importedFiles)
-      if (fileName.startsWith("@/components/ui/")) {
-        const name = fileName.slice("@/components/ui/".length);
-        if (!shadcnItems.has(name))
-          throw Error(`Unknown shadcn dependency: ${name}`);
-        stock.add(name);
-      }
+
+/** Collect authored manifests and proposed replacements, then derive complete final metadata. */
+export async function registryOutputs(cwd, proposed, inputs) {
+  const manifests = new Map();
+  async function visit(file, ancestors = []) {
+    if (ancestors.includes(file))
+      throw Error(`Registry include cycle: ${file}`);
+    if (manifests.has(file))
+      throw Error(`Registry included more than once: ${file}`);
+    if (ancestors.length >= 32)
+      throw Error(`Registry includes too deep: ${file}`);
+    const source = proposed.has(file)
+      ? structuredClone(proposed.get(file))
+      : JSON.parse(await readFile(path.join(cwd, file), "utf8"));
+    // Included manifests share the root namespace and may omit its identity.
+    const identity = manifests.get("registry.json") ?? source;
+    registrySchema.parse({
+      name: identity.name,
+      homepage: identity.homepage,
+      ...source,
+    });
+    manifests.set(file, source);
+    for (const include of source.include ?? []) {
+      const child = path.relative(
+        cwd,
+        path.resolve(cwd, path.dirname(file), include),
+      );
+      if (child.startsWith("..") || path.isAbsolute(child))
+        throw Error(`Registry include escapes package: ${include}`);
+      await visit(child, [...ancestors, file]);
+    }
   }
-  if (stock.size)
-    entry.registryDependencies = [
-      ...(entry.registryDependencies ?? []),
-      ...[...stock].sort(byCodeUnit),
-    ];
-}
-const output = await prettier.format(
-  JSON.stringify({
-    $schema: "https://ui.shadcn.com/schema/registry.json",
-    name: "finstack",
-    homepage: "https://jeickmeier.github.io/finstack-quant/",
-    include: [
-      "base",
-      "theme",
-      "shared",
-      "core",
-      "valuations",
-      "calibration",
-      "covenants",
-      "scenarios",
-      "attribution",
-      "analytics",
-      "portfolio",
-      "margin",
-      "models",
-      "statements",
-    ].map((category) => `registry/${category}/registry.json`),
-    items,
-  }),
-  { parser: "json" },
-);
-const path = `${root}registry.json`;
-if (process.argv.includes("--check")) {
-  if (
-    !isDeepStrictEqual(
-      withoutMetadata(JSON.parse(await readFile(path, "utf8"))),
-      JSON.parse(output),
-    )
-  )
-    throw new Error(
-      "Generated registry drift; run npm --prefix finstack-quant-ui run generate",
+  await visit("registry.json");
+  const items = [...manifests.values()].flatMap((source) => source.items);
+  const graph = checkGraph(items);
+  for (const item of items) {
+    Object.assign(item, itemMetadata(item, graph, inputs));
+    if (item.dependencies)
+      item.dependencies = pinWasm(item.dependencies, inputs.wasmVersion);
+  }
+  const outputs = new Map();
+  for (const [file, source] of manifests)
+    outputs.set(
+      file,
+      await prettier.format(JSON.stringify(source), { parser: "json" }),
     );
-} else await writeFile(path, output);
-console.log(
-  `${process.argv.includes("--check") ? "Checked" : "Generated"} ${items.length} contract registry items.`,
-);
+  return outputs;
+}
+
+/** Write each final artifact once, or check exact contents without modifying files. */
+export async function applyRegistryOutputs(cwd, outputs, check = false) {
+  for (const [file, content] of outputs) {
+    const target = path.join(cwd, file);
+    if (check) {
+      const actual = await readFile(target, "utf8").catch((error) => {
+        if (error.code === "ENOENT") return null;
+        throw error;
+      });
+      if (actual !== content)
+        throw Error(
+          `Generated registry drift: ${file}; run npm --prefix finstack-quant-ui run generate`,
+        );
+    } else await writeFile(target, content);
+  }
+}
+
+/** Coordinate registry content, theme, metadata and compiled WASM version before writing any artifact. */
+export async function generateRegistry(check = false) {
+  const [content, theme, inputs] = await Promise.all([
+    registryContent(),
+    themeArtifacts(),
+    metadataInputs(root),
+  ]);
+  const proposed = new Map([
+    ["registry.json", content],
+    ["registry/theme/registry.json", theme.get("registry/theme/registry.json")],
+  ]);
+  const outputs = await registryOutputs(root, proposed, inputs);
+  outputs.set(
+    "registry/theme/finstack-theme/theme.css",
+    theme.get("registry/theme/finstack-theme/theme.css"),
+  );
+  outputs.set(
+    "registry/shared/hooks/use-finstack/version.ts",
+    `// Generated by scripts/gen-registry.mjs from finstack-quant-wasm/package.json.\nexport const wasmVersion = ${JSON.stringify(inputs.wasmVersion)};\n`,
+  );
+  await applyRegistryOutputs(root, outputs, check);
+  return outputs;
+}
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  const check = process.argv.includes("--check");
+  const outputs = await generateRegistry(check);
+  console.log(
+    `${check ? "Checked" : "Generated"} ${outputs.size} complete registry artifacts.`,
+  );
+}
