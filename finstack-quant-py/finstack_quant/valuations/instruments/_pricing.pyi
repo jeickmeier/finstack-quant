@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Literal
 import pandas as pd
+from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import Tenor
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations import ValuationResult
@@ -362,6 +363,39 @@ def price_driver_fields() -> list[str]:
     >>> from finstack_quant.valuations.instruments import price_driver_fields
     >>> price_driver_fields()[0]
     'quoted_clean_price_pct'
+    """
+    ...
+
+def tranche_metric_field_units(currency: str | Currency) -> list[dict[str, str]]:
+    """
+    Units of the scalar ``TrancheMetrics`` fields, in struct order.
+
+    ``TrancheMetrics`` documents these units in prose and does not state them
+    on the wire. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        ISO-4217 code of the result's ``TrancheMetrics.currency``; it names the
+        unit of ``pv``, ``accrued`` and ``cs01``.
+
+    Returns
+    -------
+    list[dict[str, str]]
+        One ``{"field", "label", "source"}`` record per scalar field: the wire
+        field name, its unit text and the Rust field that documents it.
+        ``tranche_id``, ``currency`` and the ``metrics`` map are not listed.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import tranche_metric_field_units
+    >>> tranche_metric_field_units("USD")[0]["label"]
+    'USD'
     """
     ...
 

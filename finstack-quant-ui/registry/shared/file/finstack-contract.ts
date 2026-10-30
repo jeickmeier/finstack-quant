@@ -11,6 +11,7 @@ import type {
   CalibrationResultEnvelope,
   CalibrationEnvelope,
   CalibrationValidationReport,
+  MetricFieldUnit,
   MetricMetadata,
   MoneyValue,
   ScenarioTable,
@@ -991,6 +992,10 @@ export interface ValuationsApi {
   metricMetadata(keys: readonly string[]): Promise<Envelope<MetricMetadata[]>>;
   /** valuations.instruments.priceDriverFields: wire names of the mutually exclusive price-driving market quotes. */
   priceDriverFields(): Promise<Envelope<string[]>>;
+  /** valuations.instruments.trancheMetricFieldUnits: units of the scalar TrancheMetrics fields, in struct order. */
+  trancheMetricFieldUnits(
+    currency: string,
+  ): Promise<Envelope<MetricFieldUnit[]>>;
   /** valuations.valuationResultToJson over the host-serialized result: native canonical JSON. */
   exportResult(value: ValuationResult): Promise<Envelope<string>>;
 }

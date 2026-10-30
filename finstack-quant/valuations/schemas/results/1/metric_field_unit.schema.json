@@ -1,0 +1,34 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/results/1/metric_field_unit.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The display unit of one scalar field of a result struct.",
+  "examples": [
+    {
+      "field": "cs01",
+      "label": "USD per bp",
+      "source": "valuations::TrancheMetrics::cs01"
+    }
+  ],
+  "properties": {
+    "field": {
+      "description": "Wire name of the field.",
+      "type": "string"
+    },
+    "label": {
+      "description": "Unit text as the field documents it, such as `USD per bp` or `years`.",
+      "type": "string"
+    },
+    "source": {
+      "description": "Canonical Rust field the unit is documented on.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "field",
+    "label",
+    "source"
+  ],
+  "title": "MetricFieldUnit",
+  "type": "object"
+}

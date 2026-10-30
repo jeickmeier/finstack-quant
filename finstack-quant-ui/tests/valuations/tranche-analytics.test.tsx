@@ -37,6 +37,8 @@ beforeEach(() => {
   vi.stubGlobal("Worker", class {});
   call = vi.fn(async (method: string, arg: any) => {
     if (method === "initialize") return { state: "ready", worker: true };
+    if (method === "trancheMetricFieldUnits")
+      return native.trancheMetricFieldUnits(arg);
     const deal = native.StructuredCredit.fromJson(arg.instrumentJson);
     try {
       const head = [deal, arg.trancheId, arg.marketJson, arg.asOf] as const;
@@ -82,6 +84,7 @@ it("shows native TrancheMetrics fields in Rust order with their documented units
       trancheId="SENIOR"
       price="25"
       metrics={{ value: metrics }}
+      metricUnits={{ value: native.trancheMetricFieldUnits(metrics.currency) }}
       breakevenCdr={{ value: floating.results.breakevenCdr.value as number }}
       discountMargin={{
         value: floating.results.discountMargin.value as number,
@@ -144,6 +147,7 @@ it("shows each tile's own native error without hiding the others", () => {
       trancheId="CLONOTES-A"
       price="100"
       metrics={{ value: fixed.results.metrics.value as TrancheMetrics }}
+      metricUnits={{ value: native.trancheMetricFieldUnits("USD") }}
       breakevenCdr={{ value: fixed.results.breakevenCdr.value as number }}
       discountMargin={{ error: fixed.results.discountMargin.error!.message }}
       oas={{ value: fixed.results.oas.value as OasResult }}

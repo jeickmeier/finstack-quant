@@ -141,6 +141,7 @@ const trancheCases = [
             trancheMetricIds,
           ),
         ),
+        metricUnits: failure(() => native.trancheMetricFieldUnits("USD")),
         breakevenCdr: failure(() =>
           native.trancheBreakevenCdr(deal, trancheId, marketText, asOf),
         ),

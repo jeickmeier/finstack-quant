@@ -1027,6 +1027,7 @@ public = [
     "price_instrument",
     "tranche_breakeven_cdr",
     "tranche_discount_margin",
+    "tranche_metric_field_units",
     "tranche_metrics",
     "tranche_oas",
     "tranche_scenario_table",

@@ -123,6 +123,7 @@
     "valuations.instruments.priceInstrumentWithMarket",
     "valuations.instruments.trancheBreakevenCdr",
     "valuations.instruments.trancheDiscountMargin",
+    "valuations.instruments.trancheMetricFieldUnits",
     "valuations.instruments.trancheMetrics",
     "valuations.instruments.trancheOas",
     "valuations.instruments.trancheScenarioTable",

@@ -228,6 +228,18 @@ pub(super) fn listed_product_coverage() -> Result<Vec<Value>> {
     example(row)
 }
 
+/// The unit of a tranche's CS01.
+pub(super) fn metric_field_unit() -> Result<Vec<Value>> {
+    let units = crate::pricer::tranche_metric_field_units(Currency::USD);
+    let unit = units
+        .iter()
+        .find(|unit| unit.field == "cs01")
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Internal("cs01 has no field unit".to_string())
+        })?;
+    example(unit)
+}
+
 /// The interpretation of a bucketed DV01 key.
 pub(super) fn metric_metadata() -> Result<Vec<Value>> {
     let rows = crate::pricer::metric_metadata(&["bucketed_dv01::USD-OIS::10y".to_string()])?;

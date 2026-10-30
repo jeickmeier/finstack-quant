@@ -192,6 +192,7 @@ import type {
   CompositeTrade,
   EnhancedMonteCarloResult,
   ListedProductCoverage,
+  MetricFieldUnit,
   MetricMetadata,
   OasResult,
   PrimitiveAggregate,
@@ -424,6 +425,7 @@ export type {
   CompositeTrade,
   EnhancedMonteCarloResult,
   ListedProductCoverage,
+  MetricFieldUnit,
   MetricMetadata,
   OasResult,
   PrimitiveAggregate,
@@ -23179,6 +23181,13 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a `computation` error only if the names cannot cross the boundary.
    */
   priceDriverFields(): string[];
+  /**
+   * Units of the scalar `TrancheMetrics` fields, in struct order.
+   * @param currency - ISO-4217 code of the result's `TrancheMetrics.currency`, in any ASCII case; it names the unit of `pv`, `accrued` and `cs01`.
+   * @returns One `MetricFieldUnit` per scalar field: the wire field name, its unit text and the Rust field that documents it. `tranche_id`, `currency` and the `metrics` map are not listed.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  trancheMetricFieldUnits(currency: string): MetricFieldUnit[];
   /**
    * List the standard metrics registered for one instrument type, grouped by
    * display category.

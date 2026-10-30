@@ -3396,6 +3396,13 @@
             "bytes": 4379
           },
           {
+            "path": "schemas/results/1/metric_field_unit.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/metric_field_unit.schema.json",
+            "type_name": "MetricFieldUnit",
+            "kind": "output",
+            "bytes": 879
+          },
+          {
             "path": "schemas/results/1/metric_metadata.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
             "type_name": "MetricMetadata",
@@ -5541,6 +5548,14 @@
             "type_name": "MertonMcResult",
             "kind": "output",
             "bytes": 4379
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/metric_field_unit.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/metric_field_unit.schema.json",
+            "type_name": "MetricFieldUnit",
+            "kind": "output",
+            "bytes": 879
           },
           {
             "domain": "valuations",

@@ -13,6 +13,7 @@ use crate::instruments::Instrument;
 use crate::metrics::MetricId;
 use crate::results::ValuationResult;
 use finstack_quant_core::contract::{parse_json_value, LoadLimits};
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Error;
 use serde_json::Value;
@@ -436,6 +437,65 @@ pub fn metric_metadata(keys: &[String]) -> finstack_quant_core::Result<Vec<Metri
             })
         })
         .collect()
+}
+
+/// The display unit of one scalar field of a result struct.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MetricFieldUnit {
+    /// Wire name of the field.
+    pub field: String,
+    /// Unit text as the field documents it, such as `USD per bp` or `years`.
+    pub label: String,
+    /// Canonical Rust field the unit is documented on.
+    pub source: String,
+}
+
+/// Units of the scalar `TrancheMetrics` fields, in the order the struct declares them.
+///
+/// `TrancheMetrics` documents these units in prose and does not state them on
+/// the wire, so a host reads them here. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `TrancheMetrics::currency` of the result being labelled;
+///   it names the unit of `pv`, `accrued` and `cs01`.
+///
+/// # Returns
+///
+/// One record per scalar field. `tranche_id`, `currency` and the
+/// registry-keyed `metrics` map have no field unit and are not listed; registry
+/// metrics keep the units their [`MetricMetadata`] reports.
+pub fn tranche_metric_field_units(currency: Currency) -> Vec<MetricFieldUnit> {
+    const CURRENT_BALANCE: &str = "% of current balance";
+    [
+        ("pv", currency.to_string()),
+        ("clean_price_pct", CURRENT_BALANCE.to_string()),
+        ("dirty_price_pct", CURRENT_BALANCE.to_string()),
+        ("accrued", currency.to_string()),
+        ("factor", "current / original balance".to_string()),
+        ("wal", "years".to_string()),
+        ("ytm", "decimal".to_string()),
+        ("z_spread_bp", "bp".to_string()),
+        ("cs01", format!("{currency} per bp")),
+        ("spread_duration", "years".to_string()),
+        ("spread_convexity", "years²".to_string()),
+        ("effective_duration", "years".to_string()),
+        ("effective_convexity", "years²".to_string()),
+        ("target_price_pct", CURRENT_BALANCE.to_string()),
+        ("wal_to_call", "years".to_string()),
+        ("z_spread_to_call_bp", "bp".to_string()),
+        ("dm_to_call_bp", "bp".to_string()),
+        ("dm_bp", "bp".to_string()),
+    ]
+    .into_iter()
+    .map(|(field, label)| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::TrancheMetrics::{field}"),
+    })
+    .collect()
 }
 
 /// List every pricing model key that has a pricer in the standard registry.
@@ -867,6 +927,70 @@ fn decode_pricing_envelope(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tranche_field_units_list_every_scalar_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::TrancheMetrics;
+        let fields = [
+            "pv",
+            "clean_price_pct",
+            "dirty_price_pct",
+            "accrued",
+            "factor",
+            "wal",
+            "ytm",
+            "z_spread_bp",
+            "cs01",
+            "spread_duration",
+            "spread_convexity",
+            "effective_duration",
+            "effective_convexity",
+            "target_price_pct",
+            "wal_to_call",
+            "z_spread_to_call_bp",
+            "dm_to_call_bp",
+            "dm_bp",
+        ];
+        let mut wire: serde_json::Map<String, Value> = fields
+            .iter()
+            .map(|field| ((*field).to_string(), serde_json::json!(1.0)))
+            .collect();
+        wire.insert("tranche_id".to_string(), serde_json::json!("A"));
+        wire.insert("currency".to_string(), serde_json::json!("USD"));
+        // Strict deserialization proves these are the struct's fields; serializing
+        // lists them in declaration order, so the table cannot drift unnoticed.
+        let metrics: TrancheMetrics =
+            serde_json::from_value(Value::Object(wire)).expect("TrancheMetrics fields");
+        let mut declared: Vec<String> = serde_json::to_value(&metrics)
+            .expect("serialize")
+            .as_object()
+            .expect("object")
+            .keys()
+            .filter(|key| !["tranche_id", "currency", "metrics"].contains(&key.as_str()))
+            .cloned()
+            .collect();
+        declared.sort();
+        let units = tranche_metric_field_units(Currency::EUR);
+        let mut listed: Vec<String> = units.iter().map(|unit| unit.field.clone()).collect();
+        assert_eq!(listed, fields);
+        listed.sort();
+        assert_eq!(listed, declared);
+    }
+
+    #[test]
+    fn tranche_field_units_state_the_result_currency_and_source() {
+        let units = tranche_metric_field_units(Currency::EUR);
+        let unit = |field: &str| {
+            units
+                .iter()
+                .find(|unit| unit.field == field)
+                .expect("listed")
+        };
+        assert_eq!(unit("pv").label, "EUR");
+        assert_eq!(unit("cs01").label, "EUR per bp");
+        assert_eq!(unit("wal").label, "years");
+        assert_eq!(unit("factor").source, "valuations::TrancheMetrics::factor");
+    }
 
     fn instrument_json_for_pricing(
         instrument_json: &str,

@@ -47,6 +47,23 @@ export function trancheOasOptions(
     queryFn: (ready) => ready.call("trancheOas", snapshot!),
   });
 }
+/** Native units of the TrancheMetrics fields for a result's currency. Null disables the call. */
+export function useTrancheMetricFieldUnits(currency: string | null) {
+  return useWorkerQuery((worker) =>
+    workerQueryOptions({
+      client: worker.client,
+      queryKey: [
+        "finstack",
+        worker.session,
+        "trancheMetricFieldUnits",
+        currency,
+      ] as const,
+      ready: currency !== null,
+      missing: "Tranche field units require a currency and ready worker",
+      queryFn: (ready) => ready.call("trancheMetricFieldUnits", currency!),
+    }),
+  );
+}
 /** Snapshot the deal, tranche, market, date and explicit price. Null disables the solve. */
 export function trancheDiscountMarginOptions(
   client: FinstackClient | null,

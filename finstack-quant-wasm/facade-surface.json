@@ -4575,6 +4575,7 @@
       "trancheBreakevenCdr",
       "trancheBuilder",
       "trancheDiscountMargin",
+      "trancheMetricFieldUnits",
       "trancheMetrics",
       "trancheOas",
       "trancheScenarioTable",
@@ -4811,6 +4812,9 @@
     "kind": "function"
   },
   "valuations.instruments.priceDriverFields": {
+    "kind": "function"
+  },
+  "valuations.instruments.trancheMetricFieldUnits": {
     "kind": "function"
   },
   "valuations.instruments.trancheDiscountMargin": {

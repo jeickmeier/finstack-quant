@@ -20,6 +20,7 @@ export type ValuationsNative = {
       | "metricsForInstrument"
       | "metricMetadata"
       | "priceDriverFields"
+      | "trancheMetricFieldUnits"
     >;
   };
 };
@@ -149,6 +150,8 @@ export function createValuationsService(
       context.result(() => instruments.metricMetadata([...keys])),
     priceDriverFields: () =>
       context.result(() => instruments.priceDriverFields()),
+    trancheMetricFieldUnits: (currency) =>
+      context.result(() => instruments.trancheMetricFieldUnits(currency)),
     exportResult: (value) =>
       context.result(() =>
         exportValuation(value, native.valuations.valuationResultToJson),

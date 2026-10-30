@@ -1054,6 +1054,15 @@
       "type_name": "MertonMcResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/metric_field_unit.schema.json",
+      "bytes": 879,
+      "kind": "output",
+      "path": "schemas/results/1/metric_field_unit.schema.json",
+      "summary": "The display unit of one scalar field of a result struct.",
+      "title": "MetricFieldUnit",
+      "type_name": "MetricFieldUnit"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
       "bytes": 3353,
       "kind": "output",

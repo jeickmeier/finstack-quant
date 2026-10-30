@@ -12795,6 +12795,100 @@
               }
             }
           },
+          "metricUnits": {
+            "value": [
+              {
+                "field": "pv",
+                "label": "USD",
+                "source": "valuations::TrancheMetrics::pv"
+              },
+              {
+                "field": "clean_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::clean_price_pct"
+              },
+              {
+                "field": "dirty_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::dirty_price_pct"
+              },
+              {
+                "field": "accrued",
+                "label": "USD",
+                "source": "valuations::TrancheMetrics::accrued"
+              },
+              {
+                "field": "factor",
+                "label": "current / original balance",
+                "source": "valuations::TrancheMetrics::factor"
+              },
+              {
+                "field": "wal",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::wal"
+              },
+              {
+                "field": "ytm",
+                "label": "decimal",
+                "source": "valuations::TrancheMetrics::ytm"
+              },
+              {
+                "field": "z_spread_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::z_spread_bp"
+              },
+              {
+                "field": "cs01",
+                "label": "USD per bp",
+                "source": "valuations::TrancheMetrics::cs01"
+              },
+              {
+                "field": "spread_duration",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::spread_duration"
+              },
+              {
+                "field": "spread_convexity",
+                "label": "years²",
+                "source": "valuations::TrancheMetrics::spread_convexity"
+              },
+              {
+                "field": "effective_duration",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::effective_duration"
+              },
+              {
+                "field": "effective_convexity",
+                "label": "years²",
+                "source": "valuations::TrancheMetrics::effective_convexity"
+              },
+              {
+                "field": "target_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::target_price_pct"
+              },
+              {
+                "field": "wal_to_call",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::wal_to_call"
+              },
+              {
+                "field": "z_spread_to_call_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::z_spread_to_call_bp"
+              },
+              {
+                "field": "dm_to_call_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::dm_to_call_bp"
+              },
+              {
+                "field": "dm_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::dm_bp"
+              }
+            ]
+          },
           "breakevenCdr": {
             "value": 0.00006103515625
           },
@@ -13555,6 +13649,100 @@
                 "severity01": -14617.481497112647
               }
             }
+          },
+          "metricUnits": {
+            "value": [
+              {
+                "field": "pv",
+                "label": "USD",
+                "source": "valuations::TrancheMetrics::pv"
+              },
+              {
+                "field": "clean_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::clean_price_pct"
+              },
+              {
+                "field": "dirty_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::dirty_price_pct"
+              },
+              {
+                "field": "accrued",
+                "label": "USD",
+                "source": "valuations::TrancheMetrics::accrued"
+              },
+              {
+                "field": "factor",
+                "label": "current / original balance",
+                "source": "valuations::TrancheMetrics::factor"
+              },
+              {
+                "field": "wal",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::wal"
+              },
+              {
+                "field": "ytm",
+                "label": "decimal",
+                "source": "valuations::TrancheMetrics::ytm"
+              },
+              {
+                "field": "z_spread_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::z_spread_bp"
+              },
+              {
+                "field": "cs01",
+                "label": "USD per bp",
+                "source": "valuations::TrancheMetrics::cs01"
+              },
+              {
+                "field": "spread_duration",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::spread_duration"
+              },
+              {
+                "field": "spread_convexity",
+                "label": "years²",
+                "source": "valuations::TrancheMetrics::spread_convexity"
+              },
+              {
+                "field": "effective_duration",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::effective_duration"
+              },
+              {
+                "field": "effective_convexity",
+                "label": "years²",
+                "source": "valuations::TrancheMetrics::effective_convexity"
+              },
+              {
+                "field": "target_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::target_price_pct"
+              },
+              {
+                "field": "wal_to_call",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::wal_to_call"
+              },
+              {
+                "field": "z_spread_to_call_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::z_spread_to_call_bp"
+              },
+              {
+                "field": "dm_to_call_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::dm_to_call_bp"
+              },
+              {
+                "field": "dm_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::dm_bp"
+              }
+            ]
           },
           "breakevenCdr": {
             "value": 0

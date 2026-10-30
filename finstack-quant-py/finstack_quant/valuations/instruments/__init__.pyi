@@ -145,6 +145,7 @@ from finstack_quant.valuations.instruments._pricing import (
     metrics_for_instrument as metrics_for_instrument,
     price_driver_fields as price_driver_fields,
     price_instrument as price_instrument,
+    tranche_metric_field_units as tranche_metric_field_units,
 )
 from finstack_quant.valuations.instruments._typed_asset_backed_facility.facility_terms import (
     AmortizationEvent as AmortizationEvent,
@@ -264,6 +265,7 @@ __all__ = [
     "price_instrument",
     "tranche_breakeven_cdr",
     "tranche_discount_margin",
+    "tranche_metric_field_units",
     "tranche_metrics",
     "tranche_oas",
     "tranche_scenario_table",
