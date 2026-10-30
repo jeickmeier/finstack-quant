@@ -41,7 +41,15 @@ export function useWorkerQuery<TData, TKey extends QueryKey>(
   ) => UseQueryOptions<TData, Error, TData, TKey>,
 ) {
   const worker = useFinstack();
-  const query = useQuery(options(worker));
+  const supplied = options(worker);
+  const enabled = supplied.enabled;
+  const query = useQuery({
+    ...supplied,
+    enabled: (query) =>
+      worker.status === "ready" &&
+      worker.client !== null &&
+      (typeof enabled === "function" ? enabled(query) : enabled !== false),
+  });
   return {
     ...query,
     error: worker.error ?? query.error,
