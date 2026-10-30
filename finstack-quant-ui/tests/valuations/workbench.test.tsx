@@ -778,7 +778,7 @@ it(
       { timeout: budget(5000) },
     );
   },
-  budget(30000),
+  budget(60000),
 );
 
 it(

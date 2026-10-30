@@ -18,6 +18,7 @@ import covenantSeries from "../../src/fixtures/covenants/analyst-covenant-series
 import { StatementsWorkbench } from "@/components/finstack/statements/blocks/statements-workbench/statements-workbench";
 import { reportStatementCell } from "@/components/finstack/statements/components/statement-grid/projection";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
+import { budget } from "../shared/budget";
 import { formatRawMoney } from "../../src/format/format";
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/hooks/shared/use-finstack/client", () => ({
@@ -955,135 +956,144 @@ it("rolls reported quarters up to native annual values with editable methods", a
   ).findByRole("button", { name: "Revenue 2024Q1, value source, edit value" });
 });
 
-it("runs scenarios with forecast overrides and compares them natively", async () => {
-  render(
-    <FinstackQueryProvider>
-      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
-    </FinstackQueryProvider>,
-  );
-  await screen.findByRole("region", { name: "Income statement" });
-  fireEvent.click(screen.getByRole("button", { name: "2025Q3 Forecast" }));
-  fireEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
-  fireEvent.click(screen.getByRole("button", { name: "Add scenario" }));
-  const card = screen.getByRole("region", { name: "Scenario scenario_2" });
-  // The empty parent is a real radio choice, and a new scenario inherits the first.
-  expect(
-    within(screen.getByRole("region", { name: "Scenario base" }))
-      .getByRole("radio", { name: "No parent" })
-      .getAttribute("aria-checked"),
-  ).toBe("true");
-  expect(
-    within(card)
-      .getByRole("radio", { name: "base" })
-      .getAttribute("aria-checked"),
-  ).toBe("true");
-  // Repeated override pickers keep their visible label and name their scenario in the description.
-  expect(
-    description(
-      within(screen.getByRole("region", { name: "Scenario base" })).getByRole(
-        "combobox",
-        { name: "Add value override" },
+it(
+  "runs scenarios with forecast overrides and compares them natively",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+      </FinstackQueryProvider>,
+    );
+    await screen.findByRole("region", { name: "Income statement" });
+    fireEvent.click(screen.getByRole("button", { name: "2025Q3 Forecast" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add scenario" }));
+    const card = screen.getByRole("region", { name: "Scenario scenario_2" });
+    // The empty parent is a real radio choice, and a new scenario inherits the first.
+    expect(
+      within(screen.getByRole("region", { name: "Scenario base" }))
+        .getByRole("radio", { name: "No parent" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
+      within(card)
+        .getByRole("radio", { name: "base" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    // Repeated override pickers keep their visible label and name their scenario in the description.
+    expect(
+      description(
+        within(screen.getByRole("region", { name: "Scenario base" })).getByRole(
+          "combobox",
+          { name: "Add value override" },
+        ),
       ),
-    ),
-  ).toBe("Scenario base");
-  expect(
-    description(
+    ).toBe("Scenario base");
+    expect(
+      description(
+        within(card).getByRole("combobox", { name: "Add forecast override" }),
+      ),
+    ).toBe("Scenario scenario_2");
+    await userEvent.click(
       within(card).getByRole("combobox", { name: "Add forecast override" }),
-    ),
-  ).toBe("Scenario scenario_2");
-  await userEvent.click(
-    within(card).getByRole("combobox", { name: "Add forecast override" }),
-  );
-  await userEvent.click(await screen.findByRole("option", { name: "Revenue" }));
-  await userEvent.click(
-    within(card).getByRole("combobox", { name: "Revenue forecast method" }),
-  );
-  await userEvent.click(
-    await screen.findByRole("option", { name: "Fixed growth" }),
-  );
-  fireEvent.change(
-    within(card).getByRole("textbox", { name: /Growth per period/ }),
-    { target: { value: "-0.1" } },
-  );
-  fireEvent.click(
-    within(card).getByRole("button", { name: "Save to scenario" }),
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Run scenarios" }));
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Revenue" }),
+    );
+    await userEvent.click(
+      within(card).getByRole("combobox", { name: "Revenue forecast method" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Fixed growth" }),
+    );
+    fireEvent.change(
+      within(card).getByRole("textbox", { name: /Growth per period/ }),
+      { target: { value: "-0.1" } },
+    );
+    fireEvent.click(
+      within(card).getByRole("button", { name: "Save to scenario" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Run scenarios" }));
 
-  const comparison = await screen.findByRole("region", {
-    name: "Scenario comparison",
-  });
-  const setJson = lastCall("evaluateStatementScenarios").scenarioSetJson;
-  expect(JSON.parse(setJson)).toEqual({
-    scenarios: {
-      base: {},
-      scenario_2: {
-        parent: "base",
-        forecast_overrides: {
-          revenue: { method: "growth_pct", params: { rate: -0.1 } },
+    const comparison = await screen.findByRole("region", {
+      name: "Scenario comparison",
+    });
+    const setJson = lastCall("evaluateStatementScenarios").scenarioSetJson;
+    expect(JSON.parse(setJson)).toEqual({
+      scenarios: {
+        base: {},
+        scenario_2: {
+          parent: "base",
+          forecast_overrides: {
+            revenue: { method: "growth_pct", params: { rate: -0.1 } },
+          },
         },
       },
-    },
-  });
-  const results = native.evaluateScenarioSet(canonicalModel(), setJson);
-  // Line names are row headers, so each scenario value is announced with its line.
-  const lineHeaders = within(comparison).getAllByRole("rowheader");
-  // One row header per body row; the first row holds the column headers.
-  expect(lineHeaders).toHaveLength(
-    within(comparison).getAllByRole("row").length - 1,
-  );
-  // scenario_2's default baseline is its parent, read from the native lineage.
-  await within(comparison).findByRole("columnheader", {
-    name: "Δ scenario_2 vs base",
-  });
-  const [delta] = native.scenarioDiff(
-    setJson,
-    results,
-    "base",
-    "scenario_2",
-    ["revenue"],
-    ["2025Q3"],
-  ).variance.rows;
-  const revenueRow = within(comparison)
-    .getAllByRole("row")
-    .find(
-      (row) => within(row).queryByRole("rowheader")?.textContent === "Revenue",
-    )!;
-  const cells = within(revenueRow)
-    .getAllByRole("cell")
-    .map((cell) => cell.textContent);
-  expect(cells).toEqual([
-    ...["base", "scenario_2"].map((name) =>
+    });
+    const results = native.evaluateScenarioSet(canonicalModel(), setJson);
+    // Line names are row headers, so each scenario value is announced with its line.
+    const lineHeaders = within(comparison).getAllByRole("rowheader");
+    // One row header per body row; the first row holds the column headers.
+    expect(lineHeaders).toHaveLength(
+      within(comparison).getAllByRole("row").length - 1,
+    );
+    // scenario_2's default baseline is its parent, read from the native lineage.
+    await within(comparison).findByRole("columnheader", {
+      name: "Δ scenario_2 vs base",
+    });
+    const [delta] = native.scenarioDiff(
+      setJson,
+      results,
+      "base",
+      "scenario_2",
+      ["revenue"],
+      ["2025Q3"],
+    ).variance.rows;
+    const revenueRow = within(comparison)
+      .getAllByRole("row")
+      .find(
+        (row) =>
+          within(row).queryByRole("rowheader")?.textContent === "Revenue",
+      )!;
+    const cells = within(revenueRow)
+      .getAllByRole("cell")
+      .map((cell) => cell.textContent);
+    expect(cells).toEqual([
+      ...["base", "scenario_2"].map((name) =>
+        reportStatementCell(
+          {
+            periodId: "2025Q3",
+            present: true,
+            text: "",
+            value: results[name].monetary_nodes.revenue["2025Q3"],
+          },
+          "millions",
+        ),
+      ),
       reportStatementCell(
         {
           periodId: "2025Q3",
           present: true,
           text: "",
-          value: results[name].monetary_nodes.revenue["2025Q3"],
+          value: { amount: String(delta.abs_var), currency: "USD" },
         },
         "millions",
       ),
-    ),
-    reportStatementCell(
-      {
-        periodId: "2025Q3",
-        present: true,
-        text: "",
-        value: { amount: String(delta.abs_var), currency: "USD" },
-      },
-      "millions",
-    ),
-  ]);
-  expect(cells[0]).not.toBe(cells[1]);
-  expect(screen.getByLabelText("Lineage of scenario_2").textContent).toBe(
-    "base › scenario_2",
-  );
-  expect(screen.getByRole("region", { name: "base statements" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "scenario_2" }));
-  expect(
-    await screen.findByRole("region", { name: "scenario_2 statements" }),
-  ).toBeTruthy();
-});
+    ]);
+    expect(cells[0]).not.toBe(cells[1]);
+    expect(screen.getByLabelText("Lineage of scenario_2").textContent).toBe(
+      "base › scenario_2",
+    );
+    expect(
+      screen.getByRole("region", { name: "base statements" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "scenario_2" }));
+    expect(
+      await screen.findByRole("region", { name: "scenario_2 statements" }),
+    ).toBeTruthy();
+  },
+  budget(15000),
+);
 
 it("rejects scenario amounts outside the Rust decimal contract before the worker", async () => {
   render(
