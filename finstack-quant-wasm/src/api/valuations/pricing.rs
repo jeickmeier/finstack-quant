@@ -428,6 +428,19 @@ pub fn price_driver_fields() -> Result<JsValue, JsValue> {
     to_js_value(&finstack_quant_valuations::instruments::pricing_overrides::MarketQuoteOverrides::price_driver_fields())
 }
 
+/// Units of the scalar `TrancheMetrics` fields, in struct order.
+///
+/// `TrancheMetrics` documents these units in prose and does not state them on
+/// the wire. Values are never rescaled.
+/// @param currency - ISO-4217 code of the result's `TrancheMetrics.currency`, in any ASCII case; it names the unit of `pv`, `accrued` and `cs01`.
+/// @returns One `MetricFieldUnit` per scalar field: the wire field name, its unit text and the Rust field that documents it. `tranche_id`, `currency` and the `metrics` map are not listed.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = trancheMetricFieldUnits)]
+pub fn tranche_metric_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::tranche_metric_field_units(currency))
+}
+
 /// List every pricing model key registered in the standard pricer registry.
 ///
 /// The list is registry-derived rather than enum-derived, so it reflects real

@@ -741,7 +741,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::market::listed::ListedProductCoverage;
     use crate::metrics::risk::var_calculator::VarResult;
     use crate::metrics::risk::MarketHistory;
-    use crate::pricer::MetricMetadata;
+    use crate::pricer::{MetricFieldUnit, MetricMetadata};
     use crate::results::ValuationResult;
     use finstack_quant_core::contract::{Diagnostic, ValidationReport};
     use finstack_quant_core::currency::Currency;
@@ -1033,6 +1033,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::listed_product_coverage),
+        finstack_quant_core::schema_artifact!(
+            MetricFieldUnit,
+            "results",
+            "metric_field_unit",
+            Component,
+            "The display unit of one scalar field of a result struct."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::metric_field_unit),
         finstack_quant_core::schema_artifact!(
             MetricMetadata,
             "results",

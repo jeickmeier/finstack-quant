@@ -19,6 +19,7 @@ export const instruments = {
   metricMetadata: wasm.metricMetadata,
   metricsForInstrument: wasm.metricsForInstrument,
   priceDriverFields: wasm.priceDriverFields,
+  trancheMetricFieldUnits: wasm.trancheMetricFieldUnits,
   trancheDiscountMargin: wasm.trancheDiscountMargin,
   trancheBreakevenCdr: wasm.trancheBreakevenCdr,
   trancheOas: wasm.trancheOas,

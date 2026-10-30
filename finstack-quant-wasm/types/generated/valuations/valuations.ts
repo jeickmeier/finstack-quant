@@ -19863,6 +19863,23 @@ export interface PathStatistics {
   pik_exercise_rate: number;
 }
 /**
+ * The display unit of one scalar field of a result struct.
+ */
+export interface MetricFieldUnit {
+  /**
+   * Wire name of the field.
+   */
+  field: string;
+  /**
+   * Unit text as the field documents it, such as `USD per bp` or `years`.
+   */
+  label: string;
+  /**
+   * Canonical Rust field the unit is documented on.
+   */
+  source: string;
+}
+/**
  * Canonical per-key metric interpretation for host presentation.
  */
 export interface MetricMetadata {

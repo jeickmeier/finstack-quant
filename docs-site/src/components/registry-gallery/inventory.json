@@ -1432,7 +1432,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
-      "sha256": "0108a5ccd179e54a24ceb83322d3674e72fc3227b9f629f14349f2dc4e94b44b"
+      "sha256": "c38287b9e1a97fa1a87fba1499651e3f169a75b6bfb975c442e8a2fc374f9bba"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
