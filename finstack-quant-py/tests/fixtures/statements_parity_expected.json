@@ -382,7 +382,15 @@
         "margin": "formula",
         "score": "formula"
       }
-    }
+    },
+    "rollup.periods": [
+      {
+        "end": "2026-01-01",
+        "id": "2025",
+        "is_actual": false,
+        "start": "2025-01-01"
+      }
+    ]
   },
   "statements_analytics": {
     "company_get": [

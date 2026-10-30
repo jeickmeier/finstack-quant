@@ -86,9 +86,12 @@ def statements_cases() -> dict[str, Any]:
     rollup_model = json.dumps(INPUTS["rollup_model"])
     rollup_spec = st.RollupSpec.default_for(rollup_model, "annual")
 
+    rolled_up = doc(st.Evaluator().evaluate(rollup_model).rollup(rollup_model, rollup_spec))
+
     return {
         "rollup.default_for": doc(rollup_spec),
-        "rollup.annual": doc(st.Evaluator().evaluate(rollup_model).rollup(rollup_model, rollup_spec))["nodes"],
+        "rollup.annual": rolled_up["nodes"],
+        "rollup.periods": rolled_up["periods"],
         "result.get": result.get("profit", Q2),
         "result.get_missing": result.get("nope", Q2),
         "result.get_or": result.get_or("nope", Q2, -1.0),

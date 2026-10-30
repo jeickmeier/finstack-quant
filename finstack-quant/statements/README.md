@@ -255,7 +255,8 @@ folds the adjusted series back into a `StatementResult` as a new node.
 ## Results and export
 
 `StatementResult` holds `nodes: node_id → period_id → f64`, plus
-`monetary_nodes` for `Money`-typed nodes, `node_value_types`, optional
+`periods` (the periods `nodes` is keyed by), `monetary_nodes` for
+`Money`-typed nodes, `node_value_types`, optional
 `cs_cashflows`, an optional `check_report`, and `meta: EvalStats` (timings,
 graph size, numeric mode, parallel flag, warnings). Accessors: `get`,
 `get_money`, `get_scalar`, `get_node`, `get_or`, `all_periods`.
@@ -265,7 +266,8 @@ graph size, numeric mode, parallel flag, warnings). Accessors: `get`,
 annual). Nodes sum by
 default (flows); list balances and trailing metrics as `period_end` and ratios
 as `formula`, which re-evaluates the formula on the rolled-up values. Every
-target period must be complete. `RollupSpec::default_for(&model, frequency)`
+target period must be complete, and the result's `periods` are the targets,
+each actual only when every source is. `RollupSpec::default_for(&model, frequency)`
 chooses the methods from node tags: `balance_sheet` takes `period_end`, a
 formula tagged `ratio` or `metric` takes `formula`, and anything else sums.
 

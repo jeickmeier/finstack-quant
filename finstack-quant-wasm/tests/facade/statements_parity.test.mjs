@@ -87,13 +87,16 @@ test('statements matches the cross-host golden', () => {
 
   const rollupSpec = statements.rollupSpecDefaultFor(INPUTS.rollup_model, 'annual');
 
+  const rolledUp = statements.statementResultRollup(
+    evaluate(INPUTS.rollup_model),
+    INPUTS.rollup_model,
+    rollupSpec
+  );
+
   const actual = {
     'rollup.default_for': rollupSpec,
-    'rollup.annual': statements.statementResultRollup(
-      evaluate(INPUTS.rollup_model),
-      INPUTS.rollup_model,
-      rollupSpec
-    ).nodes,
+    'rollup.annual': rolledUp.nodes,
+    'rollup.periods': rolledUp.periods,
     'result.get': orNull(statements.statementResultGet(result, 'profit', Q2)),
     'result.get_missing': orNull(statements.statementResultGet(result, 'nope', Q2)),
     'result.get_or': statements.statementResultGetOr(result, 'nope', Q2, -1.0),

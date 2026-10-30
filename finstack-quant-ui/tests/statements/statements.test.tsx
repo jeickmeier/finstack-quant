@@ -335,6 +335,20 @@ it("routes scenario sets, rollups and data-gap checks to WASM", async () => {
     native.statementResultRollup(resultsJson, canonical, specJson),
   );
   expect(Object.keys(annual.nodes.revenue)).toEqual(["2024", "2025"]);
+  expect(annual.periods).toEqual([
+    {
+      id: "2024",
+      start: "2024-01-01",
+      end: "2025-01-01",
+      is_actual: true,
+    },
+    {
+      id: "2025",
+      start: "2025-01-01",
+      end: "2026-01-01",
+      is_actual: false,
+    },
+  ]);
   expect(
     unwrap(
       await harness.proxy.defaultRollupSpec({
