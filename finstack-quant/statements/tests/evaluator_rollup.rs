@@ -95,6 +95,99 @@ fn close(actual: Option<f64>, expected: f64) {
     assert!((actual - expected).abs() < 1e-12, "{actual} vs {expected}");
 }
 
+/// A year of quarters tagged to exercise every branch of the default rule.
+fn tagged_model() -> FinancialModelSpec {
+    let mut model = {
+        let mut model_builder = ModelBuilder::new("tagged");
+        model_builder
+            .periods("2024Q1..Q4", Some("2024Q4"))
+            .expect("valid periods");
+        let values = |values: [f64; 4]| {
+            usd(&(0..4)
+                .map(|i| (q(2024, i as u8 + 1), values[i]))
+                .collect::<Vec<_>>())
+        };
+        model_builder.value("revenue", &values([100.0, 110.0, 120.0, 130.0]));
+        model_builder.value("cash", &values([10.0, 20.0, 30.0, 40.0]));
+        // A flow tagged like a balance's family, which must still sum.
+        model_builder.value("debt_draws", &values([1.0, 2.0, 3.0, 4.0]));
+        // A ratio supplied as a value has no formula to re-evaluate, so it sums.
+        model_builder.value("supplied_ratio", &values([1.0, 1.0, 1.0, 1.0]));
+        model_builder
+            .compute("ebitda", "revenue * 0.25")
+            .expect("valid formula");
+        model_builder
+            .compute("margin", "ebitda / revenue")
+            .expect("valid formula");
+        model_builder
+            .compute("score", "cash / revenue")
+            .expect("valid formula");
+        model_builder
+            .compute("total_debt", "cumsum(debt_draws)")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    };
+    for (node, tags) in [
+        ("revenue", vec!["income_statement"]),
+        ("cash", vec!["balance_sheet"]),
+        ("debt_draws", vec!["debt"]),
+        ("supplied_ratio", vec!["ratio"]),
+        ("ebitda", vec!["income_statement"]),
+        ("margin", vec!["ratio"]),
+        ("score", vec!["metric"]),
+        // The balance tag decides before the formula rule would.
+        ("total_debt", vec!["debt", "balance_sheet", "ratio"]),
+    ] {
+        model.get_node_mut(node).expect("node").tags =
+            tags.into_iter().map(str::to_string).collect();
+    }
+    model
+}
+
+#[test]
+fn default_for_chooses_methods_from_tags() {
+    let spec = RollupSpec::default_for(&tagged_model(), PeriodKind::Annual);
+    assert_eq!(spec.frequency, PeriodKind::Annual);
+    assert_eq!(
+        spec.methods,
+        IndexMap::from([
+            ("cash".to_string(), RollupMethod::PeriodEnd),
+            ("margin".to_string(), RollupMethod::Formula),
+            ("score".to_string(), RollupMethod::Formula),
+            ("total_debt".to_string(), RollupMethod::PeriodEnd),
+        ])
+    );
+}
+
+#[test]
+fn default_for_rolls_each_branch_to_its_annual_value() {
+    let model = tagged_model();
+    let quarterly = Evaluator::new().evaluate(&model).expect("evaluation");
+    let annual = quarterly
+        .rollup(&model, &RollupSpec::default_for(&model, PeriodKind::Annual))
+        .expect("annual rollup");
+    let year = PeriodId::annual(2024);
+
+    // Otherwise: sum, for flows, a `debt`-only flow and a value-only ratio.
+    close(annual.get("revenue", &year), 460.0);
+    close(annual.get("ebitda", &year), 115.0);
+    close(annual.get("debt_draws", &year), 10.0);
+    close(annual.get("supplied_ratio", &year), 4.0);
+    // balance_sheet: the fourth quarter.
+    close(annual.get("cash", &year), 40.0);
+    close(annual.get("total_debt", &year), 10.0);
+    // ratio or metric with a formula: re-evaluated on the annual figures.
+    close(annual.get("margin", &year), 0.25);
+    close(annual.get("score", &year), 40.0 / 460.0);
+}
+
+#[test]
+fn default_for_keeps_the_requested_frequency_and_lists_nothing_for_an_untagged_model() {
+    let spec = RollupSpec::default_for(&quarterly_model(), PeriodKind::SemiAnnual);
+    assert_eq!(spec.frequency, PeriodKind::SemiAnnual);
+    assert!(spec.methods.is_empty());
+}
+
 #[test]
 fn quarterly_results_roll_up_to_annual_flows_balances_and_ratios() {
     let model = quarterly_model();

@@ -86,6 +86,7 @@
     "statements.monteCarloBreachProbability",
     "statements.parseAndCompile",
     "statements.parseFormula",
+    "statements.rollupSpecDefaultFor",
     "statements.statementResultRollup",
     "statements.validateCheckSuiteSpecJson",
     "statements.validateFinancialModelJson",

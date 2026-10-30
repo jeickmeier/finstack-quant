@@ -773,7 +773,7 @@
       "type": "registry:hook",
       "title": "useRollupStatement",
       "description": "Rolls an evaluated statement result up to a coarser frequency through the WASM worker.",
-      "docs": "Native StatementResult rollup for the supplied model, matching result and RollupSpec JSON, keyed by the complete immutable request and worker session. Null disables the query; no rollup methods or periods are inferred.",
+      "docs": "Native StatementResult rollup for the supplied model, matching result and RollupSpec JSON, and the native default RollupSpec of a model at a frequency, each keyed by the complete immutable request and worker session. Null disables a query; no rollup methods or periods are inferred.",
       "files": [
         {
           "path": "hooks/use-rollup-statement/use-rollup-statement.ts",

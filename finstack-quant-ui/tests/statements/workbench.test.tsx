@@ -60,6 +60,8 @@ beforeEach(() => {
       case "validateStatementFormula":
         native.parseAndCompile(arg);
         return native.parseFormula(arg);
+      case "defaultRollupSpec":
+        return native.rollupSpecDefaultFor(arg.modelJson, arg.frequency);
       case "rollupStatement":
         return native.statementResultRollup(
           arg.resultsJson,
@@ -910,12 +912,44 @@ it("rolls reported quarters up to native annual values with editable methods", a
   expect(JSON.parse(lastCall("rollupStatement").specJson).methods.revenue).toBe(
     undefined,
   );
+  expect(lastCall("defaultRollupSpec")).toEqual({
+    modelJson: canonicalModel(),
+    frequency: "annual",
+  });
 
   const quarterly = new native.Evaluator().evaluate(canonicalModel());
   const rolled = native.statementResultRollup(
     JSON.stringify(quarterly),
     canonicalModel(),
     lastCall("rollupStatement").specJson,
+  );
+  // A balance now tagged balance_sheet takes the year end, not four quarters' sum.
+  expect(rolled.nodes.debt_at_inception["2024"]).toBe(420_000_000);
+  // Draws and repayments are flows tagged only debt, so they still sum.
+  expect(rolled.nodes.debt_draws["2024"]).toBe(
+    ["2024Q1", "2024Q2", "2024Q3", "2024Q4"]
+      .map((period) => quarterly.nodes.debt_draws[period])
+      // finstack-arith: test-only expected flow total of the native quarterly values
+      .reduce((total, value) => total + value),
+  );
+  // The tag rule's period_end gives debt_opening the fourth quarter's opening;
+  // re-running its formula on annual inputs gives the year's first-quarter one.
+  expect(rolled.nodes.debt_opening["2024"]).toBe(
+    quarterly.nodes.debt_opening["2024Q4"],
+  );
+  const openingByFormula = native.statementResultRollup(
+    JSON.stringify(quarterly),
+    canonicalModel(),
+    JSON.stringify({
+      frequency: "annual",
+      methods: {
+        ...JSON.parse(lastCall("rollupStatement").specJson).methods,
+        debt_opening: "formula",
+      },
+    }),
+  );
+  expect(openingByFormula.nodes.debt_opening["2024"]).toBe(
+    quarterly.nodes.debt_opening["2024Q1"],
   );
   const revenue = within(income).getByRole("button", {
     name: "Revenue 2024, inspect value",
@@ -956,6 +990,48 @@ it("rolls reported quarters up to native annual values with editable methods", a
   ).findByRole("button", { name: "Revenue 2024Q1, value source, edit value" });
 });
 
+it("seeds the annual methods from a host RollupSpec without asking for the native default", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench
+        defaultModelJson={JSON.stringify(model)}
+        defaultRollupSpecJson={JSON.stringify({
+          frequency: "annual",
+          methods: { cash: "sum", total_debt: "period_end" },
+        })}
+      />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("region", { name: "Income statement" });
+  fireEvent.click(screen.getByRole("button", { name: "Annual" }));
+  await within(
+    await screen.findByRole("region", { name: "Income statement" }),
+  ).findByRole("columnheader", { name: "2024 Historical" });
+  expect(JSON.parse(lastCall("rollupStatement").specJson).methods).toEqual({
+    total_debt: "period_end",
+  });
+  expect(
+    call.mock.calls.some(([method]) => method === "defaultRollupSpec"),
+  ).toBe(false);
+});
+it("reports a host RollupSpec that does not parse instead of summing every line", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench
+        defaultModelJson={JSON.stringify(model)}
+        defaultRollupSpecJson="not json"
+      />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("region", { name: "Income statement" });
+  fireEvent.click(screen.getByRole("button", { name: "Annual" }));
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "Default rollup spec:",
+  );
+  expect(call.mock.calls.some(([method]) => method === "rollupStatement")).toBe(
+    false,
+  );
+});
 it(
   "runs scenarios with forecast overrides and compares them natively",
   async () => {

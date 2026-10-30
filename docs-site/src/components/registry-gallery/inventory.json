@@ -1512,7 +1512,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",
-      "sha256": "c5cded3ac073240076f1bca6031c2dfb957200b7621e614fb241adf4023a6855"
+      "sha256": "126410d91fd73f4e1f6f2137c6a33406a58d20cd753e8589c957c8fa184ef8d5"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-checks.json",
@@ -1600,15 +1600,15 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json",
-      "sha256": "40280f9e8b70fb22783c66f77bd2074047d28cad132053510e6c78446a567915"
+      "sha256": "1dfd711a5df9528b4bcfead38c5eea20101d27a7828a6d7d8df55e11aeb24c14"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q3.json",
-      "sha256": "37e06e6d0bd15951c553768171201ce8798258b0efd1f1bcdbe028135de29643"
+      "sha256": "a992923b5a7884b0133e21f4ca7764a56ba2f1cca6ac27bc69477ea1ba1ba7e8"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q4.json",
-      "sha256": "491a9c962636ba06701882cd2794f257ee536e9d45da2035a7bdb30178c9ae5f"
+      "sha256": "da3bd32a99be4189b317da2c35d576059ecdfdc9756e6671c6392b0b3ed48743"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",

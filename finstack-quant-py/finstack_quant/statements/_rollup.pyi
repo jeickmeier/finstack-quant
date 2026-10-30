@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from finstack_quant.statements._types import FinancialModelSpec
+
 class RollupSpec:
     """
     Target frequency and per-node methods for :meth:`StatementResult.rollup`.
@@ -45,6 +47,60 @@ class RollupSpec:
         ------
         ValueError
             If ``frequency`` or a method is not a recognized label.
+        """
+        ...
+
+    @staticmethod
+    def default_for(model: FinancialModelSpec | str, frequency: str) -> RollupSpec:
+        """
+        Default rollup methods for a model, chosen from its node tags.
+
+        The first matching rule decides each node: tagged ``balance_sheet``
+        takes ``"period_end"``; has a formula and is tagged ``ratio`` or
+        ``metric`` takes ``"formula"``; anything else sums and is not listed.
+        A balance tagged only ``debt`` sums, because ``debt`` also marks flows
+        such as draws and repayments, so tag balances ``balance_sheet``. A
+        ``ratio`` or ``metric`` formula reading ``cs.*`` values is still listed
+        as ``"formula"``, which :meth:`StatementResult.rollup` rejects.
+
+        Parameters
+        ----------
+        model : FinancialModelSpec | str
+            Model whose node tags and formulas choose the methods, typed or its
+            canonical JSON. Nothing is evaluated.
+        frequency : str
+            Target frequency stored on the spec (``"quarterly"``,
+            ``"semi_annual"``, ``"annual"``; surrounding whitespace and ASCII
+            case are ignored). It is checked against the model's periods by
+            :meth:`StatementResult.rollup`, not here.
+
+        Returns
+        -------
+        RollupSpec
+            The ``frequency`` and the ``"period_end"`` and ``"formula"`` nodes
+            in model order.
+
+        Raises
+        ------
+        ValueError
+            If ``model`` is malformed JSON or ``frequency`` is not a recognized
+            label.
+
+        Examples
+        --------
+        >>> import json
+        >>> from finstack_quant.statements import ModelBuilder, RollupSpec
+        >>> b = ModelBuilder("m")
+        >>> _ = b.periods("2025Q1..Q4", None)
+        >>> _ = b.value("revenue", [("2025Q1", 100.0)])
+        >>> _ = b.value("cash", [("2025Q1", 10.0)])
+        >>> _ = b.compute("margin", "revenue / revenue")
+        >>> model = json.loads(b.build().to_json())
+        >>> model["nodes"]["cash"]["tags"] = ["balance_sheet"]
+        >>> model["nodes"]["margin"]["tags"] = ["ratio"]
+        >>> RollupSpec.default_for(json.dumps(model), "annual").methods
+        {'cash': 'period_end', 'margin': 'formula'}
+
         """
         ...
 

@@ -2,28 +2,57 @@
   "model": {
     "id": "p9",
     "periods": [
-      { "id": "2025Q1", "start": "2025-01-01", "end": "2025-04-01", "is_actual": true },
-      { "id": "2025Q2", "start": "2025-04-01", "end": "2025-07-01", "is_actual": false }
+      {
+        "id": "2025Q1",
+        "start": "2025-01-01",
+        "end": "2025-04-01",
+        "is_actual": true
+      },
+      {
+        "id": "2025Q2",
+        "start": "2025-04-01",
+        "end": "2025-07-01",
+        "is_actual": false
+      }
     ],
     "nodes": {
       "revenue": {
         "node_id": "revenue",
         "node_type": "value",
-        "values": { "2025Q1": 100.0, "2025Q2": 120.0 }
+        "values": {
+          "2025Q1": 100.0,
+          "2025Q2": 120.0
+        }
       },
       "cogs": {
         "node_id": "cogs",
         "node_type": "value",
-        "values": { "2025Q1": 40.0, "2025Q2": 50.0 }
+        "values": {
+          "2025Q1": 40.0,
+          "2025Q2": 50.0
+        }
       },
-      "profit": { "node_id": "profit", "node_type": "calculated", "formula_text": "revenue - cogs" },
-      "margin": { "node_id": "margin", "node_type": "calculated", "formula_text": "profit / revenue" }
+      "profit": {
+        "node_id": "profit",
+        "node_type": "calculated",
+        "formula_text": "revenue - cogs"
+      },
+      "margin": {
+        "node_id": "margin",
+        "node_type": "calculated",
+        "formula_text": "profit / revenue"
+      }
     },
     "schema_version": 1
   },
   "check_suite": {
     "name": "p9 suite",
-    "builtin_checks": [{ "type": "non_finite", "nodes": [] }],
+    "builtin_checks": [
+      {
+        "type": "non_finite",
+        "nodes": []
+      }
+    ],
     "formula_checks": [
       {
         "id": "revenue_large",
@@ -43,12 +72,21 @@
         "id": "one_off",
         "name": "One-off cost",
         "category": "non_recurring",
-        "value": { "type": "fixed", "amounts": { "2025Q1": 5.0 } }
+        "value": {
+          "type": "fixed",
+          "amounts": {
+            "2025Q1": 5.0
+          }
+        }
       },
       {
         "id": "synergy",
         "name": "Synergies",
-        "value": { "type": "percentage_of_node", "node_id": "revenue", "percentage": 0.1 }
+        "value": {
+          "type": "percentage_of_node",
+          "node_id": "revenue",
+          "percentage": 0.1
+        }
       }
     ]
   },
@@ -56,29 +94,73 @@
     "by_instrument": {
       "TL-A": {
         "2025Q1": {
-          "interest_expense_cash": { "amount": "30", "currency": "USD" },
-          "interest_expense_pik": { "amount": "5", "currency": "USD" },
-          "principal_payment": { "amount": "100", "currency": "USD" },
-          "fees": { "amount": "2", "currency": "USD" },
-          "debt_balance": { "amount": "900", "currency": "USD" },
-          "accrued_interest": { "amount": "1.5", "currency": "USD" }
+          "interest_expense_cash": {
+            "amount": "30",
+            "currency": "USD"
+          },
+          "interest_expense_pik": {
+            "amount": "5",
+            "currency": "USD"
+          },
+          "principal_payment": {
+            "amount": "100",
+            "currency": "USD"
+          },
+          "fees": {
+            "amount": "2",
+            "currency": "USD"
+          },
+          "debt_balance": {
+            "amount": "900",
+            "currency": "USD"
+          },
+          "accrued_interest": {
+            "amount": "1.5",
+            "currency": "USD"
+          }
         }
       }
     },
     "totals": {
       "2025Q1": {
-        "interest_expense_cash": { "amount": "30", "currency": "USD" },
-        "interest_expense_pik": { "amount": "5", "currency": "USD" },
-        "principal_payment": { "amount": "100", "currency": "USD" },
-        "fees": { "amount": "2", "currency": "USD" },
-        "debt_balance": { "amount": "900", "currency": "USD" },
-        "accrued_interest": { "amount": "1.5", "currency": "USD" }
+        "interest_expense_cash": {
+          "amount": "30",
+          "currency": "USD"
+        },
+        "interest_expense_pik": {
+          "amount": "5",
+          "currency": "USD"
+        },
+        "principal_payment": {
+          "amount": "100",
+          "currency": "USD"
+        },
+        "fees": {
+          "amount": "2",
+          "currency": "USD"
+        },
+        "debt_balance": {
+          "amount": "900",
+          "currency": "USD"
+        },
+        "accrued_interest": {
+          "amount": "1.5",
+          "currency": "USD"
+        }
       }
     },
     "reporting_currency": "USD"
   },
   "corkscrew_config": {
-    "accounts": [{ "node_id": "cash", "account_type": "asset", "changes": ["inflow"] }],
+    "accounts": [
+      {
+        "node_id": "cash",
+        "account_type": "asset",
+        "changes": [
+          "inflow"
+        ]
+      }
+    ],
     "tolerance": 0.01,
     "fail_on_error": false
   },
@@ -89,14 +171,30 @@
         "name": "margin",
         "formula": "profit / revenue",
         "weight": 1.0,
-        "thresholds": { "AAA": [0.5, 1.0], "BBB": [0.0, 0.5] }
+        "thresholds": {
+          "AAA": [
+            0.5,
+            1.0
+          ],
+          "BBB": [
+            0.0,
+            0.5
+          ]
+        }
       }
     ]
   },
   "scenario_set": {
     "scenarios": {
-      "base": { "overrides": {} },
-      "down": { "parent": "base", "overrides": { "revenue": 90.0 } }
+      "base": {
+        "overrides": {}
+      },
+      "down": {
+        "parent": "base",
+        "overrides": {
+          "revenue": 90.0
+        }
+      }
     }
   },
   "sensitivity_config": {
@@ -106,31 +204,61 @@
         "node_id": "revenue",
         "period_id": "2025Q2",
         "base_value": 120.0,
-        "perturbations": [110.0, 130.0]
+        "perturbations": [
+          110.0,
+          130.0
+        ]
       }
     ],
-    "target_metrics": ["profit"]
+    "target_metrics": [
+      "profit"
+    ]
   },
   "subject": {
     "id": "SUBJ",
-    "attributes": { "tags": ["software"], "meta": { "gics_sector": "tech" } },
+    "attributes": {
+      "tags": [
+        "software"
+      ],
+      "meta": {
+        "gics_sector": "tech"
+      }
+    },
     "ebitda": 100.0,
-    "custom": { "rule_of_40": 42.0 }
+    "custom": {
+      "rule_of_40": 42.0
+    }
   },
   "universe": [
     {
       "id": "PEER1",
-      "attributes": { "tags": ["software"], "meta": { "gics_sector": "tech" } },
+      "attributes": {
+        "tags": [
+          "software"
+        ],
+        "meta": {
+          "gics_sector": "tech"
+        }
+      },
       "ebitda": 80.0
     },
     {
       "id": "PEER2",
-      "attributes": { "tags": ["retail"], "meta": { "gics_sector": "consumer" } },
+      "attributes": {
+        "tags": [
+          "retail"
+        ],
+        "meta": {
+          "gics_sector": "consumer"
+        }
+      },
       "ebitda": 60.0
     }
   ],
   "peer_filter": {
-    "gics_sectors": ["tech"],
+    "gics_sectors": [
+      "tech"
+    ],
     "gics_industries": [],
     "countries": [],
     "market_cap_min": null,
@@ -186,43 +314,121 @@
     "ead_schedule": null
   },
   "pd_schedule": [
-    [1.0, 0.02],
-    [2.0, 0.05],
-    [3.0, 0.09]
+    [
+      1.0,
+      0.02
+    ],
+    [
+      2.0,
+      0.05
+    ],
+    [
+      3.0,
+      0.09
+    ]
   ],
-  "comps_samples": [[1.0, 2.0, 3.0, 4.0, 5.5], [], [3.0]],
+  "comps_samples": [
+    [
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      5.5
+    ],
+    [],
+    [
+      3.0
+    ]
+  ],
   "lbo_model": {
     "id": "lbo",
     "schema_version": 1,
-    "meta": { "currency": "USD" },
+    "meta": {
+      "currency": "USD"
+    },
     "periods": [
-      { "id": "2025Q1", "start": "2025-01-01", "end": "2025-04-01", "is_actual": false },
-      { "id": "2025Q2", "start": "2025-04-01", "end": "2025-07-01", "is_actual": false },
-      { "id": "2025Q3", "start": "2025-07-01", "end": "2025-10-01", "is_actual": false },
-      { "id": "2025Q4", "start": "2025-10-01", "end": "2026-01-01", "is_actual": false },
-      { "id": "2026Q1", "start": "2026-01-01", "end": "2026-04-01", "is_actual": false }
+      {
+        "id": "2025Q1",
+        "start": "2025-01-01",
+        "end": "2025-04-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q2",
+        "start": "2025-04-01",
+        "end": "2025-07-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q3",
+        "start": "2025-07-01",
+        "end": "2025-10-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q4",
+        "start": "2025-10-01",
+        "end": "2026-01-01",
+        "is_actual": false
+      },
+      {
+        "id": "2026Q1",
+        "start": "2026-01-01",
+        "end": "2026-04-01",
+        "is_actual": false
+      }
     ],
     "nodes": {
       "ebitda": {
         "node_id": "ebitda",
         "node_type": "value",
         "values": {
-          "2025Q1": { "amount": "100", "currency": "USD" },
-          "2025Q2": { "amount": "100", "currency": "USD" },
-          "2025Q3": { "amount": "100", "currency": "USD" },
-          "2025Q4": { "amount": "100", "currency": "USD" },
-          "2026Q1": { "amount": "120", "currency": "USD" }
+          "2025Q1": {
+            "amount": "100",
+            "currency": "USD"
+          },
+          "2025Q2": {
+            "amount": "100",
+            "currency": "USD"
+          },
+          "2025Q3": {
+            "amount": "100",
+            "currency": "USD"
+          },
+          "2025Q4": {
+            "amount": "100",
+            "currency": "USD"
+          },
+          "2026Q1": {
+            "amount": "120",
+            "currency": "USD"
+          }
         }
       },
       "net_debt": {
         "node_id": "net_debt",
         "node_type": "value",
         "values": {
-          "2025Q1": { "amount": "300", "currency": "USD" },
-          "2025Q2": { "amount": "300", "currency": "USD" },
-          "2025Q3": { "amount": "300", "currency": "USD" },
-          "2025Q4": { "amount": "300", "currency": "USD" },
-          "2026Q1": { "amount": "200", "currency": "USD" }
+          "2025Q1": {
+            "amount": "300",
+            "currency": "USD"
+          },
+          "2025Q2": {
+            "amount": "300",
+            "currency": "USD"
+          },
+          "2025Q3": {
+            "amount": "300",
+            "currency": "USD"
+          },
+          "2025Q4": {
+            "amount": "300",
+            "currency": "USD"
+          },
+          "2026Q1": {
+            "amount": "200",
+            "currency": "USD"
+          }
         }
       }
     }
@@ -231,7 +437,12 @@
     "entry_multiple": 8.0,
     "entry_metric_node": "ebitda",
     "transaction_fees": 10.0,
-    "sources": [{ "name": "debt", "amount": 500.0 }],
+    "sources": [
+      {
+        "name": "debt",
+        "amount": 500.0
+      }
+    ],
     "exit_multiple": 9.0,
     "exit_metric_node": "ebitda",
     "exit_net_debt_node": "net_debt",
@@ -239,9 +450,15 @@
   },
   "lbo_check_mappings": {
     "three_statement": {
-      "assets_nodes": ["ebitda"],
-      "liabilities_nodes": ["net_debt"],
-      "equity_nodes": ["ebitda"],
+      "assets_nodes": [
+        "ebitda"
+      ],
+      "liabilities_nodes": [
+        "net_debt"
+      ],
+      "equity_nodes": [
+        "ebitda"
+      ],
       "cash_node": "net_debt",
       "retained_earnings_node": "ebitda",
       "net_income_node": "ebitda"
@@ -255,27 +472,146 @@
   "dcf_model": {
     "id": "dcf",
     "schema_version": 1,
-    "meta": { "currency": "USD" },
+    "meta": {
+      "currency": "USD"
+    },
     "periods": [
-      { "id": "2025", "start": "2025-01-01", "end": "2026-01-01", "is_actual": false },
-      { "id": "2026", "start": "2026-01-01", "end": "2027-01-01", "is_actual": false }
+      {
+        "id": "2025",
+        "start": "2025-01-01",
+        "end": "2026-01-01",
+        "is_actual": false
+      },
+      {
+        "id": "2026",
+        "start": "2026-01-01",
+        "end": "2027-01-01",
+        "is_actual": false
+      }
     ],
     "nodes": {
       "ufcf": {
         "node_id": "ufcf",
         "node_type": "value",
         "values": {
-          "2025": { "amount": "100", "currency": "USD" },
-          "2026": { "amount": "110", "currency": "USD" }
+          "2025": {
+            "amount": "100",
+            "currency": "USD"
+          },
+          "2026": {
+            "amount": "110",
+            "currency": "USD"
+          }
         }
       },
       "ebitda": {
         "node_id": "ebitda",
         "node_type": "value",
         "values": {
-          "2025": { "amount": "50", "currency": "USD" },
-          "2026": { "amount": "60", "currency": "USD" }
+          "2025": {
+            "amount": "50",
+            "currency": "USD"
+          },
+          "2026": {
+            "amount": "60",
+            "currency": "USD"
+          }
         }
+      }
+    }
+  },
+  "rollup_model": {
+    "schema_version": 1,
+    "id": "rollup",
+    "periods": [
+      {
+        "id": "2025Q1",
+        "start": "2025-01-01",
+        "end": "2025-04-01",
+        "is_actual": true
+      },
+      {
+        "id": "2025Q2",
+        "start": "2025-04-01",
+        "end": "2025-07-01",
+        "is_actual": true
+      },
+      {
+        "id": "2025Q3",
+        "start": "2025-07-01",
+        "end": "2025-10-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q4",
+        "start": "2025-10-01",
+        "end": "2026-01-01",
+        "is_actual": false
+      }
+    ],
+    "nodes": {
+      "revenue": {
+        "node_id": "revenue",
+        "node_type": "value",
+        "tags": [
+          "income_statement"
+        ],
+        "values": {
+          "2025Q1": 100.0,
+          "2025Q2": 110.0,
+          "2025Q3": 120.0,
+          "2025Q4": 130.0
+        }
+      },
+      "cash": {
+        "node_id": "cash",
+        "node_type": "value",
+        "tags": [
+          "balance_sheet"
+        ],
+        "values": {
+          "2025Q1": 10.0,
+          "2025Q2": 20.0,
+          "2025Q3": 30.0,
+          "2025Q4": 40.0
+        }
+      },
+      "debt_draws": {
+        "node_id": "debt_draws",
+        "node_type": "value",
+        "tags": [
+          "debt"
+        ],
+        "values": {
+          "2025Q1": 1.0,
+          "2025Q2": 2.0,
+          "2025Q3": 3.0,
+          "2025Q4": 4.0
+        }
+      },
+      "ebitda": {
+        "node_id": "ebitda",
+        "node_type": "calculated",
+        "tags": [
+          "income_statement"
+        ],
+        "formula_text": "revenue * 0.25"
+      },
+      "margin": {
+        "node_id": "margin",
+        "node_type": "calculated",
+        "tags": [
+          "ratio"
+        ],
+        "formula_text": "ebitda / revenue"
+      },
+      "score": {
+        "node_id": "score",
+        "node_type": "calculated",
+        "tags": [
+          "metric"
+        ],
+        "formula_text": "cash / revenue"
       }
     }
   }

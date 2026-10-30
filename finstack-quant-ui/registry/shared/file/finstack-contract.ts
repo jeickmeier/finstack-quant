@@ -56,6 +56,7 @@ import type {
   RiskDecomposition,
   SensitivityMatrixJson,
   models,
+  statements,
   statements_analytics,
   valuations,
 } from "finstack-quant-wasm";
@@ -364,6 +365,11 @@ export interface StatementRollupRequest {
   readonly modelJson: string;
   readonly resultsJson: string;
   readonly specJson: string;
+}
+/** The native default RollupSpec of `modelJson` at `frequency`, chosen from its node tags. */
+export interface StatementDefaultRollupRequest {
+  readonly modelJson: string;
+  readonly frequency: Parameters<typeof statements.rollupSpecDefaultFor>[1];
 }
 /** Native cashflow envelope object returned by the facade's instrument cashflow export. */
 export type CashflowEnvelope = ReturnType<
@@ -1251,6 +1257,10 @@ export interface StatementsApi {
   rollupStatement(
     request: StatementRollupRequest,
   ): Promise<Envelope<StatementResult>>;
+  /** statements.rollupSpecDefaultFor: rollup methods chosen from the model's node tags. */
+  defaultRollupSpec(
+    request: StatementDefaultRollupRequest,
+  ): Promise<Envelope<ReturnType<typeof statements.rollupSpecDefaultFor>>>;
   /** statements_analytics.creditAssessment: leverage, interest coverage and free cash flow at a period, with the per-period series. */
   creditAssessment(
     request: CreditAssessmentRequest,

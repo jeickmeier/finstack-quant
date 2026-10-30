@@ -27,6 +27,7 @@ export const statements = {
   statementResultGetOr: wasm.statementResultGetOr,
   statementResultAllPeriods: wasm.statementResultAllPeriods,
   statementResultRollup: wasm.statementResultRollup,
+  rollupSpecDefaultFor: wasm.rollupSpecDefaultFor,
   statementResultGetNode: wasm.statementResultGetNode,
   statementResultNodeIds: wasm.statementResultNodeIds,
   financialModelHasNode: wasm.financialModelHasNode,

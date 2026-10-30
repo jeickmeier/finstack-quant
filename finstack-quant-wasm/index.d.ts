@@ -31821,6 +31821,17 @@ export interface StatementsNamespace {
     spec: generated.statements.RollupSpec | string
   ): StatementResult;
   /**
+   * Default rollup methods for a model, chosen from its node tags.
+   * @param model - The `FinancialModelSpec` whose node tags and formulas choose the methods (object or JSON); nothing is evaluated.
+   * @param frequency - Target frequency stored on the spec: `"quarterly"`, `"semi_annual"` or `"annual"`. `statementResultRollup` checks it against the model's periods.
+   * @returns `RollupSpec` plain object with the `frequency` and the `period_end` and `formula` nodes in model order; `methods` is omitted when no node is listed.
+   * @throws Error - Throws with kind `validation` if the model is malformed or `frequency` is not a recognized label.
+   */
+  rollupSpecDefaultFor(
+    model: JsonInput,
+    frequency: 'quarterly' | 'semi_annual' | 'annual'
+  ): generated.statements.RollupSpec;
+  /**
    * Period-to-value map of one node.
    *
    * Free-function twin of Python `StatementResult.get_node` (Rust

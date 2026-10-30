@@ -39358,7 +39358,7 @@
         "node_id": "debt_at_inception",
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
-        "tags": ["debt"],
+        "tags": ["debt", "balance_sheet"],
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50056,7 +50056,7 @@
         "node_id": "debt_at_inception",
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
-        "tags": ["debt"],
+        "tags": ["debt", "balance_sheet"],
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50648,7 +50648,7 @@
         "node_id": "debt_at_inception",
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
-        "tags": ["debt"],
+        "tags": ["debt", "balance_sheet"],
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -51263,7 +51263,7 @@
         "node_id": "debt_at_inception",
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
-        "tags": ["debt"],
+        "tags": ["debt", "balance_sheet"],
         "value_type": {
           "type": "monetary",
           "currency": "USD"

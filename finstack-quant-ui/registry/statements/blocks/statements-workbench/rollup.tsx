@@ -12,30 +12,11 @@ const methodLabels: Record<RollupMethod, string> = {
   formula: "Recalculate formula (ratio)",
 };
 
-/**
- * Starting methods for a rollup: the host's RollupSpec methods when supplied,
- * otherwise balance-sheet lines take the period end and ratio or metric lines
- * with a formula are recalculated. Unlisted lines sum natively.
- */
-export function initialRollupMethods(
-  model: FinancialModelSpecWire,
-  defaultSpecJson?: string,
+/** The methods of a host-supplied RollupSpec. Throws on JSON that does not parse. */
+export function hostRollupMethods(
+  specJson: string,
 ): Record<string, RollupMethod> {
-  if (defaultSpecJson !== undefined) {
-    const spec = JSON.parse(defaultSpecJson) as RollupSpecWire;
-    return { ...spec.methods };
-  }
-  const methods: Record<string, RollupMethod> = {};
-  for (const [id, node] of Object.entries(model.nodes)) {
-    const tags = node.tags ?? [];
-    if (tags.includes("balance_sheet")) methods[id] = "period_end";
-    else if (
-      node.formula_text &&
-      tags.some((tag) => tag === "ratio" || tag === "metric")
-    )
-      methods[id] = "formula";
-  }
-  return methods;
+  return { ...(JSON.parse(specJson) as RollupSpecWire).methods };
 }
 
 /** Native annual RollupSpec JSON; lines not listed sum. */

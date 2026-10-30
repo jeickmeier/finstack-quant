@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Statements: rollup defaults decided in Rust
+
+#### Added
+
+- `RollupSpec::default_for(&model, frequency)` (Python `RollupSpec.default_for`, WASM `statements.rollupSpecDefaultFor`) chooses rollup methods from node tags: `balance_sheet` takes `period_end`, a formula tagged `ratio` or `metric` takes `formula`, and anything else sums. The statements workbench calls it instead of deciding in JavaScript, so every host starts from the same rule. Rolling up still sums unlisted nodes; a default is only applied when a host asks for it.
+
 ### Analytics: one path per capability
 
 #### Changed

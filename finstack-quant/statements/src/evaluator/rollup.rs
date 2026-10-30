@@ -12,7 +12,8 @@
 //!   value of a ratio is the ratio of the period.
 //!
 //! Only `period_end` and `formula` nodes need to be listed in a
-//! [`RollupSpec`]; everything else sums.
+//! [`RollupSpec`]; everything else sums. [`RollupSpec::default_for`] picks the
+//! methods from the model's node tags, so every host starts from the same rule.
 
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
@@ -71,6 +72,89 @@ pub struct RollupSpec {
     /// balances as `period_end` and ratios as `formula`.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub methods: IndexMap<String, RollupMethod>,
+}
+
+impl RollupSpec {
+    /// Default rollup methods for a model, chosen from its node tags.
+    ///
+    /// The first matching rule decides each node:
+    ///
+    /// | Node | Method |
+    /// | --- | --- |
+    /// | Tagged `balance_sheet` | `period_end` |
+    /// | Has a formula and is tagged `ratio` or `metric` | `formula` |
+    /// | Anything else | `sum` (not listed in `methods`) |
+    ///
+    /// The tags are the model's own declaration, so a mistagged line rolls up
+    /// wrongly: a balance tagged only `debt` sums. `debt` alone says nothing,
+    /// because it also marks flows such as draws and repayments. A `ratio` or
+    /// `metric` formula that reads capital-structure (`cs.*`) values is still
+    /// listed as `formula`, which [`StatementResult::rollup`] rejects; override
+    /// such a node's method.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - Model whose node tags and formulas choose the methods. Only
+    ///   its nodes are read; nothing is evaluated.
+    /// * `frequency` - Target frequency stored on the returned spec. It is not
+    ///   checked against the model's periods here; [`StatementResult::rollup`]
+    ///   does that.
+    ///
+    /// # Returns
+    ///
+    /// A [`RollupSpec`] for `frequency` listing the `period_end` and `formula`
+    /// nodes in model order.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::dates::PeriodKind;
+    /// use finstack_quant_statements::builder::ModelBuilder;
+    /// use finstack_quant_statements::evaluator::{RollupMethod, RollupSpec};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut model = {
+    ///     let mut model_builder = ModelBuilder::new("defaults");
+    ///     model_builder.periods("2025Q1..Q4", None)?;
+    ///     model_builder.value("revenue", &[]);
+    ///     model_builder.value("cash", &[]);
+    ///     model_builder.compute("margin", "revenue / revenue")?;
+    ///     model_builder.build()?
+    /// };
+    /// let mut tag = |id: &str, tag: &str| {
+    ///     if let Some(node) = model.get_node_mut(id) {
+    ///         node.tags.push(tag.to_string());
+    ///     }
+    /// };
+    /// tag("cash", "balance_sheet");
+    /// tag("margin", "ratio");
+    ///
+    /// let spec = RollupSpec::default_for(&model, PeriodKind::Annual);
+    /// assert_eq!(spec.methods.get("cash"), Some(&RollupMethod::PeriodEnd));
+    /// assert_eq!(spec.methods.get("margin"), Some(&RollupMethod::Formula));
+    /// assert_eq!(spec.methods.get("revenue"), None);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn default_for(model: &FinancialModelSpec, frequency: PeriodKind) -> Self {
+        let methods = model
+            .nodes
+            .iter()
+            .filter_map(|(node_id, node)| {
+                let tagged = |tag: &str| node.tags.iter().any(|node_tag| node_tag == tag);
+                let method = if tagged("balance_sheet") {
+                    RollupMethod::PeriodEnd
+                } else if node.formula_text.is_some() && (tagged("ratio") || tagged("metric")) {
+                    RollupMethod::Formula
+                } else {
+                    return None;
+                };
+                Some((node_id.as_str().to_string(), method))
+            })
+            .collect();
+        Self { frequency, methods }
+    }
 }
 
 /// One target period and the source periods it combines.
