@@ -83,7 +83,9 @@ function cells(
 }
 /** Presentation extent of the drawn intensities; null when they hold no range. */
 function generatorDomain(values: readonly number[]): HeatmapColors | null {
+  // finstack-arith: colour-scale extent of the drawn values
   const min = Math.min(...values),
+    // finstack-arith: colour-scale extent of the drawn values
     max = Math.max(...values);
   if (!(min < max)) return null;
   return min < 0 && max > 0

@@ -116,6 +116,7 @@ function VirtualIds({
               value={items[row.index]}
               index={row.index}
               aria-setsize={items.length}
+              // finstack-arith: 1-based aria-posinset of the row
               aria-posinset={row.index + 1}
             >
               {items[row.index]}

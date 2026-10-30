@@ -110,6 +110,7 @@ export function MarketContextForm({
       onValidated?.(null);
       setDocument((current) => ({
         value,
+        // finstack-arith: remount revision counter, not a value
         revision: current.revision + 1,
         error: null,
       }));

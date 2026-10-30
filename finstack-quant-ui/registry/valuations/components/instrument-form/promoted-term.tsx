@@ -116,6 +116,7 @@ export const promotedTerms: Record<string, PromotedTerm> = {
 };
 
 function atPath(value: unknown, path: string): unknown {
+  // finstack-arith: walks a dotted path through the form value; no numbers
   return path
     .split(".")
     .reduce<unknown>((node, key) => objectValue(node)[key], value);

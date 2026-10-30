@@ -91,6 +91,7 @@ export function VolCubeExplorer(props: VolCubeExplorerProps) {
     () =>
       props.cube.expiries.flatMap((expiry, row) =>
         props.cube.tenors.map((tenor, col) => {
+          // finstack-arith: row-major index into the supplied flat grid
           const index = row * props.cube.tenors.length + col;
           return {
             expiry,

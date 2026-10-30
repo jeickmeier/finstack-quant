@@ -200,6 +200,7 @@ export function MarketScenarioBuilder({
       setInput(null);
       setCanonical(null);
       onSpecChange?.(null);
+      // finstack-arith: remount revision counter, not a value
       setDoc((current) => ({ revision: current.revision + 1, value }));
     } catch (failure) {
       setActionError(message(failure));

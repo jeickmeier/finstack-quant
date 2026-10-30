@@ -462,6 +462,7 @@ export function PricingWorkbench({
                     acceptMarket(json);
                     setMarketDocument((current) => ({
                       json,
+                      // finstack-arith: remount revision counter, not a value
                       revision: current.revision + 1,
                     }));
                   }}

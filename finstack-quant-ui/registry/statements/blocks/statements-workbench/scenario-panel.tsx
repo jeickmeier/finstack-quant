@@ -375,10 +375,12 @@ export function ScenarioPanel({
         return (
           <section
             key={index}
+            // finstack-arith: 1-based ordinal for a label
             aria-label={`Scenario ${draft.name || index + 1}`}
             className="space-y-4 rounded-lg border border-border bg-card p-4"
           >
             <span id={scenarioId} className="sr-only">
+              {/* finstack-arith: 1-based ordinal for a label */}
               Scenario {draft.name || index + 1}
             </span>
             <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
@@ -523,6 +525,7 @@ export function ScenarioPanel({
                     layout="select"
                     value=""
                     onValueChange={(id) => {
+                      // finstack-arith: remount revision counter, not a value
                       setRevision((value) => value + 1);
                       update(index, {
                         forecasts: {

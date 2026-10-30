@@ -20,6 +20,7 @@ function traceRows(root: DependencyTree): TraceRow[] {
   const rows: TraceRow[] = [];
   const visit = (node: DependencyTree, depth: number) => {
     rows.push({ index: rows.length, depth, node });
+    // finstack-arith: tree depth for row indentation
     for (const child of node.children) visit(child, depth + 1);
   };
   visit(root, 0);

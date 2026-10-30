@@ -26,11 +26,13 @@ export function formatRaw(
 }
 /** Group exact decimal digits for the registry's en-US display; no numeric conversion. */
 export function groupDecimal(value: string): string {
+  // finstack-arith: expands exponent notation to digits; value unchanged
   const normalized = /[eE]/.test(value) ? new Big(value).toFixed() : value;
   const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(normalized);
   if (!match) throw new TypeError("Expected a decimal string");
   const [, sign, integer, fraction] = match;
   return (
+    // finstack-arith: concatenates the sign and grouped digits as strings
     sign +
     new Intl.NumberFormat("en-US").format(BigInt(integer)) +
     (fraction === undefined ? "" : `.${fraction}`)
@@ -94,18 +96,20 @@ export function convertRate(
   const powers = { decimal: 0, percent: 2, bp: 4 };
   if (!Object.hasOwn(powers, from) || !Object.hasOwn(powers, to))
     throw new TypeError("Unsupported rate presentation unit");
+  // finstack-arith: TODO(boundary) RB-6 duplicates core.Rate unit scaling; the rate input path goes
   const shift = powers[to] - powers[from];
   const fraction = /^-?\d+(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(value);
   if (!fraction)
     throw new TypeError("Expected decimal text for rate presentation");
-  return new Big(value)
-    .times(`1e${shift}`)
-    .toFixed(
-      Math.max(
-        0,
-        (fraction[1]?.length ?? 0) - Number(fraction[2] ?? 0) - shift,
-      ),
-    );
+  // finstack-arith: TODO(boundary) RB-6 duplicates core.Rate unit scaling; the rate input path goes
+  return new Big(value).times(`1e${shift}`).toFixed(
+    // finstack-arith: TODO(boundary) RB-6 duplicates core.Rate unit scaling; the rate input path goes
+    Math.max(
+      0,
+      // finstack-arith: TODO(boundary) RB-6 duplicates core.Rate unit scaling; the rate input path goes
+      (fraction[1]?.length ?? 0) - Number(fraction[2] ?? 0) - shift,
+    ),
+  );
 }
 /** Display an explicitly contracted rate, or preserve raw text with unavailable units. */
 export function formatRate(
@@ -117,6 +121,7 @@ export function formatRate(
     throw new TypeError("Rate presentation requires its canonical source");
   return {
     text: convertRate(
+      // finstack-arith: writes a supplied number as plain decimal text; value unchanged
       typeof value === "number" ? new Big(value).toFixed() : value,
       presentation.wire,
       presentation.display,
@@ -137,6 +142,7 @@ export function rateToWire(
 /** Add a plus sign only when the caller explicitly requests a supplied signed value. */
 export function formatSigned(value: string | number | bigint): string {
   const text = String(value);
+  // finstack-arith: reads the sign of a supplied value to prefix a plus
   return new Big(text).gt(0) ? `+${text}` : text;
 }
 /**
@@ -158,7 +164,8 @@ export function epochToIso(days: number, dates: DateApi): string {
   const [year, month, day] = dates.dateFromEpochDays(days);
   const y =
     year < 0
-      ? `-${String(-year).padStart(4, "0")}`
+      ? // finstack-arith: prints the magnitude of a negative ISO year
+        `-${String(-year).padStart(4, "0")}`
       : String(year).padStart(4, "0");
   return `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
@@ -177,7 +184,8 @@ function labelTokens(label: string): (number | string)[] {
   return [...label.matchAll(labelToken)].map(([text, sign, digits, unit]) =>
     digits === undefined
       ? text
-      : (sign ? -1 : 1) * (Number(digits) / (unit === "m" ? 12 : 1)),
+      : // finstack-arith: TODO(boundary) RB-7 re-implements parse_key_rate_label tenor ordering
+        (sign ? -1 : 1) * (Number(digits) / (unit === "m" ? 12 : 1)),
   );
 }
 /**
@@ -205,7 +213,8 @@ export function compareTenorLabels(left: string, right: string): number {
     const order =
       typeof a === "number"
         ? typeof b === "number"
-          ? a - b
+          ? // finstack-arith: TODO(boundary) RB-7 re-implements parse_key_rate_label tenor ordering
+            a - b
           : -1
         : typeof b === "number"
           ? 1

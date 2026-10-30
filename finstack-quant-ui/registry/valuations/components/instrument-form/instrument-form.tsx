@@ -85,6 +85,7 @@ export function InstrumentForm(props: {
 
             onClick={() => {
               props.onValidated?.(null);
+              // finstack-arith: remount revision counter, not a value
               setExample((n) => n + 1);
             }}
           >

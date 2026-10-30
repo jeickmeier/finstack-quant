@@ -63,7 +63,8 @@ function parameterLabel(key: string): string {
   const at = key.lastIndexOf("@");
   return at < 0
     ? labelFor(key)
-    : `${labelFor(key.slice(0, at))} · ${key.slice(at + 1)}`;
+    : // finstack-arith: string offset past the @ separator
+      `${labelFor(key.slice(0, at))} · ${key.slice(at + 1)}`;
 }
 /** A returned cell as text: grouped digits for a number, the sentinel or a dash otherwise. */
 function cellText(value: unknown): string {
@@ -165,6 +166,7 @@ export function StatementSensitivity({
           : []),
         ...data.result.scenarios.map((scenario, index) => ({
           id: String(index),
+          // finstack-arith: 1-based ordinal for a label
           label: `Scenario ${index + 1}`,
           parameters: Object.entries(scenario.parameter_values)
             .map(
@@ -236,6 +238,7 @@ export function StatementSensitivity({
             <div
               key={index}
               role="group"
+              // finstack-arith: 1-based ordinal for a label
               aria-label={`Parameter ${index + 1}`}
               className="grid items-end gap-3 @lg:grid-cols-[minmax(0,1fr)_10rem_minmax(0,1fr)_auto]"
             >
