@@ -106,7 +106,7 @@
               "currency": "USD"
             },
             "variation_margin": {
-              "amount": "-0",
+              "amount": "0",
               "currency": "USD"
             },
             "total_margin": {
@@ -162,7 +162,7 @@
               "currency": "USD"
             },
             "variation_margin": {
-              "amount": "-0",
+              "amount": "0",
               "currency": "USD"
             },
             "total_margin": {
@@ -301,7 +301,7 @@
               "currency": "USD"
             },
             "variation_margin": {
-              "amount": "-0",
+              "amount": "0",
               "currency": "USD"
             },
             "total_margin": {
@@ -357,7 +357,7 @@
               "currency": "USD"
             },
             "variation_margin": {
-              "amount": "-0",
+              "amount": "0",
               "currency": "USD"
             },
             "total_margin": {
