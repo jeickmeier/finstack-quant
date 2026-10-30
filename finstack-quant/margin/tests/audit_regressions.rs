@@ -384,3 +384,15 @@ fn drc_charge(positions: &[DrcPosition]) -> finstack_quant_core::Result<f64> {
             .drc,
     )
 }
+
+#[test]
+fn vm_net_margin_without_transfer_is_positive_zero() {
+    let calc = VmCalculator::new(CsaSpec::usd_regulatory().expect("registry"));
+    let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
+        .expect("date");
+    // Under the 500,000 regulatory MTA: no post, no collect.
+    let result = calc.calculate(usd(100_000.0), usd(0.0), date).expect("vm");
+    assert!(!result.requires_call());
+    let wire = serde_json::to_value(result.net_margin()).expect("serializes");
+    assert_eq!(wire["amount"], "0", "{wire}");
+}

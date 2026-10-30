@@ -69,12 +69,16 @@ pub struct VmResult {
 
 impl VmResult {
     /// Get net cash outflow: post minus collect, positive when the desk pays.
+    ///
+    /// At most one of the two amounts is non-zero. With no transfer the
+    /// result is a positive zero (`"0"` on the wire), never the Decimal
+    /// negative zero that negating a zero collect amount would produce.
     #[must_use]
     pub fn net_margin(&self) -> Money {
-        if self.post_amount.amount() > 0.0 {
-            self.post_amount
-        } else {
+        if self.collect_amount.amount() > 0.0 {
             self.collect_amount.checked_neg()
+        } else {
+            self.post_amount
         }
     }
 
