@@ -23,8 +23,7 @@ export function marginCallDatesOptions(
 }
 /** Native contractual call dates of a CSA between two dates, or the actual native error; supply a Finstack/Query provider. */
 export function useMarginCallDates(request: MarginCallDatesRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...marginCallDatesOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    marginCallDatesOptions(worker.client, worker.session, request),
+  );
 }

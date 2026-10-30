@@ -29,10 +29,9 @@ export function marketScenarioOptions(
 }
 /** Canonical ScenarioSpec text built and validated by Rust from the supplied operations, or the actual native error; supply a Finstack/Query provider. */
 export function useMarketScenario(request: MarketScenarioRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...marketScenarioOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    marketScenarioOptions(worker.client, worker.session, request),
+  );
 }
 /** A builder of canonical ScenarioSpec text from native operations, called on demand; rejects with the native error. */
 export function useBuildMarketScenario() {

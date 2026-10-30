@@ -26,8 +26,7 @@ export function valuePortfolioOptions(
 }
 /** Native portfolio valuation and aggregated metrics of a host-supplied book and market, or the actual native error; supply a Finstack/Query provider. */
 export function useValuePortfolio(request: PortfolioValuationRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...valuePortfolioOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    valuePortfolioOptions(worker.client, worker.session, request),
+  );
 }

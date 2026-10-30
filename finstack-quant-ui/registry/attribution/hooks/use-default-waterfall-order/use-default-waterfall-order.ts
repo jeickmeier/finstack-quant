@@ -8,7 +8,6 @@ export function useDefaultWaterfallOrder() {
   return useWorkerQuery((worker) => ({
     queryKey: ["finstack", worker.session, "defaultWaterfallOrder"] as const,
     queryFn: () => worker.client!.call("defaultWaterfallOrder"),
-    enabled: worker.status === "ready",
     ...workerQueryPolicy,
   }));
 }

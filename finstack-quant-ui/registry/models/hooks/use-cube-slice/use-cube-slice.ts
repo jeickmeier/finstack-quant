@@ -25,8 +25,7 @@ export function cubeSliceOptions(
 }
 /** Native materialized cube slice JSON; errors are unchanged. */
 export function useCubeSlice(request: CubeSliceRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...cubeSliceOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    cubeSliceOptions(worker.client, worker.session, request),
+  );
 }

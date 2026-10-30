@@ -29,8 +29,7 @@ export function positionRiskOptions(
 }
 /** Native models.factor.risk VaR/ES decomposition with its risk budget and tail stress attribution, or the actual native error; supply a Finstack/Query provider. */
 export function usePositionRisk(request: PositionRiskRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...positionRiskOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    positionRiskOptions(worker.client, worker.session, request),
+  );
 }

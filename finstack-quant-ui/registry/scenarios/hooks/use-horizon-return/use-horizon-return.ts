@@ -26,8 +26,7 @@ export function horizonReturnOptions(
 }
 /** Native scenarios.computeHorizonReturn report and its explain text, or the actual native error; supply a Finstack/Query provider. */
 export function useHorizonReturn(request: HorizonReturnRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...horizonReturnOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    horizonReturnOptions(worker.client, worker.session, request),
+  );
 }

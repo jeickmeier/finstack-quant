@@ -23,8 +23,7 @@ export function vmOptions(
 }
 /** Native variation margin of one exposure under a CSA, with Rust's call decision and net margin, or the actual native error; supply a Finstack/Query provider. */
 export function useVm(request: VmRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...vmOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    vmOptions(worker.client, worker.session, request),
+  );
 }

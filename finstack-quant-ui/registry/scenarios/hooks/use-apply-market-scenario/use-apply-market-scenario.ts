@@ -28,8 +28,7 @@ export function applyMarketScenarioOptions(
 export function useApplyMarketScenario(
   request: MarketScenarioApplicationRequest | null,
 ) {
-  return useWorkerQuery((worker) => ({
-    ...applyMarketScenarioOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    applyMarketScenarioOptions(worker.client, worker.session, request),
+  );
 }

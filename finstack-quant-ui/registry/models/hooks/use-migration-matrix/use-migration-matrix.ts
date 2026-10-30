@@ -26,8 +26,7 @@ export function migrationMatrixOptions(
 }
 /** Native models.credit.migration.TransitionMatrix of a labelled host matrix, or the actual native error; supply a Finstack/Query provider. */
 export function useMigrationMatrix(request: MigrationMatrixRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...migrationMatrixOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    migrationMatrixOptions(worker.client, worker.session, request),
+  );
 }

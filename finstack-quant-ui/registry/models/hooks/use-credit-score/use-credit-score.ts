@@ -29,8 +29,7 @@ export function creditScoreOptions(
 }
 /** A native models.credit.scoring result graded on the default PD master scale, or the actual native error; supply a Finstack/Query provider. */
 export function useCreditScore(request: CreditScoreRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...creditScoreOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    creditScoreOptions(worker.client, worker.session, request),
+  );
 }

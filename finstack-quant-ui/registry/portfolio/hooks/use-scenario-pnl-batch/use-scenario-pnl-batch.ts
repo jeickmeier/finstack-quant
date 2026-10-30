@@ -26,8 +26,7 @@ export function scenarioPnlBatchOptions(
 }
 /** Native portfolio.scenarioPnlBatch items in scenario order with the book's position order, or the earliest failing scenario's native error; supply a Finstack/Query provider. */
 export function useScenarioPnlBatch(request: ScenarioPnlBatchRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...scenarioPnlBatchOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    scenarioPnlBatchOptions(worker.client, worker.session, request),
+  );
 }

@@ -27,8 +27,7 @@ export function evaluateCovenantsOptions(
 }
 /** Native statements_analytics.evaluateCovenants DatedCovenantReports rows or structured failure. */
 export function useEvaluateCovenants(request: EvaluateCovenantsRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...evaluateCovenantsOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    evaluateCovenantsOptions(worker.client, worker.session, request),
+  );
 }

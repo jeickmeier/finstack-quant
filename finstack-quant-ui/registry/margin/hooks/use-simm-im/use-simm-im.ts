@@ -23,8 +23,7 @@ export function simmImOptions(
 }
 /** Native indicative SIMM ImResult of a sensitivity set in its own base currency, or the actual native error; supply a Finstack/Query provider. */
 export function useSimmIm(request: SimmImRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...simmImOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    simmImOptions(worker.client, worker.session, request),
+  );
 }

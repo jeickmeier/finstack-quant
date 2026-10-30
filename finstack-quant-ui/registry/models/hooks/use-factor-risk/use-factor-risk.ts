@@ -50,8 +50,7 @@ export function factorRiskOptions(
 }
 /** Native portfolio.computeFactorSensitivities of a host-supplied book, then models.factor.risk.decomposeFactors of that matrix, or the first native error; supply a Finstack/Query provider. */
 export function useFactorRisk(request: FactorRiskRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...factorRiskOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    factorRiskOptions(worker.client, worker.session, request),
+  );
 }

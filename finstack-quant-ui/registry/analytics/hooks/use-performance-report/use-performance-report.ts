@@ -29,8 +29,7 @@ export function performanceReportOptions(
 }
 /** Native analytics.Performance results of a host-supplied panel, or the actual native error; supply a Finstack/Query provider. */
 export function usePerformanceReport(request: PerformanceReportRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...performanceReportOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    performanceReportOptions(worker.client, worker.session, request),
+  );
 }

@@ -25,8 +25,7 @@ export function cubeOptions(
 }
 /** Native volatilities in the selected convention and coordinate order; errors are unchanged. */
 export function useCubeSamples(request: CubeSampleRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...cubeOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    cubeOptions(worker.client, worker.session, request),
+  );
 }

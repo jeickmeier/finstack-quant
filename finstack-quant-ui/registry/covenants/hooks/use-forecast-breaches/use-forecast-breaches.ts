@@ -26,8 +26,7 @@ export function forecastBreachesOptions(
 }
 /** Native statements_analytics.forecastBreaches FutureBreach rows or structured failure. */
 export function useForecastBreaches(request: ForecastBreachesRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...forecastBreachesOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    forecastBreachesOptions(worker.client, worker.session, request),
+  );
 }

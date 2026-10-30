@@ -23,8 +23,7 @@ export function marginCallsOptions(
 }
 /** Native margin-call schedule of an exposure series under a CSA, or the actual native error; supply a Finstack/Query provider. */
 export function useMarginCalls(request: MarginCallsRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...marginCallsOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    marginCallsOptions(worker.client, worker.session, request),
+  );
 }
