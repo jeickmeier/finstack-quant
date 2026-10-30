@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from finstack_quant import statements
 from finstack_quant.statements import StatementResult
 from finstack_quant.statements_analytics import credit_assessment
@@ -45,3 +47,9 @@ def test_credit_assessment_accepts_json_and_series_ascending() -> None:
     assert q4.leverage_ratio == 3.0
     q1 = next(pt for pt in out.series if pt.period == "2025Q1")
     assert q1.leverage_ratio is None  # incomplete TTM window
+
+
+@pytest.mark.parametrize("period", ["2030Q1", "2025"])
+def test_credit_assessment_rejects_period_outside_results(period: str) -> None:
+    with pytest.raises(ValueError, match="not a period of the statement results"):
+        credit_assessment(_results(), period)

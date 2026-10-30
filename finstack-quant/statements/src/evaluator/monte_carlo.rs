@@ -109,7 +109,10 @@ pub struct MonteCarloResults {
     pub percentiles: Vec<f64>,
     /// Forecast (non-actual) periods included in the simulation.
     pub forecast_periods: Vec<PeriodId>,
-    /// Warnings encountered while evaluating Monte Carlo paths.
+    /// Distinct warnings raised in the simulated forecast periods, each
+    /// reported once however many paths raised it, in a canonical sorted
+    /// order. Warnings in actual periods are omitted: those periods are not
+    /// simulated and every path repeats the deterministic evaluation's.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<EvalWarning>,
     /// Internal storage of path-level values keyed by `(path_id, value)` so
@@ -334,6 +337,16 @@ fn normalize_percentiles(raw: &[f64]) -> Result<Vec<f64>> {
     Ok(v)
 }
 
+/// Period a warning was raised in.
+fn warning_period(warning: &EvalWarning) -> &PeriodId {
+    match warning {
+        EvalWarning::DivisionByZero { period, .. }
+        | EvalWarning::NonFiniteValue { period, .. }
+        | EvalWarning::CapitalStructure { period, .. }
+        | EvalWarning::NonFiniteSkipped { period, .. } => period,
+    }
+}
+
 pub(crate) struct MonteCarloAccumulator {
     expected_paths: usize,
     observed_paths: usize,
@@ -380,7 +393,13 @@ impl MonteCarloAccumulator {
         warnings: Vec<EvalWarning>,
     ) -> Result<()> {
         self.observed_paths += 1;
-        self.warnings.extend(warnings);
+        // Actual periods are not simulated: their warnings repeat the
+        // deterministic evaluation's on every path.
+        self.warnings.extend(
+            warnings
+                .into_iter()
+                .filter(|warning| self.forecast_set.contains(warning_period(warning))),
+        );
 
         for (metric, period_map) in path_results {
             let metric_entry = self.path_values.entry(metric.clone()).or_default();
@@ -446,8 +465,11 @@ impl MonteCarloAccumulator {
         // nondeterministic, so sort serialized outputs (path-table rows and
         // warnings) into a canonical order: serial ≡ parallel must hold for
         // everything that reaches the wire.
+        // Report each distinct warning once rather than once per path.
         self.warnings
             .sort_by_cached_key(|warning| format!("{warning:?}"));
+        self.warnings
+            .dedup_by(|lhs, rhs| format!("{lhs:?}") == format!("{rhs:?}"));
 
         let path_data = if !self.include_path_data
             || self

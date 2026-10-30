@@ -59,6 +59,11 @@ def attribute_pnl(
         ``inflation_curves``, ``correlations``, ``fx``, ``volatility``,
         ``model_parameters``, ``market_scalars`` (the order must start with
         ``carry``; :func:`default_waterfall_order` is the canonical full list).
+        Without ``config["metrics"]``, ``"metrics_based"`` prices the
+        default metric menu; when an instrument hazard curve has no
+        calibration recipe and that menu fails, the quote-space credit
+        metrics are dropped with a note in ``notes`` and credit-curve
+        P&L flows to the residual.
     config : dict[str, Any] or str or None
         Optional config overrides (``tolerance_abs``, ``tolerance_pct``,
         ``metrics``, ``strict_validation``, ``rounding_scale``,

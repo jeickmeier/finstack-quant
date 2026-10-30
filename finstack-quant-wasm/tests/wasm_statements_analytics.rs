@@ -95,7 +95,7 @@ fn generate_tornado_entries_returns_structured_array() {
     let entries = generate_tornado_entries(
         JsValue::from(&serde_json::to_string(&result).unwrap()),
         JsValue::from("revenue"),
-        Some(JsValue::from("2024Q1".to_string())),
+        JsValue::from("2024Q1"),
     )
     .unwrap();
     let entries: Vec<finstack_quant_statements_analytics::analysis::TornadoEntry> =

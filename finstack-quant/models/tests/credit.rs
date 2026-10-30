@@ -93,3 +93,51 @@ fn migration_empirical_matrix_is_reproducible_for_same_seed() {
         }
     }
 }
+
+#[test]
+fn merton_model_json_rejects_unknown_fields() {
+    use finstack_quant_models::credit::MertonModel;
+
+    let valid = serde_json::json!({
+        "asset_value": 100.0,
+        "asset_vol": 0.25,
+        "debt_barrier": 80.0,
+        "risk_free_rate": 0.03,
+        "payout_rate": 0.0,
+        "barrier_type": "terminal",
+        "dynamics": "geometric_brownian"
+    });
+    serde_json::from_value::<MertonModel>(valid.clone()).expect("valid Merton model JSON");
+
+    let mut nested = valid.clone();
+    nested["dynamics"] = serde_json::json!({
+        "jump_diffusion": {"jump_intensity": 1.0, "jump_mean": 0.0, "jump_vol": 0.1, "typo": 5.0}
+    });
+    let error = serde_json::from_value::<MertonModel>(nested)
+        .expect_err("an unknown dynamics field must not be silently ignored");
+    assert!(
+        error.to_string().contains("unknown field `typo`"),
+        "{error}"
+    );
+    let mut barrier = valid.clone();
+    barrier["barrier_type"] = serde_json::json!({
+        "first_passage": {"barrier_growth_rate": 0.0, "typo": 1.0}
+    });
+    let error = serde_json::from_value::<MertonModel>(barrier)
+        .expect_err("an unknown barrier field must not be silently ignored");
+    assert!(
+        error.to_string().contains("unknown field `typo`"),
+        "{error}"
+    );
+
+    let mut misspelled = valid;
+    misspelled["asset_volatility"] = serde_json::json!(0.4);
+    let error = serde_json::from_value::<MertonModel>(misspelled)
+        .expect_err("an unknown field must not be silently ignored");
+    assert!(
+        error
+            .to_string()
+            .contains("unknown field `asset_volatility`"),
+        "{error}"
+    );
+}

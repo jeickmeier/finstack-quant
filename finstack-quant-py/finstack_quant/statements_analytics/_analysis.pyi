@@ -1037,7 +1037,7 @@ def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Expl
     50.0
     """
 
-def generate_tornado_entries(result: Any, metric_node: str, period: str | None = None) -> list[TornadoEntry]:
+def generate_tornado_entries(result: Any, metric_node: str, period: str) -> list[TornadoEntry]:
     """Generate tornado chart entries for a sensitivity result.
 
     Parameters
@@ -1046,8 +1046,11 @@ def generate_tornado_entries(result: Any, metric_node: str, period: str | None =
         A typed sensitivity result or its JSON serialization.
     metric_node : str
         Node to extract tornado entries for.
-    period : str | None
-        Optional period string to pin the tornado to.
+    period : str
+        Period at which the metric is read in the baseline and every scenario
+        (e.g. ``"2025Q4"``). Required: a shock replaces one forecast cell, so
+        the metric moves only in the shocked period and in later periods whose
+        formulas read it.
 
     Returns
     -------
@@ -1147,6 +1150,13 @@ def goal_seek(
 
 def run_sensitivity(model: Any, config: Any) -> SensitivityResult:
     """Run sensitivity analysis on a financial model.
+
+    Each perturbation replaces its node's value in its one forecast period
+    (Value > Forecast > Formula). It does not re-anchor the node's own
+    forecast: later periods of a growth, seasonal or stochastic forecast keep
+    their unshocked base. Formula nodes that read the shocked cell move, in
+    its period and in later periods reached through ``lag``, ``ttm`` or
+    ``cumsum``. Add one parameter per period to shock a whole forecast path.
 
     Parameters
     ----------

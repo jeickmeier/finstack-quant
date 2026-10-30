@@ -168,7 +168,9 @@ impl_repr_html_via_dataframe!(PyCreditAssessment);
 ///     ``total_debt``, ``interest_expense`` and ``free_cash_flow`` nodes.
 /// period : str
 ///     Period identifier for the assessment (``"2025Q4"``, ``"2025M03"``,
-///     ``"FY2025"``). This is a ``PeriodId``, not a date.
+///     ``"FY2025"``). This is a ``PeriodId``, not a date, and it must be a
+///     period of ``results`` in the model's own frequency: ``"2025"`` is the
+///     annual period, not the last quarter of a quarterly model.
 ///
 /// Returns
 /// -------
@@ -184,8 +186,8 @@ impl_repr_html_via_dataframe!(PyCreditAssessment);
 /// Raises
 /// ------
 /// ValueError
-///     If ``period`` is not a valid period identifier or ``results`` is
-///     malformed JSON.
+///     If ``period`` is not a valid period identifier, no node of ``results``
+///     has a value at ``period``, or ``results`` is malformed JSON.
 ///
 /// Examples
 /// --------
@@ -202,7 +204,8 @@ fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCre
     let results = extract_results_ref(results)?;
     let period = parse_period_id(period)?;
     Ok(PyCreditAssessment {
-        inner: CreditAssessment::compute(&results, period),
+        inner: CreditAssessment::compute(&results, period)
+            .map_err(crate::errors::statements_to_py)?,
     })
 }
 

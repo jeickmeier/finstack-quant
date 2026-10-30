@@ -35,7 +35,7 @@ const requests = [
     calendarId: "nyse",
   },
   // The bond market's raw hazard curve has no calibration recipe, so the
-  // metrics-based method's cs01 fails and the native error is recorded.
+  // metrics-based method drops its quote-space credit metrics with a note.
   {
     name: "roll-3m-50bp-metrics-based",
     draft: roll3m,

@@ -116,15 +116,14 @@ it("pins Rust's horizon figures and leaves the annualized return undefined witho
     "taylor",
   );
 });
-it("returns the native metrics_based failure and an unknown calendar unchanged", async () => {
-  const failed = await harness.proxy.horizonReturn(
-    request("roll-3m-50bp-metrics-based"),
-  );
-  expect(failed.ok).toBe(false);
-  if (!failed.ok)
-    expect(failed.error.message).toBe(
-      entry("roll-3m-50bp-metrics-based").error!.message,
-    );
+it("returns Rust's metrics_based note and an unknown calendar's native error unchanged", async () => {
+  // The bond's hazard curve has no calibration recipe: Rust drops the
+  // quote-space credit metrics with a note instead of failing.
+  expect(
+    report("roll-3m-50bp-metrics-based").attribution.meta.notes.some((note) =>
+      note.includes("calibration recipe"),
+    ),
+  ).toBe(true);
   const calendar = await harness.proxy.horizonReturn({
     ...request("roll-3m-50bp"),
     calendarId: "no-such-calendar",
@@ -210,10 +209,10 @@ it("shows the empty, loading and native-error states", () => {
   rerender(
     <HorizonReturnReport
       report={report("roll-3m-50bp")}
-      error={entry("roll-3m-50bp-metrics-based").error!.message}
+      error="Requested item not found: no-such-calendar"
     />,
   );
   expect(screen.getByRole("alert").textContent).toContain(
-    "lossless calibration recipe",
+    "Requested item not found: no-such-calendar",
   );
 });

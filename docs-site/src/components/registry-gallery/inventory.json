@@ -1444,7 +1444,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/horizon/cases.json",
-      "sha256": "27d8b8f197a8a66b854dee54fdf2fce7b70e2f830e05cbf3f65243fa24f3f2f6"
+      "sha256": "579fcccab23ddd5a61e597eeccca06fb48f5103a9194d264587f2c2d937c651e"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/templates/cases.json",
@@ -1452,7 +1452,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/attribution/cases.json",
-      "sha256": "cd14d6dc977a1e5c28800c02924e9718af87ae38dcfec5291ceb2eb3fad2c905"
+      "sha256": "c50a8ad2446aa5df6a7cbcb60fe85f80b7d69fc695801a70cfda1d59cfa9f1a8"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",
@@ -1496,7 +1496,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
-      "sha256": "5de939f6497e41c47b65175dca788d1dbecf7c5a1c8488d720a8df588dedc657"
+      "sha256": "99a20d53501df2235088de008c35124cc339f9741b9e160338de66b4e2c67a50"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
@@ -1584,7 +1584,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo.json",
-      "sha256": "c53139c82b0c9759b5eb8529ea5ed0fd5f5c1e33e18e01c8e9f63577f72ea376"
+      "sha256": "50fa244f436b35d1392fe3252e494e4139d3abe74826210f0d31a280d0f9f251"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-breach.json",

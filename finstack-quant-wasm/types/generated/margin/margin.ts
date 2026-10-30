@@ -1856,7 +1856,8 @@ export interface VmResult {
    */
   collect_amount: valuations.Money;
   /**
-   * Calculation date
+   * Call date: the requested valuation date rolled to the next business
+   * day of the CSA calendar (Following) when it is not one.
    */
   date: string;
   /**

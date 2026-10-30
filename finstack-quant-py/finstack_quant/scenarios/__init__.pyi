@@ -65,6 +65,12 @@ def compose_scenarios(specs: list[ScenarioSpec]) -> ScenarioSpec:
     input order) and their operations concatenated in that order. Every input
     must use the same ``hazard_bump_mode``.
 
+    The composed spec takes its ``id`` and ``name`` from the inputs joined
+    with ``+`` / ``" + "``, its ``description`` from the present input
+    descriptions joined with ``" + "`` (``None`` when no input has one), and
+    the lowest input ``priority`` (``0`` for an empty list), all in
+    execution order.
+
     Parameters
     ----------
     specs : list[ScenarioSpec]

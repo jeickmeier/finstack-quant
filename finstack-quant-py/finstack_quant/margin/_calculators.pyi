@@ -88,12 +88,13 @@ class VmResult:
     @property
     def date(self) -> datetime.date:
         """
-        Calculation date.
+        Business day on which the margin call is made.
 
         Returns
         -------
         datetime.date
-            The ``as_of`` passed to ``VmCalculator.calculate``.
+            The ``as_of`` passed to ``VmCalculator.calculate``, rolled to the
+            next business day of the CSA calendar when it is not one.
 
         Notes
         -----
@@ -534,14 +535,16 @@ class VmCalculator:
         currency : str
             ISO currency code; must equal the CSA base currency.
         as_of : datetime.date | str
-            Calculation date as ``datetime.date``, ``datetime.datetime``,
-            ``pandas.Timestamp`` or ISO ``YYYY-MM-DD`` string; the
-            settlement date is derived from it on the CSA calendar.
+            Valuation date as ``datetime.date``, ``datetime.datetime``,
+            ``pandas.Timestamp`` or ISO ``YYYY-MM-DD`` string. A date that is
+            not a business day of the CSA calendar is rolled to the next one
+            (Following); the settlement date is derived from that call date.
 
         Returns
         -------
         VmResult
-            VM breakdown with delivery/return amounts and settlement date.
+            VM breakdown with delivery/return amounts, the call date (a CSA
+            business day) and the settlement date.
 
         Raises
         ------
@@ -572,7 +575,9 @@ class VmCalculator:
         exposures : list[tuple[datetime.date | str, float]] | pd.Series
             Dated signed exposures in the CSA base currency (positive = the
             counterparty owes us), processed in the order given. A ``Series``
-            contributes its index as the dates.
+            contributes its index as the dates. A date that is not a business
+            day of the CSA calendar is rolled to the next one (Following), so
+            every ``call_date`` is a CSA business day.
         initial_collateral : float
             Collateral posted before the first date, in the CSA base currency.
 

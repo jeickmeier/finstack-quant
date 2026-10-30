@@ -112,7 +112,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1257609
+            "bytes": 1257771
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
@@ -1408,7 +1408,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json",
             "type_name": "VmResult",
             "kind": "output",
-            "bytes": 4320
+            "bytes": 4428
           },
           {
             "path": "schemas/margin/1/xva_result.schema.json",
@@ -1990,7 +1990,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1150947
+            "bytes": 1151109
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2119,7 +2119,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 383553
+            "bytes": 383715
           },
           {
             "path": "schemas/statements/1/metric_registry.schema.json",
@@ -2140,7 +2140,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
             "type_name": "MonteCarloResults",
             "kind": "output",
-            "bytes": 31502
+            "bytes": 31713
           },
           {
             "path": "schemas/statements/1/normalization_config.schema.json",
@@ -2672,7 +2672,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
             "type_name": "InstrumentPricingOverrides",
             "kind": "component",
-            "bytes": 62986
+            "bytes": 63148
           },
           {
             "path": "schemas/common/1/ir_future_conventions.schema.json",
@@ -3604,7 +3604,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1257609
+            "bytes": 1257771
           },
           {
             "domain": "attribution",
@@ -4148,7 +4148,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/vm_result.schema.json",
             "type_name": "VmResult",
             "kind": "output",
-            "bytes": 4320
+            "bytes": 4428
           },
           {
             "domain": "margin",
@@ -4492,7 +4492,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1150947
+            "bytes": 1151109
           },
           {
             "domain": "scenarios",
@@ -4548,7 +4548,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 383553
+            "bytes": 383715
           },
           {
             "domain": "statements",
@@ -4572,7 +4572,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
             "type_name": "MonteCarloResults",
             "kind": "output",
-            "bytes": 31502
+            "bytes": 31713
           },
           {
             "domain": "statements",
@@ -4716,7 +4716,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
             "type_name": "InstrumentPricingOverrides",
             "kind": "component",
-            "bytes": 62986
+            "bytes": 63148
           },
           {
             "domain": "valuations",

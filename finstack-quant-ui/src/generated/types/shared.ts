@@ -15722,7 +15722,6 @@ export type D_46455Be5Cce6B8020E50 =
          * Volatility of log-jump size.
          */
         jump_vol: number;
-        [k: string]: unknown;
       };
     }
   | {
@@ -15740,7 +15739,6 @@ export type D_46455Be5Cce6B8020E50 =
          * Mean recovery rate at default.
          */
         mean_recovery: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -15823,7 +15821,6 @@ export type D_780B68Ee5D41351B65Ca =
          * Growth rate of the default barrier over time.
          */
         barrier_growth_rate: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -17965,7 +17962,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Growth rate of the default barrier over time.
            */
           barrier_growth_rate: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -17992,7 +17988,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Volatility of log-jump size.
            */
           jump_vol: number;
-          [k: string]: unknown;
         };
       }
     | {
@@ -18010,7 +18005,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Mean recovery rate at default.
            */
           mean_recovery: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -18022,7 +18016,6 @@ export interface DEe4323Acfdb49E4Fe15B {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Hard threshold toggle configuration.
@@ -58928,7 +58921,7 @@ export interface InstrumentPricingOverrides78 {
  *
  * Deserialization is routed through [`MertonModel::new_with_dynamics`] via
  * `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
- * invariants as one built in Rust. The serialized field set is unchanged.
+ * invariants as one built in Rust. Unknown fields are rejected.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_ee4323acfdb49e4fe15b".
@@ -58956,7 +58949,6 @@ export interface DEe4323Acfdb49E4Fe15B1 {
            * Growth rate of the default barrier over time.
            */
           barrier_growth_rate: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -58983,7 +58975,6 @@ export interface DEe4323Acfdb49E4Fe15B1 {
            * Volatility of log-jump size.
            */
           jump_vol: number;
-          [k: string]: unknown;
         };
       }
     | {
@@ -59001,7 +58992,6 @@ export interface DEe4323Acfdb49E4Fe15B1 {
            * Mean recovery rate at default.
            */
           mean_recovery: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -59013,7 +59003,6 @@ export interface DEe4323Acfdb49E4Fe15B1 {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Scenario-only price and spread shocks.

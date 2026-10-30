@@ -8,7 +8,8 @@ export interface VmResultWire {
   collateral_balance: Money;
   collect_amount: Money1;
   /**
-   * Calculation date
+   * Call date: the requested valuation date rolled to the next business
+   * day of the CSA calendar (Following) when it is not one.
    */
   date: string;
   gross_exposure: Money2;
