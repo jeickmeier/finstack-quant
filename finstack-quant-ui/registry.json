@@ -298,6 +298,39 @@
       }
     },
     {
+      "name": "contract-covenant-forecast-config",
+      "type": "registry:lib",
+      "title": "Covenant forecast config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust covenant_forecast_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/covenant_forecast_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/covenant_forecast_config.json"
+        },
+        {
+          "path": "src/generated/types/covenant_forecast_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/covenant_forecast_config.ts"
+        },
+        {
+          "path": "src/generated/meta/covenant_forecast_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/covenant_forecast_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-covenant-report",
       "type": "registry:lib",
       "title": "Covenant report contract",
@@ -360,6 +393,39 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-future-breach",
+      "type": "registry:lib",
+      "title": "Future breach contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust future_breach contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/future_breach.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/future_breach.json"
+        },
+        {
+          "path": "src/generated/types/future_breach.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/future_breach.ts"
+        },
+        {
+          "path": "src/generated/meta/future_breach.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/future_breach.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json"
         ]
       }
     },

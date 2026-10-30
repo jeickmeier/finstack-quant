@@ -87,6 +87,8 @@ const sources = {
     "src/fixtures/statements/roll-forward-2025Q4.json",
   covenantSeries: "src/fixtures/covenants/analyst-covenant-series.json",
   covenantEngine: "src/fixtures/covenants/analyst-covenants.json",
+  covenantForecastConfig: "src/fixtures/covenants/analyst-forecast-config.json",
+  covenantBreachForecast: "src/fixtures/covenants/analyst-breach-forecast.json",
 };
 // The example maps are hand-written: an unmapped visual item renders a crashing gallery page.
 const exampleMaps = (

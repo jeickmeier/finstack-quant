@@ -99,6 +99,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "covenantTemplate",
     "validateCovenantEngine",
     "evaluateCovenants",
+    "forecastBreaches",
     // ScenariosApi
     "buildMarketScenario",
     "applyMarketScenario",

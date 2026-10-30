@@ -182,6 +182,19 @@ beforeEach(() => {
           engine.free();
         }
       }
+      case "forecastBreaches": {
+        const engine = native.CovenantEngine.fromJson(arg.engineJson);
+        try {
+          return native.statementsAnalyticsForecastBreaches(
+            arg.resultsJson,
+            engine,
+            arg.modelJson,
+            arg.configJson,
+          );
+        } finally {
+          engine.free();
+        }
+      }
       case "goalSeek":
         return native.goalSeek(
           arg.modelJson,
@@ -829,6 +842,21 @@ it("tests the host covenant engine on open in the Covenants tab and returns Rust
   expect(Object.keys(JSON.parse(evaluated.resultsJson).nodes)).toContain(
     "leverage",
   );
+  // The breach forecast waits for a submitted config; the analyst engine
+  // passes every date, so Rust's deterministic default forecasts none.
+  const breaches = screen.getByRole("region", {
+    name: "Covenant breach forecast",
+  });
+  expect(lastCall("forecastBreaches")).toBeUndefined();
+  const forecast = within(breaches).getByRole("button", { name: "Forecast" });
+  await waitFor(async () => {
+    await userEvent.click(forecast);
+    expect(lastCall("forecastBreaches")).toBeDefined();
+  });
+  expect(JSON.parse(lastCall("forecastBreaches").configJson)).toEqual({});
+  expect(
+    await within(breaches).findByText("Rust forecast no breaches"),
+  ).toBeTruthy();
   const templates = within(
     screen.getByRole("form", { name: "Covenant package templates" }),
   );

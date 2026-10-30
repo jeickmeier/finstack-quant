@@ -994,6 +994,51 @@
       ]
     },
     {
+      "id": "covenant-breach-forecast",
+      "route": "typed",
+      "convention": "Returned FutureBreach rows in the order supplied (Rust sorts by breach date, then covenant id) with every supplied digit: projected value, threshold and headroom in the metric's own units and the breach probability as a fraction. Rust takes every statement result period as a test date, honours windows, waivers and threshold schedules, skips non-numeric covenants and starts the horizon the day before the first period; the generated covenant_forecast_config form is passed through as JSON text for Rust to validate. Nothing is forecast, filtered or sorted in the UI.",
+      "api": {
+        "name": "statements_analytics.forecastBreaches",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StatementsAnalyticsNamespace",
+        "member": "forecastBreaches",
+        "inputs": [
+          {
+            "name": "results",
+            "type": "StatementResult | string",
+            "optional": false
+          },
+          {
+            "name": "covenants",
+            "type": "CovenantEngine",
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "config",
+            "type": "generated.covenants.CovenantForecastConfig | null",
+            "optional": true
+          }
+        ],
+        "returns": "generated.covenants.FutureBreach[]",
+        "declaration": "/**\n   * Forecast covenant breaches over every statement result period.\n   *\n   * Every period that carries a value in `results` is a test date (its last\n   * calendar day). Effective windows, waivers and threshold schedules are\n   * honored and non-numeric covenants are skipped. Deterministic breaches are\n   * always listed; in stochastic mode dates whose breach probability reaches\n   * `config.breach_probability_threshold` are listed too. Without\n   * `config.reference_date` the horizon starts the day before the first result\n   * period begins.\n   *\n   * @param results - Evaluated `StatementResult` (object or JSON) holding every metric the active numeric covenants read on each test date (ratios in turns).\n   * @param covenants - `CovenantEngine` handle whose effective specifications are forecast.\n   * @param model - `FinancialModelSpec` (object or JSON) whose period calendar gives the test dates and the default horizon start.\n   * @param config - Optional `CovenantForecastConfig` wire object; omitted means deterministic maintenance-scope forecasting.\n   * @returns `FutureBreach` wire objects sorted by breach date, then covenant id.\n   * @throws If `metrics` is empty or repeats a date, the engine or configuration is invalid or an observation is non-finite (kind `validation`), or a required metric is missing on a date (kind `not_found`).\n   */\n  forecastBreaches(\n    results: StatementResult | string,\n    covenants: CovenantEngine,\n    model: JsonInput,\n    config?: generated.covenants.CovenantForecastConfig | null\n  ): generated.covenants.FutureBreach[];",
+        "sha256": "8d949695e97cf7345a4cb6fabe0d2cac30c0c1f96f71a97d5888cfbbe50a6759"
+      },
+      "schemas": [
+        {
+          "uri": "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",
+          "pointer": "#",
+          "source": "finstack-quant/covenants/schemas/covenants/1/future_breach.schema.json",
+          "sha256": "9f118736120e54c2b1767630386b387046dcb48bc3a569bbe0379fb412e256ff",
+          "description": "A projected covenant breach."
+        }
+      ]
+    },
+    {
       "id": "cashflow-viewer",
       "route": "native-envelope-table",
       "convention": "The returned envelope object, validated against the Rust-generated cashflow schema. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. Its JSON view is a host serialization, not native text. The optional annual ladder is cashflows.calendarYearLadder per row currency (worker partition, first-appearance order) over each flow's native_pv: row-currency PV before FX conversion and any scenario price shock.",

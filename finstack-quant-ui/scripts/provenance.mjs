@@ -115,6 +115,19 @@ const displays = [
       "Generated covenant_engine form (the caller's engine; Rust publishes no example), optionally replaced by the specs of a Rust package template (covenants.covLite, lboStandard, realEstate or projectFinance over typed thresholds that start empty, a blank one sent as NaN); metric ids are free text with the model's node ids as suggestions, and each spec's metric id is listed with whether the model has that node, without inferring an unset one; validated natively by validateCovenantEngineJson.",
   },
   {
+    id: "covenant-breach-forecast",
+    schema: `${base}covenants/1/future_breach.schema.json`,
+    pointer: "#",
+    api: [
+      "statements_analytics.forecastBreaches",
+      "StatementsAnalyticsNamespace",
+      "forecastBreaches",
+    ],
+    route: "typed",
+    convention:
+      "Returned FutureBreach rows in the order supplied (Rust sorts by breach date, then covenant id) with every supplied digit: projected value, threshold and headroom in the metric's own units and the breach probability as a fraction. Rust takes every statement result period as a test date, honours windows, waivers and threshold schedules, skips non-numeric covenants and starts the horizon the day before the first period; the generated covenant_forecast_config form is passed through as JSON text for Rust to validate. Nothing is forecast, filtered or sorted in the UI.",
+  },
+  {
     id: "cashflow-viewer",
     schema: `${base}results/1/instrument_cashflow.schema.json`,
     pointer: "#",

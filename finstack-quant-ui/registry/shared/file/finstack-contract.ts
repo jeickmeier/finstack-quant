@@ -342,6 +342,13 @@ export type CovenantTemplateRequest =
       readonly minLiquidity: number;
       readonly maxNetLeverage: number;
     };
+/** Native FutureBreach wire object: one projected breach. */
+export type FutureBreach = covenantsWire.FutureBreach;
+/** A breach forecast of an evaluated statement result under a CovenantEngine. */
+export interface ForecastBreachesRequest extends EvaluateCovenantsRequest {
+  /** CovenantForecastConfig JSON; omitted means Rust's deterministic maintenance-scope default. The uint64 random_seed stays an exact integer token. */
+  readonly configJson?: string;
+}
 /** Covenant compliance of an evaluated statement result under a CovenantEngine. */
 export interface EvaluateCovenantsRequest {
   /** CovenantEngine JSON; covenant metric ids are statement node ids. */
@@ -1091,6 +1098,10 @@ export interface CovenantsApi {
   evaluateCovenants(
     request: EvaluateCovenantsRequest,
   ): Promise<Envelope<DatedCovenantReports[]>>;
+  /** covenants.CovenantEngine.fromJson + statements_analytics.forecastBreaches (config passed only when supplied): breaches sorted by date, then covenant id; the handle is freed. */
+  forecastBreaches(
+    request: ForecastBreachesRequest,
+  ): Promise<Envelope<FutureBreach[]>>;
 }
 /** scenarios: market scenario construction, application and horizon total return. */
 export interface ScenariosApi {

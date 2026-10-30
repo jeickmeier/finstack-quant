@@ -12,7 +12,10 @@ export type CovenantsNative = {
     | "validateCovenantEngineJson"
     | "CovenantEngine"
   >;
-  statements_analytics: Pick<typeof statements_analytics, "evaluateCovenants">;
+  statements_analytics: Pick<
+    typeof statements_analytics,
+    "evaluateCovenants" | "forecastBreaches"
+  >;
 };
 /** CovenantsApi over the covenants facade namespace and its statement evaluation. */
 export function createCovenantsService(
@@ -65,6 +68,36 @@ export function createCovenantsService(
             engine,
             request.modelJson,
           );
+        } finally {
+          engine.free();
+        }
+      });
+    },
+    forecastBreaches(request) {
+      return context.result(() => {
+        const engine = native.covenants.CovenantEngine.fromJson(
+          request.engineJson,
+        );
+        try {
+          const api = native.statements_analytics;
+          // Without a config Rust applies its deterministic default. The config
+          // crosses as JSON text, which the binding parses like the object
+          // form (from_js_json) and which keeps a uint64 random_seed exact;
+          // the declaration names only the object form.
+          return request.configJson === undefined
+            ? api.forecastBreaches(
+                request.resultsJson,
+                engine,
+                request.modelJson,
+              )
+            : api.forecastBreaches(
+                request.resultsJson,
+                engine,
+                request.modelJson,
+                request.configJson as unknown as Parameters<
+                  typeof api.forecastBreaches
+                >[3],
+              );
         } finally {
           engine.free();
         }

@@ -49,6 +49,46 @@
       }
     },
     {
+      "name": "covenant-breach-forecast",
+      "type": "registry:component",
+      "title": "Covenant breach forecast",
+      "description": "Forecasts covenant breaches under a CovenantForecastConfig edited with the generated form and presents the returned FutureBreach rows.",
+      "docs": "Composes schema-form over the generated covenant_forecast_config contract (started from defaultConfigJson; Rust publishes no example and an empty config takes Rust's deterministic maintenance-scope defaults; Rust validates the config when it forecasts, so the form checks structure only and a uint64 random_seed stays exact) and a finstack-table of native FutureBreach rows (statements_analytics.forecastBreaches) in the order supplied, which Rust sorts by breach date, then covenant id: date, covenant, Rust's test description, projected value, threshold, headroom and breach probability with every supplied digit (a host may inject formatValue), an unset value as a dash. Deterministic forecasts list breached dates with probability 1; a stochastic config also lists dates whose probability reaches its breach_probability_threshold. Connect onSubmit to the useForecastBreaches request. Accepts defaultConfigJson, onSubmit, breaches, loading, error, formatValue and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/covenant-breach-forecast/covenant-breach-forecast.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/covenants/components/covenant-breach-forecast/covenant-breach-forecast.tsx"
+        },
+        {
+          "path": "components/covenant-breach-forecast/covenant-forecast-config.ts",
+          "type": "registry:component",
+          "target": "components/finstack/covenants/components/covenant-breach-forecast/covenant-forecast-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/schema-form",
+        "@finstack/finstack-table",
+        "@finstack/contract-covenant-forecast-config",
+        "@finstack/contract-future-breach",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "covenant-compliance",
       "type": "registry:component",
       "title": "Covenant compliance",
@@ -174,6 +214,31 @@
           "path": "hooks/use-evaluate-covenants/use-evaluate-covenants.ts",
           "type": "registry:hook",
           "target": "hooks/covenants/use-evaluate-covenants/use-evaluate-covenants.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-forecast-breaches",
+      "type": "registry:hook",
+      "title": "useForecastBreaches",
+      "description": "Forecasts covenant breaches of evaluated statements through the WASM worker.",
+      "docs": "covenants.CovenantEngine.fromJson(engineJson), then statements_analytics.forecastBreaches(resultsJson, engine, modelJson, configJson?): FutureBreach rows sorted by breach date, then covenant id. Every result period is a test date and, without reference_date, the horizon starts the day before the first period. An omitted configJson is Rust's deterministic maintenance-scope default; the config crosses as JSON text so a uint64 random_seed stays exact. The handle is freed. A missing required metric returns the native not_found error, a non-finite one or an invalid config the validation error, unchanged. Keyed on the complete request and worker session; null disables. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-forecast-breaches/use-forecast-breaches.ts",
+          "type": "registry:hook",
+          "target": "hooks/covenants/use-forecast-breaches/use-forecast-breaches.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],

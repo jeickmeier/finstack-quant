@@ -99,6 +99,7 @@
     "statements_analytics.evaluateScenarioSet",
     "statements_analytics.evaluateScenarioSetWithMarket",
     "statements_analytics.explainFormula",
+    "statements_analytics.forecastBreaches",
     "statements_analytics.generateTornadoEntries",
     "statements_analytics.goalSeek",
     "statements_analytics.parameterSpecWithPercentages",
@@ -125,9 +126,7 @@
     "valuations.instruments.validateInstrumentJson",
     "valuations.valuationResultToJson"
   ],
-  "planned": {
-    "statements_analytics.forecastBreaches": "sd-covenant-breach-forecast"
-  },
+  "planned": {},
   "excluded": {
     "calibration.calibrationStepBaseCorrelation": "schema-form",
     "calibration.calibrationStepCapFloorHullWhite": "schema-form",
