@@ -7281,6 +7281,16 @@ export interface StatementResult {
     };
   };
   /**
+   * The periods `nodes` is keyed by, in timeline order, with their dates and
+   * actual/forecast split.
+   *
+   * [`Evaluator`](crate::evaluator::Evaluator) records the model's periods and
+   * [`rollup`](Self::rollup) records its target periods, where a target is
+   * actual only when every source period is. Empty only for hand-built
+   * results, such as [`new`](Self::new).
+   */
+  periods: Period[];
+  /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */
   schema_version: SchemaVersion;

@@ -39660,6 +39660,56 @@
   },
   "statementResult": {
     "schema_version": 1,
+    "periods": [
+      {
+        "id": "2024Q1",
+        "start": "2024-01-01",
+        "end": "2024-04-01",
+        "is_actual": true
+      },
+      {
+        "id": "2024Q2",
+        "start": "2024-04-01",
+        "end": "2024-07-01",
+        "is_actual": true
+      },
+      {
+        "id": "2024Q3",
+        "start": "2024-07-01",
+        "end": "2024-10-01",
+        "is_actual": true
+      },
+      {
+        "id": "2024Q4",
+        "start": "2024-10-01",
+        "end": "2025-01-01",
+        "is_actual": true
+      },
+      {
+        "id": "2025Q1",
+        "start": "2025-01-01",
+        "end": "2025-04-01",
+        "is_actual": true
+      },
+      {
+        "id": "2025Q2",
+        "start": "2025-04-01",
+        "end": "2025-07-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q3",
+        "start": "2025-07-01",
+        "end": "2025-10-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q4",
+        "start": "2025-10-01",
+        "end": "2026-01-01",
+        "is_actual": false
+      }
+    ],
     "nodes": {
       "cash": {
         "2024Q1": 86500000,
@@ -41579,6 +41629,56 @@
           },
           "results": {
             "schema_version": 1,
+            "periods": [
+              {
+                "id": "2024Q1",
+                "start": "2024-01-01",
+                "end": "2024-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q2",
+                "start": "2024-04-01",
+                "end": "2024-07-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q3",
+                "start": "2024-07-01",
+                "end": "2024-10-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q4",
+                "start": "2024-10-01",
+                "end": "2025-01-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q1",
+                "start": "2025-01-01",
+                "end": "2025-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q2",
+                "start": "2025-04-01",
+                "end": "2025-07-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q3",
+                "start": "2025-07-01",
+                "end": "2025-10-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q4",
+                "start": "2025-10-01",
+                "end": "2026-01-01",
+                "is_actual": false
+              }
+            ],
             "nodes": {
               "cash": {
                 "2024Q1": 86500000,
@@ -42973,6 +43073,56 @@
           },
           "results": {
             "schema_version": 1,
+            "periods": [
+              {
+                "id": "2024Q1",
+                "start": "2024-01-01",
+                "end": "2024-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q2",
+                "start": "2024-04-01",
+                "end": "2024-07-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q3",
+                "start": "2024-07-01",
+                "end": "2024-10-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q4",
+                "start": "2024-10-01",
+                "end": "2025-01-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q1",
+                "start": "2025-01-01",
+                "end": "2025-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q2",
+                "start": "2025-04-01",
+                "end": "2025-07-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q3",
+                "start": "2025-07-01",
+                "end": "2025-10-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q4",
+                "start": "2025-10-01",
+                "end": "2026-01-01",
+                "is_actual": false
+              }
+            ],
             "nodes": {
               "cash": {
                 "2024Q1": 86500000,
@@ -44367,6 +44517,56 @@
           },
           "results": {
             "schema_version": 1,
+            "periods": [
+              {
+                "id": "2024Q1",
+                "start": "2024-01-01",
+                "end": "2024-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q2",
+                "start": "2024-04-01",
+                "end": "2024-07-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q3",
+                "start": "2024-07-01",
+                "end": "2024-10-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q4",
+                "start": "2024-10-01",
+                "end": "2025-01-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q1",
+                "start": "2025-01-01",
+                "end": "2025-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q2",
+                "start": "2025-04-01",
+                "end": "2025-07-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q3",
+                "start": "2025-07-01",
+                "end": "2025-10-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q4",
+                "start": "2025-10-01",
+                "end": "2026-01-01",
+                "is_actual": false
+              }
+            ],
             "nodes": {
               "cash": {
                 "2024Q1": 86500000,
@@ -45761,6 +45961,56 @@
           },
           "results": {
             "schema_version": 1,
+            "periods": [
+              {
+                "id": "2024Q1",
+                "start": "2024-01-01",
+                "end": "2024-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q2",
+                "start": "2024-04-01",
+                "end": "2024-07-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q3",
+                "start": "2024-07-01",
+                "end": "2024-10-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q4",
+                "start": "2024-10-01",
+                "end": "2025-01-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q1",
+                "start": "2025-01-01",
+                "end": "2025-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q2",
+                "start": "2025-04-01",
+                "end": "2025-07-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q3",
+                "start": "2025-07-01",
+                "end": "2025-10-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q4",
+                "start": "2025-10-01",
+                "end": "2026-01-01",
+                "is_actual": false
+              }
+            ],
             "nodes": {
               "cash": {
                 "2024Q1": 86500000,
@@ -47152,6 +47402,56 @@
       ],
       "baseline": {
         "schema_version": 1,
+        "periods": [
+          {
+            "id": "2024Q1",
+            "start": "2024-01-01",
+            "end": "2024-04-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q2",
+            "start": "2024-04-01",
+            "end": "2024-07-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q3",
+            "start": "2024-07-01",
+            "end": "2024-10-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q4",
+            "start": "2024-10-01",
+            "end": "2025-01-01",
+            "is_actual": true
+          },
+          {
+            "id": "2025Q1",
+            "start": "2025-01-01",
+            "end": "2025-04-01",
+            "is_actual": true
+          },
+          {
+            "id": "2025Q2",
+            "start": "2025-04-01",
+            "end": "2025-07-01",
+            "is_actual": false
+          },
+          {
+            "id": "2025Q3",
+            "start": "2025-07-01",
+            "end": "2025-10-01",
+            "is_actual": false
+          },
+          {
+            "id": "2025Q4",
+            "start": "2025-10-01",
+            "end": "2026-01-01",
+            "is_actual": false
+          }
+        ],
         "nodes": {
           "cash": {
             "2024Q1": 86500000,

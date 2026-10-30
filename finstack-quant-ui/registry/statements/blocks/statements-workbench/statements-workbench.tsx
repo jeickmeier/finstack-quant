@@ -15,7 +15,6 @@ import { RollForwardReview, type EvaluatedModel } from "./roll-forward-review";
 import {
   annualRollupSpecJson,
   hostRollupMethods,
-  rolledPeriods,
   RollupMethodsEditor,
   type RollupMethod,
 } from "./rollup";
@@ -339,7 +338,7 @@ export function StatementsWorkbench({
     () =>
       model && rollup.data
         ? {
-            model: { ...model, periods: rolledPeriods(model, rollup.data) },
+            model: { ...model, periods: rollup.data.periods },
             result: rollup.data,
           }
         : null,

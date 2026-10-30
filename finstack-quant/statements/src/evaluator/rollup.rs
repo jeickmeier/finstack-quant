@@ -174,9 +174,12 @@ impl StatementResult {
     /// starts or ends mid-year cannot roll up to annual periods.
     ///
     /// The rolled-up result holds `nodes`, `monetary_nodes` and
-    /// `node_value_types` for the target periods, and any warnings raised by
-    /// re-evaluated formulas. It records no `node_sources`, capital-structure
-    /// cashflows or check report: those describe the source evaluation.
+    /// `node_value_types` for the target periods, those periods in `periods`,
+    /// and any warnings raised by re-evaluated formulas. Each target period
+    /// runs from its first source's start to its last source's end and is
+    /// actual only when every source is. The result records no `node_sources`,
+    /// capital-structure cashflows or check report: those describe the source
+    /// evaluation.
     ///
     /// # Arguments
     ///
@@ -256,6 +259,7 @@ impl StatementResult {
         ));
 
         let mut rolled = StatementResult::new();
+        rolled.periods = target_periods;
         let mut warnings = Vec::new();
         for bucket in &buckets {
             let target = bucket.period.id;

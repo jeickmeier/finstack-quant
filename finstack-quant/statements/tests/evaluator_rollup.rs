@@ -2,11 +2,16 @@
 #![allow(clippy::expect_used)]
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{PeriodId, PeriodKind};
+use finstack_quant_core::dates::{Date, Period, PeriodId, PeriodKind};
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::{Evaluator, RollupMethod, RollupSpec};
 use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec, NodeValueType};
 use indexmap::IndexMap;
+use time::Month;
+
+fn date(year: i32, month: Month, day: u8) -> Date {
+    Date::from_calendar_date(year, month, day).expect("valid date")
+}
 
 fn q(year: i32, quarter: u8) -> PeriodId {
     PeriodId::quarter(year, quarter).expect("valid quarter")
@@ -144,6 +149,36 @@ fn tagged_model() -> FinancialModelSpec {
     model
 }
 
+/// A target period is actual only when every source is: the split can fall
+/// inside a year.
+#[test]
+fn a_target_period_with_any_forecast_source_is_not_actual() {
+    let mut model = quarterly_model();
+    model.periods = finstack_quant_core::dates::build_periods("2024Q1..2025Q4", Some("2025Q1"))
+        .expect("valid periods")
+        .periods;
+    let annual = Evaluator::new()
+        .evaluate(&model)
+        .expect("evaluation")
+        .rollup(&model, &annual_spec())
+        .expect("annual rollup");
+    assert_eq!(
+        annual
+            .periods
+            .iter()
+            .map(|period| period.is_actual)
+            .collect::<Vec<_>>(),
+        [true, false]
+    );
+}
+
+#[test]
+fn an_evaluated_result_carries_the_model_periods() {
+    let model = quarterly_model();
+    let quarterly = Evaluator::new().evaluate(&model).expect("evaluation");
+    assert_eq!(quarterly.periods, model.periods);
+}
+
 #[test]
 fn default_for_chooses_methods_from_tags() {
     let spec = RollupSpec::default_for(&tagged_model(), PeriodKind::Annual);
@@ -217,6 +252,24 @@ fn quarterly_results_roll_up_to_annual_flows_balances_and_ratios() {
     close(annual.get("growth", &y2025), 620.0 / 460.0 - 1.0);
 
     assert_eq!(annual.meta.num_periods, 2);
+    assert_eq!(
+        annual.periods,
+        [
+            Period {
+                id: y2024,
+                start: date(2024, Month::January, 1),
+                end: date(2025, Month::January, 1),
+                // Every 2024 quarter is an actual.
+                is_actual: true,
+            },
+            Period {
+                id: y2025,
+                start: date(2025, Month::January, 1),
+                end: date(2026, Month::January, 1),
+                is_actual: false,
+            },
+        ]
+    );
     assert_eq!(
         annual.nodes["revenue"].keys().copied().collect::<Vec<_>>(),
         [y2024, y2025]

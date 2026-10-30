@@ -4,6 +4,10 @@
 
 ### Statements: rollup defaults decided in Rust
 
+#### Changed
+
+- `StatementResult` has a required `periods` field (Python `StatementResult.periods`): the model's periods for an evaluated result and the target periods for a rollup, each actual only when every source period is. Empty only for hand-built results. JSON without it no longer deserializes.
+
 #### Added
 
 - `RollupSpec::default_for(&model, frequency)` (Python `RollupSpec.default_for`, WASM `statements.rollupSpecDefaultFor`) chooses rollup methods from node tags: `balance_sheet` takes `period_end`, a formula tagged `ratio` or `metric` takes `formula`, and anything else sums. The statements workbench calls it instead of deciding in JavaScript, so every host starts from the same rule. Rolling up still sums unlisted nodes; a default is only applied when a host asks for it.
