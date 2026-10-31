@@ -525,8 +525,8 @@
       "name": "tranche-analytics",
       "type": "registry:component",
       "title": "Tranche analytics",
-      "description": "Displays one structured-credit tranche's native metrics, break-even CDR, discount margin and OAS, each with its own native error.",
-      "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. With onOasConfigChange, an OAS configuration disclosure edits the generated OasConfig contract, starting from its Rust example (OasConfig::default()), and hands complete JSON to the host on apply. Nothing is computed, rescaled or defaulted. No worker is required.",
+      "description": "Displays one structured-credit tranche's native metrics, break-even CDR, discount margin, OAS and cash flows by date, each with its own native error.",
+      "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. With onOasConfigChange, an OAS configuration disclosure edits the generated OasConfig contract, starting from its Rust example (OasConfig::default()), and hands complete JSON to the host on apply. With schedule, the native TrancheCashflows totals and the TrancheCashflows::to_table projection (one row per date; Rust joins and sums the per-kind flows) show as returned. Nothing is computed, rescaled or defaulted. No worker is required.",
       "files": [
         {
           "path": "components/tranche-analytics/tranche-analytics.tsx",
@@ -540,6 +540,7 @@
         }
       ],
       "registryDependencies": [
+        "@finstack/table-envelope",
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
         "@finstack/finstack-format",
@@ -562,7 +563,8 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -933,7 +935,7 @@
       "type": "registry:hook",
       "title": "useTrancheAnalytics",
       "description": "Fetches native structured-credit tranche metrics, OAS, discount margin and break-even CDR through the WASM worker.",
-      "docs": "Deal entry through StructuredCredit.newStandard (useNewStandardDeal) and the deal's tranches getter (useDealTranches), and four query option builders and hooks over valuations.instruments.trancheMetrics, trancheOas, trancheDiscountMargin and trancheBreakevenCdr, each keyed by its complete immutable request and the worker session; null disables a call. An omitted metrics price or metric list is left to Rust; OAS and discount margin require an explicit clean price, and OAS uses Rust's default OasConfig. Native errors are returned unchanged.",
+      "docs": "Deal entry through StructuredCredit.newStandard (useNewStandardDeal), the deal's tranches getter (useDealTranches), its trancheCashflows with Rust's date table (useTrancheSchedule), and four query option builders and hooks over valuations.instruments.trancheMetrics, trancheOas, trancheDiscountMargin and trancheBreakevenCdr, each keyed by its complete immutable request and the worker session; null disables a call. An omitted metrics price or metric list is left to Rust; OAS and discount margin require an explicit clean price, and OAS uses Rust's default OasConfig. Native errors are returned unchanged.",
       "files": [
         {
           "path": "hooks/use-tranche-analytics/use-tranche-analytics.ts",

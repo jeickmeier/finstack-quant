@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Structured credit: a tranche's cash flows by date in WASM
+
+#### Added
+
+- WASM `valuations.instruments.trancheCashflowsTable(cashflows)` returns Rust `TrancheCashflows::to_table` as a `TableEnvelope`: one row per payment date with cashflow, interest, principal, PIK, deferred and writedown columns. Python already reaches the same table through `TrancheCashflows.to_dataframe`.
+
 ### Structured credit: one report for a collateral pool
 
 #### Added

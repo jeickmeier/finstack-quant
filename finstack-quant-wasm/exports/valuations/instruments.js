@@ -81,6 +81,7 @@ export const instruments = {
   assetPoolAssetsByObligor: wasm.assetPoolAssetsByObligor,
   assetPoolAssetsByIndustry: wasm.assetPoolAssetsByIndustry,
   poolReport: wasm.poolReport,
+  trancheCashflowsTable: wasm.trancheCashflowsTable,
   calculatePoolStats: wasm.calculatePoolStats,
   prepaymentPenaltyLockout: wasm.prepaymentPenaltyLockout,
   prepaymentPenaltyFixed: wasm.prepaymentPenaltyFixed,

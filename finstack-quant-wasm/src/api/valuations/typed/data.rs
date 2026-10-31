@@ -18,7 +18,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::Cds
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AmortizationEvent;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CoverageRules, CoverageTestSpec, PenaltyStep, PoolAsset, PrepaymentPenalty, Tranche,
-    TrancheStructure, Waterfall,
+    TrancheCashflows, TrancheStructure, Waterfall,
 };
 use finstack_quant_valuations::instruments::{MertonMcConfig, PikSchedule};
 use wasm_bindgen::prelude::*;
@@ -409,6 +409,18 @@ pub fn asset_pool_assets_by_obligor(
 pub fn asset_pool_assets_by_industry(pool: JsValue, industry: JsValue) -> Result<JsValue, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(&pool.assets_by_industry(&js_string(&industry, "industry")?))
+}
+
+/// One row per payment date of a tranche's flows (mirrors Rust `TrancheCashflows::to_table`).
+///
+/// Python reaches the same table through `TrancheCashflows.to_dataframe`.
+/// @param cashflows - `TrancheCashflows` plain object or JSON string, as `StructuredCredit.trancheCashflows` returns it.
+/// @returns `TableEnvelope` with a `date` column in ascending order and float `cashflow`, `interest`, `principal`, `pik`, `deferred` and `writedown` columns in the flows' one currency, which the table does not state (read `total_interest.currency`). Flows on one date are summed per kind; a kind with no flow on a date is zero; the columns remain when there are no rows.
+/// @throws Error - Throws with kind `validation` if `cashflows` does not match the `TrancheCashflows` schema or mixes currencies.
+#[wasm_bindgen(js_name = trancheCashflowsTable)]
+pub fn tranche_cashflows_table(cashflows: JsValue) -> Result<JsValue, JsValue> {
+    let cashflows: TrancheCashflows = from_js_json(&cashflows, "cashflows")?;
+    to_js_value(&cashflows.to_table().map_err(to_js_err)?)
 }
 
 /// Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).

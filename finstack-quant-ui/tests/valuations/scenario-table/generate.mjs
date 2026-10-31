@@ -158,6 +158,13 @@ const trancheCases = [
         oas: failure(() =>
           native.trancheOas(deal, trancheId, marketText, asOf, marketPricePct),
         ),
+        schedule: failure(() => {
+          const cashflows = deal.trancheCashflows(trancheId, marketText, asOf);
+          return {
+            cashflows,
+            table: native.trancheCashflowsTable(cashflows),
+          };
+        }),
       },
     };
   } finally {

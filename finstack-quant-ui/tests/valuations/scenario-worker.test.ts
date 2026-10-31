@@ -76,6 +76,23 @@ it(
   budget(30000),
 );
 it(
+  "preserves a tranche's native flows and date table through the real worker",
+  async () => {
+    for (const entry of tranches.cases) {
+      const request = {
+        instrumentJson: JSON.stringify(entry.instrument),
+        marketJson: JSON.stringify(entry.market),
+        asOf: entry.asOf,
+        trancheId: entry.trancheId,
+      };
+      expect(unwrap(await worker.proxy.trancheSchedule(request))).toEqual(
+        entry.results.schedule.value,
+      );
+    }
+  },
+  budget(30000),
+);
+it(
   "builds each standard deal family and lists its native tranches through the real worker",
   async () => {
     const paramsJson = JSON.stringify(standardDeals.params);

@@ -51,6 +51,7 @@ const acronyms = new Set([
   "oid",
   "ois",
   "pde",
+  "pik",
   "pv",
   "pv01",
   "rmbs",
