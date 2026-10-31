@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Literal
 import pandas as pd
+from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import Tenor
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations import ValuationResult
@@ -321,7 +322,9 @@ def metric_metadata(keys: list[str]) -> list[dict[str, Any]]:
     -------
     list[dict[str, Any]]
         One record per key with ``key``, ``metric``, ``components`` (decoded
-        coordinate labels in original order), ``unit`` (canonical unit family
+        coordinate labels in original order), ``coordinates`` (for each label,
+        the ``group`` and numeric ``value``, a tenor in years or a decimal
+        strike, that order it on its axis), ``unit`` (canonical unit family
         string), ``group`` (native display group or ``None``) and
         ``bucketed``. No prices are changed and a unit family does not imply
         a bump size or FX conversion.
@@ -335,6 +338,92 @@ def metric_metadata(keys: list[str]) -> list[dict[str, Any]]:
     --------
     >>> from finstack_quant.valuations.instruments import metric_metadata
     >>> metric_metadata(["ytm"])[0]["unit"]
+    'decimal'
+    """
+    ...
+
+def price_driver_fields() -> list[str]:
+    """
+    Wire names of the mutually exclusive price-driving market quotes.
+
+    Validation rejects more than one of these on a
+    ``instrument_pricing_overrides.market_quotes`` object, so a host editor can
+    clear the others when one is entered. Other quotes, such as
+    ``implied_volatility``, are not in the set.
+
+    Returns
+    -------
+    list[str]
+        Field names as they appear on the wire, in precedence order.
+
+    Notes
+    -----
+    This function does not raise; the set is fixed.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import price_driver_fields
+    >>> price_driver_fields()[0]
+    'quoted_clean_price_pct'
+    """
+    ...
+
+def tranche_metric_field_units(currency: str | Currency) -> list[dict[str, str]]:
+    """
+    Units of the scalar ``TrancheMetrics`` fields, in struct order.
+
+    ``TrancheMetrics`` documents these units in prose and does not state them
+    on the wire. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        ISO-4217 code of the result's ``TrancheMetrics.currency``; it names the
+        unit of ``pv``, ``accrued`` and ``cs01``.
+
+    Returns
+    -------
+    list[dict[str, str]]
+        One ``{"field", "label", "source"}`` record per scalar field: the wire
+        field name, its unit text and the Rust field that documents it.
+        ``tranche_id``, ``currency`` and the ``metrics`` map are not listed.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import tranche_metric_field_units
+    >>> tranche_metric_field_units("USD")[0]["label"]
+    'USD'
+    """
+    ...
+
+def tranche_solve_field_units() -> dict[str, Any]:
+    """
+    Units of the tranche break-even CDR, discount margin and OAS results.
+
+    Those solvers document their units in prose: the two scalars are decimals
+    (``0.0125`` = 125 bp) and ``OasResult`` prices are percent of the tranche's
+    current balance. Values are never rescaled.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``breakeven_cdr`` and ``discount_margin``, each one record of ``field``,
+        ``label`` and ``source``, and ``oas``, one such record per ``OasResult``
+        field in struct order.
+
+    Notes
+    -----
+    This function does not raise.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import tranche_solve_field_units
+    >>> tranche_solve_field_units()["breakeven_cdr"]["label"]
     'decimal'
     """
     ...
@@ -1186,6 +1275,27 @@ class InstrumentCashflowEnvelope:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+    def calendar_year_ladder_by_currency(self) -> list[dict[str, Any]]:
+        """
+        Calendar-year ladders of this envelope, one per row currency.
+
+        Currencies never mix. Ladders follow the first appearance of each
+        currency in ``flows``, and each reads ``native_pv``, the row-currency PV
+        before FX conversion and any scenario price shock.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One ``{"currency": str, "rows": list}`` per row currency; each row has
+            ``year``, ``non_principal``, ``principal`` and ``pv``, in the units of
+            that currency, by ascending year.
+
+        Raises
+        ------
+        ValueError
+            If an amount or native PV is non-finite.
         """
         ...
     def to_dataframe(self) -> pd.DataFrame:

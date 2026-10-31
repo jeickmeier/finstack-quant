@@ -189,6 +189,37 @@
       ],
       "type": "object"
     },
+    "d_29936d53e5e53cef8284": {
+      "additionalProperties": false,
+      "description": "A concrete period with start/end dates and actual/forecast flag.",
+      "properties": {
+        "end": {
+          "description": "Exclusive end date.",
+          "format": "date",
+          "type": "string"
+        },
+        "id": {
+          "$ref": "#/$defs/d_7ed5d95d5da0aa4f3cb9",
+          "description": "Identifier of this period."
+        },
+        "is_actual": {
+          "description": "True when this period is part of the \"actuals\" subset.",
+          "type": "boolean"
+        },
+        "start": {
+          "description": "Inclusive start date.",
+          "format": "date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end",
+        "is_actual"
+      ],
+      "type": "object"
+    },
     "d_2a886a29e286928aba1b": {
       "description": "Which evaluation layer produced a statement cell (one node in one period).\n\nThe evaluator resolves every cell by the precedence\n`Value > Forecast > Formula`, after the node's optional `where` mask. The\nwinning layer is recorded per cell in [`StatementResult::node_sources`].",
       "oneOf": [
@@ -558,6 +589,10 @@
           "type": "object"
         }
       ]
+    },
+    "d_7ed5d95d5da0aa4f3cb9": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
     },
     "d_82a7f3795866afe7c96c": {
       "description": "A single finding produced by a check for a specific period or node.",
@@ -1864,6 +1899,7 @@
             "parallel": false
           },
           "nodes": {},
+          "periods": [],
           "schema_version": 1
         }
       ],
@@ -1931,6 +1967,13 @@
           "description": "Map of node_id → (period_id → value). Native values are f64; JSON uses\nnumbers for finite values and `\"nan\"`, `\"inf\"`, `\"-inf\"` for non-finite cells.",
           "type": "object"
         },
+        "periods": {
+          "description": "The periods `nodes` is keyed by, in timeline order, with their dates and\nactual/forecast split.\n\n[`Evaluator`](crate::evaluator::Evaluator) records the model's periods and\n[`rollup`](Self::rollup) records its target periods, where a target is\nactual only when every source period is. Empty only for hand-built\nresults, such as [`new`](Self::new).",
+          "items": {
+            "$ref": "#/$defs/d_29936d53e5e53cef8284"
+          },
+          "type": "array"
+        },
         "schema_version": {
           "$ref": "#/$defs/d_1123ed7c2c0a8683a461",
           "description": "Required wire-format schema version. Only numeric `1` is accepted."
@@ -1938,6 +1981,7 @@
       },
       "required": [
         "schema_version",
+        "periods",
         "nodes",
         "meta"
       ],

@@ -420,13 +420,18 @@ pub(crate) fn descending_f64(lhs: f64, rhs: f64) -> std::cmp::Ordering {
 /// descending absolute swing magnitude.
 /// Parameter identifiers preserve `node@period` so shocks to different
 /// periods of the same node remain distinguishable.
-/// Only one-at-a-time diagonal/tornado results are supported. Full-grid
-/// scenarios combine parameters and cannot identify individual impacts.
+/// Only one-at-a-time diagonal/tornado results can be ranked. Full-grid
+/// scenarios combine parameters and cannot identify individual impacts, so a
+/// full-grid result has no tornado and returns `None`.
+///
+/// # Returns
+///
+/// `Some(entries)` for a diagonal or tornado result; `None` for a full-grid one.
 ///
 /// # Errors
 ///
-/// Returns an invalid-input error for full-grid results, scenarios that do not
-/// identify exactly one perturbed parameter, an absent baseline, a missing
+/// Returns an invalid-input error for one-at-a-time results whose scenarios do
+/// not identify exactly one perturbed parameter, an absent baseline, a missing
 /// target metric/period, or non-finite metric values and impacts.
 ///
 /// # Arguments
@@ -442,9 +447,9 @@ pub fn generate_tornado_entries(
     result: &SensitivityResult,
     metric_node: &str,
     period: PeriodId,
-) -> Result<Vec<TornadoEntry>> {
+) -> Result<Option<Vec<TornadoEntry>>> {
     if result.config.mode == SensitivityMode::FullGrid {
-        return Err(Error::invalid_input("Tornado entries require diagonal or tornado sensitivity results; full-grid scenarios confound parameter impacts"));
+        return Ok(None);
     }
     if result
         .scenarios
@@ -469,7 +474,7 @@ pub fn generate_tornado_entries(
 
     entries.sort_by(|a, b| descending_f64(a.swing().abs(), b.swing().abs()));
 
-    Ok(entries)
+    Ok(Some(entries))
 }
 
 fn build_tornado_entry(
@@ -871,8 +876,9 @@ mod tests {
             "tornado runs must carry the unperturbed baseline"
         );
 
-        let entries =
-            generate_tornado_entries(&result, "gross_profit", period).expect("tornado entries");
+        let entries = generate_tornado_entries(&result, "gross_profit", period)
+            .expect("tornado entries")
+            .expect("one-at-a-time result");
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].parameter_id, "revenue@2025Q1");
         // Baseline gross profit = 60k; downside 54k, upside 66k.
@@ -1028,7 +1034,9 @@ mod tests {
             ));
         }
         let result = run_sensitivity(&model, &config).expect("sensitivity");
-        let entries = generate_tornado_entries(&result, "revenue", first).expect("entries");
+        let entries = generate_tornado_entries(&result, "revenue", first)
+            .expect("entries")
+            .expect("one-at-a-time result");
         let ids: Vec<_> = entries
             .iter()
             .map(|entry| entry.parameter_id.as_str())
@@ -1175,7 +1183,10 @@ mod tests {
             .map(|scenario| scenario.results.get("profit", &period).expect("profit"))
             .collect();
         assert_eq!(profits, vec![80.0, 60.0, 100.0, 80.0]);
-        assert!(generate_tornado_entries(&result, "profit", period).is_err());
+        // Full-grid scenarios confound parameter impacts: a typed none, not an error.
+        assert!(generate_tornado_entries(&result, "profit", period)
+            .expect("full grid is not an error")
+            .is_none());
         // Public JSON results can mislabel joint shocks as one-at-a-time runs.
         result.config.mode = SensitivityMode::Diagonal;
         let error = generate_tornado_entries(&result, "profit", period)
@@ -1266,6 +1277,6 @@ mod tests {
         result.scenarios.clear();
         assert!(generate_tornado_entries(&result, "profit", period)
             .expect("no varied parameter")
-            .is_empty());
+            .is_some_and(|entries| entries.is_empty()));
     }
 }

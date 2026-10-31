@@ -42,12 +42,14 @@ __all__ = [
     "EndogenousHazardSpec",
     "MertonBarrierType",
     "MertonModel",
+    "MertonReport",
     "RatingFactorTable",
     "SimulatedPaths",
     "ToggleExerciseModel",
     "lgd",
     "liability_management",
     "migration",
+    "merton_report",
     "moodys_warf_factor",
     "pd",
     "recovery_waterfall",
@@ -566,6 +568,389 @@ class AssetDynamics:
             stored value, including non-finite floats unsupported by its schema.
         """
         ...
+
+class MertonReport:
+    """
+    One Merton report: the model, its term structure, grades and CDS terms.
+
+    Returned by `merton_report`. Per-horizon sequences align with ``horizons``.
+    A spread or implied-equity measure Rust rejects for this model reads as
+    ``None`` and carries its message in ``errors``.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.credit import merton_report
+    >>> report = merton_report({
+    ...     "source": {
+    ...         "kind": "equity",
+    ...         "equity_value": 50.0,
+    ...         "equity_vol": 0.4,
+    ...         "short_term_debt": 30.0,
+    ...         "long_term_debt": 40.0,
+    ...         "risk_free_rate": 0.03,
+    ...         "payout_rate": 0.0,
+    ...         "maturity": 1.0,
+    ...     },
+    ...     "horizons": [1.0, 5.0],
+    ...     "maturity": 5.0,
+    ...     "recovery": 0.4,
+    ... })
+    >>> report.default_point
+    50.0
+
+    """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` via the canonical JSON round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(MertonReport.from_json, (json,))`` so unpickling rebuilds the report.
+
+        Notes
+        -----
+        This accessor does not raise; it serializes the stored value.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> MertonReport:
+        """
+        Deserialize a report from its canonical JSON form.
+
+        Parameters
+        ----------
+        json : str
+            Canonical JSON as produced by `to_json`; unknown fields are rejected.
+
+        Returns
+        -------
+        MertonReport
+            The reconstructed report; nothing is recomputed.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or has an unknown field.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.credit import MertonReport, merton_report
+        >>> firm = {"asset_value": 100.0, "asset_vol": 0.25, "debt_barrier": 60.0, "risk_free_rate": 0.03}
+        >>> firm |= {"payout_rate": 0.0, "barrier_type": "terminal", "dynamics": "geometric_brownian"}
+        >>> source = {"kind": "model", "model": firm}
+        >>> report = merton_report({"source": source, "horizons": [1.0], "maturity": 5.0, "recovery": 0.4})
+        >>> MertonReport.from_json(report.to_json()).horizons
+        [1.0]
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize the report to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON with a rejected measure as ``null`` and its message
+            in ``errors``.
+
+        Raises
+        ------
+        ValueError
+            If the report holds a non-finite number that JSON cannot carry.
+        """
+        ...
+
+    @property
+    def model(self) -> MertonModel:
+        """
+        The model the report was computed from.
+
+        Returns
+        -------
+        MertonModel
+            The supplied model, or the model calibrated from equity.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def default_point(self) -> float | None:
+        """
+        KMV default point of an equity source.
+
+        Returns
+        -------
+        float | None
+            Short-term debt plus half of long-term debt, in the firm's monetary
+            unit, used as the barrier; ``None`` for a supplied model.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def horizons(self) -> list[float]:
+        """
+        The requested horizons in years, in request order.
+
+        Returns
+        -------
+        list[float]
+            Horizons in years; every per-horizon sequence aligns with them.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def default_probabilities(self) -> list[float]:
+        """
+        Default probability per horizon.
+
+        Returns
+        -------
+        list[float]
+            Decimal probabilities aligned with ``horizons``.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def distance_to_default(self) -> list[float]:
+        """
+        Distance to default per horizon.
+
+        Returns
+        -------
+        list[float]
+            Standard deviations of asset value, aligned with ``horizons``.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def grades(self) -> list[pd.MasterScaleResult]:
+        """
+        Default-calibration master-scale grade of each default probability.
+
+        Returns
+        -------
+        list[pd.MasterScaleResult]
+            One grade per horizon, from ``pd.MasterScale.default_calibration()``.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def implied_spread(self) -> list[float] | None:
+        """
+        Exogenous-recovery zero-coupon spread per horizon.
+
+        Returns
+        -------
+        list[float] | None
+            Decimal per year aligned with ``horizons``; ``None`` when rejected,
+            with the message in ``errors``.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def debt_spread(self) -> list[float] | None:
+        """
+        Endogenous Merton (1974) debt spread per horizon.
+
+        Returns
+        -------
+        list[float] | None
+            Decimal per year aligned with ``horizons``; ``None`` for a model
+            without a terminal barrier, with the message in ``errors``.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def maturity(self) -> float:
+        """
+        The requested CDS and implied-equity maturity.
+
+        Returns
+        -------
+        float
+            Maturity in years.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def recovery(self) -> float:
+        """
+        The requested recovery.
+
+        Returns
+        -------
+        float
+            Decimal fraction of par used by the implied and CDS spreads.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def cds_par_spread(self) -> float | None:
+        """
+        CDS par spread at ``maturity``.
+
+        Returns
+        -------
+        float | None
+            Decimal per year; ``None`` when rejected, with the message in ``errors``.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def implied_equity(self) -> tuple[float, float] | None:
+        """
+        Implied equity at ``maturity``.
+
+        Returns
+        -------
+        tuple[float, float] | None
+            ``(equity value, annualized equity volatility)``; ``None`` when
+            rejected, with the message in ``errors``.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    @property
+    def errors(self) -> dict[str, str]:
+        """
+        Messages of the measures Rust rejected for this model.
+
+        Returns
+        -------
+        dict[str, str]
+            Message by measure name (``implied_spread``, ``debt_spread``,
+            ``cds_par_spread``, ``implied_equity``); empty when all computed.
+
+        Notes
+        -----
+        This accessor does not raise; it reads the stored value.
+        """
+        ...
+
+    def to_dataframe(self) -> pandas.DataFrame:
+        """
+        Return the term structure with one row per horizon.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Columns ``horizon``, ``default_probability``,
+            ``distance_to_default``, ``implied_spread``, ``debt_spread``,
+            ``grade`` and ``central_pd``; a rejected spread column holds nulls.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return a compact debug representation.
+
+        Returns
+        -------
+        str
+            Debug text naming the class and its serialized fields.
+
+        Notes
+        -----
+        This accessor does not raise; it serializes the stored value.
+        """
+        ...
+
+def merton_report(request: str | dict[str, Any]) -> MertonReport:
+    """
+    Compute a Merton report in one call.
+
+    An equity source takes the KMV default point (short-term debt plus half of
+    long-term debt) as its barrier, and grades come from the default PD master
+    scale, so every host gets the same numbers.
+
+    Parameters
+    ----------
+    request : str | dict[str, Any]
+        ``MertonReportRequest`` as a dict or JSON text: ``source`` (``{"kind":
+        "model", "model": ...}`` with canonical `MertonModel` JSON, or
+        ``{"kind": "equity", "equity_value", "equity_vol", "short_term_debt",
+        "long_term_debt", "risk_free_rate", "payout_rate", "maturity"}`` in the
+        firm's monetary unit, decimals and years), ``horizons`` (years, finite
+        and positive, in display order), ``maturity`` (CDS and implied-equity
+        years) and ``recovery`` (decimal fraction of par).
+
+    Returns
+    -------
+    MertonReport
+        The full report; a measure rejected for this model reads as ``None``.
+
+    Raises
+    ------
+    ValueError
+        If the request is malformed or has an unknown field, a horizon is
+        non-finite or not positive, or the equity calibration rejects its inputs.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.credit import merton_report
+    >>> firm = {"asset_value": 100.0, "asset_vol": 0.25, "debt_barrier": 60.0, "risk_free_rate": 0.03}
+    >>> firm |= {"payout_rate": 0.0, "barrier_type": "terminal", "dynamics": "geometric_brownian"}
+    >>> source = {"kind": "model", "model": firm}
+    >>> report = merton_report({"source": source, "horizons": [1.0, 5.0], "maturity": 5.0, "recovery": 0.4})
+    >>> (report.default_point, len(report.grades), report.errors)
+    (None, 2, {})
+    """
+    ...
 
 class SimulatedPaths:
     """

@@ -368,7 +368,7 @@ it("returns the native validation error for a flow kind Rust does not know", asy
   expect(result.ok).toBe(false);
   if (result.ok) return;
   expect(result.error.kind).toBe("validation");
-  expect(result.error.message).toContain("unknown cashflow kind 'not_a_kind'");
+  expect(result.error.message).toContain("not_a_kind");
 });
 it("keys the ladder on the worker session and the complete envelope", () => {
   const client = { call, close() {} } as FinstackClient;

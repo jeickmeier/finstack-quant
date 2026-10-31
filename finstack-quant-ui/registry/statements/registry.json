@@ -773,7 +773,7 @@
       "type": "registry:hook",
       "title": "useRollupStatement",
       "description": "Rolls an evaluated statement result up to a coarser frequency through the WASM worker.",
-      "docs": "Native StatementResult rollup for the supplied model, matching result and RollupSpec JSON, keyed by the complete immutable request and worker session. Null disables the query; no rollup methods or periods are inferred.",
+      "docs": "Native StatementResult rollup for the supplied model, matching result and RollupSpec JSON, and the native default RollupSpec of a model at a frequency, each keyed by the complete immutable request and worker session. Null disables a query; no rollup methods or periods are inferred.",
       "files": [
         {
           "path": "hooks/use-rollup-statement/use-rollup-statement.ts",
@@ -1085,7 +1085,7 @@
       "type": "registry:hook",
       "title": "useRunSensitivity",
       "description": "Runs a native sensitivity analysis of a statement model and its tornado through the WASM worker.",
-      "docs": "Native statements_analytics.parameterSpecWithPercentages for each parameter (node, period, base value and percentage moves), runSensitivity over the SensitivityConfig of the mode, those parameters and the target metric, then generateTornadoEntries of the result at the target metric and period; a full_grid run, which Rust cannot rank, returns a null tornado. Returns {result, tornado}. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
+      "docs": "Native statements_analytics.parameterSpecWithPercentages for each parameter (node, period, base value and percentage moves), runSensitivity over the SensitivityConfig of the mode, those parameters and the target metric, then generateTornadoEntries of the result at the target metric and period; Rust returns a null tornado for a full_grid run it cannot rank. Returns {result, tornado}. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
       "files": [
         {
           "path": "hooks/use-run-sensitivity/use-run-sensitivity.ts",
@@ -1280,6 +1280,11 @@
           "target": "components/finstack/statements/blocks/statements-workbench/forecast-editor.tsx"
         },
         {
+          "path": "blocks/statements-workbench/forecast-parameters.ts",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/forecast-parameters.ts"
+        },
+        {
           "path": "blocks/statements-workbench/metric-editor.tsx",
           "type": "registry:block",
           "target": "components/finstack/statements/blocks/statements-workbench/metric-editor.tsx"
@@ -1366,6 +1371,7 @@
         "@finstack/use-finstack",
         "@finstack/json-viewer",
         "@finstack/finstack-codec",
+        "@finstack/contract-forecast-parameters",
         "@finstack/contract-rollup-spec",
         "@finstack/contract-scenario-set",
         "@finstack/primitive-contracts",
@@ -1395,6 +1401,7 @@
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",

@@ -3,9 +3,7 @@ import { readFile } from "node:fs/promises";
 import init, { core } from "../../../finstack-quant-wasm/index.js";
 import type { MoneyValue } from "finstack-quant-wasm";
 import {
-  convertRate,
-  formatRate,
-  rateToWire,
+  formatPercent,
   formatMoney,
   formatRawMoney,
   groupDecimal,
@@ -13,12 +11,11 @@ import {
   formatSigned,
   isoToEpoch,
   epochToIso,
-  compareTenorLabels,
+  compareCoordinates,
   type RoundingStamp,
 } from "../../src/format/format";
 import {
   moneyColumn,
-  rateColumn,
   dateColumn,
   idColumn,
   signedColumn,
@@ -32,37 +29,12 @@ await init({
     ),
   ),
 });
-const presentation = {
-  source: "finstack-quant-wasm/index.d.ts#Rate",
-  wire: "decimal",
-  display: "bp",
-} as const;
-it("reverses 20-digit fractional presentation without a number conversion", () => {
-  const value = "0.12345678901234567890";
-  const display = formatRate(value, presentation);
-  expect(display).toEqual({ text: "1234.5678901234567890", unit: "bp" });
-  expect(rateToWire(display.text, presentation)).toBe("0.12345678901234567890");
-  expect(convertRate("12345678901234567890.12345", "decimal", "percent")).toBe(
-    "1234567890123456789012.345",
-  );
-  expect(convertRate("1234567890123456789012.345", "percent", "decimal")).toBe(
-    "12345678901234567890.12345",
-  );
-  expect(value).toBe("0.12345678901234567890");
-});
-it("formats small native numeric rates without exponent parsing loss", () => {
-  expect(formatRate(1e-7, presentation)).toEqual({ text: "0.001", unit: "bp" });
-});
-it("leaves unsupported-unit values and their spelling unchanged", () => {
-  expect(formatRate("0.12345678901234567890")).toEqual({
-    text: "0.12345678901234567890",
-    unit: null,
-  });
-  expect(rateToWire("001.2500")).toBe("001.2500");
-  expect(convertRate("001.2500", "decimal", "decimal")).toBe("001.2500");
-  expect(() => formatRate("0.1", { ...presentation, source: "" })).toThrow(
-    /source/,
-  );
+it("displays supplied fractions as exact percent digits", () => {
+  expect(formatPercent(0.25)).toBe("25");
+  expect(formatPercent(0.125)).toBe("12.5");
+  expect(formatPercent(1e-7)).toBe("0.00001");
+  expect(formatPercent(-0.05)).toBe("-5");
+  expect(formatPercent(0.07)).toBe("7");
 });
 it("groups decimal text exactly and preserves the wire string", () => {
   expect(groupDecimal("12345678901234567890.1234500")).toBe(
@@ -192,13 +164,12 @@ it("provides native Table v9 definitions with raw accessors and presentation met
   };
   const columns = [
     moneyColumn("money", (r: Row) => r.money),
-    rateColumn("rate", (r: Row) => r.rate, presentation),
     dateColumn("date", (r: Row) => r.date),
     idColumn("id", (r: Row) => r.id),
     signedColumn("delta", (r: Row) => r.delta),
   ];
   const nativeColumns: ColumnDef<{}, Row, any>[] = columns;
-  expect(nativeColumns).toHaveLength(5);
+  expect(nativeColumns).toHaveLength(4);
   for (const column of columns) {
     expect(column.meta.className).toBeTruthy();
     expect("accessorFn" in column).toBe(true);
@@ -213,64 +184,59 @@ it("provides native Table v9 definitions with raw accessors and presentation met
   ).toBe(true);
 });
 
-it("preserves canonical scientific decimal values in display conversion", () => {
+it("expands scientific decimal text when grouping", () => {
   expect(groupDecimal("1.2345e3")).toBe("1,234.5");
-  expect(formatRate("1.23e-7", presentation)).toEqual({
-    text: "0.00123",
-    unit: "bp",
+});
+
+it("orders coordinates by Rust's group, then value, then label", () => {
+  const at = (label: string, group: string, value: number | null) => ({
+    label,
+    group,
+    value,
   });
-  expect(rateToWire("0.00123", presentation)).toBe("0.000000123");
-});
-
-it("orders tenor labels by Rust's year basis before other labels", () => {
-  const sorted = (labels: string[]) => [...labels].sort(compareTenorLabels);
-  expect(sorted(["10y", "3m", "1y", "6m"])).toEqual(["3m", "6m", "1y", "10y"]);
-  expect(sorted(["1y", "12m"])).toEqual(["1y", "12m"]);
-  expect(sorted(["12m", "1y"])).toEqual(["1y", "12m"]);
-  expect(sorted(["USD-OIS", "2y"])).toEqual(["2y", "USD-OIS"]);
-  expect(sorted(["100", "95", "102.5"])).toEqual(["95", "100", "102.5"]);
-  expect(sorted(["9m", "0.75y"])).toEqual(["0.75y", "9m"]);
-  expect(sorted(["0.75y", "9m"])).toEqual(["0.75y", "9m"]);
-});
-
-it("orders vega expiry rows and decimal strikes by value, not by digit runs", () => {
-  const sorted = (labels: string[]) => [...labels].sort(compareTenorLabels);
-  // Bucketed-vega rows arrive as one `{surface}::{expiry}y` coordinate (vega.rs).
+  const sorted = (coordinates: ReturnType<typeof at>[]) =>
+    [...coordinates].sort(compareCoordinates).map(({ label }) => label);
+  // Values as MetricCoordinate supplies them; months are N/12.
   expect(
-    sorted(["S::0.5y", "S::0.25y", "S::0.75y", "S::1y", "S::2y", "S::10y"]),
-  ).toEqual(["S::0.25y", "S::0.5y", "S::0.75y", "S::1y", "S::2y", "S::10y"]);
-  // Case in a text run never outranks the numeric order of a later run.
-  expect(sorted(["Usd::2y", "USD::1y"])).toEqual(["USD::1y", "Usd::2y"]);
-  expect(sorted(["S::1y", "S::6m", "R::3m"])).toEqual([
-    "R::3m",
-    "S::6m",
-    "S::1y",
-  ]);
-  expect(sorted(["0.95", "1", "1.1", "1.2", "1.05"])).toEqual([
-    "0.95",
-    "1",
-    "1.05",
-    "1.1",
-    "1.2",
-  ]);
-  // USD-SOFR-HW-VOL strikes, which numeric collation ties.
-  expect(sorted(["0.04", "0.08", "0.004"])).toEqual(["0.004", "0.04", "0.08"]);
-  expect(sorted(["0.004", "0.04", "0.08"])).toEqual(["0.004", "0.04", "0.08"]);
-  // JPYUSD-VOL strikes from tests/valuations/instruments/pricing-market.json.
-  expect(sorted(["0.007", "0.014", "0.0007000000000000001"])).toEqual([
-    "0.0007000000000000001",
-    "0.007",
-    "0.014",
-  ]);
-  expect(sorted(["0.25", "-0.5", "USD-OIS", "3m"])).toEqual([
-    "3m",
-    "-0.5",
-    "0.25",
+    sorted([
+      at("10y", "", 10),
+      at("3m", "", 0.25),
+      at("1y", "", 1),
+      at("6m", "", 0.5),
+    ]),
+  ).toEqual(["3m", "6m", "1y", "10y"]);
+  // `12m` and `1y` tie on value, so the label decides whatever the input order.
+  expect(sorted([at("12m", "", 1), at("1y", "", 1)])).toEqual(["1y", "12m"]);
+  expect(sorted([at("1y", "", 1), at("12m", "", 1)])).toEqual(["1y", "12m"]);
+  expect(sorted([at("USD-OIS", "USD-OIS", null), at("2y", "", 2)])).toEqual([
+    "2y",
     "USD-OIS",
   ]);
-  expect(sorted(["USD-SOFR", "EUR-ESTR", "USD-OIS"])).toEqual([
-    "EUR-ESTR",
-    "USD-OIS",
-    "USD-SOFR",
-  ]);
+  // Decimal strikes order by value, where numeric text collation would tie them.
+  expect(
+    sorted([
+      at("0.04", "", 0.04),
+      at("0.08", "", 0.08),
+      at("0.004", "", 0.004),
+    ]),
+  ).toEqual(["0.004", "0.04", "0.08"]);
+  // Vega rows group by surface, and case never outranks a later value.
+  expect(
+    sorted([
+      at("S::1y", "S::", 1),
+      at("S::6m", "S::", 0.5),
+      at("R::3m", "R::", 0.25),
+    ]),
+  ).toEqual(["R::3m", "S::6m", "S::1y"]);
+  expect(
+    sorted([at("Usd::2y", "Usd::", 2), at("USD::1y", "USD::", 1)]),
+  ).toEqual(["USD::1y", "Usd::2y"]);
+  // Labels with no number collate as text.
+  expect(
+    sorted([
+      at("USD-SOFR", "USD-SOFR", null),
+      at("EUR-ESTR", "EUR-ESTR", null),
+      at("USD-OIS", "USD-OIS", null),
+    ]),
+  ).toEqual(["EUR-ESTR", "USD-OIS", "USD-SOFR"]);
 });

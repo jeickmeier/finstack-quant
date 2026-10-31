@@ -19,6 +19,9 @@ export type ValuationsNative = {
       | "listModelsGrouped"
       | "metricsForInstrument"
       | "metricMetadata"
+      | "priceDriverFields"
+      | "trancheMetricFieldUnits"
+      | "trancheSolveFieldUnits"
     >;
   };
 };
@@ -146,6 +149,12 @@ export function createValuationsService(
       context.result(() => instruments.metricsForInstrument(instrumentType)),
     metricMetadata: (keys) =>
       context.result(() => instruments.metricMetadata([...keys])),
+    priceDriverFields: () =>
+      context.result(() => instruments.priceDriverFields()),
+    trancheMetricFieldUnits: (currency) =>
+      context.result(() => instruments.trancheMetricFieldUnits(currency)),
+    trancheSolveFieldUnits: () =>
+      context.result(() => instruments.trancheSolveFieldUnits()),
     exportResult: (value) =>
       context.result(() =>
         exportValuation(value, native.valuations.valuationResultToJson),

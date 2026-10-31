@@ -22,8 +22,10 @@ pub use json::{
     list_standard_metrics, list_standard_metrics_grouped, metric_metadata, metric_value,
     metrics_for_instrument, parse_boxed_instrument_from_json, parse_boxed_instruments_from_json,
     parse_instrument_from_json, parse_typed_instrument_json, present_standard_option_greeks,
-    pretty_instrument_json, price_instrument, validate_instrument_json,
-    validate_typed_instrument_json, MetricMetadata, ParsedInstrument, STANDARD_OPTION_GREEKS,
+    pretty_instrument_json, price_instrument, tranche_metric_field_units,
+    tranche_solve_field_units, validate_instrument_json, validate_typed_instrument_json,
+    MetricCoordinate, MetricFieldUnit, MetricMetadata, ParsedInstrument, TrancheSolveFieldUnits,
+    STANDARD_OPTION_GREEKS,
 };
 
 use crate::instruments::credit_derivatives::CREDIT;

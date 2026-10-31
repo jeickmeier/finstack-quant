@@ -10,7 +10,10 @@ import {
   type WorkerApi,
 } from "@/workers/finstack-contract";
 import { evaluateStatementOptions } from "@/hooks/statements/use-evaluate-statement/use-evaluate-statement";
-import { rollupStatementOptions } from "@/hooks/statements/use-rollup-statement/use-rollup-statement";
+import {
+  defaultRollupSpecOptions,
+  rollupStatementOptions,
+} from "@/hooks/statements/use-rollup-statement/use-rollup-statement";
 import { evaluateStatementScenariosOptions } from "@/hooks/statements/use-evaluate-statement-scenarios/use-evaluate-statement-scenarios";
 import { runStatementChecksOptions } from "@/hooks/statements/use-run-statement-checks/use-run-statement-checks";
 import { explainStatementOptions } from "@/hooks/statements/use-explain-statement/use-explain-statement";
@@ -279,6 +282,10 @@ it(
 );
 
 it("keys rollup, scenario and check queries by every request field and the worker session", () => {
+  expectKeyed(defaultRollupSpecOptions, {
+    modelJson: analystModel,
+    frequency: "annual",
+  });
   expectKeyed(rollupStatementOptions, {
     modelJson: analystModel,
     resultsJson: analystResults,

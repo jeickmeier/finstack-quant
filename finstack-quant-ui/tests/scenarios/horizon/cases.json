@@ -1,9 +1,9 @@
 {
-  "description": "Native horizon total returns of the results-fixture bond: the Rust-built spec, scenarios.computeHorizonReturn (omitted method, config and calendar left to Rust) and horizonResultExplainText, or the native error.",
+  "description": "Native horizon total returns of the results-fixture bond: the Rust-built spec, scenarios.computeHorizonReturn (omitted method, config and calendar left to Rust) horizonResultExplainText and pnlAttributionPctOfTotalByBucket, or the native error.",
   "sources": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "5357646f8195d31e31fd0cb07bdb7b691583b9bb5e85ab343c47b18437c2aacf"
+      "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
     }
   ],
   "base": {
@@ -245,7 +245,105 @@
           }
         }
       },
-      "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3730.75\n  Credit: USD 0.00\n  Residual: USD 0.00\n"
+      "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3730.75\n  Credit: USD 0.00\n  Residual: USD 0.00\n",
+      "attributionBuckets": [
+        {
+          "field": "carry",
+          "amount": {
+            "amount": "12654.157529919",
+            "currency": "USD"
+          },
+          "pct_of_total": 141.80852777893284
+        },
+        {
+          "field": "rates_curves_pnl",
+          "amount": {
+            "amount": "-3730.746696937",
+            "currency": "USD"
+          },
+          "pct_of_total": -41.80852777894405
+        },
+        {
+          "field": "credit_curves_pnl",
+          "amount": {
+            "amount": "0.000000000",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "inflation_curves_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "correlations_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "fx_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "fx_translation_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "vol_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "cross_factor_pnl",
+          "amount": {
+            "amount": "0.000000001",
+            "currency": "USD"
+          },
+          "pct_of_total": 1.1206477194838633e-11
+        },
+        {
+          "field": "model_params_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "market_scalars_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "residual",
+          "amount": {
+            "amount": "0.000000000",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        }
+      ]
     },
     {
       "name": "usd-ois-50bp",
@@ -460,7 +558,105 @@
           }
         }
       },
-      "explain": "Horizon Total Return: -0.4935%\nInitial Value: USD 992091.57\nTerminal Value: USD 987195.91\nTotal P&L: USD -4895.66\n  Carry: USD 0.00\n  Rates: USD -4895.66\n  Credit: USD 0.00\n  Residual: USD 0.00\n"
+      "explain": "Horizon Total Return: -0.4935%\nInitial Value: USD 992091.57\nTerminal Value: USD 987195.91\nTotal P&L: USD -4895.66\n  Carry: USD 0.00\n  Rates: USD -4895.66\n  Credit: USD 0.00\n  Residual: USD 0.00\n",
+      "attributionBuckets": [
+        {
+          "field": "carry",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "rates_curves_pnl",
+          "amount": {
+            "amount": "-4895.657693227",
+            "currency": "USD"
+          },
+          "pct_of_total": 100
+        },
+        {
+          "field": "credit_curves_pnl",
+          "amount": {
+            "amount": "0.000000000",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "inflation_curves_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "correlations_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "fx_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "fx_translation_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "vol_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "cross_factor_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "model_params_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "market_scalars_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "residual",
+          "amount": {
+            "amount": "0.000000000",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        }
+      ]
     },
     {
       "name": "roll-3m-50bp-taylor",
@@ -807,7 +1003,105 @@
           }
         }
       },
-      "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3818.58\n  Credit: USD 0.00\n  Residual: USD 87.83\n"
+      "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3818.58\n  Credit: USD 0.00\n  Residual: USD 87.83\n",
+      "attributionBuckets": [
+        {
+          "field": "carry",
+          "amount": {
+            "amount": "12654.15752991894",
+            "currency": "USD"
+          },
+          "pct_of_total": 141.8085277789322
+        },
+        {
+          "field": "rates_curves_pnl",
+          "amount": {
+            "amount": "-3818.581617124459",
+            "currency": "USD"
+          },
+          "pct_of_total": -42.79284780893528
+        },
+        {
+          "field": "credit_curves_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "inflation_curves_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "correlations_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "fx_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "fx_translation_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "vol_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "cross_factor_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "model_params_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "market_scalars_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "residual",
+          "amount": {
+            "amount": "87.834920188519",
+            "currency": "USD"
+          },
+          "pct_of_total": 0.9843200300031097
+        }
+      ]
     },
     {
       "name": "roll-3m-50bp-metrics-based",
@@ -1140,7 +1434,105 @@
           }
         }
       },
-      "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3808.02\n  Credit: USD 0.00\n  Residual: USD 77.27\n"
+      "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3808.02\n  Credit: USD 0.00\n  Residual: USD 77.27\n",
+      "attributionBuckets": [
+        {
+          "field": "carry",
+          "amount": {
+            "amount": "12654.15752991999",
+            "currency": "USD"
+          },
+          "pct_of_total": 141.80852777894395
+        },
+        {
+          "field": "rates_curves_pnl",
+          "amount": {
+            "amount": "-3808.019346859281",
+            "currency": "USD"
+          },
+          "pct_of_total": -42.67448196808284
+        },
+        {
+          "field": "credit_curves_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "inflation_curves_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "correlations_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "fx_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "fx_translation_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "vol_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "cross_factor_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "model_params_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "market_scalars_pnl",
+          "amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "pct_of_total": 0
+        },
+        {
+          "field": "residual",
+          "amount": {
+            "amount": "77.272649922291",
+            "currency": "USD"
+          },
+          "pct_of_total": 0.8659541891389033
+        }
+      ]
     }
   ]
 }

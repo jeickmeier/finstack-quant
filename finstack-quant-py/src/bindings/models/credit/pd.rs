@@ -135,6 +135,12 @@ pub struct PyMasterScaleResult {
     inner: MasterScaleResult,
 }
 
+impl PyMasterScaleResult {
+    pub(super) fn from_inner(inner: MasterScaleResult) -> Self {
+        Self { inner }
+    }
+}
+
 #[pymethods]
 impl PyMasterScaleResult {
     #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.grade")]

@@ -5,8 +5,9 @@
 //! `FinancialModelSpec` is a function taking the object (or its JSON).
 
 use crate::utils::input::{from_js_json, js_f64, js_string, json_text};
+use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_core::dates::PeriodId;
+use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
 use finstack_quant_statements::checks::{CheckReport, Severity};
 use finstack_quant_statements::evaluator::{RollupSpec, StatementResult};
@@ -51,7 +52,7 @@ pub fn statement_result_get(
 /// @param result_json - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @param model - The `FinancialModelSpec` the result was evaluated from (object or JSON); it supplies the period dates and the formulas of `formula` nodes.
 /// @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"` default, `"period_end"`, `"formula"`) (object or JSON).
-/// @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), without `node_sources`, capital-structure cashflows or a check report.
+/// @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), with those periods in `periods` (each actual only when every source period is), without `node_sources`, capital-structure cashflows or a check report.
 ///
 /// # Errors
 ///
@@ -69,6 +70,26 @@ pub fn statement_result_rollup(
     let model = FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
     let spec: RollupSpec = from_js_json(&spec, "spec")?;
     to_js_value(&result.rollup(&model, &spec).map_err(to_js_err)?)
+}
+
+/// List the rollup methods a model's lines declare.
+///
+/// Free-function twin of Python `RollupSpec.default_for` (Rust
+/// `RollupSpec::default_for`). Only each node's `rollup` field is read: a line
+/// that declares nothing is not listed and sums, whatever its tags say.
+/// @param model - The `FinancialModelSpec` whose node declarations are listed (object or JSON); nothing is evaluated.
+/// @param frequency - Target frequency stored on the spec: `"quarterly"`, `"semi_annual"` or `"annual"`. `statementResultRollup` checks it against the model's periods.
+/// @returns `RollupSpec` plain object with the `frequency` and every declared node with its method in model order; `methods` is omitted when no node declares one.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the model is malformed or `frequency` is
+/// not a recognized label.
+#[wasm_bindgen(js_name = rollupSpecDefaultFor)]
+pub fn rollup_spec_default_for(model: JsValue, frequency: JsValue) -> Result<JsValue, JsValue> {
+    let model = FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+    let frequency: PeriodKind = js_wire(&frequency, "frequency")?;
+    to_js_value(&RollupSpec::default_for(&model, frequency))
 }
 
 /// Monetary value of one node in one period.

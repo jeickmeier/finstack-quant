@@ -1,4 +1,4 @@
-import type { scenarios } from "finstack-quant-wasm";
+import type { attribution, scenarios } from "finstack-quant-wasm";
 import type { ScenariosApi } from "../finstack-contract";
 import type { ServiceContext } from "./context";
 /** scenarios facade members this slice reads. */
@@ -11,6 +11,7 @@ export type ScenariosNative = {
     | "scenarioSpecRequiresInstruments"
     | "scenarioSpecMutatesInstruments"
     | "applyScenario"
+    | "applicationReportEffectiveAsOf"
     | "computeHorizonReturn"
     | "horizonResultExplainText"
     | "listBuiltinTemplateMetadata"
@@ -18,6 +19,7 @@ export type ScenariosNative = {
     | "buildTemplateComponent"
     | "composeScenarios"
   >;
+  attribution: Pick<typeof attribution, "pnlAttributionPctOfTotalByBucket">;
 };
 /** ScenariosApi over the scenarios facade namespace and the shared market cache. */
 export function createScenariosService(
@@ -58,6 +60,7 @@ export function createScenariosService(
     applyMarketScenario(request) {
       return context.result(() => {
         const spec = request.scenarioJson;
+        // finstack-compose: Rust's predicate decides; only the request's instrument is routed
         const inventory = api.scenarioSpecRequiresInstruments(spec)
           ? `[${request.instrumentJson}]`
           : undefined;
@@ -69,17 +72,16 @@ export function createScenariosService(
           inventory,
         );
         let instrumentJson = request.instrumentJson;
-        if (api.scenarioSpecMutatesInstruments(spec)) {
-          const instrument = applied.instruments?.[0];
-          if (!instrument)
-            throw new Error("applyScenario returned no shocked instrument");
-          instrumentJson = JSON.stringify(instrument);
-        }
+        // finstack-compose: Rust's predicate decides; a mutating scenario requires instruments, so Rust returned the copy
+        if (api.scenarioSpecMutatesInstruments(spec))
+          instrumentJson = JSON.stringify(applied.instruments![0]);
         return {
           report: applied.report,
           marketJson: context.market(JSON.stringify(applied.market)).json,
-          // A roll rebases the market, so the shocked price uses the new date.
-          asOf: applied.report.time_roll?.new_date ?? request.asOf,
+          asOf: api.applicationReportEffectiveAsOf(
+            applied.report,
+            request.asOf,
+          ),
           instrumentJson,
         };
       });
@@ -96,7 +98,14 @@ export function createScenariosService(
           undefined,
           request.calendarId ?? undefined,
         );
-        return { report, explain: api.horizonResultExplainText(report) };
+        return {
+          report,
+          explain: api.horizonResultExplainText(report),
+          attributionBuckets:
+            native.attribution.pnlAttributionPctOfTotalByBucket(
+              report.attribution,
+            ),
+        };
       });
     },
     validateScenarioSpec(json) {

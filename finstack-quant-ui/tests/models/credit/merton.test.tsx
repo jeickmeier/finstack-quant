@@ -90,58 +90,56 @@ const entry = (name: "model" | "equity") => ({
   request: fixture[name].request as MertonReportRequest,
   report: fixture[name].report as unknown as MertonReport,
 });
-const firm = JSON.parse(
-  (entry("model").request.source as { json: string }).json,
-);
-const withModel = (model: object): MertonReportRequest => ({
-  ...entry("model").request,
-  source: { kind: "model", json: JSON.stringify(model) },
-});
+const firm = (
+  entry("model").request.source as Extract<
+    MertonReportRequest["source"],
+    { kind: "model" }
+  >
+).model;
+const withModel = (model: object): MertonReportRequest =>
+  ({
+    ...entry("model").request,
+    source: { kind: "model", model },
+  }) as MertonReportRequest;
 // Reports are regenerated and compared by `mise run ui-fixtures --check`
 // (tests/models/credit/generate.mjs).
 it.each(["model", "equity"] as const)(
-  "returns the %s-source native report through the real worker and frees both handles",
+  "returns the %s-source native report through the real worker in one native call, holding no handle",
   async (name) => {
     const { request, report } = entry(name);
     const run = await counted(() => harness.proxy.mertonReport(request));
     expect(unwrap(run.value)).toEqual(report);
-    expect(run.merton).toEqual([1, 1]);
-    expect(run.scale).toEqual([1, 1]);
+    expect(run.merton).toEqual([0, 0]);
+    expect(run.scale).toEqual([0, 0]);
   },
   budget(15000),
 );
 it("grades the returned default probabilities and keeps the KMV default point of an equity source", () => {
   const model = entry("model").report;
-  expect(model.defaultPoint).toBeNull();
+  expect(model.default_point).toBeNull();
   expect(model.grades.map((grade) => grade.input_pd)).toEqual(
-    model.defaultProbabilities,
+    model.default_probabilities,
   );
   expect(model.horizons).toEqual(entry("model").request.horizons);
   const equity = entry("equity").report;
   // Short-term 30 plus half of long-term 40, as Rust returned it.
-  expect(equity.defaultPoint).toBe(50);
+  expect(equity.default_point).toBe(50);
   expect(equity.model.debt_barrier).toBe(50);
 });
 it("keeps the native error of a measure Rust rejects for the model beside the rest", async () => {
   // Rust defines the endogenous debt spread for a terminal barrier only.
-  const firstPassage = await counted(() =>
-    harness.proxy.mertonReport(
+  const report = unwrap(
+    await harness.proxy.mertonReport(
       withModel({
         ...firm,
         barrier_type: { first_passage: { barrier_growth_rate: 0 } },
       }),
     ),
   );
-  const report = unwrap(firstPassage.value);
-  expect(report.debtSpread.ok).toBe(false);
-  if (!report.debtSpread.ok) {
-    expect(report.debtSpread.error.kind).toBe("validation");
-    expect(report.debtSpread.error.message).toContain("Terminal only");
-  }
-  expect(report.impliedSpread.ok).toBe(true);
-  expect(report.cdsParSpread.ok).toBe(true);
-  expect(firstPassage.merton).toEqual([1, 1]);
-  expect(firstPassage.scale).toEqual([1, 1]);
+  expect(report.debt_spread).toBeNull();
+  expect(report.errors.debt_spread).toContain("Terminal only");
+  expect(report.implied_spread).not.toBeNull();
+  expect(report.cds_par_spread).not.toBeNull();
   // A CDS recovery that contradicts the CreditGrades mean recovery.
   const creditGrades = unwrap(
     await harness.proxy.mertonReport(
@@ -154,21 +152,22 @@ it("keeps the native error of a measure Rust rejects for the model beside the re
       }),
     ),
   );
-  expect(creditGrades.cdsParSpread.ok).toBe(false);
-  if (!creditGrades.cdsParSpread.ok)
-    expect(creditGrades.cdsParSpread.error.message).toContain("mean_recovery");
+  expect(creditGrades.cds_par_spread).toBeNull();
+  expect(creditGrades.errors.cds_par_spread).toContain("mean_recovery");
 });
 it("returns the native error of a rejected model and of a rejected equity calibration", async () => {
-  const bad = await counted(() =>
-    harness.proxy.mertonReport(withModel({ ...firm, asset_vol: -0.25 })),
+  const bad = await harness.proxy.mertonReport(
+    withModel({ ...firm, asset_vol: -0.25 }),
   );
-  expect(bad.value.ok).toBe(false);
-  expect(bad.merton).toEqual([0, 0]);
-  expect(bad.scale).toEqual([0, 0]);
+  expect(bad.ok).toBe(false);
   const { request } = entry("equity");
   const kmv = await harness.proxy.mertonReport({
     ...request,
-    source: { ...request.source, shortTermDebt: 0, longTermDebt: 0 } as never,
+    source: {
+      ...request.source,
+      short_term_debt: 0,
+      long_term_debt: 0,
+    } as never,
   });
   expect(kmv.ok).toBe(false);
   if (!kmv.ok) expect(kmv.error.kind).toBe("validation");
@@ -210,8 +209,7 @@ it("shows the returned tiles, term structure, grades and model parameters", () =
   const cds = screen.getByRole("region", {
     name: "CDS par spread (5y, recovery 0.4)",
   });
-  if (!report.cdsParSpread.ok) throw new Error("fixture CDS spread");
-  expect(within(cds).getByText(String(report.cdsParSpread.value))).toBeTruthy();
+  expect(within(cds).getByText(String(report.cds_par_spread))).toBeTruthy();
   const terms = within(
     screen.getByRole("region", { name: "Term structure" }),
   ).getByRole("table");
@@ -219,7 +217,7 @@ it("shows the returned tiles, term structure, grades and model parameters", () =
     1 + report.horizons.length,
   );
   expect(
-    within(terms).getByText(String(report.defaultProbabilities[0])),
+    within(terms).getByText(String(report.default_probabilities[0])),
   ).toBeTruthy();
   expect(within(terms).getAllByText(report.grades[0]!.grade).length).toBe(
     report.grades.filter((g) => g.grade === report.grades[0]!.grade).length,
@@ -241,8 +239,12 @@ it("shows a measure's native error in place of its values", () => {
       onSubmit={() => {}}
       report={{
         ...report,
-        debtSpread: { ok: false, error: { message: "terminal only" } },
-        impliedEquity: { ok: false, error: { message: "ill-conditioned" } },
+        debt_spread: null,
+        implied_equity: null,
+        errors: {
+          debt_spread: "terminal only",
+          implied_equity: "ill-conditioned",
+        },
       }}
     />,
   );
@@ -280,7 +282,7 @@ it(
     await userEvent.click(screen.getByRole("button", { name: "Calculate" }));
     const cleared = onSubmit.mock.lastCall![0] as MertonCalculatorRequest;
     expect(
-      cleared.source.kind === "equity" && cleared.source.payoutRate,
+      cleared.source.kind === "equity" && cleared.source.payout_rate,
     ).toBeNaN();
     cleanup();
     const validate = vi.fn(async (json: string) => json);
@@ -305,7 +307,7 @@ it(
     expect(submitted.horizons).toEqual(calculatorRequest("model").horizons);
     expect(submitted.source.kind).toBe("model");
     if (submitted.source.kind === "model")
-      expect(JSON.parse(submitted.source.json)).toEqual(firm);
+      expect(submitted.source.model).toEqual(firm);
   },
 );
 function Connected({ request }: { request: MertonReportRequest }) {

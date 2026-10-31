@@ -641,6 +641,16 @@ export interface StatementResult {
     };
   };
   /**
+   * The periods `nodes` is keyed by, in timeline order, with their dates and
+   * actual/forecast split.
+   *
+   * [`Evaluator`](crate::evaluator::Evaluator) records the model's periods and
+   * [`rollup`](Self::rollup) records its target periods, where a target is
+   * actual only when every source period is. Empty only for hand-built
+   * results, such as [`new`](Self::new).
+   */
+  periods: D_29936D53E5E53Cef8284[];
+  /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */
   schema_version: number;
@@ -2381,6 +2391,27 @@ export interface DD812Cec4E88E45C1B673 {
   warnings?: D_76Adf23Abc095Fd56514[];
 }
 /**
+ * A concrete period with start/end dates and actual/forecast flag.
+ */
+export interface D_29936D53E5E53Cef8284 {
+  /**
+   * Exclusive end date.
+   */
+  end: string;
+  /**
+   * Identifier of this period.
+   */
+  id: string;
+  /**
+   * True when this period is part of the "actuals" subset.
+   */
+  is_actual: boolean;
+  /**
+   * Inclusive start date.
+   */
+  start: string;
+}
+/**
  * Configuration used
  */
 export interface DFeab1608Ae875B3Fa417 {
@@ -2485,6 +2516,16 @@ export interface StatementResult1 {
       [k: string]: DD2458Ef8E558D1360642;
     };
   };
+  /**
+   * The periods `nodes` is keyed by, in timeline order, with their dates and
+   * actual/forecast split.
+   *
+   * [`Evaluator`](crate::evaluator::Evaluator) records the model's periods and
+   * [`rollup`](Self::rollup) records its target periods, where a target is
+   * actual only when every source period is. Empty only for hand-built
+   * results, such as [`new`](Self::new).
+   */
+  periods: D_29936D53E5E53Cef8284[];
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */

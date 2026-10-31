@@ -40,7 +40,7 @@ export function usePriceInstrument(request: PriceRequest, enabled = true) {
 }
 /** Registry options are immutable within one initialized worker session. */
 function useOptions<T>(
-  operation: "models" | "calendars",
+  operation: "models" | "calendars" | "priceDriverFields",
   fetch: (client: FinstackClient) => Promise<T>,
 ) {
   return useWorkerQuery((worker) => ({
@@ -81,6 +81,12 @@ export function useMetricMetadata(keys: readonly string[], enabled = true) {
     enabled,
     ...workerQueryPolicy,
   }));
+}
+/** Native wire names of the mutually exclusive price-driving market quotes. */
+export function usePriceDriverFields() {
+  return useOptions("priceDriverFields", (client) =>
+    client.call("priceDriverFields"),
+  );
 }
 /** Canonical calendar identifiers from the native core registry. */
 export function useCalendars() {

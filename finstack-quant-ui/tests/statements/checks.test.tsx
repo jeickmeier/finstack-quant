@@ -111,13 +111,14 @@ it("starts an unseeded suite empty and blocks submission until the required name
   renderChecks();
   const [name] = screen.getAllByRole("textbox", { name: "Name" });
   expect(name).toHaveProperty("value", "");
-  expect(name.getAttribute("aria-invalid")).toBe("true");
+  expect(name.getAttribute("aria-invalid")).not.toBe("true");
   // The Rust example (three_statement_integrity with a builtin and a formula check) is never synthesized.
   expect(screen.getAllByRole("textbox")).toHaveLength(1);
   expect(screen.queryByRole("group", { name: /^Builtin checks/ })).toBeNull();
   expect(screen.queryByRole("group", { name: /^Formula checks/ })).toBeNull();
   await user.click(await runButton());
   await waitFor(() => expect(document.activeElement).toBe(name));
+  expect(name.getAttribute("aria-invalid")).toBe("true");
   expect(calls("validateCheckSuiteSpec")).toHaveLength(0);
   expect(calls("runStatementChecks")).toHaveLength(0);
 

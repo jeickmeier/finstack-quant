@@ -991,6 +991,15 @@
       "type_name": "ConvertibleGreeks"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/currency_ladder.schema.json",
+      "bytes": 2239,
+      "kind": "output",
+      "path": "schemas/results/1/currency_ladder.schema.json",
+      "summary": "One row currency's calendar-year non-principal, principal and native PV ladder.",
+      "title": "CurrencyLadder",
+      "type_name": "CurrencyLadder"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
       "bytes": 52720,
       "kind": "output",
@@ -1054,8 +1063,17 @@
       "type_name": "MertonMcResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/metric_field_unit.schema.json",
+      "bytes": 879,
+      "kind": "output",
+      "path": "schemas/results/1/metric_field_unit.schema.json",
+      "summary": "The display unit of one scalar field of a result struct.",
+      "title": "MetricFieldUnit",
+      "type_name": "MetricFieldUnit"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
-      "bytes": 3353,
+      "bytes": 4630,
       "kind": "output",
       "path": "schemas/results/1/metric_metadata.schema.json",
       "summary": "Canonical per-key metric interpretation for host presentation.",
@@ -1124,6 +1142,15 @@
       "summary": "Per-tranche risk and spread metrics from the tranche's own projected cashflows.",
       "title": "TrancheMetrics",
       "type_name": "TrancheMetrics"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/tranche_solve_field_units.schema.json",
+      "bytes": 2744,
+      "kind": "output",
+      "path": "schemas/results/1/tranche_solve_field_units.schema.json",
+      "summary": "The display units of the tranche break-even CDR, discount margin and OAS results.",
+      "title": "TrancheSolveFieldUnits",
+      "type_name": "TrancheSolveFieldUnits"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",

@@ -16,45 +16,10 @@ import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { mertonModule } from "./merton";
 
-/** A native result or the native error of that one measure. */
-type Outcome<T> =
-  { ok: true; value: T } | { ok: false; error: { message: string } };
-/** Where the model comes from: canonical MertonModel JSON, or a KMV equity calibration. */
-export type MertonCalculatorSource =
-  | { kind: "model"; json: string }
-  | {
-      kind: "equity";
-      equityValue: number;
-      equityVol: number;
-      shortTermDebt: number;
-      longTermDebt: number;
-      riskFreeRate: number;
-      payoutRate: number;
-      maturity: number;
-    };
 /** The request the calculator submits; the worker's MertonReportRequest. */
-export interface MertonCalculatorRequest {
-  source: MertonCalculatorSource;
-  horizons: number[];
-  maturity: number;
-  recovery: number;
-}
+export type MertonCalculatorRequest = modelsWire.MertonReportRequest;
 /** The native report the worker's mertonReport returns. */
-export interface MertonReportData {
-  model: modelsWire.MertonModel;
-  defaultPoint: number | null;
-  horizons: readonly number[];
-  defaultProbabilities: readonly number[];
-  distanceToDefault: readonly number[];
-  grades: readonly modelsWire.MasterScaleResult[];
-  impliedSpread: Outcome<readonly number[]>;
-  debtSpread: Outcome<readonly number[]>;
-  maturity: number;
-  recovery: number;
-  cdsParSpread: Outcome<number>;
-  /** [equity value, equity volatility] as Rust returns them. */
-  impliedEquity: Outcome<readonly number[]>;
-}
+export type MertonReportData = modelsWire.MertonReport;
 export interface MertonCalculatorProps {
   /** The initial inputs; remount to load another request. */
   defaultRequest: MertonCalculatorRequest;
@@ -73,27 +38,27 @@ export interface MertonCalculatorProps {
 }
 const equityFields = [
   [
-    "equityValue",
+    "equity_value",
     "Equity value",
     "Market value of equity, in the firm's monetary unit.",
   ],
   [
-    "equityVol",
+    "equity_vol",
     "Equity volatility",
     "Annualized equity-return volatility, decimal.",
   ],
   [
-    "shortTermDebt",
+    "short_term_debt",
     "Short-term debt",
     "Liabilities due within one year; enter total debt here with no long-term debt for a total-debt barrier.",
   ],
   [
-    "longTermDebt",
+    "long_term_debt",
     "Long-term debt",
     "Liabilities maturing beyond one year; Rust's KMV default point takes half of it.",
   ],
-  ["riskFreeRate", "Risk-free rate", "Continuously compounded, decimal."],
-  ["payoutRate", "Payout rate", "Continuous payout yield on assets, decimal."],
+  ["risk_free_rate", "Risk-free rate", "Continuously compounded, decimal."],
+  ["payout_rate", "Payout rate", "Continuous payout yield on assets, decimal."],
   ["maturity", "Calibration maturity", "Years."],
 ] as const;
 type EquityKey = (typeof equityFields)[number][0];
@@ -146,9 +111,7 @@ export function MertonCalculator({
   const [modelValues] = useState(() => {
     if (initial.kind !== "model") return { value: undefined };
     try {
-      const value = mertonModule.codec.parse(initial.json);
-      if (value === null || typeof value !== "object" || Array.isArray(value))
-        throw new TypeError("MertonModel must be a JSON object");
+      const value = mertonModule.codec.parse(JSON.stringify(initial.model));
       return { value: value as Record<string, unknown> };
     } catch (failure) {
       return {
@@ -215,7 +178,13 @@ export function MertonCalculator({
           defaultValues={modelValues.value}
           validate={validate}
           onSubmit={(json) =>
-            onSubmit({ source: { kind: "model", json }, ...terms() })
+            onSubmit({
+              source: {
+                kind: "model",
+                model: mertonModule.codec.parse(json) as modelsWire.MertonModel,
+              },
+              ...terms(),
+            })
           }
           submitLabel="Calculate"
           layout="full"
@@ -303,8 +272,9 @@ function MertonReportView({
       cell: ({ getValue }) => shown(getValue(), format),
       meta: { className: "text-right finstack-numeric" },
     });
-    const spread = (outcome: Outcome<readonly number[]>) => (index: number) =>
-      outcome.ok ? outcome.value[index] : "—";
+    const spread =
+      (measure: readonly number[] | null | undefined) => (index: number) =>
+        measure ? measure[index] : "—";
     return [
       // The requested horizon, echoed as supplied rather than host-formatted.
       {
@@ -317,22 +287,22 @@ function MertonReportView({
       numeric(
         "default_probability",
         labelFor("default_probability"),
-        (i) => report.defaultProbabilities[i],
+        (i) => report.default_probabilities[i],
       ),
       numeric(
         "distance_to_default",
         labelFor("distance_to_default"),
-        (i) => report.distanceToDefault[i],
+        (i) => report.distance_to_default[i],
       ),
       numeric(
         "implied_spread",
         labelFor("implied_spread"),
-        spread(report.impliedSpread),
+        spread(report.implied_spread),
       ),
       numeric(
         "debt_spread",
         labelFor("debt_spread"),
-        spread(report.debtSpread),
+        spread(report.debt_spread),
       ),
       {
         id: "grade",
@@ -388,18 +358,16 @@ function MertonReportView({
       name: labelFor(key),
       value,
     })),
-    ...(report.defaultPoint === null
+    ...(report.default_point == null
       ? []
-      : [{ name: "KMV default point", value: report.defaultPoint }]),
+      : [{ name: "KMV default point", value: report.default_point }]),
   ];
   const errors = (
     [
-      ["Implied spread", report.impliedSpread],
-      ["Debt spread", report.debtSpread],
+      ["Implied spread", report.errors.implied_spread],
+      ["Debt spread", report.errors.debt_spread],
     ] as const
-  ).flatMap(([name, outcome]) =>
-    outcome.ok ? [] : [`${name}: ${outcome.error.message}`],
-  );
+  ).flatMap(([name, message]) => (message ? [`${name}: ${message}`] : []));
   const tile = (label: string, body: ReactNode) => (
     <section
       key={label}
@@ -410,33 +378,28 @@ function MertonReportView({
       {body}
     </section>
   );
-  const value = (outcome: Outcome<number>) =>
-    outcome.ok ? (
-      <p className="finstack-numeric text-base">
-        {shown(outcome.value, format)}
+  const value = (measure: number | null | undefined, name: string) =>
+    measure == null ? (
+      <p role="alert" className="text-xs text-error">
+        {report.errors[name]}
       </p>
     ) : (
-      <p role="alert" className="text-xs text-error">
-        {outcome.error.message}
-      </p>
+      <p className="finstack-numeric text-base">{shown(measure, format)}</p>
     );
-  const equity = report.impliedEquity;
-  const equityPart = (index: number): Outcome<number> =>
-    equity.ok ? { ok: true, value: equity.value[index]! } : equity;
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-2 @lg:grid-cols-3">
         {tile(
           `CDS par spread (${report.maturity}y, recovery ${report.recovery})`,
-          value(report.cdsParSpread),
+          value(report.cds_par_spread, "cds_par_spread"),
         )}
         {tile(
           `Implied equity value (${report.maturity}y)`,
-          value(equityPart(0)),
+          value(report.implied_equity?.value, "implied_equity"),
         )}
         {tile(
           `Implied equity volatility (${report.maturity}y)`,
-          value(equityPart(1)),
+          value(report.implied_equity?.vol, "implied_equity"),
         )}
       </div>
       <p className="text-xs text-muted-foreground">

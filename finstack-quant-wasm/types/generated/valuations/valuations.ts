@@ -17635,6 +17635,29 @@ export interface BorrowingBaseReport {
   eligible_collateral: Money;
 }
 /**
+ * Calendar-year non-principal / principal / PV totals for one reporting year.
+ */
+export interface CalendarYearLadderRow {
+  /**
+   * Sum of amounts that are not [`CFKind::is_principal_like`] in that year,
+   * in the flow's native units (interest, fees, recovery, and unknown-kind
+   * flows are not mixed in: unknown labels are rejected).
+   */
+  non_principal: number;
+  /**
+   * Sum of [`CFKind::is_principal_like`] amounts in that year.
+   */
+  principal: number;
+  /**
+   * Sum of present values in that year, in the same units as `non_principal`.
+   */
+  pv: number;
+  /**
+   * Calendar year of the grouped cashflows (Gregorian, as on `Date::year`).
+   */
+  year: number;
+}
+/**
  * Single-row enriched cashflow view.
  */
 export interface CashflowRow {
@@ -18862,6 +18885,19 @@ export interface CoverageTestDiagnostic {
   [k: string]: unknown;
 }
 /**
+ * One row currency's calendar-year non-principal, principal and native PV ladder.
+ */
+export interface CurrencyLadder {
+  /**
+   * Row currency every figure of `rows` is stated in.
+   */
+  currency: Currency;
+  /**
+   * Calendar-year non-principal, principal and native PV totals, by ascending year.
+   */
+  rows: CalendarYearLadderRow[];
+}
+/**
  * One structured finding emitted while loading a persisted contract.
  */
 export interface Diagnostic {
@@ -19863,6 +19899,41 @@ export interface PathStatistics {
   pik_exercise_rate: number;
 }
 /**
+ * Where one coordinate label sits on its axis.
+ *
+ * A host sorts by `group` and then by `value`, so maturity and strike order
+ * is not recovered by parsing label text.
+ */
+export interface MetricCoordinate {
+  /**
+   * Text the value is scoped by: the `{surface}::` of a vega row, empty for
+   * a bare tenor or strike, and the whole label when it carries no number.
+   */
+  group: string;
+  /**
+   * Tenor in years (`3m` is 0.25, per [`parse_key_rate_label`]) or the
+   * decimal strike; `None` when the label carries no number.
+   */
+  value?: number | null;
+}
+/**
+ * The display unit of one scalar field of a result struct.
+ */
+export interface MetricFieldUnit {
+  /**
+   * Wire name of the field.
+   */
+  field: string;
+  /**
+   * Unit text as the field documents it, such as `USD per bp` or `years`.
+   */
+  label: string;
+  /**
+   * Canonical Rust field the unit is documented on.
+   */
+  source: string;
+}
+/**
  * Canonical per-key metric interpretation for host presentation.
  */
 export interface MetricMetadata {
@@ -19874,6 +19945,10 @@ export interface MetricMetadata {
    * Decoded coordinate labels in original order; empty for scalar metrics.
    */
   components: string[];
+  /**
+   * How each entry of `components` orders along its axis, aligned with it.
+   */
+  coordinates: MetricCoordinate[];
   /**
    * Native display group; absent for a non-standard base metric.
    */
@@ -20330,6 +20405,23 @@ export interface TrancheMetrics {
    * Z-spread to the assumed call at `target_price_pct` (basis points).
    */
   z_spread_to_call_bp?: number | null;
+}
+/**
+ * The display units of the tranche break-even CDR, discount margin and OAS results.
+ */
+export interface TrancheSolveFieldUnits {
+  /**
+   * Unit of the value `tranche_breakeven_cdr` returns.
+   */
+  breakeven_cdr: MetricFieldUnit;
+  /**
+   * Unit of the value `tranche_discount_margin` returns.
+   */
+  discount_margin: MetricFieldUnit;
+  /**
+   * Unit of every `OasResult` field, in the order the struct declares them.
+   */
+  oas: MetricFieldUnit[];
 }
 /**
  * Bounded structured diagnostics emitted by persisted-contract validation.

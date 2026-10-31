@@ -224,6 +224,17 @@ impl PyApplicationReport {
         Ok(Self { inner })
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.scenarios._engine", "ApplicationReport.effective_as_of")]
+    #[pyo3(text_signature = "($self, as_of)")]
+    fn effective_as_of<'py>(
+        &self,
+        py: Python<'py>,
+        as_of: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
+        crate::bindings::date_utils::date_to_py(py, self.inner.effective_as_of(as_of))
+    }
+
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;

@@ -21,7 +21,7 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/require-wasm.mjs pkg pkg-node && vitest run",
-    "check": "node scripts/require-wasm.mjs pkg pkg-node && node scripts/run-generators.mjs --check && node scripts/run-fixtures.mjs --check && prettier --check . && node scripts/check-tokens.mjs && node scripts/check-registry.mjs && node scripts/coverage.mjs --check && tsc --noEmit && vitest run",
+    "check": "node scripts/require-wasm.mjs pkg pkg-node && node scripts/run-generators.mjs --check && node scripts/run-fixtures.mjs --check && prettier --check . && node scripts/check-tokens.mjs && node scripts/check-no-arithmetic.mjs && node scripts/check-worker-compose.mjs && node scripts/check-registry.mjs && node scripts/coverage.mjs --check && tsc --noEmit && vitest run",
     "build": "shadcn build --output public/r",
     "e2e": "playwright test -c playwright.config.ts",
     "size": "node tests/browser/size.mjs"

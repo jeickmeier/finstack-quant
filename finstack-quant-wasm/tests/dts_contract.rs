@@ -240,13 +240,17 @@ fn analytics_dts_matches_runtime_hotspots() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "lookbackReturns(refDate: string, fiscalConfig?: FiscalConfig | null): LookbackReturns;",
+        "lookbackReturns(refDate?: string | null, fiscalConfig?: FiscalConfig | null): LookbackReturns;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
         "periodStats(tickerIdx: number, aggregationFrequency?: string, fiscalConfig?: FiscalConfig | null): PeriodStats;",
     ));
     assert!(!dts.contains("lookbackReturnsWithFiscalConfig("));
+    assert!(!dts.contains("calibrateHullWhiteToCapFloorsWithForward("));
+    assert!(!dts.contains("calibrateHullWhiteToCapFloorsWithoutForward("));
+    assert!(!dts.contains("bootstrapHullWhiteSigmaScheduleToCapFloorsWithForward("));
+    assert!(!dts.contains("bootstrapHullWhiteSigmaScheduleToCapFloorsWithoutForward("));
     assert!(!dts.contains("periodStatsWithFiscalConfig("));
     assert!(declares_type(&dts, "LookbackReturns"));
     assert!(
@@ -1111,7 +1115,7 @@ fn statements_analytics_dts_matches_runtime_exports() {
     assert!(declares_type(&dts, "TornadoEntry"));
     assert!(contains_ignoring_ws(
         &dts,
-        "generateTornadoEntries(resultJson: JsonInput, metricNode: string, period: string): TornadoEntry[];"
+        "generateTornadoEntries(resultJson: JsonInput, metricNode: string, period: string): TornadoEntry[] | null;"
     ));
     assert!(declares_type(&dts, "CheckReport"));
     assert!(declares_type(&dts, "CheckResult"));

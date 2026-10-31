@@ -1,0 +1,82 @@
+{
+  "envelope": {
+    "instrument_id": "XCCY",
+    "currency": "USD",
+    "model": "discounting",
+    "as_of": "2025-01-15",
+    "discount_curve_id": "USD-OIS",
+    "flows": [
+      {
+        "date": "2026-01-15",
+        "amount": 10.0,
+        "currency": "EUR",
+        "kind": "fixed",
+        "accrual_factor": 0.0,
+        "year_fraction": 1.0,
+        "rate": null,
+        "discount_factor": 1.0,
+        "discount_curve_id": "USD-OIS",
+        "native_pv": 9.0,
+        "pv": 18.0
+      },
+      {
+        "date": "2026-06-15",
+        "amount": 20.0,
+        "currency": "USD",
+        "kind": "fixed",
+        "accrual_factor": 0.0,
+        "year_fraction": 1.0,
+        "rate": null,
+        "discount_factor": 1.0,
+        "discount_curve_id": "USD-OIS",
+        "native_pv": 18.0,
+        "pv": 36.0
+      },
+      {
+        "date": "2027-01-15",
+        "amount": 100.0,
+        "currency": "EUR",
+        "kind": "notional",
+        "accrual_factor": 0.0,
+        "year_fraction": 1.0,
+        "rate": null,
+        "discount_factor": 1.0,
+        "discount_curve_id": "USD-OIS",
+        "native_pv": 80.0,
+        "pv": 160.0
+      }
+    ],
+    "total_pv": 214.0,
+    "reconciles_with_base_value": true
+  },
+  "ladders": [
+    {
+      "currency": "EUR",
+      "rows": [
+        {
+          "year": 2026,
+          "non_principal": 10.0,
+          "principal": 0.0,
+          "pv": 9.0
+        },
+        {
+          "year": 2027,
+          "non_principal": 0.0,
+          "principal": 100.0,
+          "pv": 80.0
+        }
+      ]
+    },
+    {
+      "currency": "USD",
+      "rows": [
+        {
+          "year": 2026,
+          "non_principal": 20.0,
+          "principal": 0.0,
+          "pv": 18.0
+        }
+      ]
+    }
+  ]
+}

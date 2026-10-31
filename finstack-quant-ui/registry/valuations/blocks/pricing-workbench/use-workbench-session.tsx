@@ -17,6 +17,7 @@ import {
   useMetrics,
   useMetricMetadata,
   useMoneyFormat,
+  usePriceDriverFields,
   usePriceInstrument,
   type PriceRequest,
 } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
@@ -117,6 +118,7 @@ export function useWorkbenchSession({
         setMarketReady(false);
         setMarketDocument((current) => ({
           json: example.marketJson,
+          // finstack-arith: remount revision counter, not a value
           revision: current.revision + 1,
         }));
         setParams({
@@ -128,6 +130,7 @@ export function useWorkbenchSession({
         });
         setRequest(null);
         setCompleted(null);
+        // finstack-arith: remount revision counter, not a value
         setInstrumentRevision((current) => current + 1);
         setResultTab(exampleResultTabs?.[nextType] ?? defaultResultTab);
       }
@@ -192,6 +195,7 @@ export function useWorkbenchSession({
   const worker = useFinstack();
   const validate = useInstrumentValidator();
   const validateMarket = useMarketValidator();
+  const priceDriverFields = usePriceDriverFields();
   const models = useModels(),
     metrics = useMetrics(type || null);
   const candidate = useMemo<PriceRequest | null>(
@@ -264,6 +268,7 @@ export function useWorkbenchSession({
   );
 
   return {
+    priceDriverFields: priceDriverFields.data,
     initial,
     initialType,
     type,

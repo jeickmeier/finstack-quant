@@ -21,8 +21,9 @@ use crate::bindings::pandas_utils::{
 use crate::errors::core_to_py;
 use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::credit::{
-    moodys_warf_factor as rust_moodys_warf_factor, AssetDynamics, CreditState, CreditStateVariable,
-    DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel, RatingFactorTable,
+    merton_report as rust_merton_report, moodys_warf_factor as rust_moodys_warf_factor,
+    AssetDynamics, CreditState, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
+    MertonBarrierType, MertonModel, MertonReport, MertonReportRequest, RatingFactorTable,
     SimulatedPaths, ThresholdDirection, ToggleExerciseModel,
 };
 use pyo3::prelude::*;
@@ -531,6 +532,178 @@ wire_methods!(
     "MertonModel",
     module = "finstack_quant.models.credit"
 );
+
+#[doc = pydoc!("finstack_quant.models.credit", "MertonReport")]
+#[pyclass(
+    name = "MertonReport",
+    module = "finstack_quant.models.credit",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone)]
+pub(crate) struct PyMertonReport {
+    pub(crate) inner: MertonReport,
+}
+
+#[pymethods]
+impl PyMertonReport {
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.model")]
+    #[getter]
+    fn model(&self) -> PyMertonModel {
+        PyMertonModel {
+            inner: self.inner.model.clone(),
+        }
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.default_point")]
+    #[getter]
+    fn default_point(&self) -> Option<f64> {
+        self.inner.default_point
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.horizons")]
+    #[getter]
+    fn horizons(&self) -> Vec<f64> {
+        self.inner.horizons.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.default_probabilities")]
+    #[getter]
+    fn default_probabilities(&self) -> Vec<f64> {
+        self.inner.default_probabilities.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.distance_to_default")]
+    #[getter]
+    fn distance_to_default(&self) -> Vec<f64> {
+        self.inner.distance_to_default.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.grades")]
+    #[getter]
+    fn grades(&self) -> Vec<pd::PyMasterScaleResult> {
+        self.inner
+            .grades
+            .iter()
+            .cloned()
+            .map(pd::PyMasterScaleResult::from_inner)
+            .collect()
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.implied_spread")]
+    #[getter]
+    fn implied_spread(&self) -> Option<Vec<f64>> {
+        self.inner.implied_spread.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.debt_spread")]
+    #[getter]
+    fn debt_spread(&self) -> Option<Vec<f64>> {
+        self.inner.debt_spread.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.maturity")]
+    #[getter]
+    fn maturity(&self) -> f64 {
+        self.inner.maturity
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.recovery")]
+    #[getter]
+    fn recovery(&self) -> f64 {
+        self.inner.recovery
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.cds_par_spread")]
+    #[getter]
+    fn cds_par_spread(&self) -> Option<f64> {
+        self.inner.cds_par_spread
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.implied_equity")]
+    #[getter]
+    fn implied_equity(&self) -> Option<(f64, f64)> {
+        self.inner
+            .implied_equity
+            .map(|equity| (equity.value, equity.vol))
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.errors")]
+    #[getter]
+    fn errors(&self) -> std::collections::BTreeMap<String, String> {
+        self.inner.errors.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.to_dataframe")]
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let per_horizon = |measure: &Option<Vec<f64>>| -> Vec<Option<f64>> {
+            match measure {
+                Some(values) => values.iter().copied().map(Some).collect(),
+                None => vec![None; self.inner.horizons.len()],
+            }
+        };
+        let columns = PyDict::new(py);
+        columns.set_item("horizon", self.inner.horizons.clone())?;
+        columns.set_item(
+            "default_probability",
+            self.inner.default_probabilities.clone(),
+        )?;
+        columns.set_item(
+            "distance_to_default",
+            self.inner.distance_to_default.clone(),
+        )?;
+        columns.set_item("implied_spread", per_horizon(&self.inner.implied_spread))?;
+        columns.set_item("debt_spread", per_horizon(&self.inner.debt_spread))?;
+        columns.set_item(
+            "grade",
+            self.inner
+                .grades
+                .iter()
+                .map(|row| row.grade.clone())
+                .collect::<Vec<_>>(),
+        )?;
+        columns.set_item(
+            "central_pd",
+            self.inner
+                .grades
+                .iter()
+                .map(|row| row.central_pd)
+                .collect::<Vec<_>>(),
+        )?;
+        dict_to_dataframe(py, &columns, None)
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.__repr__")]
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("MertonReport", &self.inner)
+    }
+}
+
+wire_methods!(
+    PyMertonReport,
+    MertonReport,
+    "MertonReport",
+    module = "finstack_quant.models.credit"
+);
+
+#[doc = pydoc!("finstack_quant.models.credit", "merton_report")]
+#[pyfunction]
+#[pyo3(text_signature = "(request)")]
+fn merton_report(request: &Bound<'_, PyAny>) -> PyResult<PyMertonReport> {
+    let text = match request.extract::<String>() {
+        Ok(text) => text,
+        Err(_) => crate::bindings::module_utils::py_to_json_string(
+            request.py(),
+            request,
+            "merton_report request",
+        )?,
+    };
+    let request: MertonReportRequest = serde_json::from_str(&text)
+        .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+    Ok(PyMertonReport {
+        inner: rust_merton_report(&request).map_err(core_to_py)?,
+    })
+}
 
 #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths")]
 #[pyclass(
@@ -1051,12 +1224,14 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     module.add_class::<PyAssetDynamics>()?;
     module.add_class::<PyBarrierType>()?;
     module.add_class::<PyMertonModel>()?;
+    module.add_class::<PyMertonReport>()?;
     module.add_class::<PySimulatedPaths>()?;
     module.add_class::<PyDynamicRecoverySpec>()?;
     module.add_class::<PyEndogenousHazardSpec>()?;
     module.add_class::<PyCreditState>()?;
     module.add_class::<PyToggleExerciseModel>()?;
     module.add_class::<PyRatingFactorTable>()?;
+    module.add_function(wrap_pyfunction!(merton_report, &module)?)?;
     module.add_function(wrap_pyfunction!(moodys_warf_factor, &module)?)?;
     scoring::register(py, &module)?;
     pd::register(py, &module)?;
@@ -1073,12 +1248,14 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
             "EndogenousHazardSpec",
             "MertonBarrierType",
             "MertonModel",
+            "MertonReport",
             "RatingFactorTable",
             "SimulatedPaths",
             "ToggleExerciseModel",
             "lgd",
             "liability_management",
             "migration",
+            "merton_report",
             "moodys_warf_factor",
             "pd",
             "recovery_waterfall",

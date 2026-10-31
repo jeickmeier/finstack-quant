@@ -36,6 +36,7 @@ export function marketTree(state: MarketContextStateWire): MarketEntry[] {
     const counts = new Map<string, number>();
     for (const id of candidates) {
       const key = JSON.stringify(id);
+      // finstack-arith: counts duplicate node ids so the tree can disambiguate them
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     return {

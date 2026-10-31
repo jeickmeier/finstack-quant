@@ -450,6 +450,108 @@ fn mix_node_seed(
 }
 
 #[cfg(test)]
+mod parameter_contract_tests {
+    use super::{allowed_params, param_shape, validate_params, ParamShape};
+    use crate::types::{ForecastMethod, ForecastParameters, ForecastSpec};
+    use serde_json::{json, Value};
+
+    /// One valid wire document per method, with every optional parameter.
+    fn documents() -> Vec<Value> {
+        let bounds = |mut params: Value| {
+            params["min"] = json!(0.0);
+            params["max"] = json!(1000.0);
+            params
+        };
+        let correlated = |mut params: Value| {
+            params["correlation_with"] = json!("peer");
+            params["correlation"] = json!(0.5);
+            bounds(params)
+        };
+        vec![
+            json!({"method": "forward_fill", "params": bounds(json!({}))}),
+            json!({"method": "growth_pct", "params": bounds(json!({"rate": 0.03}))}),
+            json!({"method": "curve_pct", "params": bounds(json!({"curve": [0.01, 0.02]}))}),
+            json!({"method": "override", "params": bounds(json!({"overrides": {"2025Q1": 1.0}}))}),
+            json!({"method": "normal", "params": correlated(json!({"mean": 1.0, "std_dev": 0.1, "seed": 7}))}),
+            json!({"method": "log_normal", "params": correlated(json!({"mean": 0.0, "std_dev": 0.1, "seed": 7}))}),
+            json!({"method": "mean_reverting", "params": correlated(json!({"long_run_mean": 1.0, "reversion_speed": 0.5, "std_dev": 0.1, "seed": 7}))}),
+            json!({"method": "bootstrap", "params": bounds(json!({"historical": [1.0, 2.0], "mode": "diff", "seed": 7}))}),
+            json!({"method": "time_series", "params": bounds(json!({"historical": [1.0, 2.0], "method": "exponential", "alpha": 0.5, "beta": 0.5, "phi": 0.9, "window": 2}))}),
+            json!({"method": "seasonal", "params": bounds(json!({"historical": [1.0, 2.0], "season_length": 2, "mode": "additive", "growth": 0.01}))}),
+            json!({"method": "fade_to_target", "params": bounds(json!({"target": 1.0, "shape": "exponential", "half_life": 2.0}))}),
+        ]
+    }
+
+    #[test]
+    fn every_method_document_is_valid_for_both_the_typed_and_stored_forms() {
+        let documents = documents();
+        assert_eq!(documents.len(), 11);
+        for document in documents {
+            let typed: ForecastParameters =
+                serde_json::from_value(document.clone()).expect("typed parameters");
+            assert_eq!(serde_json::to_value(&typed).expect("serialize"), document);
+            let spec: ForecastSpec = serde_json::from_value(document).expect("forecast spec");
+            validate_params(spec.method, &spec.params).expect("stored parameters");
+            // Every key the method accepts appears in the document, so an
+            // allowed key missing from the typed struct would have failed above.
+            let mut allowed: Vec<&str> = allowed_params(spec.method).to_vec();
+            allowed.sort_unstable();
+            let mut listed: Vec<&str> = spec.params.keys().map(String::as_str).collect();
+            listed.sort_unstable();
+            assert_eq!(listed, allowed, "{:?}", spec.method);
+        }
+    }
+
+    #[test]
+    fn typed_parameters_reject_a_key_outside_the_method() {
+        let document = json!({"method": "growth_pct", "params": {"rate": 0.03, "sigma": 1.0}});
+        assert!(serde_json::from_value::<ForecastParameters>(document).is_err());
+    }
+
+    #[cfg(feature = "json-schema")]
+    #[test]
+    fn published_schema_matches_the_stored_parameter_rules() {
+        let schema =
+            serde_json::to_value(schemars::schema_for!(ForecastParameters)).expect("schema");
+        let branches = schema["oneOf"].as_array().expect("one branch per method");
+        assert_eq!(branches.len(), 11);
+        for branch in branches {
+            let method: ForecastMethod =
+                serde_json::from_value(branch["properties"]["method"]["const"].clone())
+                    .or_else(|_| {
+                        serde_json::from_value(branch["properties"]["method"]["enum"][0].clone())
+                    })
+                    .expect("method tag");
+            let name = branch["properties"]["params"]["$ref"]
+                .as_str()
+                .expect("params ref")
+                .rsplit('/')
+                .next()
+                .expect("definition name");
+            let properties = schema["$defs"][name]["properties"]
+                .as_object()
+                .expect("params properties");
+            let mut keys: Vec<&str> = properties.keys().map(String::as_str).collect();
+            keys.sort_unstable();
+            let mut allowed: Vec<&str> = allowed_params(method).to_vec();
+            allowed.sort_unstable();
+            assert_eq!(keys, allowed, "{method:?}");
+            for key in keys {
+                let text = properties[key].to_string();
+                let expected = match param_shape(key).expect("known key") {
+                    ParamShape::Number => "number",
+                    ParamShape::UnsignedInt | ParamShape::Seed => "integer",
+                    ParamShape::NumberArray => "array",
+                    ParamShape::Object => "object",
+                    ParamShape::Text => continue,
+                };
+                assert!(text.contains(expected), "{method:?}.{key}: {text}");
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use finstack_quant_core::dates::PeriodId;

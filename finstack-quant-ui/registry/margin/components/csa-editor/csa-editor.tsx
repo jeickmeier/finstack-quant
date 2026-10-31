@@ -73,6 +73,7 @@ export function CsaEditor({
     try {
       const csa = await loadPreset(preset);
       setDoc((current) => ({
+        // finstack-arith: remount revision counter, not a value
         revision: current.revision + 1,
         value: csa as unknown as Record<string, unknown>,
       }));

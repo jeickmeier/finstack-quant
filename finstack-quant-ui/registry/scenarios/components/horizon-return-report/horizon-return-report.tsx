@@ -6,6 +6,7 @@ import type {
   HorizonReport,
   MoneyValue as Money,
   PnlAttribution,
+  PnlBucketShare,
 } from "finstack-quant-wasm";
 import { formatRaw } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
@@ -17,6 +18,8 @@ import { MarketScenarioReport } from "@/components/finstack/scenarios/components
 export interface HorizonReturnReportProps {
   /** Native scenarios.computeHorizonReturn report, shown as returned. */
   report: HorizonReport | null | undefined;
+  /** Rust's buckets of the report's attribution with their shares of total (attribution.pnlAttributionPctOfTotalByBucket). */
+  attributionBuckets: readonly PnlBucketShare[] | null | undefined;
   /** Rust explain text (scenarios.horizonResultExplainText); omitted shows none. */
   explain?: string;
   loading?: boolean;
@@ -87,6 +90,7 @@ function ScenarioReportDisclosure({
  */
 export function HorizonReturnReport({
   report,
+  attributionBuckets,
   explain,
   loading,
   error,
@@ -168,6 +172,7 @@ export function HorizonReturnReport({
         <h3 className="text-sm font-medium">Attribution</h3>
         <PnlAttributionReport
           attribution={report.attribution as PnlAttribution}
+          buckets={attributionBuckets}
           density={density}
         />
       </section>

@@ -1,0 +1,46 @@
+[
+  {
+    "name": "no time roll",
+    "as_of": "2025-01-15",
+    "effective": "2025-01-15",
+    "report": {
+      "operations_applied": 0,
+      "user_operations": 0,
+      "expanded_operations": 0,
+      "changes": {
+        "market_targets": [],
+        "changed_instrument_indices": [],
+        "as_of_changed": false,
+        "portfolio_shape_changed": false,
+        "all_dirty": false
+      },
+      "warnings": []
+    }
+  },
+  {
+    "name": "time roll",
+    "as_of": "2025-01-15",
+    "effective": "2025-02-18",
+    "report": {
+      "operations_applied": 1,
+      "user_operations": 1,
+      "expanded_operations": 1,
+      "changes": {
+        "market_targets": [],
+        "changed_instrument_indices": [],
+        "as_of_changed": false,
+        "portfolio_shape_changed": false,
+        "all_dirty": false
+      },
+      "time_roll": {
+        "old_date": "2025-01-15",
+        "new_date": "2025-02-18",
+        "days": 34,
+        "instrument_carry": [],
+        "total_carry": {},
+        "failed_instruments": []
+      },
+      "warnings": []
+    }
+  }
+]

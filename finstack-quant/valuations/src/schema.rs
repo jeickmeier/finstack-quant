@@ -719,7 +719,7 @@ pub fn artifacts_slice() -> &'static [SchemaArtifact] {
 /// entry with [`SchemaArtifact::generate`].
 #[must_use]
 pub fn artifacts() -> Vec<SchemaArtifact> {
-    use crate::instruments::cashflow_export::InstrumentCashflowEnvelope;
+    use crate::instruments::cashflow_export::{CurrencyLadder, InstrumentCashflowEnvelope};
     use crate::instruments::composite::{CompositeHistoryRow, CompositeRebalanceResult};
     use crate::instruments::credit_derivatives::cds_index::CdsIndexParams;
     use crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
@@ -741,7 +741,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::market::listed::ListedProductCoverage;
     use crate::metrics::risk::var_calculator::VarResult;
     use crate::metrics::risk::MarketHistory;
-    use crate::pricer::MetricMetadata;
+    use crate::pricer::{MetricFieldUnit, MetricMetadata, TrancheSolveFieldUnits};
     use crate::results::ValuationResult;
     use finstack_quant_core::contract::{Diagnostic, ValidationReport};
     use finstack_quant_core::currency::Currency;
@@ -914,6 +914,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_kind(SchemaKind::Output)
         .with_examples(examples::instrument_cashflow),
         finstack_quant_core::schema_artifact!(
+            CurrencyLadder,
+            "results",
+            "currency_ladder",
+            Component,
+            "One row currency's calendar-year non-principal, principal and native PV ladder."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::currency_ladder),
+        finstack_quant_core::schema_artifact!(
             ValuationResult,
             "results",
             "valuation_result",
@@ -1033,6 +1043,26 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::listed_product_coverage),
+        finstack_quant_core::schema_artifact!(
+            MetricFieldUnit,
+            "results",
+            "metric_field_unit",
+            Component,
+            "The display unit of one scalar field of a result struct."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::metric_field_unit),
+        finstack_quant_core::schema_artifact!(
+            TrancheSolveFieldUnits,
+            "results",
+            "tranche_solve_field_units",
+            Component,
+            "The display units of the tranche break-even CDR, discount margin and OAS results."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::tranche_solve_field_units),
         finstack_quant_core::schema_artifact!(
             MetricMetadata,
             "results",

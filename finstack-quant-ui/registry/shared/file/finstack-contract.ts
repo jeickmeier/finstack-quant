@@ -11,6 +11,8 @@ import type {
   CalibrationResultEnvelope,
   CalibrationEnvelope,
   CalibrationValidationReport,
+  MetricFieldUnit,
+  TrancheSolveFieldUnits,
   MetricMetadata,
   MoneyValue,
   ScenarioTable,
@@ -21,7 +23,7 @@ import type {
   Explanation,
   DependencyTree,
   CheckReport,
-  CalendarYearLadderRow,
+  CurrencyLadder,
   CreditAssessment,
   DcfSensitivityResult,
   LboResult,
@@ -37,6 +39,7 @@ import type {
   ScenarioSpec,
   TemplateMetadata,
   PnlAttribution,
+  PnlBucketShare,
   DatedSeries,
   MultiFactorResult,
   RollingGreeks,
@@ -56,6 +59,7 @@ import type {
   RiskDecomposition,
   SensitivityMatrixJson,
   models,
+  statements,
   statements_analytics,
   valuations,
 } from "finstack-quant-wasm";
@@ -365,15 +369,16 @@ export interface StatementRollupRequest {
   readonly resultsJson: string;
   readonly specJson: string;
 }
+/** The rollup methods `modelJson` declares, as a native RollupSpec at `frequency`. */
+export interface StatementDefaultRollupRequest {
+  readonly modelJson: string;
+  readonly frequency: Parameters<typeof statements.rollupSpecDefaultFor>[1];
+}
 /** Native cashflow envelope object returned by the facade's instrument cashflow export. */
+export type { CurrencyLadder };
 export type CashflowEnvelope = ReturnType<
   typeof valuations.instruments.instrumentCashflowsWithMarket
 >;
-/** One row currency's native calendar-year ladder, in the units of that currency. */
-export interface CurrencyLadder {
-  readonly currency: CashflowEnvelope["flows"][number]["currency"];
-  readonly rows: CalendarYearLadderRow[];
-}
 /** One parallel shift: scenarios.parallelBpMany over the listed curve ids of one curve family. */
 export interface MarketScenarioShift {
   readonly curveKind: scenarioWire.CurveKind;
@@ -416,7 +421,7 @@ export interface MarketScenarioApplication {
   readonly report: ApplicationReport;
   /** Canonical JSON of the shocked market. */
   readonly marketJson: string;
-  /** The rolled valuation date (report.time_roll.new_date), else the request's. */
+  /** scenarios.applicationReportEffectiveAsOf: the rolled valuation date, else the request's. */
   readonly asOf: string;
   /** The shocked instrument when the scenario mutates instruments, else the request's. */
   readonly instrumentJson: string;
@@ -442,6 +447,8 @@ export interface HorizonReturn {
   readonly report: HorizonReport;
   /** scenarios.horizonResultExplainText of the report. */
   readonly explain: string;
+  /** attribution.pnlAttributionPctOfTotalByBucket of the report's attribution. */
+  readonly attributionBuckets: readonly PnlBucketShare[];
 }
 /** One attribution configuration over T0 -> T1 for an ordered list of instruments. */
 export interface AttributePnlManyRequest {
@@ -466,8 +473,8 @@ export interface AttributedPnl {
   readonly explain: string;
   /** attribution.pnlAttributionResidualWithinTolerance against the run's own tolerances. */
   readonly residualWithinTolerance: boolean;
-  /** attribution.pnlAttributionPctOfTotal per factor bucket, in percent; null where Rust returns none. */
-  readonly pctOfTotal: Readonly<Record<string, number | null>>;
+  /** attribution.pnlAttributionPctOfTotalByBucket: every money bucket with its share of total, in Rust's order. */
+  readonly buckets: readonly PnlBucketShare[];
 }
 /** A ticker-major panel for analytics.Performance; every omitted option is left to Rust. */
 export interface PerformanceReportRequest {
@@ -568,66 +575,10 @@ export interface BenchmarkTickerReport extends Omit<
 export interface BenchmarkReport extends Omit<BenchmarkReportData, "tickers"> {
   tickers: BenchmarkTickerReport[];
 }
-/** Where a Merton report's model comes from. */
-export type MertonSource =
-  | {
-      /** models.credit.MertonModel.fromJson of canonical MertonModel JSON. */
-      readonly kind: "model";
-      readonly json: string;
-    }
-  | {
-      /** MertonModel.kmvDefaultPoint(shortTermDebt, longTermDebt), then MertonModel.fromEquity with it as total debt (KMV iteration). */
-      readonly kind: "equity";
-      /** Market value of equity, in the firm's monetary unit. */
-      readonly equityValue: number;
-      /** Annualized equity-return volatility, decimal. */
-      readonly equityVol: number;
-      /** Liabilities due within one year; a total-debt barrier is this with no long-term debt. */
-      readonly shortTermDebt: number;
-      /** Liabilities maturing beyond one year. */
-      readonly longTermDebt: number;
-      /** Continuously compounded risk-free rate, decimal. */
-      readonly riskFreeRate: number;
-      /** Continuous payout yield on assets, decimal. */
-      readonly payoutRate: number;
-      /** Calibration horizon in years. */
-      readonly maturity: number;
-    };
-/** A Merton structural-credit report: one model, a horizon grid and the CDS terms. */
-export interface MertonReportRequest {
-  readonly source: MertonSource;
-  /** Horizons in years for default probability, distance to default and spreads, in display order. */
-  readonly horizons: readonly number[];
-  /** CDS and implied-equity maturity in years. */
-  readonly maturity: number;
-  /** Recovery at default as a fraction of par, for the implied and CDS spreads. */
-  readonly recovery: number;
-}
-/** The native MertonModel and MasterScale results of one request; nothing is computed in TypeScript. */
-export interface MertonReport {
-  /** The model's canonical JSON (MertonModel#toJson), parsed. */
-  model: modelsWire.MertonModel;
-  /** The KMV default point of an equity source, else null. */
-  defaultPoint: number | null;
-  /** The requested horizons, in request order; every per-horizon array aligns with them. */
-  horizons: number[];
-  /** defaultProbabilities(horizons). */
-  defaultProbabilities: number[];
-  /** distanceToDefault per horizon. */
-  distanceToDefault: number[];
-  /** MasterScale.defaultCalibration().mapPds(defaultProbabilities). */
-  grades: modelsWire.MasterScaleResult[];
-  /** impliedSpread(horizon, recovery) per horizon, or the native error. */
-  impliedSpread: Envelope<number[]>;
-  /** debtSpread per horizon, or the native error (Rust defines it for a terminal barrier only). */
-  debtSpread: Envelope<number[]>;
-  maturity: number;
-  recovery: number;
-  /** cdsParSpread(maturity, recovery), or the native error. */
-  cdsParSpread: Envelope<number>;
-  /** impliedEquity(maturity) as returned: [equity value, equity volatility], or the native error. */
-  impliedEquity: Envelope<number[]>;
-}
+/** The request of one native models.credit.mertonReport. */
+export type MertonReportRequest = modelsWire.MertonReportRequest;
+/** The native models.credit.mertonReport result. */
+export type MertonReport = modelsWire.MertonReport;
 /** One models.credit.scoring function and its named input ratios; altmanEmScore takes the Z''-Score ratios. */
 export type CreditScoreRequest =
   | {
@@ -690,7 +641,7 @@ export interface PositionRiskRequest {
   /** Tail confidence as a decimal in (0.5, 1); omitted is left to Rust (0.95). */
   readonly confidence?: number | null;
   readonly source: PositionRiskSource;
-  /** Target shares of portfolio VaR per position for models.factor.risk.evaluateRiskBudget; omitted skips the budget. */
+  /** Target shares of portfolio VaR per position for models.factor.risk.evaluateRiskBudgetFromDecomposition; omitted skips the budget. */
   readonly budget?: {
     readonly targets: readonly number[];
     /** Actual-to-target ratio that flags a breach; omitted is left to Rust. */
@@ -705,7 +656,7 @@ export type StressAttribution = ReturnType<
 export interface PositionRisk {
   /** The returned PositionRiskDecomposition (losses negative). */
   decomposition: PositionRiskDecomposition;
-  /** evaluateRiskBudget over positionComponentVar of each position and the portfolio VaR, or its native error; null without a budget. */
+  /** evaluateRiskBudgetFromDecomposition over the decomposition, or its native error; null without a budget. */
   budget: Envelope<RiskBudgetResult> | null;
   /** buildStressAttribution of a historical source's P&L, or its native error; null for a parametric source. */
   stress: Envelope<StressAttribution> | null;
@@ -1039,12 +990,20 @@ export interface ValuationsApi {
   metrics(instrumentType: string): Promise<Envelope<Record<string, string[]>>>;
   /** valuations.instruments.metricMetadata: native per-key interpretation (units, decoded coordinates, groups) for metric keys. */
   metricMetadata(keys: readonly string[]): Promise<Envelope<MetricMetadata[]>>;
+  /** valuations.instruments.priceDriverFields: wire names of the mutually exclusive price-driving market quotes. */
+  priceDriverFields(): Promise<Envelope<string[]>>;
+  /** valuations.instruments.trancheMetricFieldUnits: units of the scalar TrancheMetrics fields, in struct order. */
+  trancheMetricFieldUnits(
+    currency: string,
+  ): Promise<Envelope<MetricFieldUnit[]>>;
+  /** valuations.instruments.trancheSolveFieldUnits: units of the break-even CDR, discount margin and OAS results. */
+  trancheSolveFieldUnits(): Promise<Envelope<TrancheSolveFieldUnits>>;
   /** valuations.valuationResultToJson over the host-serialized result: native canonical JSON. */
   exportResult(value: ValuationResult): Promise<Envelope<string>>;
 }
-/** cashflows: aggregation of an exported cashflow envelope. */
+/** Aggregation of an exported cashflow envelope. */
 export interface CashflowsApi {
-  /** cashflows.calendarYearLadder once per row currency, in first-appearance order, over each flow's date, kind, amount and native_pv (row-currency PV before FX conversion and any scenario price shock). */
+  /** valuations.instruments.calendarYearLadderByCurrency: one native ladder per row currency, in first-appearance order. */
   cashflowLadder(
     cashflows: CashflowEnvelope,
   ): Promise<Envelope<CurrencyLadder[]>>;
@@ -1097,7 +1056,7 @@ export interface ScenariosApi {
 }
 /** attribution: single-instrument T0 -> T1 P&L attribution and its Rust helpers. */
 export interface AttributionApi {
-  /** attribution.attributePnlMany over canonical market texts, then pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotal per factor; one entry per instrument in input order. */
+  /** attribution.attributePnlMany over canonical market texts, then pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotalByBucket; one entry per instrument in input order. */
   attributePnlMany(
     request: AttributePnlManyRequest,
   ): Promise<Envelope<AttributedPnl[]>>;
@@ -1200,11 +1159,11 @@ export interface ModelsApi {
   ): Promise<Envelope<MigrationProjection>>;
   /** models.credit.MertonModel.fromJson + toJson: canonical MertonModel JSON text; the handle is freed. */
   validateMertonModel(json: string): Promise<Envelope<string>>;
-  /** MertonModel (fromJson, or kmvDefaultPoint + fromEquity) + default probabilities, distance to default, spreads, CDS par spread, implied equity and models.credit.pd.MasterScale.defaultCalibration().mapPds; per-field native errors are kept; both handles are freed. */
+  /** models.credit.mertonReport: the full report in one native call; a measure Rust rejects for the model is null with its message in errors. */
   mertonReport(request: MertonReportRequest): Promise<Envelope<MertonReport>>;
   /** One models.credit.scoring function over its input ratios in the facade's positional order, then models.credit.pd.MasterScale.defaultCalibration().mapScore of the result (kept as an envelope); the scale handle is freed. */
   creditScore(request: CreditScoreRequest): Promise<Envelope<CreditScore>>;
-  /** models.factor.risk parametric or historical VaR/ES decomposition, evaluateRiskBudget over positionComponentVar per position, and buildStressAttribution of a historical source; the budget and stress attribution keep their own native errors. */
+  /** models.factor.risk parametric or historical VaR/ES decomposition, evaluateRiskBudgetFromDecomposition, and buildStressAttribution of a historical source; the budget and stress attribution keep their own native errors. */
   positionRisk(request: PositionRiskRequest): Promise<Envelope<PositionRisk>>;
   /** models.factor.risk.decomposeFactors: the parametric factor and position risk decomposition of a sensitivity matrix under a factor covariance. */
   decomposeFactors(
@@ -1251,6 +1210,10 @@ export interface StatementsApi {
   rollupStatement(
     request: StatementRollupRequest,
   ): Promise<Envelope<StatementResult>>;
+  /** statements.rollupSpecDefaultFor: the rollup methods the model's lines declare. */
+  defaultRollupSpec(
+    request: StatementDefaultRollupRequest,
+  ): Promise<Envelope<ReturnType<typeof statements.rollupSpecDefaultFor>>>;
   /** statements_analytics.creditAssessment: leverage, interest coverage and free cash flow at a period, with the per-period series. */
   creditAssessment(
     request: CreditAssessmentRequest,

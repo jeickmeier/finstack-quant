@@ -196,7 +196,7 @@ fn result_metadata_is_required_and_unknown_fields_are_rejected() {
     assert_strict_result::<LookbackReturns>(
         "LookbackReturns",
         json!({
-            "ticker_names": ["FUND"], "mtd": [0.1], "qtd": [0.1], "ytd": [0.1], "fytd": [0.1]
+            "ref_date": "2025-01-02", "ticker_names": ["FUND"], "mtd": [0.1], "qtd": [0.1], "ytd": [0.1], "fytd": [0.1]
         }),
         &[],
     );

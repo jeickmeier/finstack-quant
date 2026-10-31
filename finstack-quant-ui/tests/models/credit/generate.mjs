@@ -110,59 +110,6 @@ await emit(
     projection,
   }),
 );
-// The worker's ModelsApi.mertonReport over the raw package
-// (models.credit.MertonModel and models.credit.pd.MasterScale re-export these
-// raw classes unchanged). Both cases use terminal-barrier GBM models, whose
-// every measure is defined, so no field carries a native error.
-function attempt(call) {
-  return { ok: true, value: call() };
-}
-function mertonReport({ source, horizons, maturity, recovery }) {
-  const defaultPoint =
-    source.kind === "equity"
-      ? native.MertonModel.kmvDefaultPoint(
-          source.shortTermDebt,
-          source.longTermDebt,
-        )
-      : null;
-  const model =
-    source.kind === "equity"
-      ? native.MertonModel.fromEquity(
-          source.equityValue,
-          source.equityVol,
-          defaultPoint,
-          source.riskFreeRate,
-          source.payoutRate,
-          source.maturity,
-        )
-      : native.MertonModel.fromJson(source.json);
-  let scale;
-  try {
-    const defaultProbabilities = Array.from(
-      model.defaultProbabilities(horizons),
-    );
-    scale = native.MasterScale.defaultCalibration();
-    return {
-      model: JSON.parse(model.toJson()),
-      defaultPoint,
-      horizons: [...horizons],
-      defaultProbabilities,
-      distanceToDefault: horizons.map((h) => model.distanceToDefault(h)),
-      grades: scale.mapPds(defaultProbabilities),
-      impliedSpread: attempt(() =>
-        horizons.map((h) => model.impliedSpread(h, recovery)),
-      ),
-      debtSpread: attempt(() => horizons.map((h) => model.debtSpread(h))),
-      maturity,
-      recovery,
-      cdsParSpread: attempt(() => model.cdsParSpread(maturity, recovery)),
-      impliedEquity: attempt(() => Array.from(model.impliedEquity(maturity))),
-    };
-  } finally {
-    scale?.free();
-    model.free();
-  }
-}
 const terms = { horizons: [0.5, 1, 2, 3, 5, 10], maturity: 5, recovery: 0.4 };
 const mertonCases = {
   // The facade example firm: assets 100, asset volatility 25%, debt barrier
@@ -170,7 +117,7 @@ const mertonCases = {
   model: {
     source: {
       kind: "model",
-      json: JSON.stringify({
+      model: {
         asset_value: 100,
         asset_vol: 0.25,
         debt_barrier: 60,
@@ -178,7 +125,7 @@ const mertonCases = {
         payout_rate: 0,
         barrier_type: "terminal",
         dynamics: "geometric_brownian",
-      }),
+      },
     },
     ...terms,
   },
@@ -187,12 +134,12 @@ const mertonCases = {
   equity: {
     source: {
       kind: "equity",
-      equityValue: 50,
-      equityVol: 0.4,
-      shortTermDebt: 30,
-      longTermDebt: 40,
-      riskFreeRate: 0.03,
-      payoutRate: 0,
+      equity_value: 50,
+      equity_vol: 0.4,
+      short_term_debt: 30,
+      long_term_debt: 40,
+      risk_free_rate: 0.03,
+      payout_rate: 0,
       maturity: 1,
     },
     ...terms,
@@ -201,7 +148,7 @@ const mertonCases = {
 const merton = Object.fromEntries(
   Object.entries(mertonCases).map(([name, request]) => [
     name,
-    { request, report: mertonReport(request) },
+    { request, report: native.mertonReport(request) },
   ]),
 );
 assertFinite(merton, "merton");

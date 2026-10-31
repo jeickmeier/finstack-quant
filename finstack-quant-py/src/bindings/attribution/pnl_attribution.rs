@@ -506,6 +506,12 @@ impl PyPnlAttribution {
         self.inner.pct_of_total(amount)
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.attribution._pnl_attribution", "PnlAttribution.pct_of_total_by_bucket")]
+    #[pyo3(text_signature = "($self)")]
+    fn pct_of_total_by_bucket<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.pct_of_total_by_bucket())
+    }
+
     /// Check whether the residual is within tolerance.
     ///
     /// With no arguments this uses the attribution's own stored,

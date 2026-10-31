@@ -48,11 +48,13 @@ def built_model() -> st.FinancialModelSpec:
     builder.forecast("revenue", st.ForecastSpec.growth(0.05))
     builder.compute("profit", "revenue * 0.5")
     builder.value_money("cash", {Q1: Money(100.0, "USD"), Q2: Money(110.0, "USD")})
+    builder.rollup("cash", "period_end")
     builder.with_meta("currency", "USD")
     mixed = builder.mixed("capex")
     mixed.values({Q1: 10.0})
     mixed.formula("revenue * 0.1")
     mixed.name("Capex")
+    mixed.rollup("formula")
     return mixed.build().build()
 
 
@@ -83,7 +85,20 @@ def statements_cases() -> dict[str, Any]:
     registry = st.Registry.with_builtins()
     first = registry.metric_ids()[0]
 
+    rollup_model = json.dumps(INPUTS["rollup_model"])
+    rollup_spec = st.RollupSpec.default_for(rollup_model, "annual")
+
+    rollup_results = st.Evaluator().evaluate(rollup_model)
+    rolled_up = doc(rollup_results.rollup(rollup_model, rollup_spec))
+    empty_spec = st.RollupSpec("annual")
+    override_spec = st.RollupSpec("annual", {"cash": "sum"})
+
     return {
+        "rollup.default_for": doc(rollup_spec),
+        "rollup.annual": rolled_up["nodes"],
+        "rollup.empty_spec": doc(rollup_results.rollup(rollup_model, empty_spec))["nodes"],
+        "rollup.spec_overrides": doc(rollup_results.rollup(rollup_model, override_spec))["nodes"]["cash"],
+        "rollup.periods": rolled_up["periods"],
         "result.get": result.get("profit", Q2),
         "result.get_missing": result.get("nope", Q2),
         "result.get_or": result.get_or("nope", Q2, -1.0),

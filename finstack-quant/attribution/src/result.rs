@@ -135,6 +135,24 @@ impl AttributionFactor {
     }
 }
 
+/// One money bucket of a [`PnlAttribution`] with its share of total P&L.
+///
+/// Returned by [`PnlAttribution::pct_of_total_by_bucket`], one record per bucket
+/// in the struct's field order.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PnlBucketShare {
+    /// Wire name of the [`PnlAttribution`] field holding this bucket (`carry`,
+    /// `rates_curves_pnl`, ..., `residual`).
+    pub field: String,
+    /// The bucket's P&L as attributed, in the `total_pnl` currency.
+    pub amount: Money,
+    /// Signed share of total P&L in percentage points (`25.0` = 25%); `None`
+    /// when `total_pnl` is effectively zero and the share is undefined.
+    pub pct_of_total: Option<f64>,
+}
+
 /// Complete P&L attribution result for a single instrument.
 ///
 /// Decomposes total P&L into constituent factors with optional detailed
@@ -1079,6 +1097,63 @@ impl PnlAttribution {
         }
     }
 
+    /// Every money bucket with its share of total P&L, in the struct's field order.
+    ///
+    /// Each share is [`Self::pct_of_total`] of the bucket's own amount. Lists the
+    /// eleven factor buckets and `residual`; the headline totals and endpoint
+    /// values (`total_pnl`, `mark_to_market_pnl`, `pv_t0`, `pv_t1`) are not
+    /// buckets. A host reads this list instead of naming the fields, so a bucket
+    /// added to this struct cannot silently go missing from a report.
+    ///
+    /// # Returns
+    ///
+    /// Twelve records in field order; `pct_of_total` is `None` on every record
+    /// when `total_pnl` is effectively zero.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_attribution::{AttributionMethod, PnlAttribution};
+    /// use finstack_quant_core::{currency::Currency, money::Money};
+    /// use time::macros::date;
+    ///
+    /// let mut pnl = PnlAttribution::new(
+    ///     Money::from((200_i64, Currency::USD)),
+    ///     "BOND-1",
+    ///     date!(2025 - 01 - 15),
+    ///     date!(2025 - 01 - 16),
+    ///     AttributionMethod::Parallel,
+    /// );
+    /// pnl.carry = Money::from((50_i64, Currency::USD));
+    /// let buckets = pnl.pct_of_total_by_bucket();
+    /// assert_eq!(buckets[0].field, "carry");
+    /// assert_eq!(buckets[0].pct_of_total, Some(25.0));
+    /// ```
+    #[must_use]
+    pub fn pct_of_total_by_bucket(&self) -> Vec<PnlBucketShare> {
+        [
+            ("carry", &self.carry),
+            ("rates_curves_pnl", &self.rates_curves_pnl),
+            ("credit_curves_pnl", &self.credit_curves_pnl),
+            ("inflation_curves_pnl", &self.inflation_curves_pnl),
+            ("correlations_pnl", &self.correlations_pnl),
+            ("fx_pnl", &self.fx_pnl),
+            ("fx_translation_pnl", &self.fx_translation_pnl),
+            ("vol_pnl", &self.vol_pnl),
+            ("cross_factor_pnl", &self.cross_factor_pnl),
+            ("model_params_pnl", &self.model_params_pnl),
+            ("market_scalars_pnl", &self.market_scalars_pnl),
+            ("residual", &self.residual),
+        ]
+        .into_iter()
+        .map(|(field, amount)| PnlBucketShare {
+            field: field.to_string(),
+            amount: *amount,
+            pct_of_total: self.pct_of_total(amount.amount()),
+        })
+        .collect()
+    }
+
     /// Check if residual is within tolerance.
     ///
     /// Tolerance is either percentage-based (relative to total P&L) or
@@ -1328,6 +1403,50 @@ mod tests {
     use indexmap::IndexMap;
     use std::collections::BTreeMap;
     use time::macros::date;
+
+    /// A new `Money` field on `PnlAttribution` must be listed as a bucket or
+    /// named here as a headline value, so it cannot vanish from reports.
+    #[test]
+    fn pct_of_total_by_bucket_lists_every_money_field_but_the_headline_values() {
+        let mut pnl = PnlAttribution::new(
+            Money::from((200_i64, Currency::USD)),
+            "TEST",
+            date!(2025 - 01 - 15),
+            date!(2025 - 01 - 16),
+            AttributionMethod::Parallel,
+        );
+        pnl.mark_to_market_pnl = Some(pnl.total_pnl);
+        pnl.pv_t0 = Some(pnl.total_pnl);
+        pnl.pv_t1 = Some(pnl.total_pnl);
+        pnl.rates_curves_pnl = Money::from((-50_i64, Currency::USD));
+
+        let wire = serde_json::to_value(&pnl).expect("serializes");
+        let money_fields: Vec<&str> = wire
+            .as_object()
+            .expect("object")
+            .iter()
+            .filter(|(_, value)| serde_json::from_value::<Money>((*value).clone()).is_ok())
+            .map(|(key, _)| key.as_str())
+            .filter(|key| !["total_pnl", "mark_to_market_pnl", "pv_t0", "pv_t1"].contains(key))
+            .collect();
+        let buckets = pnl.pct_of_total_by_bucket();
+        let mut listed: Vec<&str> = buckets.iter().map(|bucket| bucket.field.as_str()).collect();
+        listed.sort_unstable();
+        let mut expected = money_fields.clone();
+        expected.sort_unstable();
+        assert_eq!(listed, expected);
+
+        let rates = &buckets[1];
+        assert_eq!(rates.field, "rates_curves_pnl");
+        assert_eq!(rates.amount, pnl.rates_curves_pnl);
+        assert_eq!(rates.pct_of_total, Some(-25.0));
+
+        pnl.total_pnl = Money::from((0_i64, Currency::USD));
+        assert!(pnl
+            .pct_of_total_by_bucket()
+            .iter()
+            .all(|bucket| bucket.pct_of_total.is_none()));
+    }
 
     #[test]
     fn pct_of_total_is_signed_share_and_none_for_zero_total() {

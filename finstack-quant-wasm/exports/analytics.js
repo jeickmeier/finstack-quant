@@ -13,14 +13,17 @@ const rawPeriodStatsWithFiscalConfig = performance.periodStatsWithFiscalConfig;
 delete performance.lookbackReturnsWithFiscalConfig;
 delete performance.periodStatsWithFiscalConfig;
 
+// wasm-bindgen cannot borrow an optional handle: the None test for the two joins below.
 const isNone = (value) => value === undefined || value === null;
 
+// wasm-bindgen cannot borrow an optional FiscalConfig: joins the None and Some(config) exports.
 performance.lookbackReturns = function lookbackReturns(refDate, fiscalConfig = undefined) {
   return isNone(fiscalConfig)
     ? rawLookbackReturns.call(this, refDate)
     : rawLookbackReturnsWithFiscalConfig.call(this, refDate, fiscalConfig);
 };
 
+// wasm-bindgen cannot borrow an optional FiscalConfig: joins the None and Some(config) exports.
 performance.periodStats = function periodStats(
   tickerIdx,
   aggregationFrequency = undefined,

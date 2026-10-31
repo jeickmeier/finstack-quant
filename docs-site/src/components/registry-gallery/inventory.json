@@ -73,12 +73,6 @@
       "worker": "none"
     },
     {
-      "name": "rate-input",
-      "type": "registry:ui",
-      "docs": "Controlled rate-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
-      "worker": "none"
-    },
-    {
       "name": "tenor-input",
       "type": "registry:ui",
       "docs": "Controlled tenor-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
@@ -321,7 +315,7 @@
     {
       "name": "pnl-attribution-report",
       "type": "registry:component",
-      "docs": "Display-only view of a PnlAttribution as returned (by attribution.attributePnl / attributePnlMany, or inside scenarios.computeHorizonReturn): total, mark-to-market and endpoint values, every factor bucket as exact money with a signed bar chart of the returned amounts, the waterfall drawn only from Rust's waterfall_steps (pv_before to pv_after per step; nothing when the method returns none), the residual with the returned residual_pct and tolerances, notes, the policy stamp and the JSON. Optional explain, residualWithinTolerance and pctOfTotal props take Rust's pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotal; without residualWithinTolerance no verdict is shown. Nothing is summed, differenced or converted. Accepts attribution, loading, error and density props; no worker or query provider required.",
+      "docs": "Display-only view of a PnlAttribution as returned (by attribution.attributePnl / attributePnlMany, or inside scenarios.computeHorizonReturn): total, mark-to-market and endpoint values, every factor bucket as exact money with a signed bar chart of the returned amounts, the waterfall drawn only from Rust's waterfall_steps (pv_before to pv_after per step; nothing when the method returns none), the residual with the returned residual_pct and tolerances, notes, the policy stamp and the JSON. A required buckets prop takes Rust's pnlAttributionPctOfTotalByBucket, which names the buckets, their amounts and shares; optional explain and residualWithinTolerance props take pnlAttributionExplainText and pnlAttributionResidualWithinTolerance; without residualWithinTolerance no verdict is shown. Nothing is summed, differenced or converted. Accepts attribution, buckets, loading, error and density props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -1373,6 +1367,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-forecast-parameters",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-monte-carlo-config",
       "type": "registry:lib"
     },
@@ -1412,7 +1410,7 @@
   "provenance": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "5357646f8195d31e31fd0cb07bdb7b691583b9bb5e85ab343c47b18437c2aacf"
+      "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
@@ -1432,31 +1430,31 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
-      "sha256": "0108a5ccd179e54a24ceb83322d3674e72fc3227b9f629f14349f2dc4e94b44b"
+      "sha256": "94d360fe4576d46bd8da054248de3a7a957611a5921ae928eadd50cff42dae53"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "b05946f519838643a7a443317e73971c16fdcf9e654df46eff6e0ce7b8f9f1f7"
+      "sha256": "8415df392c3097a662ce8d4450098e58bb624fe9e4b3421d02c910d5d15b66ae"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
-      "sha256": "2df669e995742cd83fa991c28adff9ea992532594fcf3911aa3bd54ed83ad0c9"
+      "sha256": "b3b41dfa2022f36d14f3aa0dd80904a33eb2485abf34113a7965e9a8bf851200"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/horizon/cases.json",
-      "sha256": "579fcccab23ddd5a61e597eeccca06fb48f5103a9194d264587f2c2d937c651e"
+      "sha256": "a6ed012a6473c5994efebe28d902bbbde6ae0ded1534e5eef2e46bc2d493764d"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/templates/cases.json",
-      "sha256": "783868f8887f254595172255ceaa037e93a39869a88e799b5e649c6574204b53"
+      "sha256": "85de11bab158c8a7102ecfb0a9eb0d0aaa8e32669829a95a3abf61d0a05bd64c"
     },
     {
       "path": "finstack-quant-ui/tests/attribution/cases.json",
-      "sha256": "c50a8ad2446aa5df6a7cbcb60fe85f80b7d69fc695801a70cfda1d59cfa9f1a8"
+      "sha256": "3d63dfd6d64f29d1bac71a35588741cbf0cba0024d46e9a0324b622bb7c09134"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",
-      "sha256": "854fb65e7217219f57c52658e1f2e3b14cfab5884a32f726734edca87650e9eb"
+      "sha256": "321ffcfe293db4e1d0e560bb9e8f8fb730c44c9412ce6695b1d2625d69930ce8"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/benchmark.json",
@@ -1468,7 +1466,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/models/credit/merton.json",
-      "sha256": "48b77a5c7a3318e00338c55d4a90b79a5e006e3a5b6754bb814ef92357aaf981"
+      "sha256": "df2c9c9525f842227bc207a537e9230a43dd4a69b1354a8e29208952b7631a4f"
     },
     {
       "path": "finstack-quant-ui/tests/models/credit/scorecard.json",
@@ -1488,7 +1486,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/gallery.json",
-      "sha256": "3243821ebef6307028c226ffd0f47c7e5a65dc66279b4842c534aa53de0f1e12"
+      "sha256": "5d04da339ddf0ff56748d1abf9860652bb0f1a61988351a152a7003badc96cde"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/scenario-pnl.json",
@@ -1500,7 +1498,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "fc81f82963a40b36138180dc64d62ff55d12d483413f31055f55fad32abeb49a"
+      "sha256": "98b0f75aa07e657455a0dfbaf1aa75b9678a6bdaaecd0a8ed8b59826bc272158"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -1512,7 +1510,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",
-      "sha256": "c5cded3ac073240076f1bca6031c2dfb957200b7621e614fb241adf4023a6855"
+      "sha256": "afd0bb42535110611d5c74effddab943cd0f95d8e52ba68885a1d5f6eab554c1"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-checks.json",
@@ -1520,7 +1518,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
-      "sha256": "d1fd212ddead1af04973c6f987e915805259140b7f856a4ade693e488632e46a"
+      "sha256": "2857ea18a4893d0d354ec32abef2b660f0af680f20c58a3aafb2dae236df0c8b"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
@@ -1560,7 +1558,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
-      "sha256": "5a750acb5e89caf1fd6ece47cadfbfafc354353210f144fe2d9708c2d43b4609"
+      "sha256": "a0355bf8da1e687f77f756eab4e1c0edf1e6b8112cd4a38838a2dd0dc0fd9027"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek-run.json",
@@ -1600,15 +1598,15 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json",
-      "sha256": "40280f9e8b70fb22783c66f77bd2074047d28cad132053510e6c78446a567915"
+      "sha256": "23f166e4727cf0b8d9d062581094462764708189d35780c117213b7b5bae7ae8"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q3.json",
-      "sha256": "37e06e6d0bd15951c553768171201ce8798258b0efd1f1bcdbe028135de29643"
+      "sha256": "a4dc0e72c088fa798480fd2791e3d39d1ec03707cca06eeee6b2afd3053f4259"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q4.json",
-      "sha256": "491a9c962636ba06701882cd2794f257ee536e9d45da2035a7bdb30178c9ae5f"
+      "sha256": "978de34f77ec215aa5f9014affc187fca6dc899bad1c45a5a78ef1c3194c093f"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",

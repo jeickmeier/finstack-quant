@@ -58,7 +58,7 @@ const native = createRequire(import.meta.url)(
 let call: ReturnType<typeof vi.fn>, close: ReturnType<typeof vi.fn>;
 // The production ScenariosApi over the Node facade; its envelopes unwrap as the client does.
 const scenarioService = createScenariosService(
-  { scenarios: native },
+  { scenarios: native, attribution: native },
   createContext({
     initialize: async () => undefined,
     core: { MarketContext: native.MarketContext },

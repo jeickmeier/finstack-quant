@@ -69,6 +69,10 @@ The banned-phrase list in `check-typescript-docs.mjs` mirrors text
 default string in the generator without updating the blocklist (or vice versa)
 leaves a phrase either unenforced or unproducible.
 
+`check-exports-boundary.mjs` is not a docs check: `npm run lint` runs it. It fails
+on arithmetic in `exports/**` and on a function with no comment saying what
+wasm-bindgen cannot express.
+
 ## Generators
 
 Run by `docs:sync` with `--write`. Both accept `--check`, which exits 1 instead of

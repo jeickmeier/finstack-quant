@@ -127,6 +127,13 @@
             "type_name": "AttributionResultEnvelope",
             "kind": "output",
             "bytes": 86421
+          },
+          {
+            "path": "schemas/attribution/1/pnl_bucket_share.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/attribution/1/pnl_bucket_share.schema.json",
+            "type_name": "PnlBucketShare",
+            "kind": "output",
+            "bytes": 21888
           }
         ]
       },
@@ -2119,7 +2126,14 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 383715
+            "bytes": 385073
+          },
+          {
+            "path": "schemas/statements/1/forecast_parameters.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
+            "type_name": "ForecastParameters",
+            "kind": "input",
+            "bytes": 20392
           },
           {
             "path": "schemas/statements/1/metric_registry.schema.json",
@@ -2161,14 +2175,14 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
             "type_name": "RollupSpec",
             "kind": "input",
-            "bytes": 3759
+            "bytes": 3858
           },
           {
             "path": "schemas/statements/1/statement_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 70970
+            "bytes": 72475
           }
         ]
       },
@@ -2329,6 +2343,7 @@
           "RevolvingCredit",
           "RevolvingCreditFees",
           "RollRule",
+          "RollupMethod",
           "SabrParameters",
           "ScenarioPricingOverrides",
           "ScheduledFee",
@@ -2517,6 +2532,7 @@
           "RevolvingCredit",
           "RevolvingCreditFees",
           "RollRule",
+          "RollupMethod",
           "SabrParameters",
           "ScenarioPricingOverrides",
           "ScheduledFee",
@@ -3347,6 +3363,13 @@
             "bytes": 1342
           },
           {
+            "path": "schemas/results/1/currency_ladder.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/currency_ladder.schema.json",
+            "type_name": "CurrencyLadder",
+            "kind": "output",
+            "bytes": 2239
+          },
+          {
             "path": "schemas/results/1/enhanced_monte_carlo_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
             "type_name": "EnhancedMonteCarloResult",
@@ -3396,11 +3419,18 @@
             "bytes": 4379
           },
           {
+            "path": "schemas/results/1/metric_field_unit.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/metric_field_unit.schema.json",
+            "type_name": "MetricFieldUnit",
+            "kind": "output",
+            "bytes": 879
+          },
+          {
             "path": "schemas/results/1/metric_metadata.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
             "type_name": "MetricMetadata",
             "kind": "output",
-            "bytes": 3353
+            "bytes": 4630
           },
           {
             "path": "schemas/results/1/oas_result.schema.json",
@@ -3450,6 +3480,13 @@
             "type_name": "TrancheMetrics",
             "kind": "output",
             "bytes": 6278
+          },
+          {
+            "path": "schemas/results/1/tranche_solve_field_units.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/tranche_solve_field_units.schema.json",
+            "type_name": "TrancheSolveFieldUnits",
+            "kind": "output",
+            "bytes": 2744
           },
           {
             "path": "schemas/results/1/valuation_result.schema.json",
@@ -3621,6 +3658,14 @@
             "type_name": "AttributionResultEnvelope",
             "kind": "output",
             "bytes": 86421
+          },
+          {
+            "domain": "attribution",
+            "path": "schemas/attribution/1/pnl_bucket_share.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/attribution/1/pnl_bucket_share.schema.json",
+            "type_name": "PnlBucketShare",
+            "kind": "output",
+            "bytes": 21888
           },
           {
             "domain": "calibration",
@@ -4548,7 +4593,15 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 383715
+            "bytes": 385073
+          },
+          {
+            "domain": "statements",
+            "path": "schemas/statements/1/forecast_parameters.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
+            "type_name": "ForecastParameters",
+            "kind": "input",
+            "bytes": 20392
           },
           {
             "domain": "statements",
@@ -4596,7 +4649,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
             "type_name": "RollupSpec",
             "kind": "input",
-            "bytes": 3759
+            "bytes": 3858
           },
           {
             "domain": "statements",
@@ -4604,7 +4657,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 70970
+            "bytes": 72475
           },
           {
             "domain": "valuations",
@@ -5488,6 +5541,14 @@
           },
           {
             "domain": "valuations",
+            "path": "schemas/results/1/currency_ladder.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/currency_ladder.schema.json",
+            "type_name": "CurrencyLadder",
+            "kind": "output",
+            "bytes": 2239
+          },
+          {
+            "domain": "valuations",
             "path": "schemas/results/1/enhanced_monte_carlo_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
             "type_name": "EnhancedMonteCarloResult",
@@ -5544,11 +5605,19 @@
           },
           {
             "domain": "valuations",
+            "path": "schemas/results/1/metric_field_unit.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/metric_field_unit.schema.json",
+            "type_name": "MetricFieldUnit",
+            "kind": "output",
+            "bytes": 879
+          },
+          {
+            "domain": "valuations",
             "path": "schemas/results/1/metric_metadata.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
             "type_name": "MetricMetadata",
             "kind": "output",
-            "bytes": 3353
+            "bytes": 4630
           },
           {
             "domain": "valuations",
@@ -5605,6 +5674,14 @@
             "type_name": "TrancheMetrics",
             "kind": "output",
             "bytes": 6278
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/tranche_solve_field_units.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/tranche_solve_field_units.schema.json",
+            "type_name": "TrancheSolveFieldUnits",
+            "kind": "output",
+            "bytes": 2744
           },
           {
             "domain": "valuations",

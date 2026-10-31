@@ -3,6 +3,7 @@
 use super::capital_structure::PyCapitalStructureCashflows;
 use super::monte_carlo::{extract_config, PyMonteCarloResults};
 use super::parse_period_id;
+use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::{envelope_to_pandas, selected_envelope_to_pandas};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
@@ -124,6 +125,25 @@ impl PyStatementResult {
         Ok(self.inner.get_or(node_id, &pid, default))
     }
 
+    /// The periods this result is keyed by, in timeline order.
+    ///
+    /// The model's periods for an evaluated result; the target periods for a
+    /// rolled-up one. Empty only for a result deserialized with no periods.
+    ///
+    /// Returns
+    /// -------
+    /// list[Period]
+    ///     Each period's id, inclusive start, exclusive end and actual flag.
+    #[getter]
+    fn periods(&self) -> Vec<PyPeriod> {
+        self.inner
+            .periods
+            .iter()
+            .cloned()
+            .map(PyPeriod::from_inner)
+            .collect()
+    }
+
     /// Get every evaluated period for one node as ordered pairs.
     ///
     /// Parameters
@@ -167,8 +187,9 @@ impl PyStatementResult {
     /// StatementResult
     ///     Values keyed by the target periods (``"2025"``, ``"2025H1"``,
     ///     ``"2025Q1"``; fiscal periods keep their ``FY`` prefix), with
-    ///     monetary values and value types. It carries no ``node_sources``,
-    ///     capital-structure cashflows or check report.
+    ///     monetary values, value types and those periods in ``periods`` (each
+    ///     actual only when every source period is). It carries no
+    ///     ``node_sources``, capital-structure cashflows or check report.
     ///
     /// Raises
     /// ------

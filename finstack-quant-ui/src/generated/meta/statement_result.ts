@@ -13,6 +13,7 @@ export default [
           "parallel": false
         },
         "nodes": {},
+        "periods": [],
         "schema_version": 1
       }
     ],
@@ -176,6 +177,35 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Materiality/properties/relative_pct",
     "description": "Discrepancy as a percentage of the reference value.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_29936d53e5e53cef8284",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Period",
+    "description": "A concrete period with start/end dates and actual/forecast flag."
+  },
+  {
+    "path": "#/$defs/d_29936d53e5e53cef8284/properties/end",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Period/properties/end",
+    "description": "Exclusive end date.",
+    "format": "date"
+  },
+  {
+    "path": "#/$defs/d_29936d53e5e53cef8284/properties/id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Period/properties/id",
+    "description": "Identifier of this period.",
+    "ref": "#/$defs/PeriodId",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodId"
+  },
+  {
+    "path": "#/$defs/d_29936d53e5e53cef8284/properties/is_actual",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Period/properties/is_actual",
+    "description": "True when this period is part of the \"actuals\" subset."
+  },
+  {
+    "path": "#/$defs/d_29936d53e5e53cef8284/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Period/properties/start",
+    "description": "Inclusive start date.",
+    "format": "date"
   },
   {
     "path": "#/$defs/d_2a886a29e286928aba1b",
@@ -528,6 +558,11 @@ export default [
     "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/period",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/period",
     "description": "Period in which the drop occurred."
+  },
+  {
+    "path": "#/$defs/d_7ed5d95d5da0aa4f3cb9",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodId",
+    "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`."
   },
   {
     "path": "#/$defs/d_82a7f3795866afe7c96c",
@@ -2211,6 +2246,17 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/nodes/additionalProperties/additionalProperties",
     "ref": "#/$defs/ResultNumber",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultNumber"
+  },
+  {
+    "path": "#/properties/periods",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/periods",
+    "description": "The periods `nodes` is keyed by, in timeline order, with their dates and\nactual/forecast split.\n\n[`Evaluator`](crate::evaluator::Evaluator) records the model's periods and\n[`rollup`](Self::rollup) records its target periods, where a target is\nactual only when every source period is. Empty only for hand-built\nresults, such as [`new`](Self::new)."
+  },
+  {
+    "path": "#/properties/periods/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/periods/items",
+    "ref": "#/$defs/Period",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Period"
   },
   {
     "path": "#/properties/schema_version",

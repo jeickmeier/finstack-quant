@@ -74,8 +74,10 @@ export function createAnalyticsService(
           const cumulative = handle.cumulativeReturns();
           const drawdowns = handle.getDrawdownSeries();
           const tickerNames = handle.getTickerNames();
-          // The lookback date defaults to the last native active date; Rust rejects a missing one.
-          const refDate = request.lookbackDate ?? activeDates.at(-1)!;
+          const lookback = handle.lookbackReturns(
+            option(request.lookbackDate),
+            fiscal,
+          );
           const correlation = handle.correlationMatrix();
           return {
             tickerNames,
@@ -85,6 +87,7 @@ export function createAnalyticsService(
             frequency: handle.getFrequency(),
             activeDates,
             summary: handle.summary(rate, option(request.confidence)),
+            // finstack-compose: one native call per ticker index, nothing read from the names
             tickers: tickerNames.map((_, index) => ({
               activeDates: handle.getActiveDatesForTicker(index),
               cumulativeReturns: Array.from(cumulative[index]!),
@@ -101,13 +104,14 @@ export function createAnalyticsService(
             monthly: handle.periodicReturns("monthly"),
             annual: handle.periodicReturns("annual"),
             lookback: {
-              refDate,
-              returns: handle.lookbackReturns(refDate, fiscal),
+              refDate: lookback.ref_date,
+              returns: lookback,
               fiscalYearStart: request.fiscalYearStart
                 ? { ...request.fiscalYearStart }
                 : null,
             },
             correlation: {
+              // finstack-compose: copies each typed-array row out for structured clone
               matrix: correlation.matrix.map((row) => Array.from(row)),
               repaired: correlation.repaired,
             },
@@ -145,6 +149,7 @@ export function createAnalyticsService(
             downCapture: Array.from(performance.downCapture()),
             captureRatio: Array.from(performance.captureRatio()),
             battingAverage: Array.from(performance.battingAverage()),
+            // finstack-compose: one native call per ticker index, nothing read from the names
             tickers: tickerNames.map((_, index) => {
               const rolling = performance.rollingGreeks(index, window, rate);
               return {

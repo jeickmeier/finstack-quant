@@ -1,0 +1,64 @@
+{
+  "decomposition": {
+    "portfolio_var": -0.20805935515022297,
+    "portfolio_es": -0.26091482522095716,
+    "confidence": 0.95,
+    "method": "parametric",
+    "var_contributions": [
+      {
+        "position_id": "A",
+        "component_var": -0.18725341963520067,
+        "relative_var": 0.9,
+        "marginal_var": -0.3120890327253345,
+        "incremental_var": null
+      },
+      {
+        "position_id": "B",
+        "component_var": -0.0208059355150223,
+        "relative_var": 0.10000000000000002,
+        "marginal_var": -0.05201483878755575,
+        "incremental_var": null
+      }
+    ],
+    "es_contributions": [
+      {
+        "position_id": "A",
+        "component_es": -0.23482334269886146,
+        "relative_es": 0.9,
+        "marginal_es": -0.3913722378314358
+      },
+      {
+        "position_id": "B",
+        "component_es": -0.02609148252209572,
+        "relative_es": 0.10000000000000002,
+        "marginal_es": -0.0652287063052393
+      }
+    ],
+    "n_positions": 2,
+    "euler_residual": 0.0
+  },
+  "targets": [
+    0.5,
+    0.5
+  ],
+  "result": {
+    "positions": [
+      {
+        "position_id": "A",
+        "actual_component_var": -0.18725341963520067,
+        "target_component_var": 0.10402967757511149,
+        "utilization": 1.8,
+        "excess": 0.08322374206008919
+      },
+      {
+        "position_id": "B",
+        "actual_component_var": -0.0208059355150223,
+        "target_component_var": 0.10402967757511149,
+        "utilization": 0.20000000000000004,
+        "excess": -0.08322374206008919
+      }
+    ],
+    "total_overbudget": 0.08322374206008919,
+    "has_breach": true
+  }
+}

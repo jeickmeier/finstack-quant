@@ -8,6 +8,7 @@ import { chain } from './chain.js';
 const rawBuild = wasm.CashFlowBuilder.prototype.build;
 const rawBuildWithMarket = wasm.CashFlowBuilder.prototype.buildWithMarket;
 delete wasm.CashFlowBuilder.prototype.buildWithMarket;
+// wasm-bindgen cannot borrow the optional market: joins the None and Some(market) exports.
 wasm.CashFlowBuilder.prototype.build = function build(market = undefined) {
   return market === undefined || market === null
     ? rawBuild.call(this)
@@ -49,6 +50,7 @@ export const cashflows = {
   aggregateByPeriod: wasm.aggregateByPeriod,
   aggregateCashflowsChecked: wasm.aggregateCashflowsChecked,
   annualToMonthly: wasm.annualToMonthly,
+  // wasm-bindgen cannot borrow the optional market: joins the None and Some(market) exports.
   buildCashflowSchedule: (spec, market = undefined) =>
     market === undefined || market === null
       ? wasm.buildCashflowSchedule(spec)
@@ -70,8 +72,10 @@ export const cashflows = {
   floatingRateSpecSofr: wasm.floatingRateSpecSofr,
   floatingRateSpecSonia: wasm.floatingRateSpecSonia,
   floatingRateSpecValidate: wasm.floatingRateSpecValidate,
+  // wasm-bindgen cannot borrow an array of handles: `scheduleJsonList` sends canonical JSON.
   materializeFixings: (market, schedules, oldDate, newDate) =>
     wasm.materializeFixings(market, scheduleJsonList(schedules), oldDate, newDate),
+  // wasm-bindgen cannot borrow an array of handles: `scheduleJsonList` sends canonical JSON.
   mergeCashflowSchedules: (schedules, notional, dayCount) =>
     wasm.mergeCashflowSchedules(scheduleJsonList(schedules), notional, dayCount),
   monthlyToAnnual: wasm.monthlyToAnnual,

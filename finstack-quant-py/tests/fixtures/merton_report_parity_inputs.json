@@ -1,0 +1,53 @@
+{
+  "description": "Shared inputs for models.credit merton_report in both hosts; the Python test and tests/facade/merton_report_parity.test.mjs assert identical reports against the pinned expected JSON. Regenerate with UPDATE_MERTON_PARITY=1 uv run --no-sync pytest finstack-quant-py/tests/test_merton_report_parity.py.",
+  "terms": {
+    "horizons": [
+      0.5,
+      1.0,
+      2.0,
+      5.0
+    ],
+    "maturity": 5.0,
+    "recovery": 0.4
+  },
+  "sources": {
+    "model": {
+      "kind": "model",
+      "model": {
+        "asset_value": 100.0,
+        "asset_vol": 0.25,
+        "debt_barrier": 60.0,
+        "risk_free_rate": 0.03,
+        "payout_rate": 0.0,
+        "barrier_type": "terminal",
+        "dynamics": "geometric_brownian"
+      }
+    },
+    "first_passage": {
+      "kind": "model",
+      "model": {
+        "asset_value": 100.0,
+        "asset_vol": 0.25,
+        "debt_barrier": 60.0,
+        "risk_free_rate": 0.03,
+        "payout_rate": 0.0,
+        "barrier_type": {
+          "first_passage": {
+            "barrier_growth_rate": 0.0
+          }
+        },
+        "dynamics": "geometric_brownian"
+      }
+    },
+    "equity": {
+      "kind": "equity",
+      "equity_value": 50.0,
+      "equity_vol": 0.4,
+      "short_term_debt": 30.0,
+      "long_term_debt": 40.0,
+      "risk_free_rate": 0.03,
+      "payout_rate": 0.0,
+      "maturity": 1.0
+    }
+  }
+}

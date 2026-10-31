@@ -10,9 +10,10 @@ use crate::instruments::envelope::{instrument_load_error, MAX_JSON_BYTES};
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use crate::instruments::pricing_overrides::MetricPricingOverrides;
 use crate::instruments::Instrument;
-use crate::metrics::MetricId;
+use crate::metrics::{parse_key_rate_label, MetricId};
 use crate::results::ValuationResult;
 use finstack_quant_core::contract::{parse_json_value, LoadLimits};
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Error;
 use serde_json::Value;
@@ -389,12 +390,51 @@ pub struct MetricMetadata {
     pub metric: String,
     /// Decoded coordinate labels in original order; empty for scalar metrics.
     pub components: Vec<String>,
+    /// How each entry of `components` orders along its axis, aligned with it.
+    pub coordinates: Vec<MetricCoordinate>,
     /// Native unit family; custom or calculator-dependent units remain unknown.
     pub unit: crate::metrics::MetricUnit,
     /// Native display group; absent for a non-standard base metric.
     pub group: Option<String>,
     /// Whether this is a DV01/CS01 bucket with nonempty identifier and bucket coordinates.
     pub bucketed: bool,
+}
+
+/// Where one coordinate label sits on its axis.
+///
+/// A host sorts by `group` and then by `value`, so maturity and strike order
+/// is not recovered by parsing label text.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MetricCoordinate {
+    /// Text the value is scoped by: the `{surface}::` of a vega row, empty for
+    /// a bare tenor or strike, and the whole label when it carries no number.
+    pub group: String,
+    /// Tenor in years (`3m` is 0.25, per [`parse_key_rate_label`]) or the
+    /// decimal strike; `None` when the label carries no number.
+    pub value: Option<f64>,
+}
+
+impl MetricCoordinate {
+    /// Read a decoded coordinate label: a tenor or decimal after any final `::`.
+    fn from_label(label: &str) -> Self {
+        let tail = label.rfind("::").map_or(0, |index| index + 2);
+        let (group, coordinate) = label.split_at(tail);
+        let value = parse_key_rate_label(coordinate)
+            .ok()
+            .or_else(|| coordinate.parse::<f64>().ok().filter(|v| v.is_finite()));
+        match value {
+            Some(value) => Self {
+                group: group.to_string(),
+                value: Some(value),
+            },
+            None => Self {
+                group: label.to_string(),
+                value: None,
+            },
+        }
+    }
 }
 
 /// Describe canonical metric keys without computing or transforming their values.
@@ -429,6 +469,10 @@ pub fn metric_metadata(keys: &[String]) -> finstack_quant_core::Result<Vec<Metri
             Ok(MetricMetadata {
                 key: key.clone(),
                 metric: base.to_string(),
+                coordinates: components
+                    .iter()
+                    .map(|label| MetricCoordinate::from_label(label))
+                    .collect(),
                 components,
                 unit: id.unit(),
                 group,
@@ -436,6 +480,110 @@ pub fn metric_metadata(keys: &[String]) -> finstack_quant_core::Result<Vec<Metri
             })
         })
         .collect()
+}
+
+/// The display unit of one scalar field of a result struct.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MetricFieldUnit {
+    /// Wire name of the field.
+    pub field: String,
+    /// Unit text as the field documents it, such as `USD per bp` or `years`.
+    pub label: String,
+    /// Canonical Rust field the unit is documented on.
+    pub source: String,
+}
+
+/// Units of the scalar `TrancheMetrics` fields, in the order the struct declares them.
+///
+/// `TrancheMetrics` documents these units in prose and does not state them on
+/// the wire, so a host reads them here. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `TrancheMetrics::currency` of the result being labelled;
+///   it names the unit of `pv`, `accrued` and `cs01`.
+///
+/// # Returns
+///
+/// One record per scalar field. `tranche_id`, `currency` and the
+/// registry-keyed `metrics` map have no field unit and are not listed; registry
+/// metrics keep the units their [`MetricMetadata`] reports.
+pub fn tranche_metric_field_units(currency: Currency) -> Vec<MetricFieldUnit> {
+    const CURRENT_BALANCE: &str = "% of current balance";
+    [
+        ("pv", currency.to_string()),
+        ("clean_price_pct", CURRENT_BALANCE.to_string()),
+        ("dirty_price_pct", CURRENT_BALANCE.to_string()),
+        ("accrued", currency.to_string()),
+        ("factor", "current / original balance".to_string()),
+        ("wal", "years".to_string()),
+        ("ytm", "decimal".to_string()),
+        ("z_spread_bp", "bp".to_string()),
+        ("cs01", format!("{currency} per bp")),
+        ("spread_duration", "years".to_string()),
+        ("spread_convexity", "years²".to_string()),
+        ("effective_duration", "years".to_string()),
+        ("effective_convexity", "years²".to_string()),
+        ("target_price_pct", CURRENT_BALANCE.to_string()),
+        ("wal_to_call", "years".to_string()),
+        ("z_spread_to_call_bp", "bp".to_string()),
+        ("dm_to_call_bp", "bp".to_string()),
+        ("dm_bp", "bp".to_string()),
+    ]
+    .into_iter()
+    .map(|(field, label)| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::TrancheMetrics::{field}"),
+    })
+    .collect()
+}
+
+/// Units of the tranche solvers' results, which do not state them on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct TrancheSolveFieldUnits {
+    /// Unit of the value `tranche_breakeven_cdr` returns.
+    pub breakeven_cdr: MetricFieldUnit,
+    /// Unit of the value `tranche_discount_margin` returns.
+    pub discount_margin: MetricFieldUnit,
+    /// Unit of every `OasResult` field, in the order the struct declares them.
+    pub oas: Vec<MetricFieldUnit>,
+}
+
+/// Units of the tranche break-even CDR, discount margin and OAS results.
+///
+/// Those solvers document their units in prose: the two scalars are decimals
+/// (`0.0125` = 125 bp) and `OasResult` prices are percent of the tranche's current
+/// balance. Values are never rescaled.
+pub fn tranche_solve_field_units() -> TrancheSolveFieldUnits {
+    const CURRENT_BALANCE: &str = "% of current balance";
+    let scalar = |field: &str, source: &str| MetricFieldUnit {
+        field: field.to_string(),
+        label: "decimal".to_string(),
+        source: format!("valuations::{source}"),
+    };
+    TrancheSolveFieldUnits {
+        breakeven_cdr: scalar("breakeven_cdr", "tranche_breakeven_cdr"),
+        discount_margin: scalar("discount_margin", "tranche_discount_margin"),
+        oas: [
+            ("oas", "decimal"),
+            ("model_price", CURRENT_BALANCE),
+            ("market_price", CURRENT_BALANCE),
+            ("num_paths", "paths"),
+            ("price_std_error", CURRENT_BALANCE),
+        ]
+        .into_iter()
+        .map(|(field, label)| MetricFieldUnit {
+            field: field.to_string(),
+            label: label.to_string(),
+            source: format!("valuations::OasResult::{field}"),
+        })
+        .collect(),
+    }
 }
 
 /// List every pricing model key that has a pricer in the standard registry.
@@ -867,6 +1015,120 @@ fn decode_pricing_envelope(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coordinates_order_tenors_strikes_and_vega_rows_by_value() {
+        let at = |label: &str| {
+            let coordinate = MetricCoordinate::from_label(label);
+            (coordinate.group, coordinate.value)
+        };
+        let bare = |value: f64| (String::new(), Some(value));
+        assert_eq!(at("3m"), bare(0.25));
+        assert_eq!(at("12m"), bare(1.0));
+        assert_eq!(at("0.75y"), bare(0.75));
+        assert_eq!(at("10y"), bare(10.0));
+        assert_eq!(at("0.004"), bare(0.004));
+        assert_eq!(at("-0.5"), bare(-0.5));
+        assert_eq!(at("S::0.25y"), ("S::".to_string(), Some(0.25)));
+        assert_eq!(at("USD-OIS"), ("USD-OIS".to_string(), None));
+        assert_eq!(at(""), (String::new(), None));
+        // A word that f64::from_str reads as a number is still text.
+        assert_eq!(at("inf"), ("inf".to_string(), None));
+    }
+
+    #[test]
+    fn tranche_field_units_list_every_scalar_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::TrancheMetrics;
+        let fields = [
+            "pv",
+            "clean_price_pct",
+            "dirty_price_pct",
+            "accrued",
+            "factor",
+            "wal",
+            "ytm",
+            "z_spread_bp",
+            "cs01",
+            "spread_duration",
+            "spread_convexity",
+            "effective_duration",
+            "effective_convexity",
+            "target_price_pct",
+            "wal_to_call",
+            "z_spread_to_call_bp",
+            "dm_to_call_bp",
+            "dm_bp",
+        ];
+        let mut wire: serde_json::Map<String, Value> = fields
+            .iter()
+            .map(|field| ((*field).to_string(), serde_json::json!(1.0)))
+            .collect();
+        wire.insert("tranche_id".to_string(), serde_json::json!("A"));
+        wire.insert("currency".to_string(), serde_json::json!("USD"));
+        // Strict deserialization proves these are the struct's fields; serializing
+        // lists them in declaration order, so the table cannot drift unnoticed.
+        let metrics: TrancheMetrics =
+            serde_json::from_value(Value::Object(wire)).expect("TrancheMetrics fields");
+        let mut declared: Vec<String> = serde_json::to_value(&metrics)
+            .expect("serialize")
+            .as_object()
+            .expect("object")
+            .keys()
+            .filter(|key| !["tranche_id", "currency", "metrics"].contains(&key.as_str()))
+            .cloned()
+            .collect();
+        declared.sort();
+        let units = tranche_metric_field_units(Currency::EUR);
+        let mut listed: Vec<String> = units.iter().map(|unit| unit.field.clone()).collect();
+        assert_eq!(listed, fields);
+        listed.sort();
+        assert_eq!(listed, declared);
+    }
+
+    #[test]
+    fn oas_field_units_list_every_oas_result_field_in_struct_order() {
+        let result = crate::instruments::fixed_income::structured_credit::OasResult {
+            oas: 0.01,
+            model_price: 99.0,
+            market_price: 99.5,
+            num_paths: 100,
+            price_std_error: 0.1,
+        };
+        let wire = serde_json::to_value(&result).expect("serialize");
+        let mut declared: Vec<&str> = wire
+            .as_object()
+            .expect("object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        declared.sort_unstable();
+        let units = tranche_solve_field_units();
+        let mut listed: Vec<&str> = units.oas.iter().map(|unit| unit.field.as_str()).collect();
+        assert_eq!(listed[0], "oas");
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units.oas[0].source, "valuations::OasResult::oas");
+        assert_eq!(units.breakeven_cdr.label, "decimal");
+        assert_eq!(
+            units.discount_margin.source,
+            "valuations::tranche_discount_margin"
+        );
+    }
+
+    #[test]
+    fn tranche_field_units_state_the_result_currency_and_source() {
+        let units = tranche_metric_field_units(Currency::EUR);
+        let unit = |field: &str| {
+            units
+                .iter()
+                .find(|unit| unit.field == field)
+                .expect("listed")
+        };
+        assert_eq!(unit("pv").label, "EUR");
+        assert_eq!(unit("cs01").label, "EUR per bp");
+        assert_eq!(unit("wal").label, "years");
+        assert_eq!(unit("factor").source, "valuations::TrancheMetrics::factor");
+    }
 
     fn instrument_json_for_pricing(
         instrument_json: &str,
@@ -1899,6 +2161,19 @@ mod tests {
         assert_eq!(bucketed.unit, crate::metrics::MetricUnit::Currency);
         assert_eq!(bucketed.group.as_deref(), Some("Sensitivity"));
         assert_eq!(bucketed.components, vec!["A::B", "5y"]);
+        assert_eq!(
+            bucketed.coordinates,
+            vec![
+                MetricCoordinate {
+                    group: "A::B".to_string(),
+                    value: None
+                },
+                MetricCoordinate {
+                    group: String::new(),
+                    value: Some(5.0)
+                },
+            ]
+        );
         assert!(bucketed.bucketed);
 
         let custom = &metadata[2];
