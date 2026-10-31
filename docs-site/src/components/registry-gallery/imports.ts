@@ -319,6 +319,13 @@ export const importHarnesses = {
       name: "use-margin-call-dates",
       modules: modules.length,
     })),
+  "use-liability-management": () =>
+    Promise.all([
+      import("@/hooks/models/use-liability-management/use-liability-management"),
+    ]).then((modules) => ({
+      name: "use-liability-management",
+      modules: modules.length,
+    })),
   "use-option-calculator": () =>
     Promise.all([
       import("@/hooks/models/use-option-calculator/use-option-calculator"),

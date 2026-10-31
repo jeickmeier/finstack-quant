@@ -228,6 +228,22 @@ test("curve-query selected surface", async ({ page }) => {
   await expect(lookup.getByRole("table")).toBeVisible();
   await expect(lookup).toHaveScreenshot("curve-query-surface.png");
 });
+test("liability-management-card exercise economics", async ({ page }) => {
+  const item = await open(
+    page,
+    "liability-management-card",
+    "light",
+    "comfortable",
+  );
+  // The four item baselines stop above the exercise's table.
+  const exercise = item.getByRole("region", {
+    name: "Liability management exercise",
+  });
+  await expect(exercise.getByRole("table")).toBeVisible();
+  await expect(exercise).toHaveScreenshot(
+    "liability-management-card-exercise.png",
+  );
+});
 test("merton-calculator model parameters", async ({ page }) => {
   const item = await open(page, "merton-calculator", "light", "comfortable");
   // The four item baselines stop inside the term structure, above this table.

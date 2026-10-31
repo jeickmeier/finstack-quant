@@ -2,6 +2,69 @@
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "items": [
     {
+      "name": "liability-management-card",
+      "type": "registry:component",
+      "title": "Liability management card",
+      "description": "Forms and native economics of a distressed exchange offer and a liability management exercise, with Rust's own tender recommendation.",
+      "docs": "Two forms. Exchange offer, the holder's view: hold-out PV, new instrument PV, consent fee, equity sweetener and offer structure, with the returned tender total, NPV pickup, breakeven recovery and tender_recommended, which is Rust's field and never compared here; the hurdle Rust applies shows beside it as supplied. Liability management exercise, the issuer's view: structure, notional, participation, EBITDA and a price input that Rust reads as a price, an extension fee or a transferred-asset fraction by structure, with the returned cost, par retired, discount capture, holder impact and, for a positive EBITDA, the leverage block. Amounts use one unit you choose, with no currency conversion; percentages are fractions. An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset. Each analysis shows its own native error. Accepts defaultExchange, defaultLme, onExchangeSubmit, onLmeSubmit, exchange, lme, hurdle, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/liability-management-card/liability-management-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/liability-management-card/liability-management-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "badge",
+        "button"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-liability-management",
+      "type": "registry:hook",
+      "title": "useLiabilityManagement",
+      "description": "Runs the native exchange-offer and LME analyses and reads the tender hurdle through the WASM worker.",
+      "docs": "useExchangeOffer calls models.credit.liabilityManagement.analyzeExchangeOffer, useLme calls analyzeLme and useTenderRecommendationHurdle calls tenderRecommendationHurdle, each one native call with its arguments in the binding's positions. Null means no request. Requires FinstackQueryProvider. A rejected input is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-liability-management/use-liability-management.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-liability-management/use-liability-management.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "option-calculator",
       "type": "registry:component",
       "title": "Option calculator",

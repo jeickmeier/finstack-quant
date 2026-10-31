@@ -464,6 +464,17 @@ const displays = [
       "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model.",
   },
   {
+    id: "liability-management-card",
+    api: [
+      "models.credit.liabilityManagement.analyzeExchangeOffer",
+      "CreditLiabilityManagementNamespace",
+      "analyzeExchangeOffer",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned models.credit.liabilityManagement.analyzeExchangeOffer and analyzeLme results as Rust returned them. The tender recommendation is Rust's tender_recommended field; tenderRecommendationHurdle shows beside it as supplied and is never compared here. Amounts are in one caller-defined unit with no currency conversion; percentages are fractions and leverage a multiple. The LME price input is a price, an extension fee or a transferred-asset fraction by structure, as the facade documents.",
+  },
+  {
     id: "option-calculator",
     api: ["models.bsPrice", "ModelsNamespace", "bsPrice"],
     route: "returned-model",

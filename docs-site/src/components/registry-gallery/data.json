@@ -40255,6 +40255,169 @@
       }
     }
   },
+  "liabilityManagement": {
+    "description": "Native models.credit.liabilityManagement results: exchange offers above and inside the tender hurdle, tender, amend-and-extend and dropdown exercises, and the validation errors of a negative fee and a price quoted in points.",
+    "hurdle": 1.02,
+    "exchange": {
+      "recommended": {
+        "request": {
+          "oldPv": 45,
+          "newPv": 80,
+          "consentFee": 2,
+          "equitySweetenerValue": 3,
+          "exchangeType": "discount"
+        },
+        "result": {
+          "ok": true,
+          "value": {
+            "exchange_type": "discount",
+            "old_npv": 45,
+            "new_npv": 80,
+            "consent_fee": 2,
+            "equity_sweetener_value": 3,
+            "tender_total": 85,
+            "delta_npv": 40,
+            "breakeven_recovery": 1,
+            "tender_recommended": true
+          }
+        }
+      },
+      "insideHurdle": {
+        "request": {
+          "oldPv": 100,
+          "newPv": 100.5,
+          "consentFee": 0.5,
+          "equitySweetenerValue": 0.25,
+          "exchangeType": "par_for_par"
+        },
+        "result": {
+          "ok": true,
+          "value": {
+            "exchange_type": "par_for_par",
+            "old_npv": 100,
+            "new_npv": 100.5,
+            "consent_fee": 0.5,
+            "equity_sweetener_value": 0.25,
+            "tender_total": 101.25,
+            "delta_npv": 1.25,
+            "breakeven_recovery": 1,
+            "tender_recommended": false
+          }
+        }
+      },
+      "negativeFee": {
+        "request": {
+          "oldPv": 45,
+          "newPv": 80,
+          "consentFee": -1,
+          "equitySweetenerValue": 0,
+          "exchangeType": "uptier"
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "name": "FinstackError",
+            "message": "Validation error: Invalid consent_fee: must be non-negative, got -1",
+            "kind": "validation"
+          }
+        }
+      }
+    },
+    "lme": {
+      "tender": {
+        "request": {
+          "lmeType": "tender_offer",
+          "notional": 1000,
+          "repurchasePricePct": 0.6,
+          "optAcceptancePct": 0.8,
+          "ebitda": 125
+        },
+        "result": {
+          "ok": true,
+          "value": {
+            "lme_type": "tender_offer",
+            "cost": 480,
+            "notional_reduction": 800,
+            "discount_capture": 320,
+            "discount_capture_pct": 0.4,
+            "remaining_holder_impact_pct": 0,
+            "leverage_impact": {
+              "pre_total_debt": 1000,
+              "post_total_debt": 200,
+              "pre_leverage": 8,
+              "post_leverage": 1.6,
+              "leverage_reduction": 6.4
+            }
+          }
+        }
+      },
+      "amendAndExtend": {
+        "request": {
+          "lmeType": "amend_and_extend",
+          "notional": 1000,
+          "repurchasePricePct": 0.01,
+          "optAcceptancePct": 0.9,
+          "ebitda": null
+        },
+        "result": {
+          "ok": true,
+          "value": {
+            "lme_type": "amend_and_extend",
+            "cost": 9,
+            "notional_reduction": 0,
+            "discount_capture": -9,
+            "discount_capture_pct": 0,
+            "remaining_holder_impact_pct": 0,
+            "leverage_impact": null
+          }
+        }
+      },
+      "dropdown": {
+        "request": {
+          "lmeType": "dropdown",
+          "notional": 1000,
+          "repurchasePricePct": 0.3,
+          "optAcceptancePct": 0.7,
+          "ebitda": 125
+        },
+        "result": {
+          "ok": true,
+          "value": {
+            "lme_type": "dropdown",
+            "cost": 0,
+            "notional_reduction": 0,
+            "discount_capture": 0,
+            "discount_capture_pct": 0,
+            "remaining_holder_impact_pct": 0.3,
+            "leverage_impact": {
+              "pre_total_debt": 1000,
+              "post_total_debt": 1000,
+              "pre_leverage": 8,
+              "post_leverage": 8,
+              "leverage_reduction": 0
+            }
+          }
+        }
+      },
+      "pricePoints": {
+        "request": {
+          "lmeType": "open_market_repurchase",
+          "notional": 1000,
+          "repurchasePricePct": 60,
+          "optAcceptancePct": 0.8,
+          "ebitda": null
+        },
+        "result": {
+          "ok": false,
+          "error": {
+            "name": "FinstackError",
+            "message": "Validation error: repurchase_price_pct must be in (0.0, 1.5], got 60",
+            "kind": "validation"
+          }
+        }
+      }
+    }
+  },
   "simm": {
     "description": "Native indicative SIMM (default version and MPOR) on 2025-01-15: the simm_sensitivities_json schema example and a single USD 5Y IR delta of 1000, each with its canonical sensitivities text and returned ImResult.",
     "example": {

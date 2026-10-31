@@ -174,11 +174,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twenty-three native fixture generators under
+`mise run ui-fixtures` runs the twenty-four native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
-scenario-table; statements → covenants; analytics; models credit, risk and options;
+scenario-table; statements → covenants; analytics; models credit, risk, options and liability management;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -1010,6 +1010,23 @@ vega, so the check could not fail on a returned result.
 are discounted and Bachelier prices undiscounted, Black-Scholes vega and rhos are
 per 1% move and theta per day, and forward-Greek vega is per unit of volatility.
 The native fixture is `tests/models/options/cases.json`.
+
+## Liability management card
+
+`useExchangeOffer` and `useLme` (`@finstack/use-liability-management`) call
+`models.credit.liabilityManagement.analyzeExchangeOffer` and `analyzeLme`, and
+`useTenderRecommendationHurdle` reads `tenderRecommendationHurdle`. Each is one
+native call; `tests/models/liability-management/liability-management-card.test.tsx`
+pins the positional order against the fields Rust echoes.
+`LiabilityManagementCard` has a form and a table per analysis. The recommendation
+is Rust's `tender_recommended`: the card never compares `tender_total` with the
+hurdle, which it shows beside the badge as supplied, as a multiple of the hold-out
+PV. Amounts use one unit the caller chooses and Rust converts no currency;
+percentages are fractions (0.60 is 60 cents, and 60 is rejected), and the price
+input means a price, an extension fee or a transferred-asset fraction by structure.
+An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset,
+which leaves the leverage block out. Leverage covers the target instrument's debt
+only. The native fixture is `tests/models/liability-management/cases.json`.
 
 ## Credit scorecard
 

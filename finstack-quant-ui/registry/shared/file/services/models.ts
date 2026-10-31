@@ -13,7 +13,7 @@ import type {
   ScoringResult,
 } from "../finstack-contract";
 import { attempt, type ServiceContext } from "./context";
-/** The closed-form option functions, models.volatility evaluators and the surface arbitrage check, the core surface handles they read, models.credit.migration, the Merton model, the credit-scoring functions, the PD master scale and the models.factor.risk position decompositions. */
+/** The closed-form option functions, models.volatility evaluators and the surface arbitrage check, the core surface handles they read, models.credit.migration, the Merton model, the credit-scoring functions, the PD master scale, the liability-management analyses and the models.factor.risk position decompositions. */
 export type ModelsNative = {
   core: Pick<typeof core, "FxDeltaVolSurface" | "VolCube" | "VolSurface">;
   models: Pick<
@@ -48,6 +48,10 @@ export type ModelsNative = {
         "TransitionMatrix" | "GeneratorMatrix" | "project"
       >;
       pd: Pick<typeof models.credit.pd, "MasterScale">;
+      liabilityManagement: Pick<
+        typeof models.credit.liabilityManagement,
+        "analyzeExchangeOffer" | "analyzeLme" | "tenderRecommendationHurdle"
+      >;
       scoring: Pick<
         typeof models.credit.scoring,
         | "altmanZScore"
@@ -532,6 +536,32 @@ export function createModelsService(
         }
       });
     },
+    analyzeExchangeOffer(request) {
+      return context.result(() =>
+        native.models.credit.liabilityManagement.analyzeExchangeOffer(
+          request.oldPv,
+          request.newPv,
+          request.consentFee,
+          request.equitySweetenerValue,
+          request.exchangeType,
+        ),
+      );
+    },
+    analyzeLme(request) {
+      return context.result(() =>
+        native.models.credit.liabilityManagement.analyzeLme(
+          request.lmeType,
+          request.notional,
+          request.repurchasePricePct,
+          request.optAcceptancePct,
+          request.ebitda,
+        ),
+      );
+    },
+    tenderRecommendationHurdle: () =>
+      context.result(() =>
+        native.models.credit.liabilityManagement.tenderRecommendationHurdle(),
+      ),
     optionCalculator(request) {
       return context.result((): OptionCalculatorResult => {
         const { model } = request;

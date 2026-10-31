@@ -677,6 +677,30 @@ export type CurveQueryResult =
       kind: "surface";
       points: { expiry: number; strike: number; vol: Envelope<number> }[];
     };
+/** One distressed exchange offer; amounts in one caller-defined unit, no currency conversion. */
+export interface ExchangeOfferRequest {
+  /** Present value of the existing claim if not tendered. */
+  readonly oldPv: number;
+  /** Present value of the new instrument received on tendering. */
+  readonly newPv: number;
+  /** Cash consent or early-tender fee. */
+  readonly consentFee: number;
+  /** Estimated value of attached equity or warrants. */
+  readonly equitySweetenerValue: number;
+  readonly exchangeType: modelsWire.ExchangeType;
+}
+/** One liability management exercise; amounts in one caller-defined unit, percentages as fractions. */
+export interface LmeRequest {
+  readonly lmeType: modelsWire.LmeType;
+  /** Outstanding face of the target instrument. */
+  readonly notional: number;
+  /** Price, extension fee or transferred-asset fraction, by structure. */
+  readonly repurchasePricePct: number;
+  /** Fraction of holders participating. */
+  readonly optAcceptancePct: number;
+  /** Unset leaves the leverage block out. */
+  readonly ebitda?: number | null;
+}
 /** Terms of one European option; each model takes its own, as the facade function documents them. */
 export type OptionTerms =
   | {
@@ -1276,6 +1300,14 @@ export interface ModelsApi {
   mertonReport(request: MertonReportRequest): Promise<Envelope<MertonReport>>;
   /** One models.credit.scoring function over its input ratios in the facade's positional order, then models.credit.pd.MasterScale.defaultCalibration().mapScore of the result (kept as an envelope); the scale handle is freed. */
   creditScore(request: CreditScoreRequest): Promise<Envelope<CreditScore>>;
+  /** models.credit.liabilityManagement.analyzeExchangeOffer, including Rust's tender_recommended. */
+  analyzeExchangeOffer(
+    request: ExchangeOfferRequest,
+  ): Promise<Envelope<modelsWire.ExchangeOfferAnalysis>>;
+  /** models.credit.liabilityManagement.analyzeLme. */
+  analyzeLme(request: LmeRequest): Promise<Envelope<modelsWire.LmeAnalysis>>;
+  /** models.credit.liabilityManagement.tenderRecommendationHurdle. */
+  tenderRecommendationHurdle(): Promise<Envelope<number>>;
   /** One closed-form price (bsPrice, black76Price, bachelierPrice) or implied-volatility solve (bsImpliedVol, black76ImpliedVol, models.volatility.impliedVolBachelier) in the facade's positional order, then the model's Greeks at that volatility, kept as an envelope. */
   optionCalculator(
     request: OptionCalculatorRequest,
