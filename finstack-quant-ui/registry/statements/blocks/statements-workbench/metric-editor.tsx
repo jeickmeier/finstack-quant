@@ -50,6 +50,7 @@ export function MetricEditor({
         name: name.trim(),
         node_type: "calculated",
         tags: ["metric", ...(kind === "scalar" ? ["ratio"] : [])],
+        rollup: "formula",
         value_type:
           kind === "scalar"
             ? { type: "scalar" }

@@ -549,6 +549,55 @@ impl ModelBuilder {
         Ok(self)
     }
 
+    /// Declare how an existing line rolls up to a coarser reporting frequency.
+    ///
+    /// Call it after the method that creates the line, whichever one that is
+    /// (`value`, `value_money`, `value_scalar`, `compute`, `forecast`,
+    /// `add_metric_from_registry`). Redefining `node_id` afterwards discards
+    /// the declaration along with the rest of the old definition.
+    ///
+    /// # Arguments
+    ///
+    /// * `node_id` - Existing node to declare the method on
+    /// * `rollup` - `Sum` for flows, `PeriodEnd` for balances and trailing
+    ///   metrics, `Formula` for ratios. A rollup rejects `Formula` on a node
+    ///   without a formula. A [`RollupSpec`](crate::evaluator::RollupSpec)
+    ///   entry for the node overrides this declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `node_id` does not exist.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use finstack_quant_statements::builder::ModelBuilder;
+    /// # use finstack_quant_statements::types::{AmountOrScalar, RollupMethod};
+    /// # use finstack_quant_core::dates::PeriodId;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut model_builder = ModelBuilder::new("demo");
+    /// model_builder.periods("2025Q1..Q1", None)?;
+    /// model_builder.value("cash", &[(PeriodId::quarter(2025, 1)?, AmountOrScalar::scalar(40.0))]);
+    /// model_builder.rollup("cash", RollupMethod::PeriodEnd)?;
+    /// let model = model_builder.build()?;
+    /// assert_eq!(model.get_node("cash").and_then(|node| node.rollup), Some(RollupMethod::PeriodEnd));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn rollup(
+        &mut self,
+        node_id: &str,
+        rollup: crate::types::RollupMethod,
+    ) -> Result<&mut Self> {
+        let node = self.nodes.get_mut(node_id).ok_or_else(|| {
+            Error::build(format!(
+                "Cannot declare a rollup method for unknown node '{node_id}'"
+            ))
+        })?;
+        node.rollup = Some(rollup);
+        Ok(self)
+    }
+
     /// Add a calculated node with a formula.
     ///
     /// Calculated nodes derive their values from formulas only.
@@ -648,6 +697,7 @@ impl ModelBuilder {
             forecast: None,
             formula: None,
             name: None,
+            rollup: None,
         }
     }
 
@@ -1005,6 +1055,7 @@ pub struct MixedNodeBuilder {
     forecast: Option<crate::types::ForecastSpec>,
     formula: Option<String>,
     name: Option<String>,
+    rollup: Option<crate::types::RollupMethod>,
 }
 
 impl MixedNodeBuilder {
@@ -1143,6 +1194,34 @@ impl MixedNodeBuilder {
         self
     }
 
+    /// Declare how this line rolls up to a coarser reporting frequency.
+    ///
+    /// # Arguments
+    /// * `rollup` - `Sum` for flows, `PeriodEnd` for balances and trailing
+    ///   metrics, `Formula` for ratios. A rollup rejects `Formula` on a node
+    ///   without a formula. A [`RollupSpec`](crate::evaluator::RollupSpec)
+    ///   entry for the node overrides this declaration.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use finstack_quant_statements::builder::ModelBuilder;
+    /// # use finstack_quant_statements::types::RollupMethod;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut model_builder = ModelBuilder::new("demo");
+    /// model_builder.periods("2025Q1..Q2", None)?;
+    /// let mut mixed = model_builder.mixed("cash");
+    /// mixed.rollup(RollupMethod::PeriodEnd);
+    /// let model = mixed.build()?.build()?;
+    /// assert_eq!(model.get_node("cash").and_then(|node| node.rollup), Some(RollupMethod::PeriodEnd));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn rollup(&mut self, rollup: crate::types::RollupMethod) -> &mut Self {
+        self.rollup = Some(rollup);
+        self
+    }
+
     /// Build the mixed node and return to the parent model builder.
     ///
     /// This validates the mixed node ID eagerly before attaching it to the
@@ -1194,6 +1273,7 @@ impl MixedNodeBuilder {
         if let Some(formula) = self.formula {
             node.formula_text = Some(formula);
         }
+        node.rollup = self.rollup;
 
         self.parent.put_node(self.node_id, node);
         Ok(self.parent)

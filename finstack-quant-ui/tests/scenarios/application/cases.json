@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "5357646f8195d31e31fd0cb07bdb7b691583b9bb5e85ab343c47b18437c2aacf"
+      "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
     }
   ],
   "base": {
@@ -148,6 +148,7 @@
           "key": "ytm",
           "metric": "ytm",
           "components": [],
+          "coordinates": [],
           "unit": "decimal",
           "group": "Pricing",
           "bucketed": false
@@ -156,6 +157,7 @@
           "key": "dv01",
           "metric": "dv01",
           "components": [],
+          "coordinates": [],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": false
@@ -164,6 +166,7 @@
           "key": "duration_mod",
           "metric": "duration_mod",
           "components": [],
+          "coordinates": [],
           "unit": "years",
           "group": "Pricing",
           "bucketed": false
@@ -172,6 +175,7 @@
           "key": "bucketed_dv01",
           "metric": "bucketed_dv01",
           "components": [],
+          "coordinates": [],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": false
@@ -180,6 +184,16 @@
           "key": "bucketed_dv01::USD-OIS::10y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "10y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 10
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -188,6 +202,16 @@
           "key": "bucketed_dv01::USD-OIS::15y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "15y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 15
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -196,6 +220,16 @@
           "key": "bucketed_dv01::USD-OIS::1y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "1y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 1
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -204,6 +238,16 @@
           "key": "bucketed_dv01::USD-OIS::20y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "20y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 20
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -212,6 +256,16 @@
           "key": "bucketed_dv01::USD-OIS::2y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "2y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 2
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -220,6 +274,16 @@
           "key": "bucketed_dv01::USD-OIS::30y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "30y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 30
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -228,6 +292,16 @@
           "key": "bucketed_dv01::USD-OIS::3m",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "3m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.25
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -236,6 +310,16 @@
           "key": "bucketed_dv01::USD-OIS::3y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "3y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 3
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -244,6 +328,16 @@
           "key": "bucketed_dv01::USD-OIS::5y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "5y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 5
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -252,6 +346,16 @@
           "key": "bucketed_dv01::USD-OIS::6m",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "6m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.5
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -260,6 +364,16 @@
           "key": "bucketed_dv01::USD-OIS::7y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "7y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 7
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -426,6 +540,7 @@
           "key": "ytm",
           "metric": "ytm",
           "components": [],
+          "coordinates": [],
           "unit": "decimal",
           "group": "Pricing",
           "bucketed": false
@@ -434,6 +549,7 @@
           "key": "dv01",
           "metric": "dv01",
           "components": [],
+          "coordinates": [],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": false
@@ -442,6 +558,7 @@
           "key": "duration_mod",
           "metric": "duration_mod",
           "components": [],
+          "coordinates": [],
           "unit": "years",
           "group": "Pricing",
           "bucketed": false
@@ -450,6 +567,7 @@
           "key": "bucketed_dv01",
           "metric": "bucketed_dv01",
           "components": [],
+          "coordinates": [],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": false
@@ -458,6 +576,16 @@
           "key": "bucketed_dv01::USD-OIS::10y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "10y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 10
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -466,6 +594,16 @@
           "key": "bucketed_dv01::USD-OIS::15y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "15y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 15
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -474,6 +612,16 @@
           "key": "bucketed_dv01::USD-OIS::1y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "1y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 1
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -482,6 +630,16 @@
           "key": "bucketed_dv01::USD-OIS::20y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "20y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 20
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -490,6 +648,16 @@
           "key": "bucketed_dv01::USD-OIS::2y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "2y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 2
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -498,6 +666,16 @@
           "key": "bucketed_dv01::USD-OIS::30y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "30y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 30
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -506,6 +684,16 @@
           "key": "bucketed_dv01::USD-OIS::3m",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "3m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.25
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -514,6 +702,16 @@
           "key": "bucketed_dv01::USD-OIS::3y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "3y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 3
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -522,6 +720,16 @@
           "key": "bucketed_dv01::USD-OIS::5y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "5y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 5
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -530,6 +738,16 @@
           "key": "bucketed_dv01::USD-OIS::6m",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "6m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.5
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -538,6 +756,16 @@
           "key": "bucketed_dv01::USD-OIS::7y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "7y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 7
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -684,6 +912,7 @@
           "key": "ytm",
           "metric": "ytm",
           "components": [],
+          "coordinates": [],
           "unit": "decimal",
           "group": "Pricing",
           "bucketed": false
@@ -692,6 +921,7 @@
           "key": "dv01",
           "metric": "dv01",
           "components": [],
+          "coordinates": [],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": false
@@ -700,6 +930,7 @@
           "key": "duration_mod",
           "metric": "duration_mod",
           "components": [],
+          "coordinates": [],
           "unit": "years",
           "group": "Pricing",
           "bucketed": false
@@ -708,6 +939,7 @@
           "key": "bucketed_dv01",
           "metric": "bucketed_dv01",
           "components": [],
+          "coordinates": [],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": false
@@ -716,6 +948,16 @@
           "key": "bucketed_dv01::USD-OIS::10y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "10y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 10
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -724,6 +966,16 @@
           "key": "bucketed_dv01::USD-OIS::15y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "15y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 15
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -732,6 +984,16 @@
           "key": "bucketed_dv01::USD-OIS::1y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "1y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 1
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -740,6 +1002,16 @@
           "key": "bucketed_dv01::USD-OIS::20y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "20y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 20
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -748,6 +1020,16 @@
           "key": "bucketed_dv01::USD-OIS::2y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "2y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 2
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -756,6 +1038,16 @@
           "key": "bucketed_dv01::USD-OIS::30y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "30y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 30
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -764,6 +1056,16 @@
           "key": "bucketed_dv01::USD-OIS::3m",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "3m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.25
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -772,6 +1074,16 @@
           "key": "bucketed_dv01::USD-OIS::3y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "3y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 3
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -780,6 +1092,16 @@
           "key": "bucketed_dv01::USD-OIS::5y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "5y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 5
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -788,6 +1110,16 @@
           "key": "bucketed_dv01::USD-OIS::6m",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "6m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.5
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true
@@ -796,6 +1128,16 @@
           "key": "bucketed_dv01::USD-OIS::7y",
           "metric": "bucketed_dv01",
           "components": ["USD-OIS", "7y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 7
+            }
+          ],
           "unit": "currency",
           "group": "Sensitivity",
           "bucketed": true

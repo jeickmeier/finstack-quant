@@ -336,6 +336,7 @@ function HorizonReturnSection({
       </div>
       <HorizonReturnReport
         report={horizon.data?.report}
+        attributionBuckets={horizon.data?.attributionBuckets}
         explain={horizon.data?.explain}
         loading={horizon.isFetching}
         error={horizon.error?.message ?? calendars.error?.message}

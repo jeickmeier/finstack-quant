@@ -128,6 +128,7 @@ export function CalibrationPanel({
           onClick={() => {
             abort.current?.abort();
             setDocument(draft);
+            // finstack-arith: remount revision counter, not a value
             setRevision((v) => v + 1);
             setInput(null);
             setValidated(null);

@@ -206,6 +206,7 @@ public = [
     "build_stress_attribution",
     "decompose_factors",
     "evaluate_risk_budget",
+    "evaluate_risk_budget_from_decomposition",
     "historical_var_decomposition",
     "parametric_var_decomposition",
     "position_component_var",
@@ -1023,12 +1024,15 @@ public = [
     "metric_metadata",
     "metrics_for_instrument",
     "pretty_instrument_json",
+    "price_driver_fields",
     "price_instrument",
     "tranche_breakeven_cdr",
     "tranche_discount_margin",
+    "tranche_metric_field_units",
     "tranche_metrics",
     "tranche_oas",
     "tranche_scenario_table",
+    "tranche_solve_field_units",
     "validate_instrument_json",
     "validate_typed_instrument_json",
 ]
@@ -1079,11 +1083,13 @@ public = [
     "EndogenousHazardSpec",
     "MertonBarrierType",
     "MertonModel",
+    "MertonReport",
     "RatingFactorTable",
     "SimulatedPaths",
     "ToggleExerciseModel",
     "lgd",
     "liability_management",
+    "merton_report",
     "migration",
     "moodys_warf_factor",
     "pd",
@@ -2060,7 +2066,7 @@ types = { CreditExposure = "CreditExposure", PortfolioLossConfig = "PortfolioLos
 
 [parity.modules."finstack_quant.models.credit"]
 js = "models.credit"
-types = { CreditState = "CreditState" }
+types = { CreditState = "CreditState", MertonReport = "MertonReport" }
 
 [parity.modules."finstack_quant.models.credit.lgd"]
 js = "models.credit.lgd"
@@ -2252,6 +2258,9 @@ excluded = { manual = "literal" }
 renames = { metric_weighted = { js = "valuations.composite.weightingMethodMetricWeighted", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, dv01_neutral = { js = "valuations.composite.weightingMethodDv01Neutral", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, delta_neutral = { js = "valuations.composite.weightingMethodDeltaNeutral", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, duration_weighted = { js = "valuations.composite.weightingMethodDurationWeighted", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, volatility_weighted = { js = "valuations.composite.weightingMethodVolatilityWeighted", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" } }
 excluded = { fixed_quantity = "literal", notional_weighted = "literal" }
 
+[parity.members."finstack_quant.valuations.instruments.InstrumentCashflowEnvelope"]
+renames = { calendar_year_ladder_by_currency = { js = "valuations.instruments.calendarYearLadderByCurrency", reason = "WASM cashflow envelopes are plain objects; the Rust InstrumentCashflowEnvelope::calendar_year_ladder_by_currency method is a free function taking the object" } }
+
 [parity.members."finstack_quant.valuations.instruments.SimulationDiagnostics"]
 excluded = { coverage_tests_dataframe = "pandas" }
 
@@ -2430,7 +2439,7 @@ renames = { affirmative = { js = "covenants.covenantTypeAffirmative", reason = "
 renames = { threshold_for = { js = "covenants.thresholdScheduleThresholdFor", reason = "WASM ThresholdSchedule values are plain objects; the Rust ThresholdSchedule::threshold_for function is a free function over the wire value" } }
 
 [parity.members."finstack_quant.attribution.PnlAttribution"]
-renames = { explain = { js = "attribution.pnlAttributionExplainText", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::explain method is a free function taking the object" }, pct_of_total = { js = "attribution.pnlAttributionPctOfTotal", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::pct_of_total method is a free function taking the object" }, required_metrics = { js = "attribution.pnlAttributionRequiredMetrics", reason = "WASM attribution results are plain objects; Rust AttributionMethod::required_metrics of meta.method is a free function taking the object" }, residual_within_tolerance = { js = "attribution.pnlAttributionResidualWithinTolerance", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::residual_within_tolerance method is a free function taking the object" }, validate_currencies = { js = "attribution.pnlAttributionValidateCurrencies", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::validate_currencies method is a free function taking the object" } }
+renames = { explain = { js = "attribution.pnlAttributionExplainText", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::explain method is a free function taking the object" }, pct_of_total = { js = "attribution.pnlAttributionPctOfTotal", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::pct_of_total method is a free function taking the object" }, pct_of_total_by_bucket = { js = "attribution.pnlAttributionPctOfTotalByBucket", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::pct_of_total_by_bucket method is a free function taking the object" }, required_metrics = { js = "attribution.pnlAttributionRequiredMetrics", reason = "WASM attribution results are plain objects; Rust AttributionMethod::required_metrics of meta.method is a free function taking the object" }, residual_within_tolerance = { js = "attribution.pnlAttributionResidualWithinTolerance", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::residual_within_tolerance method is a free function taking the object" }, validate_currencies = { js = "attribution.pnlAttributionValidateCurrencies", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::validate_currencies method is a free function taking the object" } }
 
 [parity.members."finstack_quant.calibration.CalibrationEnvelope"]
 renames = { content_hash = { js = "calibration.calibrationEnvelopeContentHash", reason = "WASM envelopes are plain objects; the Rust CalibrationEnvelope::content_hash method is a free function taking the envelope" } }
@@ -2569,6 +2578,7 @@ renames = { values = { js = "features.timeSeriesOpValues", reason = "WASM TimeSe
 
 [parity.members."finstack_quant.scenarios.ApplicationReport"]
 excluded = { carry_to_dataframe = "pandas", changes_to_dataframe = "pandas" }
+renames = { effective_as_of = { js = "scenarios.applicationReportEffectiveAsOf", reason = "WASM application reports are plain objects; the Rust ApplicationReport::effective_as_of method is a free function taking the object" } }
 
 [parity.members."finstack_quant.scenarios.Compounding"]
 excluded = { continuous = "literal", monthly = "literal", quarterly = "literal", semi_annual = "literal", simple = "literal" }
@@ -2627,6 +2637,9 @@ renames = { add_adjustment = { js = "statements.normalizationConfigAddAdjustment
 
 [parity.members."finstack_quant.statements.PikToggleSpec"]
 renames = { validate = { js = "statements.validatePikToggleSpecJson", reason = "WASM specs are plain objects; the Rust PikToggleSpec::validate method runs inside the JSON validation function" } }
+
+[parity.members."finstack_quant.statements.RollupSpec"]
+renames = { default_for = { js = "statements.rollupSpecDefaultFor", reason = "WASM rollup specs are plain objects; the Rust RollupSpec::default_for associated function is a free function" } }
 
 [parity.members."finstack_quant.statements.StatementResult"]
 renames = { rollup = { js = "statements.statementResultRollup", reason = "WASM statement results are plain objects; the Rust StatementResult::rollup method is a free function taking the object" }, get = { js = "statements.statementResultGet", reason = "WASM statement results are plain objects; the Rust StatementResult::get method is a free function taking the object" }, get_money = { js = "statements.statementResultGetMoney", reason = "WASM statement results are plain objects; the Rust StatementResult::get_money method is a free function taking the object" }, get_scalar = { js = "statements.statementResultGetScalar", reason = "WASM statement results are plain objects; the Rust StatementResult::get_scalar method is a free function taking the object" }, get_or = { js = "statements.statementResultGetOr", reason = "WASM statement results are plain objects; the Rust StatementResult::get_or method is a free function taking the object" }, all_periods = { js = "statements.statementResultAllPeriods", reason = "WASM statement results are plain objects; the Rust StatementResult::all_periods method is a free function taking the object" }, get_node = { js = "statements.statementResultGetNode", reason = "WASM statement results are plain objects; the Rust StatementResult::get_node method is a free function taking the object" }, node_ids = { js = "statements.statementResultNodeIds", reason = "WASM statement results are plain objects; the Rust StatementResult node-id accessor is a free function taking the object" }, to_dated_schedule = { js = "statements.nodeToDatedSchedule", reason = "WASM statement results are plain objects; the Rust evaluator::node_to_dated_schedule function is a free function taking the object" }, to_arrow_long = { js = "statements.statementResultToTableLong", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_long returns the TableEnvelope that Python wraps as an Arrow table" }, to_arrow_wide = { js = "statements.statementResultToTableWide", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_wide returns the TableEnvelope that Python wraps as an Arrow table" } }

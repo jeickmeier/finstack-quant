@@ -95,6 +95,7 @@ export function FinstackProvider({
   }, [revision, wasmUrl]);
   return (
     <Context.Provider
+      // finstack-arith: remount revision counter, not a value
       value={{ ...state, reset: () => setRevision((value) => value + 1) }}
     >
       {children}

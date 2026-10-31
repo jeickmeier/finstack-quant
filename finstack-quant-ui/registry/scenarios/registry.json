@@ -173,7 +173,7 @@
       "type": "registry:hook",
       "title": "useHorizonReturn",
       "description": "Computes a priced instrument's horizon total return under a canonical scenario through the WASM worker.",
-      "docs": "scenarios.computeHorizonReturn on the supplied instrument, market, valuation date and ScenarioSpec, then scenarios.horizonResultExplainText. Returns {report, explain}: the native HorizonReport (HorizonResult plus Rust's summary, whose undefined values are null) and its explain text. Omitted method and calendarId, and the config, stay unset so Rust applies its defaults (the default attribution method; a weekends-only roll calendar); an unknown calendar or an attribution failure returns the native error unchanged. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "docs": "scenarios.computeHorizonReturn on the supplied instrument, market, valuation date and ScenarioSpec, then scenarios.horizonResultExplainText and attribution.pnlAttributionPctOfTotalByBucket of its attribution. Returns {report, explain, attributionBuckets}: the native HorizonReport (HorizonResult plus Rust's summary, whose undefined values are null) and its explain text. Omitted method and calendarId, and the config, stay unset so Rust applies its defaults (the default attribution method; a weekends-only roll calendar); an unknown calendar or an attribution failure returns the native error unchanged. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
       "files": [
         {
           "path": "hooks/use-horizon-return/use-horizon-return.ts",

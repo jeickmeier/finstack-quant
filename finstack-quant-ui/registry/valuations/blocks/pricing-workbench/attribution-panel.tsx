@@ -207,9 +207,9 @@ export function AttributionResults({
       ) : (
         <PnlAttributionReport
           attribution={result?.attribution}
+          buckets={result?.buckets}
           explain={result?.explain}
           residualWithinTolerance={result?.residualWithinTolerance}
-          pctOfTotal={result?.pctOfTotal}
           loading={attribution.isFetching}
           error={attribution.error?.message}
           density={density}

@@ -39,13 +39,9 @@ function positionRisk({ positionIds, confidence, source, budget }) {
       budget == null
         ? null
         : envelope(() =>
-            native.evaluateRiskBudget(
-              positionIds,
-              positionIds.map((id) =>
-                native.positionComponentVar(decomposition, id),
-              ),
+            native.evaluateRiskBudgetFromDecomposition(
+              decomposition,
               budget.targets,
-              decomposition.portfolio_var,
               optional(budget.utilizationThreshold),
             ),
           ),

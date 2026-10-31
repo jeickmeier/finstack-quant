@@ -19,6 +19,24 @@ prerequisites and duration.
   present the choices its own controls offer, as `instrument-form` (desk-quote
   and term-sheet tables), the statements workbench (forecast and rollup method
   lists) and `valuation-details` (raw-detail labels) do.
+- Each layer keeps to its job: Rust computes; bindings convert, make one call
+  and map errors; the facade (`finstack-quant-wasm/exports/**`) re-exports, plus
+  plumbing wasm-bindgen cannot express; a worker method makes one native call,
+  with only handle-passing chains and plain maps over user-supplied points; hooks
+  hold query state; components draw. The test for any line of JS: would Python
+  get a different number or decision without this line? If so, it belongs in
+  Rust. Three gates back this and none catches a rule that reads only the request
+  or has no arithmetic in it, so review still applies. `check-worker-compose`
+  (`ui-check`) flags an `if`, `?:`, `??`, loop or `.map`-style iteration in
+  `registry/shared/file/services/**` that reads a native result: move the decision
+  to Rust, and explain pure composition with `// finstack-compose: <reason>` on or
+  directly above the line. `check-no-arithmetic` (`ui-check`) flags arithmetic in
+  `registry/**` and `src/**`; explain mechanics with
+  `// finstack-arith: <reason>` on or directly above the line (`{/* ... */}` among
+  JSX children), or a reasoned glob in `scripts/no-arithmetic-allow.json`, and
+  never allow-list financial logic. `check-exports-boundary` (`wasm-lint`) fails
+  on arithmetic in the facade and on a function with no comment saying what
+  wasm-bindgen cannot express.
 - Never edit the stock shadcn files under `finstack-quant-ui/components/ui/`;
   compose them. Domain components never import `@base-ui/*` (`check-registry`).
 - Colours, fonts, spacing and density come only from the theme tokens in

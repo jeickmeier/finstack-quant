@@ -14,8 +14,7 @@ import { CovenantsPanel } from "./covenants-panel";
 import { RollForwardReview, type EvaluatedModel } from "./roll-forward-review";
 import {
   annualRollupSpecJson,
-  initialRollupMethods,
-  rolledPeriods,
+  hostRollupMethods,
   RollupMethodsEditor,
   type RollupMethod,
 } from "./rollup";
@@ -34,7 +33,10 @@ import {
   useEvaluateStatement,
 } from "@/hooks/statements/use-evaluate-statement/use-evaluate-statement";
 import { useStatementModelValidator } from "@/hooks/statements/use-statement-model-validator/use-statement-model-validator";
-import { useRollupStatement } from "@/hooks/statements/use-rollup-statement/use-rollup-statement";
+import {
+  useDefaultRollupSpec,
+  useRollupStatement,
+} from "@/hooks/statements/use-rollup-statement/use-rollup-statement";
 import { useCreditAssessment } from "@/hooks/statements/use-credit-assessment/use-credit-assessment";
 import { usePlSummaryReport } from "@/hooks/statements/use-pl-summary-report/use-pl-summary-report";
 import { CreditAssessmentReport } from "@/components/finstack/statements/components/credit-assessment-report/credit-assessment-report";
@@ -157,7 +159,7 @@ export function StatementsWorkbench({
   defaultCheckSuiteJson?: string;
   /** Optional native ScenarioSet JSON that seeds the Scenarios tab. */
   defaultScenarioSetJson?: string;
-  /** Optional native RollupSpec JSON whose methods seed the annual view; otherwise methods follow line tags. */
+  /** Optional native RollupSpec JSON whose methods seed the annual view; otherwise the methods the model declares do. */
   defaultRollupSpecJson?: string;
   /** Optional native CovenantEngine JSON that seeds the Covenants tab and is tested on open. */
   defaultCovenantEngineJson?: string;
@@ -244,6 +246,7 @@ export function StatementsWorkbench({
           ];
         });
         setRequest(next);
+        // finstack-arith: remount revision counter, not a value
         setRevision((value) => value + 1);
         onModelAccepted?.(canonical);
         return null;
@@ -296,17 +299,29 @@ export function StatementsWorkbench({
     string,
     RollupMethod
   > | null>(null);
-  const methods = useMemo(() => {
-    if (rollupMethods) return rollupMethods;
-    if (!model) return {};
+  const hostRollup = useMemo(() => {
+    if (defaultRollupSpecJson === undefined) return null;
     try {
-      return initialRollupMethods(model, defaultRollupSpecJson);
-    } catch {
-      return {};
+      return { methods: hostRollupMethods(defaultRollupSpecJson), error: null };
+    } catch (error) {
+      return {
+        methods: null,
+        error: `Default rollup spec: ${(error as Error).message}`,
+      };
     }
-  }, [rollupMethods, model, defaultRollupSpecJson]);
+  }, [defaultRollupSpecJson]);
+  const defaultRollup = useDefaultRollupSpec(
+    periodView === "annual" && request && !hostRollup
+      ? { modelJson: request.modelJson, frequency: "annual" }
+      : null,
+  );
+  /** The analyst's edits, else the host's spec, else the native default. Null until known. */
+  const methods =
+    rollupMethods ??
+    hostRollup?.methods ??
+    (defaultRollup.data ? { ...defaultRollup.data.methods } : null);
   const rollupRequest: StatementRollupRequest | null =
-    periodView === "annual" && request && resultJson
+    periodView === "annual" && request && resultJson && methods
       ? {
           modelJson: request.modelJson,
           resultsJson: resultJson,
@@ -314,11 +329,16 @@ export function StatementsWorkbench({
         }
       : null;
   const rollup = useRollupStatement(rollupRequest);
+  const rollupError =
+    hostRollup?.error ??
+    defaultRollup.error?.message ??
+    rollup.error?.message ??
+    null;
   const annual = useMemo(
     () =>
       model && rollup.data
         ? {
-            model: { ...model, periods: rolledPeriods(model, rollup.data) },
+            model: { ...model, periods: rollup.data.periods },
             result: rollup.data,
           }
         : null,
@@ -704,7 +724,7 @@ export function StatementsWorkbench({
                     ? "Select a period above to review it. Click a reported or forecast value to edit in exact units; calculated lines update from their drivers."
                     : "Annual values are rolled up natively from the reported periods. Switch to Reported to edit values."}
                 </p>
-                {!reported && (
+                {!reported && methods && (
                   <RollupMethodsEditor
                     model={model}
                     nodeIds={
@@ -714,15 +734,15 @@ export function StatementsWorkbench({
                     onChange={setRollupMethods}
                   />
                 )}
-                {!reported && rollup.error && (
+                {!reported && rollupError && (
                   <p
                     role="alert"
                     className="rounded-md border border-error p-3 text-sm text-error"
                   >
-                    {rollup.error.message}
+                    {rollupError}
                   </p>
                 )}
-                {!view && !rollup.error && (
+                {!view && !rollupError && (
                   <p className="text-sm text-muted-foreground" role="status">
                     Rolling up to annual periods…
                   </p>
@@ -955,8 +975,7 @@ export function StatementsWorkbench({
                         className="text-sm text-muted-foreground"
                         role="status"
                       >
-                        {rollup.error?.message ??
-                          "Rolling up to annual periods…"}
+                        {rollupError ?? "Rolling up to annual periods…"}
                       </p>
                     )}
                     <div className="rounded-lg border border-border bg-card p-4">

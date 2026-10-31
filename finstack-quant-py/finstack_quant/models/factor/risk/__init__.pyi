@@ -18,6 +18,7 @@ from finstack_quant.models.factor.risk._budget import (
     PositionBudgetEntry as PositionBudgetEntry,
     RiskBudgetResult as RiskBudgetResult,
     evaluate_risk_budget as evaluate_risk_budget,
+    evaluate_risk_budget_from_decomposition as evaluate_risk_budget_from_decomposition,
 )
 from finstack_quant.models.factor.risk._contributions import (
     FactorContribution as FactorContribution,
@@ -52,6 +53,7 @@ __all__ = [
     "build_stress_attribution",
     "decompose_factors",
     "evaluate_risk_budget",
+    "evaluate_risk_budget_from_decomposition",
     "historical_var_decomposition",
     "parametric_var_decomposition",
     "position_component_var",

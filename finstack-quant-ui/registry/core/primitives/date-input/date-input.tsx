@@ -48,6 +48,7 @@ export function DateInput({
   };
   const selected = parse(value);
   const iso = (date: Date) =>
+    // finstack-arith: JS Date months are 0-based; builds ISO text for the picker
     `${String(date.getUTCFullYear()).padStart(4, "0")}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
   const range = [
     ...(min ? [{ before: parse(min)! }] : []),

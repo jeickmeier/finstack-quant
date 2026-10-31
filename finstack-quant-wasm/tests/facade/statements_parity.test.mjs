@@ -44,11 +44,13 @@ function builtModel() {
     [Q1]: { amount: '100', currency: 'USD' },
     [Q2]: { amount: '110', currency: 'USD' },
   });
+  builder.rollup('cash', 'period_end');
   builder.withMeta('currency', 'USD');
   const mixed = builder.mixed('capex');
   mixed.values({ [Q1]: 10.0 });
   mixed.formula('revenue * 0.1');
   mixed.name('Capex');
+  mixed.rollup('formula');
   const ready = mixed.build();
   return ready.build();
 }
@@ -85,7 +87,28 @@ test('statements matches the cross-host golden', () => {
   const registry = statements.Registry.withBuiltins();
   const first = registry.metricIds()[0];
 
+  const rollupSpec = statements.rollupSpecDefaultFor(INPUTS.rollup_model, 'annual');
+
+  const rolledUp = statements.statementResultRollup(
+    evaluate(INPUTS.rollup_model),
+    INPUTS.rollup_model,
+    rollupSpec
+  );
+
   const actual = {
+    'rollup.default_for': rollupSpec,
+    'rollup.annual': rolledUp.nodes,
+    'rollup.empty_spec': statements.statementResultRollup(
+      evaluate(INPUTS.rollup_model),
+      INPUTS.rollup_model,
+      { frequency: 'annual' }
+    ).nodes,
+    'rollup.spec_overrides': statements.statementResultRollup(
+      evaluate(INPUTS.rollup_model),
+      INPUTS.rollup_model,
+      { frequency: 'annual', methods: { cash: 'sum' } }
+    ).nodes.cash,
+    'rollup.periods': rolledUp.periods,
     'result.get': orNull(statements.statementResultGet(result, 'profit', Q2)),
     'result.get_missing': orNull(statements.statementResultGet(result, 'nope', Q2)),
     'result.get_or': statements.statementResultGetOr(result, 'nope', Q2, -1.0),
@@ -402,6 +425,28 @@ test('MixedNodeBuilder.valuesMoney and forecast feed the mixed node', () => {
     () => mixed.name('again'),
     (e) => e.kind === 'validation' && /consumed/.test(e.message)
   );
+});
+
+test('builder lines roll up with their declared method under an empty spec', () => {
+  const quarters = { '2025Q1': 10, '2025Q2': 20, '2025Q3': 30, '2025Q4': 40 };
+  const builder = new statements.ModelBuilder('declared');
+  builder.periods('2025Q1..Q4');
+  builder.value('flow', quarters);
+  builder.value('balance', quarters);
+  builder.rollup('balance', 'period_end');
+  assert.throws(
+    () => builder.rollup('ghost', 'sum'),
+    (e) => e.kind === 'validation' && /ghost/.test(e.message)
+  );
+  const mixed = builder.mixed('mixed_balance');
+  mixed.values(quarters);
+  mixed.rollup('period_end');
+  const model = mixed.build().build();
+  assert.equal(model.nodes.mixed_balance.rollup, 'period_end');
+  const annual = statements.statementResultRollup(evaluate(model), model, { frequency: 'annual' });
+  assert.equal(annual.nodes.flow['2025'], 100);
+  assert.equal(annual.nodes.balance['2025'], 40);
+  assert.equal(annual.nodes.mixed_balance['2025'], 40);
 });
 
 test('Evaluator.evaluateWithMarket and evaluateMonteCarlo keep their Rust twins', () => {

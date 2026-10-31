@@ -894,6 +894,7 @@ impl Evaluator {
         meta: EvalStats,
     ) -> Result<()> {
         results.meta = meta;
+        results.periods = model.periods.clone();
         results.populate_value_types(&prepared.node_value_types);
         if let Some(suite) = &self.check_suite {
             results.check_report = Some(suite.run(model, results)?);

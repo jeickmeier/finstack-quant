@@ -538,8 +538,8 @@
       "name": "use-merton-report",
       "type": "registry:hook",
       "title": "useMertonReport",
-      "description": "Builds a native models.credit.MertonModel report graded on the default PD master scale through the WASM worker.",
-      "docs": "models.credit.MertonModel.fromJson of canonical MertonModel JSON, or MertonModel.kmvDefaultPoint(shortTermDebt, longTermDebt) then fromEquity with it as total debt; then defaultProbabilities over the horizons, distanceToDefault, impliedSpread(horizon, recovery) and debtSpread per horizon, cdsParSpread(maturity, recovery), impliedEquity(maturity), toJson, and models.credit.pd.MasterScale.defaultCalibration().mapPds of the default probabilities. A measure Rust rejects for the model keeps its native error beside the rest of the report. Both handles are freed. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "description": "Runs native models.credit.mertonReport, graded on the default PD master scale, through the WASM worker.",
+      "docs": "models.credit.mertonReport: one native call taking a MertonReportRequest (canonical MertonModel JSON, or an equity source Rust calibrates to the KMV default point) and returning the full MertonReport, graded on the default PD master scale. A measure Rust rejects for the model carries its message beside the rest; a rejected request is the hook error.",
       "files": [
         {
           "path": "hooks/use-merton-report/use-merton-report.ts",
@@ -617,7 +617,7 @@
       "type": "registry:hook",
       "title": "usePositionRisk",
       "description": "Decomposes position VaR and ES with native models.factor.risk, evaluates a risk budget and attributes tail stress through the WASM worker.",
-      "docs": "models.factor.risk.parametricVarDecomposition(positionIds, weights, covariance, confidence, computeIncremental) or historicalVarDecomposition(positionIds, pnls, confidence); then, when a budget is requested, evaluateRiskBudget over positionComponentVar of each position, the targets and the returned portfolio VaR; and, for a historical source, buildStressAttribution of the same P&L. Omitted confidence, incremental flag and utilization threshold are left to Rust. The budget and stress attribution keep their own native errors beside the decomposition. Keyed on the complete request (non-finite values stay distinct) and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "docs": "models.factor.risk.parametricVarDecomposition(positionIds, weights, covariance, confidence, computeIncremental) or historicalVarDecomposition(positionIds, pnls, confidence); then, when a budget is requested, evaluateRiskBudgetFromDecomposition over the decomposition and the targets; and, for a historical source, buildStressAttribution of the same P&L. Omitted confidence, incremental flag and utilization threshold are left to Rust. The budget and stress attribution keep their own native errors beside the decomposition. Keyed on the complete request (non-finite values stay distinct) and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
       "files": [
         {
           "path": "hooks/use-position-risk/use-position-risk.ts",

@@ -118,6 +118,7 @@
         "key": "ytm",
         "metric": "ytm",
         "components": [],
+        "coordinates": [],
         "unit": "decimal",
         "group": "Pricing",
         "bucketed": false
@@ -126,6 +127,7 @@
         "key": "dv01",
         "metric": "dv01",
         "components": [],
+        "coordinates": [],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": false
@@ -134,6 +136,7 @@
         "key": "duration_mod",
         "metric": "duration_mod",
         "components": [],
+        "coordinates": [],
         "unit": "years",
         "group": "Pricing",
         "bucketed": false
@@ -142,6 +145,7 @@
         "key": "bucketed_dv01",
         "metric": "bucketed_dv01",
         "components": [],
+        "coordinates": [],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": false
@@ -150,6 +154,16 @@
         "key": "bucketed_dv01::USD-OIS::10y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "10y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 10
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -158,6 +172,16 @@
         "key": "bucketed_dv01::USD-OIS::15y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "15y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 15
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -166,6 +190,16 @@
         "key": "bucketed_dv01::USD-OIS::1y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "1y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 1
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -174,6 +208,16 @@
         "key": "bucketed_dv01::USD-OIS::20y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "20y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 20
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -182,6 +226,16 @@
         "key": "bucketed_dv01::USD-OIS::2y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "2y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 2
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -190,6 +244,16 @@
         "key": "bucketed_dv01::USD-OIS::30y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "30y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 30
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -198,6 +262,16 @@
         "key": "bucketed_dv01::USD-OIS::3m",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "3m"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 0.25
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -206,6 +280,16 @@
         "key": "bucketed_dv01::USD-OIS::3y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "3y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 3
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -214,6 +298,16 @@
         "key": "bucketed_dv01::USD-OIS::5y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "5y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 5
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -222,6 +316,16 @@
         "key": "bucketed_dv01::USD-OIS::6m",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "6m"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 0.5
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -230,6 +334,16 @@
         "key": "bucketed_dv01::USD-OIS::7y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "7y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 7
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -240,6 +354,7 @@
         "key": "ytm",
         "metric": "ytm",
         "components": [],
+        "coordinates": [],
         "unit": "decimal",
         "group": "Pricing",
         "bucketed": false
@@ -248,6 +363,16 @@
         "key": "bucketed_cs01::SYNTHETIC-CREDIT::1y",
         "metric": "bucketed_cs01",
         "components": ["SYNTHETIC-CREDIT", "1y"],
+        "coordinates": [
+          {
+            "group": "SYNTHETIC-CREDIT",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 1
+          }
+        ],
         "unit": "currency",
         "group": "Credit",
         "bucketed": true
@@ -256,6 +381,16 @@
         "key": "bucketed_cs01::SYNTHETIC-CREDIT::3y",
         "metric": "bucketed_cs01",
         "components": ["SYNTHETIC-CREDIT", "3y"],
+        "coordinates": [
+          {
+            "group": "SYNTHETIC-CREDIT",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 3
+          }
+        ],
         "unit": "currency",
         "group": "Credit",
         "bucketed": true
@@ -264,6 +399,16 @@
         "key": "bucketed_cs01::SYNTHETIC-CREDIT::5y",
         "metric": "bucketed_cs01",
         "components": ["SYNTHETIC-CREDIT", "5y"],
+        "coordinates": [
+          {
+            "group": "SYNTHETIC-CREDIT",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 5
+          }
+        ],
         "unit": "currency",
         "group": "Credit",
         "bucketed": true
@@ -272,6 +417,16 @@
         "key": "bucketed_cs01::SYNTHETIC-OTHER::1y",
         "metric": "bucketed_cs01",
         "components": ["SYNTHETIC-OTHER", "1y"],
+        "coordinates": [
+          {
+            "group": "SYNTHETIC-OTHER",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 1
+          }
+        ],
         "unit": "currency",
         "group": "Credit",
         "bucketed": true
@@ -280,6 +435,16 @@
         "key": "bucketed_dv01::USD-OIS::30y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "30y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 30
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -288,6 +453,16 @@
         "key": "bucketed_dv01::USD-OIS::10y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "10y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 10
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -12795,6 +12970,141 @@
               }
             }
           },
+          "metricUnits": {
+            "value": [
+              {
+                "field": "pv",
+                "label": "USD",
+                "source": "valuations::TrancheMetrics::pv"
+              },
+              {
+                "field": "clean_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::clean_price_pct"
+              },
+              {
+                "field": "dirty_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::dirty_price_pct"
+              },
+              {
+                "field": "accrued",
+                "label": "USD",
+                "source": "valuations::TrancheMetrics::accrued"
+              },
+              {
+                "field": "factor",
+                "label": "current / original balance",
+                "source": "valuations::TrancheMetrics::factor"
+              },
+              {
+                "field": "wal",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::wal"
+              },
+              {
+                "field": "ytm",
+                "label": "decimal",
+                "source": "valuations::TrancheMetrics::ytm"
+              },
+              {
+                "field": "z_spread_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::z_spread_bp"
+              },
+              {
+                "field": "cs01",
+                "label": "USD per bp",
+                "source": "valuations::TrancheMetrics::cs01"
+              },
+              {
+                "field": "spread_duration",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::spread_duration"
+              },
+              {
+                "field": "spread_convexity",
+                "label": "years²",
+                "source": "valuations::TrancheMetrics::spread_convexity"
+              },
+              {
+                "field": "effective_duration",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::effective_duration"
+              },
+              {
+                "field": "effective_convexity",
+                "label": "years²",
+                "source": "valuations::TrancheMetrics::effective_convexity"
+              },
+              {
+                "field": "target_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::target_price_pct"
+              },
+              {
+                "field": "wal_to_call",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::wal_to_call"
+              },
+              {
+                "field": "z_spread_to_call_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::z_spread_to_call_bp"
+              },
+              {
+                "field": "dm_to_call_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::dm_to_call_bp"
+              },
+              {
+                "field": "dm_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::dm_bp"
+              }
+            ]
+          },
+          "solveUnits": {
+            "value": {
+              "breakeven_cdr": {
+                "field": "breakeven_cdr",
+                "label": "decimal",
+                "source": "valuations::tranche_breakeven_cdr"
+              },
+              "discount_margin": {
+                "field": "discount_margin",
+                "label": "decimal",
+                "source": "valuations::tranche_discount_margin"
+              },
+              "oas": [
+                {
+                  "field": "oas",
+                  "label": "decimal",
+                  "source": "valuations::OasResult::oas"
+                },
+                {
+                  "field": "model_price",
+                  "label": "% of current balance",
+                  "source": "valuations::OasResult::model_price"
+                },
+                {
+                  "field": "market_price",
+                  "label": "% of current balance",
+                  "source": "valuations::OasResult::market_price"
+                },
+                {
+                  "field": "num_paths",
+                  "label": "paths",
+                  "source": "valuations::OasResult::num_paths"
+                },
+                {
+                  "field": "price_std_error",
+                  "label": "% of current balance",
+                  "source": "valuations::OasResult::price_std_error"
+                }
+              ]
+            }
+          },
           "breakevenCdr": {
             "value": 0.00006103515625
           },
@@ -13556,6 +13866,141 @@
               }
             }
           },
+          "metricUnits": {
+            "value": [
+              {
+                "field": "pv",
+                "label": "USD",
+                "source": "valuations::TrancheMetrics::pv"
+              },
+              {
+                "field": "clean_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::clean_price_pct"
+              },
+              {
+                "field": "dirty_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::dirty_price_pct"
+              },
+              {
+                "field": "accrued",
+                "label": "USD",
+                "source": "valuations::TrancheMetrics::accrued"
+              },
+              {
+                "field": "factor",
+                "label": "current / original balance",
+                "source": "valuations::TrancheMetrics::factor"
+              },
+              {
+                "field": "wal",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::wal"
+              },
+              {
+                "field": "ytm",
+                "label": "decimal",
+                "source": "valuations::TrancheMetrics::ytm"
+              },
+              {
+                "field": "z_spread_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::z_spread_bp"
+              },
+              {
+                "field": "cs01",
+                "label": "USD per bp",
+                "source": "valuations::TrancheMetrics::cs01"
+              },
+              {
+                "field": "spread_duration",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::spread_duration"
+              },
+              {
+                "field": "spread_convexity",
+                "label": "years²",
+                "source": "valuations::TrancheMetrics::spread_convexity"
+              },
+              {
+                "field": "effective_duration",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::effective_duration"
+              },
+              {
+                "field": "effective_convexity",
+                "label": "years²",
+                "source": "valuations::TrancheMetrics::effective_convexity"
+              },
+              {
+                "field": "target_price_pct",
+                "label": "% of current balance",
+                "source": "valuations::TrancheMetrics::target_price_pct"
+              },
+              {
+                "field": "wal_to_call",
+                "label": "years",
+                "source": "valuations::TrancheMetrics::wal_to_call"
+              },
+              {
+                "field": "z_spread_to_call_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::z_spread_to_call_bp"
+              },
+              {
+                "field": "dm_to_call_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::dm_to_call_bp"
+              },
+              {
+                "field": "dm_bp",
+                "label": "bp",
+                "source": "valuations::TrancheMetrics::dm_bp"
+              }
+            ]
+          },
+          "solveUnits": {
+            "value": {
+              "breakeven_cdr": {
+                "field": "breakeven_cdr",
+                "label": "decimal",
+                "source": "valuations::tranche_breakeven_cdr"
+              },
+              "discount_margin": {
+                "field": "discount_margin",
+                "label": "decimal",
+                "source": "valuations::tranche_discount_margin"
+              },
+              "oas": [
+                {
+                  "field": "oas",
+                  "label": "decimal",
+                  "source": "valuations::OasResult::oas"
+                },
+                {
+                  "field": "model_price",
+                  "label": "% of current balance",
+                  "source": "valuations::OasResult::model_price"
+                },
+                {
+                  "field": "market_price",
+                  "label": "% of current balance",
+                  "source": "valuations::OasResult::market_price"
+                },
+                {
+                  "field": "num_paths",
+                  "label": "paths",
+                  "source": "valuations::OasResult::num_paths"
+                },
+                {
+                  "field": "price_std_error",
+                  "label": "% of current balance",
+                  "source": "valuations::OasResult::price_std_error"
+                }
+              ]
+            }
+          },
           "breakevenCdr": {
             "value": 0
           },
@@ -13580,7 +14025,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "5357646f8195d31e31fd0cb07bdb7b691583b9bb5e85ab343c47b18437c2aacf"
+        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_swap.json",
@@ -14577,7 +15022,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "5357646f8195d31e31fd0cb07bdb7b691583b9bb5e85ab343c47b18437c2aacf"
+        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
       }
     ],
     "base": {
@@ -14722,6 +15167,7 @@
             "key": "ytm",
             "metric": "ytm",
             "components": [],
+            "coordinates": [],
             "unit": "decimal",
             "group": "Pricing",
             "bucketed": false
@@ -14730,6 +15176,7 @@
             "key": "dv01",
             "metric": "dv01",
             "components": [],
+            "coordinates": [],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": false
@@ -14738,6 +15185,7 @@
             "key": "duration_mod",
             "metric": "duration_mod",
             "components": [],
+            "coordinates": [],
             "unit": "years",
             "group": "Pricing",
             "bucketed": false
@@ -14746,6 +15194,7 @@
             "key": "bucketed_dv01",
             "metric": "bucketed_dv01",
             "components": [],
+            "coordinates": [],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": false
@@ -14754,6 +15203,16 @@
             "key": "bucketed_dv01::USD-OIS::10y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "10y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 10
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -14762,6 +15221,16 @@
             "key": "bucketed_dv01::USD-OIS::15y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "15y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 15
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -14770,6 +15239,16 @@
             "key": "bucketed_dv01::USD-OIS::1y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "1y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 1
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -14778,6 +15257,16 @@
             "key": "bucketed_dv01::USD-OIS::20y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "20y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 20
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -14786,6 +15275,16 @@
             "key": "bucketed_dv01::USD-OIS::2y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "2y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 2
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -14794,6 +15293,16 @@
             "key": "bucketed_dv01::USD-OIS::30y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "30y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 30
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -14802,6 +15311,16 @@
             "key": "bucketed_dv01::USD-OIS::3m",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "3m"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 0.25
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -14810,6 +15329,16 @@
             "key": "bucketed_dv01::USD-OIS::3y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "3y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 3
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -14818,6 +15347,16 @@
             "key": "bucketed_dv01::USD-OIS::5y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "5y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 5
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -14826,6 +15365,16 @@
             "key": "bucketed_dv01::USD-OIS::6m",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "6m"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 0.5
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -14834,6 +15383,16 @@
             "key": "bucketed_dv01::USD-OIS::7y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "7y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 7
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15000,6 +15559,7 @@
             "key": "ytm",
             "metric": "ytm",
             "components": [],
+            "coordinates": [],
             "unit": "decimal",
             "group": "Pricing",
             "bucketed": false
@@ -15008,6 +15568,7 @@
             "key": "dv01",
             "metric": "dv01",
             "components": [],
+            "coordinates": [],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": false
@@ -15016,6 +15577,7 @@
             "key": "duration_mod",
             "metric": "duration_mod",
             "components": [],
+            "coordinates": [],
             "unit": "years",
             "group": "Pricing",
             "bucketed": false
@@ -15024,6 +15586,7 @@
             "key": "bucketed_dv01",
             "metric": "bucketed_dv01",
             "components": [],
+            "coordinates": [],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": false
@@ -15032,6 +15595,16 @@
             "key": "bucketed_dv01::USD-OIS::10y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "10y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 10
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15040,6 +15613,16 @@
             "key": "bucketed_dv01::USD-OIS::15y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "15y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 15
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15048,6 +15631,16 @@
             "key": "bucketed_dv01::USD-OIS::1y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "1y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 1
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15056,6 +15649,16 @@
             "key": "bucketed_dv01::USD-OIS::20y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "20y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 20
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15064,6 +15667,16 @@
             "key": "bucketed_dv01::USD-OIS::2y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "2y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 2
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15072,6 +15685,16 @@
             "key": "bucketed_dv01::USD-OIS::30y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "30y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 30
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15080,6 +15703,16 @@
             "key": "bucketed_dv01::USD-OIS::3m",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "3m"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 0.25
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15088,6 +15721,16 @@
             "key": "bucketed_dv01::USD-OIS::3y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "3y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 3
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15096,6 +15739,16 @@
             "key": "bucketed_dv01::USD-OIS::5y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "5y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 5
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15104,6 +15757,16 @@
             "key": "bucketed_dv01::USD-OIS::6m",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "6m"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 0.5
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15112,6 +15775,16 @@
             "key": "bucketed_dv01::USD-OIS::7y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "7y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 7
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15258,6 +15931,7 @@
             "key": "ytm",
             "metric": "ytm",
             "components": [],
+            "coordinates": [],
             "unit": "decimal",
             "group": "Pricing",
             "bucketed": false
@@ -15266,6 +15940,7 @@
             "key": "dv01",
             "metric": "dv01",
             "components": [],
+            "coordinates": [],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": false
@@ -15274,6 +15949,7 @@
             "key": "duration_mod",
             "metric": "duration_mod",
             "components": [],
+            "coordinates": [],
             "unit": "years",
             "group": "Pricing",
             "bucketed": false
@@ -15282,6 +15958,7 @@
             "key": "bucketed_dv01",
             "metric": "bucketed_dv01",
             "components": [],
+            "coordinates": [],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": false
@@ -15290,6 +15967,16 @@
             "key": "bucketed_dv01::USD-OIS::10y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "10y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 10
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15298,6 +15985,16 @@
             "key": "bucketed_dv01::USD-OIS::15y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "15y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 15
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15306,6 +16003,16 @@
             "key": "bucketed_dv01::USD-OIS::1y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "1y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 1
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15314,6 +16021,16 @@
             "key": "bucketed_dv01::USD-OIS::20y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "20y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 20
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15322,6 +16039,16 @@
             "key": "bucketed_dv01::USD-OIS::2y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "2y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 2
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15330,6 +16057,16 @@
             "key": "bucketed_dv01::USD-OIS::30y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "30y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 30
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15338,6 +16075,16 @@
             "key": "bucketed_dv01::USD-OIS::3m",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "3m"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 0.25
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15346,6 +16093,16 @@
             "key": "bucketed_dv01::USD-OIS::3y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "3y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 3
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15354,6 +16111,16 @@
             "key": "bucketed_dv01::USD-OIS::5y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "5y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 5
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15362,6 +16129,16 @@
             "key": "bucketed_dv01::USD-OIS::6m",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "6m"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 0.5
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15370,6 +16147,16 @@
             "key": "bucketed_dv01::USD-OIS::7y",
             "metric": "bucketed_dv01",
             "components": ["USD-OIS", "7y"],
+            "coordinates": [
+              {
+                "group": "USD-OIS",
+                "value": null
+              },
+              {
+                "group": "",
+                "value": 7
+              }
+            ],
             "unit": "currency",
             "group": "Sensitivity",
             "bucketed": true
@@ -15379,11 +16166,11 @@
     ]
   },
   "horizonReturn": {
-    "description": "Native horizon total returns of the results-fixture bond: the Rust-built spec, scenarios.computeHorizonReturn (omitted method, config and calendar left to Rust) and horizonResultExplainText, or the native error.",
+    "description": "Native horizon total returns of the results-fixture bond: the Rust-built spec, scenarios.computeHorizonReturn (omitted method, config and calendar left to Rust) horizonResultExplainText and pnlAttributionPctOfTotalByBucket, or the native error.",
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "5357646f8195d31e31fd0cb07bdb7b691583b9bb5e85ab343c47b18437c2aacf"
+        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
       }
     ],
     "base": {
@@ -15625,7 +16412,105 @@
             }
           }
         },
-        "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3730.75\n  Credit: USD 0.00\n  Residual: USD 0.00\n"
+        "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3730.75\n  Credit: USD 0.00\n  Residual: USD 0.00\n",
+        "attributionBuckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "12654.157529919",
+              "currency": "USD"
+            },
+            "pct_of_total": 141.80852777893284
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "-3730.746696937",
+              "currency": "USD"
+            },
+            "pct_of_total": -41.80852777894405
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0.000000001",
+              "currency": "USD"
+            },
+            "pct_of_total": 1.1206477194838633e-11
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          }
+        ]
       },
       {
         "name": "usd-ois-50bp",
@@ -15840,7 +16725,105 @@
             }
           }
         },
-        "explain": "Horizon Total Return: -0.4935%\nInitial Value: USD 992091.57\nTerminal Value: USD 987195.91\nTotal P&L: USD -4895.66\n  Carry: USD 0.00\n  Rates: USD -4895.66\n  Credit: USD 0.00\n  Residual: USD 0.00\n"
+        "explain": "Horizon Total Return: -0.4935%\nInitial Value: USD 992091.57\nTerminal Value: USD 987195.91\nTotal P&L: USD -4895.66\n  Carry: USD 0.00\n  Rates: USD -4895.66\n  Credit: USD 0.00\n  Residual: USD 0.00\n",
+        "attributionBuckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "-4895.657693227",
+              "currency": "USD"
+            },
+            "pct_of_total": 100
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          }
+        ]
       },
       {
         "name": "roll-3m-50bp-taylor",
@@ -16187,7 +17170,105 @@
             }
           }
         },
-        "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3818.58\n  Credit: USD 0.00\n  Residual: USD 87.83\n"
+        "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3818.58\n  Credit: USD 0.00\n  Residual: USD 87.83\n",
+        "attributionBuckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "12654.15752991894",
+              "currency": "USD"
+            },
+            "pct_of_total": 141.8085277789322
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "-3818.581617124459",
+              "currency": "USD"
+            },
+            "pct_of_total": -42.79284780893528
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "87.834920188519",
+              "currency": "USD"
+            },
+            "pct_of_total": 0.9843200300031097
+          }
+        ]
       },
       {
         "name": "roll-3m-50bp-metrics-based",
@@ -16520,7 +17601,105 @@
             }
           }
         },
-        "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3808.02\n  Credit: USD 0.00\n  Residual: USD 77.27\n"
+        "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3808.02\n  Credit: USD 0.00\n  Residual: USD 77.27\n",
+        "attributionBuckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "12654.15752991999",
+              "currency": "USD"
+            },
+            "pct_of_total": 141.80852777894395
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "-3808.019346859281",
+              "currency": "USD"
+            },
+            "pct_of_total": -42.67448196808284
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "77.272649922291",
+              "currency": "USD"
+            },
+            "pct_of_total": 0.8659541891389033
+          }
+        ]
       }
     ]
   },
@@ -16529,7 +17708,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "5357646f8195d31e31fd0cb07bdb7b691583b9bb5e85ab343c47b18437c2aacf"
+        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
       }
     ],
     "asOf": "2025-01-01",
@@ -16836,11 +18015,11 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "5357646f8195d31e31fd0cb07bdb7b691583b9bb5e85ab343c47b18437c2aacf"
+        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
       },
       {
         "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
-        "sha256": "2df669e995742cd83fa991c28adff9ea992532594fcf3911aa3bd54ed83ad0c9"
+        "sha256": "b3b41dfa2022f36d14f3aa0dd80904a33eb2485abf34113a7965e9a8bf851200"
       }
     ],
     "cases": [
@@ -16966,20 +18145,104 @@
         },
         "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Coupon Income: USD 0.14\n  │   ├─ Roll-Down: USD -1000.04\n  ├─ Credit Curves: USD -60.52 (5.7%)\n  └─ Residual: USD 0.00 (-0.0%)",
         "residualWithinTolerance": true,
-        "pctOfTotal": {
-          "carry": 94.29259396162338,
-          "rates_curves_pnl": 0,
-          "credit_curves_pnl": 5.707406038376626,
-          "inflation_curves_pnl": 0,
-          "correlations_pnl": 0,
-          "fx_pnl": 0,
-          "fx_translation_pnl": 0,
-          "vol_pnl": 0,
-          "cross_factor_pnl": 0,
-          "model_params_pnl": 0,
-          "market_scalars_pnl": 0,
-          "residual": 0
-        }
+        "buckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "-999.899955113005",
+              "currency": "USD"
+            },
+            "pct_of_total": 94.29259396162338
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "0.000000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "-60.522622210469",
+              "currency": "USD"
+            },
+            "pct_of_total": 5.707406038376626
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0.000000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0.000000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0.000000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "0.000000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          }
+        ]
       },
       {
         "name": "waterfall",
@@ -17280,20 +18543,104 @@
         },
         "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Coupon Income: USD 0.14\n  │   ├─ Roll-Down: USD -1000.04\n  ├─ Credit Curves: USD -60.52 (5.7%)\n  └─ Residual: USD 0.00 (-0.0%)",
         "residualWithinTolerance": true,
-        "pctOfTotal": {
-          "carry": 94.29259396162338,
-          "rates_curves_pnl": 0,
-          "credit_curves_pnl": 5.707406038376626,
-          "inflation_curves_pnl": 0,
-          "correlations_pnl": 0,
-          "fx_pnl": 0,
-          "fx_translation_pnl": 0,
-          "vol_pnl": 0,
-          "cross_factor_pnl": 0,
-          "model_params_pnl": 0,
-          "market_scalars_pnl": 0,
-          "residual": 0
-        }
+        "buckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "-999.899955113005",
+              "currency": "USD"
+            },
+            "pct_of_total": 94.29259396162338
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "0.000000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "-60.522622210469",
+              "currency": "USD"
+            },
+            "pct_of_total": 5.707406038376626
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0.000000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0.000000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0.000000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0.000000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "0.000000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          }
+        ]
       },
       {
         "name": "metrics_based",
@@ -17601,20 +18948,104 @@
         },
         "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Roll-Down: USD -999.90\n  ├─ Credit Curves: USD -63.50 (6.0%)\n  └─ Residual: USD 2.98 (-0.3%)",
         "residualWithinTolerance": true,
-        "pctOfTotal": {
-          "carry": 94.29259396162338,
-          "rates_curves_pnl": 0,
-          "credit_curves_pnl": 5.988612862506802,
-          "inflation_curves_pnl": 0,
-          "correlations_pnl": 0,
-          "fx_pnl": 0,
-          "fx_translation_pnl": 0,
-          "vol_pnl": 0,
-          "cross_factor_pnl": 0,
-          "model_params_pnl": 0,
-          "market_scalars_pnl": 0,
-          "residual": -0.28120682413017595
-        }
+        "buckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "-999.899955113005",
+              "currency": "USD"
+            },
+            "pct_of_total": 94.29259396162338
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "-63.5046028625197",
+              "currency": "USD"
+            },
+            "pct_of_total": 5.988612862506802
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "2.9819806520507",
+              "currency": "USD"
+            },
+            "pct_of_total": -0.28120682413017595
+          }
+        ]
       },
       {
         "name": "taylor",
@@ -17942,20 +19373,104 @@
         },
         "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Coupon Income: USD 0.00\n  │   ├─ Roll-Down: USD -999.90\n  ├─ Credit Curves: USD -63.50 (6.0%)\n  └─ Residual: USD 2.98 (-0.3%)",
         "residualWithinTolerance": true,
-        "pctOfTotal": {
-          "carry": 94.29259396162338,
-          "rates_curves_pnl": 0,
-          "credit_curves_pnl": 5.988612862506802,
-          "inflation_curves_pnl": 0,
-          "correlations_pnl": 0,
-          "fx_pnl": 0,
-          "fx_translation_pnl": 0,
-          "vol_pnl": 0,
-          "cross_factor_pnl": 0,
-          "model_params_pnl": 0,
-          "market_scalars_pnl": 0,
-          "residual": -0.28120682413017917
-        }
+        "buckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "-999.8999551130050349",
+              "currency": "USD"
+            },
+            "pct_of_total": 94.29259396162338
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "-63.5046028625197",
+              "currency": "USD"
+            },
+            "pct_of_total": 5.988612862506802
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "2.9819806520507349",
+              "currency": "USD"
+            },
+            "pct_of_total": -0.28120682413017917
+          }
+        ]
       }
     ],
     "workbench": [
@@ -18087,20 +19602,104 @@
         },
         "explain": "Total P&L: USD -4895.66\n  ├─ Rates Curves: USD -4895.66 (100.0%)\n  └─ Residual: USD 0.00 (-0.0%)",
         "residualWithinTolerance": true,
-        "pctOfTotal": {
-          "carry": 0,
-          "rates_curves_pnl": 100,
-          "credit_curves_pnl": 0,
-          "inflation_curves_pnl": 0,
-          "correlations_pnl": 0,
-          "fx_pnl": 0,
-          "fx_translation_pnl": 0,
-          "vol_pnl": 0,
-          "cross_factor_pnl": 0,
-          "model_params_pnl": 0,
-          "market_scalars_pnl": 0,
-          "residual": 0
-        }
+        "buckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "-4895.657693227",
+              "currency": "USD"
+            },
+            "pct_of_total": 100
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          }
+        ]
       },
       {
         "scenario": "usd-ois-50bp",
@@ -18408,20 +20007,104 @@
         },
         "explain": "Total P&L: USD -4895.66\n  ├─ Rates Curves: USD -4895.66 (100.0%)\n  └─ Residual: USD 0.00 (-0.0%)",
         "residualWithinTolerance": true,
-        "pctOfTotal": {
-          "carry": 0,
-          "rates_curves_pnl": 100,
-          "credit_curves_pnl": 0,
-          "inflation_curves_pnl": 0,
-          "correlations_pnl": 0,
-          "fx_pnl": 0,
-          "fx_translation_pnl": 0,
-          "vol_pnl": 0,
-          "cross_factor_pnl": 0,
-          "model_params_pnl": 0,
-          "market_scalars_pnl": 0,
-          "residual": 0
-        }
+        "buckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "-4895.657693227",
+              "currency": "USD"
+            },
+            "pct_of_total": 100
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          }
+        ]
       },
       {
         "scenario": "usd-ois-50bp",
@@ -18646,20 +20329,104 @@
         },
         "explain": "Total P&L: USD -4895.66\n  ├─ Rates Curves: USD -4890.42 (99.9%)\n  └─ Residual: USD -5.24 (0.1%)",
         "residualWithinTolerance": true,
-        "pctOfTotal": {
-          "carry": 0,
-          "rates_curves_pnl": 99.8929433444691,
-          "credit_curves_pnl": 0,
-          "inflation_curves_pnl": 0,
-          "correlations_pnl": 0,
-          "fx_pnl": 0,
-          "fx_translation_pnl": 0,
-          "vol_pnl": 0,
-          "cross_factor_pnl": 0,
-          "model_params_pnl": 0,
-          "market_scalars_pnl": 0,
-          "residual": 0.1070566555308993
-        }
+        "buckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "-4890.41656583439",
+              "currency": "USD"
+            },
+            "pct_of_total": 99.8929433444691
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "-5.24112739261",
+              "currency": "USD"
+            },
+            "pct_of_total": 0.1070566555308993
+          }
+        ]
       },
       {
         "scenario": "roll-1m-25bp",
@@ -18967,20 +20734,104 @@
         },
         "explain": "Total P&L: USD 2375.02\n  ├─ Carry: USD 4613.75 (194.3%)\n  │   ├─ Coupon Income: USD 3874.31\n  │   ├─ Pull-to-Par: USD 1319.26\n  │   ├─ Roll-Down: USD -579.82\n  ├─ Rates Curves: USD -2238.72 (-94.3%)\n  └─ Residual: USD 0.00 (0.0%)",
         "residualWithinTolerance": true,
-        "pctOfTotal": {
-          "carry": 194.26106602144495,
-          "rates_curves_pnl": -94.26106602144499,
-          "credit_curves_pnl": 0,
-          "inflation_curves_pnl": 0,
-          "correlations_pnl": 0,
-          "fx_pnl": 0,
-          "fx_translation_pnl": 0,
-          "vol_pnl": 0,
-          "cross_factor_pnl": 0,
-          "model_params_pnl": 0,
-          "market_scalars_pnl": 0,
-          "residual": 0
-        }
+        "buckets": [
+          {
+            "field": "carry",
+            "amount": {
+              "amount": "4613.745264130",
+              "currency": "USD"
+            },
+            "pct_of_total": 194.26106602144495
+          },
+          {
+            "field": "rates_curves_pnl",
+            "amount": {
+              "amount": "-2238.722127162",
+              "currency": "USD"
+            },
+            "pct_of_total": -94.26106602144499
+          },
+          {
+            "field": "credit_curves_pnl",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "inflation_curves_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "correlations_pnl",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "fx_translation_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "vol_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "cross_factor_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "model_params_pnl",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "market_scalars_pnl",
+            "amount": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          },
+          {
+            "field": "residual",
+            "amount": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "pct_of_total": 0
+          }
+        ]
       }
     ]
   },
@@ -27435,6 +29286,7 @@
       "lookback": {
         "refDate": "2025-06-30",
         "returns": {
+          "ref_date": "2025-06-30",
           "ticker_names": ["Global Macro Composite", "Benchmark"],
           "mtd": [0.18180985775262454, 0.18953436981124244],
           "qtd": [0.9625756858664355, 0.587208537364615],
@@ -34335,7 +36187,15 @@
       "request": {
         "source": {
           "kind": "model",
-          "json": "{\"asset_value\":100,\"asset_vol\":0.25,\"debt_barrier\":60,\"risk_free_rate\":0.03,\"payout_rate\":0,\"barrier_type\":\"terminal\",\"dynamics\":\"geometric_brownian\"}"
+          "model": {
+            "asset_value": 100,
+            "asset_vol": 0.25,
+            "debt_barrier": 60,
+            "risk_free_rate": 0.03,
+            "payout_rate": 0,
+            "barrier_type": "terminal",
+            "dynamics": "geometric_brownian"
+          }
         },
         "horizons": [0.5, 1, 2, 3, 5, 10],
         "maturity": 5,
@@ -34351,13 +36211,13 @@
           "barrier_type": "terminal",
           "dynamics": "geometric_brownian"
         },
-        "defaultPoint": null,
+        "default_point": null,
         "horizons": [0.5, 1, 2, 3, 5, 10],
-        "defaultProbabilities": [
+        "default_probabilities": [
           0.0019500516120603815, 0.020759845258390343, 0.07525079984838666,
           0.1207911503784265, 0.1833658439745175, 0.26423686540063307
         ],
-        "distanceToDefault": [
+        "distance_to_default": [
           2.8861305666443076, 2.038302495063963, 1.4377619824632548,
           1.1710409915231685, 0.9026123156240909, 0.6303375950098661
         ],
@@ -34399,42 +36259,34 @@
             "grade_index": 7
           }
         ],
-        "impliedSpread": {
-          "ok": true,
-          "value": [
-            0.002341431975701445, 0.012534132221441702, 0.023100760751164764,
-            0.025078398902654245, 0.02331114675646606, 0.01726193191771863
-          ]
-        },
-        "debtSpread": {
-          "ok": true,
-          "value": [
-            0.0001916002006336442, 0.0017667693194893695, 0.005247937922050362,
-            0.007304510501199079, 0.009019959105114038, 0.009375410256907477
-          ]
-        },
+        "implied_spread": [
+          0.002341431975701445, 0.012534132221441702, 0.023100760751164764,
+          0.025078398902654245, 0.02331114675646606, 0.01726193191771863
+        ],
+        "debt_spread": [
+          0.0001916002006336442, 0.0017667693194893695, 0.005247937922050362,
+          0.007304510501199079, 0.009019959105114038, 0.009375410256907477
+        ],
         "maturity": 5,
         "recovery": 0.4,
-        "cdsParSpread": {
-          "ok": true,
-          "value": 0.023936463273530044
+        "cds_par_spread": 0.023936463273530044,
+        "implied_equity": {
+          "value": 50.63484718383464,
+          "vol": 0.4582212856376535
         },
-        "impliedEquity": {
-          "ok": true,
-          "value": [50.63484718383464, 0.4582212856376535]
-        }
+        "errors": {}
       }
     },
     "equity": {
       "request": {
         "source": {
           "kind": "equity",
-          "equityValue": 50,
-          "equityVol": 0.4,
-          "shortTermDebt": 30,
-          "longTermDebt": 40,
-          "riskFreeRate": 0.03,
-          "payoutRate": 0,
+          "equity_value": 50,
+          "equity_vol": 0.4,
+          "short_term_debt": 30,
+          "long_term_debt": 40,
+          "risk_free_rate": 0.03,
+          "payout_rate": 0,
           "maturity": 1
         },
         "horizons": [0.5, 1, 2, 3, 5, 10],
@@ -34451,13 +36303,13 @@
           "barrier_type": "terminal",
           "dynamics": "geometric_brownian"
         },
-        "defaultPoint": 50,
+        "default_point": 50,
         "horizons": [0.5, 1, 2, 3, 5, 10],
-        "defaultProbabilities": [
+        "default_probabilities": [
           9.826424658800987e-7, 0.00035356472194204966, 0.0076011012673561935,
           0.022281120073663244, 0.05509499259367572, 0.11456521704562975
         ],
-        "distanceToDefault": [
+        "distance_to_default": [
           4.7569616433581805, 3.3867998941234205, 2.4275258716114743,
           2.0087633180051814, 1.5973397929527562, 1.202601843195131
         ],
@@ -34499,32 +36351,23 @@
             "grade_index": 6
           }
         ],
-        "impliedSpread": {
-          "ok": true,
-          "value": [
-            0.0000011791713067092048, 0.00021216133779023756,
-            0.002285546151132663, 0.004486279078189885, 0.006723145172355406,
-            0.0071215837117430516
-          ]
-        },
-        "debtSpread": {
-          "ok": true,
-          "value": [
-            5.350909831307663e-8, 0.000017641974605942912,
-            0.00033043361142499433, 0.0008690188584505668,
-            0.0018164456923322313, 0.002840470439343398
-          ]
-        },
+        "implied_spread": [
+          0.0000011791713067092048, 0.00021216133779023756,
+          0.002285546151132663, 0.004486279078189885, 0.006723145172355406,
+          0.0071215837117430516
+        ],
+        "debt_spread": [
+          5.350909831307663e-8, 0.000017641974605942912, 0.00033043361142499433,
+          0.0008690188584505668, 0.0018164456923322313, 0.002840470439343398
+        ],
         "maturity": 5,
         "recovery": 0.4,
-        "cdsParSpread": {
-          "ok": true,
-          "value": 0.00651346098323259
+        "cds_par_spread": 0.00651346098323259,
+        "implied_equity": {
+          "value": 55.87510959248689,
+          "vol": 0.350798497799075
         },
-        "impliedEquity": {
-          "ok": true,
-          "value": [55.87510959248689, 0.350798497799075]
-        }
+        "errors": {}
       }
     }
   },
@@ -36973,6 +38816,7 @@
         "key": "dv01",
         "metric": "dv01",
         "components": [],
+        "coordinates": [],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": false
@@ -36981,6 +38825,7 @@
         "key": "bucketed_dv01",
         "metric": "bucketed_dv01",
         "components": [],
+        "coordinates": [],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": false
@@ -36989,6 +38834,7 @@
         "key": "theta",
         "metric": "theta",
         "components": [],
+        "coordinates": [],
         "unit": "currency",
         "group": "Carry",
         "bucketed": false
@@ -36997,6 +38843,7 @@
         "key": "cs01",
         "metric": "cs01",
         "components": [],
+        "coordinates": [],
         "unit": "currency",
         "group": "Credit",
         "bucketed": false
@@ -37005,6 +38852,16 @@
         "key": "bucketed_dv01::USD-TREASURY::10y",
         "metric": "bucketed_dv01",
         "components": ["USD-TREASURY", "10y"],
+        "coordinates": [
+          {
+            "group": "USD-TREASURY",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 10
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37013,6 +38870,16 @@
         "key": "bucketed_dv01::USD-TREASURY::15y",
         "metric": "bucketed_dv01",
         "components": ["USD-TREASURY", "15y"],
+        "coordinates": [
+          {
+            "group": "USD-TREASURY",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 15
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37021,6 +38888,16 @@
         "key": "bucketed_dv01::USD-TREASURY::1y",
         "metric": "bucketed_dv01",
         "components": ["USD-TREASURY", "1y"],
+        "coordinates": [
+          {
+            "group": "USD-TREASURY",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 1
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37029,6 +38906,16 @@
         "key": "bucketed_dv01::USD-TREASURY::20y",
         "metric": "bucketed_dv01",
         "components": ["USD-TREASURY", "20y"],
+        "coordinates": [
+          {
+            "group": "USD-TREASURY",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 20
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37037,6 +38924,16 @@
         "key": "bucketed_dv01::USD-TREASURY::2y",
         "metric": "bucketed_dv01",
         "components": ["USD-TREASURY", "2y"],
+        "coordinates": [
+          {
+            "group": "USD-TREASURY",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 2
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37045,6 +38942,16 @@
         "key": "bucketed_dv01::USD-TREASURY::30y",
         "metric": "bucketed_dv01",
         "components": ["USD-TREASURY", "30y"],
+        "coordinates": [
+          {
+            "group": "USD-TREASURY",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 30
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37053,6 +38960,16 @@
         "key": "bucketed_dv01::USD-TREASURY::3m",
         "metric": "bucketed_dv01",
         "components": ["USD-TREASURY", "3m"],
+        "coordinates": [
+          {
+            "group": "USD-TREASURY",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 0.25
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37061,6 +38978,16 @@
         "key": "bucketed_dv01::USD-TREASURY::3y",
         "metric": "bucketed_dv01",
         "components": ["USD-TREASURY", "3y"],
+        "coordinates": [
+          {
+            "group": "USD-TREASURY",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 3
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37069,6 +38996,16 @@
         "key": "bucketed_dv01::USD-TREASURY::5y",
         "metric": "bucketed_dv01",
         "components": ["USD-TREASURY", "5y"],
+        "coordinates": [
+          {
+            "group": "USD-TREASURY",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 5
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37077,6 +39014,16 @@
         "key": "bucketed_dv01::USD-TREASURY::6m",
         "metric": "bucketed_dv01",
         "components": ["USD-TREASURY", "6m"],
+        "coordinates": [
+          {
+            "group": "USD-TREASURY",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 0.5
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37085,6 +39032,16 @@
         "key": "bucketed_dv01::USD-TREASURY::7y",
         "metric": "bucketed_dv01",
         "components": ["USD-TREASURY", "7y"],
+        "coordinates": [
+          {
+            "group": "USD-TREASURY",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 7
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37093,6 +39050,12 @@
         "key": "cs01::US912828XG33",
         "metric": "cs01",
         "components": ["US912828XG33"],
+        "coordinates": [
+          {
+            "group": "US912828XG33",
+            "value": null
+          }
+        ],
         "unit": "currency",
         "group": "Credit",
         "bucketed": false
@@ -37101,6 +39064,7 @@
         "key": "theta_period_days",
         "metric": "theta_period_days",
         "components": [],
+        "coordinates": [],
         "unit": "dimensionless",
         "group": "Carry",
         "bucketed": false
@@ -37109,6 +39073,16 @@
         "key": "bucketed_dv01::USD-OIS::10y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "10y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 10
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37117,6 +39091,16 @@
         "key": "bucketed_dv01::USD-OIS::15y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "15y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 15
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37125,6 +39109,16 @@
         "key": "bucketed_dv01::USD-OIS::1y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "1y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 1
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37133,6 +39127,16 @@
         "key": "bucketed_dv01::USD-OIS::20y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "20y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 20
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37141,6 +39145,16 @@
         "key": "bucketed_dv01::USD-OIS::2y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "2y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 2
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37149,6 +39163,16 @@
         "key": "bucketed_dv01::USD-OIS::30y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "30y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 30
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37157,6 +39181,16 @@
         "key": "bucketed_dv01::USD-OIS::3m",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "3m"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 0.25
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37165,6 +39199,16 @@
         "key": "bucketed_dv01::USD-OIS::3y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "3y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 3
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37173,6 +39217,16 @@
         "key": "bucketed_dv01::USD-OIS::5y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "5y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 5
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37181,6 +39235,16 @@
         "key": "bucketed_dv01::USD-OIS::6m",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "6m"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 0.5
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37189,6 +39253,16 @@
         "key": "bucketed_dv01::USD-OIS::7y",
         "metric": "bucketed_dv01",
         "components": ["USD-OIS", "7y"],
+        "coordinates": [
+          {
+            "group": "USD-OIS",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 7
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37197,6 +39271,16 @@
         "key": "bucketed_dv01::USD-SOFR-3M::10y",
         "metric": "bucketed_dv01",
         "components": ["USD-SOFR-3M", "10y"],
+        "coordinates": [
+          {
+            "group": "USD-SOFR-3M",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 10
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37205,6 +39289,16 @@
         "key": "bucketed_dv01::USD-SOFR-3M::15y",
         "metric": "bucketed_dv01",
         "components": ["USD-SOFR-3M", "15y"],
+        "coordinates": [
+          {
+            "group": "USD-SOFR-3M",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 15
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37213,6 +39307,16 @@
         "key": "bucketed_dv01::USD-SOFR-3M::1y",
         "metric": "bucketed_dv01",
         "components": ["USD-SOFR-3M", "1y"],
+        "coordinates": [
+          {
+            "group": "USD-SOFR-3M",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 1
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37221,6 +39325,16 @@
         "key": "bucketed_dv01::USD-SOFR-3M::20y",
         "metric": "bucketed_dv01",
         "components": ["USD-SOFR-3M", "20y"],
+        "coordinates": [
+          {
+            "group": "USD-SOFR-3M",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 20
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37229,6 +39343,16 @@
         "key": "bucketed_dv01::USD-SOFR-3M::2y",
         "metric": "bucketed_dv01",
         "components": ["USD-SOFR-3M", "2y"],
+        "coordinates": [
+          {
+            "group": "USD-SOFR-3M",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 2
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37237,6 +39361,16 @@
         "key": "bucketed_dv01::USD-SOFR-3M::30y",
         "metric": "bucketed_dv01",
         "components": ["USD-SOFR-3M", "30y"],
+        "coordinates": [
+          {
+            "group": "USD-SOFR-3M",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 30
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37245,6 +39379,16 @@
         "key": "bucketed_dv01::USD-SOFR-3M::3m",
         "metric": "bucketed_dv01",
         "components": ["USD-SOFR-3M", "3m"],
+        "coordinates": [
+          {
+            "group": "USD-SOFR-3M",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 0.25
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37253,6 +39397,16 @@
         "key": "bucketed_dv01::USD-SOFR-3M::3y",
         "metric": "bucketed_dv01",
         "components": ["USD-SOFR-3M", "3y"],
+        "coordinates": [
+          {
+            "group": "USD-SOFR-3M",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 3
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37261,6 +39415,16 @@
         "key": "bucketed_dv01::USD-SOFR-3M::5y",
         "metric": "bucketed_dv01",
         "components": ["USD-SOFR-3M", "5y"],
+        "coordinates": [
+          {
+            "group": "USD-SOFR-3M",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 5
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37269,6 +39433,16 @@
         "key": "bucketed_dv01::USD-SOFR-3M::6m",
         "metric": "bucketed_dv01",
         "components": ["USD-SOFR-3M", "6m"],
+        "coordinates": [
+          {
+            "group": "USD-SOFR-3M",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 0.5
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -37277,6 +39451,16 @@
         "key": "bucketed_dv01::USD-SOFR-3M::7y",
         "metric": "bucketed_dv01",
         "components": ["USD-SOFR-3M", "7y"],
+        "coordinates": [
+          {
+            "group": "USD-SOFR-3M",
+            "value": null
+          },
+          {
+            "group": "",
+            "value": 7
+          }
+        ],
         "unit": "currency",
         "group": "Sensitivity",
         "bucketed": true
@@ -38206,7 +40390,7 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "5357646f8195d31e31fd0cb07bdb7b691583b9bb5e85ab343c47b18437c2aacf"
+        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/composite.json",
@@ -39143,6 +41327,7 @@
         "name": "Revenue growth, QoQ",
         "node_type": "calculated",
         "tags": ["driver", "ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -39197,6 +41382,7 @@
         "name": "Gross margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -39256,6 +41442,7 @@
         "name": "EBITDA margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -39359,6 +41546,7 @@
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
         "tags": ["debt"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -39480,6 +41668,7 @@
         "name": "Debt, closing balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -39491,6 +41680,7 @@
         "name": "Debt, opening balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -39502,6 +41692,7 @@
         "name": "Cash and equivalents",
         "node_type": "mixed",
         "tags": ["balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -39537,6 +41728,7 @@
         "name": "LTM EBITDA",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -39548,6 +41740,7 @@
         "name": "Gross leverage (Debt / LTM EBITDA)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -39558,6 +41751,7 @@
         "name": "Interest coverage (EBITDA / interest)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -39660,6 +41854,56 @@
   },
   "statementResult": {
     "schema_version": 1,
+    "periods": [
+      {
+        "id": "2024Q1",
+        "start": "2024-01-01",
+        "end": "2024-04-01",
+        "is_actual": true
+      },
+      {
+        "id": "2024Q2",
+        "start": "2024-04-01",
+        "end": "2024-07-01",
+        "is_actual": true
+      },
+      {
+        "id": "2024Q3",
+        "start": "2024-07-01",
+        "end": "2024-10-01",
+        "is_actual": true
+      },
+      {
+        "id": "2024Q4",
+        "start": "2024-10-01",
+        "end": "2025-01-01",
+        "is_actual": true
+      },
+      {
+        "id": "2025Q1",
+        "start": "2025-01-01",
+        "end": "2025-04-01",
+        "is_actual": true
+      },
+      {
+        "id": "2025Q2",
+        "start": "2025-04-01",
+        "end": "2025-07-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q3",
+        "start": "2025-07-01",
+        "end": "2025-10-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q4",
+        "start": "2025-10-01",
+        "end": "2026-01-01",
+        "is_actual": false
+      }
+    ],
     "nodes": {
       "cash": {
         "2024Q1": 86500000,
@@ -41579,6 +43823,56 @@
           },
           "results": {
             "schema_version": 1,
+            "periods": [
+              {
+                "id": "2024Q1",
+                "start": "2024-01-01",
+                "end": "2024-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q2",
+                "start": "2024-04-01",
+                "end": "2024-07-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q3",
+                "start": "2024-07-01",
+                "end": "2024-10-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q4",
+                "start": "2024-10-01",
+                "end": "2025-01-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q1",
+                "start": "2025-01-01",
+                "end": "2025-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q2",
+                "start": "2025-04-01",
+                "end": "2025-07-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q3",
+                "start": "2025-07-01",
+                "end": "2025-10-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q4",
+                "start": "2025-10-01",
+                "end": "2026-01-01",
+                "is_actual": false
+              }
+            ],
             "nodes": {
               "cash": {
                 "2024Q1": 86500000,
@@ -42973,6 +45267,56 @@
           },
           "results": {
             "schema_version": 1,
+            "periods": [
+              {
+                "id": "2024Q1",
+                "start": "2024-01-01",
+                "end": "2024-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q2",
+                "start": "2024-04-01",
+                "end": "2024-07-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q3",
+                "start": "2024-07-01",
+                "end": "2024-10-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q4",
+                "start": "2024-10-01",
+                "end": "2025-01-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q1",
+                "start": "2025-01-01",
+                "end": "2025-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q2",
+                "start": "2025-04-01",
+                "end": "2025-07-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q3",
+                "start": "2025-07-01",
+                "end": "2025-10-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q4",
+                "start": "2025-10-01",
+                "end": "2026-01-01",
+                "is_actual": false
+              }
+            ],
             "nodes": {
               "cash": {
                 "2024Q1": 86500000,
@@ -44367,6 +46711,56 @@
           },
           "results": {
             "schema_version": 1,
+            "periods": [
+              {
+                "id": "2024Q1",
+                "start": "2024-01-01",
+                "end": "2024-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q2",
+                "start": "2024-04-01",
+                "end": "2024-07-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q3",
+                "start": "2024-07-01",
+                "end": "2024-10-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q4",
+                "start": "2024-10-01",
+                "end": "2025-01-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q1",
+                "start": "2025-01-01",
+                "end": "2025-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q2",
+                "start": "2025-04-01",
+                "end": "2025-07-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q3",
+                "start": "2025-07-01",
+                "end": "2025-10-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q4",
+                "start": "2025-10-01",
+                "end": "2026-01-01",
+                "is_actual": false
+              }
+            ],
             "nodes": {
               "cash": {
                 "2024Q1": 86500000,
@@ -45761,6 +48155,56 @@
           },
           "results": {
             "schema_version": 1,
+            "periods": [
+              {
+                "id": "2024Q1",
+                "start": "2024-01-01",
+                "end": "2024-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q2",
+                "start": "2024-04-01",
+                "end": "2024-07-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q3",
+                "start": "2024-07-01",
+                "end": "2024-10-01",
+                "is_actual": true
+              },
+              {
+                "id": "2024Q4",
+                "start": "2024-10-01",
+                "end": "2025-01-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q1",
+                "start": "2025-01-01",
+                "end": "2025-04-01",
+                "is_actual": true
+              },
+              {
+                "id": "2025Q2",
+                "start": "2025-04-01",
+                "end": "2025-07-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q3",
+                "start": "2025-07-01",
+                "end": "2025-10-01",
+                "is_actual": false
+              },
+              {
+                "id": "2025Q4",
+                "start": "2025-10-01",
+                "end": "2026-01-01",
+                "is_actual": false
+              }
+            ],
             "nodes": {
               "cash": {
                 "2024Q1": 86500000,
@@ -47152,6 +49596,56 @@
       ],
       "baseline": {
         "schema_version": 1,
+        "periods": [
+          {
+            "id": "2024Q1",
+            "start": "2024-01-01",
+            "end": "2024-04-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q2",
+            "start": "2024-04-01",
+            "end": "2024-07-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q3",
+            "start": "2024-07-01",
+            "end": "2024-10-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q4",
+            "start": "2024-10-01",
+            "end": "2025-01-01",
+            "is_actual": true
+          },
+          {
+            "id": "2025Q1",
+            "start": "2025-01-01",
+            "end": "2025-04-01",
+            "is_actual": true
+          },
+          {
+            "id": "2025Q2",
+            "start": "2025-04-01",
+            "end": "2025-07-01",
+            "is_actual": false
+          },
+          {
+            "id": "2025Q3",
+            "start": "2025-07-01",
+            "end": "2025-10-01",
+            "is_actual": false
+          },
+          {
+            "id": "2025Q4",
+            "start": "2025-10-01",
+            "end": "2026-01-01",
+            "is_actual": false
+          }
+        ],
         "nodes": {
           "cash": {
             "2024Q1": 86500000,
@@ -49833,6 +52327,7 @@
         "name": "Revenue growth, QoQ",
         "node_type": "calculated",
         "tags": ["driver", "ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -49887,6 +52382,7 @@
         "name": "Gross margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -49950,6 +52446,7 @@
         "name": "EBITDA margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -50057,6 +52554,7 @@
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
         "tags": ["debt"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50185,6 +52683,7 @@
         "name": "Debt, closing balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50196,6 +52695,7 @@
         "name": "Debt, opening balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50207,6 +52707,7 @@
         "name": "Cash and equivalents",
         "node_type": "mixed",
         "tags": ["balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50246,6 +52747,7 @@
         "name": "LTM EBITDA",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50257,6 +52759,7 @@
         "name": "Gross leverage (Debt / LTM EBITDA)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -50267,6 +52770,7 @@
         "name": "Interest coverage (EBITDA / interest)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -50417,6 +52921,7 @@
         "name": "Revenue growth, QoQ",
         "node_type": "calculated",
         "tags": ["driver", "ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -50471,6 +52976,7 @@
         "name": "Gross margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -50538,6 +53044,7 @@
         "name": "EBITDA margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -50649,6 +53156,7 @@
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
         "tags": ["debt"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50784,6 +53292,7 @@
         "name": "Debt, closing balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50795,6 +53304,7 @@
         "name": "Debt, opening balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50806,6 +53316,7 @@
         "name": "Cash and equivalents",
         "node_type": "mixed",
         "tags": ["balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50849,6 +53360,7 @@
         "name": "LTM EBITDA",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -50860,6 +53372,7 @@
         "name": "Gross leverage (Debt / LTM EBITDA)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -50870,6 +53383,7 @@
         "name": "Interest coverage (EBITDA / interest)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51024,6 +53538,7 @@
         "name": "Revenue growth, QoQ",
         "node_type": "calculated",
         "tags": ["driver", "ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51078,6 +53593,7 @@
         "name": "Gross margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51149,6 +53665,7 @@
         "name": "EBITDA margin",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51264,6 +53781,7 @@
         "name": "Debt at 2024Q1 opening",
         "node_type": "value",
         "tags": ["debt"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -51405,6 +53923,7 @@
         "name": "Debt, closing balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -51416,6 +53935,7 @@
         "name": "Debt, opening balance",
         "node_type": "calculated",
         "tags": ["debt", "balance_sheet"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -51427,6 +53947,7 @@
         "name": "Cash and equivalents",
         "node_type": "mixed",
         "tags": ["balance_sheet"],
+        "rollup": "period_end",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -51474,6 +53995,7 @@
         "name": "LTM EBITDA",
         "node_type": "calculated",
         "tags": ["ratio"],
+        "rollup": "formula",
         "value_type": {
           "type": "monetary",
           "currency": "USD"
@@ -51485,6 +54007,7 @@
         "name": "Gross leverage (Debt / LTM EBITDA)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },
@@ -51495,6 +54018,7 @@
         "name": "Interest coverage (EBITDA / interest)",
         "node_type": "calculated",
         "tags": ["ratio", "covenant"],
+        "rollup": "formula",
         "value_type": {
           "type": "scalar"
         },

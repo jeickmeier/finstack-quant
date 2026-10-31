@@ -3,6 +3,8 @@ import { useState } from "react";
 import {
   useTrancheBreakevenCdr,
   useTrancheDiscountMargin,
+  useTrancheMetricFieldUnits,
+  useTrancheSolveFieldUnits,
   useTrancheMetrics,
   useTrancheOas,
   type TrancheRequest,
@@ -46,6 +48,10 @@ export function TranchePanel({
     marketPricePct,
     metrics: metrics ?? null,
   });
+  const metricUnits = useTrancheMetricFieldUnits(
+    metricsQuery.data?.currency ?? null,
+  );
+  const solveUnits = useTrancheSolveFieldUnits();
   const cdr = useTrancheBreakevenCdr(request);
   const dm = useTrancheDiscountMargin(
     marketPricePct === null ? null : { ...request, marketPricePct },
@@ -71,6 +77,8 @@ export function TranchePanel({
       price={price}
       onPriceChange={setPrice}
       metrics={tile(metricsQuery)}
+      metricUnits={tile(metricUnits)}
+      solveUnits={tile(solveUnits)}
       breakevenCdr={tile(cdr)}
       discountMargin={tile(dm)}
       oas={

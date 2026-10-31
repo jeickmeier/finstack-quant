@@ -331,6 +331,11 @@ export interface LookbackReturns {
    */
   qtd: number[];
   /**
+   * Date on which every lookback window ended: the requested date, else the
+   * last active date of the panel.
+   */
+  ref_date: DateWire;
+  /**
    * Ticker names aligned with every per-ticker vector below.
    */
   ticker_names: string[];

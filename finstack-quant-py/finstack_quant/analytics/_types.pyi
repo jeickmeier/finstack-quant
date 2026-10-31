@@ -1499,6 +1499,22 @@ class LookbackReturns:
         """
 
     @property
+    def ref_date(self) -> datetime.date:
+        """
+        Date on which every lookback window ended.
+
+        Returns
+        -------
+        datetime.date
+            The requested date, else the last active date of the panel.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
     def ticker_names(self) -> list[str]:
         """
         Ticker names aligned with the ``mtd`` / ``qtd`` / ``ytd`` / ``fytd``

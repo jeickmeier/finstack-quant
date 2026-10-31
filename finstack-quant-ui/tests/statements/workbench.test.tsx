@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -60,6 +61,8 @@ beforeEach(() => {
       case "validateStatementFormula":
         native.parseAndCompile(arg);
         return native.parseFormula(arg);
+      case "defaultRollupSpec":
+        return native.rollupSpecDefaultFor(arg.modelJson, arg.frequency);
       case "rollupStatement":
         return native.statementResultRollup(
           arg.resultsJson,
@@ -315,12 +318,15 @@ it("changes a native forecast method and calculates a newly added metric", async
     name: "Revenue forecast",
   });
   fireEvent.change(
-    within(revenueEditor).getByRole("textbox", { name: /Growth per period/ }),
+    within(revenueEditor).getByRole("textbox", { name: /^Rate/ }),
     { target: { value: "0.1" } },
   );
-  fireEvent.click(
-    within(revenueEditor).getByRole("button", { name: "Apply forecast" }),
+  const applyForecast = within(revenueEditor).getByRole<HTMLButtonElement>(
+    "button",
+    { name: "Apply forecast" },
   );
+  await waitFor(() => expect(applyForecast.disabled).toBe(false));
+  fireEvent.click(applyForecast);
   await waitFor(() => expect(accepted).toHaveBeenCalledTimes(2));
   const forecastModel = JSON.parse(accepted.mock.lastCall![0]);
   expect(forecastModel.nodes.revenue.forecast).toEqual({
@@ -345,6 +351,7 @@ it("changes a native forecast method and calculates a newly added metric", async
     node_type: "calculated",
     formula_text: "revenue / total_debt",
     value_type: { type: "scalar" },
+    rollup: "formula",
   });
   const nativeResult = new native.Evaluator().evaluate(
     accepted.mock.lastCall![0],
@@ -910,12 +917,46 @@ it("rolls reported quarters up to native annual values with editable methods", a
   expect(JSON.parse(lastCall("rollupStatement").specJson).methods.revenue).toBe(
     undefined,
   );
+  expect(lastCall("defaultRollupSpec")).toEqual({
+    modelJson: canonicalModel(),
+    frequency: "annual",
+  });
 
   const quarterly = new native.Evaluator().evaluate(canonicalModel());
   const rolled = native.statementResultRollup(
     JSON.stringify(quarterly),
     canonicalModel(),
     lastCall("rollupStatement").specJson,
+  );
+  // Every line's method is declared on its node, so an empty spec agrees with the view.
+  expect(
+    native.statementResultRollup(
+      JSON.stringify(quarterly),
+      canonicalModel(),
+      JSON.stringify({ frequency: "annual" }),
+    ).nodes,
+  ).toEqual(rolled.nodes);
+  // A value declared period_end takes the year end, not four quarters' sum.
+  expect(rolled.nodes.debt_at_inception).toEqual({
+    "2024": 420_000_000,
+    "2025": 420_000_000,
+  });
+  // Draws carry no declaration, so they sum.
+  expect(rolled.nodes.debt_draws).toEqual({
+    "2024": 40_000_000,
+    "2025": 55_000_000,
+  });
+  // debt_opening declares formula: closing debt less the year's flows is the
+  // year's opening balance, not the opening of its fourth quarter.
+  expect(rolled.nodes.debt_opening).toEqual({
+    "2024": 420_000_000,
+    "2025": 415_000_000,
+  });
+  expect(rolled.nodes.debt_opening["2024"]).toBe(
+    quarterly.nodes.debt_opening["2024Q1"],
+  );
+  expect(rolled.nodes.debt_opening["2025"]).toBe(
+    quarterly.nodes.debt_opening["2025Q1"],
   );
   const revenue = within(income).getByRole("button", {
     name: "Revenue 2024, inspect value",
@@ -943,12 +984,26 @@ it("rolls reported quarters up to native annual values with editable methods", a
     }),
   );
   await userEvent.click(
-    await screen.findByRole("option", { name: "Recalculate formula (ratio)" }),
+    await screen.findByRole("option", { name: "Period end (balance)" }),
   );
   await waitFor(() =>
     expect(
       JSON.parse(lastCall("rollupStatement").specJson).methods.debt_opening,
-    ).toBe("formula"),
+    ).toBe("period_end"),
+  );
+  // Choosing Sum must reach native: an unlisted line would keep its declaration.
+  await userEvent.click(
+    screen.getByRole("combobox", {
+      name: "Debt, closing balance roll-up method",
+    }),
+  );
+  await userEvent.click(
+    await screen.findByRole("option", { name: "Sum (flow)" }),
+  );
+  await waitFor(() =>
+    expect(
+      JSON.parse(lastCall("rollupStatement").specJson).methods.total_debt,
+    ).toBe("sum"),
   );
   fireEvent.click(screen.getByRole("button", { name: "Reported" }));
   await within(
@@ -956,6 +1011,55 @@ it("rolls reported quarters up to native annual values with editable methods", a
   ).findByRole("button", { name: "Revenue 2024Q1, value source, edit value" });
 });
 
+it("seeds the annual methods from a host RollupSpec without asking for the native default", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench
+        defaultModelJson={JSON.stringify(model)}
+        defaultRollupSpecJson={JSON.stringify({
+          frequency: "annual",
+          methods: { cash: "sum", total_debt: "period_end" },
+        })}
+      />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("region", { name: "Income statement" });
+  fireEvent.click(screen.getByRole("button", { name: "Annual" }));
+  await within(
+    await screen.findByRole("region", { name: "Income statement" }),
+  ).findByRole("columnheader", { name: "2024 Historical" });
+  expect(JSON.parse(lastCall("rollupStatement").specJson).methods).toEqual({
+    cash: "sum",
+    total_debt: "period_end",
+  });
+  // A line the host spec leaves out keeps its declaration, and the picker says so.
+  expect(
+    screen.getByRole("combobox", {
+      name: "Debt, opening balance roll-up method",
+    }).textContent,
+  ).toContain("Recalculate formula");
+  expect(
+    call.mock.calls.some(([method]) => method === "defaultRollupSpec"),
+  ).toBe(false);
+});
+it("reports a host RollupSpec that does not parse instead of summing every line", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench
+        defaultModelJson={JSON.stringify(model)}
+        defaultRollupSpecJson="not json"
+      />
+    </FinstackQueryProvider>,
+  );
+  await screen.findByRole("region", { name: "Income statement" });
+  fireEvent.click(screen.getByRole("button", { name: "Annual" }));
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "Default rollup spec:",
+  );
+  expect(call.mock.calls.some(([method]) => method === "rollupStatement")).toBe(
+    false,
+  );
+});
 it(
   "runs scenarios with forecast overrides and compares them natively",
   async () => {
@@ -1006,13 +1110,18 @@ it(
     await userEvent.click(
       await screen.findByRole("option", { name: "Fixed growth" }),
     );
-    fireEvent.change(
-      within(card).getByRole("textbox", { name: /Growth per period/ }),
-      { target: { value: "-0.1" } },
-    );
-    fireEvent.click(
-      within(card).getByRole("button", { name: "Save to scenario" }),
-    );
+    fireEvent.change(within(card).getByRole("textbox", { name: /^Rate/ }), {
+      target: { value: "-0.1" },
+    });
+    const save = within(card).getByRole<HTMLButtonElement>("button", {
+      name: "Save to scenario",
+    });
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
+    // Saving is asynchronous and only updates the draft, so let it settle.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve));
+    });
     fireEvent.click(screen.getByRole("button", { name: "Run scenarios" }));
 
     const comparison = await screen.findByRole("region", {

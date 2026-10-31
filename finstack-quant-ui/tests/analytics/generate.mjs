@@ -83,7 +83,12 @@ function report(request) {
     const cumulative = performance.cumulativeReturns();
     const drawdowns = performance.getDrawdownSeries();
     const tickerNames = performance.getTickerNames();
-    const refDate = request.lookbackDate ?? activeDates.at(-1);
+    const lookback = fiscal
+      ? performance.lookbackReturnsWithFiscalConfig(
+          request.lookbackDate ?? undefined,
+          fiscal,
+        )
+      : performance.lookbackReturns(request.lookbackDate ?? undefined);
     const correlation = performance.correlationMatrix();
     return {
       tickerNames,
@@ -107,10 +112,8 @@ function report(request) {
       monthly: performance.periodicReturns("monthly"),
       annual: performance.periodicReturns("annual"),
       lookback: {
-        refDate,
-        returns: fiscal
-          ? performance.lookbackReturnsWithFiscalConfig(refDate, fiscal)
-          : performance.lookbackReturns(refDate),
+        refDate: lookback.ref_date,
+        returns: lookback,
         fiscalYearStart: request.fiscalYearStart
           ? { ...request.fiscalYearStart }
           : null,

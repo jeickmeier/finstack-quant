@@ -208,6 +208,7 @@ export function CovenantEngineEditor({
       const specs = await loadTemplate(request);
       setInput(null);
       setDoc((current) => ({
+        // finstack-arith: remount revision counter, not a value
         revision: current.revision + 1,
         value: { specs: specs as unknown[] },
       }));

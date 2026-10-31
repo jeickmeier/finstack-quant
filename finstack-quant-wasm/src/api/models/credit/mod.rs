@@ -41,6 +41,25 @@ pub fn moodys_warf_factor(rating: JsValue) -> Result<f64, JsValue> {
     credit::moodys_warf_factor(js_parse::<CreditRating>(&rating, "rating")?).map_err(to_js_err)
 }
 
+/// One Merton report: the model, its term structure, grades and CDS terms.
+///
+/// An equity source takes the KMV default point (short-term debt plus half of
+/// long-term debt) as its barrier, and grades come from the default PD master
+/// scale, so every host gets the same numbers.
+/// @param request - `MertonReportRequest` object or JSON text: `source` (`{ kind: "model", model }` with canonical `MertonModel` JSON, or `{ kind: "equity", equity_value, equity_vol, short_term_debt, long_term_debt, risk_free_rate, payout_rate, maturity }` in the firm's monetary unit, decimals and years), `horizons` (years, finite and positive, in display order), `maturity` (CDS and implied-equity years) and `recovery` (decimal fraction of par).
+/// @returns `MertonReport` plain object; per-horizon arrays align with `horizons`, and a measure Rust rejects for this model is `null` with its message under its field name in `errors`.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the request is malformed or has an unknown
+/// field, a horizon is non-finite or not positive, or the equity calibration
+/// rejects its inputs.
+#[wasm_bindgen(js_name = mertonReport)]
+pub fn merton_report(request: JsValue) -> Result<JsValue, JsValue> {
+    let request: credit::MertonReportRequest = from_js_json(&request, "request")?;
+    to_js_value(&credit::merton_report(&request).map_err(to_js_err)?)
+}
+
 /// Rating-to-factor table used for WARF-style portfolio credit quality.
 #[wasm_bindgen(js_name = RatingFactorTable)]
 pub struct JsRatingFactorTable {

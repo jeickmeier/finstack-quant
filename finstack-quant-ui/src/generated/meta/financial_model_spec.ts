@@ -5139,6 +5139,21 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeType"
   },
   {
+    "path": "#/$defs/d_7b4cd44901322286925a/properties/rollup",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeSpec/properties/rollup",
+    "description": "How this line rolls up to a coarser reporting frequency. A rollup uses\nits own per-line method first, then this; a line declaring nothing is\nsummed. Tags never choose a method."
+  },
+  {
+    "path": "#/$defs/d_7b4cd44901322286925a/properties/rollup/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeSpec/properties/rollup/anyOf/0",
+    "ref": "#/$defs/RollupMethod",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod"
+  },
+  {
+    "path": "#/$defs/d_7b4cd44901322286925a/properties/rollup/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeSpec/properties/rollup/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_7b4cd44901322286925a/properties/tags",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeSpec/properties/tags",
     "description": "Tags for grouping/filtering"
@@ -8575,6 +8590,29 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CallPutSchedule/properties/puts/items",
     "ref": "#/$defs/CallPut",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CallPut"
+  },
+  {
+    "path": "#/$defs/d_fc17544530079d46d05e",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod",
+    "description": "How one node's values combine over the source periods of a target period."
+  },
+  {
+    "path": "#/$defs/d_fc17544530079d46d05e/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod/oneOf/0",
+    "const": "sum",
+    "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nA missing source value leaves the target value missing."
+  },
+  {
+    "path": "#/$defs/d_fc17544530079d46d05e/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod/oneOf/1",
+    "const": "period_end",
+    "description": "Take the last source period's value: balances such as cash, debt and\nequity, and trailing metrics such as last-twelve-month EBITDA."
+  },
+  {
+    "path": "#/$defs/d_fc17544530079d46d05e/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod/oneOf/2",
+    "const": "formula",
+    "description": "Re-evaluate the node's formula (and `where` clause) on the rolled-up\nvalues: ratios such as margins, leverage and coverage. Time-series\nfunctions then run at the target frequency, so `lag(x, 1)` is the\nprior target period."
   },
   {
     "path": "#/$defs/d_fedf13c6253774f430cb",

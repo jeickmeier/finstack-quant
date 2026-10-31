@@ -2,7 +2,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import type { ReactNode } from "react";
 import type { ScenarioDiffWire } from "@/lib/finstack/generated/types/scenario_diff";
-import { formatRate, groupDecimal } from "@/lib/finstack/format/format";
+import { formatPercent, groupDecimal } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 
@@ -10,11 +10,6 @@ import { FinstackTable } from "@/components/finstack/shared/table/finstack-table
 export type VarianceReportWire = ScenarioDiffWire["variance"];
 type VarianceRow = VarianceReportWire["rows"][number];
 /** Rust documents `pct_var` as a fraction (`abs_var / baseline`); shown as a percent. */
-const fraction = {
-  source: "statements_analytics::VarianceRow::pct_var (fraction)",
-  wire: "decimal",
-  display: "percent",
-} as const;
 /** Every supplied digit, grouped; a non-finite native value shows as itself. */
 function exactValue(_metric: string, value: number): string {
   return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
@@ -23,7 +18,7 @@ function exactValue(_metric: string, value: number): string {
 function percentText(value: number | null | undefined): string {
   if (value == null) return "n/m";
   if (!Number.isFinite(value)) return String(value);
-  return `${formatRate(value, fraction).text}%`;
+  return `${formatPercent(value)}%`;
 }
 export interface VarianceTableProps {
   /** Native VarianceReport; rows are shown in native order, never sorted or totalled. */

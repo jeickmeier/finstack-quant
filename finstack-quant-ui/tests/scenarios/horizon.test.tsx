@@ -11,7 +11,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
-import type { HorizonReport } from "finstack-quant-wasm";
+import type { HorizonReport, PnlBucketShare } from "finstack-quant-wasm";
 import { horizonReturnOptions } from "@/hooks/scenarios/use-horizon-return/use-horizon-return";
 import { HorizonReturnReport } from "@/components/finstack/scenarios/components/horizon-return-report/horizon-return-report";
 import { unwrap, type HorizonReturnRequest } from "@/workers/finstack-contract";
@@ -53,6 +53,8 @@ const request = (
   };
 };
 const report = (name: string) => entry(name).report as unknown as HorizonReport;
+const buckets = (name: string) =>
+  entry(name).attributionBuckets as unknown as PnlBucketShare[];
 // Horizon returns are regenerated and compared by `mise run ui-fixtures --check`
 // (tests/scenarios/horizon/generate.mjs).
 it("pins the JSON inputs the horizon fixture was built from", () => {
@@ -95,6 +97,9 @@ it.each(
       entry(name).report,
     );
     expect(result.explain).toBe(entry(name).explain);
+    expect(JSON.parse(JSON.stringify(result.attributionBuckets))).toEqual(
+      entry(name).attributionBuckets,
+    );
   },
   budget(15000),
 );
@@ -143,6 +148,7 @@ it("shows Rust's summary, contributions, explain text and attribution as returne
   render(
     <HorizonReturnReport
       report={rolled}
+      attributionBuckets={buckets("roll-3m-50bp")}
       explain={entry("roll-3m-50bp").explain}
       density="comfortable"
     />,
@@ -191,7 +197,12 @@ it("shows Rust's summary, contributions, explain text and attribution as returne
   );
 });
 it("shows an undefined annualized return as not defined, never 0", () => {
-  render(<HorizonReturnReport report={report("usd-ois-50bp")} />);
+  render(
+    <HorizonReturnReport
+      report={report("usd-ois-50bp")}
+      attributionBuckets={buckets("usd-ois-50bp")}
+    />,
+  );
   expect(
     screen.getByText("Annualized return (decimal)").nextSibling!.textContent,
   ).toBe("not defined");
@@ -200,15 +211,20 @@ it("shows an undefined annualized return as not defined, never 0", () => {
   ).toBe("no time roll");
 });
 it("shows the empty, loading and native-error states", () => {
-  const { rerender } = render(<HorizonReturnReport report={null} />);
+  const { rerender } = render(
+    <HorizonReturnReport report={null} attributionBuckets={null} />,
+  );
   expect(screen.getByRole("status").textContent).toBe("No horizon return");
-  rerender(<HorizonReturnReport report={null} loading />);
+  rerender(
+    <HorizonReturnReport report={null} attributionBuckets={null} loading />,
+  );
   expect(screen.getByRole("status").textContent).toBe(
     "Computing horizon return…",
   );
   rerender(
     <HorizonReturnReport
       report={report("roll-3m-50bp")}
+      attributionBuckets={buckets("roll-3m-50bp")}
       error="Requested item not found: no-such-calendar"
     />,
   );

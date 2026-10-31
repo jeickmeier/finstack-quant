@@ -440,6 +440,36 @@ fn metric_metadata<'py>(py: Python<'py>, keys: Vec<String>) -> PyResult<Bound<'p
     serde_to_py(py, &metadata)
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "price_driver_fields")]
+#[pyfunction]
+fn price_driver_fields() -> Vec<&'static str> {
+    finstack_quant_valuations::instruments::pricing_overrides::MarketQuoteOverrides::price_driver_fields()
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "tranche_solve_field_units")]
+#[pyfunction]
+#[pyo3(text_signature = "()")]
+fn tranche_solve_field_units(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    serde_to_py(
+        py,
+        &finstack_quant_valuations::pricer::tranche_solve_field_units(),
+    )
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "tranche_metric_field_units")]
+#[pyfunction]
+#[pyo3(text_signature = "(currency)")]
+fn tranche_metric_field_units<'py>(
+    py: Python<'py>,
+    currency: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let currency = crate::bindings::core::currency::extract_currency(currency)?;
+    serde_to_py(
+        py,
+        &finstack_quant_valuations::pricer::tranche_metric_field_units(currency),
+    )
+}
+
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "list_models")]
 #[pyfunction]
 fn list_models() -> Vec<String> {
@@ -530,6 +560,19 @@ impl PyInstrumentCashflowEnvelope {
     #[getter]
     fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.as_of)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.calendar_year_ladder_by_currency")]
+    #[pyo3(text_signature = "($self)")]
+    fn calendar_year_ladder_by_currency<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let ladders = self
+            .inner
+            .calendar_year_ladder_by_currency()
+            .map_err(crate::errors::core_to_py)?;
+        serde_to_py(py, &ladders)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.flows")]
@@ -626,6 +669,9 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics_grouped, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(metric_metadata, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(price_driver_fields, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(tranche_metric_field_units, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(tranche_solve_field_units, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(metrics_for_instrument, m)?)?;
     Ok(())
 }
@@ -645,7 +691,10 @@ pub(crate) const EXPORTS: &[&str] = &[
     "list_standard_metrics_grouped",
     "metric_metadata",
     "metrics_for_instrument",
+    "price_driver_fields",
     "price_instrument",
+    "tranche_metric_field_units",
+    "tranche_solve_field_units",
 ];
 
 /// Price an instrument envelope through the canonical Rust pricer.

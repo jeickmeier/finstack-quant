@@ -191,9 +191,12 @@ import type {
   CompositeRebalanceResult,
   CompositeTrade,
   EnhancedMonteCarloResult,
+  CurrencyLadder,
   ListedProductCoverage,
+  MetricFieldUnit,
   MetricMetadata,
   OasResult,
+  TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
   ResultsMeta,
@@ -208,6 +211,7 @@ import type {
   AttributionSpec,
   AttributionResultEnvelope,
   PnlAttribution,
+  PnlBucketShare,
 } from './types/generated/attribution/index.js';
 import type {
   CheckCategory,
@@ -423,9 +427,12 @@ export type {
   CompositeRebalanceResult,
   CompositeTrade,
   EnhancedMonteCarloResult,
+  CurrencyLadder,
   ListedProductCoverage,
+  MetricFieldUnit,
   MetricMetadata,
   OasResult,
+  TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
   ResultsMeta,
@@ -435,7 +442,13 @@ export type {
   ValidationReport,
 };
 export type { Diagnostic } from './types/generated/valuations/index.js';
-export type { AttributionInputs, AttributionSpec, AttributionResultEnvelope, PnlAttribution };
+export type {
+  AttributionInputs,
+  AttributionSpec,
+  AttributionResultEnvelope,
+  PnlAttribution,
+  PnlBucketShare,
+};
 export type {
   CheckCategory,
   CheckFinding,
@@ -9171,12 +9184,12 @@ declare class Performance {
    * calendar quarter and year. FYTD is the first observation on or after the
    * fiscal calendar start of `fiscalConfig` through `refDate`. Holidays are not
    * skipped. The first included simple return still spans the prior close.
-   * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
+   * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end. Omitted or `null` is the last active date; the result's `ref_date` states the date used.
    * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` is the calendar year (`FiscalConfig::default`).
-   * @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
-   * @throws Error - Rejects an invalid ISO `ref_date` or a result that cannot be serialized to JavaScript.
+   * @returns The window end `ref_date` and per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
+   * @throws Error - Rejects an invalid ISO `ref_date`, an omitted one while no dates are active, or a result that cannot be serialized to JavaScript.
    */
-  lookbackReturns(refDate: string, fiscalConfig?: FiscalConfig | null): LookbackReturns;
+  lookbackReturns(refDate?: string | null, fiscalConfig?: FiscalConfig | null): LookbackReturns;
   /**
    * Aggregated period statistics for one asset at the given frequency. Without
    * a fiscal calendar, Gregorian periods are bucketed with ISO weeks.
@@ -9837,6 +9850,19 @@ export interface FactorRiskNamespace {
    * @throws Error - Throws a `validation` error if `decomp` is malformed, and a `not_found` error if the position is not in the decomposition.
    */
   positionComponentVar(decomp: PositionRiskDecomposition | string, positionId: string): number;
+  /**
+   * Evaluate a risk budget against a position risk decomposition.
+   * @param decomp - `PositionRiskDecomposition` object or JSON, as returned by `parametricVarDecomposition` or `historicalVarDecomposition`.
+   * @param targetVarPct - Target fraction of portfolio VaR in `[0, 1]` per position, aligned with `decomp.var_contributions`; non-empty targets must sum to one within 0.05.
+   * @param utilizationThreshold - Optional actual-to-target ratio that flags a budget breach; omit for the Rust default of 1.2.
+   * @returns `RiskBudgetResult`: per-position `positions` rows, `total_overbudget` and `has_breach`.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `decomp` is malformed, `targetVarPct` does not have one entry per position, targets are non-finite, outside [0, 1] or do not sum to one, the threshold is non-positive, or nonzero component VaR is paired with zero portfolio VaR.
+   */
+  evaluateRiskBudgetFromDecomposition(
+    decomp: PositionRiskDecomposition | string,
+    targetVarPct: number[] | Float64Array,
+    utilizationThreshold?: number | null
+  ): RiskBudgetResult;
   /**
    * Decompose portfolio risk into factor and position contributions.
    *
@@ -23169,10 +23195,37 @@ export interface ValuationInstrumentsNamespace {
    * console.log(ytm.unit, bucket.components, bucket.bucketed);
    * ```
    * @param keys - Canonical scalar or qualified wire keys in output order. Custom keys retain unknown units; malformed or obsolete encodings are rejected.
-   * @returns Ordered metadata records preserving original keys, decoded components, native unit families, display groups, and bucket eligibility.
+   * @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.
    * @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.
    */
   metricMetadata(keys: string[]): MetricMetadata[];
+  /**
+   * Wire names of the mutually exclusive price-driving market quotes.
+   * @returns Field names as they appear on the wire, in precedence order.
+   * @throws Error - Throws a `computation` error only if the names cannot cross the boundary.
+   */
+  priceDriverFields(): string[];
+  /**
+   * Units of the scalar `TrancheMetrics` fields, in struct order.
+   * @param currency - ISO-4217 code of the result's `TrancheMetrics.currency`, in any ASCII case; it names the unit of `pv`, `accrued` and `cs01`.
+   * @returns One `MetricFieldUnit` per scalar field: the wire field name, its unit text and the Rust field that documents it. `tranche_id`, `currency` and the `metrics` map are not listed.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  trancheMetricFieldUnits(currency: string): MetricFieldUnit[];
+  /**
+   * Units of the tranche break-even CDR, discount margin and OAS results.
+   * @returns `TrancheSolveFieldUnits`: `breakeven_cdr` and `discount_margin`, each one `MetricFieldUnit`, and `oas`, one `MetricFieldUnit` per `OasResult` field in struct order.
+   */
+  trancheSolveFieldUnits(): TrancheSolveFieldUnits;
+  /**
+   * Calendar-year ladders of a cashflow envelope, one per row currency.
+   * @param envelope - `InstrumentCashflowEnvelope` returned by `instrumentCashflows`, as an object or JSON.
+   * @returns One `CurrencyLadder` per row currency, in first-appearance order of `flows`; rows ascend by year.
+   * @throws Error - Throws a `validation` error if `envelope` is malformed or an amount or native PV is non-finite.
+   */
+  calendarYearLadderByCurrency(
+    envelope: generated.valuations.InstrumentCashflowEnvelope | string
+  ): CurrencyLadder[];
   /**
    * List the standard metrics registered for one instrument type, grouped by
    * display category.
@@ -27018,6 +27071,17 @@ export interface ModelCreditNamespace {
    */
   migration: CreditMigrationNamespace;
   /**
+   * One Merton report: the model, its term structure, grades and CDS terms.
+   *
+   * An equity source takes the KMV default point (short-term debt plus half of
+   * long-term debt) as its barrier, and grades come from the default PD master
+   * scale, so every host gets the same numbers.
+   * @param request - `MertonReportRequest` object or JSON text: `source` (`{ kind: "model", model }` with canonical `MertonModel` JSON, or `{ kind: "equity", equity_value, equity_vol, short_term_debt, long_term_debt, risk_free_rate, payout_rate, maturity }` in the firm's monetary unit, decimals and years), `horizons` (years, finite and positive, in display order), `maturity` (CDS and implied-equity years) and `recovery` (decimal fraction of par).
+   * @returns `MertonReport` plain object; per-horizon arrays align with `horizons`, and a measure Rust rejects for this model is `null` with its message under its field name in `errors`.
+   * @throws Error - Throws with kind `validation` if the request is malformed or has an unknown field, a horizon is non-finite or not positive, or the equity calibration rejects its inputs.
+   */
+  mertonReport(request: generated.models.MertonReportRequest | string): generated.models.MertonReport;
+  /**
    * Moody's WARF rating factor for one credit rating.
    * @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`; agency notches are normalized by the Rust parser.
    * @returns The Moody's weighted-average rating factor for that rating (for example 610 for Baa3).
@@ -30843,6 +30907,13 @@ export interface AttributionNamespace {
    */
   pnlAttributionPctOfTotal(pnl: PnlAttribution | string, amount: number): number | undefined;
   /**
+   * Every money bucket with its share of total P&L, in the struct's field order.
+   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @returns One `PnlBucketShare` per bucket: the attribute's wire `field`, its `amount` in the `total_pnl` currency and `pct_of_total` in signed percentage points, `null` when `total_pnl` is effectively zero.
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+   */
+  pnlAttributionPctOfTotalByBucket(pnl: PnlAttribution | string): PnlBucketShare[];
+  /**
    * Whether the attribution residual is within tolerance (twin of Python `PnlAttribution.residual_within_tolerance`).
    * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
    * @param pctTolerance - Optional percentage tolerance (`0.1` = 0.1%); omitted uses the run's `meta.tolerance_pct`.
@@ -31170,6 +31241,13 @@ export interface ModelBuilder extends WasmOwned {
    * @throws Error with kind `validation` if `availabilityDates` is malformed, the node does not exist or the builder was consumed.
    */
   availabilityDates(nodeId: string, availabilityDates: Record<string, string> | string): void;
+  /**
+   * Declare how an existing line rolls up to a coarser reporting frequency.
+   * @param nodeId - Existing node to declare the method on.
+   * @param rollup - `"sum"` for flows, `"period_end"` for balances and trailing metrics, `"formula"` for ratios. A rollup rejects `"formula"` on a node without a formula, and a `RollupSpec` entry for the node overrides this declaration.
+   * @throws Error with kind `validation` if `rollup` is not a recognized method, the node does not exist or the builder was consumed.
+   */
+  rollup(nodeId: string, rollup: generated.statements.RollupMethod): void;
   /**
    * Add a calculated node defined by a DSL formula.
    *
@@ -31503,6 +31581,12 @@ export interface MixedNodeBuilder extends WasmOwned {
    */
   name(name: string): void;
   /**
+   * Declare how this line rolls up to a coarser reporting frequency.
+   * @param rollup - `"sum"` for flows, `"period_end"` for balances and trailing metrics, `"formula"` for ratios. A rollup rejects `"formula"` on a node without a formula, and a `RollupSpec` entry for the node overrides this declaration.
+   * @throws Error with kind `validation` if `rollup` is not a recognized method or the builder was consumed.
+   */
+  rollup(rollup: generated.statements.RollupMethod): void;
+  /**
    * Finish the node and return the model builder.
    *
    * Twin of Python `MixedNodeBuilder.build` (Rust `MixedNodeBuilder::build`).
@@ -31812,7 +31896,7 @@ export interface StatementsNamespace {
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
    * @param model - The `FinancialModelSpec` the result was evaluated from (object or JSON); it supplies the period dates and the formulas of `formula` nodes.
    * @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"` default, `"period_end"`, `"formula"`) (object or JSON).
-   * @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), without `node_sources`, capital-structure cashflows or a check report.
+   * @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), with those periods in `periods` (each actual only when every source period is), without `node_sources`, capital-structure cashflows or a check report.
    * @throws Error - Throws with kind `validation` if an input is malformed, the target frequency is not a whole multiple of the model's, a target period is incomplete, a method names an unknown node, a `formula` node has no formula or reads `cs.*` values, or a re-evaluated formula fails.
    */
   statementResultRollup(
@@ -31820,6 +31904,17 @@ export interface StatementsNamespace {
     model: JsonInput,
     spec: generated.statements.RollupSpec | string
   ): StatementResult;
+  /**
+   * List the rollup methods a model's lines declare. A line that declares nothing is not listed and sums, whatever its tags say.
+   * @param model - The `FinancialModelSpec` whose node declarations are listed (object or JSON); nothing is evaluated.
+   * @param frequency - Target frequency stored on the spec: `"quarterly"`, `"semi_annual"` or `"annual"`. `statementResultRollup` checks it against the model's periods.
+   * @returns `RollupSpec` plain object with the `frequency` and every declared node with its method in model order; `methods` is omitted when no node declares one.
+   * @throws Error - Throws with kind `validation` if the model is malformed or `frequency` is not a recognized label.
+   */
+  rollupSpecDefaultFor(
+    model: JsonInput,
+    frequency: 'quarterly' | 'semi_annual' | 'annual'
+  ): generated.statements.RollupSpec;
   /**
    * Period-to-value map of one node.
    *
@@ -32417,14 +32512,14 @@ export interface StatementsAnalyticsNamespace {
    * @param resultJson - Result JSON produced by a prior call.
    * @param metricNode - Statement metric node identifier selected for the requested analysis.
    * @param period - Required model period, such as `"2025Q4"`, at which the metric is read in the baseline and every scenario; a shock replaces one forecast cell, so the metric moves only in the shocked period and in later periods whose formulas read it.
-   * @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key.
-   * @throws Error - Rejects malformed `result_json`, an invalid `period` identifier, or a full-grid run, a scenario that does not identify exactly one perturbed parameter, an absent unperturbed baseline, a missing target metric or period, non-finite metric values or impacts, or failure to convert the entries to JavaScript.
+   * @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key; `null` for a full-grid run, whose scenarios combine parameters and cannot be ranked.
+   * @throws Error - Rejects malformed `result_json`, an invalid `period` identifier, or a one-at-a-time run whose scenario does not identify exactly one perturbed parameter, an absent unperturbed baseline, a missing target metric or period, non-finite metric values or impacts, or failure to convert the entries to JavaScript.
    */
   generateTornadoEntries(
     resultJson: JsonInput,
     metricNode: string,
     period: string
-  ): TornadoEntry[];
+  ): TornadoEntry[] | null;
   /**
    * Find the driver value that makes a target node reach a target value.
    *
@@ -34799,6 +34894,14 @@ export interface ScenariosNamespace {
    * @throws Error - Throws a `TypeError` when `result` is not an object or JSON string, and a `validation` error when it is not a `HorizonResult`.
    */
   horizonResultExplainText(result: HorizonReport | HorizonResult | string): string;
+  /**
+   * The valuation date that holds after a scenario.
+   * @param report - `ApplicationReport` returned by `applyScenario`, as an object or JSON.
+   * @param asOf - ISO-8601 valuation date the scenario was applied at, returned unchanged without a roll.
+   * @returns ISO-8601 date: the roll's new date, else `asOf`.
+   * @throws Error - Throws a `TypeError` when an argument has the wrong type, and a `validation` error when `report` is not an `ApplicationReport` or `asOf` is not an ISO date.
+   */
+  applicationReportEffectiveAsOf(report: ApplicationReport | string, asOf: string): string;
   /**
    * One attribution factor's P&L as a fraction of the initial value.
    *

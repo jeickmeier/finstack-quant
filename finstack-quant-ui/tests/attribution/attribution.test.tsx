@@ -1,7 +1,6 @@
 import { createRequire } from "node:module";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { attributePnlManyOptions } from "@/hooks/attribution/use-attribute-pnl-many/use-attribute-pnl-many";
-import { attributionFactorFields } from "@/components/finstack/attribution/components/pnl-attribution-report/pnl-attribution-report";
 import {
   unwrap,
   type AttributePnlManyRequest,
@@ -78,13 +77,9 @@ it.each(
       expected.residualWithinTolerance,
     );
     // Rust returns -0 for a zero share; JSON reads it as 0.
-    expect(JSON.parse(JSON.stringify(result!.pctOfTotal))).toEqual(
-      expected.pctOfTotal,
+    expect(JSON.parse(JSON.stringify(result!.buckets))).toEqual(
+      expected.buckets,
     );
-    // Rust's share per bucket, keyed in the report's factor order.
-    expect(Object.keys(result!.pctOfTotal)).toEqual([
-      ...attributionFactorFields,
-    ]);
   },
   budget(20000),
 );
@@ -93,7 +88,10 @@ it("pins Rust's bond figures: an all-rates parallel shock, and carry plus rates 
   expect(parallel.attribution!.total_pnl.amount).toBe("-4895.657693227");
   expect(parallel.attribution!.rates_curves_pnl.amount).toBe("-4895.657693227");
   expect(parallel.attribution!.waterfall_steps).toBeUndefined();
-  expect(parallel.pctOfTotal!.rates_curves_pnl).toBe(100);
+  expect(
+    parallel.buckets!.find((bucket) => bucket.field === "rates_curves_pnl")!
+      .pct_of_total,
+  ).toBe(100);
   const sameDate = workbench("usd-ois-50bp", "waterfall");
   expect(sameDate.attribution!.waterfall_steps).toHaveLength(9);
   const rolled = workbench("roll-1m-25bp", "waterfall");

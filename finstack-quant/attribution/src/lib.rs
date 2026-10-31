@@ -154,6 +154,7 @@ pub use detail::{
 };
 pub use result::{
     AttributionFactor, AttributionMeta, AttributionMethod, ExecutionPolicy, PnlAttribution,
+    PnlBucketShare,
 };
 
 /// Snapshot/restore primitives used by benches and integration tests.

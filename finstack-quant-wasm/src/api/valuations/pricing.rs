@@ -406,13 +406,68 @@ pub fn metrics_for_instrument(instrument_type: JsValue) -> Result<JsValue, JsVal
 ///
 /// * `keys` - Canonical scalar or qualified wire keys in output order. Custom
 ///   keys retain unknown units; malformed or obsolete encodings are rejected.
-/// @returns Ordered metadata records preserving original keys, decoded components, native unit families, display groups, and bucket eligibility.
+/// @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.
 /// @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.
 #[wasm_bindgen(js_name = metricMetadata)]
 pub fn metric_metadata(keys: JsValue) -> Result<JsValue, JsValue> {
     let keys = js_string_seq(&keys, "keys")?;
     let metadata = finstack_quant_valuations::pricer::metric_metadata(&keys).map_err(to_js_err)?;
     to_js_value(&metadata)
+}
+
+/// Wire names of the mutually exclusive price-driving market quotes.
+///
+/// Validation rejects more than one of these on a
+/// `instrument_pricing_overrides.market_quotes` object, so a host editor can
+/// clear the others when one is entered. Other quotes, such as
+/// `implied_volatility`, are not in the set.
+/// @returns Field names as they appear on the wire, in precedence order.
+/// @throws Error - Throws a `computation` error only if the names cannot cross the boundary.
+#[wasm_bindgen(js_name = priceDriverFields)]
+pub fn price_driver_fields() -> Result<JsValue, JsValue> {
+    to_js_value(&finstack_quant_valuations::instruments::pricing_overrides::MarketQuoteOverrides::price_driver_fields())
+}
+
+/// Calendar-year ladders of a cashflow envelope, one per row currency.
+///
+/// Free-function twin of Python `InstrumentCashflowEnvelope.calendar_year_ladder_by_currency`
+/// (Rust `InstrumentCashflowEnvelope::calendar_year_ladder_by_currency`). Currencies never mix;
+/// each ladder reads `native_pv`, the row-currency PV before FX conversion and any scenario price shock.
+/// @param envelope - `InstrumentCashflowEnvelope` returned by `instrumentCashflows`, as an object or JSON.
+/// @returns One `CurrencyLadder` per row currency, in first-appearance order of `flows`; rows ascend by year.
+/// @throws Error - Throws a `validation` error if `envelope` is malformed or an amount or native PV is non-finite.
+#[wasm_bindgen(js_name = calendarYearLadderByCurrency)]
+pub fn calendar_year_ladder_by_currency(envelope: JsValue) -> Result<JsValue, JsValue> {
+    let envelope: finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope =
+        crate::utils::input::from_js_json(&envelope, "envelope")?;
+    to_js_value(
+        &envelope
+            .calendar_year_ladder_by_currency()
+            .map_err(to_js_err)?,
+    )
+}
+
+/// Units of the tranche break-even CDR, discount margin and OAS results.
+///
+/// Those solvers document their units in prose and do not state them on the wire.
+/// Values are never rescaled.
+/// @returns `TrancheSolveFieldUnits`: `breakeven_cdr` and `discount_margin`, each one `MetricFieldUnit`, and `oas`, one `MetricFieldUnit` per `OasResult` field in struct order.
+#[wasm_bindgen(js_name = trancheSolveFieldUnits)]
+pub fn tranche_solve_field_units() -> Result<JsValue, JsValue> {
+    to_js_value(&finstack_quant_valuations::pricer::tranche_solve_field_units())
+}
+
+/// Units of the scalar `TrancheMetrics` fields, in struct order.
+///
+/// `TrancheMetrics` documents these units in prose and does not state them on
+/// the wire. Values are never rescaled.
+/// @param currency - ISO-4217 code of the result's `TrancheMetrics.currency`, in any ASCII case; it names the unit of `pv`, `accrued` and `cs01`.
+/// @returns One `MetricFieldUnit` per scalar field: the wire field name, its unit text and the Rust field that documents it. `tranche_id`, `currency` and the `metrics` map are not listed.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = trancheMetricFieldUnits)]
+pub fn tranche_metric_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::tranche_metric_field_units(currency))
 }
 
 /// List every pricing model key registered in the standard pricer registry.

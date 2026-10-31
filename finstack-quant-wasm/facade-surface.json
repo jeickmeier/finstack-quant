@@ -117,6 +117,7 @@
       "defaultWaterfallOrder",
       "pnlAttributionExplainText",
       "pnlAttributionPctOfTotal",
+      "pnlAttributionPctOfTotalByBucket",
       "pnlAttributionRequiredMetrics",
       "pnlAttributionResidualWithinTolerance",
       "pnlAttributionValidateCurrencies",
@@ -166,6 +167,9 @@
     "kind": "function"
   },
   "attribution.pnlAttributionPctOfTotal": {
+    "kind": "function"
+  },
+  "attribution.pnlAttributionPctOfTotalByBucket": {
     "kind": "function"
   },
   "attribution.pnlAttributionResidualWithinTolerance": {
@@ -2579,6 +2583,7 @@
       "ToggleExerciseModel",
       "lgd",
       "liabilityManagement",
+      "mertonReport",
       "migration",
       "moodysWarfFactor",
       "pd",
@@ -2678,6 +2683,9 @@
     "statics": ["defaultCalibration", "fromJson", "fromRegistryId"],
     "methods": ["free", "getFactor", "toJson"],
     "getters": ["agency", "defaultFactor", "methodology"]
+  },
+  "models.credit.mertonReport": {
+    "kind": "function"
   },
   "models.credit.moodysWarfFactor": {
     "kind": "function"
@@ -3035,6 +3043,7 @@
       "decomposeFactors",
       "defaultUtilizationThreshold",
       "evaluateRiskBudget",
+      "evaluateRiskBudgetFromDecomposition",
       "historicalVarDecomposition",
       "parametricVarDecomposition",
       "positionComponentVar"
@@ -3047,6 +3056,9 @@
     "kind": "function"
   },
   "models.factor.risk.evaluateRiskBudget": {
+    "kind": "function"
+  },
+  "models.factor.risk.evaluateRiskBudgetFromDecomposition": {
     "kind": "function"
   },
   "models.factor.risk.buildStressAttribution": {
@@ -3796,6 +3808,7 @@
   "scenarios": {
     "kind": "namespace",
     "keys": [
+      "applicationReportEffectiveAsOf",
       "applyScenario",
       "buildFromTemplate",
       "buildTemplateComponent",
@@ -3873,6 +3886,9 @@
   "scenarios.scenarioSpecMutatesInstruments": {
     "kind": "function"
   },
+  "scenarios.applicationReportEffectiveAsOf": {
+    "kind": "function"
+  },
   "scenarios.horizonResultExplainText": {
     "kind": "function"
   },
@@ -3933,6 +3949,7 @@
       "normalize",
       "parseAndCompile",
       "parseFormula",
+      "rollupSpecDefaultFor",
       "schema",
       "statementResultAllPeriods",
       "statementResultGet",
@@ -3997,6 +4014,7 @@
       "periods",
       "periodsExplicit",
       "reportingCurrency",
+      "rollup",
       "value",
       "valueMoney",
       "valueScalar",
@@ -4011,7 +4029,7 @@
     "kind": "class",
     "constructor": false,
     "statics": [],
-    "methods": ["build", "forecast", "formula", "free", "name", "values", "valuesMoney"],
+    "methods": ["build", "forecast", "formula", "free", "name", "rollup", "values", "valuesMoney"],
     "getters": []
   },
   "statements.validateFinancialModelJson": {
@@ -4075,6 +4093,9 @@
     "kind": "function"
   },
   "statements.statementResultRollup": {
+    "kind": "function"
+  },
+  "statements.rollupSpecDefaultFor": {
     "kind": "function"
   },
   "statements.statementResultGetNode": {
@@ -4537,6 +4558,7 @@
       "bondFromCashflowsJson",
       "calculatePoolStats",
       "calculateVar",
+      "calendarYearLadderByCurrency",
       "cdsIndexParamsCdxNaHy",
       "cdsIndexParamsCdxNaIg",
       "cdsIndexParamsItraxxEurope",
@@ -4561,14 +4583,17 @@
       "prepaymentPenaltyStepDown",
       "prepaymentPenaltyYieldMaintenance",
       "prettyInstrumentJson",
+      "priceDriverFields",
       "priceInstrument",
       "priceInstrumentWithMarket",
       "trancheBreakevenCdr",
       "trancheBuilder",
       "trancheDiscountMargin",
+      "trancheMetricFieldUnits",
       "trancheMetrics",
       "trancheOas",
       "trancheScenarioTable",
+      "trancheSolveFieldUnits",
       "trancheStructureFromBalances",
       "validateInstrumentJson",
       "validateTypedInstrumentJson",
@@ -4780,6 +4805,12 @@
   "valuations.instruments.instrumentCashflowsWithMarket": {
     "kind": "function"
   },
+  "valuations.instruments.calendarYearLadderByCurrency": {
+    "kind": "function"
+  },
+  "valuations.instruments.trancheSolveFieldUnits": {
+    "kind": "function"
+  },
   "valuations.instruments.calculateVar": {
     "kind": "function"
   },
@@ -4799,6 +4830,12 @@
     "kind": "function"
   },
   "valuations.instruments.metricsForInstrument": {
+    "kind": "function"
+  },
+  "valuations.instruments.priceDriverFields": {
+    "kind": "function"
+  },
+  "valuations.instruments.trancheMetricFieldUnits": {
     "kind": "function"
   },
   "valuations.instruments.trancheDiscountMargin": {

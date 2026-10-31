@@ -763,16 +763,20 @@ impl PyNodeSpec {
     ///     Optional DSL predicate; periods where it is false evaluate to 0.
     /// tags : list[str] | None
     ///     Free-form labels for grouping and filtering.
+    /// rollup : str | None
+    ///     How the line rolls up to a coarser frequency: ``"sum"`` (flows),
+    ///     ``"period_end"`` (balances, trailing metrics) or ``"formula"``
+    ///     (ratios). ``None`` sums. A ``RollupSpec`` entry overrides it.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If a period id does not parse or a value is neither numeric nor
-    ///     ``Money``.
+    ///     If a period id does not parse, a value is neither numeric nor
+    ///     ``Money``, or ``rollup`` is not a recognized method.
     #[new]
     #[pyo3(
-        signature = (node_id, node_type, name=None, values=None, forecast=None, formula_text=None, where_text=None, tags=None),
-        text_signature = "(node_id, node_type, name=None, values=None, forecast=None, formula_text=None, where_text=None, tags=None)"
+        signature = (node_id, node_type, name=None, values=None, forecast=None, formula_text=None, where_text=None, tags=None, rollup=None),
+        text_signature = "(node_id, node_type, name=None, values=None, forecast=None, formula_text=None, where_text=None, tags=None, rollup=None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -784,6 +788,7 @@ impl PyNodeSpec {
         formula_text: Option<String>,
         where_text: Option<String>,
         tags: Option<Vec<String>>,
+        rollup: Option<&str>,
     ) -> PyResult<Self> {
         let mut inner = NodeSpec::new(node_id, node_type.inner);
         inner.name = name;
@@ -795,6 +800,10 @@ impl PyNodeSpec {
         inner.formula_text = formula_text;
         inner.where_text = where_text;
         inner.tags = tags.unwrap_or_default();
+        inner.rollup = rollup
+            .map(finstack_quant_core::wire::serde_parse)
+            .transpose()
+            .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -879,6 +888,17 @@ impl PyNodeSpec {
     #[getter]
     fn tags(&self) -> Vec<String> {
         self.inner.tags.clone()
+    }
+
+    /// Declared rollup method label, or ``None`` when the line declares none.
+    #[getter]
+    fn rollup(&self) -> PyResult<Option<String>> {
+        self.inner
+            .rollup
+            .as_ref()
+            .map(finstack_quant_core::wire::serde_label)
+            .transpose()
+            .map_err(core_to_py)
     }
 
     /// Declared or inferred value type: ``"monetary"``, ``"scalar"``, or

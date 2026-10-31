@@ -27,6 +27,7 @@ DEFAULT_UTILIZATION_THRESHOLD = _risk.DEFAULT_UTILIZATION_THRESHOLD
 parametric_var_decomposition = _risk.parametric_var_decomposition
 historical_var_decomposition = _risk.historical_var_decomposition
 evaluate_risk_budget = _risk.evaluate_risk_budget
+evaluate_risk_budget_from_decomposition = _risk.evaluate_risk_budget_from_decomposition
 build_stress_attribution = _risk.build_stress_attribution
 position_component_var = _risk.position_component_var
 decompose_factors = _risk.decompose_factors
@@ -48,6 +49,7 @@ __all__: list[str] = [
     "build_stress_attribution",
     "decompose_factors",
     "evaluate_risk_budget",
+    "evaluate_risk_budget_from_decomposition",
     "historical_var_decomposition",
     "parametric_var_decomposition",
     "position_component_var",

@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+### UI boundary: rules decided in Rust
+
+`check-worker-compose` (`ui-check`) now flags a worker service that decides from a native result; pure composition takes `// finstack-compose: <reason>`.
+
+#### Changed
+
+- `Performance::lookback_returns` takes `Option<Date>` (Python `ref_date=None`, WASM optional `refDate`) and defaults to the last active date, erroring when none is active; it returns `Result`. `LookbackReturns` gains a required `ref_date` stating the date the windows ended on.
+- `generate_tornado_entries` (Python `generate_tornado_entries`, WASM `statements_analytics.generateTornadoEntries`) returns `None` / `null` for a full-grid result instead of an error. A full grid has no tornado by construction, so a host no longer checks the mode first.
+
+#### Removed
+
+- The `rate-input` registry item and the UI's `rateColumn`, `rateToWire`, `convertRate`, `formatRate` and `RatePresentation`. Nothing in the registry used them, and they scaled rate units in JavaScript. Display percent is now `formatPercent`.
+
+#### Added
+
+- `models::credit::merton_report` (Python `models.credit.merton_report`, WASM `models.credit.mertonReport`) returns the full Merton report in one call. It owns the KMV default point of an equity source and the default master scale, so hosts cannot differ on them. A non-positive horizon now fails the whole report, and a measure rejected for the model is null with its message in `errors` rather than a structured error.
+- `MarketQuoteOverrides::price_driver_fields()` (Python and WASM `valuations.instruments.price_driver_fields` / `priceDriverFields`) publishes the mutually exclusive price-driving quote fields. `price_driver_count` reads the same definition, and `InstrumentForm` takes the list through `priceDriverFields` (connect `usePriceDriverFields`) instead of holding a copy.
+- `pricer::tranche_metric_field_units(currency)` (Python `tranche_metric_field_units`, WASM `valuations.instruments.trancheMetricFieldUnits`) publishes the unit and order of the scalar `TrancheMetrics` fields. `TrancheAnalytics` requires them as `metricUnits` (connect `useTrancheMetricFieldUnits`).
+- `MetricMetadata.coordinates`: for each entry of `components`, the `group` and numeric `value` (tenor in years or decimal strike) that order it on its axis. The UI sorts by these instead of parsing labels.
+- `PnlAttribution::pct_of_total_by_bucket()` (Python `PnlAttribution.pct_of_total_by_bucket`, WASM `attribution.pnlAttributionPctOfTotalByBucket`) lists every money bucket with its amount and share of total. `PnlAttributionReport` requires it as `buckets` and always shows the share column; `HorizonReturnReport` requires it as `attributionBuckets`. A bucket added to `PnlAttribution` now reaches the report, which previously hid it behind two JavaScript field lists.
+- `risk::evaluate_risk_budget_from_decomposition(decomposition, targets, threshold)` (Python `evaluate_risk_budget_from_decomposition`, WASM `models.factor.risk.evaluateRiskBudgetFromDecomposition`) evaluates a budget against a decomposition in one call, joining component VaR and portfolio VaR in Rust. `usePositionRisk` calls it.
+- `ApplicationReport::effective_as_of(as_of)` (Python `ApplicationReport.effective_as_of`, WASM `scenarios.applicationReportEffectiveAsOf`) returns the valuation date after a scenario: the time roll's new date, else `as_of`.
+- `InstrumentCashflowEnvelope::calendar_year_ladder_by_currency()` (Python `InstrumentCashflowEnvelope.calendar_year_ladder_by_currency`, WASM `valuations.instruments.calendarYearLadderByCurrency`) returns one `CurrencyLadder` per row currency over `native_pv`, so a host no longer partitions the flows or picks the PV column. `useCashflowLadder` calls it.
+- `pricer::tranche_solve_field_units()` (Python `tranche_solve_field_units`, WASM `valuations.instruments.trancheSolveFieldUnits`) publishes the units of the break-even CDR, discount margin and `OasResult` fields. `TrancheAnalytics` requires them as `solveUnits` (connect `useTrancheSolveFieldUnits`); `num_paths` now reads "paths".
+- `statements::types::ForecastParameters`, published as the `forecast_parameters` schema, states each forecast method's parameters in the wire shape of `ForecastSpec`. The workbench forecast editor renders it with `SchemaForm` instead of a per-method field table, so its field labels are now the Rust parameter names and optional fields appear behind Add.
+
+### UI: schema forms hold errors until an edit or a submit
+
+#### Changed
+
+- `SchemaForm` holds a field's validation issue until an edit touches its path or submit is attempted, and the first attempt shows them all. Choosing a union branch, adding an optional term or adding an array row no longer counts as an edit, so these actions no longer mark the field dirty. A form with `actions={false}` has no submit to attempt and shows its issues as before.
+
+### Statements: rollup methods declared per line
+
+#### Changed
+
+- `StatementResult` has a required `periods` field (Python `StatementResult.periods`): the model's periods for an evaluated result and the target periods for a rollup, each actual only when every source period is. Empty only for hand-built results. JSON without it no longer deserializes.
+
+#### Added
+
+- `NodeSpec.rollup` (Rust `NodeSpec::with_rollup`, Python `NodeSpec(..., rollup=...)`, WASM through the JSON model): each statement line declares its rollup method on the node. `StatementResult::rollup` resolves a line as its entry in `RollupSpec::methods`, then its declaration, then `sum`, so an empty spec gives every host the same numbers. A line resolving to `formula` with no formula is an error naming the node. `RollupMethod` moved from `statements::evaluator` to `statements::types`.
+- `ModelBuilder::rollup(node_id, method)` and `MixedNodeBuilder::rollup(method)` (Python `rollup`, WASM `rollup`) declare a line's method from the public builder, so no line has to drop to `NodeSpec` and `insert_node`.
+- `RollupSpec::default_for(&model, frequency)` (Python `RollupSpec.default_for`, WASM `statements.rollupSpecDefaultFor`) lists the declared methods so a host can seed its choices. The tag rule it briefly carried is gone: `balance_sheet`, `ratio` and `metric` tags no longer choose a method anywhere, so a model that relied on them sums until its lines declare `rollup`. The statements workbench no longer decides in JavaScript, and it now sends an explicit `sum` so choosing Sum overrides a line's declaration.
+
 ### Analytics: one path per capability
 
 #### Changed

@@ -1,5 +1,27 @@
 {
   "$defs": {
+    "MetricCoordinate": {
+      "additionalProperties": false,
+      "description": "Where one coordinate label sits on its axis.\n\nA host sorts by `group` and then by `value`, so maturity and strike order\nis not recovered by parsing label text.",
+      "properties": {
+        "group": {
+          "description": "Text the value is scoped by: the `{surface}::` of a vega row, empty for\na bare tenor or strike, and the whole label when it carries no number.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Tenor in years (`3m` is 0.25, per [`parse_key_rate_label`]) or the\ndecimal strike; `None` when the label carries no number.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "group"
+      ],
+      "type": "object"
+    },
     "MetricUnit": {
       "description": "Unit family of a metric value.\n\nThe classification follows the unit documented on each `MetricId`\nconstant. Currency-per-bump sensitivities (`dv01`, `cs01`, `vega`) are\nreported as [`MetricUnit::Currency`]: the value is a currency amount and\nthe bump is part of the metric's definition, not of its unit.",
       "oneOf": [
@@ -52,6 +74,16 @@
         "USD-OIS",
         "10y"
       ],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 10.0
+        }
+      ],
       "group": "Sensitivity",
       "key": "bucketed_dv01::USD-OIS::10y",
       "metric": "bucketed_dv01",
@@ -67,6 +99,13 @@
       "description": "Decoded coordinate labels in original order; empty for scalar metrics.",
       "items": {
         "type": "string"
+      },
+      "type": "array"
+    },
+    "coordinates": {
+      "description": "How each entry of `components` orders along its axis, aligned with it.",
+      "items": {
+        "$ref": "#/$defs/MetricCoordinate"
       },
       "type": "array"
     },
@@ -94,6 +133,7 @@
     "key",
     "metric",
     "components",
+    "coordinates",
     "unit",
     "bucketed"
   ],

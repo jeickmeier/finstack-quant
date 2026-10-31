@@ -189,6 +189,7 @@ function PricingOverrides({
         type="button"
         onClick={() => {
           onValueChange(undefined);
+          // finstack-arith: remount revision counter, not a value
           setGeneration((current) => current + 1);
         }}
       >

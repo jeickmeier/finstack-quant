@@ -5948,6 +5948,17 @@
           "$ref": "#/$defs/NodeType",
           "description": "Node computation type"
         },
+        "rollup": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RollupMethod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How this line rolls up to a coarser reporting frequency. A rollup uses\nits own per-line method first, then this; a line declaring nothing is\nsummed. Tags never choose a method."
+        },
         "tags": {
           "description": "Tags for grouping/filtering",
           "items": {
@@ -7116,6 +7127,26 @@
         {
           "const": "cds_imm",
           "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual.",
+          "type": "string"
+        }
+      ]
+    },
+    "RollupMethod": {
+      "description": "How one node's values combine over the source periods of a target period.",
+      "oneOf": [
+        {
+          "const": "sum",
+          "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nA missing source value leaves the target value missing.",
+          "type": "string"
+        },
+        {
+          "const": "period_end",
+          "description": "Take the last source period's value: balances such as cash, debt and\nequity, and trailing metrics such as last-twelve-month EBITDA.",
+          "type": "string"
+        },
+        {
+          "const": "formula",
+          "description": "Re-evaluate the node's formula (and `where` clause) on the rolled-up\nvalues: ratios such as margins, leverage and coverage. Time-series\nfunctions then run at the target frequency, so `lag(x, 1)` is the\nprior target period.",
           "type": "string"
         }
       ]

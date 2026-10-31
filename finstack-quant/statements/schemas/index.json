@@ -11,12 +11,21 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-      "bytes": 383715,
+      "bytes": 385073,
       "kind": "input",
       "path": "schemas/statements/1/financial_model_spec.schema.json",
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
       "title": "FinancialModelSpec",
       "type_name": "FinancialModelSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
+      "bytes": 20392,
+      "kind": "input",
+      "path": "schemas/statements/1/forecast_parameters.schema.json",
+      "summary": "One forecast method with its typed parameters, in the wire shape of ForecastSpec.",
+      "title": "ForecastParameters",
+      "type_name": "ForecastParameters"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
@@ -65,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
-      "bytes": 3759,
+      "bytes": 3858,
       "kind": "input",
       "path": "schemas/statements/1/rollup_spec.schema.json",
       "summary": "Target frequency and per-node methods for rolling statement results up to coarser periods.",
@@ -74,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-      "bytes": 70970,
+      "bytes": 72475,
       "kind": "output",
       "path": "schemas/statements/1/statement_result.schema.json",
       "summary": "Evaluated node values per period, with policy stamps.",

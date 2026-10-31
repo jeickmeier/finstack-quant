@@ -7,7 +7,7 @@ import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import type { MonteCarloResults } from "finstack-quant-wasm";
 import { Button } from "@/components/ui/button";
-import { formatRate, groupDecimal } from "@/lib/finstack/format/format";
+import { formatPercent, groupDecimal } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
@@ -17,12 +17,7 @@ import { FinstackTable } from "@/components/finstack/shared/table/finstack-table
 import { monteCarloConfigModule } from "./monte-carlo-config";
 
 /** Rust documents MonteCarloConfig percentiles and breach probabilities as fractions in [0, 1]; shown as percents. */
-const fraction = {
-  source: "statements::MonteCarloConfig::percentiles (fraction)",
-  wire: "decimal",
-  display: "percent",
-} as const;
-const percent = (value: number) => `${formatRate(value, fraction).text}%`;
+const percent = (value: number) => `${formatPercent(value)}%`;
 /** Every supplied digit, grouped; a non-finite native value shows as itself. */
 function exactValue(value: number): string {
   return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
@@ -124,13 +119,16 @@ export function StatementMonteCarlo({
   const percentiles = results?.percentiles ?? [];
   const chart = useMemo(() => {
     // Bands pair the lowest returned percentile with the highest, inwards.
+    // finstack-arith: draw order of the returned percentiles
     const ordered = [...percentiles].sort((a, b) => a - b);
     const bands: BandPoint[] = [];
     const lines: LinePoint[] = [];
     for (const period of periods) {
       const pairs = series?.values[period] as Pairs | undefined;
+      // finstack-arith: pairs returned percentiles for drawing; computes none
       for (let i = 0; i < Math.floor(ordered.length / 2); i += 1) {
         const low = at(pairs, ordered[i]!);
+        // finstack-arith: pairs returned percentiles for drawing; computes none
         const high = at(pairs, ordered[ordered.length - 1 - i]!);
         if (
           low !== undefined &&
@@ -139,6 +137,7 @@ export function StatementMonteCarlo({
           Number.isFinite(high)
         )
           bands.push({
+            // finstack-arith: pairs returned percentiles for drawing; computes none
             band: `${percent(ordered[i]!)}–${percent(ordered[ordered.length - 1 - i]!)}`,
             period,
             low,
@@ -148,7 +147,8 @@ export function StatementMonteCarlo({
       // An odd count leaves one middle percentile unpaired; it is drawn as a line.
       const middle =
         ordered.length % 2 === 1
-          ? ordered[(ordered.length - 1) / 2]
+          ? // finstack-arith: pairs returned percentiles for drawing; computes none
+            ordered[(ordered.length - 1) / 2]
           : undefined;
       const value = middle === undefined ? undefined : at(pairs, middle);
       if (value !== undefined && Number.isFinite(value))

@@ -59,4 +59,4 @@ pub use results::{
     CapitalStructureClaimCategory, CapitalStructureWarning, CellSource, EvalStats, EvalWarning,
     NumericMode, StatementResult,
 };
-pub use rollup::{RollupMethod, RollupSpec};
+pub use rollup::RollupSpec;

@@ -590,6 +590,11 @@
     "schema": "schemas/financial_model_spec.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
+    "source": "finstack-quant/statements/schemas/statements/1/forecast_parameters.schema.json",
+    "schema": "schemas/forecast_parameters.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
     "source": "finstack-quant/statements/schemas/statements/1/monte_carlo_config.schema.json",
     "schema": "schemas/monte_carlo_config.json"

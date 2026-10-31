@@ -69,6 +69,7 @@ function sliceView(result: CubeSlice) {
       slice.strikes.map((strike, column) => ({
         expiry: tenor,
         secondary: strike,
+        // finstack-arith: row-major index into the supplied flat grid
         value: slice.vols_row_major[row * slice.strikes.length + column]!,
         key: JSON.stringify([slice.id, slice.expiry, tenor, strike]),
       })),
@@ -244,6 +245,7 @@ export function VolCubeSlice(props: VolCubeSliceProps) {
           {strikes.map((text, index) => (
             <DecimalInput
               key={index}
+              // finstack-arith: 1-based ordinal for a label
               label={`Strike ${index + 1}`}
               value={text}
               onValueChange={(next) =>

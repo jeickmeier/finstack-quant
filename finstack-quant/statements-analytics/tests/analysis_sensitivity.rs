@@ -71,12 +71,16 @@ fn tornado_reads_the_metric_at_the_requested_period() {
     config.add_target_metric("cumulative_revenue");
     let result = run_sensitivity(&model, &config).unwrap();
 
-    let shocked = generate_tornado_entries(&result, "cumulative_revenue", quarter(4)).unwrap();
+    let shocked = generate_tornado_entries(&result, "cumulative_revenue", quarter(4))
+        .unwrap()
+        .unwrap();
     assert_eq!(shocked[0].parameter_id, "revenue@2025Q2");
     assert!((shocked[0].downside + 10.5).abs() < 1e-9, "{shocked:?}");
     assert!((shocked[0].upside - 10.5).abs() < 1e-9, "{shocked:?}");
 
-    let actual = generate_tornado_entries(&result, "cumulative_revenue", quarter(1)).unwrap();
+    let actual = generate_tornado_entries(&result, "cumulative_revenue", quarter(1))
+        .unwrap()
+        .unwrap();
     assert_eq!((actual[0].downside, actual[0].upside), (0.0, 0.0));
 }
 

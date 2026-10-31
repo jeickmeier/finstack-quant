@@ -21444,3 +21444,22 @@ export interface AttributionResultEnvelope {
    */
   schema: AttributionSchema;
 }
+/**
+ * One money bucket of a P&L attribution with its share of total P&L
+ */
+export interface PnlBucketShare {
+  /**
+   * The bucket's P&L as attributed, in the `total_pnl` currency.
+   */
+  amount: Money;
+  /**
+   * Wire name of the [`PnlAttribution`] field holding this bucket (`carry`,
+   * `rates_curves_pnl`, ..., `residual`).
+   */
+  field: string;
+  /**
+   * Signed share of total P&L in percentage points (`25.0` = 25%); `None`
+   * when `total_pnl` is effectively zero and the share is undefined.
+   */
+  pct_of_total?: number | null;
+}

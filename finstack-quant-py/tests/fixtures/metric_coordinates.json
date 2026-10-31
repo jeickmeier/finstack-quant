@@ -1,0 +1,14 @@
+{
+  "keys": [
+    "bucketed_dv01::USD-OIS::3m",
+    "bucketed_dv01::USD-OIS::10y",
+    "bucketed_vega::SURF_x3a_x3a0.25y::1.05",
+    "pv01::USD-OIS"
+  ],
+  "coordinates": [
+    [{ "group": "USD-OIS", "value": null }, { "group": "", "value": 0.25 }],
+    [{ "group": "USD-OIS", "value": null }, { "group": "", "value": 10.0 }],
+    [{ "group": "SURF::", "value": 0.25 }, { "group": "", "value": 1.05 }],
+    [{ "group": "USD-OIS", "value": null }]
+  ]
+}

@@ -200,6 +200,16 @@ add no curated label maps for those names. A composing editor presents the
 choices its own controls offer: instrument-form's desk-quote and term-sheet
 tables, the statements workbench's forecast and rollup method lists and the
 valuation-details raw-detail labels.
+`check-no-arithmetic` enforces this in `ui-check`: arithmetic in `registry/` or
+`src/` needs a `// finstack-arith: <reason>` comment or a reasoned glob in
+`scripts/no-arithmetic-allow.json`, and financial logic moves to Rust.
+`check-worker-compose` flags an `if`, `?:`, `??`, loop or `.map`-style iteration in
+`registry/shared/file/services/**` that reads a native result: a decision moves
+to Rust and pure composition takes `// finstack-compose: <reason>`. A value traces
+from the service's `native` parameter by symbol; request arguments, handle-passing
+chains, plain maps over user-supplied points and `x ?? null` are not flagged. The
+test for any line of JS: would Python get a different number or decision without
+it?
 
 Generated interfaces describe wire shapes and cannot express every runtime
 constraint (bounds, patterns or exclusive unions). They are not WASM host types.
@@ -384,10 +394,9 @@ host (inside the worker for browser consumers). Column presets target Table
 `labelFor` (`label.mjs`, also used by `registry-content` for item titles) turns a
 Rust wire or metric name into a sentence-case label with one set of upright
 market acronyms; it is typography only and adds no financial names.
-`compareTenorLabels` puts whole-label `Nm`/`Ny` tenors first in maturity order on
-Rust's year basis (a month is 1/12 year). Other labels compare run by run:
-numbers by value, an embedded tenor run such as vega's `SURF::0.25y` in years,
-and text by en-US collation; ties fall back to the full label.
+`compareCoordinates` sorts coordinate labels by the group and value Rust publishes
+on `MetricMetadata.coordinates` (a tenor in years or a decimal strike), then by
+the label text; nothing parses a label for its maturity.
 
 ## Controlled primitives
 
@@ -461,11 +470,10 @@ canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns the
 envelope object. `CashflowViewer` accepts that object as `cashflows` plus optional loading/error props and needs no provider. It presents native rows in a table, with `serializeHost` JSON copy/download in a secondary **Envelope JSON** disclosure;
 unsupported export preserves caller pricing/model state and shows the native error. The workbench owns one cashflow query for both display and its print snapshot.
 `useCashflowLadder` (the individual `use-cashflow-ladder` item, beside
-`use-cashflows`) takes that envelope object; the worker partitions its flows by
-row currency in first-appearance order and calls `cashflows.calendarYearLadder`
-once per currency over each flow's `native_pv`, the row-currency PV before FX
-conversion and any scenario price shock (Rust requires PVs in the units of the
-amounts). `CashflowViewer`'s optional `ladder` (and `ladderError`) props add a
+`use-cashflows`) takes that envelope object and calls
+`valuations.instruments.calendarYearLadderByCurrency`: one ladder per row
+currency in first-appearance order, each over `native_pv`, the row-currency PV
+before FX conversion and any scenario price shock. `CashflowViewer`'s optional `ladder` (and `ladderError`) props add a
 Schedule / Annual ladder toggle with one table per currency headed Native PV;
 nothing is summed or converted across currencies.
 `useDiffStatementScenarios` (`use-diff-statement-scenarios`) sends the scenario
@@ -513,7 +521,7 @@ report. Returns are MOIC only: IRR is not part of the native result.
 `statements_analytics.parameterSpecWithPercentages` (the base value is the
 evaluated cell, a missing or non-finite one sent as NaN), runs
 `runSensitivity` and returns its `generateTornadoEntries` at the target metric
-and period, or a null tornado for a `full_grid` run, which Rust cannot rank.
+and period, which Rust returns as null for a `full_grid` run it cannot rank.
 `useGoalSeek` (`use-goal-seek`) passes the target, driver, update flag and an
 optional bracket to `goalSeek`, leaving an unset bracket unset. Below the
 Scenarios tab's scenario set, `StatementSensitivity` shows the native tornado
@@ -791,9 +799,10 @@ disclosure, the scenario report. `PnlAttributionReport` (the `attribution`
 category) shows any returned `PnlAttribution`:
 total, mark-to-market and endpoint values, every factor bucket, a signed
 factor chart, the waterfall drawn only from Rust's `waterfall_steps`, the
-residual and the notes. Its optional `explain`, `residualWithinTolerance` and
-`pctOfTotal` props take Rust's `pnlAttributionExplainText`,
-`pnlAttributionResidualWithinTolerance` and `pnlAttributionPctOfTotal`;
+residual and the notes. Its required `buckets` prop takes Rust's
+`pnlAttributionPctOfTotalByBucket`, which names the buckets, their amounts and
+shares. Its optional `explain` and `residualWithinTolerance` props take
+`pnlAttributionExplainText` and `pnlAttributionResidualWithinTolerance`;
 without the residual check no verdict is shown. In `pricing-workbench` the
 horizon return sits in the Market scenario results tab under the applied
 scenario, with method and roll-calendar choices.
@@ -805,7 +814,7 @@ dates into JSON text, never parsing them, over the instrument envelopes in
 order (`attributePnl` takes an `AttributionSpec`, not an envelope). Each
 result comes back with `pnlAttributionExplainText`,
 `pnlAttributionResidualWithinTolerance` (the run's own tolerances) and
-`pnlAttributionPctOfTotal` per factor bucket, ready for
+`pnlAttributionPctOfTotalByBucket`, ready for
 `PnlAttributionReport`. Rust requires the method, so the request always
 carries one; every other input stays unset. `useDefaultWaterfallOrder` returns
 `defaultWaterfallOrder`, the factor order a `{waterfall: order}` method uses.
@@ -919,16 +928,14 @@ returns a `forwards` key, for example
 
 `useMertonModelValidator` (`@finstack/use-merton-model-validator`) returns
 canonical `MertonModel` JSON (`models.credit.MertonModel.fromJson`, `toJson`).
-`useMertonReport` builds the model from that JSON, or from an equity
-calibration (`MertonModel.kmvDefaultPoint(shortTermDebt, longTermDebt)`, then
-`fromEquity` with it as total debt), and returns the default probabilities,
-distances to default, implied and debt spreads per requested horizon, the CDS
-par spread and implied equity at the requested maturity, and the
-`models.credit.pd.MasterScale.defaultCalibration()` grades of the default
-probabilities. A measure Rust rejects for the model (the debt spread of a
-first-passage barrier, a CDS recovery that contradicts a CreditGrades mean
-recovery) keeps its native error beside the rest of the report. Both handles
-are freed. `MertonCalculator` composes `SchemaForm` over the generated
+`useMertonReport` makes one native call, `models.credit.mertonReport`, with the
+model as canonical JSON or an equity source Rust calibrates to the KMV default
+point. It returns the default probabilities, distances to default, implied and
+debt spreads per requested horizon, the CDS par spread and implied equity at the
+requested maturity, and the default PD master-scale grades. A measure Rust
+rejects for the model (the debt spread of a first-passage barrier, a CDS recovery
+that contradicts a CreditGrades mean recovery) carries its message beside the
+rest of the report. `MertonCalculator` composes `SchemaForm` over the generated
 `merton_model` contract (Rust publishes no example, so the form starts from the
 caller's request) or an equity-calibration form with the horizon and CDS
 inputs, and shows the returned report. The native fixture (the facade example
@@ -958,9 +965,8 @@ per model) is `tests/models/credit/scorecard.json`.
 `usePositionRisk` (`@finstack/use-position-risk`) decomposes position VaR and
 ES with `models.factor.risk.parametricVarDecomposition` (weights and a
 position covariance) or `historicalVarDecomposition` (position-major scenario
-P&L). With a budget it calls `evaluateRiskBudget` over
-`positionComponentVar(decomposition, id)` of each position, the target shares
-and the returned portfolio VaR; for a historical source it also calls
+P&L). With a budget it calls `evaluateRiskBudgetFromDecomposition` over the
+decomposition and the target shares; for a historical source it also calls
 `buildStressAttribution` of the same P&L. Omitted confidence, incremental flag
 and utilization threshold are left to Rust; the budget and stress attribution
 keep their own native errors beside the decomposition. `PortfolioRiskReport`

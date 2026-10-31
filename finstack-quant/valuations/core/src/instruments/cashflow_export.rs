@@ -50,6 +50,7 @@ use serde::Serialize;
 
 use crate::instruments::Instrument;
 use crate::pricer::{ModelKey, PricerKey};
+use finstack_quant_cashflows::aggregation::{calendar_year_ladder, CalendarYearLadderRow};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use std::collections::HashMap;
 
@@ -92,6 +93,60 @@ pub struct InstrumentCashflowEnvelope {
     /// exporter returns an error instead of emitting a non-reconciling
     /// envelope, so every successful response carries `true`.
     pub reconciles_with_base_value: bool,
+}
+
+/// One row currency's calendar-year ladder from an [`InstrumentCashflowEnvelope`].
+#[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CurrencyLadder {
+    /// Row currency every figure of `rows` is stated in.
+    pub currency: Currency,
+    /// Calendar-year non-principal, principal and native PV totals, by ascending year.
+    pub rows: Vec<CalendarYearLadderRow>,
+}
+
+impl InstrumentCashflowEnvelope {
+    /// Calendar-year ladders of this envelope, one per row currency.
+    ///
+    /// Currencies never mix: a ladder sums only the flows settling in its currency.
+    /// The ladders follow the first appearance of each currency in `flows`, and
+    /// each one reads [`CashflowRow::native_pv`], the row-currency PV before FX
+    /// conversion and any scenario price shock, because a ladder's PVs are in the
+    /// units of its amounts.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when an amount or native
+    /// PV is non-finite.
+    pub fn calendar_year_ladder_by_currency(
+        &self,
+    ) -> finstack_quant_core::Result<Vec<CurrencyLadder>> {
+        let mut groups: Vec<(Currency, Vec<&CashflowRow>)> = Vec::new();
+        for flow in &self.flows {
+            match groups
+                .iter_mut()
+                .find(|(currency, _)| *currency == flow.currency)
+            {
+                Some((_, rows)) => rows.push(flow),
+                None => groups.push((flow.currency, vec![flow])),
+            }
+        }
+        groups
+            .into_iter()
+            .map(|(currency, flows)| {
+                let dates: Vec<Date> = flows.iter().map(|flow| flow.date).collect();
+                let kinds: Vec<String> = flows.iter().map(|flow| flow.kind.to_string()).collect();
+                let kinds: Vec<&str> = kinds.iter().map(String::as_str).collect();
+                let amounts: Vec<f64> = flows.iter().map(|flow| flow.amount).collect();
+                let pvs: Vec<f64> = flows.iter().map(|flow| flow.native_pv).collect();
+                Ok(CurrencyLadder {
+                    currency,
+                    rows: calendar_year_ladder(&dates, &kinds, &amounts, &pvs)?,
+                })
+            })
+            .collect()
+    }
 }
 
 /// Single-row enriched cashflow view.
@@ -698,7 +753,76 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::sum_pvs;
+    use super::{sum_pvs, InstrumentCashflowEnvelope};
+    use finstack_quant_core::currency::Currency;
+
+    fn flow(
+        date: &str,
+        currency: &str,
+        kind: &str,
+        amount: f64,
+        native_pv: f64,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "date": date,
+            "amount": amount,
+            "currency": currency,
+            "kind": kind,
+            "accrual_factor": 0.0,
+            "year_fraction": 1.0,
+            "rate": null,
+            "discount_factor": 1.0,
+            "discount_curve_id": "USD-OIS",
+            "native_pv": native_pv,
+            "pv": native_pv * 2.0,
+        })
+    }
+
+    fn envelope(flows: Vec<serde_json::Value>) -> InstrumentCashflowEnvelope {
+        serde_json::from_value(serde_json::json!({
+            "instrument_id": "X",
+            "currency": "USD",
+            "model": "discounting",
+            "as_of": "2025-01-15",
+            "discount_curve_id": "USD-OIS",
+            "flows": flows,
+            "total_pv": 0.0,
+            "reconciles_with_base_value": true,
+        }))
+        .expect("valid envelope")
+    }
+
+    #[test]
+    fn ladder_splits_by_row_currency_in_first_appearance_order_on_native_pv() {
+        let ladders = envelope(vec![
+            flow("2026-01-15", "EUR", "fixed", 10.0, 9.0),
+            flow("2026-06-15", "USD", "fixed", 20.0, 18.0),
+            flow("2027-01-15", "EUR", "notional", 100.0, 80.0),
+            flow("2026-09-15", "EUR", "fixed", 5.0, 4.0),
+        ])
+        .calendar_year_ladder_by_currency()
+        .expect("ladders");
+
+        assert_eq!(
+            ladders.iter().map(|l| l.currency).collect::<Vec<_>>(),
+            [Currency::EUR, Currency::USD]
+        );
+        let eur = &ladders[0].rows;
+        assert_eq!(eur.iter().map(|r| r.year).collect::<Vec<_>>(), [2026, 2027]);
+        assert_eq!(eur[0].non_principal, 15.0);
+        // Native PV, never the reporting-currency `pv` column.
+        assert_eq!(eur[0].pv, 13.0);
+        assert_eq!(eur[1].principal, 100.0);
+        assert_eq!(ladders[1].rows[0].pv, 18.0);
+    }
+
+    #[test]
+    fn ladder_of_no_flows_is_empty() {
+        let ladders = envelope(vec![])
+            .calendar_year_ladder_by_currency()
+            .expect("ladders");
+        assert!(ladders.is_empty());
+    }
 
     #[test]
     fn total_pv_uses_compensated_summation_for_mixed_sign_flows() {

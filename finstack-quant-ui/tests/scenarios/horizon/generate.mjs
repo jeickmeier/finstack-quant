@@ -84,6 +84,9 @@ const cases = requests.map(({ name, draft, method, calendarId }) => {
       calendarId,
       report,
       explain: native.horizonResultExplainText(report),
+      attributionBuckets: native.pnlAttributionPctOfTotalByBucket(
+        report.attribution,
+      ),
     };
   } catch (error) {
     return {
@@ -100,7 +103,7 @@ await emit(
   new URL("cases.json", import.meta.url),
   serializeHost({
     description:
-      "Native horizon total returns of the results-fixture bond: the Rust-built spec, scenarios.computeHorizonReturn (omitted method, config and calendar left to Rust) and horizonResultExplainText, or the native error.",
+      "Native horizon total returns of the results-fixture bond: the Rust-built spec, scenarios.computeHorizonReturn (omitted method, config and calendar left to Rust) horizonResultExplainText and pnlAttributionPctOfTotalByBucket, or the native error.",
     sources: [
       {
         path: bondPath,

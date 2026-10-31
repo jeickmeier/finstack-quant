@@ -225,19 +225,33 @@ impl Performance {
     ///
     /// # Arguments
     ///
-    /// * `ref_date` - Inclusive end of each lookback window.
+    /// * `ref_date` - Inclusive end of each lookback window; `None` uses the last
+    ///   date of [`Self::get_active_dates`].
     /// * `fiscal_config` - Fiscal year start month and day for FYTD; `None`
     ///   uses [`FiscalConfig::default`], the calendar year (January 1).
     ///
     /// # Returns
     ///
-    /// Per-ticker compounded simple returns for MTD, QTD, YTD, and FYTD.
-    /// All four vectors contain one entry per ticker.
+    /// The date the windows ended on and per-ticker compounded simple returns for
+    /// MTD, QTD, YTD, and FYTD. All four vectors contain one entry per ticker.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `ref_date` is `None`
+    /// and the panel's active date range is empty.
     pub fn lookback_returns(
         &self,
-        ref_date: Date,
+        ref_date: Option<Date>,
         fiscal_config: Option<FiscalConfig>,
-    ) -> LookbackReturns {
+    ) -> finstack_quant_core::Result<LookbackReturns> {
+        let ref_date = match ref_date {
+            Some(date) => date,
+            None => *self.get_active_dates().last().ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "lookback_returns requires a ref_date when no dates are active".to_string(),
+                )
+            })?,
+        };
         // MTD/QTD/YTD starts are total over the representable range; FYTD falls
         // back to ref_date only when its fiscal start precedes Date::MIN.
         let month_start =
@@ -260,7 +274,8 @@ impl Performance {
             })
         };
 
-        LookbackReturns {
+        Ok(LookbackReturns {
+            ref_date,
             ticker_names: self.get_ticker_names().to_vec(),
             mtd: compute(month_start(ref_date.month())),
             qtd: compute(month_start(
@@ -268,7 +283,7 @@ impl Performance {
             )),
             ytd: compute(fiscal_start(FiscalConfig::calendar_year())),
             fytd: compute(fiscal_start(fiscal_config.unwrap_or_default())),
-        }
+        })
     }
 
     /// Period-aggregated statistics for a specific ticker.
@@ -498,16 +513,20 @@ mod tests {
         .expect("panel");
         let ref_date = on(2025, Month::May, 15);
 
-        let us_federal = perf.lookback_returns(ref_date, Some(FiscalConfig::us_federal()));
+        let us_federal = perf
+            .lookback_returns(Some(ref_date), Some(FiscalConfig::us_federal()))
+            .expect("lookback");
         assert_eq!(us_federal.mtd, vec![comp_total(&r[7..9])]);
         assert_eq!(us_federal.qtd, vec![comp_total(&r[5..9])]);
         assert_eq!(us_federal.ytd, vec![comp_total(&r[1..9])]);
         assert_eq!(us_federal.fytd, vec![comp_total(&r[0..9])]);
 
-        let clamped = perf.lookback_returns(
-            ref_date,
-            Some(FiscalConfig::new(2, 30).expect("day 30 clamps")),
-        );
+        let clamped = perf
+            .lookback_returns(
+                Some(ref_date),
+                Some(FiscalConfig::new(2, 30).expect("day 30 clamps")),
+            )
+            .expect("lookback");
         assert_eq!(clamped.fytd, vec![comp_total(&r[3..9])]);
     }
 
@@ -515,10 +534,47 @@ mod tests {
     fn lookback_returns_default_fiscal_year_is_calendar_year() {
         let perf = sample_two_month_daily_performance();
         let ref_date = *perf.get_dates().last().unwrap();
-        let omitted = perf.lookback_returns(ref_date, None);
-        let explicit = perf.lookback_returns(ref_date, Some(FiscalConfig::calendar_year()));
+        let omitted = perf
+            .lookback_returns(Some(ref_date), None)
+            .expect("lookback");
+        let explicit = perf
+            .lookback_returns(Some(ref_date), Some(FiscalConfig::calendar_year()))
+            .expect("lookback");
         assert_eq!(omitted.fytd, explicit.fytd);
         assert_eq!(omitted.ytd, explicit.fytd);
+    }
+
+    #[test]
+    fn lookback_returns_ends_on_the_last_active_date_when_no_date_is_given() {
+        let mut perf = sample_two_month_daily_performance();
+        let dates = perf.get_dates().to_vec();
+        let window_end = dates[dates.len() / 2];
+        perf.reset_date_range(dates[0], window_end);
+
+        let omitted = perf.lookback_returns(None, None).expect("lookback");
+        assert_eq!(Some(&omitted.ref_date), perf.get_active_dates().last());
+        let explicit = perf
+            .lookback_returns(Some(omitted.ref_date), None)
+            .expect("lookback");
+        assert_eq!(omitted.mtd, explicit.mtd);
+        assert_eq!(omitted.ref_date, explicit.ref_date);
+
+        let requested = perf
+            .lookback_returns(Some(dates[0]), None)
+            .expect("lookback");
+        assert_eq!(requested.ref_date, dates[0]);
+    }
+
+    #[test]
+    fn lookback_returns_rejects_no_date_over_an_empty_active_range() {
+        let mut perf = sample_two_month_daily_performance();
+        let dates = perf.get_dates().to_vec();
+        perf.reset_date_range(dates[dates.len() - 1], dates[0]);
+        assert!(perf.get_active_dates().is_empty());
+        let error = perf
+            .lookback_returns(None, None)
+            .expect_err("no active dates");
+        assert!(error.to_string().contains("ref_date"));
     }
 
     #[test]

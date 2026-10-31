@@ -1,0 +1,98 @@
+[
+  {
+    "field": "carry",
+    "amount": {
+      "amount": "25111.870112110",
+      "currency": "USD"
+    },
+    "pct_of_total": 110.46011624140002
+  },
+  {
+    "field": "rates_curves_pnl",
+    "amount": {
+      "amount": "-2377.990258833",
+      "currency": "USD"
+    },
+    "pct_of_total": -10.460116241400044
+  },
+  {
+    "field": "credit_curves_pnl",
+    "amount": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "pct_of_total": 0.0
+  },
+  {
+    "field": "inflation_curves_pnl",
+    "amount": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "pct_of_total": 0.0
+  },
+  {
+    "field": "correlations_pnl",
+    "amount": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "pct_of_total": 0.0
+  },
+  {
+    "field": "fx_pnl",
+    "amount": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "pct_of_total": 0.0
+  },
+  {
+    "field": "fx_translation_pnl",
+    "amount": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "pct_of_total": 0.0
+  },
+  {
+    "field": "vol_pnl",
+    "amount": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "pct_of_total": 0.0
+  },
+  {
+    "field": "cross_factor_pnl",
+    "amount": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "pct_of_total": 0.0
+  },
+  {
+    "field": "model_params_pnl",
+    "amount": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "pct_of_total": 0.0
+  },
+  {
+    "field": "market_scalars_pnl",
+    "amount": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "pct_of_total": 0.0
+  },
+  {
+    "field": "residual",
+    "amount": {
+      "amount": "0.000000000",
+      "currency": "USD"
+    },
+    "pct_of_total": 0.0
+  }
+]

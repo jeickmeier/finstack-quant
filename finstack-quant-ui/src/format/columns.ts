@@ -1,11 +1,6 @@
 import type { AccessorFnColumnDef, RowData } from "@tanstack/react-table";
 import type { MoneyValue } from "finstack-quant-wasm";
-import {
-  formatRawMoney,
-  formatRate,
-  formatSigned,
-  type RatePresentation,
-} from "./format";
+import { formatRawMoney, formatSigned } from "./format";
 
 /** Formatting metadata read by the shared table; it adds no native table feature. */
 export interface ColumnPresentation {
@@ -37,26 +32,6 @@ export function moneyColumn<TData extends RowData>(
     meta: { className: "text-right finstack-numeric" },
     cell: (info) =>
       displayText?.(info.row.original) ?? formatRawMoney(info.getValue()),
-  };
-}
-/** Source-backed rate presentation; absent metadata leaves values raw with unavailable units. */
-export function rateColumn<TData extends RowData>(
-  id: string,
-  accessorFn: (row: TData) => string | number,
-  presentation?: RatePresentation,
-): FormattedColumn<TData, string | number> {
-  return {
-    id,
-    header: id,
-    accessorFn,
-    meta: {
-      className: "text-right finstack-numeric",
-      unit: presentation?.display ?? "Unit unavailable",
-    },
-    cell: (info) => {
-      const value = formatRate(info.getValue(), presentation);
-      return value.unit ? `${value.text} ${value.unit}` : value.text;
-    },
   };
 }
 /** ISO date column; epoch inputs must first pass through the native date adapter. */

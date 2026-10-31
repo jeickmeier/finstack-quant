@@ -8770,6 +8770,7 @@
     "lookback": {
       "refDate": "2025-11-24",
       "returns": {
+        "ref_date": "2025-11-24",
         "ticker_names": ["Global Macro Composite", "Benchmark"],
         "mtd": [-0.02754355388124818, -0.08959534551873566],
         "qtd": [-0.19384459020608877, -0.15396458801499133],
