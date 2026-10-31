@@ -80,6 +80,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "formatMoney",
     "validateMarket",
     "calendars",
+    "curveQuery",
     // ValuationsApi
     "price",
     "validate",

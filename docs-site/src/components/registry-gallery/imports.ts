@@ -49,6 +49,10 @@ export const importHarnesses = {
       name: "finstack-worker",
       modules: modules.length,
     })),
+  "use-curve-query": () =>
+    Promise.all([import("@/hooks/core/use-curve-query/use-curve-query")]).then(
+      (modules) => ({ name: "use-curve-query", modules: modules.length }),
+    ),
   "use-market-validator": () =>
     Promise.all([
       import("@/hooks/core/use-market-validator/use-market-validator"),

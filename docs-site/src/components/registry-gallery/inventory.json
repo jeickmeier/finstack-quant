@@ -61,6 +61,12 @@
       "worker": "none"
     },
     {
+      "name": "curve-query",
+      "type": "registry:component",
+      "docs": "Reads one stored curve or surface at supplied points: discount factor and continuously compounded zero rate, plus continuously compounded forward rates over year-fraction intervals, of a discount curve; the forward rate of a forward curve; survival probability and hazard rate of a hazard curve; volatility of a stored surface at an expiry and strike. Curve points are years from the base date or ISO dates, which pass through as entered for Rust to convert with the curve day count. A point Rust rejects shows its native error in its own cell; an id the market does not hold is the whole error. Look up passes the lookup to the caller (usually, with the market, the useCurveQuery request). Mount it in market-context-browser through renderObject with curveQueryTarget, which names the queryable target of a browser entry. Accepts target, defaultPoints, defaultForwards, onSubmit, result, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
       "name": "decimal-input",
       "type": "registry:ui",
       "docs": "Controlled decimal-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
@@ -579,6 +585,10 @@
     {
       "name": "finstack-worker",
       "type": "registry:file"
+    },
+    {
+      "name": "use-curve-query",
+      "type": "registry:hook"
     },
     {
       "name": "use-market-validator",
@@ -1425,6 +1435,10 @@
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
       "sha256": "87b45db4b2e5180dcdbd7b4ca1f92e767ed56ffd9a108c9b1b8dd40ded0d89aa"
+    },
+    {
+      "path": "finstack-quant-ui/tests/core/curve-query/cases.json",
+      "sha256": "19d4893bfa09d59477fd258f6dde63ce33a771b1a3112c5a9200a4ecbe0ff35d"
     },
     {
       "path": "finstack-quant-ui/tests/core/cubes/cases.json",

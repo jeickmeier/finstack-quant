@@ -174,10 +174,10 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twenty-one native fixture generators under
+`mise run ui-fixtures` runs the twenty-two native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details;
-portfolio → portfolio margin; curves → market-browser; cubes, calibration,
+portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
 scenario-table; statements → covenants; analytics; models credit, risk and options;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
@@ -940,6 +940,29 @@ rest of the report. `MertonCalculator` composes `SchemaForm` over the generated
 caller's request) or an equity-calibration form with the horizon and CDS
 inputs, and shows the returned report. The native fixture (the facade example
 firm and a KMV calibration) is `tests/models/credit/merton.json`.
+
+## Curve query
+
+`useCurveQuery` (`@finstack/use-curve-query`) reads one stored object of a market
+at supplied points over the cached market handle: `MarketContext.getDiscount`
+(`df`, `zeroRate`, `forward`), `getForward` (`rate`), `getHazard` (`sp`,
+`hazardRate`) or `getSurface` (`models.volatility.getSurfaceVol`). `CurveQuery`
+is a separate item, so `market-context-browser` still needs no worker; a host
+mounts it through the browser's `renderObject` slot with `curveQueryTarget(entry)`,
+which names the queryable target of a browser entry and is null for the rest, and
+the slot replaces the stored chart, so a host that wants both renders
+`StoredCurveView` beside it.
+
+Curve points are years from the base date or ISO dates. Dates pass through as
+entered and Rust converts them with the curve day count; JavaScript never turns
+a date into a year fraction. `DiscountCurve.forward` and `getSurfaceVol` take
+year fractions only, so forward intervals and surface expiries are entered in
+years and labelled so. A point Rust rejects keeps its native error in its own
+cell (a malformed date, a reversed interval, a coordinate outside the surface
+grid); an id the market does not hold is the whole error. The zero rate uses
+the Rust default compounding, continuous. The native fixture, which cuts the
+market-browser snapshot down and adds a stored surface, is
+`tests/core/curve-query/cases.json`.
 
 ## Option calculator
 

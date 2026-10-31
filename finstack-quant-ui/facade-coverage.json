@@ -63,6 +63,7 @@
     "models.volatility.getCubeNormalVol",
     "models.volatility.getCubeVol",
     "models.volatility.getFxDeltaVol",
+    "models.volatility.getSurfaceVol",
     "models.volatility.impliedVolBachelier",
     "models.volatility.materializeCubeExpirySlice",
     "models.volatility.materializeCubeExpirySliceNormal",

@@ -27,6 +27,7 @@ const nonvisual = registry.items.filter((item) => !visualTypes.has(item.type));
 const sources = {
   bond: "src/fixtures/results/bond.json",
   market: "tests/core/market-browser/cases.json",
+  curveQuery: "tests/core/curve-query/cases.json",
   cubes: "tests/core/cubes/cases.json",
   calibration: "tests/calibration/cases.json",
   scenarios: "tests/valuations/scenario-table/cases.json",
