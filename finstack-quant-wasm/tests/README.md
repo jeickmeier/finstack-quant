@@ -86,6 +86,9 @@ TypeScript consumer.
   documents the hand-written facade rather than the raw wasm-bindgen types. It
   also reads [`../benchmarks/bench.mjs`](../benchmarks/bench.mjs) so the
   benchmark script cannot drift from the declared API.
+  It also compares each declaration's parameter order with the
+  `#[wasm_bindgen]` signature it declares (order only, not names or arity), which
+  `tsc` cannot do when the swapped parameters share a type.
 - **`return_shapes.rs`** pins _shapes_: no binding bypasses the
   JSON-compatible serializer, only `*Json`-suffixed exports return strings,
   computation results are structured rather than strings, prose-returning

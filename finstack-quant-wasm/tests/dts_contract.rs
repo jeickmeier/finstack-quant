@@ -1,7 +1,13 @@
 //! Contract test: generated TypeScript declarations match the facade surface.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
+
+// `boundary_signatures.rs` shares the scanner and reads different `Export` fields.
+#[allow(dead_code)]
+#[path = "export_scan.rs"]
+mod export_scan;
 
 fn index_dts() -> String {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1881,4 +1887,267 @@ fn typed_cashflows_and_covenants_surface_is_declared() {
     // The facade joins the market / no-market twins; the raw twins are not published.
     assert!(!dts.contains("buildWithMarket("));
     assert!(!dts.contains("buildCashflowScheduleWithMarket("));
+}
+
+/// One callable member of a declared `interface` or `class`; `constructor(...)`
+/// and `new (...)` both have the name `constructor`.
+struct DeclaredFn {
+    container: String,
+    name: String,
+    params: Vec<String>,
+}
+
+/// Split at `separator` outside every bracket pair (`=>` is not a bracket).
+fn split_top_level(text: &str, separator: char) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0;
+    let mut previous = ' ';
+    for (i, ch) in text.char_indices() {
+        match ch {
+            '(' | '[' | '{' | '<' => depth += 1,
+            '>' if previous == '=' => {}
+            ')' | ']' | '}' | '>' => depth -= 1,
+            _ if ch == separator && depth == 0 => {
+                parts.push(&text[start..i]);
+                start = i + ch.len_utf8();
+            }
+            _ => {}
+        }
+        previous = ch;
+    }
+    parts.push(&text[start..]);
+    parts
+}
+
+/// The callable member declared by one `;`-terminated interface or class member.
+fn declared_fn(container: &str, member: &str) -> Option<DeclaredFn> {
+    let member = member.trim();
+    let member = member
+        .strip_prefix("static ")
+        .unwrap_or(member)
+        .trim_start();
+    let name_end = member.find(|c: char| !(c.is_alphanumeric() || c == '_' || c == '$'))?;
+    let (name, rest) = member.split_at(name_end);
+    let mut rest = rest.trim_start();
+    if rest.starts_with('<') {
+        let close = export_scan::matching(rest.as_bytes(), 0, b'<', b'>');
+        rest = rest[close + 1..].trim_start();
+    }
+    if name.is_empty() || !rest.starts_with('(') {
+        return None;
+    }
+    let close = export_scan::matching(rest.as_bytes(), 0, b'(', b')');
+    let list = rest[1..close].trim();
+    let params = if list.is_empty() {
+        Vec::new()
+    } else {
+        split_top_level(list, ',')
+            .into_iter()
+            .map(str::trim)
+            .filter(|param| !param.is_empty())
+            .map(|param| {
+                let end = param.find([':', '?']).unwrap_or(param.len());
+                param[..end].trim_start_matches("...").trim().to_string()
+            })
+            .collect()
+    };
+    Some(DeclaredFn {
+        container: container.to_string(),
+        name: if name == "new" { "constructor" } else { name }.to_string(),
+        params,
+    })
+}
+
+/// Every callable member declared in `dts`, plus each interface's `extends` list.
+fn declared_fns(dts: &str) -> (Vec<DeclaredFn>, BTreeMap<String, Vec<String>>) {
+    let bytes = export_scan::blank(dts);
+    let text = std::str::from_utf8(&bytes).expect("utf8");
+    let mut fns = Vec::new();
+    let mut parents = BTreeMap::new();
+    let mut offset = 0;
+    for line in text.split_inclusive('\n') {
+        let line_start = offset;
+        offset += line.len();
+        let head = line.strip_prefix("export ").unwrap_or(line);
+        let head = head.strip_prefix("declare ").unwrap_or(head);
+        let Some(head) = head
+            .strip_prefix("interface ")
+            .or_else(|| head.strip_prefix("class "))
+        else {
+            continue;
+        };
+        let Some(open) = line.find('{') else {
+            continue;
+        };
+        let name_end = head
+            .find(|c: char| !(c.is_alphanumeric() || c == '_'))
+            .unwrap_or(head.len());
+        let name = &head[..name_end];
+        if let Some((_, list)) =
+            head[..head.find('{').unwrap_or(head.len())].split_once(" extends ")
+        {
+            let list = split_top_level(list, ',');
+            parents
+                .entry(name.to_string())
+                .or_insert_with(Vec::new)
+                .extend(
+                    list.into_iter()
+                        .map(|parent| parent.trim().split('<').next().unwrap_or("").to_string()),
+                );
+        }
+        let body_open = line_start + open;
+        let body_close = export_scan::matching(&bytes, body_open, b'{', b'}');
+        fns.extend(
+            split_top_level(&text[body_open + 1..body_close], ';')
+                .into_iter()
+                .filter_map(|member| declared_fn(name, member)),
+        );
+    }
+    (fns, parents)
+}
+
+/// Facade keys of the renamed exports, by raw wasm-bindgen name, from the
+/// `key: wasm.rawName` entries in `exports/**`.
+fn facade_renames() -> BTreeMap<String, BTreeSet<String>> {
+    fn visit(dir: &std::path::Path, renames: &mut BTreeMap<String, BTreeSet<String>>) {
+        for entry in fs::read_dir(dir).expect("readable exports directory") {
+            let path = entry.expect("dir entry").path();
+            if path.is_dir() {
+                visit(&path, renames);
+            } else if path.extension().is_some_and(|ext| ext == "js") {
+                let source = fs::read_to_string(&path).expect("readable facade file");
+                for line in source.lines() {
+                    if let Some((key, raw)) = line.trim().split_once(": wasm.") {
+                        renames
+                            .entry(raw.trim_end_matches(',').trim().to_string())
+                            .or_default()
+                            .insert(key.to_string());
+                    }
+                }
+            }
+        }
+    }
+    let mut renames = BTreeMap::new();
+    visit(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("exports"),
+        &mut renames,
+    );
+    renames
+}
+
+/// Parameter names as the order check compares them: a `Json` suffix is a Rust
+/// naming detail that several declarations drop (`specJson` is declared `spec`).
+fn comparable(name: &str) -> &str {
+    name.strip_suffix("Json").unwrap_or(name)
+}
+
+/// A declaration must list its parameters in the order of the `#[wasm_bindgen]`
+/// signature it declares. `tsc` cannot see this when the swapped parameters
+/// share a type (Black-76 `vol` and `expiry` are both `number`).
+///
+/// Each export is compared with the same-named declarations on its class, the
+/// interfaces that class extends and its `*Constructor` interface, else with
+/// every same-named declaration: free functions, facade renames and members
+/// declared through a generic such as `FxConstructor<T>` have no class-named
+/// home. The check reads the parameters the two lists share: it fails when two
+/// or more of them appear in another order. JS facade wrappers may add, drop or
+/// rename parameters by design, so this gate covers order only, not names or
+/// arity, and an export sharing fewer than two names with its declaration is
+/// not compared. Exports whose function name is a `macro_rules!` metavariable
+/// cannot be read from the source and are not compared either.
+#[test]
+fn dts_parameter_order_matches_wasm_bindgen_signatures() {
+    let (declared, parents) = declared_fns(&index_dts());
+    let renames = facade_renames();
+    let mut by_name: BTreeMap<&str, Vec<&DeclaredFn>> = BTreeMap::new();
+    for decl in &declared {
+        by_name.entry(&decl.name).or_default().push(decl);
+    }
+
+    let mut compared = 0;
+    let mut offenders = Vec::new();
+    for export in export_scan::scan_exports().iter().filter(|e| !e.accessor) {
+        let expected: Vec<String> = export
+            .params
+            .iter()
+            .map(|(name, _)| export_scan::camel_case(name))
+            .collect();
+        let expected: Vec<&str> = expected.iter().map(|name| comparable(name)).collect();
+
+        let mut names = BTreeSet::from([export.js_name.clone()]);
+        if export.class.is_none() {
+            names.extend(renames.get(&export.js_name).into_iter().flatten().cloned());
+        }
+        let candidates: Vec<&DeclaredFn> = names
+            .iter()
+            .flat_map(|name| by_name.get(name.as_str()).into_iter().flatten().copied())
+            .collect();
+
+        let mut scope = BTreeSet::new();
+        if let Some(class) = &export.class {
+            let mut pending = vec![class.clone(), format!("{class}Constructor")];
+            while let Some(container) = pending.pop() {
+                pending.extend(parents.get(&container).into_iter().flatten().cloned());
+                scope.insert(container);
+            }
+        }
+        let scoped: Vec<&DeclaredFn> = candidates
+            .iter()
+            .copied()
+            .filter(|decl| scope.contains(&decl.container))
+            .collect();
+        let candidates = if scoped.is_empty() {
+            candidates
+        } else {
+            scoped
+        };
+
+        // The declarations sharing two or more names, with those names in
+        // declared order.
+        let shared: Vec<(&DeclaredFn, Vec<&str>)> = candidates
+            .iter()
+            .map(|decl| {
+                let declared: Vec<&str> = decl
+                    .params
+                    .iter()
+                    .map(|name| comparable(name))
+                    .filter(|name| expected.contains(name))
+                    .collect();
+                (*decl, declared)
+            })
+            .filter(|(_, declared)| declared.len() >= 2)
+            .collect();
+        let Some((first, _)) = shared.first() else {
+            continue;
+        };
+        compared += 1;
+        let in_order = shared.iter().any(|(_, declared)| {
+            let order: Vec<&str> = expected
+                .iter()
+                .copied()
+                .filter(|name| declared.contains(name))
+                .collect();
+            *declared == order
+        });
+        if !in_order {
+            let label = match &export.class {
+                Some(class) => format!("{class}.{}", export.js_name),
+                None => export.js_name.clone(),
+            };
+            offenders.push(format!(
+                "{label} ({}): declared on {} as ({}), Rust order is ({})",
+                export.file,
+                first.container,
+                first.params.join(", "),
+                expected.join(", ")
+            ));
+        }
+    }
+    assert!(compared > 600, "compared only {compared} declarations");
+    assert!(
+        offenders.is_empty(),
+        "index.d.ts parameter order differs from the Rust binding:\n{}",
+        offenders.join("\n")
+    );
 }
