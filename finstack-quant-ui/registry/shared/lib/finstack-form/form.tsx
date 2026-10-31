@@ -178,7 +178,8 @@ function ArrayField({
         size="sm"
         type="button"
 
-        onClick={() => field.pushValue(create())}
+        // Adding reveals a blank row; it does not edit it.
+        onClick={() => field.pushValue(create(), { dontUpdateMeta: true })}
       >
         Add {label}
       </Button>

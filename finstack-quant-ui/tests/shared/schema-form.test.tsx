@@ -403,10 +403,11 @@ it.each([true, false])(
     );
     const checkbox = screen.getByRole("checkbox", { name: "Choice" });
     expect(checkbox.getAttribute("aria-checked")).toBe("mixed");
+    expect(checkbox.getAttribute("aria-invalid")).not.toBe("true");
+    fireEvent.submit(checkbox.closest("form")!);
     await waitFor(() =>
       expect(checkbox.getAttribute("aria-invalid")).toBe("true"),
     );
-    fireEvent.submit(checkbox.closest("form")!);
     expect(submit).not.toHaveBeenCalled();
     expect(validateChoice).not.toHaveBeenCalled();
     if (choice) fireEvent.click(checkbox);
@@ -434,6 +435,143 @@ it.each([true, false])(
     );
   },
 );
+function moduleFor(schema: Schema) {
+  return {
+    schema,
+    metadata: [],
+    codec: createWireCodec({ ...schema }),
+    example: initialValue(schema, { schema, pointer: "#" }),
+  };
+}
+const twoAnswers = moduleFor({
+  type: "object",
+  properties: { first: { type: "boolean" }, second: { type: "boolean" } },
+  required: ["first", "second"],
+});
+const isInvalid = (name: string) =>
+  screen.getByRole("checkbox", { name }).getAttribute("aria-invalid") ===
+  "true";
+it("holds each field's issue until it is edited or submit is attempted", async () => {
+  const submit = vi.fn();
+  render(
+    <SchemaForm
+      module={twoAnswers}
+      validate={async (json) => json}
+      onSubmit={submit}
+    />,
+  );
+  const apply = screen.getByRole<HTMLButtonElement>("button", {
+    name: "Apply instrument",
+  });
+  await waitFor(() => expect(apply.disabled).toBe(false));
+  expect(screen.queryByRole("alert")).toBeNull();
+
+  // Editing one field reveals nothing about the other.
+  fireEvent.click(screen.getByRole("checkbox", { name: "First" }));
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole("checkbox", { name: "First" })
+        .getAttribute("aria-checked"),
+    ).toBe("true"),
+  );
+  await waitFor(() => expect(apply.disabled).toBe(false));
+  expect(isInvalid("Second")).toBe(false);
+  expect(screen.queryByRole("alert")).toBeNull();
+
+  fireEvent.click(apply);
+  await waitFor(() => expect(isInvalid("Second")).toBe(true));
+  expect(submit).not.toHaveBeenCalled();
+
+  // Reset starts the hold again.
+  fireEvent.click(screen.getByRole("button", { name: "Reset edits" }));
+  await waitFor(() => expect(isInvalid("Second")).toBe(false));
+  await waitFor(() => expect(apply.disabled).toBe(false));
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+it("shows every held issue on the first attempt when an edit already made the form invalid", async () => {
+  const module = moduleFor({
+    type: "object",
+    properties: { amount: { type: "number" }, ready: { type: "boolean" } },
+    required: ["amount", "ready"],
+  });
+  render(
+    <SchemaForm
+      module={module}
+      defaultValues={{ amount: 1 }}
+      validate={async (json) => json}
+      onSubmit={() => {}}
+    />,
+  );
+  const amount = screen.getByRole("textbox", { name: "Amount" });
+  fireEvent.change(amount, { target: { value: "x" } });
+  await waitFor(() => expect(amount.getAttribute("aria-invalid")).toBe("true"));
+  expect(isInvalid("Ready")).toBe(false);
+  const apply = screen.getByRole<HTMLButtonElement>("button", {
+    name: "Apply instrument",
+  });
+  await waitFor(() => expect(apply.disabled).toBe(false));
+  fireEvent.click(apply);
+  await waitFor(() => expect(isInvalid("Ready")).toBe(true));
+});
+it("shows an embedded editor's issues at once because it has no submit to attempt", async () => {
+  render(
+    <SchemaForm
+      module={twoAnswers}
+      actions={false}
+      validate={async (json) => json}
+      onSubmit={() => {}}
+    />,
+  );
+  await waitFor(() => expect(isInvalid("Second")).toBe(true));
+});
+it("holds the issues of a union branch the user only selected", async () => {
+  const module = moduleFor({
+    type: "object",
+    properties: {
+      choice: {
+        oneOf: [
+          {
+            type: "object",
+            title: "Empty",
+            properties: { kind: { const: "empty" } },
+            required: ["kind"],
+          },
+          {
+            type: "object",
+            title: "Answer",
+            properties: {
+              kind: { const: "answer" },
+              ready: { type: "boolean" },
+            },
+            required: ["kind", "ready"],
+          },
+        ],
+      },
+    },
+    required: ["choice"],
+  });
+  render(
+    <SchemaForm
+      module={module}
+      layout="full"
+      validate={async (json) => json}
+      onSubmit={() => {}}
+    />,
+  );
+  await userEvent.click(screen.getByRole("radio", { name: /answer/i }));
+  await screen.findByRole("checkbox", { name: "Ready" });
+  const apply = screen.getByRole<HTMLButtonElement>("button", {
+    name: "Apply instrument",
+  });
+  await waitFor(() => expect(apply.disabled).toBe(false));
+  expect(isInvalid("Ready")).toBe(false);
+  expect(screen.queryByRole("alert")).toBeNull();
+  fireEvent.click(apply);
+  await waitFor(() =>
+    expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
+  );
+});
 it("requires an explicit is_cap answer in the generated cap_floor_vol schema", () => {
   const find = (node: unknown): Schema | undefined => {
     if (Array.isArray(node)) {

@@ -144,3 +144,43 @@ it(
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   },
 );
+
+it(
+  "holds a required field's error until an edit or Apply",
+  { timeout: budget(10000) },
+  async () => {
+    const onApply = show({ method: "growth_pct", params: { rate: 0.03 } });
+    await userEvent.click(
+      screen.getByRole("combobox", { name: /forecast method/ }),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Fade to target" }),
+    );
+    const target = await screen.findByRole("textbox", { name: /^Target/ });
+    const button = screen.getByRole<HTMLButtonElement>("button", {
+      name: "Apply forecast",
+    });
+    // The native check has settled and the field is still empty.
+    await waitFor(() => expect(button.disabled).toBe(false));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(target.getAttribute("aria-invalid")).not.toBe("true");
+
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(target.getAttribute("aria-invalid")).toBe("true"),
+    );
+    expect(screen.getAllByRole("alert").length).toBeGreaterThan(0);
+    expect(onApply).not.toHaveBeenCalled();
+
+    fireEvent.change(target, { target: { value: "10" } });
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(target.getAttribute("aria-invalid")).not.toBe("true");
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
+    expect((onApply.mock.calls[0] as unknown[])[0]).toEqual({
+      method: "fade_to_target",
+      params: { target: 10 },
+    });
+  },
+);

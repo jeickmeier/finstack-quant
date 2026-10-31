@@ -16,6 +16,12 @@
 - `MetricMetadata.coordinates`: for each entry of `components`, the `group` and numeric `value` (tenor in years or decimal strike) that order it on its axis. The UI sorts by these instead of parsing labels.
 - `statements::types::ForecastParameters`, published as the `forecast_parameters` schema, states each forecast method's parameters in the wire shape of `ForecastSpec`. The workbench forecast editor renders it with `SchemaForm` instead of a per-method field table, so its field labels are now the Rust parameter names and optional fields appear behind Add.
 
+### UI: schema forms hold errors until an edit or a submit
+
+#### Changed
+
+- `SchemaForm` holds a field's validation issue until an edit touches its path or submit is attempted, and the first attempt shows them all. Choosing a union branch, adding an optional term or adding an array row no longer counts as an edit, so these actions no longer mark the field dirty. A form with `actions={false}` has no submit to attempt and shows its issues as before.
+
 ### Statements: rollup methods declared per line
 
 #### Changed

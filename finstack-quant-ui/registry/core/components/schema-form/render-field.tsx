@@ -10,7 +10,13 @@ import { discriminator } from "./discriminator";
 import type { InstrumentModule, SchemaLocation } from "./schema";
 import { propertiesOf } from "./schema";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
-import { initialValue, nullable, objectValue, resolve } from "./schema-walk";
+import {
+  initialValue,
+  nullable,
+  objectValue,
+  resolve,
+  withinPath,
+} from "./schema-walk";
 import type { SchemaFormApi, FieldFilter } from "./schema-form";
 import { nullableFieldChrome, optionalFieldChrome } from "./field-chrome";
 
@@ -110,17 +116,13 @@ export function RenderField({
   const fieldMeta = useStore(form.store, (state) => state.fieldMeta);
   const sheet = useContext(SheetContext);
   const render = useContext(FieldRendererContext);
-  const within = (child: string, parent: string) =>
-    child === parent ||
-    child.startsWith(`${parent}.`) ||
-    child.startsWith(`${parent}[`);
   const denied = (fieldPath: string) =>
-    fields?.deny?.some((key) => within(fieldPath, key)) ?? false;
+    fields?.deny?.some((key) => withinPath(fieldPath, key)) ?? false;
   if (denied(path)) return null;
   if (
     fields?.allow &&
     path &&
-    !fields.allow.some((key) => within(key, path) || within(path, key))
+    !fields.allow.some((key) => withinPath(key, path) || withinPath(path, key))
   )
     return null;
   const resolved = resolve(module.schema, location);
@@ -205,7 +207,10 @@ export function RenderField({
             description: branch.schema.description,
           }))}
           onValueChange={(index) =>
-            form.setFieldValue(path, union.switchTo(Number(index), value))
+            // Choosing a branch reveals its fields; it does not edit them.
+            form.setFieldValue(path, union.switchTo(Number(index), value), {
+              dontUpdateMeta: true,
+            })
           }
         />
         {selected >= 0 && (
@@ -359,7 +364,7 @@ export function RenderField({
       const fieldPath = path ? `${path}.${key}` : key;
       return Object.entries(fieldMeta).some(
         ([name, meta]) =>
-          within(name, fieldPath) && Boolean(meta?.errors.length),
+          withinPath(name, fieldPath) && Boolean(meta?.errors.length),
       );
     };
     const render = ([key, node]: (typeof properties)[number]) => {
