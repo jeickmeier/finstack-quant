@@ -12,6 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { createRequire } from "node:module";
 import { LESS_COMMON_TERMS } from "@/components/finstack/core/components/schema-form/disclosure";
 import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
+import { errorText } from "@/lib/finstack/form";
 import * as bond from "../../src/generated/instrument/bond";
 import { createWireCodec } from "../../src/codec.mjs";
 import { discriminator } from "@/components/finstack/core/components/schema-form/discriminator";
@@ -724,4 +725,24 @@ it("workingValue keeps wide integer tokens and incomplete edit text exact", () =
   expect(
     workingValue({}, { schema: { type: "number" }, pointer: "#" }, "1e"),
   ).toBe("1e");
+});
+it("states a form validator's issue once, never as an unknown error", () => {
+  const issue = {
+    message: "Invalid input: expected number, received undefined",
+  };
+  // TanStack's Standard Schema record beside the same issue on the field.
+  expect(errorText([{ form: { "params.rate": [issue] } }, issue])).toBe(
+    issue.message,
+  );
+  expect(
+    errorText([{ form: { a: [issue], "b.c": [{ message: "Bad" }] } }]),
+  ).toBe(`${issue.message}; Bad`);
+  expect(errorText([{ form: "Whole form" }, "Text", [[issue]]])).toBe(
+    `Whole form; Text; ${issue.message}`,
+  );
+  expect(errorText([{ unknown: 1 }])).toBe("Invalid field value");
+  expect(errorText([null, undefined, { form: {} }])).toBe(
+    "Invalid field value",
+  );
+  expect(errorText([])).toBeUndefined();
 });
