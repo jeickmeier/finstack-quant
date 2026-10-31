@@ -153,7 +153,7 @@ class SimulationDiagnostics:
         Returns
         -------
         list[dict[str, Any]]
-            ``payment_date``, ``pool_balance``, ``pool_factor``, ``wac``, ``weighted_avg_spread_bp``, ``warf``, the period's collections, defaults, recoveries, reinvested par, fees paid, the cash-account balances, ``delinquent_balance``, ``servicer_advances_outstanding``, ``excess_spread`` and the ``coverage_tests`` the executor evaluated.
+            ``payment_date``, ``pool_balance``, ``pool_factor``, ``wac``, ``weighted_avg_spread_bp``, ``warf``, the period's collections, defaults, recoveries, reinvested par, fees paid, the cash-account balances, ``delinquent_balance``, ``servicer_advances_outstanding``, ``excess_spread``, the ``coverage_tests`` the executor evaluated, ``waterfall`` (how the period's waterfall ran: ``total_available``, ``tier_allocations``, ``payment_records`` with each recipient's requested and paid amounts and an ``is_principal`` flag, ``diverted_amounts``, ``diverted_cash``, ``had_diversions``, ``remaining_interest``, ``remaining_principal``, ``principal_used_for_interest``, ``recovery_proceeds``) and ``non_waterfall_payments`` (cash paid to a tranche outside the waterfall: ``payment_date``, ``tranche_id``, ``source``, ``interest``, ``principal``, ``incentive_fee``; a recovery settling after the last period sits on that period with its own later date). Per tranche and date, ``payment_records`` plus ``non_waterfall_payments`` sum to the tranche's interest and principal flows. Amounts are in the deal currency.
 
         Raises
         ------

@@ -560,11 +560,6 @@ pub(super) fn simulate_period(
     // Per-period deal accounting: end-of-period balances, the cash that moved
     // and the coverage tests exactly as the executor evaluated them (single
     // source: the waterfall's own results).
-    let pool_factor = if state.original_pool_balance.amount() > 0.0 {
-        state.pool_outstanding.amount() / state.original_pool_balance.amount()
-    } else {
-        0.0
-    };
     let trigger_levels: FxHashMap<&str, f64> = period_waterfall
         .coverage_tests()
         .map(|spec| (spec.id.as_str(), spec.trigger_level))
@@ -586,41 +581,23 @@ pub(super) fn simulate_period(
             }
         })
         .collect();
-    let (wac, weighted_avg_spread_bp, warf) = super::state::pool_composition(state)?;
-    let delinquent: f64 = state
-        .pool_state
-        .delinquent
-        .iter()
-        .map(|buckets| super::delinquency::delinquent_balance(buckets))
-        .sum();
-    state
-        .period_diagnostics
-        .push(super::state::PeriodDiagnostics {
-            payment_date: pay_date,
-            pool_balance: state.pool_outstanding,
-            pool_factor,
-            wac,
-            weighted_avg_spread_bp,
-            warf,
-            interest_collections: pool_flows.interest,
-            principal_collections: pool_flows
-                .scheduled_principal
-                .checked_add(pool_flows.prepayment)?,
-            defaults: pool_flows.default,
-            recoveries: released_recoveries,
-            reinvested_par: reinvested_cash,
-            fees_paid: Money::new(fees_paid, state.currency)?,
-            reserve_balance: state.reserve_balance,
-            spread_account: state.spread_account,
-            funding_account: state.principal_funding_account,
-            delinquent_balance: Money::new(delinquent, state.currency)?,
-            servicer_advances_outstanding: Money::new(
-                state.servicer_advances_outstanding(),
-                state.currency,
-            )?,
-            excess_spread: state.excess_spread_history.last().copied().unwrap_or(0.0),
-            coverage_tests,
-        });
+    let record = super::state::PeriodDiagnostics {
+        interest_collections: pool_flows.interest,
+        principal_collections: pool_flows
+            .scheduled_principal
+            .checked_add(pool_flows.prepayment)?,
+        defaults: pool_flows.default,
+        recoveries: released_recoveries,
+        reinvested_par: reinvested_cash,
+        fees_paid: Money::new(fees_paid, state.currency)?,
+        excess_spread: state.excess_spread_history.last().copied().unwrap_or(0.0),
+        coverage_tests,
+        waterfall: waterfall_result.into(),
+        // Reserve interest routed to a tranche this period.
+        non_waterfall_payments: std::mem::take(&mut state.pending_non_waterfall_payments),
+        ..super::state::PeriodDiagnostics::from_state(state, pay_date)?
+    };
+    state.period_diagnostics.push(record);
 
     state
         .reserve_balance_path

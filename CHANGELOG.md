@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Structured credit: who got paid each period
+
+#### Added
+
+- `PeriodDiagnostics.waterfall` (`PeriodWaterfall`): each period's tier allocations, `PaymentRecord`s, diversions and carried cash, on the `SimulationDiagnostics.periods` that `StructuredCredit::run_simulation` returns (Python `run_simulation`, WASM `runSimulation`). `PaymentRecord` gains `is_principal`.
+- `PeriodDiagnostics.non_waterfall_payments` (`NonWaterfallPayment`, `NonWaterfallSource`): cash paid to a tranche outside the waterfall (routed reserve interest, redemption, terminal releases). Per tranche and date, payment records plus these sum to the tranche's interest and principal flows.
+
+#### Changed
+
+- A deal with no payment period left that still settles cash now reports one record in `SimulationDiagnostics.periods` holding that settlement.
+
 ### UI boundary: rules decided in Rust
 
 `check-worker-compose` (`ui-check`) now flags a worker service that decides from a native result; pure composition takes `// finstack-compose: <reason>`.

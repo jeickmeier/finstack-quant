@@ -65,15 +65,15 @@ pub use tranches::{CoverageTrigger, Tranche, TrancheBuilder, TrancheStructure};
 
 pub use setup::{DealFees, IncentiveFeeSpec};
 
-pub(crate) use waterfall::DiversionRecord;
 pub use waterfall::{
     AfcSpec, AllocationMode, CccBucketRule, ControlledAccumulationSpec, CoveragePlacement,
     CoverageRules, CoverageTestAction, CoverageTestSpec, CoverageTestType, DefaultedValuation,
-    DiscountObligationRule, EarlyAmortizationSpec, EquityHistory, ExcessSpreadSpec, FundingSource,
-    ManagementFeeType, PaymentCalculation, PaymentRecord, PaymentType, Recipient, RecipientType,
-    ReserveAccountSpec, ReserveTarget, RoundingConvention, ShiftMode, ShiftingInterestSpec,
-    ShiftingInterestStep, StepDownSpec, StepDownTrigger, TargetOcSpec, TemplateFees, Waterfall,
-    WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier,
+    DiscountObligationRule, DiversionRecord, EarlyAmortizationSpec, EquityHistory,
+    ExcessSpreadSpec, FundingSource, ManagementFeeType, PaymentCalculation, PaymentRecord,
+    PaymentType, Recipient, RecipientType, ReserveAccountSpec, ReserveTarget, RoundingConvention,
+    ShiftMode, ShiftingInterestSpec, ShiftingInterestStep, StepDownSpec, StepDownTrigger,
+    TargetOcSpec, TemplateFees, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
+    WaterfallTier,
 };
 
 pub(crate) use results::DealAccruals;
