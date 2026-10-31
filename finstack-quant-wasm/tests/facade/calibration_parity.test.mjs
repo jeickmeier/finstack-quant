@@ -369,6 +369,10 @@ test('calibrateHullWhiteToCapFloors matches the Python fixed-kappa fit', () => {
     curve
   );
   assert.deepEqual(plain(explicit), plain(params));
+  const [none] = calibration.calibrateHullWhiteToCapFloors(curve, quotes, HW.scalar_config, null);
+  assert.deepEqual(plain(none), plain(params));
+  assert.equal(calibration.calibrateHullWhiteToCapFloorsWithForward, undefined);
+  assert.equal(calibration.calibrateHullWhiteToCapFloorsWithoutForward, undefined);
   assert.throws(
     () => calibration.calibrateHullWhiteToCapFloors(curve, quotes, { fit_tolerance: 1e-6 }),
     validation
