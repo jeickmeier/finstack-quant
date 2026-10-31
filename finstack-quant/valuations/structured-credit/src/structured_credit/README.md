@@ -707,6 +707,20 @@ every coverage test as the executor evaluated it (`CoverageTestDiagnostic {
 test_id, ratio, trigger_level, cushion, passing }`; a single source, not a
 recomputation).
 
+`PeriodDiagnostics::waterfall` (`PeriodWaterfall`) says who was paid: the tier
+allocations, each recipient's `PaymentRecord` (requested, paid, shortfall,
+`diverted`, `is_principal`), the diversions and what was carried forward. It is
+the serializable projection of `WaterfallDistribution`, whose recipient-keyed
+maps cannot be JSON. Cash that reaches a tranche outside the waterfall is on
+`PeriodDiagnostics::non_waterfall_payments` (`NonWaterfallPayment`, tagged with a
+`NonWaterfallSource`): reserve interest routed to a tranche on the period that
+earned it, and the redemption and terminal releases on the deal's last period.
+Per tranche and date the two sum to the tranche's `interest_flows` plus
+`principal_flows`. A recovery settling after the last period carries its own
+later `payment_date`; a deal with no payment period left that still settles cash
+has one record holding that settlement. Monte Carlo and OAS paths build the same
+record and discard it with the path.
+
 `SimulationDiagnostics::to_table()` owns the nineteen-column period export used
 by Python `to_dataframe()`. It retains period order and duplicate dates, joins
 the first reserve-interest entry matching each payment date, and uses zero for

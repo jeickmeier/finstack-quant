@@ -3388,7 +3388,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
             "type_name": "FacilityProjection",
             "kind": "output",
-            "bytes": 39592
+            "bytes": 51882
           },
           {
             "path": "schemas/results/1/instrument_cashflow.schema.json",
@@ -3458,14 +3458,14 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
             "type_name": "SimulationDiagnostics",
             "kind": "output",
-            "bytes": 9967
+            "bytes": 22257
           },
           {
             "path": "schemas/results/1/simulation_run.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
             "type_name": "SimulationRun",
             "kind": "output",
-            "bytes": 36503
+            "bytes": 48793
           },
           {
             "path": "schemas/results/1/tranche_cashflows.schema.json",
@@ -5569,7 +5569,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
             "type_name": "FacilityProjection",
             "kind": "output",
-            "bytes": 39592
+            "bytes": 51882
           },
           {
             "domain": "valuations",
@@ -5649,7 +5649,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
             "type_name": "SimulationDiagnostics",
             "kind": "output",
-            "bytes": 9967
+            "bytes": 22257
           },
           {
             "domain": "valuations",
@@ -5657,7 +5657,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
             "type_name": "SimulationRun",
             "kind": "output",
-            "bytes": 36503
+            "bytes": 48793
           },
           {
             "domain": "valuations",

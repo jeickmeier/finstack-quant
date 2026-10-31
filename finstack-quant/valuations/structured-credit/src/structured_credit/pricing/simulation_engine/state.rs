@@ -1,4 +1,5 @@
 use super::*;
+use crate::structured_credit::types::{DiversionRecord, PaymentRecord};
 use finstack_quant_core::types::CreditRating;
 
 /// De minimis threshold for write-down recording (avoids noise from fp rounding).
@@ -35,6 +36,9 @@ pub(super) struct SimulationState<'a> {
     pub(super) excess_spread_history: Vec<f64>,
     /// Per-period deal accounting for [`SimulationDiagnostics::periods`].
     pub(super) period_diagnostics: Vec<PeriodDiagnostics>,
+    /// Payments to tranches outside the waterfall not yet attached to a period
+    /// record (see [`PeriodDiagnostics::non_waterfall_payments`]).
+    pub(super) pending_non_waterfall_payments: Vec<NonWaterfallPayment>,
     /// Whether an early-amortization event has occurred; once set the
     /// revolving period stays closed.
     pub(super) early_amortization_triggered: bool,
@@ -146,6 +150,122 @@ pub struct CoverageTestDiagnostic {
     pub passing: bool,
 }
 
+/// How one period's waterfall ran: who was paid, how much, and what was left.
+///
+/// The serializable projection of [`WaterfallDistribution`]: its two
+/// recipient-keyed maps cannot be JSON (a `RecipientType::Tranche` is not a
+/// string key) and hold nothing `payment_records` does not, and its payment
+/// date and coverage tests are already on [`PeriodDiagnostics`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct PeriodWaterfall {
+    /// Cash entering the waterfall (interest plus principal proceeds).
+    pub total_available: Money,
+    /// Cash each tier allocated, as `(tier id, amount)` in execution order.
+    pub tier_allocations: Vec<(String, Money)>,
+    /// Every recipient payment, in execution order.
+    pub payment_records: Vec<PaymentRecord>,
+    /// Coverage-test diversions that moved cash, in execution order.
+    pub diverted_amounts: Vec<DiversionRecord>,
+    /// Total cash failing coverage tests diverted this period.
+    pub diverted_cash: Money,
+    /// Whether any coverage-test tier failed this period, even with no cash
+    /// left to divert.
+    pub had_diversions: bool,
+    /// Interest proceeds left undistributed, carried to the next period.
+    pub remaining_interest: Money,
+    /// Principal proceeds left undistributed, carried to the next period.
+    pub remaining_principal: Money,
+    /// Principal proceeds spent on fee or interest tiers.
+    pub principal_used_for_interest: Money,
+    /// Recovery cash included in `total_available`.
+    pub recovery_proceeds: Money,
+}
+
+impl PeriodWaterfall {
+    /// A waterfall that moved nothing, for a settlement with no waterfall run.
+    fn empty(currency: Currency) -> Self {
+        let zero = Money::from((0_i64, currency));
+        Self {
+            total_available: zero,
+            tier_allocations: Vec::new(),
+            payment_records: Vec::new(),
+            diverted_amounts: Vec::new(),
+            diverted_cash: zero,
+            had_diversions: false,
+            remaining_interest: zero,
+            remaining_principal: zero,
+            principal_used_for_interest: zero,
+            recovery_proceeds: zero,
+        }
+    }
+}
+
+impl From<WaterfallDistribution> for PeriodWaterfall {
+    fn from(distribution: WaterfallDistribution) -> Self {
+        Self {
+            total_available: distribution.total_available,
+            tier_allocations: distribution.tier_allocations,
+            payment_records: distribution.payment_records,
+            diverted_amounts: distribution.diverted_amounts,
+            diverted_cash: distribution.diverted_cash,
+            had_diversions: distribution.had_diversions,
+            remaining_interest: distribution.remaining_interest,
+            remaining_principal: distribution.remaining_principal,
+            principal_used_for_interest: distribution.principal_used_for_interest,
+            recovery_proceeds: distribution.recovery_proceeds,
+        }
+    }
+}
+
+/// Where cash paid to a tranche outside the waterfall came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum NonWaterfallSource {
+    /// Reserve-account interest routed straight to a named tranche
+    /// (`ReserveInterestDestination::Tranche`).
+    ReserveInterest,
+    /// A deal call or clean-up call redemption, including the surplus paid to
+    /// the most junior class after every note is redeemed.
+    Redemption,
+    /// Excess-spread account and retained interest released at deal end.
+    SpreadAccountRelease,
+    /// Controlled-accumulation funding account and retained principal released
+    /// at deal end.
+    PrincipalAccountRelease,
+    /// Reserve account released at deal end.
+    ReserveAccountRelease,
+    /// A recovery claim still pending at deal end, settled at its lagged date.
+    RecoveryRelease,
+}
+
+/// Cash paid to one tranche outside the waterfall.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct NonWaterfallPayment {
+    /// Date the tranche received the cash. A recovery settling after the last
+    /// period carries its own later date here.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub payment_date: Date,
+    /// Id of the tranche paid (`Tranche::id`), equity classes included.
+    pub tranche_id: String,
+    /// Where the cash came from.
+    pub source: NonWaterfallSource,
+    /// Part booked to the tranche's interest flows.
+    pub interest: Money,
+    /// Part booked to the tranche's principal flows, net of `incentive_fee`.
+    pub principal: Money,
+    /// Manager incentive fee withheld from the cash before it reached an
+    /// equity class; zero otherwise. Already counted in the period's
+    /// `fees_paid`, and not part of what the tranche received.
+    pub incentive_fee: Money,
+}
+
 /// Deal accounting for one payment period, recorded after the waterfall.
 ///
 /// Balances are end-of-period; collections, defaults, recoveries and fees are
@@ -199,13 +319,70 @@ pub struct PeriodDiagnostics {
     pub excess_spread: f64,
     /// Every coverage test the executor evaluated this period.
     pub coverage_tests: Vec<CoverageTestDiagnostic>,
+    /// How this period's waterfall ran.
+    pub waterfall: PeriodWaterfall,
+    /// Cash paid to tranches outside the waterfall: reserve interest routed to
+    /// a tranche, and, on the deal's last period, its redemption and terminal
+    /// releases. Together with `waterfall.payment_records` this is every
+    /// tranche's interest and principal cash: per tranche and date, the two
+    /// sum to the tranche's `interest_flows` plus `principal_flows`.
+    pub non_waterfall_payments: Vec<NonWaterfallPayment>,
+}
+
+impl PeriodDiagnostics {
+    /// The record of a payment date from the end-of-period state, with no cash
+    /// moved: the base each period adds its flows to.
+    pub(super) fn from_state(state: &SimulationState, payment_date: Date) -> Result<Self> {
+        let zero = Money::from((0_i64, state.currency));
+        let pool_factor = if state.original_pool_balance.amount() > 0.0 {
+            state.pool_outstanding.amount() / state.original_pool_balance.amount()
+        } else {
+            0.0
+        };
+        let (wac, weighted_avg_spread_bp, warf) = pool_composition(state)?;
+        let delinquent: f64 = state
+            .pool_state
+            .delinquent
+            .iter()
+            .map(|buckets| super::delinquency::delinquent_balance(buckets))
+            .sum();
+        Ok(Self {
+            payment_date,
+            pool_balance: state.pool_outstanding,
+            pool_factor,
+            wac,
+            weighted_avg_spread_bp,
+            warf,
+            interest_collections: zero,
+            principal_collections: zero,
+            defaults: zero,
+            recoveries: zero,
+            reinvested_par: zero,
+            fees_paid: zero,
+            reserve_balance: state.reserve_balance,
+            spread_account: state.spread_account,
+            funding_account: state.principal_funding_account,
+            delinquent_balance: Money::new(delinquent, state.currency)?,
+            servicer_advances_outstanding: Money::new(
+                state.servicer_advances_outstanding(),
+                state.currency,
+            )?,
+            excess_spread: 0.0,
+            coverage_tests: Vec::new(),
+            waterfall: PeriodWaterfall::empty(state.currency),
+            non_waterfall_payments: Vec::new(),
+        })
+    }
 }
 
 /// Deal-level accounting produced alongside the tranche cashflows.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SimulationDiagnostics {
-    /// Per-period deal accounting, in payment order.
+    /// Per-period deal accounting, in payment order. A deal with no payment
+    /// period left that still settles cash (a fully defaulted pool with
+    /// recoveries pending, or a funded reserve) has one record, holding that
+    /// settlement in `non_waterfall_payments`.
     #[serde(default)]
     pub periods: Vec<PeriodDiagnostics>,
     /// Reserve-account balance at the end of each simulated period.
@@ -597,6 +774,7 @@ impl<'a> SimulationState<'a> {
             hedge_schedules: Vec::new(),
             excess_spread_history: Vec::new(),
             period_diagnostics: Vec::new(),
+            pending_non_waterfall_payments: Vec::new(),
             early_amortization_triggered: false,
             card_flow_base: None,
             incentive_fee: None,

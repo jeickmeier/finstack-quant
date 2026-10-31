@@ -38,7 +38,7 @@ pub use types::{
     ConcentrationLimit, ConcentrationScope, ControlledAccumulationSpec, CoveragePlacement,
     CoverageRules, CoverageTestAction, CoverageTestSpec, CoverageTestType, CoverageTrigger,
     CreditModelConfig, DealFees, DealType, DefaultedValuation, DelinquencyModel,
-    DiscountObligationRule, EarlyAmortizationSpec, EligibilityRule, EquityHistory,
+    DiscountObligationRule, DiversionRecord, EarlyAmortizationSpec, EligibilityRule, EquityHistory,
     ExcessSpreadSpec, FundingSource, HedgeSwap, IncentiveFeeSpec, InstrumentCollateral,
     InstrumentExerciseOverride, LiquidationSpec, LiveCollateral, LossAllocationPolicy,
     LossRecognition, ManagementFeeType, Metadata, ModificationSpec, PaymentCalculation,
@@ -58,7 +58,8 @@ pub use pricing::execute_waterfall;
 pub use pricing::coverage_tests::{TestContext, TestResult};
 pub use pricing::waterfall::WaterfallContext;
 pub use pricing::{
-    CoverageTestDiagnostic, PeriodDiagnostics, SimulationDiagnostics, SimulationRun,
+    CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource, PeriodDiagnostics,
+    PeriodWaterfall, SimulationDiagnostics, SimulationRun,
 };
 
 pub use metrics::{

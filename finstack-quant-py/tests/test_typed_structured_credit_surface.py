@@ -863,3 +863,29 @@ def test_recovery_only_configuration_is_reported_and_fully_disabled(recovery: di
         disabled = disabled.disable_stochastic()
     assert deal.is_stochastic
     assert deal.stochastic_recovery_spec == recovery
+
+
+def test_period_detail_reconciles_with_tranche_flows_on_a_called_deal() -> None:
+    """The 2028 call redeems outside the waterfall; the period record still adds up."""
+    run = _clo().run_simulation(_market(), CLOSE).to_dict()
+    periods = run["diagnostics"]["periods"]
+    assert run["diagnostics"]["periods"][-1]["non_waterfall_payments"]
+    assert {p["source"] for p in periods[-1]["non_waterfall_payments"]} == {"redemption"}
+    recipients = {"A": {"tranche": "A"}, "B": {"tranche": "B"}, "E": "equity"}
+    for tranche_id, recipient in recipients.items():
+        flows = run["tranches"][tranche_id]
+        booked: dict[str, float] = {}
+        for date, amount in flows["interest_flows"] + flows["principal_flows"]:
+            booked[date] = booked.get(date, 0.0) + float(amount["amount"])
+        reported: dict[str, float] = {}
+        for period in periods:
+            date = period["payment_date"]
+            for record in period["waterfall"]["payment_records"]:
+                if record["recipient"] == recipient:
+                    reported[date] = reported.get(date, 0.0) + float(record["paid_amount"]["amount"])
+            for payment in period["non_waterfall_payments"]:
+                if payment["tranche_id"] == tranche_id:
+                    cash = float(payment["interest"]["amount"]) + float(payment["principal"]["amount"])
+                    reported[payment["payment_date"]] = reported.get(payment["payment_date"], 0.0) + cash
+        for date in booked.keys() | reported.keys():
+            assert reported.get(date, 0.0) == pytest.approx(booked.get(date, 0.0), abs=1e-6), (tranche_id, date)

@@ -3970,6 +3970,16 @@ export type PathSamplingMethod =
       };
     };
 /**
+ * Where cash paid to a tranche outside the waterfall came from.
+ */
+export type NonWaterfallSource =
+  | "reserve_interest"
+  | "redemption"
+  | "spread_account_release"
+  | "principal_account_release"
+  | "reserve_account_release"
+  | "recovery_release";
+/**
  * Strongly-typed instrument classification for pricer dispatch.
  *
  * Each variant represents a distinct instrument type with its own pricing
@@ -18958,6 +18968,28 @@ export interface Diagnostic {
   severity: Severity;
 }
 /**
+ * Record of a diverted payment from one tier to another recipient.
+ */
+export interface DiversionRecord {
+  /**
+   * Cash diverted, in the deal currency.
+   */
+  amount: Money;
+  /**
+   * Failing coverage tests that caused the diversion, for display.
+   */
+  reason: string;
+  /**
+   * `WaterfallTier::id` of the coverage-test tier that diverted the cash.
+   */
+  source_tier: string;
+  /**
+   * `Recipient::id` that received the cash, or `principal_account` when a
+   * `Reinvest` test retained it as principal proceeds.
+   */
+  target_tranche: string;
+}
+/**
  * Revolving-credit Monte Carlo value with per-path details.
  */
 export interface EnhancedMonteCarloResult {
@@ -19383,7 +19415,10 @@ export interface SimulationDiagnostics {
    */
   early_amortization_date?: DateWire | null;
   /**
-   * Per-period deal accounting, in payment order.
+   * Per-period deal accounting, in payment order. A deal with no payment
+   * period left that still settles cash (a fully defaulted pool with
+   * recoveries pending, or a funded reserve) has one record, holding that
+   * settlement in `non_waterfall_payments`.
    */
   periods?: PeriodDiagnostics[];
   /**
@@ -19445,6 +19480,14 @@ export interface PeriodDiagnostics {
    */
   interest_collections: Money;
   /**
+   * Cash paid to tranches outside the waterfall: reserve interest routed to
+   * a tranche, and, on the deal's last period, its redemption and terminal
+   * releases. Together with `waterfall.payment_records` this is every
+   * tranche's interest and principal cash: per tranche and date, the two
+   * sum to the tranche's `interest_flows` plus `principal_flows`.
+   */
+  non_waterfall_payments: NonWaterfallPayment[];
+  /**
    * Payment date of the period.
    */
   payment_date: DateWire;
@@ -19492,10 +19535,142 @@ export interface PeriodDiagnostics {
    */
   warf: number;
   /**
+   * How this period's waterfall ran.
+   */
+  waterfall: PeriodWaterfall;
+  /**
    * Balance-weighted spread of the floating-rate collateral (basis points).
    */
   weighted_avg_spread_bp: number;
   [k: string]: unknown;
+}
+/**
+ * Cash paid to one tranche outside the waterfall.
+ */
+export interface NonWaterfallPayment {
+  /**
+   * Manager incentive fee withheld from the cash before it reached an
+   * equity class; zero otherwise. Already counted in the period's
+   * `fees_paid`, and not part of what the tranche received.
+   */
+  incentive_fee: Money;
+  /**
+   * Part booked to the tranche's interest flows.
+   */
+  interest: Money;
+  /**
+   * Date the tranche received the cash. A recovery settling after the last
+   * period carries its own later date here.
+   */
+  payment_date: DateWire;
+  /**
+   * Part booked to the tranche's principal flows, net of `incentive_fee`.
+   */
+  principal: Money;
+  /**
+   * Where the cash came from.
+   */
+  source: NonWaterfallSource;
+  /**
+   * Id of the tranche paid (`Tranche::id`), equity classes included.
+   */
+  tranche_id: string;
+  [k: string]: unknown;
+}
+/**
+ * How one period's waterfall ran: who was paid, how much, and what was left.
+ *
+ * The serializable projection of [`WaterfallDistribution`]: its two
+ * recipient-keyed maps cannot be JSON (a `RecipientType::Tranche` is not a
+ * string key) and hold nothing `payment_records` does not, and its payment
+ * date and coverage tests are already on [`PeriodDiagnostics`].
+ */
+export interface PeriodWaterfall {
+  /**
+   * Coverage-test diversions that moved cash, in execution order.
+   */
+  diverted_amounts: DiversionRecord[];
+  /**
+   * Total cash failing coverage tests diverted this period.
+   */
+  diverted_cash: Money;
+  /**
+   * Whether any coverage-test tier failed this period, even with no cash
+   * left to divert.
+   */
+  had_diversions: boolean;
+  /**
+   * Every recipient payment, in execution order.
+   */
+  payment_records: PaymentRecord[];
+  /**
+   * Principal proceeds spent on fee or interest tiers.
+   */
+  principal_used_for_interest: Money;
+  /**
+   * Recovery cash included in `total_available`.
+   */
+  recovery_proceeds: Money;
+  /**
+   * Interest proceeds left undistributed, carried to the next period.
+   */
+  remaining_interest: Money;
+  /**
+   * Principal proceeds left undistributed, carried to the next period.
+   */
+  remaining_principal: Money;
+  /**
+   * Cash each tier allocated, as `(tier id, amount)` in execution order.
+   */
+  tier_allocations: [string, Money][];
+  /**
+   * Cash entering the waterfall (interest plus principal proceeds).
+   */
+  total_available: Money;
+  [k: string]: unknown;
+}
+/**
+ * One recipient's payment as the waterfall executor made it.
+ */
+export interface PaymentRecord {
+  /**
+   * Whether a failing coverage test diverted this payment here.
+   */
+  diverted: boolean;
+  /**
+   * Whether this payment is capital: it retires the tranche's balance and
+   * books to its principal flows rather than its interest flows.
+   */
+  is_principal: boolean;
+  /**
+   * Cash actually paid, in the deal currency.
+   */
+  paid_amount: Money;
+  /**
+   * `WaterfallTier::priority` of that tier (lower runs first).
+   */
+  priority: number;
+  /**
+   * Who was paid. An equity class is paid as `RecipientType::Equity`, every
+   * other class as `RecipientType::Tranche` with its id.
+   */
+  recipient: RecipientType;
+  /**
+   * `Recipient::id` within the tier.
+   */
+  recipient_id: string;
+  /**
+   * Amount the recipient's calculation asked for, in the deal currency.
+   */
+  requested_amount: Money;
+  /**
+   * `requested_amount` less `paid_amount`.
+   */
+  shortfall: Money;
+  /**
+   * `WaterfallTier::id` of the tier that made the payment.
+   */
+  tier_id: string;
 }
 /**
  * Result containing tranche-specific cashflows and metadata.

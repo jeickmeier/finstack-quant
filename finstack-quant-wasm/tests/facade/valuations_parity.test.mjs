@@ -377,6 +377,23 @@ test('equity option and convertible analytics match Python', () => {
   same(plain(convertible.greeks(data.market, '2024-06-20')), data.greeks, 'greeks', 1e-4);
 });
 
+test('structured-credit period detail says who was paid', () => {
+  const sc = golden.structured;
+  const deal = instruments.StructuredCredit.fromJson(sc.deal);
+  const { periods } = deal.runSimulation(sc.market, sc.as_of).diagnostics;
+  const coupon = periods[0].waterfall.payment_records.find(
+    (record) => record.recipient.tranche === 'A' && !record.is_principal
+  );
+  assert.ok(Number(coupon.paid_amount.amount) > 0);
+  // The deal is called in 2028: the redemption is outside the waterfall.
+  const redemption = periods.at(-1).non_waterfall_payments.filter((p) => p.source === 'redemption');
+  assert.deepEqual(
+    redemption.map((p) => p.tranche_id),
+    ['A', 'B', 'E']
+  );
+  same(periods, sc.diagnostics.periods, 'periods', LOOSE);
+});
+
 test('structured-credit deal analytics match Python', () => {
   const sc = golden.structured;
   const deal = instruments.StructuredCredit.fromJson(sc.deal);
