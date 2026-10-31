@@ -28,8 +28,8 @@ export interface ScenarioHeatmapProps
   /** Select an exact returned severity, expressed as a decimal; no repricing is triggered. */
   severity: number;
   onSeverityChange(severity: number): void;
-  /** Explicit price extent straddling 100, the canonical par reference. */
-  priceDomain: readonly [number, number];
+  /** Price extent straddling 100, the canonical par reference; omitted means the returned prices' reach about par. */
+  priceDomain?: readonly [number, number];
   link?: LinkedSelection;
   width?: number;
   height?: number;
@@ -40,6 +40,13 @@ export interface ScenarioHeatmapProps
 /** A view of original cells in input order, never a regenerated or normalized grid. */
 export function scenarioCells(table: ScenarioTable, severity: number) {
   return table.cells.filter((cell) => cell.severity === severity);
+}
+/** Color extent of the table's prices, symmetric about par so the ramp's center means par. */
+function parDomain(table: ScenarioTable): readonly [number, number] {
+  // finstack-arith: chart color domain about the par reference; no value is changed
+  const reach = Math.max(1, ...table.cells.map((c) => Math.abs(c.price - 100)));
+  // finstack-arith: chart color domain about the par reference; no value is changed
+  return [100 - reach, 100 + reach];
 }
 /** Shared heatmap uses returned prices directly and the canonical par reference as its color center. */
 export function scenarioPreset(
@@ -53,6 +60,7 @@ export function scenarioPreset(
     | "formatValue"
   >,
 ) {
+  const [low, high] = props.priceDomain ?? parDomain(props.table);
   return heatmap({
     data: scenarioCells(props.table, props.severity),
     x: (cell) => cell.cpr,
@@ -63,7 +71,7 @@ export function scenarioPreset(
     yLabel: "CDR (annual decimal)",
     valueLabel: scenarioPriceLabel,
     palette: "diverging",
-    domain: [props.priceDomain[0], 100, props.priceDomain[1]],
+    domain: [low, 100, high],
     link: props.link,
     annotations: props.annotations,
     formatValue: props.formatValue,
@@ -181,7 +189,7 @@ export function ScenarioHeatmapPanel({
   priceDomain,
 }: {
   table: ScenarioTable;
-  priceDomain: readonly [number, number];
+  priceDomain?: readonly [number, number];
 }) {
   const [severity, setSeverity] = useState(table.cells[0]?.severity),
     link = useLinkedSelection();

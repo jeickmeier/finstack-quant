@@ -1,22 +1,58 @@
 "use client";
+import { useCallback } from "react";
 import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
+import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
 import {
   useWorkerQuery,
   workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type {
+  StandardDealRequest,
   TrancheMetricsRequest,
   TrancheOasRequest,
   TranchePriceRequest,
   TrancheRequest,
 } from "@/workers/finstack-contract";
 export type {
+  DealTranches,
+  StandardDealRequest,
+  StandardDealType,
   TrancheMetricsRequest,
   TrancheOasRequest,
   TranchePriceRequest,
   TrancheRequest,
 } from "@/workers/finstack-contract";
+/** Build a deal on request: native canonical instrument JSON, or the native error thrown. */
+export function useNewStandardDeal() {
+  const worker = useFinstack();
+  return useCallback(
+    async (request: StandardDealRequest) => {
+      if (worker.error) throw worker.error;
+      if (worker.status !== "ready" || !worker.client)
+        throw new Error("Building a deal is waiting for the worker");
+      return worker.client.call("newStandardDeal", request);
+    },
+    [worker.client, worker.status, worker.error],
+  );
+}
+/** Native tranches of a deal's instrument JSON. Null disables the call. */
+export function useDealTranches(instrumentJson: string | null) {
+  return useWorkerQuery((worker) =>
+    workerQueryOptions({
+      client: worker.client,
+      queryKey: [
+        "finstack",
+        worker.session,
+        "dealTranches",
+        instrumentJson,
+      ] as const,
+      ready: instrumentJson !== null,
+      missing: "Deal tranches require instrument JSON and a ready worker",
+      queryFn: (ready) => ready.call("dealTranches", instrumentJson!),
+    }),
+  );
+}
 /** Snapshot the deal, tranche, market, date, optional price and metric ids. Null disables the call. */
 export function trancheMetricsOptions(
   client: FinstackClient | null,

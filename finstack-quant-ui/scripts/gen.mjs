@@ -100,6 +100,7 @@ export async function generate(repo = repoRoot) {
           "scenario_spec",
           "scenario_diff",
           "scenario_grid",
+          "standard_deal_params",
           "oas_config",
           "table_envelope",
           "covenant_report",
@@ -244,11 +245,12 @@ export async function generate(repo = repoRoot) {
             value.startsWith("#/$defs/")
           ) {
             const id = value.slice("#/$defs/".length).split("/")[0];
-            if (localNames.has(id)) {
-              next[key] =
-                `#/$defs/${localNames.get(id)}${value.slice(`#/$defs/${id}`.length)}`;
-              continue;
-            }
+            if (localNames.has(id))
+              // A bare ref: the compiler renames a ref with sibling keywords
+              // per use, and only the definition's own name is declared below.
+              return {
+                $ref: `#/$defs/${localNames.get(id)}${value.slice(`#/$defs/${id}`.length)}`,
+              };
           }
           next[key] = retarget(value);
         }
@@ -257,7 +259,8 @@ export async function generate(repo = repoRoot) {
       const defs = Object.fromEntries(
         [...localNames].map(([key, title]) => [
           title,
-          retarget(typeInput.$defs[key]),
+          // The root compile names a local ref by its title; keep it the part's name.
+          { ...retarget(typeInput.$defs[key]), title },
         ]),
       );
       typeInput = retarget({ ...typeInput, $defs: {} });

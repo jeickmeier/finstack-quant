@@ -180,3 +180,56 @@ if (!checking)
       ),
     })),
   );
+// Deal entry: every family StructuredCredit.newStandard accepts, from the schema's
+// Rust example params, with the tranches a selector lists and the proof it simulates
+// on the UI market.
+const paramsSource =
+  "finstack-quant/valuations/schemas/common/1/standard_deal_params.schema.json";
+const params = JSON.parse(
+  await readFile(
+    new URL(`../../../../${paramsSource}`, import.meta.url),
+    "utf8",
+  ),
+).examples[0];
+const dealGrid = {
+  cprs: [0, 0.1],
+  cdrs: [0, 0.05],
+  severities: [0.4],
+  recovery_lag: null,
+};
+const dealCases = ["abs", "clo", "cmbs", "rmbs"].map((family) => {
+  const deal = native.StructuredCredit.newStandard(
+    family,
+    JSON.stringify(params),
+  );
+  try {
+    const instrumentJson = deal.toJson();
+    const tranches = deal.tranches;
+    return {
+      family,
+      instrumentJson,
+      tranches,
+      table: native.trancheScenarioTable(
+        deal,
+        tranches.tranches[0].id,
+        marketJson,
+        params.closing_date,
+        JSON.stringify(dealGrid),
+      ),
+    };
+  } finally {
+    deal.free();
+  }
+});
+await emit(
+  new URL("./standard-deals.json", import.meta.url),
+  JSON.stringify({
+    paramsSource,
+    params,
+    marketSource,
+    marketSha256: createHash("sha256").update(marketJson).digest("hex"),
+    asOf: params.closing_date,
+    grid: dealGrid,
+    cases: dealCases,
+  }),
+);

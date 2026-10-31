@@ -8,11 +8,13 @@ import {
   unwrap,
   errorValue,
   type ScenarioRequest,
+  type StandardDealType,
 } from "@/workers/finstack-contract";
 import { scenarioOptions } from "@/hooks/valuations/use-scenario-table/use-scenario-table";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import fixture from "./scenario-table/cases.json";
 import tranches from "./scenario-table/tranche-analytics.json";
+import standardDeals from "./scenario-table/standard-deals.json";
 import { budget } from "../shared/budget";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -70,6 +72,49 @@ it(
         deal.free();
       }
     }
+  },
+  budget(30000),
+);
+it(
+  "builds each standard deal family and lists its native tranches through the real worker",
+  async () => {
+    const paramsJson = JSON.stringify(standardDeals.params);
+    for (const c of standardDeals.cases) {
+      const built = unwrap(
+        await worker.proxy.newStandardDeal({
+          dealType: c.family as StandardDealType,
+          paramsJson,
+        }),
+      );
+      expect(built).toBe(c.instrumentJson);
+      expect(unwrap(await worker.proxy.dealTranches(built))).toEqual(
+        c.tranches,
+      );
+      // Each family simulates on the UI market; the fixture holds the native table.
+      expect(
+        unwrap(
+          await worker.proxy.scenarioTable({
+            instrumentJson: built,
+            trancheId: c.tranches.tranches[0]!.id,
+            marketJson,
+            asOf: standardDeals.asOf,
+            gridJson: JSON.stringify(standardDeals.grid),
+          }),
+        ),
+      ).toEqual(c.table);
+    }
+    let error;
+    try {
+      native.StructuredCredit.newStandard("cbo", paramsJson);
+    } catch (e) {
+      error = errorValue(e);
+    }
+    expect(
+      await worker.proxy.newStandardDeal({
+        dealType: "cbo" as StandardDealType,
+        paramsJson,
+      }),
+    ).toEqual({ ok: false, error });
   },
   budget(30000),
 );

@@ -53,6 +53,7 @@ const acronyms = new Set([
   "pde",
   "pv",
   "pv01",
+  "rmbs",
   "rr",
   "sabr",
   "sofr",

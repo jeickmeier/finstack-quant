@@ -21,8 +21,8 @@ import {
   FxSurfaceChart,
   type FxSurfaceChartProps,
 } from "@/components/finstack/models/components/fx-surface-chart/fx-surface-chart";
-import { ScenarioPanel } from "./scenario-panel";
-import { TranchePanel } from "./tranche-panel";
+import { DealPresetPanel } from "./deal-preset-panel";
+import { StructuredCreditPanel } from "./structured-credit-panel";
 import { CalibrationPanel } from "./calibration-panel";
 import {
   MarketScenarioInputs,
@@ -77,11 +77,14 @@ export function PricingWorkbench({
   /** Notify the host when a prepared instrument example is selected. */
   onInstrumentTypeChange?: (type: string) => void;
   defaultCalibrationJson?: string;
-  /** Explicit native tranche/grid inputs and display extent; offered while structured credit is selected and evaluated on its completed request only. */
+  /** Optional host seeds for the structured-credit tab, which is offered while structured credit is selected and evaluated on its completed request only. */
   scenario?: {
-    trancheId: string;
-    gridJson: string;
-    priceDomain: readonly [number, number];
+    /** Initially selected tranche; omitted means the first tranche the deal returns. */
+    trancheId?: string;
+    /** Initial native ScenarioGrid JSON; omitted means the schema's Rust example. */
+    gridJson?: string;
+    /** Display extent of the price heatmap; omitted means the returned prices about par. */
+    priceDomain?: readonly [number, number];
     /** Registry metric ids valued on the tranche by trancheMetrics; omitted means none. */
     trancheMetrics?: readonly string[];
   };
@@ -133,6 +136,8 @@ export function PricingWorkbench({
     market,
     acceptMarket,
     setInstrument,
+    builtInstrumentJson,
+    loadInstrument,
     selectType,
     printSnapshot,
     startPrint,
@@ -330,6 +335,9 @@ export function PricingWorkbench({
                 keepMounted
                 className="finstack-workbench__panel print:hidden"
               >
+                {type === "structured_credit" && (
+                  <DealPresetPanel onDeal={loadInstrument} />
+                )}
                 <InstrumentForm
                   key={instrumentRevision}
                   type={type}
@@ -340,6 +348,7 @@ export function PricingWorkbench({
                   showGeneratedExample={!exampleRequests}
                   priceDriverFields={priceDriverFields}
                   defaultJson={
+                    builtInstrumentJson ??
                     exampleRequests?.[type]?.instrumentJson ??
                     ((defaultInstrumentType ?? initialType) === initialType
                       ? initial.instrumentJson
@@ -552,7 +561,7 @@ export function PricingWorkbench({
                       P&amp;L explain
                     </TabsTrigger>
                     <TabsTrigger value="request">Request</TabsTrigger>
-                    {scenario && type === "structured_credit" && (
+                    {type === "structured_credit" && (
                       <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
                     )}
                   </TabsList>
@@ -663,45 +672,19 @@ export function PricingWorkbench({
                   />
                 </TabsContent>
                 <TabsContent value="scenarios" className="print:hidden">
-                  {scenario &&
-                  completed?.instrumentType === "structured_credit" ? (
-                    <>
-                      <TranchePanel
-                        key={JSON.stringify([
-                          completed.request.instrumentJson,
-                          completed.request.marketJson,
-                          completed.request.asOf,
-                          scenario.trancheId,
-                        ])}
-                        request={{
-                          instrumentJson: completed.request.instrumentJson,
-                          marketJson: completed.request.marketJson,
-                          asOf: completed.request.asOf,
-                          trancheId: scenario.trancheId,
-                        }}
-                        metrics={scenario.trancheMetrics}
-                        density={currentDensity}
-                      />
-                      <details
-                        onToggle={(event) =>
-                          setScenariosOpen(event.currentTarget.open)
-                        }
-                      >
-                        <summary>Scenario prices</summary>
-                        {scenariosOpen && (
-                          <ScenarioPanel
-                            request={{
-                              instrumentJson: completed.request.instrumentJson,
-                              marketJson: completed.request.marketJson,
-                              asOf: completed.request.asOf,
-                              trancheId: scenario.trancheId,
-                              gridJson: scenario.gridJson,
-                            }}
-                            priceDomain={scenario.priceDomain}
-                          />
-                        )}
-                      </details>
-                    </>
+                  {completed?.instrumentType === "structured_credit" ? (
+                    <StructuredCreditPanel
+                      key={completed.request.instrumentJson}
+                      request={{
+                        instrumentJson: completed.request.instrumentJson,
+                        marketJson: completed.request.marketJson,
+                        asOf: completed.request.asOf,
+                      }}
+                      seeds={scenario}
+                      scenariosOpen={scenariosOpen}
+                      onScenariosOpenChange={setScenariosOpen}
+                      density={currentDensity}
+                    />
                   ) : (
                     <p>Scenario prices are unavailable for this instrument.</p>
                   )}

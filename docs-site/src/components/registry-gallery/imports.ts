@@ -637,6 +637,15 @@ export const importHarnesses = {
       name: "contract-scenario-grid",
       modules: modules.length,
     })),
+  "contract-standard-deal-params": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/standard_deal_params.json"),
+      import("@/lib/finstack/generated/types/standard_deal_params"),
+      import("@/lib/finstack/generated/meta/standard_deal_params"),
+    ]).then((modules) => ({
+      name: "contract-standard-deal-params",
+      modules: modules.length,
+    })),
   "contract-covenant-engine": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/covenant_engine.json"),
