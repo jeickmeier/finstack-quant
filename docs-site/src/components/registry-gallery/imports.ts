@@ -99,6 +99,13 @@ export const importHarnesses = {
       name: "use-scenario-table",
       modules: modules.length,
     })),
+  "use-deal-report": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-deal-report/use-deal-report"),
+    ]).then((modules) => ({
+      name: "use-deal-report",
+      modules: modules.length,
+    })),
   "use-tranche-analytics": () =>
     Promise.all([
       import("@/hooks/valuations/use-tranche-analytics/use-tranche-analytics"),

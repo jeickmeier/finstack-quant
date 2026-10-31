@@ -1,0 +1,1001 @@
+{
+  "goldenSource": "finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/structured_credit/clo_mezzanine_base_case.json",
+  "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
+  "cases": [
+    {
+      "name": "golden",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-MEZZANINE-BASE-CASE-GOLDEN",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-FULL",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [
+                {
+                  "id": "LOAN1",
+                  "asset_type": {
+                    "type": "first_lien_loan"
+                  },
+                  "balance": {
+                    "amount": "12000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.035,
+                  "spread_bp": 350,
+                  "forward_curve_id": "SOFR-3M",
+                  "maturity": "2030-01-01",
+                  "rating": "BB",
+                  "industry": "Technology",
+                  "obligor_id": "OBLIGOR-1",
+                  "defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": 0.0123,
+                  "mdr_override": 0.0042,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                },
+                {
+                  "id": "BOND1",
+                  "asset_type": {
+                    "type": "high_yield_bond"
+                  },
+                  "balance": {
+                    "amount": "8000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.055,
+                  "spread_bp": null,
+                  "forward_curve_id": null,
+                  "maturity": "2029-07-01",
+                  "rating": "A",
+                  "industry": "Healthcare",
+                  "obligor_id": "OBLIGOR-2",
+                  "defaulted": true,
+                  "recovery_amount": {
+                    "amount": "1000000",
+                    "currency": "USD"
+                  },
+                  "default_date": "2026-04-01",
+                  "purchase_price": {
+                    "amount": "7800000",
+                    "currency": "USD"
+                  },
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_365f",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "8000000",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": {
+                "end": "2026-01-01",
+                "is_active": true,
+                "criteria": {
+                  "max_price_pct": 102.5,
+                  "min_yield": 0.04
+                },
+                "amortizing_tranches": ["SENIOR"],
+                "assumptions": null
+              },
+              "collection_account": {
+                "amount": "250000",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "100000",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "75000",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "EQUITY",
+                  "attach_pct": 0,
+                  "detach_pct": 10,
+                  "seniority": "equity",
+                  "rating": "BB",
+                  "original_balance": {
+                    "amount": "5000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.12
+                    }
+                  },
+                  "oc_trigger": {
+                    "trigger_level": 1.15,
+                    "cure_level": null,
+                    "breach_date": null,
+                    "consequence": "divert_cash_flow"
+                  },
+                  "ic_trigger": {
+                    "trigger_level": 1.05,
+                    "cure_level": null,
+                    "breach_date": null,
+                    "consequence": "divert_cash_flow"
+                  },
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {
+                    "tags": ["equity"],
+                    "meta": {
+                      "desk": "alts"
+                    }
+                  }
+                },
+                {
+                  "id": "SENIOR",
+                  "attach_pct": 10,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": "AAA",
+                  "original_balance": {
+                    "amount": "45000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "43000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "floating": {
+                      "forward_curve_id": "SOFR-3M",
+                      "spread_bp": "150.0",
+                      "gearing": "1.0",
+                      "gearing_includes_spread": true,
+                      "index_floor_bp": "0.0",
+                      "all_in_floor_bp": "25.0",
+                      "all_in_cap_bp": "1200.0",
+                      "index_cap_bp": null,
+                      "reset_frequency": {
+                        "count": 3,
+                        "unit": "months"
+                      },
+                      "reset_lag_days": 2,
+                      "fixing_calendar_id": "usny"
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {
+                    "tags": ["senior"]
+                  }
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 1,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "business_day_convention": "modified_following",
+            "discount_curve_id": "USD-SOFR-DISC",
+            "instrument_pricing_overrides": {
+              "market_quotes": {
+                "quoted_dirty_price_currency": 10952092.791475201
+              }
+            },
+            "attributes": {
+              "tags": ["full"],
+              "meta": {
+                "book": "structured_credit"
+              }
+            },
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.13486609002406202
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.025
+            },
+            "recovery_spec": {
+              "rate": 0.42,
+              "recovery_lag": 9
+            },
+            "correlation_structure": {
+              "structure": "sectored",
+              "intra_sector": 0.28,
+              "inter_sector": 0.12,
+              "prepay_default": -0.18
+            },
+            "market_conditions": {
+              "refi_rate": 0.035
+            },
+            "deal_metadata": {
+              "manager_id": "Manager-X",
+              "servicer_id": "Servicer-Y",
+              "master_servicer_id": "Master-Z",
+              "special_servicer_id": "Special-W",
+              "trustee_id": "Trustee-T"
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "asOf": "2026-04-30",
+      "report": {
+        "total_balance": {
+          "amount": "20000000",
+          "currency": "USD"
+        },
+        "stats": {
+          "wac": 0,
+          "weighted_avg_spread_bp": 350,
+          "weighted_avg_maturity": 3.475068493150685,
+          "diversity_score": 1.9230769230769231,
+          "num_obligors": 2,
+          "num_industries": 2,
+          "defaulted_balance_pct": 40,
+          "undrawn_commitment": 0
+        },
+        "warf": 1350,
+        "by_obligor": [
+          {
+            "key": "OBLIGOR-1",
+            "balance": {
+              "amount": "12000000",
+              "currency": "USD"
+            },
+            "balance_pct": 60,
+            "asset_count": 1
+          },
+          {
+            "key": "OBLIGOR-2",
+            "balance": {
+              "amount": "8000000",
+              "currency": "USD"
+            },
+            "balance_pct": 40,
+            "asset_count": 1
+          }
+        ],
+        "by_industry": [
+          {
+            "key": "Technology",
+            "balance": {
+              "amount": "12000000",
+              "currency": "USD"
+            },
+            "balance_pct": 60,
+            "asset_count": 1
+          },
+          {
+            "key": "Healthcare",
+            "balance": {
+              "amount": "8000000",
+              "currency": "USD"
+            },
+            "balance_pct": 40,
+            "asset_count": 1
+          }
+        ],
+        "by_rating": [
+          {
+            "key": "BB",
+            "balance": {
+              "amount": "12000000",
+              "currency": "USD"
+            },
+            "balance_pct": 60,
+            "asset_count": 1
+          },
+          {
+            "key": "A",
+            "balance": {
+              "amount": "8000000",
+              "currency": "USD"
+            },
+            "balance_pct": 40,
+            "asset_count": 1
+          }
+        ]
+      },
+      "units": {
+        "total_balance": {
+          "field": "total_balance",
+          "label": "USD",
+          "source": "valuations::PoolReport::total_balance"
+        },
+        "warf": {
+          "field": "warf",
+          "label": "Moody's rating factor",
+          "source": "valuations::PoolReport::warf"
+        },
+        "stats": [
+          {
+            "field": "wac",
+            "label": "decimal",
+            "source": "valuations::PoolStats::wac"
+          },
+          {
+            "field": "weighted_avg_spread_bp",
+            "label": "bp",
+            "source": "valuations::PoolStats::weighted_avg_spread_bp"
+          },
+          {
+            "field": "weighted_avg_maturity",
+            "label": "years",
+            "source": "valuations::PoolStats::weighted_avg_maturity"
+          },
+          {
+            "field": "diversity_score",
+            "label": "score",
+            "source": "valuations::PoolStats::diversity_score"
+          },
+          {
+            "field": "num_obligors",
+            "label": "obligors",
+            "source": "valuations::PoolStats::num_obligors"
+          },
+          {
+            "field": "num_industries",
+            "label": "industries",
+            "source": "valuations::PoolStats::num_industries"
+          },
+          {
+            "field": "defaulted_balance_pct",
+            "label": "% of current pool balance",
+            "source": "valuations::PoolStats::defaulted_balance_pct"
+          },
+          {
+            "field": "undrawn_commitment",
+            "label": "USD",
+            "source": "valuations::PoolStats::undrawn_commitment"
+          }
+        ],
+        "concentration": [
+          {
+            "field": "balance",
+            "label": "USD",
+            "source": "valuations::PoolConcentrationEntry::balance"
+          },
+          {
+            "field": "balance_pct",
+            "label": "% of current pool balance",
+            "source": "valuations::PoolConcentrationEntry::balance_pct"
+          },
+          {
+            "field": "asset_count",
+            "label": "assets",
+            "source": "valuations::PoolConcentrationEntry::asset_count"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unattributed",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [
+                {
+                  "id": "COLLATERAL-1",
+                  "asset_type": {
+                    "type": "high_yield_bond"
+                  },
+                  "balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.07,
+                  "spread_bp": null,
+                  "forward_curve_id": null,
+                  "maturity": "2034-01-01",
+                  "rating": null,
+                  "industry": null,
+                  "obligor_id": null,
+                  "defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "CLONOTES-A",
+                  "attach_pct": 0,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.06
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.2
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.02
+            },
+            "recovery_spec": {
+              "rate": 0.6,
+              "recovery_lag": 12
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "asOf": "2024-01-01",
+      "report": {
+        "total_balance": {
+          "amount": "100000000",
+          "currency": "USD"
+        },
+        "stats": {
+          "wac": 0.07,
+          "weighted_avg_spread_bp": 0,
+          "weighted_avg_maturity": 10.008219178082191,
+          "diversity_score": 0,
+          "num_obligors": 0,
+          "num_industries": 0,
+          "defaulted_balance_pct": 0,
+          "undrawn_commitment": 0
+        },
+        "warf": 3650,
+        "by_obligor": [
+          {
+            "key": null,
+            "balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "balance_pct": 100,
+            "asset_count": 1
+          }
+        ],
+        "by_industry": [
+          {
+            "key": null,
+            "balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "balance_pct": 100,
+            "asset_count": 1
+          }
+        ],
+        "by_rating": [
+          {
+            "key": null,
+            "balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "balance_pct": 100,
+            "asset_count": 1
+          }
+        ]
+      },
+      "units": {
+        "total_balance": {
+          "field": "total_balance",
+          "label": "USD",
+          "source": "valuations::PoolReport::total_balance"
+        },
+        "warf": {
+          "field": "warf",
+          "label": "Moody's rating factor",
+          "source": "valuations::PoolReport::warf"
+        },
+        "stats": [
+          {
+            "field": "wac",
+            "label": "decimal",
+            "source": "valuations::PoolStats::wac"
+          },
+          {
+            "field": "weighted_avg_spread_bp",
+            "label": "bp",
+            "source": "valuations::PoolStats::weighted_avg_spread_bp"
+          },
+          {
+            "field": "weighted_avg_maturity",
+            "label": "years",
+            "source": "valuations::PoolStats::weighted_avg_maturity"
+          },
+          {
+            "field": "diversity_score",
+            "label": "score",
+            "source": "valuations::PoolStats::diversity_score"
+          },
+          {
+            "field": "num_obligors",
+            "label": "obligors",
+            "source": "valuations::PoolStats::num_obligors"
+          },
+          {
+            "field": "num_industries",
+            "label": "industries",
+            "source": "valuations::PoolStats::num_industries"
+          },
+          {
+            "field": "defaulted_balance_pct",
+            "label": "% of current pool balance",
+            "source": "valuations::PoolStats::defaulted_balance_pct"
+          },
+          {
+            "field": "undrawn_commitment",
+            "label": "USD",
+            "source": "valuations::PoolStats::undrawn_commitment"
+          }
+        ],
+        "concentration": [
+          {
+            "field": "balance",
+            "label": "USD",
+            "source": "valuations::PoolConcentrationEntry::balance"
+          },
+          {
+            "field": "balance_pct",
+            "label": "% of current pool balance",
+            "source": "valuations::PoolConcentrationEntry::balance_pct"
+          },
+          {
+            "field": "asset_count",
+            "label": "assets",
+            "source": "valuations::PoolConcentrationEntry::asset_count"
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-MEZZANINE-BASE-CASE-GOLDEN",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-FULL",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [],
+              "cumulative_defaults": {
+                "amount": "8000000",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": {
+                "end": "2026-01-01",
+                "is_active": true,
+                "criteria": {
+                  "max_price_pct": 102.5,
+                  "min_yield": 0.04
+                },
+                "amortizing_tranches": ["SENIOR"],
+                "assumptions": null
+              },
+              "collection_account": {
+                "amount": "250000",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "100000",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "75000",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "EQUITY",
+                  "attach_pct": 0,
+                  "detach_pct": 10,
+                  "seniority": "equity",
+                  "rating": "BB",
+                  "original_balance": {
+                    "amount": "5000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.12
+                    }
+                  },
+                  "oc_trigger": {
+                    "trigger_level": 1.15,
+                    "cure_level": null,
+                    "breach_date": null,
+                    "consequence": "divert_cash_flow"
+                  },
+                  "ic_trigger": {
+                    "trigger_level": 1.05,
+                    "cure_level": null,
+                    "breach_date": null,
+                    "consequence": "divert_cash_flow"
+                  },
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {
+                    "tags": ["equity"],
+                    "meta": {
+                      "desk": "alts"
+                    }
+                  }
+                },
+                {
+                  "id": "SENIOR",
+                  "attach_pct": 10,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": "AAA",
+                  "original_balance": {
+                    "amount": "45000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "43000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "floating": {
+                      "forward_curve_id": "SOFR-3M",
+                      "spread_bp": "150.0",
+                      "gearing": "1.0",
+                      "gearing_includes_spread": true,
+                      "index_floor_bp": "0.0",
+                      "all_in_floor_bp": "25.0",
+                      "all_in_cap_bp": "1200.0",
+                      "index_cap_bp": null,
+                      "reset_frequency": {
+                        "count": 3,
+                        "unit": "months"
+                      },
+                      "reset_lag_days": 2,
+                      "fixing_calendar_id": "usny"
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {
+                    "tags": ["senior"]
+                  }
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 1,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "business_day_convention": "modified_following",
+            "discount_curve_id": "USD-SOFR-DISC",
+            "instrument_pricing_overrides": {
+              "market_quotes": {
+                "quoted_dirty_price_currency": 10952092.791475201
+              }
+            },
+            "attributes": {
+              "tags": ["full"],
+              "meta": {
+                "book": "structured_credit"
+              }
+            },
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.13486609002406202
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.025
+            },
+            "recovery_spec": {
+              "rate": 0.42,
+              "recovery_lag": 9
+            },
+            "correlation_structure": {
+              "structure": "sectored",
+              "intra_sector": 0.28,
+              "inter_sector": 0.12,
+              "prepay_default": -0.18
+            },
+            "market_conditions": {
+              "refi_rate": 0.035
+            },
+            "deal_metadata": {
+              "manager_id": "Manager-X",
+              "servicer_id": "Servicer-Y",
+              "master_servicer_id": "Master-Z",
+              "special_servicer_id": "Special-W",
+              "trustee_id": "Trustee-T"
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "asOf": "2026-04-30",
+      "report": {
+        "total_balance": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "stats": {
+          "wac": 0,
+          "weighted_avg_spread_bp": 0,
+          "weighted_avg_maturity": 0,
+          "diversity_score": 0,
+          "num_obligors": 0,
+          "num_industries": 0,
+          "defaulted_balance_pct": 0,
+          "undrawn_commitment": 0
+        },
+        "warf": 0,
+        "by_obligor": [],
+        "by_industry": [],
+        "by_rating": []
+      },
+      "units": {
+        "total_balance": {
+          "field": "total_balance",
+          "label": "USD",
+          "source": "valuations::PoolReport::total_balance"
+        },
+        "warf": {
+          "field": "warf",
+          "label": "Moody's rating factor",
+          "source": "valuations::PoolReport::warf"
+        },
+        "stats": [
+          {
+            "field": "wac",
+            "label": "decimal",
+            "source": "valuations::PoolStats::wac"
+          },
+          {
+            "field": "weighted_avg_spread_bp",
+            "label": "bp",
+            "source": "valuations::PoolStats::weighted_avg_spread_bp"
+          },
+          {
+            "field": "weighted_avg_maturity",
+            "label": "years",
+            "source": "valuations::PoolStats::weighted_avg_maturity"
+          },
+          {
+            "field": "diversity_score",
+            "label": "score",
+            "source": "valuations::PoolStats::diversity_score"
+          },
+          {
+            "field": "num_obligors",
+            "label": "obligors",
+            "source": "valuations::PoolStats::num_obligors"
+          },
+          {
+            "field": "num_industries",
+            "label": "industries",
+            "source": "valuations::PoolStats::num_industries"
+          },
+          {
+            "field": "defaulted_balance_pct",
+            "label": "% of current pool balance",
+            "source": "valuations::PoolStats::defaulted_balance_pct"
+          },
+          {
+            "field": "undrawn_commitment",
+            "label": "USD",
+            "source": "valuations::PoolStats::undrawn_commitment"
+          }
+        ],
+        "concentration": [
+          {
+            "field": "balance",
+            "label": "USD",
+            "source": "valuations::PoolConcentrationEntry::balance"
+          },
+          {
+            "field": "balance_pct",
+            "label": "% of current pool balance",
+            "source": "valuations::PoolConcentrationEntry::balance_pct"
+          },
+          {
+            "field": "asset_count",
+            "label": "assets",
+            "source": "valuations::PoolConcentrationEntry::asset_count"
+          }
+        ]
+      }
+    }
+  ]
+}

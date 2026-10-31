@@ -132,6 +132,8 @@
     "valuations.instruments.listModelsGrouped",
     "valuations.instruments.metricMetadata",
     "valuations.instruments.metricsForInstrument",
+    "valuations.instruments.poolReport",
+    "valuations.instruments.poolReportFieldUnits",
     "valuations.instruments.priceDriverFields",
     "valuations.instruments.priceInstrumentWithMarket",
     "valuations.instruments.scenarioTableFieldUnits",

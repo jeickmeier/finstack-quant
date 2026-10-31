@@ -241,3 +241,41 @@ await emit(
     cases: dealCases,
   }),
 );
+// Pool report: a pool with real obligors, industries and ratings (the CLO mezzanine
+// golden), the example CLO, whose one asset carries no attributes, and an empty pool.
+const emptyPool = structuredClone(golden.instrument);
+emptyPool.instrument.spec.pool.assets = [];
+const poolCases = [
+  {
+    name: "golden",
+    instrument: golden.instrument,
+    asOf: golden.metadata.valuation_date,
+  },
+  { name: "unattributed", instrument, asOf },
+  {
+    name: "empty",
+    instrument: emptyPool,
+    asOf: golden.metadata.valuation_date,
+  },
+].map((entry) => {
+  const instrumentJson = native.validateInstrumentJson(
+    JSON.stringify(entry.instrument),
+  );
+  const deal = native.StructuredCredit.fromJson(instrumentJson);
+  try {
+    const report = native.poolReport(deal.pool, entry.asOf);
+    return {
+      name: entry.name,
+      instrument: JSON.parse(instrumentJson),
+      asOf: entry.asOf,
+      report,
+      units: native.poolReportFieldUnits(report.total_balance.currency),
+    };
+  } finally {
+    deal.free();
+  }
+});
+await emit(
+  new URL("./pool-report.json", import.meta.url),
+  JSON.stringify({ goldenSource, instrumentSource, cases: poolCases }),
+);

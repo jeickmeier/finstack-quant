@@ -262,6 +262,11 @@ test("a standard deal family builds, prices and lists its native tranches", asyn
       name: `${scenarios.trancheId} tranche analytics`,
     }),
   ).toBeVisible();
+  // The built deal reaches its native pool report.
+  await results.locator("summary", { hasText: /^Pool report$/ }).click();
+  const pool = results.getByRole("region", { name: "Pool report" });
+  await expect(pool).toContainText("WARF");
+  await expect(pool.getByRole("table", { name: "By rating" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

@@ -247,6 +247,12 @@
       "worker": "none"
     },
     {
+      "name": "pool-report",
+      "type": "registry:component",
+      "docs": "Present a native valuations.instruments.poolReport result: total balance, WARF and PoolStats tiles, then concentration tables by obligor, industry and rating in Rust's row order. Every unit comes from native poolReportFieldUnits for the report's currency. A null key means the attribute is missing on those assets and shows as such. Nothing is summed, sorted, grouped or rescaled. No worker is required.",
+      "worker": "none"
+    },
+    {
       "name": "tranche-analytics",
       "type": "registry:component",
       "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. With onOasConfigChange, an OAS configuration disclosure edits the generated OasConfig contract, starting from its Rust example (OasConfig::default()), and hands complete JSON to the host on apply. With schedule, the native TrancheCashflows totals and the TrancheCashflows::to_table projection (one row per date; Rust joins and sums the per-kind flows) show as returned. Nothing is computed, rescaled or defaulted. No worker is required.",
@@ -255,7 +261,7 @@
     {
       "name": "pricing-workbench",
       "type": "registry:block",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "worker": "host"
     },
     {
@@ -628,6 +634,10 @@
     },
     {
       "name": "use-scenario-table",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-deal-report",
       "type": "registry:hook"
     },
     {
@@ -1479,6 +1489,10 @@
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
       "sha256": "0fa06a4979f734bb9a6ba39a63b806c6b306d01f864ef6b2092fa79045f370e0"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/scenario-table/pool-report.json",
+      "sha256": "0ec5d9f9a9e4cb6193fddc8ffdd32759d8e8b5e45de786c61d5426fc1c3b3cbe"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",

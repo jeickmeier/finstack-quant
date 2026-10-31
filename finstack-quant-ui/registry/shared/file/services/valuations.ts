@@ -24,6 +24,8 @@ export type ValuationsNative = {
       | "trancheMetricFieldUnits"
       | "trancheSolveFieldUnits"
       | "scenarioTableFieldUnits"
+      | "poolReport"
+      | "poolReportFieldUnits"
     >;
   };
 };
@@ -150,6 +152,13 @@ export function createValuationsService(
         ),
       );
     },
+    poolReport(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.poolReport(deal.pool, request.asOf),
+        ),
+      );
+    },
     trancheMetrics(request) {
       return context.result(() =>
         withDeal(request.instrumentJson, (deal) =>
@@ -214,6 +223,8 @@ export function createValuationsService(
       context.result(() => instruments.trancheMetricFieldUnits(currency)),
     scenarioTableFieldUnits: (currency) =>
       context.result(() => instruments.scenarioTableFieldUnits(currency)),
+    poolReportFieldUnits: (currency) =>
+      context.result(() => instruments.poolReportFieldUnits(currency)),
     trancheSolveFieldUnits: () =>
       context.result(() => instruments.trancheSolveFieldUnits()),
     exportResult: (value) =>
