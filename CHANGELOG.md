@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Structured credit: scenario table currency and units
+
+#### Added
+
+- `ScenarioTable.currency` names the currency of each cell's `writedown`, as `TrancheMetrics.currency` does for its result.
+- `scenario_table_field_units(currency)` (`ScenarioTableFieldUnits`; WASM `scenarioTableFieldUnits`) states the unit of every `ScenarioCell` field, split into swept `axes` and reported `measures`.
+
+#### Changed
+
+- `ScenarioTable` JSON now requires `currency`.
+
 ### Structured credit: a tranche's cash flows by date in WASM
 
 #### Added

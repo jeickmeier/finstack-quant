@@ -22,6 +22,7 @@ export const instruments = {
   metricsForInstrument: wasm.metricsForInstrument,
   priceDriverFields: wasm.priceDriverFields,
   poolReportFieldUnits: wasm.poolReportFieldUnits,
+  scenarioTableFieldUnits: wasm.scenarioTableFieldUnits,
   trancheMetricFieldUnits: wasm.trancheMetricFieldUnits,
   trancheDiscountMargin: wasm.trancheDiscountMargin,
   trancheBreakevenCdr: wasm.trancheBreakevenCdr,

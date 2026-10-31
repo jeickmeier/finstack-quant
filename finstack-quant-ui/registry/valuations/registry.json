@@ -494,8 +494,8 @@
       "name": "scenario-heatmap",
       "type": "registry:component",
       "title": "Scenario heatmap",
-      "description": "Heatmap of a structured-credit scenario table: clean price by CPR and CDR at a controlled severity.",
-      "docs": "Display returned ScenarioTable prices at original CPR/CDR coordinates, with an explicitly controlled severity and priceDomain straddling the canonical par reference 100. Prices are clean settlement percentages of current tranche balance per Rust ScenarioCell.price. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation, rebasing or WAL/writedown overlay.",
+      "description": "Heatmap of a structured-credit scenario table: price, WAL or writedown by CPR and CDR at a controlled severity.",
+      "docs": "Display one returned ScenarioTable measure at original CPR/CDR coordinates, with explicitly controlled severity and measure. The measures, axes and their units come from native scenarioTableFieldUnits. Price centres its colour on the canonical par reference 100 over an optional priceDomain, else the returned prices' reach about par; WAL and writedown run low to high over the table. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation or rebasing.",
       "files": [
         {
           "path": "components/scenario-heatmap/scenario-heatmap.tsx",
@@ -908,8 +908,8 @@
       "name": "use-scenario-table",
       "type": "registry:hook",
       "title": "useScenarioTable",
-      "description": "Fetches a native structured-credit tranche scenario table through the WASM worker.",
-      "docs": "Native structured-credit scenario table with immutable complete request/session keys. No locally computed prices.",
+      "description": "Fetches a native structured-credit tranche scenario table and its field units through the WASM worker.",
+      "docs": "Native structured-credit scenario table with immutable complete request/session keys, and scenarioTableFieldUnits for its currency. No locally computed values.",
       "files": [
         {
           "path": "hooks/use-scenario-table/use-scenario-table.ts",

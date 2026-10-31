@@ -197,6 +197,7 @@ import type {
   MetricMetadata,
   OasResult,
   PoolReportFieldUnits,
+  ScenarioTableFieldUnits,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
@@ -435,6 +436,7 @@ export type {
   MetricMetadata,
   OasResult,
   PoolReportFieldUnits,
+  ScenarioTableFieldUnits,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
@@ -23209,6 +23211,15 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a `computation` error only if the names cannot cross the boundary.
    */
   priceDriverFields(): string[];
+  /**
+   * Units of the `ScenarioCell` fields, the one place a host reads them from.
+   *
+   * Rates are decimals, the price is percent of the tranche's current balance and the writedown is in currency units. Values are never rescaled.
+   * @param currency - ISO-4217 code of the result's `ScenarioTable.currency`, in any ASCII case; it names the unit of `writedown`.
+   * @returns `ScenarioTableFieldUnits`: `axes`, one `MetricFieldUnit` per swept input (`cpr`, `cdr`, `severity`), and `measures`, one per reported measure (`price`, `wal`, `writedown`), each in struct order.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  scenarioTableFieldUnits(currency: string): ScenarioTableFieldUnits;
   /**
    * Units of the `PoolReport` fields, the one place a host reads them from.
    * @param currency - ISO-4217 code of the pool's base currency, in any ASCII case; it names the unit of `total_balance`, `undrawn_commitment` and each row's `balance`.

@@ -431,6 +431,41 @@ def tranche_solve_field_units() -> dict[str, Any]:
     """
     ...
 
+def scenario_table_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of the :class:`ScenarioTable` cell fields, the one place a host reads them from.
+
+    Rates are decimals, the price is percent of the tranche's current balance
+    and the writedown is in currency units. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        ``ScenarioTable.currency`` of the table being labelled, an ISO-4217 code
+        in any ASCII case or a ``Currency``. It names the unit of ``writedown``.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``axes``, one record of ``field``, ``label`` and ``source`` per swept
+        input (``cpr``, ``cdr``, ``severity``); and ``measures``, one such record
+        per reported measure (``price``, ``wal``, ``writedown``), each in struct
+        order.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import scenario_table_field_units
+    >>> units = scenario_table_field_units("USD")
+    >>> {row["field"]: row["label"] for row in units["measures"]}["wal"]
+    'years'
+    """
+    ...
+
 def pool_report_field_units(currency: str | Currency) -> dict[str, Any]:
     """
     Units of the :class:`PoolReport` fields, the one place a host reads them from.

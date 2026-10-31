@@ -136,6 +136,16 @@ it(
   budget(30000),
 );
 it(
+  "returns the native scenario table units through the real worker",
+  async () => {
+    for (const c of fixture.cases)
+      expect(
+        unwrap(await worker.proxy.scenarioTableFieldUnits(c.table.currency)),
+      ).toEqual(c.units);
+  },
+  budget(30000),
+);
+it(
   "snapshots every request input and isolates worker sessions",
   async () => {
     const request = {

@@ -351,6 +351,7 @@ def build_cases() -> dict[str, Any]:
     }
     scenario_table = {
         "tranche_id": "A",
+        "currency": "USD",
         "cells": [{"cpr": 0.1, "cdr": 0.02, "severity": 0.4, "price": 99.5, "wal": 4.2, "writedown": 0.0}],
     }
     index_params = ins.CdsIndexParams.cdx_na_hy(42, 1, Bps(500.0))

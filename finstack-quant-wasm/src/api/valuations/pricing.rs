@@ -474,6 +474,19 @@ pub fn tranche_metric_field_units(currency: JsValue) -> Result<JsValue, JsValue>
     to_js_value(&finstack_quant_valuations::pricer::tranche_metric_field_units(currency))
 }
 
+/// Units of the `ScenarioCell` fields, the one place a host reads them from.
+///
+/// Rates are decimals, the price is percent of the tranche's current balance and
+/// the writedown is in currency units. Values are never rescaled.
+/// @param currency - ISO-4217 code of the result's `ScenarioTable.currency`, in any ASCII case; it names the unit of `writedown`.
+/// @returns `ScenarioTableFieldUnits`: `axes`, one `MetricFieldUnit` per swept input (`cpr`, `cdr`, `severity`), and `measures`, one per reported measure (`price`, `wal`, `writedown`), each in struct order.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = scenarioTableFieldUnits)]
+pub fn scenario_table_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::scenario_table_field_units(currency))
+}
+
 /// Units of the `PoolReport` fields, the one place a host reads them from.
 ///
 /// `PoolStats` mixes a decimal coupon, a basis-point spread and a percent-point

@@ -16,6 +16,7 @@ import type {
   MetricMetadata,
   MoneyValue,
   ScenarioTable,
+  ScenarioTableFieldUnits,
   StructuredCredit,
   ScenarioResults,
   TrancheCashflows,
@@ -1155,6 +1156,10 @@ export interface ValuationsApi {
   trancheMetricFieldUnits(
     currency: string,
   ): Promise<Envelope<MetricFieldUnit[]>>;
+  /** valuations.instruments.scenarioTableFieldUnits: units of a scenario table's axes and measures. */
+  scenarioTableFieldUnits(
+    currency: string,
+  ): Promise<Envelope<ScenarioTableFieldUnits>>;
   /** valuations.instruments.trancheSolveFieldUnits: units of the break-even CDR, discount margin and OAS results. */
   trancheSolveFieldUnits(): Promise<Envelope<TrancheSolveFieldUnits>>;
   /** valuations.valuationResultToJson over the host-serialized result: native canonical JSON. */

@@ -1118,12 +1118,21 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
-      "bytes": 2537,
+      "bytes": 2805,
       "kind": "output",
       "path": "schemas/results/1/scenario_table.schema.json",
       "summary": "Structured-credit scenario grid results for one tranche.",
       "title": "ScenarioTable",
       "type_name": "ScenarioTable"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table_field_units.schema.json",
+      "bytes": 2441,
+      "kind": "output",
+      "path": "schemas/results/1/scenario_table_field_units.schema.json",
+      "summary": "The display units of a scenario table's axes and measures.",
+      "title": "ScenarioTableFieldUnits",
+      "type_name": "ScenarioTableFieldUnits"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",

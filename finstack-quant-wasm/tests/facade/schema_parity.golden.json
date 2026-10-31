@@ -3465,7 +3465,14 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
             "type_name": "ScenarioTable",
             "kind": "output",
-            "bytes": 2537
+            "bytes": 2805
+          },
+          {
+            "path": "schemas/results/1/scenario_table_field_units.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table_field_units.schema.json",
+            "type_name": "ScenarioTableFieldUnits",
+            "kind": "output",
+            "bytes": 2441
           },
           {
             "path": "schemas/results/1/simulation_diagnostics.schema.json",
@@ -5671,7 +5678,15 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
             "type_name": "ScenarioTable",
             "kind": "output",
-            "bytes": 2537
+            "bytes": 2805
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/scenario_table_field_units.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table_field_units.schema.json",
+            "type_name": "ScenarioTableFieldUnits",
+            "kind": "output",
+            "bytes": 2441
           },
           {
             "domain": "valuations",

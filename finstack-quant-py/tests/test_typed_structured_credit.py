@@ -211,6 +211,7 @@ class TestStructuredCreditTypedAnalytics:
 
         payload = json.dumps({
             "tranche_id": "A",
+            "currency": "USD",
             "cells": [
                 {
                     "cpr": 0.06,

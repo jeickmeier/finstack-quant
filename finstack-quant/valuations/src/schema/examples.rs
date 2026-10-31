@@ -179,6 +179,7 @@ pub(super) fn scenario_grid() -> Result<Vec<Value>> {
 pub(super) fn scenario_table() -> Result<Vec<Value>> {
     example_from_json::<structured_credit::ScenarioTable>(json!({
         "tranche_id": "B",
+        "currency": "USD",
         "cells": [
             {"cpr": 0.15, "cdr": 0.02, "severity": 0.4, "price": 99.1, "wal": 5.8, "writedown": 0.0},
             {"cpr": 0.15, "cdr": 0.06, "severity": 0.4, "price": 93.4, "wal": 6.3, "writedown": 0.035}
@@ -246,6 +247,11 @@ pub(super) fn currency_ladder() -> Result<Vec<Value>> {
 /// The tranche solvers' units.
 pub(super) fn tranche_solve_field_units() -> Result<Vec<Value>> {
     example(&crate::pricer::tranche_solve_field_units())
+}
+
+/// The units of a USD scenario table's cells.
+pub(super) fn scenario_table_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::scenario_table_field_units(Currency::USD))
 }
 
 /// The unit of a tranche's CS01.

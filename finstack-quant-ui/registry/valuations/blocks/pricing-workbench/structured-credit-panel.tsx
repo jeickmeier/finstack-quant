@@ -66,7 +66,7 @@ export function StructuredCreditPanel({
       <details
         onToggle={(event) => onScenariosOpenChange(event.currentTarget.open)}
       >
-        <summary>Scenario prices</summary>
+        <summary>Scenarios</summary>
         {scenariosOpen && (
           <ScenarioPanel
             key={trancheId}

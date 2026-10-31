@@ -243,7 +243,7 @@
     {
       "name": "scenario-heatmap",
       "type": "registry:component",
-      "docs": "Display returned ScenarioTable prices at original CPR/CDR coordinates, with an explicitly controlled severity and priceDomain straddling the canonical par reference 100. Prices are clean settlement percentages of current tranche balance per Rust ScenarioCell.price. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation, rebasing or WAL/writedown overlay.",
+      "docs": "Display one returned ScenarioTable measure at original CPR/CDR coordinates, with explicitly controlled severity and measure. The measures, axes and their units come from native scenarioTableFieldUnits. Price centres its colour on the canonical par reference 100 over an optional priceDomain, else the returned prices' reach about par; WAL and writedown run low to high over the table. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation or rebasing.",
       "worker": "none"
     },
     {
@@ -1474,7 +1474,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
-      "sha256": "a22ca4c5dc62aa36a5f4e7387d634374c3edd3bcfbf9f830114e9294147880ec"
+      "sha256": "bd886ce39eedefdc5f86352a338f35eb4c704bdcb8d2c54faacdfe4d1a1560f1"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",

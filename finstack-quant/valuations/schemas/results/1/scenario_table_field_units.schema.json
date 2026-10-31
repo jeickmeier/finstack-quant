@@ -1,0 +1,92 @@
+{
+  "$defs": {
+    "MetricFieldUnit": {
+      "additionalProperties": false,
+      "description": "The display unit of one scalar field of a result struct.",
+      "properties": {
+        "field": {
+          "description": "Wire name of the field.",
+          "type": "string"
+        },
+        "label": {
+          "description": "Unit text as the field documents it, such as `USD per bp` or `years`.",
+          "type": "string"
+        },
+        "source": {
+          "description": "Canonical Rust field the unit is documented on.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "label",
+        "source"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table_field_units.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The display units of a scenario table's axes and measures.",
+  "examples": [
+    {
+      "axes": [
+        {
+          "field": "cpr",
+          "label": "annual decimal",
+          "source": "valuations::ScenarioCell::cpr"
+        },
+        {
+          "field": "cdr",
+          "label": "annual decimal",
+          "source": "valuations::ScenarioCell::cdr"
+        },
+        {
+          "field": "severity",
+          "label": "decimal",
+          "source": "valuations::ScenarioCell::severity"
+        }
+      ],
+      "measures": [
+        {
+          "field": "price",
+          "label": "% of current balance",
+          "source": "valuations::ScenarioCell::price"
+        },
+        {
+          "field": "wal",
+          "label": "years",
+          "source": "valuations::ScenarioCell::wal"
+        },
+        {
+          "field": "writedown",
+          "label": "USD",
+          "source": "valuations::ScenarioCell::writedown"
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "axes": {
+      "description": "Unit of each swept `ScenarioCell` input, in the order the struct declares them.",
+      "items": {
+        "$ref": "#/$defs/MetricFieldUnit"
+      },
+      "type": "array"
+    },
+    "measures": {
+      "description": "Unit of each measure `ScenarioCell` reports, in the order the struct declares them.",
+      "items": {
+        "$ref": "#/$defs/MetricFieldUnit"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "axes",
+    "measures"
+  ],
+  "title": "ScenarioTableFieldUnits",
+  "type": "object"
+}
