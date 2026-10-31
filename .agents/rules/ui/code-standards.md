@@ -25,8 +25,12 @@ prerequisites and duration.
   with only handle-passing chains and plain maps over user-supplied points; hooks
   hold query state; components draw. The test for any line of JS: would Python
   get a different number or decision without this line? If so, it belongs in
-  Rust. Two gates back this and neither catches a rule with no arithmetic in it,
-  so review still applies. `check-no-arithmetic` (`ui-check`) flags arithmetic in
+  Rust. Three gates back this and none catches a rule that reads only the request
+  or has no arithmetic in it, so review still applies. `check-worker-compose`
+  (`ui-check`) flags an `if`, `?:`, `??`, loop or `.map`-style iteration in
+  `registry/shared/file/services/**` that reads a native result: move the decision
+  to Rust, and explain pure composition with `// finstack-compose: <reason>` on or
+  directly above the line. `check-no-arithmetic` (`ui-check`) flags arithmetic in
   `registry/**` and `src/**`; explain mechanics with
   `// finstack-arith: <reason>` on or directly above the line (`{/* ... */}` among
   JSX children), or a reasoned glob in `scripts/no-arithmetic-allow.json`, and

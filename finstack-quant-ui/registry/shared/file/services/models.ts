@@ -167,6 +167,7 @@ export function createModelsService(
             : request.convention === "black_lognormal"
               ? native.models.volatility.getCubeVol
               : null;
+        // finstack-compose: dispatch on request.convention; evaluate is a native function, not a result
         if (!evaluate)
           throw new RangeError("Unsupported cube output convention");
         const handle = native.core.VolCube.fromJson(

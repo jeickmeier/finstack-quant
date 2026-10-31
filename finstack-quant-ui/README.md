@@ -202,8 +202,14 @@ tables, the statements workbench's forecast and rollup method lists and the
 valuation-details raw-detail labels.
 `check-no-arithmetic` enforces this in `ui-check`: arithmetic in `registry/` or
 `src/` needs a `// finstack-arith: <reason>` comment or a reasoned glob in
-`scripts/no-arithmetic-allow.json`, and financial logic moves to Rust. The test
-for any line of JS: would Python get a different number or decision without it?
+`scripts/no-arithmetic-allow.json`, and financial logic moves to Rust.
+`check-worker-compose` flags an `if`, `?:`, `??`, loop or `.map`-style iteration in
+`registry/shared/file/services/**` that reads a native result: a decision moves
+to Rust and pure composition takes `// finstack-compose: <reason>`. A value traces
+from the service's `native` parameter by symbol; request arguments, handle-passing
+chains, plain maps over user-supplied points and `x ?? null` are not flagged. The
+test for any line of JS: would Python get a different number or decision without
+it?
 
 Generated interfaces describe wire shapes and cannot express every runtime
 constraint (bounds, patterns or exclusive unions). They are not WASM host types.

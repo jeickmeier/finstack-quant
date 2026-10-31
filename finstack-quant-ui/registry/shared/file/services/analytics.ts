@@ -87,6 +87,7 @@ export function createAnalyticsService(
             frequency: handle.getFrequency(),
             activeDates,
             summary: handle.summary(rate, option(request.confidence)),
+            // finstack-compose: one native call per ticker index, nothing read from the names
             tickers: tickerNames.map((_, index) => ({
               activeDates: handle.getActiveDatesForTicker(index),
               cumulativeReturns: Array.from(cumulative[index]!),
@@ -110,6 +111,7 @@ export function createAnalyticsService(
                 : null,
             },
             correlation: {
+              // finstack-compose: copies each typed-array row out for structured clone
               matrix: correlation.matrix.map((row) => Array.from(row)),
               repaired: correlation.repaired,
             },
@@ -147,6 +149,7 @@ export function createAnalyticsService(
             downCapture: Array.from(performance.downCapture()),
             captureRatio: Array.from(performance.captureRatio()),
             battingAverage: Array.from(performance.battingAverage()),
+            // finstack-compose: one native call per ticker index, nothing read from the names
             tickers: tickerNames.map((_, index) => {
               const rolling = performance.rollingGreeks(index, window, rate);
               return {
