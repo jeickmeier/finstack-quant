@@ -903,3 +903,58 @@ def test_first_breaches_and_credit_enhancement_come_from_run_simulation() -> Non
     first = diagnostics.periods[0]["credit_enhancement"]
     assert [entry["tranche_id"] for entry in first] == ["A", "B", "E"]
     assert first[0]["credit_enhancement"] > first[1]["credit_enhancement"] > first[2]["credit_enhancement"]
+
+
+def test_pool_report_is_one_native_call_over_the_pool_analytics() -> None:
+    """Concentration, WARF and statistics of a hand-checkable pool."""
+    from finstack_quant.valuations.instruments import (
+        PoolConcentrationEntry,
+        PoolReport,
+        PoolStats,
+        calculate_pool_stats,
+        pool_report,
+    )
+
+    rows = [
+        ("A", 300.0, "X", "Tech", "BB", False),
+        ("B", 300.0, "Y", "Tech", "B", False),
+        ("C", 100.0, "X", "Retail", "BB", False),
+        ("D", 200.0, "Z", "Retail", "CCC", True),
+        ("E", 100.0, None, None, None, False),
+    ]
+    spec = PoolAsset.fixed_rate_bond("T", usd(1.0), 0.05, MATURITY, DayCount.ACT_360).to_dict()
+    assets = [
+        {
+            **spec,
+            "id": id_,
+            "balance": {"amount": str(balance), "currency": "USD"},
+            "obligor_id": obligor,
+            "industry": industry,
+            "rating": rating,
+            "defaulted": defaulted,
+        }
+        for id_, balance, obligor, industry, rating, defaulted in rows
+    ]
+    pool = AssetPool("P", "clo", USD).with_assets(json.dumps(assets))
+
+    report = pool_report(pool, CLOSE)
+
+    assert isinstance(report, PoolReport)
+    assert report.total_balance.amount == 1000.0
+    assert isinstance(report.stats, PoolStats)
+    assert report.stats.to_dict() == calculate_pool_stats(pool, CLOSE).to_dict()
+    assert report.warf == pytest.approx((400 * 1350 + 300 * 2720 + 100 * 3650) / 800)
+
+    assert all(isinstance(row, PoolConcentrationEntry) for row in report.by_obligor)
+    assert [row.key for row in report.by_obligor] == ["X", "Y", "Z", None]
+    assert [row.balance_pct for row in report.by_obligor] == [40.0, 30.0, 20.0, 10.0]
+    assert [row.asset_count for row in report.by_obligor] == [2, 1, 1, 1]
+    assert report.by_obligor[0].balance.amount == 400.0
+    assert [row.key for row in report.by_rating] == ["BB", "B", "CCC", None]
+
+    frame = report.to_dataframe()
+    assert list(frame.columns) == ["dimension", "key", "balance", "currency", "balance_pct", "asset_count"]
+    assert frame.groupby("dimension")["balance_pct"].sum().tolist() == pytest.approx([100.0, 100.0, 100.0])
+
+    assert PoolReport.from_json(report.to_json()).to_dict() == report.to_dict()
+    assert pickle.loads(pickle.dumps(report)).to_dict() == report.to_dict()  # noqa: S301

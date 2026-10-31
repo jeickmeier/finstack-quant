@@ -196,6 +196,7 @@ import type {
   MetricFieldUnit,
   MetricMetadata,
   OasResult,
+  PoolReportFieldUnits,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
@@ -432,6 +433,7 @@ export type {
   MetricFieldUnit,
   MetricMetadata,
   OasResult,
+  PoolReportFieldUnits,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
@@ -23206,6 +23208,13 @@ export interface ValuationInstrumentsNamespace {
    */
   priceDriverFields(): string[];
   /**
+   * Units of the `PoolReport` fields, the one place a host reads them from.
+   * @param currency - ISO-4217 code of the pool's base currency, in any ASCII case; it names the unit of `total_balance`, `undrawn_commitment` and each row's `balance`.
+   * @returns `PoolReportFieldUnits`: `total_balance` and `warf`, each one `MetricFieldUnit`; `stats`, one per `PoolStats` field in struct order; and `concentration`, one per numeric `PoolConcentrationEntry` field in struct order.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  poolReportFieldUnits(currency: string): PoolReportFieldUnits;
+  /**
    * Units of the scalar `TrancheMetrics` fields, in struct order.
    * @param currency - ISO-4217 code of the result's `TrancheMetrics.currency`, in any ASCII case; it names the unit of `pv`, `accrued` and `cs01`.
    * @returns One `MetricFieldUnit` per scalar field: the wire field name, its unit text and the Rust field that documents it. `tranche_id`, `currency` and the `metrics` map are not listed.
@@ -23613,6 +23622,17 @@ export interface ValuationInstrumentsNamespace {
     pool: generated.valuations.AssetPool | string,
     industry: string
   ): generated.valuations.PoolAsset[];
+  /**
+   * Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).
+   * @param pool - `AssetPool` plain object or JSON string, in any of its three representations.
+   * @param asOf - ISO-8601 date the remaining maturities are measured from. It also stands in for the closing date when a pool is normalized: it ages representative lines and counts the delayed draws already funded on instrument collateral.
+   * @returns `PoolReport` plain object: `total_balance` (the denominator of every share), `stats` (`PoolStats` of the same rows), `warf` (Moody's rating factor weighted by balance over the performing rows, unrated assets at the `NR` factor) and `by_obligor`, `by_industry`, `by_rating`, each a list of `PoolConcentrationEntry` with `balance_pct` in percent points. An empty pool reports zero balances and empty tables. `poolReportFieldUnits` states every unit.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, the pool cannot be normalized, an asset is not in the pool's base currency, or a rating has no Moody's factor.
+   */
+  poolReport(
+    pool: generated.valuations.AssetPool | string,
+    asOf: string
+  ): generated.valuations.PoolReport;
   /**
    * Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).
    * @param pool - `AssetPool` plain object or JSON string.

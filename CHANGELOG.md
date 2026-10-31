@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Structured credit: one report for a collateral pool
+
+#### Added
+
+- `pool_report(pool, as_of)` returns a `PoolReport`: `calculate_pool_stats`, Moody's WARF of the performing collateral (the number `clo_warf` and `PeriodDiagnostics.warf` report) and concentration by obligor, industry and rating. Each `PoolConcentrationEntry` holds the key (`null` for assets with no value on the dimension), balance, `balance_pct` in percent points and asset count; tables cover defaulted assets, sum to 100% and are ordered by balance descending, then key ascending. Python `pool_report`, WASM `poolReport`.
+- `pool_report_field_units(currency)` (`PoolReportFieldUnits`) states the unit of every report field. Python `pool_report_field_units`, WASM `poolReportFieldUnits`.
+
+#### Changed
+
+- All structured-credit WARF numbers share one function, so `CloWarfCalculator` now skips non-positive-balance rows, as `PeriodDiagnostics.warf` already did. Pools with positive balances are unaffected.
+
 ### Structured credit: who got paid each period
 
 #### Added

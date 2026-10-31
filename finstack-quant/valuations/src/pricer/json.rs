@@ -619,6 +619,73 @@ pub fn tranche_solve_field_units() -> TrancheSolveFieldUnits {
     }
 }
 
+/// Units of a `PoolReport`, which do not all appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PoolReportFieldUnits {
+    /// Unit of `PoolReport::total_balance`.
+    pub total_balance: MetricFieldUnit,
+    /// Unit of `PoolReport::warf`.
+    pub warf: MetricFieldUnit,
+    /// Unit of every `PoolReport::stats` field, in the order `PoolStats`
+    /// declares them.
+    pub stats: Vec<MetricFieldUnit>,
+    /// Unit of the numeric fields of each `by_obligor`, `by_industry` and
+    /// `by_rating` row, in the order `PoolConcentrationEntry` declares them.
+    pub concentration: Vec<MetricFieldUnit>,
+}
+
+/// Units of the `PoolReport` fields, the one place a host reads them from.
+///
+/// `PoolStats` mixes a decimal coupon, a basis-point spread and a percent-point
+/// defaulted share. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `AssetPool::currency` of the report being labelled; it
+///   names the unit of `total_balance`, `undrawn_commitment` and each row's
+///   `balance`.
+///
+/// # Returns
+///
+/// One record per numeric field, grouped by the struct holding it. Each row's
+/// string `key` has no unit and is not listed.
+pub fn pool_report_field_units(currency: Currency) -> PoolReportFieldUnits {
+    const POOL_SHARE: &str = "% of current pool balance";
+    let unit = |owner: &str, field: &str, label: String| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::{owner}::{field}"),
+    };
+    let currency = currency.to_string();
+    PoolReportFieldUnits {
+        total_balance: unit("PoolReport", "total_balance", currency.clone()),
+        warf: unit("PoolReport", "warf", "Moody's rating factor".to_string()),
+        stats: [
+            ("wac", "decimal"),
+            ("weighted_avg_spread_bp", "bp"),
+            ("weighted_avg_maturity", "years"),
+            ("diversity_score", "score"),
+            ("num_obligors", "obligors"),
+            ("num_industries", "industries"),
+            ("defaulted_balance_pct", POOL_SHARE),
+            ("undrawn_commitment", currency.as_str()),
+        ]
+        .into_iter()
+        .map(|(field, label)| unit("PoolStats", field, label.to_string()))
+        .collect(),
+        concentration: [
+            ("balance", currency.as_str()),
+            ("balance_pct", POOL_SHARE),
+            ("asset_count", "assets"),
+        ]
+        .into_iter()
+        .map(|(field, label)| unit("PoolConcentrationEntry", field, label.to_string()))
+        .collect(),
+    }
+}
+
 /// List every pricing model key that has a pricer in the standard registry.
 ///
 /// The list is **registry-derived**, not enum-derived: it reports real dispatch
@@ -1067,6 +1134,57 @@ mod tests {
         assert_eq!(at(""), (String::new(), None));
         // A word that f64::from_str reads as a number is still text.
         assert_eq!(at("inf"), ("inf".to_string(), None));
+    }
+
+    #[test]
+    fn pool_report_field_units_list_every_numeric_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::{
+            pool_report, AssetPool, DealType, PoolAsset,
+        };
+        let as_of = time::macros::date!(2025 - 01 - 01);
+        let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::EUR);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A",
+            finstack_quant_core::money::Money::new(100.0, Currency::EUR).expect("money"),
+            0.05,
+            time::macros::date!(2030 - 01 - 01),
+            finstack_quant_core::dates::DayCount::Thirty360,
+        ));
+        let report =
+            serde_json::to_value(pool_report(&pool, as_of).expect("report")).expect("serialize");
+        let wire_fields = |value: &Value, skip: &[&str]| -> Vec<String> {
+            value
+                .as_object()
+                .expect("object")
+                .keys()
+                .filter(|key| !skip.contains(&key.as_str()))
+                .cloned()
+                .collect()
+        };
+        let names = |rows: &[MetricFieldUnit]| -> Vec<String> {
+            rows.iter().map(|row| row.field.clone()).collect()
+        };
+        let sorted = |mut fields: Vec<String>| {
+            fields.sort();
+            fields
+        };
+
+        let units = pool_report_field_units(Currency::EUR);
+        assert_eq!(
+            sorted(names(&units.stats)),
+            sorted(wire_fields(&report["stats"], &[]))
+        );
+        assert_eq!(
+            sorted(names(&units.concentration)),
+            sorted(wire_fields(&report["by_obligor"][0], &["key"]))
+        );
+        assert_eq!(units.total_balance.label, "EUR");
+        assert_eq!(units.warf.source, "valuations::PoolReport::warf");
+        assert_eq!(names(&units.stats)[0], "wac");
+        assert_eq!(units.stats[0].label, "decimal");
+        assert_eq!(units.stats[1].label, "bp");
+        assert_eq!(units.stats[6].label, "% of current pool balance");
+        assert_eq!(units.stats[7].label, "EUR");
     }
 
     #[test]

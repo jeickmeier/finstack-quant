@@ -6579,6 +6579,140 @@
         "defaulted_balance_pct": -0.0,
         "undrawn_commitment": -0.0
       }
+    },
+    "pool_report": {
+      "pool": "{\"id\": \"P\", \"deal_type\": \"clo\", \"currency\": \"USD\", \"assets\": [{\"id\": \"A\", \"asset_type\": {\"type\": \"high_yield_bond\"}, \"balance\": {\"amount\": \"300\", \"currency\": \"USD\"}, \"rate\": 0.08, \"spread_bp\": null, \"forward_curve_id\": null, \"maturity\": \"2032-01-01\", \"rating\": \"BB\", \"industry\": \"Tech\", \"obligor_id\": \"X\", \"defaulted\": false, \"recovery_amount\": null, \"default_date\": null, \"purchase_price\": null, \"acquisition_date\": null, \"origination_date\": null, \"day_count\": \"act_360\", \"smm_override\": null, \"mdr_override\": null, \"recovery_rate\": null, \"contractual_payment\": null}, {\"id\": \"B\", \"asset_type\": {\"type\": \"high_yield_bond\"}, \"balance\": {\"amount\": \"300\", \"currency\": \"USD\"}, \"rate\": 0.08, \"spread_bp\": null, \"forward_curve_id\": null, \"maturity\": \"2032-01-01\", \"rating\": \"B\", \"industry\": \"Tech\", \"obligor_id\": \"Y\", \"defaulted\": false, \"recovery_amount\": null, \"default_date\": null, \"purchase_price\": null, \"acquisition_date\": null, \"origination_date\": null, \"day_count\": \"act_360\", \"smm_override\": null, \"mdr_override\": null, \"recovery_rate\": null, \"contractual_payment\": null}, {\"id\": \"C\", \"asset_type\": {\"type\": \"high_yield_bond\"}, \"balance\": {\"amount\": \"100\", \"currency\": \"USD\"}, \"rate\": 0.08, \"spread_bp\": null, \"forward_curve_id\": null, \"maturity\": \"2032-01-01\", \"rating\": \"BB+\", \"industry\": \"Retail\", \"obligor_id\": \"X\", \"defaulted\": false, \"recovery_amount\": null, \"default_date\": null, \"purchase_price\": null, \"acquisition_date\": null, \"origination_date\": null, \"day_count\": \"act_360\", \"smm_override\": null, \"mdr_override\": null, \"recovery_rate\": null, \"contractual_payment\": null}, {\"id\": \"D\", \"asset_type\": {\"type\": \"high_yield_bond\"}, \"balance\": {\"amount\": \"200\", \"currency\": \"USD\"}, \"rate\": 0.08, \"spread_bp\": null, \"forward_curve_id\": null, \"maturity\": \"2032-01-01\", \"rating\": \"CCC\", \"industry\": \"Retail\", \"obligor_id\": \"Z\", \"defaulted\": true, \"recovery_amount\": null, \"default_date\": null, \"purchase_price\": null, \"acquisition_date\": null, \"origination_date\": null, \"day_count\": \"act_360\", \"smm_override\": null, \"mdr_override\": null, \"recovery_rate\": null, \"contractual_payment\": null}, {\"id\": \"E\", \"asset_type\": {\"type\": \"high_yield_bond\"}, \"balance\": {\"amount\": \"100\", \"currency\": \"USD\"}, \"rate\": 0.08, \"spread_bp\": null, \"forward_curve_id\": null, \"maturity\": \"2032-01-01\", \"rating\": null, \"industry\": null, \"obligor_id\": null, \"defaulted\": false, \"recovery_amount\": null, \"default_date\": null, \"purchase_price\": null, \"acquisition_date\": null, \"origination_date\": null, \"day_count\": \"act_360\", \"smm_override\": null, \"mdr_override\": null, \"recovery_rate\": null, \"contractual_payment\": null}], \"cumulative_defaults\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"cumulative_recoveries\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"cumulative_prepayments\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"cumulative_scheduled_amortization\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"reinvestment_period\": null, \"collection_account\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"reserve_account\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"excess_spread_account\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"rep_lines\": null}",
+      "report": {
+        "total_balance": {
+          "amount": "1000",
+          "currency": "USD"
+        },
+        "stats": {
+          "wac": 0.08,
+          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_maturity": 8.005479452054796,
+          "diversity_score": 2.793103448275862,
+          "num_obligors": 3,
+          "num_industries": 2,
+          "defaulted_balance_pct": 20.0,
+          "undrawn_commitment": -0.0
+        },
+        "warf": 2100.0,
+        "by_obligor": [
+          {
+            "key": "X",
+            "balance": {
+              "amount": "400",
+              "currency": "USD"
+            },
+            "balance_pct": 40.0,
+            "asset_count": 2
+          },
+          {
+            "key": "Y",
+            "balance": {
+              "amount": "300",
+              "currency": "USD"
+            },
+            "balance_pct": 30.0,
+            "asset_count": 1
+          },
+          {
+            "key": "Z",
+            "balance": {
+              "amount": "200",
+              "currency": "USD"
+            },
+            "balance_pct": 20.0,
+            "asset_count": 1
+          },
+          {
+            "key": null,
+            "balance": {
+              "amount": "100",
+              "currency": "USD"
+            },
+            "balance_pct": 10.0,
+            "asset_count": 1
+          }
+        ],
+        "by_industry": [
+          {
+            "key": "Tech",
+            "balance": {
+              "amount": "600",
+              "currency": "USD"
+            },
+            "balance_pct": 60.0,
+            "asset_count": 2
+          },
+          {
+            "key": "Retail",
+            "balance": {
+              "amount": "300",
+              "currency": "USD"
+            },
+            "balance_pct": 30.0,
+            "asset_count": 2
+          },
+          {
+            "key": null,
+            "balance": {
+              "amount": "100",
+              "currency": "USD"
+            },
+            "balance_pct": 10.0,
+            "asset_count": 1
+          }
+        ],
+        "by_rating": [
+          {
+            "key": "B",
+            "balance": {
+              "amount": "300",
+              "currency": "USD"
+            },
+            "balance_pct": 30.0,
+            "asset_count": 1
+          },
+          {
+            "key": "BB",
+            "balance": {
+              "amount": "300",
+              "currency": "USD"
+            },
+            "balance_pct": 30.0,
+            "asset_count": 1
+          },
+          {
+            "key": "CCC",
+            "balance": {
+              "amount": "200",
+              "currency": "USD"
+            },
+            "balance_pct": 20.0,
+            "asset_count": 1
+          },
+          {
+            "key": null,
+            "balance": {
+              "amount": "100",
+              "currency": "USD"
+            },
+            "balance_pct": 10.0,
+            "asset_count": 1
+          },
+          {
+            "key": "BB+",
+            "balance": {
+              "amount": "100",
+              "currency": "USD"
+            },
+            "balance_pct": 10.0,
+            "asset_count": 1
+          }
+        ]
+      }
     }
   },
   "merton": {

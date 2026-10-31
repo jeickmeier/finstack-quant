@@ -20,6 +20,7 @@ pub(crate) mod enums;
 pub(crate) mod hedges;
 pub(crate) mod npl;
 pub(crate) mod pool;
+mod pool_report;
 /// SoA layout for pool assets.
 pub(crate) mod pool_state;
 pub(crate) mod results;
@@ -59,6 +60,7 @@ pub use pool::{
     calculate_pool_stats, PoolAsset, PoolStats, ReinvestmentAssumptions, ReinvestmentCriteria,
     ReinvestmentPeriod, RepLine,
 };
+pub use pool_report::{pool_report, PoolConcentrationEntry, PoolReport};
 pub(crate) use pool_state::PoolState;
 
 pub use tranches::{CoverageTrigger, Tranche, TrancheBuilder, TrancheStructure};

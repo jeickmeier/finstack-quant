@@ -1090,6 +1090,24 @@
       "type_name": "OasResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/pool_report.schema.json",
+      "bytes": 7029,
+      "kind": "output",
+      "path": "schemas/results/1/pool_report.schema.json",
+      "summary": "Collateral-pool statistics, WARF and concentration by obligor, industry and rating.",
+      "title": "PoolReport",
+      "type_name": "PoolReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/pool_report_field_units.schema.json",
+      "bytes": 3944,
+      "kind": "output",
+      "path": "schemas/results/1/pool_report_field_units.schema.json",
+      "summary": "The display units of the collateral-pool report fields.",
+      "title": "PoolReportFieldUnits",
+      "type_name": "PoolReportFieldUnits"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
       "bytes": 2491,
       "kind": "output",

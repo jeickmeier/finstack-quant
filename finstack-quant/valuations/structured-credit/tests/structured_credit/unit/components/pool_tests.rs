@@ -933,3 +933,195 @@ fn test_pool_stats_rejects_retired_keys() {
         );
     }
 }
+
+// PoolReport Tests
+
+mod pool_report_tests {
+    use super::*;
+    use finstack_quant_valuations_structured_credit::structured_credit::{
+        pool_report, PoolConcentrationEntry, PoolReport, RepLine,
+    };
+
+    fn row(
+        id: &str,
+        balance: f64,
+        obligor: Option<&str>,
+        industry: Option<&str>,
+        rating: Option<CreditRating>,
+    ) -> PoolAsset {
+        let mut asset = PoolAsset::fixed_rate_bond(
+            id,
+            Money::new(balance, Currency::USD).expect("valid money fixture"),
+            0.05,
+            maturity_date(),
+            DayCount::Thirty360,
+        );
+        asset.obligor_id = obligor.map(str::to_string);
+        asset.industry = industry.map(str::to_string);
+        asset.rating = rating;
+        asset
+    }
+
+    /// Total 1000: obligors X 400 (two rows), Y 300, Z 200, none 100; the Z row
+    /// is defaulted.
+    fn small_pool() -> AssetPool {
+        let mut defaulted = row(
+            "D",
+            200.0,
+            Some("Z"),
+            Some("Retail"),
+            Some(CreditRating::CCC),
+        );
+        defaulted.defaulted = true;
+        let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+        pool.assets = vec![
+            row("A", 300.0, Some("X"), Some("Tech"), Some(CreditRating::BB)),
+            defaulted,
+            row("B", 300.0, Some("Y"), Some("Tech"), Some(CreditRating::B)),
+            row(
+                "C",
+                100.0,
+                Some("X"),
+                Some("Retail"),
+                Some(CreditRating::BB),
+            ),
+            row("E", 100.0, None, None, None),
+        ];
+        pool
+    }
+
+    fn keys(rows: &[PoolConcentrationEntry]) -> Vec<Option<&str>> {
+        rows.iter().map(|row| row.key.as_deref()).collect()
+    }
+
+    fn shares(rows: &[PoolConcentrationEntry]) -> Vec<f64> {
+        rows.iter().map(|row| row.balance_pct).collect()
+    }
+
+    #[test]
+    fn shares_are_percent_points_of_the_whole_pool_and_sum_to_100() {
+        let report = pool_report(&small_pool(), test_date()).expect("report");
+        assert_eq!(report.total_balance.amount(), 1000.0);
+
+        assert_eq!(
+            keys(&report.by_obligor),
+            [Some("X"), Some("Y"), Some("Z"), None]
+        );
+        assert_eq!(shares(&report.by_obligor), [40.0, 30.0, 20.0, 10.0]);
+        assert_eq!(
+            report
+                .by_obligor
+                .iter()
+                .map(|row| row.asset_count)
+                .collect::<Vec<_>>(),
+            [2, 1, 1, 1]
+        );
+        assert_eq!(report.by_obligor[0].balance.amount(), 400.0);
+        assert_eq!(report.by_obligor[0].balance.currency(), Currency::USD);
+
+        for table in [&report.by_obligor, &report.by_industry, &report.by_rating] {
+            let total: f64 = shares(table).iter().sum();
+            assert!((total - 100.0).abs() < 1e-9, "shares sum to {total}");
+        }
+    }
+
+    #[test]
+    fn ties_order_by_key_with_the_unassigned_row_first() {
+        let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+        pool.assets = vec![
+            row("A", 100.0, Some("B"), None, None),
+            row("B", 200.0, Some("C"), None, None),
+            row("C", 100.0, None, None, None),
+            row("D", 100.0, Some("A"), None, None),
+        ];
+        let report = pool_report(&pool, test_date()).expect("report");
+        assert_eq!(
+            keys(&report.by_obligor),
+            [Some("C"), None, Some("A"), Some("B")]
+        );
+
+        pool.assets.reverse();
+        let reversed = pool_report(&pool, test_date()).expect("report");
+        assert_eq!(reversed.by_obligor, report.by_obligor);
+    }
+
+    #[test]
+    fn rating_keys_are_the_wire_form_and_unrated_stays_apart_from_nr() {
+        let mut pool = small_pool();
+        pool.assets
+            .push(row("R", 100.0, None, None, Some(CreditRating::BBPlus)));
+        pool.assets
+            .push(row("N", 50.0, None, None, Some(CreditRating::NR)));
+        let report = pool_report(&pool, test_date()).expect("report");
+        let keys = keys(&report.by_rating);
+        assert!(keys.contains(&Some("BB+")), "{keys:?}");
+        assert!(keys.contains(&Some("NR")), "{keys:?}");
+        assert!(keys.contains(&None), "{keys:?}");
+        for row in report.by_rating.iter().filter(|row| row.key.is_some()) {
+            let wire: CreditRating =
+                serde_json::from_value(serde_json::json!(row.key)).expect("rating wire form");
+            assert_eq!(row.key.as_deref(), Some(wire.to_string().as_str()));
+        }
+    }
+
+    #[test]
+    fn warf_weights_performing_rows_only_and_unrated_as_nr() {
+        let report = pool_report(&small_pool(), test_date()).expect("report");
+        // BB 400 @ 1350, B 300 @ 2720, unrated 100 @ NR 3650; the defaulted row
+        // at 200 is out, over a performing balance of 800.
+        let expected = (400.0 * 1350.0 + 300.0 * 2720.0 + 100.0 * 3650.0) / 800.0;
+        assert!((report.warf - expected).abs() < 1e-9, "{}", report.warf);
+    }
+
+    #[test]
+    fn stats_come_from_calculate_pool_stats() {
+        let pool = small_pool();
+        let report = pool_report(&pool, test_date()).expect("report");
+        let stats: PoolStats = calculate_pool_stats(&pool, test_date()).expect("stats");
+        assert_eq!(
+            serde_json::to_value(&report.stats).expect("serialize"),
+            serde_json::to_value(&stats).expect("serialize")
+        );
+        assert_eq!(report.stats.defaulted_balance_pct, 20.0);
+    }
+
+    #[test]
+    fn empty_pool_reports_zeros_and_empty_tables() {
+        let pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+        let report = pool_report(&pool, test_date()).expect("report");
+        assert_eq!(report.total_balance.amount(), 0.0);
+        assert_eq!(report.warf, 0.0);
+        assert!(report.by_obligor.is_empty());
+        assert!(report.by_industry.is_empty());
+        assert!(report.by_rating.is_empty());
+    }
+
+    #[test]
+    fn representative_lines_land_in_the_unassigned_rows() {
+        let mut pool = AssetPool::new("POOL", DealType::Rmbs, Currency::USD);
+        pool.rep_lines = Some(vec![RepLine::new(
+            "LINE",
+            Money::new(500.0, Currency::USD).expect("valid money fixture"),
+            0.05,
+            maturity_date(),
+            DayCount::Thirty360,
+            AssetType::FirstLienLoan {},
+        )]);
+        let report = pool_report(&pool, test_date()).expect("report");
+        assert_eq!(report.total_balance.amount(), 500.0);
+        for table in [&report.by_obligor, &report.by_industry, &report.by_rating] {
+            assert_eq!(keys(table), [None]);
+            assert_eq!(shares(table), [100.0]);
+        }
+        assert_eq!(report.warf, 3650.0);
+    }
+
+    #[test]
+    fn report_round_trips_through_its_wire_form() {
+        let report = pool_report(&small_pool(), test_date()).expect("report");
+        let wire = serde_json::to_string(&report).expect("serialize");
+        let back: PoolReport = serde_json::from_str(&wire).expect("deserialize");
+        assert_eq!(back.by_rating, report.by_rating);
+        assert!(wire.contains("\"key\":null"), "{wire}");
+    }
+}

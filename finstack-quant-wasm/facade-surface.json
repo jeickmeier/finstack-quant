@@ -4578,6 +4578,8 @@
       "pikScheduleModeAt",
       "poolAssetFixedRateBond",
       "poolAssetFloatingRateLoan",
+      "poolReport",
+      "poolReportFieldUnits",
       "prepaymentPenaltyFixed",
       "prepaymentPenaltyLockout",
       "prepaymentPenaltyStepDown",
@@ -4833,6 +4835,9 @@
     "kind": "function"
   },
   "valuations.instruments.priceDriverFields": {
+    "kind": "function"
+  },
+  "valuations.instruments.poolReportFieldUnits": {
     "kind": "function"
   },
   "valuations.instruments.trancheMetricFieldUnits": {
@@ -6003,6 +6008,9 @@
     "kind": "function"
   },
   "valuations.instruments.assetPoolAssetsByIndustry": {
+    "kind": "function"
+  },
+  "valuations.instruments.poolReport": {
     "kind": "function"
   },
   "valuations.instruments.calculatePoolStats": {

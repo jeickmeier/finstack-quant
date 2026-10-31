@@ -20281,7 +20281,74 @@ export interface OasResult {
   [k: string]: unknown;
 }
 /**
- * Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.
+ * Balance held by one obligor, industry or rating, as a row of a [`PoolReport`]
+ * concentration table.
+ */
+export interface PoolConcentrationEntry {
+  /**
+   * Number of asset rows grouped, zero-balance rows included.
+   */
+  asset_count: number;
+  /**
+   * Current balance of the row's assets, defaulted assets included, in the
+   * pool's base currency.
+   */
+  balance: Money;
+  /**
+   * `balance` in percent points of [`PoolReport::total_balance`] (`20.0` =
+   * 20%), the convention of `ConcentrationLimit::max_pct` and
+   * `PoolStats::defaulted_balance_pct`, so a share compares to a limit
+   * directly. The rows of one table sum to `100.0`; `0.0` when the pool
+   * balance is not positive.
+   */
+  balance_pct: number;
+  /**
+   * Obligor id, industry or rating wire form (`"BB+"`) this row groups, or
+   * `null` for the assets that carry no value on the dimension. A null key
+   * cannot collide with a real name.
+   */
+  key?: string | null;
+}
+/**
+ * Collateral-pool statistics, WARF and concentration by obligor, industry and rating.
+ */
+export interface PoolReport {
+  /**
+   * Balance per `PoolAsset::industry`.
+   */
+  by_industry: PoolConcentrationEntry[];
+  /**
+   * Balance per `PoolAsset::obligor_id`.
+   */
+  by_obligor: PoolConcentrationEntry[];
+  /**
+   * Balance per `PoolAsset::rating` wire form. An asset with no rating is in
+   * the null-key row, not in an explicit `"NR"` row, although WARF weights
+   * both with the `NR` factor.
+   */
+  by_rating: PoolConcentrationEntry[];
+  /**
+   * [`calculate_pool_stats`] of the same rows. Its fields mix units: `wac` is
+   * a decimal, `weighted_avg_spread_bp` basis points and
+   * `defaulted_balance_pct` percent points.
+   */
+  stats: PoolStats;
+  /**
+   * Current balance of every asset row, defaulted assets included, in the
+   * pool's base currency: the denominator of each `balance_pct`.
+   */
+  total_balance: Money;
+  /**
+   * Moody's weighted-average rating factor, the number `CloWarfCalculator`
+   * and `PeriodDiagnostics::warf` report: weighted by balance over the
+   * performing rows only (defaulted and non-positive-balance rows are out of
+   * both numerator and denominator). An unrated asset takes the Moody's table
+   * factor for `NR`. `0.0` when no performing balance remains.
+   */
+  warf: number;
+}
+/**
+ * AssetPool-level performance statistics
  */
 export interface PoolStats {
   /**
@@ -20325,6 +20392,29 @@ export interface PoolStats {
    * [`AssetPool::weighted_avg_spread_bp`].
    */
   weighted_avg_spread_bp: number;
+}
+/**
+ * The display units of the collateral-pool report fields.
+ */
+export interface PoolReportFieldUnits {
+  /**
+   * Unit of the numeric fields of each `by_obligor`, `by_industry` and
+   * `by_rating` row, in the order `PoolConcentrationEntry` declares them.
+   */
+  concentration: MetricFieldUnit[];
+  /**
+   * Unit of every `PoolReport::stats` field, in the order `PoolStats`
+   * declares them.
+   */
+  stats: MetricFieldUnit[];
+  /**
+   * Unit of `PoolReport::total_balance`.
+   */
+  total_balance: MetricFieldUnit;
+  /**
+   * Unit of `PoolReport::warf`.
+   */
+  warf: MetricFieldUnit;
 }
 /**
  * Market conventions of one interest-rate index.

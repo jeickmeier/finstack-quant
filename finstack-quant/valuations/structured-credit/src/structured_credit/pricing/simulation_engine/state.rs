@@ -1,6 +1,6 @@
 use super::*;
+use crate::structured_credit::types::pool::weighted_avg_rating_factor;
 use crate::structured_credit::types::{DiversionRecord, PaymentRecord};
-use finstack_quant_core::types::CreditRating;
 
 /// De minimis threshold for write-down recording (avoids noise from fp rounding).
 pub(super) const WRITEDOWN_DE_MINIMIS: f64 = 0.01;
@@ -1057,8 +1057,6 @@ pub(super) fn pool_composition(state: &SimulationState) -> Result<(f64, f64, f64
     let mut coupon = 0.0_f64;
     let mut floating_balance = 0.0_f64;
     let mut spread = 0.0_f64;
-    let mut rated_balance = 0.0_f64;
-    let mut factor = 0.0_f64;
     for (i, balance) in state.pool_state.balances.iter().enumerate() {
         if *balance <= 0.0 || state.pool_state.defaulted[i] {
             continue;
@@ -1076,17 +1074,21 @@ pub(super) fn pool_composition(state: &SimulationState) -> Result<(f64, f64, f64
                 coupon += balance * state.pool_state.rates[i];
             }
         }
-        if let Some(asset) = state.pool.assets.get(i) {
-            let rating = asset.rating.unwrap_or(CreditRating::NR);
-            rated_balance += balance;
-            factor += balance * finstack_quant_models::credit::moodys_warf_factor(rating)?;
-        }
     }
     let weighted = |sum: f64, total: f64| if total > 0.0 { sum / total } else { 0.0 };
     Ok((
         weighted(coupon, fixed_balance),
         weighted(spread, floating_balance),
-        weighted(factor, rated_balance),
+        weighted_avg_rating_factor(
+            state
+                .pool_state
+                .balances
+                .iter()
+                .zip(&state.pool_state.defaulted)
+                .zip(&state.pool.assets)
+                .filter(|((_, defaulted), _)| !**defaulted)
+                .map(|((balance, _), asset)| (*balance, asset.rating)),
+        )?,
     ))
 }
 

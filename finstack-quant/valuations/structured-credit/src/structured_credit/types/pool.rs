@@ -481,7 +481,7 @@ impl Default for ReinvestmentCriteria {
 }
 
 /// AssetPool-level performance statistics
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PoolStats {
@@ -1324,6 +1324,39 @@ impl AssetPool {
         }
         weighted_spread / included_balance
     }
+}
+
+/// Moody's weighted-average rating factor of `rows`, the only WARF formula in
+/// the crate: weighted by balance over the rows with a positive balance, with
+/// an unrated row taking the Moody's table factor for `NR`.
+///
+/// # Arguments
+///
+/// * `rows` - `(balance, rating)` of each performing row, in pool-currency
+///   units; the caller leaves defaulted rows out.
+///
+/// # Returns
+///
+/// The rating factor, or `0.0` when no row has a positive balance.
+///
+/// # Errors
+///
+/// Returns an error when the Moody's table has no factor for a counted rating.
+pub(crate) fn weighted_avg_rating_factor(
+    rows: impl IntoIterator<Item = (f64, Option<CreditRating>)>,
+) -> finstack_quant_core::Result<f64> {
+    let mut weighted = 0.0;
+    let mut total = 0.0;
+    for (balance, rating) in rows {
+        if balance <= 0.0 {
+            continue;
+        }
+        let factor =
+            finstack_quant_models::credit::moodys_warf_factor(rating.unwrap_or(CreditRating::NR))?;
+        weighted += balance * factor;
+        total += balance;
+    }
+    Ok(if total > 0.0 { weighted / total } else { 0.0 })
 }
 
 /// Calculate current pool statistics.

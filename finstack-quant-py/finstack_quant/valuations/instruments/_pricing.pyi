@@ -431,6 +431,42 @@ def tranche_solve_field_units() -> dict[str, Any]:
     """
     ...
 
+def pool_report_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of the :class:`PoolReport` fields, the one place a host reads them from.
+
+    ``PoolStats`` mixes a decimal coupon, a basis-point spread and a
+    percent-point defaulted share. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        Base currency of the pool being labelled, an ISO-4217 code in any ASCII
+        case or a ``Currency``. It names the unit of ``total_balance``,
+        ``undrawn_commitment`` and each row's ``balance``.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``total_balance`` and ``warf``, each one record of ``field``, ``label``
+        and ``source``; ``stats``, one such record per ``PoolStats`` field in
+        struct order; and ``concentration``, one per numeric
+        ``PoolConcentrationEntry`` field in struct order.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import pool_report_field_units
+    >>> units = pool_report_field_units("USD")
+    >>> {row["field"]: row["label"] for row in units["stats"]}["weighted_avg_spread_bp"]
+    'bp'
+    """
+    ...
+
 class MetricPricingOverrides:
     """
     Metric-time pricing overrides merged into an instrument before pricing.

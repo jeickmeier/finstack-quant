@@ -32,8 +32,8 @@ pub use utils::{validate_tiers, ValidationError};
 
 pub use types::MarketConditions;
 pub use types::{
-    calculate_pool_stats, AdvanceRate, AdvancingPolicy, AfcSpec, AllocationMode, AssetPool,
-    AssetType, BalloonSpec, BorrowingBaseReport, BorrowingBaseRules, CallAssumption,
+    calculate_pool_stats, pool_report, AdvanceRate, AdvancingPolicy, AfcSpec, AllocationMode,
+    AssetPool, AssetType, BalloonSpec, BorrowingBaseReport, BorrowingBaseRules, CallAssumption,
     CallExercisePolicy, CallScope, CardPortfolioSpec, CccBucketRule, CollateralInstrument,
     ConcentrationLimit, ConcentrationScope, ControlledAccumulationSpec, CoveragePlacement,
     CoverageRules, CoverageTestAction, CoverageTestSpec, CoverageTestType, CoverageTrigger,
@@ -42,15 +42,15 @@ pub use types::{
     ExcessSpreadSpec, FundingSource, HedgeSwap, IncentiveFeeSpec, InstrumentCollateral,
     InstrumentExerciseOverride, LiquidationSpec, LiveCollateral, LossAllocationPolicy,
     LossRecognition, ManagementFeeType, Metadata, ModificationSpec, PaymentCalculation,
-    PaymentRecord, PaymentType, PenaltyStep, PoolAsset, PoolStats, PrepaymentPenalty,
-    PutExercisePolicy, Recipient, RecipientType, ReinvestmentAssumptions, ReinvestmentCriteria,
-    ReinvestmentPeriod, RepLine, ReserveAccountSpec, ReserveInterestDestination, ReserveTarget,
-    RoundingConvention, ShiftMode, ShiftingInterestSpec, ShiftingInterestStep,
-    SpecialServicingSpec, StandardDealParams, StepDownSpec, StepDownTrigger, StructuredCredit,
-    StructuredCreditBuilder, SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche,
-    TrancheAccrualPeriod, TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance,
-    TrancheStructure, TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution,
-    WaterfallRules, WaterfallTier,
+    PaymentRecord, PaymentType, PenaltyStep, PoolAsset, PoolConcentrationEntry, PoolReport,
+    PoolStats, PrepaymentPenalty, PutExercisePolicy, Recipient, RecipientType,
+    ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, RepLine, ReserveAccountSpec,
+    ReserveInterestDestination, ReserveTarget, RoundingConvention, ShiftMode, ShiftingInterestSpec,
+    ShiftingInterestStep, SpecialServicingSpec, StandardDealParams, StepDownSpec, StepDownTrigger,
+    StructuredCredit, StructuredCreditBuilder, SwapNotional, SwapPriority, TargetOcSpec,
+    TemplateFees, Tranche, TrancheAccrualPeriod, TrancheBuilder, TrancheCashflows, TrancheDraw,
+    TrancheReadvance, TrancheStructure, TriggerConsequence, Waterfall, WaterfallBuilder,
+    WaterfallDistribution, WaterfallRules, WaterfallTier,
 };
 
 pub use pricing::execute_waterfall;

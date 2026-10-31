@@ -411,6 +411,25 @@ pub fn asset_pool_assets_by_industry(pool: JsValue, industry: JsValue) -> Result
     to_js_value(&pool.assets_by_industry(&js_string(&industry, "industry")?))
 }
 
+/// Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).
+///
+/// Each concentration table covers every asset row, defaulted assets included in balances and denominator, so its shares sum to 100%. Assets with no value on a dimension form one row with a null key. Rows are ordered by balance descending, then key ascending with the null key first. Representative lines and instrument collateral are normalized to asset rows first and land in the null-key rows.
+/// @param pool - `AssetPool` plain object or JSON string, in any of its three representations.
+/// @param as_of - ISO-8601 date the remaining maturities are measured from. It also stands in for the closing date when a pool is normalized: it ages representative lines and counts the delayed draws already funded on instrument collateral.
+/// @returns `PoolReport` plain object: `total_balance` (the denominator of every share), `stats` (`PoolStats` of the same rows), `warf` (Moody's rating factor weighted by balance over the performing rows, unrated assets at the `NR` factor) and `by_obligor`, `by_industry`, `by_rating`, each a list of `PoolConcentrationEntry` with `balance_pct` in percent points. An empty pool reports zero balances and empty tables. `poolReportFieldUnits` states every unit.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, the pool cannot be normalized, an asset is not in the pool's base currency, or a rating has no Moody's factor.
+#[wasm_bindgen(js_name = poolReport)]
+pub fn pool_report(pool: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
+    to_js_value(
+        &finstack_quant_valuations::instruments::fixed_income::structured_credit::pool_report(
+            &pool,
+            js_date(&as_of, "asOf")?,
+        )
+        .map_err(to_js_err)?,
+    )
+}
+
 /// Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).
 /// @param pool - `AssetPool` plain object or JSON string.
 /// @param as_of - ISO-8601 date the remaining maturities are measured from.
