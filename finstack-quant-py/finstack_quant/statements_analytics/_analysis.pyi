@@ -1037,7 +1037,7 @@ def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Expl
     50.0
     """
 
-def generate_tornado_entries(result: Any, metric_node: str, period: str) -> list[TornadoEntry]:
+def generate_tornado_entries(result: Any, metric_node: str, period: str) -> list[TornadoEntry] | None:
     """Generate tornado chart entries for a sensitivity result.
 
     Parameters
@@ -1054,15 +1054,16 @@ def generate_tornado_entries(result: Any, metric_node: str, period: str) -> list
 
     Returns
     -------
-    list[TornadoEntry]
+    list[TornadoEntry] or None
         Typed entries sorted by descending absolute swing, with parameter IDs
-        preserving the perturbed ``node@period`` key.
+        preserving the perturbed ``node@period`` key; ``None`` for a full-grid
+        run, whose scenarios combine parameters and cannot be ranked.
 
     Raises
     ------
     ValueError
-        If ``period`` does not parse, ``result`` is malformed JSON, the run
-        uses a full grid, a scenario does not contain exactly one perturbed
+        If ``period`` does not parse, ``result`` is malformed JSON, a
+        one-at-a-time run's scenario does not contain exactly one perturbed
         parameter, its unperturbed baseline is absent, the target metric/period
         is missing, or a metric value or impact is non-finite.
 

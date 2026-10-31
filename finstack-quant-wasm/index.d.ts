@@ -32505,14 +32505,14 @@ export interface StatementsAnalyticsNamespace {
    * @param resultJson - Result JSON produced by a prior call.
    * @param metricNode - Statement metric node identifier selected for the requested analysis.
    * @param period - Required model period, such as `"2025Q4"`, at which the metric is read in the baseline and every scenario; a shock replaces one forecast cell, so the metric moves only in the shocked period and in later periods whose formulas read it.
-   * @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key.
-   * @throws Error - Rejects malformed `result_json`, an invalid `period` identifier, or a full-grid run, a scenario that does not identify exactly one perturbed parameter, an absent unperturbed baseline, a missing target metric or period, non-finite metric values or impacts, or failure to convert the entries to JavaScript.
+   * @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key; `null` for a full-grid run, whose scenarios combine parameters and cannot be ranked.
+   * @throws Error - Rejects malformed `result_json`, an invalid `period` identifier, or a one-at-a-time run whose scenario does not identify exactly one perturbed parameter, an absent unperturbed baseline, a missing target metric or period, non-finite metric values or impacts, or failure to convert the entries to JavaScript.
    */
   generateTornadoEntries(
     resultJson: JsonInput,
     metricNode: string,
     period: string
-  ): TornadoEntry[];
+  ): TornadoEntry[] | null;
   /**
    * Find the driver value that makes a target node reach a target value.
    *

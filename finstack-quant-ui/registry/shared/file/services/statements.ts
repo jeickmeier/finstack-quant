@@ -241,16 +241,14 @@ export function createStatementsService(
           request.modelJson,
           JSON.stringify(config),
         );
-        // Rust ranks only one-at-a-time runs; a full-grid result has no tornado.
-        const tornado =
-          request.mode === "full_grid"
-            ? null
-            : api.generateTornadoEntries(
-                result,
-                request.targetMetric,
-                request.period,
-              );
-        return { result, tornado };
+        return {
+          result,
+          tornado: api.generateTornadoEntries(
+            result,
+            request.targetMetric,
+            request.period,
+          ),
+        };
       });
     },
     goalSeek(request) {

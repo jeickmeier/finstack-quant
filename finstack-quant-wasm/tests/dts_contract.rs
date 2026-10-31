@@ -1111,7 +1111,7 @@ fn statements_analytics_dts_matches_runtime_exports() {
     assert!(declares_type(&dts, "TornadoEntry"));
     assert!(contains_ignoring_ws(
         &dts,
-        "generateTornadoEntries(resultJson: JsonInput, metricNode: string, period: string): TornadoEntry[];"
+        "generateTornadoEntries(resultJson: JsonInput, metricNode: string, period: string): TornadoEntry[] | null;"
     ));
     assert!(declares_type(&dts, "CheckReport"));
     assert!(declares_type(&dts, "CheckResult"));
