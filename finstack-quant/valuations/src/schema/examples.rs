@@ -293,6 +293,20 @@ pub(super) fn pool_stats() -> Result<Vec<Value>> {
     )?)
 }
 
+/// Report on the canonical example CLO pool at its closing date.
+pub(super) fn pool_report() -> Result<Vec<Value>> {
+    let deal = structured_credit::StructuredCredit::example()?;
+    example(&structured_credit::pool_report(
+        &deal.pool,
+        deal.closing_date,
+    )?)
+}
+
+/// The units of a USD pool report.
+pub(super) fn pool_report_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::pool_report_field_units(Currency::USD))
+}
+
 /// One quarterly interest payment on a senior floating-rate tranche.
 fn tranche_cashflows_value(tranche_id: &str) -> Value {
     let usd = |amount: &str| json!({"amount": amount, "currency": "USD"});

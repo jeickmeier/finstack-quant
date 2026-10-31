@@ -10,11 +10,12 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_equity_metrics, AssetPool, CoverageTestSpec, DealType, PeriodDiagnostics,
-    PeriodWaterfall, PoolAsset, ReserveInterestDestination, SimulationDiagnostics,
-    StructuredCredit, Tranche, TrancheStructure,
+    calculate_equity_metrics, pool_report, AssetPool, CoverageTestSpec, DealType,
+    PeriodDiagnostics, PeriodWaterfall, PoolAsset, ReserveInterestDestination,
+    SimulationDiagnostics, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -174,6 +175,28 @@ fn period_diagnostics_carry_the_executor_coverage_ratios_and_pool_path() {
 /// Equity IRR is the XIRR of the invested balance against every projected
 /// distribution, including reserve interest routed straight to the equity
 /// class; MOIC and the cash-on-cash series come from the same flows.
+/// No defaults and no prepayments leave the bullet pool's weights unchanged, so
+/// the simulated period WARF is the report's, including the unrated rows.
+#[test]
+fn period_warf_is_the_pool_report_warf() {
+    let mut deal = clo(0.0);
+    for (i, asset) in deal.pool.assets.iter_mut().enumerate() {
+        asset.rating = match i % 3 {
+            0 => Some(CreditRating::BB),
+            1 => Some(CreditRating::B),
+            _ => None,
+        };
+    }
+    let report = pool_report(&deal.pool, close()).expect("report");
+    let run = deal.run_simulation(&market(), close()).expect("simulation");
+    let first = run.diagnostics.periods.first().expect("a period");
+    assert_eq!(first.warf, report.warf);
+    assert_eq!(
+        report.warf,
+        (4.0 * 1350.0 + 3.0 * 2720.0 + 3.0 * 3650.0) / 10.0
+    );
+}
+
 #[test]
 fn equity_irr_reproduces_xirr_of_the_equity_flows() {
     let mut deal = clo(0.02);

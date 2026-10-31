@@ -3440,6 +3440,20 @@
             "bytes": 1413
           },
           {
+            "path": "schemas/results/1/pool_report.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/pool_report.schema.json",
+            "type_name": "PoolReport",
+            "kind": "output",
+            "bytes": 7029
+          },
+          {
+            "path": "schemas/results/1/pool_report_field_units.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/pool_report_field_units.schema.json",
+            "type_name": "PoolReportFieldUnits",
+            "kind": "output",
+            "bytes": 3944
+          },
+          {
             "path": "schemas/results/1/pool_stats.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
             "type_name": "PoolStats",
@@ -5626,6 +5640,22 @@
             "type_name": "OasResult",
             "kind": "output",
             "bytes": 1413
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/pool_report.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/pool_report.schema.json",
+            "type_name": "PoolReport",
+            "kind": "output",
+            "bytes": 7029
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/pool_report_field_units.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/pool_report_field_units.schema.json",
+            "type_name": "PoolReportFieldUnits",
+            "kind": "output",
+            "bytes": 3944
           },
           {
             "domain": "valuations",

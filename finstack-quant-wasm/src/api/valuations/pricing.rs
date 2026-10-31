@@ -474,6 +474,21 @@ pub fn tranche_metric_field_units(currency: JsValue) -> Result<JsValue, JsValue>
     to_js_value(&finstack_quant_valuations::pricer::tranche_metric_field_units(currency))
 }
 
+/// Units of the `PoolReport` fields, the one place a host reads them from.
+///
+/// `PoolStats` mixes a decimal coupon, a basis-point spread and a percent-point
+/// defaulted share. Values are never rescaled.
+/// @param currency - ISO-4217 code of the pool's base currency, in any ASCII case; it names the unit of `total_balance`, `undrawn_commitment` and each row's `balance`.
+/// @returns `PoolReportFieldUnits`: `total_balance` and `warf`, each one `MetricFieldUnit`; `stats`, one per `PoolStats` field in struct order; and `concentration`, one per numeric `PoolConcentrationEntry` field in struct order.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = poolReportFieldUnits)]
+pub fn pool_report_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::pool_report_field_units(
+        currency,
+    ))
+}
+
 /// List every pricing model key registered in the standard pricer registry.
 ///
 /// The list is registry-derived rather than enum-derived, so it reflects real

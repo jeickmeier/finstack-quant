@@ -74,6 +74,35 @@ def _pinned_timestamp(result_json: str) -> str:
     return ValuationResult.from_json(json.dumps(document)).to_json()
 
 
+def _pool_report_case(pool: ins.AssetPool, close: datetime.date) -> dict[str, Any]:
+    """The report on a pool with named obligors, a default, a tie and a missing row."""
+    spec = json.loads(pool.to_json())
+    template = spec["assets"][0]
+    spec["assets"] = [
+        {
+            **template,
+            "id": asset_id,
+            "balance": {"amount": balance, "currency": "USD"},
+            "obligor_id": obligor,
+            "industry": industry,
+            "rating": rating,
+            "defaulted": defaulted,
+        }
+        for asset_id, balance, obligor, industry, rating, defaulted in [
+            ("A", "300", "X", "Tech", "BB", False),
+            ("B", "300", "Y", "Tech", "B", False),
+            ("C", "100", "X", "Retail", "BB+", False),
+            ("D", "200", "Z", "Retail", "CCC", True),
+            ("E", "100", None, None, None, False),
+        ]
+    ]
+    pool_json = json.dumps(spec)
+    return {
+        "pool": pool_json,
+        "report": ins.pool_report(ins.AssetPool.from_json(pool_json), close).to_dict(),
+    }
+
+
 def _money(value: Money) -> dict[str, Any]:
     return {"amount": value.amount, "currency": str(value.currency)}
 
@@ -257,6 +286,7 @@ def build_cases() -> dict[str, Any]:
             "assets_by_industry": [asset.to_dict() for asset in deal.pool.assets_by_industry("NOBODY")],
             "pool_stats": ins.calculate_pool_stats(deal.pool, close).to_dict(),
         },
+        "pool_report": _pool_report_case(deal.pool, close),
     }
 
     # -- Merton Monte Carlo ------------------------------------------------

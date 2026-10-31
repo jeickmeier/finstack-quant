@@ -35,3 +35,19 @@ const SOLVE_PINNED = JSON.parse(
 test('trancheSolveFieldUnits matches the records pinned for both hosts', () => {
   assert.deepEqual(plain(facade.valuations.instruments.trancheSolveFieldUnits()), SOLVE_PINNED);
 });
+
+const POOL_REPORT_PINNED = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/fixtures/pool_report_field_units.json',
+      import.meta.url
+    )
+  )
+);
+
+test('poolReportFieldUnits matches the records pinned for both hosts', () => {
+  assert.deepEqual(
+    plain(facade.valuations.instruments.poolReportFieldUnits('EUR')),
+    POOL_REPORT_PINNED
+  );
+});

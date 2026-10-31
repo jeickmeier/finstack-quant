@@ -499,6 +499,17 @@ test('structured-credit deal analytics match Python', () => {
     'by industry'
   );
   same(plain(instruments.calculatePoolStats(pool, sc.as_of)), analytics.pool_stats, 'pool stats');
+  const report = plain(instruments.poolReport(sc.pool_report.pool, sc.as_of));
+  same(report, sc.pool_report.report, 'pool report');
+  assert.deepEqual(
+    report.by_obligor.map((row) => [row.key, row.balance_pct, row.asset_count]),
+    [
+      ['X', 40, 2],
+      ['Y', 30, 1],
+      ['Z', 20, 1],
+      [null, 10, 1],
+    ]
+  );
 });
 
 test('Merton Monte Carlo bond pricing matches Python', () => {
