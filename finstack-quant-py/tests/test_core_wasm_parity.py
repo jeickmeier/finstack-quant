@@ -320,6 +320,7 @@ CASES: dict[str, Callable[[], Any]] = {
     # --- market data ------------------------------------------------------------------
     "discount_curve": lambda: json.loads(_discount().to_json()),
     "discount_curve_queries": lambda: [
+        _discount().zero_rate(2.0),
         _discount().zero_rate(2.0, "periodic(1)"),
         _discount().zero_rate(2.0, "semi_annual"),
         _discount().zero_rate("2027-01-02", "quarterly"),
