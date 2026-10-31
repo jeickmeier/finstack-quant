@@ -162,7 +162,8 @@ Registered for `InstrumentType::TermLoan` in `metrics/mod.rs`:
 | `custom("yt2y")`, `custom("yt3y")`, `custom("yt4y")` | IRR to fixed 2/3/4-year horizons |
 | `DiscountMargin` | Additive spread for floating-rate loans that reproduces the price |
 | `custom("all_in_rate")` | Effective borrower cost including fees |
-| `custom("oid_eir_amortization")` | OID effective-interest-rate amortization schedule |
+| `custom("oid_eir_amortization")` | Total OID effective-interest-rate amortization; stores the dated amortization and carrying-value series |
+| `custom("oid_eir_rate")` | Fee-inclusive effective interest rate, decimal; one solve shared with `oid_eir_amortization` |
 | `Oas`, `EmbeddedOptionValue` | Callable-tree metrics. OAS is quoted or solved; `EmbeddedOptionValue` is holder `P_callable − P_straight`. |
 | `Dv01`, `BucketedDv01` | Parallel and key-rate risk on the selected model. Quoted callable loans freeze the solved OAS under curve bumps. |
 | `Cs01`, `BucketedCs01` | Parallel and key-rate credit risk on the selected model. The credit tree re-bootstraps par spreads; discounting uses z-spread. |

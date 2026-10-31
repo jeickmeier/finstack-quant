@@ -1357,6 +1357,44 @@ fn oid_effective_rate_exceeds_the_running_rate_with_an_upfront_fee() {
     );
 }
 
+/// `oid_eir_rate` is requestable by itself, with no `oid_eir` spec, and equals
+/// what an `oid_eir_amortization` request stores. Both orders give one answer.
+#[test]
+fn oid_effective_rate_is_requestable_directly() {
+    let m = market();
+    let facility = origination_facility(Some(UpfrontFee::FractionOfCommitment(0.02)), 0.0);
+    assert!(facility.oid_eir.is_none());
+    let run = |ids: &[&str]| {
+        let ids: Vec<MetricId> = ids.iter().map(|id| MetricId::custom(*id)).collect();
+        finstack_quant_valuations::pricer::STANDARD
+            .pricers()
+            .price_with_metrics(
+                &facility,
+                ModelKey::Discounting,
+                &m,
+                AS_OF,
+                &ids,
+                Default::default(),
+            )
+            .expect("metrics")
+            .measures
+    };
+    let rate = MetricId::custom("oid_eir_rate");
+    let total = MetricId::custom("oid_eir_amortization");
+    let direct = run(&["oid_eir_rate"]);
+    let side = run(&["oid_eir_amortization"]);
+    assert_eq!(direct[&rate], side[&rate]);
+    assert_eq!(direct[&total], side[&total]);
+    for ids in [
+        ["oid_eir_rate", "oid_eir_amortization"],
+        ["oid_eir_amortization", "oid_eir_rate"],
+    ] {
+        let both = run(&ids);
+        assert_eq!(both[&rate], direct[&rate]);
+        assert_eq!(both[&total], direct[&total]);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Task 11: scheduled fees and custom-deal recipes
 // ---------------------------------------------------------------------------

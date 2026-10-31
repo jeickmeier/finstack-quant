@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "974f04b4d5c4e60af63954e4b98f7eaa83c230469d1a48e3b5dfcd6ead47bd3a",
+          "sha256": "5590246edc27a463671f87aa6ae1e8d170af11df0fa7669f4835963c6cd2a1b3",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -159,7 +159,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
-          "sha256": "2135aa83a66a03128536a9e6980fc0cc12dd8df5e84c23bc19fab1e5c7605597",
+          "sha256": "28b5324823f41cff4fefccf2d5aafd92a7587bd8d3d0a3591772f0cf1a587af0",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "c4472f7adf668b6115f67444435aa579a03a9c1caf945eb0d77858349255625f",
+          "sha256": "b8230fbb7bff0c79e51a2b07673e0dec7f8b13b2904ce7f097db888480ae3b29",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -285,7 +285,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
-          "sha256": "37c1f3debbe88b6ee83dd1958c92664b682e279fee8ecee2494e016cd44e75cb",
+          "sha256": "65117f67eac5804f6b28317d29eb8da23d084b894b9a66e0d30e243f4ee602da",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -327,14 +327,14 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/revolving_credit.schema.json",
-          "sha256": "67273c95fcc06ef55cd3d30fc83c346ae4a774abc0606502e39195fb902c53c5",
+          "sha256": "815f5697fc36f309c884bc769a0a87fb48dcef3532df0833df906a1db0891c7b",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
-          "sha256": "f1f1015f8309b3f2b1ecc2777086958dff6460e6d33d48eedc40946eb287281a",
+          "sha256": "c164dbd24e936875f977b39803df41cd42dd824e2cf54ad6e3ca081868ca4ce9",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -731,8 +731,8 @@
           }
         ],
         "returns": "MetricMetadata[]",
-        "declaration": "/**\n   * Describe canonical metric identifiers using Rust-owned units and coordinates.\n   * @example\n   * ```typescript\n   * import init, { valuations } from \"finstack-quant-wasm\";\n   * await init();\n   * const [ytm, bucket] = valuations.instruments.metricMetadata([\n   *   'ytm',\n   *   'bucketed_dv01::USD-OIS::10y',\n   * ]);\n   * console.log(ytm.unit, bucket.components, bucket.bucketed);\n   * ```\n   * @param keys - Canonical scalar or qualified wire keys in output order. Custom keys retain unknown units; malformed or obsolete encodings are rejected.\n   * @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.\n   * @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.\n   */\n  metricMetadata(keys: string[]): MetricMetadata[];",
-        "sha256": "4446ba78040fcc56da6d6384592b3e20b0fe4b0829fe9dfafee8e859c26d9e56"
+        "declaration": "/**\n   * Describe canonical metric identifiers using Rust-owned units and coordinates.\n   * @example\n   * ```typescript\n   * import init, { valuations } from \"finstack-quant-wasm\";\n   * await init();\n   * const [ytm, bucket] = valuations.instruments.metricMetadata([\n   *   'ytm',\n   *   'bucketed_dv01::USD-OIS::10y',\n   * ]);\n   * console.log(ytm.unit, bucket.components, bucket.bucketed);\n   * ```\n   * @param keys - Canonical scalar or qualified wire keys in output order. Custom keys retain unknown units; one the standard registry holds gets the group `\"Instrument Specific\"`, any other gets no group; malformed or obsolete encodings are rejected.\n   * @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.\n   * @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.\n   */\n  metricMetadata(keys: string[]): MetricMetadata[];",
+        "sha256": "eed373e5fdf9168c91ffea0908f92cea616b47a1f1c5c715c81610745af52562"
       },
       "schemas": [
         {
