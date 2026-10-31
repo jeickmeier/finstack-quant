@@ -15986,7 +15986,7 @@
               "discount_factor": 0.8595775700357209,
               "discount_curve_id": "USD-OIS",
               "beginning_balance": 13528386.842907196,
-              "ending_balance": -4.9e-9,
+              "ending_balance": 0,
               "native_pv": 11628697.888929388,
               "pv": 11628697.88892939
             }
@@ -16715,7 +16715,7 @@
             "metric": "ytc",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -16724,7 +16724,7 @@
             "metric": "yt2y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -16733,7 +16733,7 @@
             "metric": "yt3y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -16742,7 +16742,7 @@
             "metric": "yt4y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -16760,7 +16760,7 @@
             "metric": "all_in_rate",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -16769,7 +16769,7 @@
             "metric": "oid_eir_rate",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -16778,7 +16778,7 @@
             "metric": "oid_eir_amortization",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "currency",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -16950,7 +16950,7 @@
             "metric": "ytc",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -16959,7 +16959,7 @@
             "metric": "yt2y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -16968,7 +16968,7 @@
             "metric": "yt3y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -16977,7 +16977,7 @@
             "metric": "yt4y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -16995,7 +16995,7 @@
             "metric": "all_in_rate",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17004,7 +17004,7 @@
             "metric": "oid_eir_rate",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17013,7 +17013,7 @@
             "metric": "oid_eir_amortization",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "currency",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17189,7 +17189,7 @@
             "metric": "ytc",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17198,7 +17198,7 @@
             "metric": "yt2y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17207,7 +17207,7 @@
             "metric": "yt3y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17216,7 +17216,7 @@
             "metric": "yt4y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17234,7 +17234,7 @@
             "metric": "all_in_rate",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17243,7 +17243,7 @@
             "metric": "oid_eir_rate",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17252,7 +17252,7 @@
             "metric": "oid_eir_amortization",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "currency",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17428,7 +17428,7 @@
             "metric": "ytc",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17437,7 +17437,7 @@
             "metric": "yt2y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17446,7 +17446,7 @@
             "metric": "yt3y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17455,7 +17455,7 @@
             "metric": "yt4y",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17473,7 +17473,7 @@
             "metric": "all_in_rate",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17482,7 +17482,7 @@
             "metric": "oid_eir_rate",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17491,7 +17491,7 @@
             "metric": "oid_eir_amortization",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "currency",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17658,7 +17658,7 @@
             "metric": "all_in_rate",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17667,7 +17667,7 @@
             "metric": "oid_eir_rate",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "decimal",
             "group": "Instrument Specific",
             "bucketed": false
           },
@@ -17676,7 +17676,7 @@
             "metric": "oid_eir_amortization",
             "components": [],
             "coordinates": [],
-            "unit": "unknown",
+            "unit": "currency",
             "group": "Instrument Specific",
             "bucketed": false
           }

@@ -415,7 +415,7 @@ pub struct MetricMetadata {
     pub components: Vec<String>,
     /// How each entry of `components` orders along its axis, aligned with it.
     pub coordinates: Vec<MetricCoordinate>,
-    /// Native unit family; custom or calculator-dependent units remain unknown.
+    /// Native unit family; undeclared custom and calculator-dependent units are unknown.
     pub unit: crate::metrics::MetricUnit,
     /// Native display group, the same name [`metrics_for_instrument`] lists the
     /// base metric under; absent for a base metric the standard registry does
@@ -470,7 +470,8 @@ impl MetricCoordinate {
 ///   retain their original spelling and use the native composite codec to decode
 ///   coordinates. A custom name the standard registry holds gets
 ///   [`MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME`](crate::metrics::MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME);
-///   any other is accepted with no group. Custom names have unknown units.
+///   any other is accepted with no group. A custom name has a unit only when
+///   [`MetricId::unit`] declares one, and is otherwise unknown.
 ///
 /// # Returns
 ///

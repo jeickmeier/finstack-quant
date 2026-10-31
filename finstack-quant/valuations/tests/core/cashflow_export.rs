@@ -600,6 +600,13 @@ fn assert_balances_roll(envelope: &InstrumentCashflowEnvelope, opening: f64, clo
     let first = envelope.flows.first().expect("flows");
     assert!((first.beginning_balance.expect("begin") - opening).abs() < 1e-6);
     assert!((previous.expect("flows") - closing).abs() < 1e-6);
+    if closing == 0.0 {
+        assert_eq!(
+            previous,
+            Some(0.0),
+            "a repaid balance closes at exactly zero"
+        );
+    }
 }
 
 fn balance_market(as_of: Date) -> MarketContext {

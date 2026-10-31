@@ -103,7 +103,7 @@ pub fn analyze_lme(
 
 /// Minimum NPV ratio at which a tender is recommended. Twin of the Rust and
 /// Python constant `TENDER_RECOMMENDATION_HURDLE`: a holder is advised to
-/// tender when the tender NPV is at least `old_npv` times this hurdle.
+/// tender when the tender NPV exceeds `old_npv` times this hurdle.
 /// @returns The dimensionless hurdle multiple.
 #[wasm_bindgen(js_name = tenderRecommendationHurdle)]
 pub fn tender_recommendation_hurdle() -> f64 {

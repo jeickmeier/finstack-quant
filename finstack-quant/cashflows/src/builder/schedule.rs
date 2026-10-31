@@ -930,7 +930,9 @@ impl CashFlowSchedule {
     /// counts, goes from zero to that notional. A row that moves nothing keeps
     /// the balance it sits at: for a coupon that is the balance just before its
     /// accrual end, so a coupon paid after a principal date on the accrual end
-    /// still shows the principal it accrued on.
+    /// still shows the principal it accrued on. A balance within half a minor
+    /// currency unit of zero reads as zero: it is the float residue of the
+    /// amortization amounts, not principal.
     ///
     /// # Returns
     ///
@@ -971,6 +973,17 @@ impl CashFlowSchedule {
                     .map_or(self.notional.initial, |last| path[last].1);
                 *balance = (held, held);
             }
+        }
+        let currency = self.notional.initial.currency();
+        let residue = 0.5 * 10f64.powi(-i32::from(currency.decimals()));
+        let settle = |money: &mut Money| {
+            if money.amount().abs() < residue {
+                *money = Money::from((0_i64, currency));
+            }
+        };
+        for (before, after) in &mut balances {
+            settle(before);
+            settle(after);
         }
         Ok(balances)
     }

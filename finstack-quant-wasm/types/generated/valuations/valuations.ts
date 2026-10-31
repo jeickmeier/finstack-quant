@@ -19971,7 +19971,7 @@ export interface MetricMetadata {
    */
   metric: string;
   /**
-   * Native unit family; custom or calculator-dependent units remain unknown.
+   * Native unit family; undeclared custom and calculator-dependent units are unknown.
    */
   unit: MetricUnit;
 }

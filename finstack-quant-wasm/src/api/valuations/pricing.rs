@@ -406,8 +406,8 @@ pub fn metrics_for_instrument(instrument_type: JsValue) -> Result<JsValue, JsVal
 ///
 /// # Arguments
 ///
-/// * `keys` - Canonical scalar or qualified wire keys in output order. Custom
-///   keys retain unknown units; one the standard registry holds gets the group
+/// * `keys` - Canonical scalar or qualified wire keys in output order. A custom
+///   key has a unit only when Rust declares one; one the standard registry holds gets the group
 ///   `"Instrument Specific"`, any other gets no group; malformed or obsolete
 ///   encodings are rejected.
 /// @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.
