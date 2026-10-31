@@ -59,6 +59,13 @@ impl MetricGroup {
         MetricGroup::Alternatives,
     ];
 
+    /// Display name listing a registered metric that belongs to no group.
+    ///
+    /// Such a metric is registered under its own id for specific instrument
+    /// types (`all_in_rate`, `parity`, `yt3y`), so no [`MetricGroup`] holds it.
+    /// [`MetricGroup::ALL`] never produces this name.
+    pub const INSTRUMENT_SPECIFIC_DISPLAY_NAME: &'static str = "Instrument Specific";
+
     /// Human-readable group name.
     pub const fn display_name(&self) -> &'static str {
         match self {
