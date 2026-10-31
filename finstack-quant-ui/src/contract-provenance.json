@@ -2120,6 +2120,47 @@
       }
     },
     {
+      "id": "liability-management-card",
+      "route": "returned-model",
+      "convention": "Returned models.credit.liabilityManagement.analyzeExchangeOffer and analyzeLme results as Rust returned them. The tender recommendation is Rust's tender_recommended field; tenderRecommendationHurdle shows beside it as supplied and is never compared here. Amounts are in one caller-defined unit with no currency conversion; percentages are fractions and leverage a multiple. The LME price input is a price, an extension fee or a transferred-asset fraction by structure, as the facade documents.",
+      "api": {
+        "name": "models.credit.liabilityManagement.analyzeExchangeOffer",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "CreditLiabilityManagementNamespace",
+        "member": "analyzeExchangeOffer",
+        "inputs": [
+          {
+            "name": "oldPv",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "newPv",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "consentFee",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "equitySweetenerValue",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "exchangeType",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "ExchangeOfferAnalysis",
+        "declaration": "/**\n   * Compare hold-versus-tender economics for a distressed exchange offer.\n   * Tendering is recommended only when total consideration exceeds the\n   * hold-out present value by more than 2%.\n   * @returns Tender total, NPV pickup, breakeven recovery, and recommendation.\n   * @param oldPv - Present value of the existing claim if it is not tendered, in the caller's monetary unit.\n   * @param newPv - Present value of the new instrument received on tendering, in the same unit as oldPv.\n   * @param consentFee - Cash consent or early-tender fee paid to participating holders, in the same unit as oldPv.\n   * @param equitySweetenerValue - Estimated value of equity or warrants attached to the new instrument, in the same unit as oldPv.\n   * @param exchangeType - Canonical offer structure: par_for_par, discount, uptier, or downtier.\n   * @throws Error - Throws a JavaScript exception if `exchangeType` is unrecognized, any monetary input is negative or non-finite, or the result cannot be converted to a JavaScript object.\n   */\n  analyzeExchangeOffer(\n    oldPv: number,\n    newPv: number,\n    consentFee: number,\n    equitySweetenerValue: number,\n    exchangeType: string\n  ): ExchangeOfferAnalysis;",
+        "sha256": "a5aa9e45ed42a262f0d47bbd03d094a53e0e4605ca3a7b5cb89c1ec64e8a543b"
+      }
+    },
+    {
       "id": "option-calculator",
       "route": "returned-model",
       "convention": "Returned closed-form results of one European option: models.bsPrice, black76Price or bachelierPrice of an entered volatility, or bsImpliedVol, black76ImpliedVol or models.volatility.impliedVolBachelier of an entered price, then bsGreeks, black76Greeks or bachelierGreeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",

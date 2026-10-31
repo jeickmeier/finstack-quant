@@ -38,6 +38,7 @@ const acronyms = new Set([
   "irs",
   "isda",
   "libor",
+  "lme",
   "lp",
   "mbs",
   "mc",

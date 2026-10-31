@@ -403,6 +403,12 @@
       "worker": "none"
     },
     {
+      "name": "liability-management-card",
+      "type": "registry:component",
+      "docs": "Two forms. Exchange offer, the holder's view: hold-out PV, new instrument PV, consent fee, equity sweetener and offer structure, with the returned tender total, NPV pickup, breakeven recovery and tender_recommended, which is Rust's field and never compared here; the hurdle Rust applies shows beside it as supplied. Liability management exercise, the issuer's view: structure, notional, participation, EBITDA and a price input that Rust reads as a price, an extension fee or a transferred-asset fraction by structure, with the returned cost, par retired, discount capture, holder impact and, for a positive EBITDA, the leverage block. Amounts use one unit you choose, with no currency conversion; percentages are fractions. An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset. Each analysis shows its own native error. Accepts defaultExchange, defaultLme, onExchangeSubmit, onLmeSubmit, exchange, lme, hurdle, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "option-calculator",
       "type": "registry:component",
       "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. A price Rust cannot invert is the whole error; Greeks Rust rejects (at zero volatility under Black-Scholes) show their native error beside the price. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
@@ -754,6 +760,10 @@
     },
     {
       "name": "use-margin-call-dates",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-liability-management",
       "type": "registry:hook"
     },
     {
@@ -1517,6 +1527,10 @@
     {
       "path": "finstack-quant-ui/tests/models/options/cases.json",
       "sha256": "9fb6c54c8b7050e0ff8d768ead41b3d375a19f766dd3b60fa1e1229cabb44e09"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/liability-management/cases.json",
+      "sha256": "6f51a7c35d8889becbb50185a69a67e4a744c692a82d85d261b9594cc9a872bf"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/margin/simm.json",

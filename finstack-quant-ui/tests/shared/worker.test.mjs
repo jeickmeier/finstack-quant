@@ -153,6 +153,9 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "mertonReport",
     "creditScore",
     "optionCalculator",
+    "analyzeExchangeOffer",
+    "analyzeLme",
+    "tenderRecommendationHurdle",
     "positionRisk",
     "decomposeFactors",
     // StatementsApi
