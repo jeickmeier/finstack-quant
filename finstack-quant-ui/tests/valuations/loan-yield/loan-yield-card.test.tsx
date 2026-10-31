@@ -157,15 +157,17 @@ it("labels by labelFor and states only the unit and group Rust declares", () => 
   const cells = (metric: string) =>
     [...rowFor(metric).children].map((cell) => cell.textContent);
   expect(cells("yt3y")[0]).toBe("YT3Y");
-  expect(cells("yt3y").slice(2)).toEqual([
-    "not declared",
-    "Instrument Specific",
-  ]);
+  expect(cells("yt3y").slice(2)).toEqual(["decimal", "Instrument Specific"]);
   expect(cells("ytm").slice(2)).toEqual(["decimal", "Pricing"]);
   expect(cells("embedded_option_value").slice(2)).toEqual([
     "currency",
     "Pricing",
   ]);
+});
+it("says not declared when metadata carries no unit for the metric", () => {
+  const entry = cases.quotedTree;
+  render(<LoanYieldCard rows={rowsOf(entry)} metadata={[]} />);
+  expect(rowFor("yt3y").children[2].textContent).toBe("not declared");
 });
 it.each([
   ["quotedDiscounting", "embedded_option_value", "require the Tree model"],

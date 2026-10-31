@@ -3430,7 +3430,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
             "type_name": "MetricMetadata",
             "kind": "output",
-            "bytes": 4725
+            "bytes": 4734
           },
           {
             "path": "schemas/results/1/oas_result.schema.json",
@@ -5617,7 +5617,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
             "type_name": "MetricMetadata",
             "kind": "output",
-            "bytes": 4725
+            "bytes": 4734
           },
           {
             "domain": "valuations",
