@@ -1,31 +1,24 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
 import { schema } from './calibration/schema.js';
 
-// TODO(boundary) RB-9: replace this default with two raw exports, one per Rust call.
 // The cap/floor Hull-White calibrators take an optional projection curve
-// (`forward`). wasm-bindgen cannot borrow an optional class handle
-// (`Option<&T>`), so the raw functions take it as a required handle and the
-// published functions pass `discount` when it is omitted — the Rust default
-// (`forward: None` projects on the discount curve). Same workaround as the
-// optional `DayCountContext` in `exports/core.js`.
-const projectionCurve = (discount, forward) =>
-  forward === undefined || forward === null ? discount : forward;
-// wasm-bindgen cannot borrow the optional `forward`: resolved by `projectionCurve` above.
+// (`forward`). wasm-bindgen cannot borrow an optional handle, so the two raw
+// exports of each are one Rust call each (`forward: None` and `Some(forward)`) and
+// the published function picks between them.
 const calibrateHullWhiteToCapFloors = (discount, quotes, config, forward = undefined) =>
-  wasm.calibrateHullWhiteToCapFloors(discount, quotes, config, projectionCurve(discount, forward));
-// wasm-bindgen cannot borrow the optional `forward`: resolved by `projectionCurve` above.
+  forward === undefined || forward === null
+    ? wasm.calibrateHullWhiteToCapFloorsWithoutForward(discount, quotes, config)
+    : wasm.calibrateHullWhiteToCapFloorsWithForward(discount, quotes, config, forward);
+// wasm-bindgen cannot borrow the optional `forward`: picks between the two raw exports.
 const bootstrapHullWhiteSigmaScheduleToCapFloors = (
   discount,
   quotes,
   config,
   forward = undefined
 ) =>
-  wasm.bootstrapHullWhiteSigmaScheduleToCapFloors(
-    discount,
-    quotes,
-    config,
-    projectionCurve(discount, forward)
-  );
+  forward === undefined || forward === null
+    ? wasm.bootstrapHullWhiteSigmaScheduleToCapFloorsWithoutForward(discount, quotes, config)
+    : wasm.bootstrapHullWhiteSigmaScheduleToCapFloorsWithForward(discount, quotes, config, forward);
 
 /** Quote ingestion, market construction, and explicit model calibration. */
 export const calibration = {

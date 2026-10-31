@@ -247,6 +247,10 @@ fn analytics_dts_matches_runtime_hotspots() {
         "periodStats(tickerIdx: number, aggregationFrequency?: string, fiscalConfig?: FiscalConfig | null): PeriodStats;",
     ));
     assert!(!dts.contains("lookbackReturnsWithFiscalConfig("));
+    assert!(!dts.contains("calibrateHullWhiteToCapFloorsWithForward("));
+    assert!(!dts.contains("calibrateHullWhiteToCapFloorsWithoutForward("));
+    assert!(!dts.contains("bootstrapHullWhiteSigmaScheduleToCapFloorsWithForward("));
+    assert!(!dts.contains("bootstrapHullWhiteSigmaScheduleToCapFloorsWithoutForward("));
     assert!(!dts.contains("periodStatsWithFiscalConfig("));
     assert!(declares_type(&dts, "LookbackReturns"));
     assert!(
