@@ -2064,6 +2064,62 @@
       }
     },
     {
+      "id": "loan-yield-card",
+      "route": "returned-model",
+      "convention": "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model.",
+      "api": {
+        "name": "valuations.instruments.priceInstrumentWithMarket",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "priceInstrumentWithMarket",
+        "inputs": [
+          {
+            "name": "instrumentJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "market",
+            "type": "MarketContext",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": "string | null",
+            "optional": true
+          },
+          {
+            "name": "metrics",
+            "type": "string[] | null",
+            "optional": true
+          },
+          {
+            "name": "metricPricingOverrides",
+            "type": "JsonInput | null",
+            "optional": true
+          },
+          {
+            "name": "marketHistory",
+            "type": "JsonInput | null",
+            "optional": true
+          },
+          {
+            "name": "explain",
+            "type": "boolean | null",
+            "optional": true
+          }
+        ],
+        "returns": "ValuationResult",
+        "declaration": "/**\n   * Price an instrument using a pre-parsed `core.MarketContext` handle.\n   *\n   * Avoids the per-call market-parse overhead of `priceInstrument`.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * Their `seed` is a lossless `bigint`; serialize such results with\n   * `valuations.valuationResultToJson`.\n   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.\n   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data for this call.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit, `null`, or `\"default\"` for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result.\n   * @param metricPricingOverrides - Optional JSON object patch applied before validation. Only supplied fields replace stored overrides; `{}` preserves them. Supplied `bump_config` fields merge into the stored object. Explicit `null` clears nullable fields to their Rust fallback. Omit the argument or pass JavaScript `null`/`undefined` to retain the envelope configuration.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Under `\"discounting\"` and `\"hazard_rate\"` it holds one `cashflow_pv` entry per projected cashflow (date, amount, discount factor, curve, survival probability, present value) summing to the price, capped at 1000 entries; other models get one `computation_step` entry stating that no per-flow decomposition exists. Omit or pass `false` for no trace.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, `provenance`, …). `provenance` records the model, requested date, declared market dependencies, scenario adjustment and, when metrics are requested, the finite-difference bump sizes.\n   * @throws Error - Throws a JavaScript exception if an instrument, metric-pricing-override, or market- history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrumentWithMarket(\n    instrumentJson: JsonInput,\n    market: MarketContext,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: JsonInput | null,\n    marketHistory?: JsonInput | null,\n    explain?: boolean | null\n  ): ValuationResult;",
+        "sha256": "887a88441ef4e22d6e41cd856482d6f2b7382acb8c3ae062a92460444b2d5097"
+      }
+    },
+    {
       "id": "option-calculator",
       "route": "returned-model",
       "convention": "Returned closed-form results of one European option: models.bsPrice, black76Price or bachelierPrice of an entered volatility, or bsImpliedVol, black76ImpliedVol or models.volatility.impliedVolBachelier of an entered price, then bsGreeks, black76Greeks or bachelierGreeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",

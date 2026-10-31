@@ -23,6 +23,7 @@ const generators = [
   "tests/attribution/generate.mjs",
   "tests/valuations/cashflows/generate.mjs",
   "tests/valuations/details/generate.mjs",
+  "tests/valuations/loan-yield/generate.mjs",
   "tests/core/curves/generate.mjs",
   "tests/core/market-browser/generate.mjs",
   "tests/core/curve-query/generate.mjs",
