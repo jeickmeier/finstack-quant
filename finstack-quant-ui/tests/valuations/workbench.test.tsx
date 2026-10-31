@@ -16,6 +16,8 @@ import { serializeHost } from "../../src/codec.mjs";
 import detailFixtures from "./details/cases.json";
 import cashflowFixtures from "./cashflows/cases.json";
 import scenarioCases from "./scenario-table/cases.json";
+import standardDeals from "./scenario-table/standard-deals.json";
+import scenarioGridSchema from "../../src/generated/schemas/scenario_grid.json";
 import pricingMarket from "./instruments/pricing-market.json";
 import type { ValuationResult } from "finstack-quant-wasm";
 import bondFixture from "../../src/fixtures/results/bond.json";
@@ -117,6 +119,25 @@ beforeEach(() => {
         return native.dryRun(request);
       case "calibrate":
         return native.calibrate(request);
+      case "newStandardDeal": {
+        const deal = native.StructuredCredit.newStandard(
+          request.dealType,
+          request.paramsJson,
+        );
+        try {
+          return deal.toJson();
+        } finally {
+          deal.free();
+        }
+      }
+      case "dealTranches": {
+        const deal = native.StructuredCredit.fromJson(request);
+        try {
+          return deal.tranches;
+        } finally {
+          deal.free();
+        }
+      }
       case "scenarioTable": {
         const deal = native.StructuredCredit.fromJson(request.instrumentJson);
         try {
@@ -777,6 +798,97 @@ it(
         ).toBeTruthy(),
       { timeout: budget(5000) },
     );
+  },
+  budget(60000),
+);
+
+it(
+  "enters a deal from a registry family and analyses its tranche with no host seeds",
+  async () => {
+    const family = standardDeals.cases.find((c) => c.family === "rmbs")!;
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench
+          defaultRequest={{
+            instrumentJson: JSON.stringify(scenarioCases.cases[0]!.instrument),
+            marketJson: JSON.stringify(pricingMarket),
+            asOf: scenarioCases.asOf,
+            model: "discounting",
+            metrics: [],
+          }}
+        />
+      </FinstackQueryProvider>,
+    );
+    await waitFor(() => expect(prices()).toHaveLength(1), {
+      timeout: budget(10000),
+    });
+    // The form starts from Rust's example, and building sends that family and those params.
+    const summary = screen.getByText("Start from a standard deal", {
+      selector: "summary",
+    });
+    const details = summary.closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    const entry = within(details);
+    fireEvent.click(await entry.findByRole("radio", { name: "RMBS" }));
+    const build = entry.getByRole("button", {
+      name: "Build deal",
+    }) as HTMLButtonElement;
+    await waitFor(() => expect(build.disabled).toBe(false), {
+      timeout: budget(5000),
+    });
+    fireEvent.click(build);
+    await waitFor(
+      () =>
+        expect(
+          call.mock.calls.some(([method]) => method === "newStandardDeal"),
+        ).toBe(true),
+      { timeout: budget(5000) },
+    );
+    const built = call.mock.calls.find(
+      ([method]) => method === "newStandardDeal",
+    )![1];
+    expect(built.dealType).toBe("rmbs");
+    expect(JSON.parse(built.paramsJson)).toEqual(standardDeals.params);
+    // The built deal reprices through the workbench's normal path.
+    await waitFor(
+      () => expect(prices().at(-1)!.instrumentJson).toBe(family.instrumentJson),
+      { timeout: budget(10000) },
+    );
+    // No host seed: the tab lists the deal's native tranches and selects the first returned.
+    await userEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
+    const tranche = family.tranches.tranches[0]!.id;
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector(`[aria-label="${tranche} tranche analytics"]`),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    const metricCalls = call.mock.calls.filter(
+      ([method]) => method === "trancheMetrics",
+    );
+    expect(metricCalls.at(-1)![1]).toMatchObject({
+      instrumentJson: family.instrumentJson,
+      trancheId: tranche,
+    });
+    // The grid and the price extent come from Rust's example and the returned prices.
+    fireEvent.click(
+      screen.getByText("Scenario prices", { selector: "summary" }),
+    );
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector(`[aria-label="${tranche} scenario prices"]`),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    expect(
+      JSON.parse(
+        call.mock.calls.find(([method]) => method === "scenarioTable")![1]
+          .gridJson,
+      ),
+    ).toEqual(scenarioGridSchema.examples[0]);
   },
   budget(60000),
 );

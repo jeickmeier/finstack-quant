@@ -255,7 +255,7 @@
     {
       "name": "pricing-workbench",
       "type": "registry:block",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid. Host owns routes and domain inputs.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "worker": "host"
     },
     {
@@ -944,6 +944,10 @@
     },
     {
       "name": "contract-scenario-grid",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-standard-deal-params",
       "type": "registry:lib"
     },
     {

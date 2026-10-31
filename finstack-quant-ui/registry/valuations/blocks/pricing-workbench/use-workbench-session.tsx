@@ -96,6 +96,16 @@ export function useWorkbenchSession({
       );
   }, []);
   const [instrument, setInstrument] = useState<string | null>(null);
+  // A deal built from a preset; the instrument form remounts on it and stays the editor.
+  const [builtInstrumentJson, setBuiltInstrumentJson] = useState<string | null>(
+    null,
+  );
+  const loadInstrument = useCallback((json: string) => {
+    setInstrument(null);
+    setBuiltInstrumentJson(json);
+    // finstack-arith: remount revision counter, not a value
+    setInstrumentRevision((current) => current + 1);
+  }, []);
   const [params, setParams] = useState<PricingParams>(() => ({
     asOf: initial.asOf,
     model: initial.model,
@@ -112,6 +122,7 @@ export function useWorkbenchSession({
   const selectType = useCallback(
     (nextType: string) => {
       const example = exampleRequests?.[nextType];
+      setBuiltInstrumentJson(null);
       if (example) {
         setInstrument(null);
         setMarket(null);
@@ -292,6 +303,8 @@ export function useWorkbenchSession({
     market,
     acceptMarket,
     setInstrument,
+    builtInstrumentJson,
+    loadInstrument,
     selectType,
     printSnapshot,
     startPrint,

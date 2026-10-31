@@ -16,6 +16,7 @@ import type {
   MetricMetadata,
   MoneyValue,
   ScenarioTable,
+  StructuredCredit,
   ScenarioResults,
   TrancheMetrics,
   OasResult,
@@ -102,6 +103,15 @@ export interface ScenarioRequest {
   /** Complete native ScenarioGrid JSON; no model inputs are inferred. */
   readonly gridJson: string;
 }
+/** One of the deal families StructuredCredit.newStandard accepts. */
+export type StandardDealType = "abs" | "clo" | "cmbs" | "rmbs";
+/** A registry deal family and its complete native StandardDealParams JSON. */
+export interface StandardDealRequest {
+  readonly dealType: StandardDealType;
+  readonly paramsJson: string;
+}
+/** The native capital structure of a deal, as StructuredCredit's tranches getter returns it. */
+export type DealTranches = StructuredCredit["tranches"];
 /** One tranche of a structured-credit deal, priced on a complete market at a valuation date. */
 export interface TrancheRequest {
   readonly instrumentJson: string;
@@ -1107,6 +1117,10 @@ export interface ValuationsApi {
   validate(instrumentJson: string): Promise<Envelope<string>>;
   /** valuations.instruments.validateInstrumentJson + instrumentCashflowsWithMarket over the cached market handle; the native envelope object. */
   cashflows(request: CashflowRequest): Promise<Envelope<CashflowEnvelope>>;
+  /** valuations.instruments.StructuredCredit.newStandard + toJson: the canonical instrument JSON of a deal under its family's registry assumptions. */
+  newStandardDeal(request: StandardDealRequest): Promise<Envelope<string>>;
+  /** valuations.instruments.StructuredCredit.fromJson + its tranches getter. */
+  dealTranches(instrumentJson: string): Promise<Envelope<DealTranches>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
   scenarioTable(request: ScenarioRequest): Promise<Envelope<ScenarioTable>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheMetrics; no OasConfig or price default is supplied. */

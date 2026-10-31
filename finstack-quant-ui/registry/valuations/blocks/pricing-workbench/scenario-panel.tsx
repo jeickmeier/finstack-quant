@@ -30,7 +30,7 @@ export function ScenarioPanel({
   priceDomain,
 }: {
   request: ScenarioRequest;
-  priceDomain: readonly [number, number];
+  priceDomain?: readonly [number, number];
 }) {
   const [initial] = useState(() => gridValues(request.gridJson));
   const [gridJson, setGridJson] = useState(request.gridJson);

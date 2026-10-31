@@ -102,6 +102,24 @@ export function createValuationsService(
         );
       });
     },
+    newStandardDeal(request) {
+      return context.result(() => {
+        const deal = instruments.StructuredCredit.newStandard(
+          request.dealType,
+          request.paramsJson,
+        );
+        try {
+          return deal.toJson();
+        } finally {
+          deal.free();
+        }
+      });
+    },
+    dealTranches(instrumentJson) {
+      return context.result(() =>
+        withDeal(instrumentJson, (deal) => deal.tranches),
+      );
+    },
     scenarioTable(request) {
       return context.result(() =>
         withDeal(request.instrumentJson, (deal) =>

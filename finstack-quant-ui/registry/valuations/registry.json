@@ -571,7 +571,7 @@
       "type": "registry:block",
       "title": "Pricing workbench",
       "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows, tranche analytics and scenarios.",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid. Host owns routes and domain inputs.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "files": [
         {
           "path": "blocks/pricing-workbench/pricing-workbench.tsx",
@@ -602,6 +602,21 @@
           "path": "blocks/pricing-workbench/scenario-grid.ts",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/scenario-grid.ts"
+        },
+        {
+          "path": "blocks/pricing-workbench/deal-preset-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/deal-preset-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/deal-preset-form.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/deal-preset-form.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/structured-credit-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/structured-credit-panel.tsx"
         },
         {
           "path": "blocks/pricing-workbench/tranche-panel.tsx",
@@ -664,6 +679,8 @@
         "@finstack/finstack-worker",
         "@finstack/schema-form",
         "@finstack/contract-scenario-grid",
+        "@finstack/contract-standard-deal-params",
+        "@finstack/shared-schema-defs",
         "@finstack/finstack-codec",
         "@finstack/market-scenario-builder",
         "@finstack/market-scenario-report",
@@ -692,6 +709,7 @@
           "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
           "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+          "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
           "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
@@ -915,7 +933,7 @@
       "type": "registry:hook",
       "title": "useTrancheAnalytics",
       "description": "Fetches native structured-credit tranche metrics, OAS, discount margin and break-even CDR through the WASM worker.",
-      "docs": "Four query option builders and hooks over valuations.instruments.trancheMetrics, trancheOas, trancheDiscountMargin and trancheBreakevenCdr, each keyed by its complete immutable request and the worker session; null disables a call. An omitted metrics price or metric list is left to Rust; OAS and discount margin require an explicit clean price, and OAS uses Rust's default OasConfig. Native errors are returned unchanged.",
+      "docs": "Deal entry through StructuredCredit.newStandard (useNewStandardDeal) and the deal's tranches getter (useDealTranches), and four query option builders and hooks over valuations.instruments.trancheMetrics, trancheOas, trancheDiscountMargin and trancheBreakevenCdr, each keyed by its complete immutable request and the worker session; null disables a call. An omitted metrics price or metric list is left to Rust; OAS and discount margin require an explicit clean price, and OAS uses Rust's default OasConfig. Native errors are returned unchanged.",
       "files": [
         {
           "path": "hooks/use-tranche-analytics/use-tranche-analytics.ts",

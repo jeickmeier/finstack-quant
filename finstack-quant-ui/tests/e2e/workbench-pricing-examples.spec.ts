@@ -236,6 +236,35 @@ test("switching instrument loads its model and market, and gallery links retain 
   expect(errors).toEqual([]);
 });
 
+test("a standard deal family builds, prices and lists its native tranches", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=pricing-workbench&theme=light&density=compact&focus=1&instrument=structured_credit",
+  );
+  const state = page.locator(".finstack-workbench__state");
+  await expect(state).toHaveText("Priced");
+  await page.getByText("Start from a standard deal", { exact: true }).click();
+  await page.getByRole("radio", { name: "RMBS", exact: true }).click();
+  await page.getByRole("button", { name: "Build deal" }).click();
+  await expect(state).toHaveText("Priced");
+  const results = page.getByRole("region", { name: "Results", exact: true });
+  await results.getByRole("tab", { name: "Request" }).click();
+  await results.getByText("Priced instrument", { exact: true }).click();
+  await expect(
+    results.getByRole("region", { name: "Priced instrument JSON" }),
+  ).toContainText('"deal_type":"rmbs"');
+  await results.getByRole("tab", { name: "Scenarios" }).click();
+  await expect(
+    results.getByRole("region", {
+      name: `${scenarios.trancheId} tranche analytics`,
+    }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("structured-credit scenario prices use the completed native request", async ({
   page,
 }) => {
