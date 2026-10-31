@@ -311,6 +311,16 @@ export function matchesBranch(
     );
   return schema.type === typeof value;
 }
+/** Whether the form path `child` is `parent` or lies under it; every path lies under the root "". */
+export function withinPath(child: string, parent: string): boolean {
+  return (
+    !parent ||
+    child === parent ||
+    child.startsWith(`${parent}.`) ||
+    child.startsWith(`${parent}[`)
+  );
+}
+
 export function structuralValidator(module: InstrumentModule) {
   return z.record(z.string(), z.unknown()).transform((value, context) => {
     try {
