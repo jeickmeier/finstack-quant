@@ -469,6 +469,7 @@ clone values; export through the worker's `exportResult` method for native
 canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns the native cashflow
 envelope object. `CashflowViewer` accepts that object as `cashflows` plus optional loading/error props and needs no provider. It presents native rows in a table, with `serializeHost` JSON copy/download in a secondary **Envelope JSON** disclosure;
 unsupported export preserves caller pricing/model state and shows the native error. The workbench owns one cashflow query for both display and its print snapshot.
+**Principal before** and **Principal after** show the envelope's `beginning_balance` and `ending_balance` as supplied, in the row currency. Rust fills them per row for bonds, term loans and revolvers (a coupon shows the principal it accrued on, a PIK, amortization, sweep, draw or repayment row moves it, and an issue funding row starts from zero) and per period for agency MBS (rows of one period share the pool balances); nothing is accumulated in JavaScript, and the columns hide only when no row carries a balance.
 `useCashflowLadder` (the individual `use-cashflow-ladder` item, beside
 `use-cashflows`) takes that envelope object and calls
 `valuations.instruments.calendarYearLadderByCurrency`: one ladder per row
