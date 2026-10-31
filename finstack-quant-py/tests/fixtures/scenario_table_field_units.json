@@ -1,0 +1,36 @@
+{
+  "axes": [
+    {
+      "field": "cpr",
+      "label": "annual decimal",
+      "source": "valuations::ScenarioCell::cpr"
+    },
+    {
+      "field": "cdr",
+      "label": "annual decimal",
+      "source": "valuations::ScenarioCell::cdr"
+    },
+    {
+      "field": "severity",
+      "label": "decimal",
+      "source": "valuations::ScenarioCell::severity"
+    }
+  ],
+  "measures": [
+    {
+      "field": "price",
+      "label": "% of current balance",
+      "source": "valuations::ScenarioCell::price"
+    },
+    {
+      "field": "wal",
+      "label": "years",
+      "source": "valuations::ScenarioCell::wal"
+    },
+    {
+      "field": "writedown",
+      "label": "EUR",
+      "source": "valuations::ScenarioCell::writedown"
+    }
+  ]
+}

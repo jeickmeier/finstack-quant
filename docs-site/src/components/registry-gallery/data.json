@@ -12254,6 +12254,7 @@
         },
         "table": {
           "tranche_id": "CLONOTES-A",
+          "currency": "USD",
           "cells": [
             {
               "cpr": 0,
@@ -12350,6 +12351,42 @@
               "price": 106.99965109085419,
               "wal": 4.639337413310317,
               "writedown": 9468364.34269152
+            }
+          ]
+        },
+        "units": {
+          "axes": [
+            {
+              "field": "cpr",
+              "label": "annual decimal",
+              "source": "valuations::ScenarioCell::cpr"
+            },
+            {
+              "field": "cdr",
+              "label": "annual decimal",
+              "source": "valuations::ScenarioCell::cdr"
+            },
+            {
+              "field": "severity",
+              "label": "decimal",
+              "source": "valuations::ScenarioCell::severity"
+            }
+          ],
+          "measures": [
+            {
+              "field": "price",
+              "label": "% of current balance",
+              "source": "valuations::ScenarioCell::price"
+            },
+            {
+              "field": "wal",
+              "label": "years",
+              "source": "valuations::ScenarioCell::wal"
+            },
+            {
+              "field": "writedown",
+              "label": "USD",
+              "source": "valuations::ScenarioCell::writedown"
             }
           ]
         }
@@ -12504,6 +12541,7 @@
         },
         "table": {
           "tranche_id": "CLONOTES-A",
+          "currency": "USD",
           "cells": [
             {
               "cpr": 0,
@@ -12600,6 +12638,42 @@
               "price": 106.99965109085419,
               "wal": 4.639337413310317,
               "writedown": 4734182.17134576
+            }
+          ]
+        },
+        "units": {
+          "axes": [
+            {
+              "field": "cpr",
+              "label": "annual decimal",
+              "source": "valuations::ScenarioCell::cpr"
+            },
+            {
+              "field": "cdr",
+              "label": "annual decimal",
+              "source": "valuations::ScenarioCell::cdr"
+            },
+            {
+              "field": "severity",
+              "label": "decimal",
+              "source": "valuations::ScenarioCell::severity"
+            }
+          ],
+          "measures": [
+            {
+              "field": "price",
+              "label": "% of current balance",
+              "source": "valuations::ScenarioCell::price"
+            },
+            {
+              "field": "wal",
+              "label": "years",
+              "source": "valuations::ScenarioCell::wal"
+            },
+            {
+              "field": "writedown",
+              "label": "USD",
+              "source": "valuations::ScenarioCell::writedown"
             }
           ]
         }

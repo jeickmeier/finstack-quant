@@ -7,6 +7,7 @@
 
 use crate::structured_credit::StructuredCredit;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
@@ -51,7 +52,7 @@ pub struct ScenarioCell {
     pub price: f64,
     /// Weighted-average life in years.
     pub wal: f64,
-    /// Total principal writedown in currency units.
+    /// Total principal writedown, in units of [`ScenarioTable::currency`].
     pub writedown: f64,
 }
 
@@ -62,6 +63,8 @@ pub struct ScenarioCell {
 pub struct ScenarioTable {
     /// Identifier of the tranche evaluated.
     pub tranche_id: String,
+    /// Currency of the tranche, which each cell's `writedown` is denominated in.
+    pub currency: Currency,
     /// Evaluated cells, in CPR-major, then CDR, then severity order.
     pub cells: Vec<ScenarioCell>,
 }
@@ -96,7 +99,9 @@ pub fn tranche_scenario_table(
     deal.validate_for_pricing()?;
     let deal = deal.resolved_for_pricing()?;
     // Prices are per CURRENT face (the factor-adjusted quote basis).
-    let current_balance = deal.tranches.require(tranche_id)?.current_balance.amount();
+    let current_balance = deal.tranches.require(tranche_id)?.current_balance;
+    let currency = current_balance.currency();
+    let current_balance = current_balance.amount();
 
     // Cap grid size before allocating: each cell clones and reprices the deal.
     // Use checked mul so a huge product cannot wrap on wasm32 `usize`.
@@ -172,6 +177,7 @@ pub fn tranche_scenario_table(
 
     let table = ScenarioTable {
         tranche_id: tranche_id.to_string(),
+        currency,
         cells,
     };
     super::finite::ensure_scenario_table_finite(&table)?;

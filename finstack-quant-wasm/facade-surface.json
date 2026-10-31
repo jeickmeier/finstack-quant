@@ -4588,6 +4588,7 @@
       "priceDriverFields",
       "priceInstrument",
       "priceInstrumentWithMarket",
+      "scenarioTableFieldUnits",
       "trancheBreakevenCdr",
       "trancheBuilder",
       "trancheCashflowsTable",
@@ -4839,6 +4840,9 @@
     "kind": "function"
   },
   "valuations.instruments.poolReportFieldUnits": {
+    "kind": "function"
+  },
+  "valuations.instruments.scenarioTableFieldUnits": {
     "kind": "function"
   },
   "valuations.instruments.trancheMetricFieldUnits": {

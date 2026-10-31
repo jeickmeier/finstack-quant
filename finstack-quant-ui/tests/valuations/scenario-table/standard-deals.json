@@ -163,6 +163,7 @@
       },
       "table": {
         "tranche_id": "CLONOTES-A",
+        "currency": "USD",
         "cells": [
           {
             "cpr": 0,
@@ -242,6 +243,7 @@
       },
       "table": {
         "tranche_id": "CLONOTES-A",
+        "currency": "USD",
         "cells": [
           {
             "cpr": 0,
@@ -321,6 +323,7 @@
       },
       "table": {
         "tranche_id": "CLONOTES-A",
+        "currency": "USD",
         "cells": [
           {
             "cpr": 0,
@@ -400,6 +403,7 @@
       },
       "table": {
         "tranche_id": "CLONOTES-A",
+        "currency": "USD",
         "cells": [
           {
             "cpr": 0,

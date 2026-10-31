@@ -23,6 +23,7 @@ export type ValuationsNative = {
       | "priceDriverFields"
       | "trancheMetricFieldUnits"
       | "trancheSolveFieldUnits"
+      | "scenarioTableFieldUnits"
     >;
   };
 };
@@ -211,6 +212,8 @@ export function createValuationsService(
       context.result(() => instruments.priceDriverFields()),
     trancheMetricFieldUnits: (currency) =>
       context.result(() => instruments.trancheMetricFieldUnits(currency)),
+    scenarioTableFieldUnits: (currency) =>
+      context.result(() => instruments.scenarioTableFieldUnits(currency)),
     trancheSolveFieldUnits: () =>
       context.result(() => instruments.trancheSolveFieldUnits()),
     exportResult: (value) =>

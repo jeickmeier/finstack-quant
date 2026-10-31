@@ -265,7 +265,7 @@ test("a standard deal family builds, prices and lists its native tranches", asyn
   expect(errors).toEqual([]);
 });
 
-test("structured-credit scenario prices use the completed native request", async ({
+test("structured-credit scenarios use the completed native request", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -276,9 +276,9 @@ test("structured-credit scenario prices use the completed native request", async
   const results = page.getByRole("region", { name: "Results", exact: true });
   await expect(page.locator(".finstack-workbench__state")).toHaveText("Priced");
   await results.getByRole("tab", { name: "Scenarios" }).click();
-  await results.getByText("Scenario prices", { exact: true }).click();
+  await results.locator("summary", { hasText: /^Scenarios$/ }).click();
   const scenario = results.getByRole("region", {
-    name: "CLONOTES-A scenario prices",
+    name: "CLONOTES-A scenario measures",
   });
   // The grid shows the live native prices; the committed fixture holds the same
   // native table and `mise run ui-fixtures --check` keeps it fresh.
@@ -286,6 +286,14 @@ test("structured-credit scenario prices use the completed native request", async
     String(scenarios.cases[0]!.table.cells[0]!.price),
   );
   await expect(scenario).toContainText("trancheScenarioTable");
+  // WAL and writedown read the same returned cells, each with its native unit.
+  await scenario.getByRole("radio", { name: "WAL", exact: true }).click();
+  await expect(scenario).toContainText("WAL (years). Severity:");
+  await expect(scenario.getByRole("grid")).toContainText(
+    String(scenarios.cases[0]!.table.cells[0]!.wal),
+  );
+  await scenario.getByRole("radio", { name: "Writedown", exact: true }).click();
+  await expect(scenario).toContainText("Writedown (USD). Severity:");
   // The native ScenarioGrid editor is seeded from the host grid.
   await expect(
     results.getByRole("button", { name: "Run scenarios" }),

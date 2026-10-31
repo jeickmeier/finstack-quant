@@ -619,6 +619,58 @@ pub fn tranche_solve_field_units() -> TrancheSolveFieldUnits {
     }
 }
 
+/// Units of a `ScenarioTable`'s cells, which do not appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioTableFieldUnits {
+    /// Unit of each swept `ScenarioCell` input, in the order the struct declares them.
+    pub axes: Vec<MetricFieldUnit>,
+    /// Unit of each measure `ScenarioCell` reports, in the order the struct declares them.
+    pub measures: Vec<MetricFieldUnit>,
+}
+
+/// Units of the `ScenarioCell` fields, the one place a host reads them from.
+///
+/// Rates are decimals, the price is percent of the tranche's current balance and
+/// the writedown is in currency units. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `ScenarioTable::currency` of the table being labelled; it
+///   names the unit of `writedown`.
+///
+/// # Returns
+///
+/// One record per numeric cell field, split into the swept axes and the reported
+/// measures so a host can offer the measures without naming them.
+pub fn scenario_table_field_units(currency: Currency) -> ScenarioTableFieldUnits {
+    let unit = |&(field, label): &(&str, &str)| MetricFieldUnit {
+        field: field.to_string(),
+        label: label.to_string(),
+        source: format!("valuations::ScenarioCell::{field}"),
+    };
+    let currency = currency.to_string();
+    ScenarioTableFieldUnits {
+        axes: [
+            ("cpr", "annual decimal"),
+            ("cdr", "annual decimal"),
+            ("severity", "decimal"),
+        ]
+        .iter()
+        .map(unit)
+        .collect(),
+        measures: [
+            ("price", "% of current balance"),
+            ("wal", "years"),
+            ("writedown", currency.as_str()),
+        ]
+        .iter()
+        .map(unit)
+        .collect(),
+    }
+}
+
 /// Units of a `PoolReport`, which do not all appear on the wire.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -1264,6 +1316,44 @@ mod tests {
             units.discount_margin.source,
             "valuations::tranche_discount_margin"
         );
+    }
+
+    #[test]
+    fn scenario_table_units_list_every_cell_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::ScenarioCell;
+        let cell = ScenarioCell {
+            cpr: 0.0,
+            cdr: 0.0,
+            severity: 0.0,
+            price: 0.0,
+            wal: 0.0,
+            writedown: 0.0,
+        };
+        let value = serde_json::to_value(&cell).expect("serialize");
+        let mut declared: Vec<&str> = value
+            .as_object()
+            .expect("object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        declared.sort_unstable();
+        let units = scenario_table_field_units(Currency::EUR);
+        let order: Vec<&str> = units
+            .axes
+            .iter()
+            .chain(&units.measures)
+            .map(|unit| unit.field.as_str())
+            .collect();
+        assert_eq!(
+            order,
+            ["cpr", "cdr", "severity", "price", "wal", "writedown"]
+        );
+        let mut listed = order;
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units.measures[0].label, "% of current balance");
+        assert_eq!(units.measures[2].label, "EUR");
+        assert_eq!(units.measures[1].source, "valuations::ScenarioCell::wal");
     }
 
     #[test]

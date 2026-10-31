@@ -20502,7 +20502,7 @@ export interface ScenarioCell {
    */
   wal: number;
   /**
-   * Total principal writedown in currency units.
+   * Total principal writedown, in units of [`ScenarioTable::currency`].
    */
   writedown: number;
 }
@@ -20538,9 +20538,26 @@ export interface ScenarioTable {
    */
   cells: ScenarioCell[];
   /**
+   * Currency of the tranche, which each cell's `writedown` is denominated in.
+   */
+  currency: Currency;
+  /**
    * Identifier of the tranche evaluated.
    */
   tranche_id: string;
+}
+/**
+ * The display units of a scenario table's axes and measures.
+ */
+export interface ScenarioTableFieldUnits {
+  /**
+   * Unit of each swept `ScenarioCell` input, in the order the struct declares them.
+   */
+  axes: MetricFieldUnit[];
+  /**
+   * Unit of each measure `ScenarioCell` reports, in the order the struct declares them.
+   */
+  measures: MetricFieldUnit[];
 }
 /**
  * Tranche cashflows and deal accounting from one deterministic simulation.

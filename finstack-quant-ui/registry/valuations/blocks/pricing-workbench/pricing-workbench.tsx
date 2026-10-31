@@ -686,7 +686,7 @@ export function PricingWorkbench({
                       density={currentDensity}
                     />
                   ) : (
-                    <p>Scenario prices are unavailable for this instrument.</p>
+                    <p>Scenarios are unavailable for this instrument.</p>
                   )}
                 </TabsContent>
               </Tabs>

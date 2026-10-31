@@ -1692,8 +1692,8 @@
     },
     {
       "id": "scenario-heatmap",
-      "route": "returned-prices",
-      "convention": "Rust clean settlement price, percent of current tranche balance.",
+      "route": "returned-measures",
+      "convention": "Returned ScenarioCell measures only, in the units scenarioTableFieldUnits states: Rust clean settlement price in percent of current tranche balance, WAL in years, writedown in the table's currency.",
       "api": {
         "name": "valuations.instruments.trancheScenarioTable",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -2507,7 +2507,7 @@
   ],
   "scenarioAuthority": {
     "source": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/scenario.rs",
-    "sha256": "6d1e2e6ef80f6979abba09e6c918668e0eb2bbfc1b3847bdafdc76e50a3c3c39"
+    "sha256": "b0109c1eb652aecbceb2c94ee7dd4220d4fc7705edf87c41c594d18d54e957ce"
   },
   "deferred": {
     "machine-readable-units": "Generic values stay raw; do not infer units from names or decimal refs.",

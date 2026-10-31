@@ -44,6 +44,7 @@ const cases = [instrument, factor].map((input, index) => {
       name: index ? "factor-adjusted" : "original",
       instrument: JSON.parse(instrumentJson),
       table,
+      units: native.scenarioTableFieldUnits(table.currency),
     };
   } finally {
     deal.free();

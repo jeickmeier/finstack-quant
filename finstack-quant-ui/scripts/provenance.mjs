@@ -354,9 +354,9 @@ const displays = [
       "ValuationInstrumentsNamespace",
       "trancheScenarioTable",
     ],
-    route: "returned-prices",
+    route: "returned-measures",
     convention:
-      "Rust clean settlement price, percent of current tranche balance.",
+      "Returned ScenarioCell measures only, in the units scenarioTableFieldUnits states: Rust clean settlement price in percent of current tranche balance, WAL in years, writedown in the table's currency.",
   },
   {
     id: "tranche-analytics",

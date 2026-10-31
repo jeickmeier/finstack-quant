@@ -154,6 +154,8 @@ beforeEach(() => {
           deal.free();
         }
       }
+      case "scenarioTableFieldUnits":
+        return native.scenarioTableFieldUnits(request);
       case "scenarioTable": {
         const deal = native.StructuredCredit.fromJson(request.instrumentJson);
         try {
@@ -703,7 +705,7 @@ it(
   budget(15000),
 );
 
-it("offers configured scenario prices only while structured credit is selected", async () => {
+it("offers scenarios only while structured credit is selected", async () => {
   render(
     <FinstackQueryProvider>
       <PricingWorkbench
@@ -722,7 +724,7 @@ it("offers configured scenario prices only while structured credit is selected",
   expect(screen.queryByRole("tab", { name: "Scenarios" })).toBeNull();
 });
 it(
-  "loads configured scenario prices only on demand from the completed structured-credit context",
+  "loads scenarios only on demand from the completed structured-credit context",
   async () => {
     const request = {
       instrumentJson: JSON.stringify(scenarioCases.cases[0]!.instrument),
@@ -749,7 +751,7 @@ it(
     );
     await userEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
     const toggle = await screen.findByText(
-      "Scenario prices",
+      "Scenarios",
       { selector: "summary" },
       { timeout: budget(5000) },
     );
@@ -774,7 +776,7 @@ it(
     await waitFor(
       () =>
         expect(
-          document.querySelector('[aria-label="CLONOTES-A scenario prices"]'),
+          document.querySelector('[aria-label="CLONOTES-A scenario measures"]'),
         ).toBeTruthy(),
       { timeout: budget(5000) },
     );
@@ -810,7 +812,7 @@ it(
     await waitFor(
       () =>
         expect(
-          document.querySelector('[aria-label="CLONOTES-A scenario prices"]'),
+          document.querySelector('[aria-label="CLONOTES-A scenario measures"]'),
         ).toBeTruthy(),
       { timeout: budget(5000) },
     );
@@ -889,13 +891,11 @@ it(
       trancheId: tranche,
     });
     // The grid and the price extent come from Rust's example and the returned prices.
-    fireEvent.click(
-      screen.getByText("Scenario prices", { selector: "summary" }),
-    );
+    fireEvent.click(screen.getByText("Scenarios", { selector: "summary" }));
     await waitFor(
       () =>
         expect(
-          document.querySelector(`[aria-label="${tranche} scenario prices"]`),
+          document.querySelector(`[aria-label="${tranche} scenario measures"]`),
         ).toBeTruthy(),
       { timeout: budget(10000) },
     );

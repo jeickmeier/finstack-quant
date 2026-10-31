@@ -51,3 +51,19 @@ test('poolReportFieldUnits matches the records pinned for both hosts', () => {
     POOL_REPORT_PINNED
   );
 });
+
+const SCENARIO_PINNED = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/fixtures/scenario_table_field_units.json',
+      import.meta.url
+    )
+  )
+);
+
+test('scenarioTableFieldUnits matches the records pinned for both hosts', () => {
+  assert.deepEqual(
+    plain(facade.valuations.instruments.scenarioTableFieldUnits('EUR')),
+    SCENARIO_PINNED
+  );
+});

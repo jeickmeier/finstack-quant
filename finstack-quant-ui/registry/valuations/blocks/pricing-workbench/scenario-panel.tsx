@@ -2,6 +2,7 @@
 import { useState } from "react";
 import {
   useScenarioTable,
+  useScenarioTableFieldUnits,
   type ScenarioRequest,
 } from "@/hooks/valuations/use-scenario-table/use-scenario-table";
 import { ScenarioHeatmapPanel } from "@/components/finstack/valuations/components/scenario-heatmap/scenario-heatmap";
@@ -36,6 +37,7 @@ export function ScenarioPanel({
   const [gridJson, setGridJson] = useState(request.gridJson);
   const current = { ...request, gridJson };
   const query = useScenarioTable(current);
+  const units = useScenarioTableFieldUnits(query.data?.currency ?? null);
   return (
     <div className="flex flex-col gap-3">
       {"error" in initial ? (
@@ -50,12 +52,13 @@ export function ScenarioPanel({
           onSubmit={setGridJson}
         />
       )}
-      {query.error ? (
-        <p role="alert">{query.error.message}</p>
-      ) : query.data ? (
+      {query.error || units.error ? (
+        <p role="alert">{(query.error ?? units.error)!.message}</p>
+      ) : query.data && units.data ? (
         <ScenarioHeatmapPanel
           key={JSON.stringify(current)}
           table={query.data}
+          units={units.data}
           priceDomain={priceDomain}
         />
       ) : (
