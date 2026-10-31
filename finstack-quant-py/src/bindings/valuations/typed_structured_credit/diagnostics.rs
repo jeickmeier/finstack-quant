@@ -101,6 +101,12 @@ impl PySimulationDiagnostics {
             .collect()
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.first_breaches")]
+    #[getter]
+    fn first_breaches<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.first_breaches)
+    }
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.periods")]
     #[getter]
     fn periods<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

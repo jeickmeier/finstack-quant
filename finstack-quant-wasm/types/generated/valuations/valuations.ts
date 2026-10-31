@@ -18876,6 +18876,23 @@ export interface ConvertibleGreeks {
   [k: string]: unknown;
 }
 /**
+ * When one coverage test first failed over a simulation.
+ */
+export interface CoverageTestBreach {
+  /**
+   * First payment date this simulation found the test failing; a later cure
+   * does not clear it. `None` when it never failed.
+   */
+  first_breach?: DateWire | null;
+  /**
+   * Id of the test: `CoverageTestDiagnostic::test_id` for a test the
+   * waterfall carries (`OC_<tranche>`), or `OC_<tranche>_trigger` /
+   * `IC_<tranche>_trigger` for a tranche's own `oc_trigger` / `ic_trigger`.
+   */
+  test_id: string;
+  [k: string]: unknown;
+}
+/**
  * One coverage test as the waterfall executor evaluated it in a period.
  */
 export interface CoverageTestDiagnostic {
@@ -19415,6 +19432,15 @@ export interface SimulationDiagnostics {
    */
   early_amortization_date?: DateWire | null;
   /**
+   * First failure of each coverage test, one entry per test sorted by
+   * `test_id`. Covers every test the waterfall carries (each also on
+   * `periods[i].coverage_tests`) and every tranche `oc_trigger` /
+   * `ic_trigger`, whatever its consequence (only a breached `DivertCashFlow`
+   * trigger is on `coverage_tests`, for the periods it is in breach). A deal
+   * with no coverage test has no entries.
+   */
+  first_breaches: CoverageTestBreach[];
+  /**
    * Per-period deal accounting, in payment order. A deal with no payment
    * period left that still settles cash (a fully defaulted pool with
    * recoveries pending, or a funded reserve) has one record, holding that
@@ -19456,6 +19482,14 @@ export interface PeriodDiagnostics {
    */
   coverage_tests: CoverageTestDiagnostic[];
   /**
+   * Every tranche's credit enhancement on this period's end-of-period
+   * balances, in `TrancheStructure` order. The step-down trigger
+   * `MinCreditEnhancement` reads the senior tranche's value from the same
+   * function on the next payment date, before that date's principal is paid,
+   * so with no losses or draws in between it tests this period's number.
+   */
+  credit_enhancement: TrancheCreditEnhancement[];
+  /**
    * Par that defaulted (charged off) this period.
    */
   defaults: Money;
@@ -19483,8 +19517,11 @@ export interface PeriodDiagnostics {
    * Cash paid to tranches outside the waterfall: reserve interest routed to
    * a tranche, and, on the deal's last period, its redemption and terminal
    * releases. Together with `waterfall.payment_records` this is every
-   * tranche's interest and principal cash: per tranche and date, the two
-   * sum to the tranche's `interest_flows` plus `principal_flows`.
+   * tranche's cash: per tranche and date, the two sum to the tranche's
+   * `cashflows`, and to its `interest_flows` plus `principal_flows`. The one
+   * exception to the second sum is residual cash a custom waterfall pays a
+   * debt class beyond its interest claim, which the engine books to
+   * `cashflows` alone.
    */
   non_waterfall_payments: NonWaterfallPayment[];
   /**
@@ -19542,6 +19579,28 @@ export interface PeriodDiagnostics {
    * Balance-weighted spread of the floating-rate collateral (basis points).
    */
   weighted_avg_spread_bp: number;
+  [k: string]: unknown;
+}
+/**
+ * One tranche's credit enhancement at a period's end.
+ */
+export interface TrancheCreditEnhancement {
+  /**
+   * Share of the collateral beneath this tranche, as a decimal (`0.30` is
+   * 30%): `(C − N) ÷ C`, where `C` is the collateral balance plus the
+   * controlled-accumulation funding account and `N` the balances of this
+   * tranche and every tranche paid ahead of it (`payment_priority` at or
+   * below its own). Deferred interest is not in `N`. Negative when the notes
+   * exceed the collateral, and zero when there is no collateral. Pari-passu
+   * classes rank by `payment_priority`, so each is enhanced only by those
+   * ranked after it; an equity class's value is the collateral left above
+   * the whole structure.
+   */
+  credit_enhancement: number;
+  /**
+   * Id of the tranche (`Tranche::id`).
+   */
+  tranche_id: string;
   [k: string]: unknown;
 }
 /**

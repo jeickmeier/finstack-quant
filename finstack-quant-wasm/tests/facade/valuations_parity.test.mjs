@@ -394,6 +394,29 @@ test('structured-credit period detail says who was paid', () => {
   same(periods, sc.diagnostics.periods, 'periods', LOOSE);
 });
 
+test('structured-credit first breaches and credit enhancement come from runSimulation', () => {
+  const sc = golden.structured;
+  const { diagnostics } = instruments.StructuredCredit.fromJson(sc.deal).runSimulation(
+    sc.market,
+    sc.as_of
+  );
+  assert.deepEqual(
+    diagnostics.first_breaches.map((entry) => entry.test_id),
+    ['OC_A']
+  );
+  same(diagnostics.first_breaches, sc.diagnostics.first_breaches, 'first breaches');
+  assert.deepEqual(
+    diagnostics.periods[0].credit_enhancement.map((entry) => entry.tranche_id),
+    ['A', 'B', 'E']
+  );
+  same(
+    diagnostics.periods[0].credit_enhancement,
+    sc.diagnostics.periods[0].credit_enhancement,
+    'credit enhancement',
+    LOOSE
+  );
+});
+
 test('structured-credit deal analytics match Python', () => {
   const sc = golden.structured;
   const deal = instruments.StructuredCredit.fromJson(sc.deal);

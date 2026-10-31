@@ -150,6 +150,41 @@ pub struct CoverageTestDiagnostic {
     pub passing: bool,
 }
 
+/// When one coverage test first failed over a simulation.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct CoverageTestBreach {
+    /// Id of the test: `CoverageTestDiagnostic::test_id` for a test the
+    /// waterfall carries (`OC_<tranche>`), or `OC_<tranche>_trigger` /
+    /// `IC_<tranche>_trigger` for a tranche's own `oc_trigger` / `ic_trigger`.
+    pub test_id: String,
+    /// First payment date this simulation found the test failing; a later cure
+    /// does not clear it. `None` when it never failed.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
+    pub first_breach: Option<Date>,
+}
+
+/// One tranche's credit enhancement at a period's end.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct TrancheCreditEnhancement {
+    /// Id of the tranche (`Tranche::id`).
+    pub tranche_id: String,
+    /// Share of the collateral beneath this tranche, as a decimal (`0.30` is
+    /// 30%): `(C − N) ÷ C`, where `C` is the collateral balance plus the
+    /// controlled-accumulation funding account and `N` the balances of this
+    /// tranche and every tranche paid ahead of it (`payment_priority` at or
+    /// below its own). Deferred interest is not in `N`. Negative when the notes
+    /// exceed the collateral, and zero when there is no collateral. Pari-passu
+    /// classes rank by `payment_priority`, so each is enhanced only by those
+    /// ranked after it; an equity class's value is the collateral left above
+    /// the whole structure.
+    pub credit_enhancement: f64,
+}
+
 /// How one period's waterfall ran: who was paid, how much, and what was left.
 ///
 /// The serializable projection of [`WaterfallDistribution`]: its two
@@ -324,9 +359,18 @@ pub struct PeriodDiagnostics {
     /// Cash paid to tranches outside the waterfall: reserve interest routed to
     /// a tranche, and, on the deal's last period, its redemption and terminal
     /// releases. Together with `waterfall.payment_records` this is every
-    /// tranche's interest and principal cash: per tranche and date, the two
-    /// sum to the tranche's `interest_flows` plus `principal_flows`.
+    /// tranche's cash: per tranche and date, the two sum to the tranche's
+    /// `cashflows`, and to its `interest_flows` plus `principal_flows`. The one
+    /// exception to the second sum is residual cash a custom waterfall pays a
+    /// debt class beyond its interest claim, which the engine books to
+    /// `cashflows` alone.
     pub non_waterfall_payments: Vec<NonWaterfallPayment>,
+    /// Every tranche's credit enhancement on this period's end-of-period
+    /// balances, in `TrancheStructure` order. The step-down trigger
+    /// `MinCreditEnhancement` reads the senior tranche's value from the same
+    /// function on the next payment date, before that date's principal is paid,
+    /// so with no losses or draws in between it tests this period's number.
+    pub credit_enhancement: Vec<TrancheCreditEnhancement>,
 }
 
 impl PeriodDiagnostics {
@@ -371,6 +415,15 @@ impl PeriodDiagnostics {
             coverage_tests: Vec::new(),
             waterfall: PeriodWaterfall::empty(state.currency),
             non_waterfall_payments: Vec::new(),
+            credit_enhancement: state
+                .tranches
+                .tranches
+                .iter()
+                .map(|tranche| TrancheCreditEnhancement {
+                    tranche_id: tranche.id.to_string(),
+                    credit_enhancement: tranche_credit_enhancement(state, tranche),
+                })
+                .collect(),
         })
     }
 }
@@ -420,6 +473,13 @@ pub struct SimulationDiagnostics {
         schemars(with = "Vec<(String, finstack_quant_core::wire::DateWire, Money)>")
     )]
     pub tranche_draws: Vec<(String, Date, Money)>,
+    /// First failure of each coverage test, one entry per test sorted by
+    /// `test_id`. Covers every test the waterfall carries (each also on
+    /// `periods[i].coverage_tests`) and every tranche `oc_trigger` /
+    /// `ic_trigger`, whatever its consequence (only a breached `DivertCashFlow`
+    /// trigger is on `coverage_tests`, for the periods it is in breach). A deal
+    /// with no coverage test has no entries.
+    pub first_breaches: Vec<CoverageTestBreach>,
 }
 
 impl SimulationDiagnostics {
@@ -525,8 +585,8 @@ impl SimulationDiagnostics {
 ///
 /// Computes, on current balances: cumulative loss (fraction of the *original*
 /// pool), the overcollateralization ratio (pool ÷ rated non-equity notes), and
-/// senior credit enhancement (`(pool − senior note) ÷ pool`, the senior note
-/// being the lowest payment-priority tranche). See [`StepDownTrigger`].
+/// senior credit enhancement ([`tranche_credit_enhancement`] of the lowest
+/// payment-priority tranche). See [`StepDownTrigger`].
 ///
 /// [`StepDownTrigger`]: crate::structured_credit::StepDownTrigger
 pub(super) fn step_down_metrics(
@@ -566,13 +626,6 @@ pub(super) fn step_down_metrics(
                 .map_or(0.0, |m| m.amount())
         })
         .sum();
-    let senior_note_balance = state
-        .tranches
-        .tranches
-        .iter()
-        .min_by_key(|t| t.payment_priority)
-        .and_then(|t| state.tranche_balances.get(t.id.as_str()))
-        .map_or(0.0, |m| m.amount());
     crate::structured_credit::pricing::resolve::StepDownMetrics {
         delinquency_rate,
         cumulative_loss_fraction,
@@ -581,12 +634,79 @@ pub(super) fn step_down_metrics(
         } else {
             f64::INFINITY
         },
-        credit_enhancement: if pool > 0.0 {
-            (pool - senior_note_balance) / pool
-        } else {
-            0.0
-        },
+        credit_enhancement: state
+            .tranches
+            .tranches
+            .iter()
+            .min_by_key(|t| t.payment_priority)
+            .map_or(0.0, |senior| tranche_credit_enhancement(state, senior)),
     }
+}
+
+/// Credit enhancement of `tranche` on the state's current balances; see
+/// [`TrancheCreditEnhancement::credit_enhancement`] for the definition.
+///
+/// # Arguments
+///
+/// * `state` - Simulation state supplying collateral and note balances.
+/// * `tranche` - Tranche to measure; its `payment_priority` decides which
+///   notes rank at or ahead of it.
+///
+/// # Returns
+///
+/// The decimal share of collateral beneath the tranche.
+pub(super) fn tranche_credit_enhancement(state: &SimulationState, tranche: &Tranche) -> f64 {
+    // N2: the funding account's principal has left the asset balances but is
+    // still collateral for the notes (see `step_down_metrics`).
+    let collateral = state.pool_outstanding.amount() + state.principal_funding_account.amount();
+    if collateral <= 0.0 {
+        return 0.0;
+    }
+    let notes_at_or_ahead: f64 = state
+        .tranches
+        .tranches
+        .iter()
+        .filter(|note| note.payment_priority <= tranche.payment_priority)
+        .map(|note| {
+            state
+                .tranche_balances
+                .get(note.id.as_str())
+                .map_or(0.0, |m| m.amount())
+        })
+        .sum();
+    (collateral - notes_at_or_ahead) / collateral
+}
+
+/// First failure of each coverage test, sorted by test id: what the executor
+/// reported on `periods`, merged with the tranche triggers' own breach dates.
+fn first_coverage_breaches(
+    periods: &[PeriodDiagnostics],
+    triggers: &[super::triggers::TrancheTriggerState],
+) -> Vec<CoverageTestBreach> {
+    let mut first: std::collections::BTreeMap<&str, Option<Date>> =
+        std::collections::BTreeMap::new();
+    for period in periods {
+        for test in &period.coverage_tests {
+            let date = first.entry(test.test_id.as_str()).or_insert(None);
+            if !test.passing && date.is_none() {
+                *date = Some(period.payment_date);
+            }
+        }
+    }
+    for trigger in triggers {
+        let date = first.entry(trigger.test_id.as_str()).or_insert(None);
+        *date = match (*date, trigger.first_breach) {
+            (Some(reported), Some(breach)) => Some(reported.min(breach)),
+            (reported, breach) => reported.or(breach),
+        };
+    }
+    first
+        .into_iter()
+        .map(|(test_id, first_breach)| CoverageTestBreach {
+            test_id: test_id.to_string(),
+            first_breach,
+        })
+        .collect()
 }
 
 /// Loop-invariant pieces of the initial [`SimulationState`], computed once
@@ -838,8 +958,10 @@ impl<'a> SimulationState<'a> {
     pub(super) fn finalize_with_diagnostics(
         mut self,
     ) -> (FxHashMap<String, TrancheCashflows>, SimulationDiagnostics) {
+        let periods = std::mem::take(&mut self.period_diagnostics);
         let diagnostics = SimulationDiagnostics {
-            periods: std::mem::take(&mut self.period_diagnostics),
+            first_breaches: first_coverage_breaches(&periods, &self.tranche_triggers),
+            periods,
             reserve_balance_path: std::mem::take(&mut self.reserve_balance_path),
             reserve_interest_paid: std::mem::take(&mut self.reserve_interest_paid),
             draws_from_reserve: self.draws_from_reserve,

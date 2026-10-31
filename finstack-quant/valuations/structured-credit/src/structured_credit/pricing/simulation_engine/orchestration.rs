@@ -640,6 +640,7 @@ impl SimulationRun {
                 reserve_replenished: zero,
                 early_amortization_date: None,
                 tranche_draws: Vec::new(),
+                first_breaches: Vec::new(),
             },
         }
     }
