@@ -2574,6 +2574,7 @@ renames = { values = { js = "features.timeSeriesOpValues", reason = "WASM TimeSe
 
 [parity.members."finstack_quant.scenarios.ApplicationReport"]
 excluded = { carry_to_dataframe = "pandas", changes_to_dataframe = "pandas" }
+renames = { effective_as_of = { js = "scenarios.applicationReportEffectiveAsOf", reason = "WASM application reports are plain objects; the Rust ApplicationReport::effective_as_of method is a free function taking the object" } }
 
 [parity.members."finstack_quant.scenarios.Compounding"]
 excluded = { continuous = "literal", monthly = "literal", quarterly = "literal", semi_annual = "literal", simple = "literal" }

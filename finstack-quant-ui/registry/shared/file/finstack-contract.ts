@@ -424,7 +424,7 @@ export interface MarketScenarioApplication {
   readonly report: ApplicationReport;
   /** Canonical JSON of the shocked market. */
   readonly marketJson: string;
-  /** The rolled valuation date (report.time_roll.new_date), else the request's. */
+  /** scenarios.applicationReportEffectiveAsOf: the rolled valuation date, else the request's. */
   readonly asOf: string;
   /** The shocked instrument when the scenario mutates instruments, else the request's. */
   readonly instrumentJson: string;

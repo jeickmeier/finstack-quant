@@ -70,6 +70,7 @@
     "portfolio.portfolioMetricsSeries",
     "portfolio.scenarioPnlBatch",
     "portfolio.valuePortfolio",
+    "scenarios.applicationReportEffectiveAsOf",
     "scenarios.applyScenario",
     "scenarios.buildFromTemplate",
     "scenarios.buildTemplateComponent",

@@ -88,7 +88,7 @@ function apply(scenarioJson) {
   return {
     report: applied.report,
     marketJson,
-    asOf: applied.report.time_roll?.new_date ?? base.asOf,
+    asOf: native.applicationReportEffectiveAsOf(applied.report, base.asOf),
     instrumentJson: native.scenarioSpecMutatesInstruments(scenarioJson)
       ? JSON.stringify(applied.instruments[0])
       : base.instrumentJson,

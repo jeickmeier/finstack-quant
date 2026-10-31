@@ -34877,6 +34877,14 @@ export interface ScenariosNamespace {
    */
   horizonResultExplainText(result: HorizonReport | HorizonResult | string): string;
   /**
+   * The valuation date that holds after a scenario.
+   * @param report - `ApplicationReport` returned by `applyScenario`, as an object or JSON.
+   * @param asOf - ISO-8601 valuation date the scenario was applied at, returned unchanged without a roll.
+   * @returns ISO-8601 date: the roll's new date, else `asOf`.
+   * @throws Error - Throws a `TypeError` when an argument has the wrong type, and a `validation` error when `report` is not an `ApplicationReport` or `asOf` is not an ISO date.
+   */
+  applicationReportEffectiveAsOf(report: ApplicationReport | string, asOf: string): string;
+  /**
    * One attribution factor's P&L as a fraction of the initial value.
    *
    * Free-function twin of Python `HorizonResult.factor_contribution` (Rust

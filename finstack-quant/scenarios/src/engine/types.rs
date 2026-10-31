@@ -481,6 +481,26 @@ pub struct ApplicationReport {
     pub time_roll: Option<RollForwardReport>,
 }
 
+impl ApplicationReport {
+    /// The valuation date that holds after this scenario.
+    ///
+    /// A `TimeRollForward` operation rebases the market, so a re-valuation of the
+    /// shocked market must use [`RollForwardReport::new_date`]; a scenario without
+    /// a roll leaves the valuation date alone.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date the scenario was applied at, returned unchanged
+    ///   when the scenario contained no time roll.
+    #[must_use]
+    pub fn effective_as_of(
+        &self,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::dates::Date {
+        self.time_roll.as_ref().map_or(as_of, |roll| roll.new_date)
+    }
+}
+
 /// Encode an instrument inventory as canonical envelopes, in input order.
 ///
 /// This is the encoding [`ApplicationEnvelope::from_contexts`] uses for its
@@ -567,6 +587,34 @@ impl ApplicationEnvelope {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn effective_as_of_is_the_rolled_date_only_when_the_scenario_rolled() {
+        let requested = time::macros::date!(2025 - 01 - 01);
+        let mut report = ApplicationReport {
+            operations_applied: 0,
+            user_operations: 0,
+            expanded_operations: 0,
+            changes: Default::default(),
+            applied_shocks: vec![],
+            warnings: vec![],
+            meta: None,
+            time_roll: None,
+        };
+        assert_eq!(report.effective_as_of(requested), requested);
+        report.time_roll = Some(RollForwardReport {
+            old_date: requested,
+            new_date: time::macros::date!(2025 - 02 - 03),
+            days: 33,
+            instrument_carry: vec![],
+            total_carry: indexmap::IndexMap::new(),
+            failed_instruments: vec![],
+        });
+        assert_eq!(
+            report.effective_as_of(requested),
+            time::macros::date!(2025 - 02 - 03)
+        );
+    }
+
     use super::*;
 
     #[test]
