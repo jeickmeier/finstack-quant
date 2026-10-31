@@ -3,7 +3,10 @@ mod budget;
 pub(crate) mod contributions;
 mod functions;
 mod stress;
-use budget::{evaluate_risk_budget, PyPositionBudgetEntry, PyRiskBudgetResult};
+use budget::{
+    evaluate_risk_budget, evaluate_risk_budget_from_decomposition, PyPositionBudgetEntry,
+    PyRiskBudgetResult,
+};
 pub(crate) use contributions::PyRiskDecomposition;
 use contributions::{
     PyFactorContribution, PyPositionEsContribution, PyPositionFactorContribution,
@@ -41,6 +44,10 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(evaluate_risk_budget, m)?)?;
     m.add_function(wrap_pyfunction!(build_stress_attribution, m)?)?;
     m.add_function(wrap_pyfunction!(position_component_var, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        evaluate_risk_budget_from_decomposition,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(decompose_factors, m)?)?;
     Ok(())
 }

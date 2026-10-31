@@ -50,8 +50,7 @@ export type ModelsNative = {
         typeof models.factor.risk,
         | "parametricVarDecomposition"
         | "historicalVarDecomposition"
-        | "positionComponentVar"
-        | "evaluateRiskBudget"
+        | "evaluateRiskBudgetFromDecomposition"
         | "buildStressAttribution"
         | "decomposeFactors"
       >;
@@ -440,13 +439,9 @@ export function createModelsService(
             budget == null
               ? null
               : attempt(() =>
-                  risk.evaluateRiskBudget(
-                    ids,
-                    ids.map((id) =>
-                      risk.positionComponentVar(decomposition, id),
-                    ),
+                  risk.evaluateRiskBudgetFromDecomposition(
+                    decomposition,
                     [...budget.targets],
-                    decomposition.portfolio_var,
                     budget.utilizationThreshold ?? undefined,
                   ),
                 ),

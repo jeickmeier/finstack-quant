@@ -11,7 +11,8 @@ mod residual;
 mod types;
 
 pub use budget::{
-    evaluate_risk_budget, PositionBudgetEntry, RiskBudgetResult, DEFAULT_UTILIZATION_THRESHOLD,
+    evaluate_risk_budget, evaluate_risk_budget_from_decomposition, PositionBudgetEntry,
+    RiskBudgetResult, DEFAULT_UTILIZATION_THRESHOLD,
 };
 pub use parametric::decompose_factors;
 pub use position::{

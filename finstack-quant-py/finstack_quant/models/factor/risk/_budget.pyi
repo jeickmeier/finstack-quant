@@ -3,6 +3,53 @@
 from __future__ import annotations
 
 import pandas as pd
+from finstack_quant.models.factor.risk._contributions import PositionRiskDecomposition
+
+def evaluate_risk_budget_from_decomposition(
+    decomp: PositionRiskDecomposition,
+    target_var_pct: list[float],
+    utilization_threshold: float | None = None,
+) -> RiskBudgetResult:
+    """
+    Evaluate a risk budget against a position risk decomposition.
+
+    Reads each position's component VaR and the portfolio VaR from ``decomp``,
+    then applies ``evaluate_risk_budget``. Rows keep the decomposition's position
+    order, which is the order the positions were supplied to it.
+
+    Parameters
+    ----------
+    decomp : PositionRiskDecomposition
+        Decomposition supplying the position ids, component VaRs (losses
+        negative) and portfolio VaR.
+    target_var_pct : list[float]
+        Target fraction of portfolio VaR in ``[0, 1]`` per position, aligned
+        with ``decomp.var_contributions``; a non-empty budget must sum to one
+        within 0.05.
+    utilization_threshold : float, optional
+        Actual-to-target ratio above which a breach is flagged. ``None`` uses
+        the Rust default ``DEFAULT_UTILIZATION_THRESHOLD`` (1.2).
+
+    Returns
+    -------
+    RiskBudgetResult
+        Per-position utilization and excess, ``total_overbudget`` and ``has_breach``.
+
+    Raises
+    ------
+    ValueError
+        If ``target_var_pct`` does not have one entry per position, a target is
+        non-finite or outside ``[0, 1]``, targets do not sum to one, the threshold
+        is non-positive, or non-zero component VaR is paired with zero portfolio VaR.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.factor.risk import PositionRiskDecomposition, evaluate_risk_budget_from_decomposition
+    >>> doc = '{"portfolio_var":-1.0,"portfolio_es":-1.2,"confidence":0.95,"method":"parametric","var_contributions":[{"position_id":"P1","component_var":-1.0,"relative_var":1.0,"marginal_var":-1.0,"incremental_var":null}],"es_contributions":[],"n_positions":1,"euler_residual":0.0}'
+    >>> evaluate_risk_budget_from_decomposition(PositionRiskDecomposition.from_json(doc), [1.0]).has_breach
+    False
+    """
+    ...
 
 def evaluate_risk_budget(
     position_ids: list[str],

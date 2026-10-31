@@ -9847,6 +9847,19 @@ export interface FactorRiskNamespace {
    */
   positionComponentVar(decomp: PositionRiskDecomposition | string, positionId: string): number;
   /**
+   * Evaluate a risk budget against a position risk decomposition.
+   * @param decomp - `PositionRiskDecomposition` object or JSON, as returned by `parametricVarDecomposition` or `historicalVarDecomposition`.
+   * @param targetVarPct - Target fraction of portfolio VaR in `[0, 1]` per position, aligned with `decomp.var_contributions`; non-empty targets must sum to one within 0.05.
+   * @param utilizationThreshold - Optional actual-to-target ratio that flags a budget breach; omit for the Rust default of 1.2.
+   * @returns `RiskBudgetResult`: per-position `positions` rows, `total_overbudget` and `has_breach`.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `decomp` is malformed, `targetVarPct` does not have one entry per position, targets are non-finite, outside [0, 1] or do not sum to one, the threshold is non-positive, or nonzero component VaR is paired with zero portfolio VaR.
+   */
+  evaluateRiskBudgetFromDecomposition(
+    decomp: PositionRiskDecomposition | string,
+    targetVarPct: number[] | Float64Array,
+    utilizationThreshold?: number | null
+  ): RiskBudgetResult;
+  /**
    * Decompose portfolio risk into factor and position contributions.
    *
    * Uses the parametric (covariance-based) Euler decomposition.  Accepts

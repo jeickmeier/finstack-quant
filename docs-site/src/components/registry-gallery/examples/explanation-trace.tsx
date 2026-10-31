@@ -6,8 +6,8 @@ export function Example({ density = "compact" }: ExampleProps) {
   return (
     <>
       <p>
-        Supplied canonical Rust trace example; request one from pricing with
-        the <code>explain</code> argument.
+        Supplied canonical Rust trace example; request one from pricing with the{" "}
+        <code>explain</code> argument.
       </p>
       <ExplanationTrace
         value={{

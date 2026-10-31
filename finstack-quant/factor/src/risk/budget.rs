@@ -4,6 +4,7 @@
 //! position (or group of positions). The budgeting engine compares actual
 //! component VaR against targets and computes utilization ratios.
 
+use super::position::PositionRiskDecomposition;
 use finstack_quant_core::wire::NonFiniteFields;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -229,6 +230,47 @@ pub fn evaluate_risk_budget(
         total_overbudget,
         has_breach,
     })
+}
+
+/// Evaluate a risk budget against a position risk decomposition.
+///
+/// Reads each position's component VaR and the portfolio VaR from
+/// `decomposition`, then applies [`evaluate_risk_budget`], so a host joins
+/// nothing itself. Rows keep the decomposition's position order, which is the
+/// order the positions were supplied to the decomposition.
+///
+/// # Arguments
+///
+/// * `decomposition` - Decomposition supplying the position ids, component VaRs
+///   (losses negative) and portfolio VaR.
+/// * `target_var_pct` - Finite target fraction in `[0, 1]` per position, aligned
+///   with `decomposition.var_contributions`; a non-empty budget must sum to ~1.0
+///   (within 0.05).
+/// * `utilization_threshold` - Finite, strictly positive utilization ratio above
+///   which a breach is flagged; `None` uses [`DEFAULT_UTILIZATION_THRESHOLD`].
+///
+/// # Errors
+///
+/// Returns [`finstack_quant_core::Error::Validation`] under the conditions
+/// listed on [`evaluate_risk_budget`], including when `target_var_pct` does not
+/// have one entry per position.
+pub fn evaluate_risk_budget_from_decomposition(
+    decomposition: &PositionRiskDecomposition,
+    target_var_pct: &[f64],
+    utilization_threshold: Option<f64>,
+) -> finstack_quant_core::Result<RiskBudgetResult> {
+    let (position_ids, actual_var): (Vec<String>, Vec<f64>) = decomposition
+        .var_contributions
+        .iter()
+        .map(|contribution| (contribution.position_id.clone(), contribution.component_var))
+        .unzip();
+    evaluate_risk_budget(
+        position_ids,
+        &actual_var,
+        target_var_pct,
+        decomposition.portfolio_var,
+        utilization_threshold.unwrap_or(DEFAULT_UTILIZATION_THRESHOLD),
+    )
 }
 
 #[cfg(test)]
@@ -533,6 +575,42 @@ mod tests {
 
         let result = evaluate(&targets, DEFAULT_UTILIZATION_THRESHOLD, &decomp);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn from_decomposition_joins_component_var_and_portfolio_var() -> TestResult {
+        let decomposition = parametric_var_decomposition(
+            &["A".to_string(), "B".to_string()],
+            &[0.6, 0.4],
+            &[0.04, 0.0, 0.0, 0.01],
+            None,
+            false,
+        )?;
+        let joined = evaluate_risk_budget(
+            vec!["A".to_string(), "B".to_string()],
+            &[
+                decomposition.component_var("A")?,
+                decomposition.component_var("B")?,
+            ],
+            &[0.5, 0.5],
+            decomposition.portfolio_var,
+            DEFAULT_UTILIZATION_THRESHOLD,
+        )?;
+        let result = evaluate_risk_budget_from_decomposition(&decomposition, &[0.5, 0.5], None)?;
+        assert_eq!(
+            serde_json::to_value(&result).expect("serializes"),
+            serde_json::to_value(&joined).expect("serializes")
+        );
+        assert_eq!(result.positions[0].position_id.as_str(), "A");
+
+        let strict =
+            evaluate_risk_budget_from_decomposition(&decomposition, &[0.5, 0.5], Some(0.01))?;
+        assert!(strict.has_breach);
+
+        let err = evaluate_risk_budget_from_decomposition(&decomposition, &[1.0], None)
+            .expect_err("one target per position");
+        assert!(err.to_string().contains("target_var_pct length"));
+        Ok(())
     }
 
     #[test]
