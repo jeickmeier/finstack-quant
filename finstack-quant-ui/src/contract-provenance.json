@@ -2033,6 +2033,37 @@
       }
     },
     {
+      "id": "curve-query",
+      "route": "returned-model",
+      "convention": "Returned native values of one stored object per supplied point: DiscountCurve.df and zeroRate (default continuous compounding) and forward (continuously compounded, year fractions only), ForwardCurve.rate (simple, on the curve day count), HazardCurve.sp and hazardRate, and models.volatility.getSurfaceVol (expiry in years, strike in the surface's units, inside the grid). Curve dates pass through as ISO text for Rust to convert with the curve day count; no date, unit or tenor conversion happens here. A point Rust rejects keeps its native error in its cell.",
+      "api": {
+        "name": "models.volatility.getSurfaceVol",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "VolatilityNamespace",
+        "member": "getSurfaceVol",
+        "inputs": [
+          {
+            "name": "surface",
+            "type": "VolSurface",
+            "optional": false
+          },
+          {
+            "name": "expiry",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "strike",
+            "type": "number",
+            "optional": false
+          }
+        ],
+        "returns": "number",
+        "declaration": "/**\n   * Interpolate a volatility surface; coordinates outside the grid are rejected.\n   * @param surface - `core.VolSurface` handle, such as a `materializeCubeTenorSlice` or `materializeFxDeltaSurface` result.\n   * @param expiry - Option expiry in years, within the surface grid.\n   * @param strike - Strike in the surface's own units, within the surface grid.\n   * @returns The interpolated volatility, as a decimal.\n   * @throws Error - Throws a `validation` error if a coordinate is outside the grid.\n   */\n  getSurfaceVol(surface: VolSurface, expiry: number, strike: number): number;",
+        "sha256": "371fef05aaec7efd18d51464de858422992ba6b0a058a91b83d801cb6c5fd517"
+      }
+    },
+    {
       "id": "option-calculator",
       "route": "returned-model",
       "convention": "Returned closed-form results of one European option: models.bsPrice, black76Price or bachelierPrice of an entered volatility, or bsImpliedVol, black76ImpliedVol or models.volatility.impliedVolBachelier of an entered price, then bsGreeks, black76Greeks or bachelierGreeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",

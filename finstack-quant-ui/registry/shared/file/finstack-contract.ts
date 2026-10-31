@@ -616,6 +616,58 @@ export interface CreditScore {
   /** models.credit.pd.MasterScale.defaultCalibration().mapScore(result), or its native error (Rust rejects a result without an implied PD). */
   grade: Envelope<modelsWire.MasterScaleResult>;
 }
+/** Years from the curve base date, or an ISO date Rust converts with the curve day count. */
+export type CurvePoint = number | string;
+/** One stored curve or surface of a market and the points to read it at. */
+export type CurveQueryRequest = {
+  readonly marketJson: string;
+  /** The stored id, the MarketContext lookup key. */
+  readonly id: string;
+} & (
+  | {
+      readonly kind: "discount";
+      readonly points: readonly CurvePoint[];
+      /** Start and end of each forward rate, in years: DiscountCurve.forward takes no dates. */
+      readonly forwards: readonly (readonly [number, number])[];
+    }
+  | {
+      readonly kind: "forward" | "hazard";
+      readonly points: readonly CurvePoint[];
+    }
+  | {
+      readonly kind: "surface";
+      readonly points: readonly {
+        /** Years. */
+        readonly expiry: number;
+        /** In the surface's own units. */
+        readonly strike: number;
+      }[];
+    }
+);
+/** The returned values per supplied point, each with its own native error; nothing is computed in TypeScript. */
+export type CurveQueryResult =
+  | {
+      kind: "discount";
+      points: {
+        t: CurvePoint;
+        df: Envelope<number>;
+        zeroRate: Envelope<number>;
+      }[];
+      forwards: { t1: number; t2: number; rate: Envelope<number> }[];
+    }
+  | { kind: "forward"; points: { t: CurvePoint; rate: Envelope<number> }[] }
+  | {
+      kind: "hazard";
+      points: {
+        t: CurvePoint;
+        sp: Envelope<number>;
+        hazardRate: Envelope<number>;
+      }[];
+    }
+  | {
+      kind: "surface";
+      points: { expiry: number; strike: number; vol: Envelope<number> }[];
+    };
 /** Terms of one European option; each model takes its own, as the facade function documents them. */
 export type OptionTerms =
   | {
@@ -1007,6 +1059,8 @@ export interface CoreApi {
   formatMoney(request: MoneyFormatRequest): Promise<Envelope<string>>;
   /** core.MarketContext.fromJson + toJson: canonicalize the complete market and cache its handle. */
   validateMarket(marketJson: string): Promise<Envelope<string>>;
+  /** MarketContext.getDiscount (df, zeroRate, forward), getForward (rate), getHazard (sp, hazardRate) or getSurface (models.volatility.getSurfaceVol), per supplied point, over the cached market handle; each point keeps its own native error and the curve handle is freed. */
+  curveQuery(request: CurveQueryRequest): Promise<Envelope<CurveQueryResult>>;
   /** core.availableCalendars. */
   calendars(): Promise<Envelope<string[]>>;
 }

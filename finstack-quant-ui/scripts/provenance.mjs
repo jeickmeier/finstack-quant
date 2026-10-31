@@ -442,6 +442,17 @@ const displays = [
       "Returned models.credit.MertonModel results of a model from canonical MertonModel JSON (natively validated) or from a KMV equity calibration Rust performs: default probabilities, distances to default, implied spreads (recovery as a fraction of par) and debt spreads per requested horizon, the CDS par spread and implied equity at the requested maturity, and models.credit.pd.MasterScale.defaultCalibration grades of the default probabilities. Decimals as returned (spreads per year, probabilities and volatilities as fractions), no unit inferred; a measure Rust rejects for the model shows its native error beside the rest.",
   },
   {
+    id: "curve-query",
+    api: [
+      "models.volatility.getSurfaceVol",
+      "VolatilityNamespace",
+      "getSurfaceVol",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned native values of one stored object per supplied point: DiscountCurve.df and zeroRate (default continuous compounding) and forward (continuously compounded, year fractions only), ForwardCurve.rate (simple, on the curve day count), HazardCurve.sp and hazardRate, and models.volatility.getSurfaceVol (expiry in years, strike in the surface's units, inside the grid). Curve dates pass through as ISO text for Rust to convert with the curve day count; no date, unit or tenor conversion happens here. A point Rust rejects keeps its native error in its cell.",
+  },
+  {
     id: "option-calculator",
     api: ["models.bsPrice", "ModelsNamespace", "bsPrice"],
     route: "returned-model",
