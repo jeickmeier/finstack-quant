@@ -80,6 +80,15 @@ export interface PriceRequest {
   readonly metricPricingOverrides?: string | null;
   readonly marketHistory?: string | null;
 }
+/** A pricing request whose metric ids are each priced on their own call. */
+export interface MetricValuesRequest extends Omit<PriceRequest, "metrics"> {
+  readonly metrics: readonly string[];
+}
+/** One metric id and its native value, or the native error of that id alone; a value is absent when Rust returned none under the id. */
+export interface MetricValue {
+  metric: string;
+  value: Envelope<number | undefined>;
+}
 /** Exact source amount plus the returned rounding stamp; both are snapshotted verbatim and never recomputed. */
 export interface MoneyFormatRequest {
   readonly value: MoneyValue;
@@ -1068,6 +1077,8 @@ export interface CoreApi {
 export interface ValuationsApi {
   /** valuations.instruments.validateInstrumentJson + priceInstrumentWithMarket over the cached market handle. */
   price(request: PriceRequest): Promise<Envelope<ValuationResult>>;
+  /** valuations.instruments.priceInstrumentWithMarket once per supplied metric id: one failing id fails a whole native request, so each id keeps its own value or native error. */
+  metricValues(request: MetricValuesRequest): Promise<Envelope<MetricValue[]>>;
   /** valuations.instruments.validateInstrumentJson: validate and canonicalize instrument JSON. */
   validate(instrumentJson: string): Promise<Envelope<string>>;
   /** valuations.instruments.validateInstrumentJson + instrumentCashflowsWithMarket over the cached market handle; the native envelope object. */
@@ -1088,7 +1099,7 @@ export interface ValuationsApi {
   trancheBreakevenCdr(request: TrancheRequest): Promise<Envelope<number>>;
   /** valuations.instruments.listModelsGrouped. */
   models(): Promise<Envelope<Record<string, string[]>>>;
-  /** valuations.instruments.metricsForInstrument: standard metrics registered for one instrument type, by native display group. */
+  /** valuations.instruments.metricsForInstrument: every metric registered for one instrument type, by native display group, with those outside a group under "Instrument Specific". */
   metrics(instrumentType: string): Promise<Envelope<Record<string, string[]>>>;
   /** valuations.instruments.metricMetadata: native per-key interpretation (units, decoded coordinates, groups) for metric keys. */
   metricMetadata(keys: readonly string[]): Promise<Envelope<MetricMetadata[]>>;

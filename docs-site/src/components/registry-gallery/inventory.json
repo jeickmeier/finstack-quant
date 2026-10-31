@@ -169,6 +169,12 @@
       "worker": "none"
     },
     {
+      "name": "loan-yield-card",
+      "type": "registry:component",
+      "docs": "Shows the metric ids a loan analyst reads together: ytm, ytw, ytc, yt2y, yt3y, yt4y, discount_margin, all_in_rate, oid_eir_rate, oid_eir_amortization and embedded_option_value. applicableLoanYieldMetrics keeps those Rust lists for the instrument type (metricsForInstrument); pass the result to useMetricValues, which prices each id on its own call because one failing id fails a whole native request, and useMetricMetadata for units and groups. An id Rust rejects (embedded_option_value without the tree model, discount_margin on a fixed loan or on a callable loan without a quote) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. Unit shows what metricMetadata declares and says not declared otherwise; values are never rescaled. Accepts rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "metric-picker",
       "type": "registry:ui",
       "docs": "Controlled metric-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
@@ -592,6 +598,10 @@
     },
     {
       "name": "use-market-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-metric-values",
       "type": "registry:hook"
     },
     {
@@ -1459,6 +1469,10 @@
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
       "sha256": "0645b27a6dca79bc649bbab1c83b3c00d4b46d494fc26988aad58645c87aa890"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
+      "sha256": "f7ca86b9b989ff7e31e4002ea3e90bc725e994d610c10b7022cb5ad1ac728d81"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",

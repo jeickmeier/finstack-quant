@@ -1,7 +1,7 @@
 import type { valuations } from "finstack-quant-wasm";
 import { exportValuation } from "@/lib/finstack/host";
 import { resolveModel, type ValuationsApi } from "../finstack-contract";
-import type { ServiceContext } from "./context";
+import { attempt, type ServiceContext } from "./context";
 /** valuations facade members this slice reads. */
 export type ValuationsNative = {
   valuations: Pick<typeof valuations, "valuationResultToJson"> & {
@@ -58,6 +58,30 @@ export function createValuationsService(
           undefined,
           request.marketHistory,
         );
+      });
+    },
+    metricValues(request) {
+      return context.result(() => {
+        const instrument = instruments.validateInstrumentJson(
+          request.instrumentJson,
+          request.metricPricingOverrides,
+        );
+        const market = context.market(request.marketJson).handle;
+        return request.metrics.map((metric) => ({
+          metric,
+          value: attempt(
+            () =>
+              instruments.priceInstrumentWithMarket(
+                instrument,
+                market,
+                request.asOf,
+                resolveModel(request.model),
+                [metric],
+                undefined,
+                request.marketHistory,
+              ).measures[metric],
+          ),
+        }));
       });
     },
     validate(instrumentJson) {

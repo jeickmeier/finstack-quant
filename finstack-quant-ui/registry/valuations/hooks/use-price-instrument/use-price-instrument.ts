@@ -53,7 +53,7 @@ function useOptions<T>(
 export function useModels() {
   return useOptions("models", (client) => client.call("models"));
 }
-/** Standard metrics Rust registers for one instrument type, grouped by native category; null disables the query. */
+/** Every metric Rust registers for one instrument type, by native group (those outside a group under "Instrument Specific"); null disables the query. */
 export function useMetrics(instrumentType: string | null) {
   return useWorkerQuery((worker) => ({
     queryKey: ["finstack", worker.session, "metrics", instrumentType] as const,

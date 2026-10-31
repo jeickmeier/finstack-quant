@@ -2,6 +2,65 @@
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "items": [
     {
+      "name": "loan-yield-card",
+      "type": "registry:component",
+      "title": "Loan yield card",
+      "description": "Yields, discount margin, all-in rate, OID and the call value of a loan by metric id, as Rust returned them, with each id's own native error.",
+      "docs": "Shows the metric ids a loan analyst reads together: ytm, ytw, ytc, yt2y, yt3y, yt4y, discount_margin, all_in_rate, oid_eir_rate, oid_eir_amortization and embedded_option_value. applicableLoanYieldMetrics keeps those Rust lists for the instrument type (metricsForInstrument); pass the result to useMetricValues, which prices each id on its own call because one failing id fails a whole native request, and useMetricMetadata for units and groups. An id Rust rejects (embedded_option_value without the tree model, discount_margin on a fixed loan or on a callable loan without a quote) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. Unit shows what metricMetadata declares and says not declared otherwise; values are never rescaled. Accepts rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/loan-yield-card/loan-yield-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/loan-yield-card/loan-yield-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-metric-values",
+      "type": "registry:hook",
+      "title": "useMetricValues",
+      "description": "Prices each supplied metric id on its own call through the WASM worker, so one failing id leaves the others.",
+      "docs": "valuations.instruments.priceInstrumentWithMarket once per supplied metric id over the cached market handle, in the supplied order. Null means no request. Requires FinstackQueryProvider. Each id keeps its own native error; a malformed instrument or market is the hook error. Use it where a card must not go blank because one id cannot compute, since one failing id fails a whole native request.",
+      "files": [
+        {
+          "path": "hooks/use-metric-values/use-metric-values.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-metric-values/use-metric-values.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "metric-picker",
       "type": "registry:ui",
       "title": "Metric picker",

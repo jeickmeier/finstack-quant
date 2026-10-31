@@ -453,6 +453,17 @@ const displays = [
       "Returned native values of one stored object per supplied point: DiscountCurve.df and zeroRate (default continuous compounding) and forward (continuously compounded, year fractions only), ForwardCurve.rate (simple, on the curve day count), HazardCurve.sp and hazardRate, and models.volatility.getSurfaceVol (expiry in years, strike in the surface's units, inside the grid). Curve dates pass through as ISO text for Rust to convert with the curve day count; no date, unit or tenor conversion happens here. A point Rust rejects keeps its native error in its cell.",
   },
   {
+    id: "loan-yield-card",
+    api: [
+      "valuations.instruments.priceInstrumentWithMarket",
+      "ValuationInstrumentsNamespace",
+      "priceInstrumentWithMarket",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model.",
+  },
+  {
     id: "option-calculator",
     api: ["models.bsPrice", "ModelsNamespace", "bsPrice"],
     route: "returned-model",

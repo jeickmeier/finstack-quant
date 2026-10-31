@@ -174,9 +174,9 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twenty-two native fixture generators under
+`mise run ui-fixtures` runs the twenty-three native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
-horizon return, scenario templates, attribution, cashflows → details;
+horizon return, scenario templates, attribution, cashflows → details; loan yields;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
 scenario-table; statements → covenants; analytics; models credit, risk and options;
 margin), then
@@ -555,9 +555,9 @@ empty), a fan of bands between the returned percentiles paired from the
 outside in (the unpaired middle one a line), the percentile table, the breach
 readout and the warnings, all as returned.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
-`useMetrics(instrumentType)` returns the standard metrics Rust registers for
-that type (`metricsForInstrument`), grouped by native category; `null` disables
-it. `PricingParamsForm` reports selected metrics the type does not offer and
+`useMetrics(instrumentType)` returns every metric Rust registers for that type
+(`metricsForInstrument`), by native group, with those outside a group under
+"Instrument Specific"; `null` disables it. `PricingParamsForm` reports selected metrics the type does not offer and
 never drops them.
 `useInstrumentValidator` accepts canonical text and an optional abort signal;
 `SchemaForm` owns the 250ms debounce and prevents superseded responses from
@@ -964,6 +964,33 @@ grid); an id the market does not hold is the whole error. The zero rate uses
 the Rust default compounding, continuous. The native fixture, which cuts the
 market-browser snapshot down and adds a stored surface, is
 `tests/core/curve-query/cases.json`.
+
+## Loan yield card
+
+`useMetricValues` (`@finstack/use-metric-values`) prices each supplied metric id
+on its own `valuations.instruments.priceInstrumentWithMarket` call over the cached
+market handle. It exists because one failing id fails a whole native request: a
+request for `ytm`, `discount_margin` and `all_in_rate` on a fixed loan returns only
+the discount-margin error, so a card asking for them together would go blank. Each
+id keeps its value or its native error; a malformed instrument or market is the
+whole error.
+
+`LoanYieldCard` is the view over it, for term loans: `ytm`, `ytw`, `ytc`, `yt2y`,
+`yt3y`, `yt4y`, `discount_margin`, `all_in_rate`, `oid_eir_rate`,
+`oid_eir_amortization` and `embedded_option_value`. `applicableLoanYieldMetrics`
+keeps those `metricsForInstrument` lists for the type, and all eleven are listed
+for `term_loan`. An id Rust rejects shows its error in its row:
+`embedded_option_value` on a callable loan needs the `tree` model, and
+`discount_margin` needs a floating loan and, when callable, a
+`quoted_clean_price_pct`. Yields solve to that quote when the instrument carries
+one, otherwise to the model price, which differs by model. Unit and group are what
+`metricMetadata` declares. It declares no unit for the ids outside a metric group
+(`ytc`, `yt2y`, `yt3y`, `yt4y`, `all_in_rate`, `oid_eir_rate`,
+`oid_eir_amortization`), so the card says "not declared" and never rescales.
+`oid_eir_amortization` shows Rust's total; the per-date keys Rust also returns are
+not shown. The revolver's own card is a later item; on a revolver this card shows
+the five ids Rust lists. The native fixture is
+`tests/valuations/loan-yield/cases.json`.
 
 ## Option calculator
 
