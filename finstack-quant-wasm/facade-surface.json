@@ -4558,6 +4558,7 @@
       "bondFromCashflowsJson",
       "calculatePoolStats",
       "calculateVar",
+      "calendarYearLadderByCurrency",
       "cdsIndexParamsCdxNaHy",
       "cdsIndexParamsCdxNaIg",
       "cdsIndexParamsItraxxEurope",
@@ -4801,6 +4802,9 @@
     "kind": "function"
   },
   "valuations.instruments.instrumentCashflowsWithMarket": {
+    "kind": "function"
+  },
+  "valuations.instruments.calendarYearLadderByCurrency": {
     "kind": "function"
   },
   "valuations.instruments.calculateVar": {

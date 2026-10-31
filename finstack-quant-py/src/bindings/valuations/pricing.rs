@@ -552,6 +552,19 @@ impl PyInstrumentCashflowEnvelope {
         crate::bindings::date_utils::date_to_py(py, self.inner.as_of)
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.calendar_year_ladder_by_currency")]
+    #[pyo3(text_signature = "($self)")]
+    fn calendar_year_ladder_by_currency<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let ladders = self
+            .inner
+            .calendar_year_ladder_by_currency()
+            .map_err(crate::errors::core_to_py)?;
+        serde_to_py(py, &ladders)
+    }
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.flows")]
     #[getter]
     fn flows<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

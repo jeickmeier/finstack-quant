@@ -1250,6 +1250,27 @@ class InstrumentCashflowEnvelope:
         This accessor does not raise; it returns the stored value.
         """
         ...
+    def calendar_year_ladder_by_currency(self) -> list[dict[str, Any]]:
+        """
+        Calendar-year ladders of this envelope, one per row currency.
+
+        Currencies never mix. Ladders follow the first appearance of each
+        currency in ``flows``, and each reads ``native_pv``, the row-currency PV
+        before FX conversion and any scenario price shock.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One ``{"currency": str, "rows": list}`` per row currency; each row has
+            ``year``, ``non_principal``, ``principal`` and ``pv``, in the units of
+            that currency, by ascending year.
+
+        Raises
+        ------
+        ValueError
+            If an amount or native PV is non-finite.
+        """
+        ...
     def to_dataframe(self) -> pd.DataFrame:
         """
         One row per cashflow as a pandas ``DataFrame``.

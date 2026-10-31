@@ -191,6 +191,7 @@ import type {
   CompositeRebalanceResult,
   CompositeTrade,
   EnhancedMonteCarloResult,
+  CurrencyLadder,
   ListedProductCoverage,
   MetricFieldUnit,
   MetricMetadata,
@@ -425,6 +426,7 @@ export type {
   CompositeRebalanceResult,
   CompositeTrade,
   EnhancedMonteCarloResult,
+  CurrencyLadder,
   ListedProductCoverage,
   MetricFieldUnit,
   MetricMetadata,
@@ -23208,6 +23210,15 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
    */
   trancheMetricFieldUnits(currency: string): MetricFieldUnit[];
+  /**
+   * Calendar-year ladders of a cashflow envelope, one per row currency.
+   * @param envelope - `InstrumentCashflowEnvelope` returned by `instrumentCashflows`, as an object or JSON.
+   * @returns One `CurrencyLadder` per row currency, in first-appearance order of `flows`; rows ascend by year.
+   * @throws Error - Throws a `validation` error if `envelope` is malformed or an amount or native PV is non-finite.
+   */
+  calendarYearLadderByCurrency(
+    envelope: generated.valuations.InstrumentCashflowEnvelope | string
+  ): CurrencyLadder[];
   /**
    * List the standard metrics registered for one instrument type, grouped by
    * display category.

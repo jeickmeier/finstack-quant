@@ -228,6 +228,21 @@ pub(super) fn listed_product_coverage() -> Result<Vec<Value>> {
     example(row)
 }
 
+/// A one-year ladder of a US dollar envelope.
+pub(super) fn currency_ladder() -> Result<Vec<Value>> {
+    example(&crate::instruments::cashflow_export::CurrencyLadder {
+        currency: Currency::USD,
+        rows: vec![
+            finstack_quant_cashflows::aggregation::CalendarYearLadderRow {
+                year: 2025,
+                non_principal: 21_250.0,
+                principal: 0.0,
+                pv: 20_801.625,
+            },
+        ],
+    })
+}
+
 /// The unit of a tranche's CS01.
 pub(super) fn metric_field_unit() -> Result<Vec<Value>> {
     let units = crate::pricer::tranche_metric_field_units(Currency::USD);

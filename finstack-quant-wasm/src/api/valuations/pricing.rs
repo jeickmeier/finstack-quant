@@ -428,6 +428,25 @@ pub fn price_driver_fields() -> Result<JsValue, JsValue> {
     to_js_value(&finstack_quant_valuations::instruments::pricing_overrides::MarketQuoteOverrides::price_driver_fields())
 }
 
+/// Calendar-year ladders of a cashflow envelope, one per row currency.
+///
+/// Free-function twin of Python `InstrumentCashflowEnvelope.calendar_year_ladder_by_currency`
+/// (Rust `InstrumentCashflowEnvelope::calendar_year_ladder_by_currency`). Currencies never mix;
+/// each ladder reads `native_pv`, the row-currency PV before FX conversion and any scenario price shock.
+/// @param envelope - `InstrumentCashflowEnvelope` returned by `instrumentCashflows`, as an object or JSON.
+/// @returns One `CurrencyLadder` per row currency, in first-appearance order of `flows`; rows ascend by year.
+/// @throws Error - Throws a `validation` error if `envelope` is malformed or an amount or native PV is non-finite.
+#[wasm_bindgen(js_name = calendarYearLadderByCurrency)]
+pub fn calendar_year_ladder_by_currency(envelope: JsValue) -> Result<JsValue, JsValue> {
+    let envelope: finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope =
+        crate::utils::input::from_js_json(&envelope, "envelope")?;
+    to_js_value(
+        &envelope
+            .calendar_year_ladder_by_currency()
+            .map_err(to_js_err)?,
+    )
+}
+
 /// Units of the scalar `TrancheMetrics` fields, in struct order.
 ///
 /// `TrancheMetrics` documents these units in prose and does not state them on

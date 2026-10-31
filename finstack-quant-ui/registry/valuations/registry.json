@@ -804,7 +804,7 @@
       "type": "registry:hook",
       "title": "useCashflowLadder",
       "description": "Fetches the native calendar-year cashflow ladder of a supplied cashflow envelope, one per row currency, through the WASM worker.",
-      "docs": "Native cashflows.calendarYearLadder rows for each row currency of the supplied envelope, in first-appearance order, over each flow's native PV (row currency, before FX conversion and any scenario price shock). Keyed on the complete envelope and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider. No sums or FX conversion are computed locally.",
+      "docs": "Native valuations.instruments.calendarYearLadderByCurrency rows for each row currency of the supplied envelope, in first-appearance order, over each flow's native PV (row currency, before FX conversion and any scenario price shock). Keyed on the complete envelope and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider. No sums or FX conversion are computed locally.",
       "files": [
         {
           "path": "hooks/use-cashflow-ladder/use-cashflow-ladder.ts",

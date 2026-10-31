@@ -2257,6 +2257,9 @@ excluded = { manual = "literal" }
 renames = { metric_weighted = { js = "valuations.composite.weightingMethodMetricWeighted", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, dv01_neutral = { js = "valuations.composite.weightingMethodDv01Neutral", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, delta_neutral = { js = "valuations.composite.weightingMethodDeltaNeutral", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, duration_weighted = { js = "valuations.composite.weightingMethodDurationWeighted", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, volatility_weighted = { js = "valuations.composite.weightingMethodVolatilityWeighted", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" } }
 excluded = { fixed_quantity = "literal", notional_weighted = "literal" }
 
+[parity.members."finstack_quant.valuations.instruments.InstrumentCashflowEnvelope"]
+renames = { calendar_year_ladder_by_currency = { js = "valuations.instruments.calendarYearLadderByCurrency", reason = "WASM cashflow envelopes are plain objects; the Rust InstrumentCashflowEnvelope::calendar_year_ladder_by_currency method is a free function taking the object" } }
+
 [parity.members."finstack_quant.valuations.instruments.SimulationDiagnostics"]
 excluded = { coverage_tests_dataframe = "pandas" }
 

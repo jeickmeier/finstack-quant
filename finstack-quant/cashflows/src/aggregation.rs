@@ -416,8 +416,9 @@ pub fn aggregate_cashflows_checked(
 }
 
 /// Calendar-year non-principal / principal / PV totals for one reporting year.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CalendarYearLadderRow {
     /// Calendar year of the grouped cashflows (Gregorian, as on `Date::year`).
     pub year: i32,

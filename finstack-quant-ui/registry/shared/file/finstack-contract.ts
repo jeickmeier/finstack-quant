@@ -22,7 +22,7 @@ import type {
   Explanation,
   DependencyTree,
   CheckReport,
-  CalendarYearLadderRow,
+  CurrencyLadder,
   CreditAssessment,
   DcfSensitivityResult,
   LboResult,
@@ -374,14 +374,10 @@ export interface StatementDefaultRollupRequest {
   readonly frequency: Parameters<typeof statements.rollupSpecDefaultFor>[1];
 }
 /** Native cashflow envelope object returned by the facade's instrument cashflow export. */
+export type { CurrencyLadder };
 export type CashflowEnvelope = ReturnType<
   typeof valuations.instruments.instrumentCashflowsWithMarket
 >;
-/** One row currency's native calendar-year ladder, in the units of that currency. */
-export interface CurrencyLadder {
-  readonly currency: CashflowEnvelope["flows"][number]["currency"];
-  readonly rows: CalendarYearLadderRow[];
-}
 /** One parallel shift: scenarios.parallelBpMany over the listed curve ids of one curve family. */
 export interface MarketScenarioShift {
   readonly curveKind: scenarioWire.CurveKind;
@@ -1002,9 +998,9 @@ export interface ValuationsApi {
   /** valuations.valuationResultToJson over the host-serialized result: native canonical JSON. */
   exportResult(value: ValuationResult): Promise<Envelope<string>>;
 }
-/** cashflows: aggregation of an exported cashflow envelope. */
+/** Aggregation of an exported cashflow envelope. */
 export interface CashflowsApi {
-  /** cashflows.calendarYearLadder once per row currency, in first-appearance order, over each flow's date, kind, amount and native_pv (row-currency PV before FX conversion and any scenario price shock). */
+  /** valuations.instruments.calendarYearLadderByCurrency: one native ladder per row currency, in first-appearance order. */
   cashflowLadder(
     cashflows: CashflowEnvelope,
   ): Promise<Envelope<CurrencyLadder[]>>;

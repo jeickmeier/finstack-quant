@@ -17635,6 +17635,29 @@ export interface BorrowingBaseReport {
   eligible_collateral: Money;
 }
 /**
+ * Calendar-year non-principal / principal / PV totals for one reporting year.
+ */
+export interface CalendarYearLadderRow {
+  /**
+   * Sum of amounts that are not [`CFKind::is_principal_like`] in that year,
+   * in the flow's native units (interest, fees, recovery, and unknown-kind
+   * flows are not mixed in: unknown labels are rejected).
+   */
+  non_principal: number;
+  /**
+   * Sum of [`CFKind::is_principal_like`] amounts in that year.
+   */
+  principal: number;
+  /**
+   * Sum of present values in that year, in the same units as `non_principal`.
+   */
+  pv: number;
+  /**
+   * Calendar year of the grouped cashflows (Gregorian, as on `Date::year`).
+   */
+  year: number;
+}
+/**
  * Single-row enriched cashflow view.
  */
 export interface CashflowRow {
@@ -18860,6 +18883,19 @@ export interface CoverageTestDiagnostic {
    */
   trigger_level: number;
   [k: string]: unknown;
+}
+/**
+ * One row currency's calendar-year non-principal, principal and native PV ladder.
+ */
+export interface CurrencyLadder {
+  /**
+   * Row currency every figure of `rows` is stated in.
+   */
+  currency: Currency;
+  /**
+   * Calendar-year non-principal, principal and native PV totals, by ascending year.
+   */
+  rows: CalendarYearLadderRow[];
 }
 /**
  * One structured finding emitted while loading a persisted contract.

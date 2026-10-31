@@ -464,11 +464,10 @@ canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns the
 envelope object. `CashflowViewer` accepts that object as `cashflows` plus optional loading/error props and needs no provider. It presents native rows in a table, with `serializeHost` JSON copy/download in a secondary **Envelope JSON** disclosure;
 unsupported export preserves caller pricing/model state and shows the native error. The workbench owns one cashflow query for both display and its print snapshot.
 `useCashflowLadder` (the individual `use-cashflow-ladder` item, beside
-`use-cashflows`) takes that envelope object; the worker partitions its flows by
-row currency in first-appearance order and calls `cashflows.calendarYearLadder`
-once per currency over each flow's `native_pv`, the row-currency PV before FX
-conversion and any scenario price shock (Rust requires PVs in the units of the
-amounts). `CashflowViewer`'s optional `ladder` (and `ladderError`) props add a
+`use-cashflows`) takes that envelope object and calls
+`valuations.instruments.calendarYearLadderByCurrency`: one ladder per row
+currency in first-appearance order, each over `native_pv`, the row-currency PV
+before FX conversion and any scenario price shock. `CashflowViewer`'s optional `ladder` (and `ladderError`) props add a
 Schedule / Annual ladder toggle with one table per currency headed Native PV;
 nothing is summed or converted across currencies.
 `useDiffStatementScenarios` (`use-diff-statement-scenarios`) sends the scenario

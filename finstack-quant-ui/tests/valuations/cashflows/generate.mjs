@@ -46,22 +46,6 @@ for (const type of ["fx_swap", "xccy_swap", "equity_option"]) {
     },
   });
 }
-// The worker's CashflowsApi.cashflowLadder partition: one native call per row
-// currency, in first-appearance order, over each flow's row-currency native PV.
-function ladder(envelope) {
-  const groups = new Map();
-  for (const flow of envelope.flows)
-    groups.set(flow.currency, [...(groups.get(flow.currency) ?? []), flow]);
-  return [...groups].map(([currency, flows]) => ({
-    currency,
-    rows: native.calendarYearLadder(
-      flows.map((flow) => flow.date),
-      flows.map((flow) => flow.kind),
-      flows.map((flow) => flow.amount),
-      flows.map((flow) => flow.native_pv),
-    ),
-  }));
-}
 const cases = inputs.map(({ type, request }) => {
   const priced = native.priceInstrument(
     request.instrumentJson,
@@ -89,7 +73,7 @@ const cases = inputs.map(({ type, request }) => {
     request,
     pricedValue: priced.value,
     cashflows,
-    ladder: cashflows && ladder(cashflows),
+    ladder: cashflows && native.calendarYearLadderByCurrency(cashflows),
     error,
   };
 });
