@@ -29488,8 +29488,8 @@ export interface ModelsNamespace {
     forward: number,
     strike: number,
     df: number,
-    expiry: number,
     vol: number,
+    expiry: number,
     isCall: boolean
   ): number;
   /**
@@ -29508,8 +29508,8 @@ export interface ModelsNamespace {
   black76Greeks(
     forward: number,
     strike: number,
-    expiry: number,
     vol: number,
+    expiry: number,
     isCall: boolean
   ): ForwardGreeks;
   /**
