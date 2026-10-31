@@ -26,6 +26,15 @@
       "summary": "Attributed P&L by effect and grouping, with policy stamps.",
       "title": "Finstack Quant Attribution Result",
       "type_name": "AttributionResultEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/attribution/1/pnl_bucket_share.schema.json",
+      "bytes": 21888,
+      "kind": "output",
+      "path": "schemas/attribution/1/pnl_bucket_share.schema.json",
+      "summary": "A P&L bucket's field name, amount and share of total.",
+      "title": "Finstack Quant P&L Bucket Share",
+      "type_name": "PnlBucketShare"
     }
   ],
   "schema_index_version": 1

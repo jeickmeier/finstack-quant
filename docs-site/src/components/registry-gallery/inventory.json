@@ -315,7 +315,7 @@
     {
       "name": "pnl-attribution-report",
       "type": "registry:component",
-      "docs": "Display-only view of a PnlAttribution as returned (by attribution.attributePnl / attributePnlMany, or inside scenarios.computeHorizonReturn): total, mark-to-market and endpoint values, every factor bucket as exact money with a signed bar chart of the returned amounts, the waterfall drawn only from Rust's waterfall_steps (pv_before to pv_after per step; nothing when the method returns none), the residual with the returned residual_pct and tolerances, notes, the policy stamp and the JSON. Optional explain, residualWithinTolerance and pctOfTotal props take Rust's pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotal; without residualWithinTolerance no verdict is shown. Nothing is summed, differenced or converted. Accepts attribution, loading, error and density props; no worker or query provider required.",
+      "docs": "Display-only view of a PnlAttribution as returned (by attribution.attributePnl / attributePnlMany, or inside scenarios.computeHorizonReturn): total, mark-to-market and endpoint values, every factor bucket as exact money with a signed bar chart of the returned amounts, the waterfall drawn only from Rust's waterfall_steps (pv_before to pv_after per step; nothing when the method returns none), the residual with the returned residual_pct and tolerances, notes, the policy stamp and the JSON. A required buckets prop takes Rust's pnlAttributionPctOfTotalByBucket, which names the buckets, their amounts and shares; optional explain and residualWithinTolerance props take pnlAttributionExplainText and pnlAttributionResidualWithinTolerance; without residualWithinTolerance no verdict is shown. Nothing is summed, differenced or converted. Accepts attribution, buckets, loading, error and density props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -1442,7 +1442,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/horizon/cases.json",
-      "sha256": "e63a69232899df08f519db2a103246ce5ec710790b7cfd8f021a3ef0de98d6f0"
+      "sha256": "a6ed012a6473c5994efebe28d902bbbde6ae0ded1534e5eef2e46bc2d493764d"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/templates/cases.json",
@@ -1450,7 +1450,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/attribution/cases.json",
-      "sha256": "886fc0b1d153288f17866407f803d87f1394b0148c0c75a2a3a0abe713d705d9"
+      "sha256": "3d63dfd6d64f29d1bac71a35588741cbf0cba0024d46e9a0324b622bb7c09134"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",

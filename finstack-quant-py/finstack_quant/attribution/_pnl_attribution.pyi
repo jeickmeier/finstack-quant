@@ -938,6 +938,28 @@ class PnlAttribution:
         """
         ...
 
+    def pct_of_total_by_bucket(self) -> list[dict[str, Any]]:
+        """
+        Every money bucket with its share of total P&L, in the struct's field order.
+
+        Lists the eleven factor buckets and ``residual``, so a report reads the
+        buckets from Rust instead of naming them. ``total_pnl``,
+        ``mark_to_market_pnl``, ``pv_t0`` and ``pv_t1`` are not buckets.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One record per bucket: ``field`` (the attribute's wire name),
+            ``amount`` (``{"amount": str, "currency": str}`` in the ``total_pnl``
+            currency) and ``pct_of_total`` (signed percentage points, or ``None``
+            when ``total_pnl`` is effectively zero).
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
     def residual_within_tolerance(
         self,
         pct_tolerance: float | None = None,

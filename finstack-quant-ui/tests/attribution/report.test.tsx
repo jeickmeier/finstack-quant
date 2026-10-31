@@ -6,12 +6,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import type { PnlAttribution } from "finstack-quant-wasm";
-import {
-  PnlAttributionReport,
-  attributionFactorFields,
-  type PnlAttributionReportProps,
-} from "@/components/finstack/attribution/components/pnl-attribution-report/pnl-attribution-report";
+import type { PnlAttribution, PnlBucketShare } from "finstack-quant-wasm";
+import { PnlAttributionReport } from "@/components/finstack/attribution/components/pnl-attribution-report/pnl-attribution-report";
 import fixture from "./cases.json";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -32,6 +28,8 @@ const entry = (name: string) =>
   fixture.cases.find((candidate) => candidate.name === name)!;
 const attribution = (name: string) =>
   entry(name).attribution as unknown as PnlAttribution;
+const buckets = (name: string) =>
+  entry(name).buckets as unknown as PnlBucketShare[];
 // Attributions are regenerated and compared by `mise run ui-fixtures --check`
 // (tests/attribution/generate.mjs).
 it("pins the JSON inputs the attribution fixture was built from", () => {
@@ -48,9 +46,11 @@ it("pins the JSON inputs the attribution fixture was built from", () => {
     ).toBe(source.sha256);
 });
 it("lists every factor field the Rust report knows", () => {
-  // Each listed field is a returned Money bucket.
-  for (const field of attributionFactorFields)
-    expect(attribution("parallel")[field]).toHaveProperty("amount");
+  // Each listed field is a returned Money bucket, shown as returned.
+  for (const bucket of entry("parallel").buckets)
+    expect(
+      attribution("parallel")[bucket.field as keyof PnlAttribution],
+    ).toEqual(bucket.amount);
   expect(fixture.cases.map((c) => c.name)).toEqual([
     "parallel",
     "waterfall",
@@ -63,10 +63,7 @@ it("shows the returned totals and factor buckets as exact money with Rust's shar
   render(
     <PnlAttributionReport
       attribution={pnl}
-      pctOfTotal={
-        entry("metrics_based")
-          .pctOfTotal as PnlAttributionReportProps["pctOfTotal"]
-      }
+      buckets={buckets("metrics_based")}
       density="comfortable"
     />,
   );
@@ -78,14 +75,16 @@ it("shows the returned totals and factor buckets as exact money with Rust's shar
   const rows = (
     within(table).getAllByRole("row") as HTMLTableRowElement[]
   ).slice(1);
-  expect(rows).toHaveLength(attributionFactorFields.length);
-  const credit = rows[attributionFactorFields.indexOf("credit_curves_pnl")]!;
+  const listed = buckets("metrics_based");
+  expect(rows).toHaveLength(listed.length);
+  const creditShare = listed.find(
+    (bucket) => bucket.field === "credit_curves_pnl",
+  )!;
+  const credit = rows[listed.indexOf(creditShare)]!;
   expect(within(credit).getByTitle(pnl.credit_curves_pnl.amount)).toBeTruthy();
-  expect(credit.cells[2]!.textContent).toBe(
-    String(entry("metrics_based").pctOfTotal.credit_curves_pnl),
-  );
+  expect(credit.cells[2]!.textContent).toBe(String(creditShare.pct_of_total));
   // The share is Rust's, for the factor's own returned amount.
-  expect(entry("metrics_based").pctOfTotal.credit_curves_pnl).toBe(
+  expect(creditShare.pct_of_total).toBe(
     native.pnlAttributionPctOfTotal(pnl, Number(pnl.credit_curves_pnl.amount)),
   );
   expect(
@@ -98,7 +97,9 @@ it("shows the returned totals and factor buckets as exact money with Rust's shar
 });
 it("draws the waterfall only from Rust's steps and lists them as returned", () => {
   const pnl = attribution("waterfall");
-  render(<PnlAttributionReport attribution={pnl} />);
+  render(
+    <PnlAttributionReport attribution={pnl} buckets={buckets("waterfall")} />,
+  );
   const waterfall = screen.getByRole("region", { name: "Waterfall" });
   const steps = within(waterfall).getByRole("table", {
     name: "Waterfall steps",
@@ -124,7 +125,10 @@ it("draws the waterfall only from Rust's steps and lists them as returned", () =
 });
 it("shows Rust's residual verdict only when supplied, else the returned figures", () => {
   const pnl = attribution("taylor");
-  const { rerender } = render(<PnlAttributionReport attribution={pnl} />);
+  const listed = buckets("taylor");
+  const { rerender } = render(
+    <PnlAttributionReport attribution={pnl} buckets={listed} />,
+  );
   const residual = () => screen.getByLabelText("Residual");
   expect(residual().textContent).not.toMatch(/tolerance:|within|outside/i);
   expect(residual().textContent).toContain(String(pnl.meta.residual_pct));
@@ -132,6 +136,7 @@ it("shows Rust's residual verdict only when supplied, else the returned figures"
   rerender(
     <PnlAttributionReport
       attribution={pnl}
+      buckets={listed}
       residualWithinTolerance={entry("taylor").residualWithinTolerance}
       explain={entry("taylor").explain}
     />,
@@ -139,12 +144,17 @@ it("shows Rust's residual verdict only when supplied, else the returned figures"
   expect(entry("taylor").residualWithinTolerance).toBe(true);
   expect(residual().textContent).toContain("Residual within tolerance");
   rerender(
-    <PnlAttributionReport attribution={pnl} residualWithinTolerance={false} />,
+    <PnlAttributionReport
+      attribution={pnl}
+      buckets={listed}
+      residualWithinTolerance={false}
+    />,
   );
   expect(residual().textContent).toContain("Residual outside tolerance");
   rerender(
     <PnlAttributionReport
       attribution={{ ...pnl, result_invalid: true }}
+      buckets={listed}
       residualWithinTolerance
     />,
   );
@@ -155,6 +165,7 @@ it("shows the explain text, notes, stamp and JSON as returned", () => {
   render(
     <PnlAttributionReport
       attribution={pnl}
+      buckets={buckets("taylor")}
       explain={entry("taylor").explain}
     />,
   );
@@ -172,13 +183,16 @@ it("shows the explain text, notes, stamp and JSON as returned", () => {
   expect(JSON.parse(json.querySelector("code")!.textContent!)).toEqual(pnl);
 });
 it("shows the empty, loading and native-error states", () => {
-  const { rerender } = render(<PnlAttributionReport attribution={null} />);
+  const { rerender } = render(
+    <PnlAttributionReport attribution={null} buckets={null} />,
+  );
   expect(screen.getByRole("status").textContent).toBe("No P&L attribution");
-  rerender(<PnlAttributionReport attribution={null} loading />);
+  rerender(<PnlAttributionReport attribution={null} buckets={null} loading />);
   expect(screen.getByRole("status").textContent).toBe("Attributing P&L…");
   rerender(
     <PnlAttributionReport
       attribution={attribution("parallel")}
+      buckets={buckets("parallel")}
       error="Validation error: method"
     />,
   );

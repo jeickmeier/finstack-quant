@@ -127,6 +127,13 @@
             "type_name": "AttributionResultEnvelope",
             "kind": "output",
             "bytes": 86421
+          },
+          {
+            "path": "schemas/attribution/1/pnl_bucket_share.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/attribution/1/pnl_bucket_share.schema.json",
+            "type_name": "PnlBucketShare",
+            "kind": "output",
+            "bytes": 21888
           }
         ]
       },
@@ -3637,6 +3644,14 @@
             "type_name": "AttributionResultEnvelope",
             "kind": "output",
             "bytes": 86421
+          },
+          {
+            "domain": "attribution",
+            "path": "schemas/attribution/1/pnl_bucket_share.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/attribution/1/pnl_bucket_share.schema.json",
+            "type_name": "PnlBucketShare",
+            "kind": "output",
+            "bytes": 21888
           },
           {
             "domain": "calibration",

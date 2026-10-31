@@ -135,6 +135,7 @@ fn attribution_schema_inventory_is_exact() {
             "attribution.schema.json",
             "attribution_inputs.schema.json",
             "attribution_result.schema.json",
+            "pnl_bucket_share.schema.json",
         ]
     );
 }

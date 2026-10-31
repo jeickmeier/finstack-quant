@@ -1,4 +1,4 @@
-import type { scenarios } from "finstack-quant-wasm";
+import type { attribution, scenarios } from "finstack-quant-wasm";
 import type { ScenariosApi } from "../finstack-contract";
 import type { ServiceContext } from "./context";
 /** scenarios facade members this slice reads. */
@@ -18,6 +18,7 @@ export type ScenariosNative = {
     | "buildTemplateComponent"
     | "composeScenarios"
   >;
+  attribution: Pick<typeof attribution, "pnlAttributionPctOfTotalByBucket">;
 };
 /** ScenariosApi over the scenarios facade namespace and the shared market cache. */
 export function createScenariosService(
@@ -96,7 +97,14 @@ export function createScenariosService(
           undefined,
           request.calendarId ?? undefined,
         );
-        return { report, explain: api.horizonResultExplainText(report) };
+        return {
+          report,
+          explain: api.horizonResultExplainText(report),
+          attributionBuckets:
+            native.attribution.pnlAttributionPctOfTotalByBucket(
+              report.attribution,
+            ),
+        };
       });
     },
     validateScenarioSpec(json) {

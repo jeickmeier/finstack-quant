@@ -4,7 +4,7 @@
     "attribution.attributePnlMany",
     "attribution.defaultWaterfallOrder",
     "attribution.pnlAttributionExplainText",
-    "attribution.pnlAttributionPctOfTotal",
+    "attribution.pnlAttributionPctOfTotalByBucket",
     "attribution.pnlAttributionResidualWithinTolerance",
     "calibration.calibrate",
     "calibration.dryRun",

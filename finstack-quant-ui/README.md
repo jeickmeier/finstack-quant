@@ -794,9 +794,10 @@ disclosure, the scenario report. `PnlAttributionReport` (the `attribution`
 category) shows any returned `PnlAttribution`:
 total, mark-to-market and endpoint values, every factor bucket, a signed
 factor chart, the waterfall drawn only from Rust's `waterfall_steps`, the
-residual and the notes. Its optional `explain`, `residualWithinTolerance` and
-`pctOfTotal` props take Rust's `pnlAttributionExplainText`,
-`pnlAttributionResidualWithinTolerance` and `pnlAttributionPctOfTotal`;
+residual and the notes. Its required `buckets` prop takes Rust's
+`pnlAttributionPctOfTotalByBucket`, which names the buckets, their amounts and
+shares. Its optional `explain` and `residualWithinTolerance` props take
+`pnlAttributionExplainText` and `pnlAttributionResidualWithinTolerance`;
 without the residual check no verdict is shown. In `pricing-workbench` the
 horizon return sits in the Market scenario results tab under the applied
 scenario, with method and roll-calendar choices.
@@ -808,7 +809,7 @@ dates into JSON text, never parsing them, over the instrument envelopes in
 order (`attributePnl` takes an `AttributionSpec`, not an envelope). Each
 result comes back with `pnlAttributionExplainText`,
 `pnlAttributionResidualWithinTolerance` (the run's own tolerances) and
-`pnlAttributionPctOfTotal` per factor bucket, ready for
+`pnlAttributionPctOfTotalByBucket`, ready for
 `PnlAttributionReport`. Rust requires the method, so the request always
 carries one; every other input stays unset. `useDefaultWaterfallOrder` returns
 `defaultWaterfallOrder`, the factor order a `{waterfall: order}` method uses.
