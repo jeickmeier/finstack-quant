@@ -12,6 +12,7 @@ import type {
   CalibrationEnvelope,
   CalibrationValidationReport,
   MetricFieldUnit,
+  TrancheSolveFieldUnits,
   MetricMetadata,
   MoneyValue,
   ScenarioTable,
@@ -995,6 +996,8 @@ export interface ValuationsApi {
   trancheMetricFieldUnits(
     currency: string,
   ): Promise<Envelope<MetricFieldUnit[]>>;
+  /** valuations.instruments.trancheSolveFieldUnits: units of the break-even CDR, discount margin and OAS results. */
+  trancheSolveFieldUnits(): Promise<Envelope<TrancheSolveFieldUnits>>;
   /** valuations.valuationResultToJson over the host-serialized result: native canonical JSON. */
   exportResult(value: ValuationResult): Promise<Envelope<string>>;
 }

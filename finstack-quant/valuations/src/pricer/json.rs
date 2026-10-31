@@ -541,6 +541,51 @@ pub fn tranche_metric_field_units(currency: Currency) -> Vec<MetricFieldUnit> {
     .collect()
 }
 
+/// Units of the tranche solvers' results, which do not state them on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct TrancheSolveFieldUnits {
+    /// Unit of the value `tranche_breakeven_cdr` returns.
+    pub breakeven_cdr: MetricFieldUnit,
+    /// Unit of the value `tranche_discount_margin` returns.
+    pub discount_margin: MetricFieldUnit,
+    /// Unit of every `OasResult` field, in the order the struct declares them.
+    pub oas: Vec<MetricFieldUnit>,
+}
+
+/// Units of the tranche break-even CDR, discount margin and OAS results.
+///
+/// Those solvers document their units in prose: the two scalars are decimals
+/// (`0.0125` = 125 bp) and `OasResult` prices are percent of the tranche's current
+/// balance. Values are never rescaled.
+pub fn tranche_solve_field_units() -> TrancheSolveFieldUnits {
+    const CURRENT_BALANCE: &str = "% of current balance";
+    let scalar = |field: &str, source: &str| MetricFieldUnit {
+        field: field.to_string(),
+        label: "decimal".to_string(),
+        source: format!("valuations::{source}"),
+    };
+    TrancheSolveFieldUnits {
+        breakeven_cdr: scalar("breakeven_cdr", "tranche_breakeven_cdr"),
+        discount_margin: scalar("discount_margin", "tranche_discount_margin"),
+        oas: [
+            ("oas", "decimal"),
+            ("model_price", CURRENT_BALANCE),
+            ("market_price", CURRENT_BALANCE),
+            ("num_paths", "paths"),
+            ("price_std_error", CURRENT_BALANCE),
+        ]
+        .into_iter()
+        .map(|(field, label)| MetricFieldUnit {
+            field: field.to_string(),
+            label: label.to_string(),
+            source: format!("valuations::OasResult::{field}"),
+        })
+        .collect(),
+    }
+}
+
 /// List every pricing model key that has a pricer in the standard registry.
 ///
 /// The list is **registry-derived**, not enum-derived: it reports real dispatch
@@ -1038,6 +1083,36 @@ mod tests {
         assert_eq!(listed, fields);
         listed.sort();
         assert_eq!(listed, declared);
+    }
+
+    #[test]
+    fn oas_field_units_list_every_oas_result_field_in_struct_order() {
+        let result = crate::instruments::fixed_income::structured_credit::OasResult {
+            oas: 0.01,
+            model_price: 99.0,
+            market_price: 99.5,
+            num_paths: 100,
+            price_std_error: 0.1,
+        };
+        let wire = serde_json::to_value(&result).expect("serialize");
+        let mut declared: Vec<&str> = wire
+            .as_object()
+            .expect("object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        declared.sort_unstable();
+        let units = tranche_solve_field_units();
+        let mut listed: Vec<&str> = units.oas.iter().map(|unit| unit.field.as_str()).collect();
+        assert_eq!(listed[0], "oas");
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units.oas[0].source, "valuations::OasResult::oas");
+        assert_eq!(units.breakeven_cdr.label, "decimal");
+        assert_eq!(
+            units.discount_margin.source,
+            "valuations::tranche_discount_margin"
+        );
     }
 
     #[test]

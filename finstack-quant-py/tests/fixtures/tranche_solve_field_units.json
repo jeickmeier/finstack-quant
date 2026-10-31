@@ -1,0 +1,39 @@
+{
+  "breakeven_cdr": {
+    "field": "breakeven_cdr",
+    "label": "decimal",
+    "source": "valuations::tranche_breakeven_cdr"
+  },
+  "discount_margin": {
+    "field": "discount_margin",
+    "label": "decimal",
+    "source": "valuations::tranche_discount_margin"
+  },
+  "oas": [
+    {
+      "field": "oas",
+      "label": "decimal",
+      "source": "valuations::OasResult::oas"
+    },
+    {
+      "field": "model_price",
+      "label": "% of current balance",
+      "source": "valuations::OasResult::model_price"
+    },
+    {
+      "field": "market_price",
+      "label": "% of current balance",
+      "source": "valuations::OasResult::market_price"
+    },
+    {
+      "field": "num_paths",
+      "label": "paths",
+      "source": "valuations::OasResult::num_paths"
+    },
+    {
+      "field": "price_std_error",
+      "label": "% of current balance",
+      "source": "valuations::OasResult::price_std_error"
+    }
+  ]
+}

@@ -243,6 +243,11 @@ pub(super) fn currency_ladder() -> Result<Vec<Value>> {
     })
 }
 
+/// The tranche solvers' units.
+pub(super) fn tranche_solve_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::tranche_solve_field_units())
+}
+
 /// The unit of a tranche's CS01.
 pub(super) fn metric_field_unit() -> Result<Vec<Value>> {
     let units = crate::pricer::tranche_metric_field_units(Currency::USD);

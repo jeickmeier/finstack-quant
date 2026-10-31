@@ -1144,6 +1144,15 @@
       "type_name": "TrancheMetrics"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/tranche_solve_field_units.schema.json",
+      "bytes": 2744,
+      "kind": "output",
+      "path": "schemas/results/1/tranche_solve_field_units.schema.json",
+      "summary": "The display units of the tranche break-even CDR, discount margin and OAS results.",
+      "title": "TrancheSolveFieldUnits",
+      "type_name": "TrancheSolveFieldUnits"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
       "bytes": 64781,
       "kind": "output",

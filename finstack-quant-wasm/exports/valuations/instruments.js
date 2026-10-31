@@ -12,6 +12,7 @@ export const instruments = {
   instrumentCashflows: wasm.instrumentCashflows,
   instrumentCashflowsWithMarket: wasm.instrumentCashflowsWithMarket,
   calendarYearLadderByCurrency: wasm.calendarYearLadderByCurrency,
+  trancheSolveFieldUnits: wasm.trancheSolveFieldUnits,
   calculateVar: wasm.calculateVar,
   listModels: wasm.listModels,
   listModelsGrouped: wasm.listModelsGrouped,

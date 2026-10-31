@@ -39,6 +39,8 @@ beforeEach(() => {
     if (method === "initialize") return { state: "ready", worker: true };
     if (method === "trancheMetricFieldUnits")
       return native.trancheMetricFieldUnits(arg);
+    if (method === "trancheSolveFieldUnits")
+      return native.trancheSolveFieldUnits();
     const deal = native.StructuredCredit.fromJson(arg.instrumentJson);
     try {
       const head = [deal, arg.trancheId, arg.marketJson, arg.asOf] as const;
@@ -85,6 +87,7 @@ it("shows native TrancheMetrics fields in Rust order with their documented units
       price="25"
       metrics={{ value: metrics }}
       metricUnits={{ value: native.trancheMetricFieldUnits(metrics.currency) }}
+      solveUnits={{ value: native.trancheSolveFieldUnits() }}
       breakevenCdr={{ value: floating.results.breakevenCdr.value as number }}
       discountMargin={{
         value: floating.results.discountMargin.value as number,
@@ -148,6 +151,7 @@ it("shows each tile's own native error without hiding the others", () => {
       price="100"
       metrics={{ value: fixed.results.metrics.value as TrancheMetrics }}
       metricUnits={{ value: native.trancheMetricFieldUnits("USD") }}
+      solveUnits={{ value: native.trancheSolveFieldUnits() }}
       breakevenCdr={{ value: fixed.results.breakevenCdr.value as number }}
       discountMargin={{ error: fixed.results.discountMargin.error!.message }}
       oas={{ value: fixed.results.oas.value as OasResult }}

@@ -3,6 +3,7 @@ import type { ExampleProps } from "./props";
 import { TrancheAnalytics } from "@/components/finstack/valuations/components/tranche-analytics/tranche-analytics";
 import type {
   MetricFieldUnit,
+  TrancheSolveFieldUnits,
   OasResult,
   TrancheMetrics,
 } from "finstack-quant-wasm";
@@ -23,6 +24,7 @@ export function Example({ density = "compact" }: ExampleProps) {
       price={String(floating.marketPricePct)}
       metrics={{ value: results.metrics.value as TrancheMetrics }}
       metricUnits={{ value: results.metricUnits.value as MetricFieldUnit[] }}
+      solveUnits={{ value: results.solveUnits.value as TrancheSolveFieldUnits }}
       breakevenCdr={{ value: results.breakevenCdr.value as number }}
       discountMargin={{ value: results.discountMargin.value as number }}
       oas={{ value: results.oas.value as OasResult }}

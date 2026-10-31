@@ -4593,6 +4593,7 @@
       "trancheMetrics",
       "trancheOas",
       "trancheScenarioTable",
+      "trancheSolveFieldUnits",
       "trancheStructureFromBalances",
       "validateInstrumentJson",
       "validateTypedInstrumentJson",
@@ -4805,6 +4806,9 @@
     "kind": "function"
   },
   "valuations.instruments.calendarYearLadderByCurrency": {
+    "kind": "function"
+  },
+  "valuations.instruments.trancheSolveFieldUnits": {
     "kind": "function"
   },
   "valuations.instruments.calculateVar": {

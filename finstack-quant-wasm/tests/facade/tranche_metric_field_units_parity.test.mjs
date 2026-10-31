@@ -22,3 +22,16 @@ const PINNED = JSON.parse(
 test('trancheMetricFieldUnits matches the records pinned for both hosts', () => {
   assert.deepEqual(plain(facade.valuations.instruments.trancheMetricFieldUnits('EUR')), PINNED);
 });
+
+const SOLVE_PINNED = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/fixtures/tranche_solve_field_units.json',
+      import.meta.url
+    )
+  )
+);
+
+test('trancheSolveFieldUnits matches the records pinned for both hosts', () => {
+  assert.deepEqual(plain(facade.valuations.instruments.trancheSolveFieldUnits()), SOLVE_PINNED);
+});
