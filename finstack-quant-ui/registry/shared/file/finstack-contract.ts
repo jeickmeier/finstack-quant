@@ -38,6 +38,7 @@ import type {
   ScenarioSpec,
   TemplateMetadata,
   PnlAttribution,
+  PnlBucketShare,
   DatedSeries,
   MultiFactorResult,
   RollingGreeks,
@@ -449,6 +450,8 @@ export interface HorizonReturn {
   readonly report: HorizonReport;
   /** scenarios.horizonResultExplainText of the report. */
   readonly explain: string;
+  /** attribution.pnlAttributionPctOfTotalByBucket of the report's attribution. */
+  readonly attributionBuckets: readonly PnlBucketShare[];
 }
 /** One attribution configuration over T0 -> T1 for an ordered list of instruments. */
 export interface AttributePnlManyRequest {
@@ -473,8 +476,8 @@ export interface AttributedPnl {
   readonly explain: string;
   /** attribution.pnlAttributionResidualWithinTolerance against the run's own tolerances. */
   readonly residualWithinTolerance: boolean;
-  /** attribution.pnlAttributionPctOfTotal per factor bucket, in percent; null where Rust returns none. */
-  readonly pctOfTotal: Readonly<Record<string, number | null>>;
+  /** attribution.pnlAttributionPctOfTotalByBucket: every money bucket with its share of total, in Rust's order. */
+  readonly buckets: readonly PnlBucketShare[];
 }
 /** A ticker-major panel for analytics.Performance; every omitted option is left to Rust. */
 export interface PerformanceReportRequest {
@@ -1054,7 +1057,7 @@ export interface ScenariosApi {
 }
 /** attribution: single-instrument T0 -> T1 P&L attribution and its Rust helpers. */
 export interface AttributionApi {
-  /** attribution.attributePnlMany over canonical market texts, then pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotal per factor; one entry per instrument in input order. */
+  /** attribution.attributePnlMany over canonical market texts, then pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotalByBucket; one entry per instrument in input order. */
   attributePnlMany(
     request: AttributePnlManyRequest,
   ): Promise<Envelope<AttributedPnl[]>>;

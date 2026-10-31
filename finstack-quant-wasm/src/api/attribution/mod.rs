@@ -366,6 +366,22 @@ pub fn pnl_attribution_pct_of_total(pnl: JsValue, amount: JsValue) -> Result<Opt
     Ok(pnl.pct_of_total(crate::utils::input::js_f64(&amount, "amount")?))
 }
 
+/// Every money bucket with its share of total P&L, in the struct's field order.
+///
+/// Free-function twin of Python `PnlAttribution.pct_of_total_by_bucket` (Rust
+/// `PnlAttribution::pct_of_total_by_bucket`). Lists the eleven factor buckets and
+/// `residual`, so a report reads the buckets from Rust instead of naming them.
+/// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+/// @returns One `PnlBucketShare` per bucket: the attribute's wire `field`, its `amount` in the `total_pnl` currency and `pct_of_total` in signed percentage points, `null` when `total_pnl` is effectively zero.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+#[wasm_bindgen(js_name = pnlAttributionPctOfTotalByBucket)]
+pub fn pnl_attribution_pct_of_total_by_bucket(pnl: JsValue) -> Result<JsValue, JsValue> {
+    crate::utils::to_js_value(&parse_pnl(&pnl)?.pct_of_total_by_bucket())
+}
+
 /// Whether the attribution residual is within tolerance.
 ///
 /// Free-function twin of Python `PnlAttribution.residual_within_tolerance`

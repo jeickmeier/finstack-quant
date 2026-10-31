@@ -16,6 +16,7 @@ export const attribution = {
   validateReturnContributionJson: wasm.validateReturnContributionJson,
   pnlAttributionExplainText: wasm.pnlAttributionExplainText,
   pnlAttributionPctOfTotal: wasm.pnlAttributionPctOfTotal,
+  pnlAttributionPctOfTotalByBucket: wasm.pnlAttributionPctOfTotalByBucket,
   pnlAttributionResidualWithinTolerance: wasm.pnlAttributionResidualWithinTolerance,
   pnlAttributionValidateCurrencies: wasm.pnlAttributionValidateCurrencies,
   pnlAttributionRequiredMetrics: wasm.pnlAttributionRequiredMetrics,

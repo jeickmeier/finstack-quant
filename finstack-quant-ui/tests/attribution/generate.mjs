@@ -12,21 +12,6 @@ const sourcePath =
   "finstack-quant/attribution/tests/fixtures/production_convertible_credit.json";
 const sourceBytes = await readFile(new URL(sourcePath, repository));
 const source = JSON.parse(sourceBytes);
-// The PnlAttribution buckets pnl-attribution-report lists.
-const fields = [
-  "carry",
-  "rates_curves_pnl",
-  "credit_curves_pnl",
-  "inflation_curves_pnl",
-  "correlations_pnl",
-  "fx_pnl",
-  "fx_translation_pnl",
-  "vol_pnl",
-  "cross_factor_pnl",
-  "model_params_pnl",
-  "market_scalars_pnl",
-  "residual",
-];
 const methods = [
   { name: "parallel", method: "parallel" },
   // Rust's default factor order; the waterfall steps chain in it.
@@ -53,15 +38,7 @@ const cases = methods.map(({ name, method }) => {
     explain: native.pnlAttributionExplainText(attribution),
     residualWithinTolerance:
       native.pnlAttributionResidualWithinTolerance(attribution),
-    pctOfTotal: Object.fromEntries(
-      fields.map((field) => [
-        field,
-        native.pnlAttributionPctOfTotal(
-          attribution,
-          Number(attribution[field].amount),
-        ) ?? null,
-      ]),
-    ),
+    buckets: native.pnlAttributionPctOfTotalByBucket(attribution),
   };
 });
 // The workbench's P&L explain: the results-fixture bond attributed by the
@@ -93,15 +70,7 @@ function attributed(inputs) {
       explain: native.pnlAttributionExplainText(attribution),
       residualWithinTolerance:
         native.pnlAttributionResidualWithinTolerance(attribution),
-      pctOfTotal: Object.fromEntries(
-        fields.map((field) => [
-          field,
-          native.pnlAttributionPctOfTotal(
-            attribution,
-            Number(attribution[field].amount),
-          ) ?? null,
-        ]),
-      ),
+      buckets: native.pnlAttributionPctOfTotalByBucket(attribution),
     };
   } catch (error) {
     return { ok: false, kind: error.kind, message: error.message };

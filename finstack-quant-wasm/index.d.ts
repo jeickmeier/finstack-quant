@@ -209,6 +209,7 @@ import type {
   AttributionSpec,
   AttributionResultEnvelope,
   PnlAttribution,
+  PnlBucketShare,
 } from './types/generated/attribution/index.js';
 import type {
   CheckCategory,
@@ -437,7 +438,13 @@ export type {
   ValidationReport,
 };
 export type { Diagnostic } from './types/generated/valuations/index.js';
-export type { AttributionInputs, AttributionSpec, AttributionResultEnvelope, PnlAttribution };
+export type {
+  AttributionInputs,
+  AttributionSpec,
+  AttributionResultEnvelope,
+  PnlAttribution,
+  PnlBucketShare,
+};
 export type {
   CheckCategory,
   CheckFinding,
@@ -30868,6 +30875,13 @@ export interface AttributionNamespace {
    * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`, and kind `invalid_type` if `amount` is not a number.
    */
   pnlAttributionPctOfTotal(pnl: PnlAttribution | string, amount: number): number | undefined;
+  /**
+   * Every money bucket with its share of total P&L, in the struct's field order.
+   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @returns One `PnlBucketShare` per bucket: the attribute's wire `field`, its `amount` in the `total_pnl` currency and `pct_of_total` in signed percentage points, `null` when `total_pnl` is effectively zero.
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+   */
+  pnlAttributionPctOfTotalByBucket(pnl: PnlAttribution | string): PnlBucketShare[];
   /**
    * Whether the attribution residual is within tolerance (twin of Python `PnlAttribution.residual_within_tolerance`).
    * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).

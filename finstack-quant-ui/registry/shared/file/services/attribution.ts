@@ -1,4 +1,4 @@
-import type { attribution, PnlAttribution } from "finstack-quant-wasm";
+import type { attribution } from "finstack-quant-wasm";
 import type { AttributionApi } from "../finstack-contract";
 import type { ServiceContext } from "./context";
 /** attribution facade members this slice reads. */
@@ -8,25 +8,10 @@ export type AttributionNative = {
     | "attributePnlMany"
     | "defaultWaterfallOrder"
     | "pnlAttributionExplainText"
-    | "pnlAttributionPctOfTotal"
+    | "pnlAttributionPctOfTotalByBucket"
     | "pnlAttributionResidualWithinTolerance"
   >;
 };
-/** The PnlAttribution buckets whose share of total Rust reports, in the Rust struct's field order. */
-const factorFields = [
-  "carry",
-  "rates_curves_pnl",
-  "credit_curves_pnl",
-  "inflation_curves_pnl",
-  "correlations_pnl",
-  "fx_pnl",
-  "fx_translation_pnl",
-  "vol_pnl",
-  "cross_factor_pnl",
-  "model_params_pnl",
-  "market_scalars_pnl",
-  "residual",
-] as const satisfies readonly (keyof PnlAttribution)[];
 /** AttributionApi over the attribution facade namespace and the shared market cache. */
 export function createAttributionService(
   native: AttributionNative,
@@ -46,16 +31,7 @@ export function createAttributionService(
             explain: api.pnlAttributionExplainText(attribution),
             residualWithinTolerance:
               api.pnlAttributionResidualWithinTolerance(attribution),
-            // Rust's share per bucket; the decimal amount crosses as the number its signature takes.
-            pctOfTotal: Object.fromEntries(
-              factorFields.map((field) => [
-                field,
-                api.pnlAttributionPctOfTotal(
-                  attribution,
-                  Number(attribution[field].amount),
-                ) ?? null,
-              ]),
-            ),
+            buckets: api.pnlAttributionPctOfTotalByBucket(attribution),
           }));
       });
     },

@@ -5,7 +5,11 @@ import { barY, defineChart } from "@tanstack/charts";
 import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
-import type { MoneyValue as Money, PnlAttribution } from "finstack-quant-wasm";
+import type {
+  MoneyValue as Money,
+  PnlAttribution,
+  PnlBucketShare,
+} from "finstack-quant-wasm";
 import { Badge } from "@/components/ui/badge";
 import { formatRaw } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
@@ -15,43 +19,21 @@ import { MoneyValue } from "@/components/finstack/core/primitives/money-value/mo
 import { StampBadge } from "@/components/finstack/valuations/primitives/stamp-badge/stamp-badge";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
 
-/** The PnlAttribution buckets a report lists, in the Rust struct's field order; `residual` closes them. */
-export const attributionFactorFields = [
-  "carry",
-  "rates_curves_pnl",
-  "credit_curves_pnl",
-  "inflation_curves_pnl",
-  "correlations_pnl",
-  "fx_pnl",
-  "fx_translation_pnl",
-  "vol_pnl",
-  "cross_factor_pnl",
-  "model_params_pnl",
-  "market_scalars_pnl",
-  "residual",
-] as const;
-export type AttributionFactorField = (typeof attributionFactorFields)[number];
-
 export interface PnlAttributionReportProps {
   /** A native PnlAttribution, shown as returned. */
   attribution: PnlAttribution | null | undefined;
+  /** Rust's buckets of that attribution with their shares of total (attribution.pnlAttributionPctOfTotalByBucket), in its order. */
+  buckets: readonly PnlBucketShare[] | null | undefined;
   /** Rust explain text (attribution.pnlAttributionExplainText); omitted shows none. */
   explain?: string;
   /** Rust residual check (attribution.pnlAttributionResidualWithinTolerance); omitted shows the returned residual figures without a verdict. */
   residualWithinTolerance?: boolean;
-  /** Rust share of total P&L in percent per factor field (attribution.pnlAttributionPctOfTotal); null where Rust returns none. Omitted hides the column. */
-  pctOfTotal?: Readonly<Partial<Record<AttributionFactorField, number | null>>>;
   loading?: boolean;
   /** Native error, shown as returned. */
   error?: string;
   density?: "compact" | "comfortable";
 }
 
-type FactorRow = {
-  field: AttributionFactorField;
-  money: Money;
-  pct: number | null | undefined;
-};
 type Step = NonNullable<PnlAttribution["waterfall_steps"]>[number];
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -68,7 +50,7 @@ function methodText(method: unknown) {
   return typeof method === "string" ? method : JSON.stringify(method);
 }
 
-const factorColumns = (withPct: boolean): ColumnDef<{}, FactorRow, any>[] => [
+const factorColumns: ColumnDef<{}, PnlBucketShare, any>[] = [
   {
     id: "factor",
     header: "Factor",
@@ -78,20 +60,18 @@ const factorColumns = (withPct: boolean): ColumnDef<{}, FactorRow, any>[] => [
   {
     id: "pnl",
     header: "P&L",
-    accessorFn: (row) => row.money.amount,
+    accessorFn: (row) => row.amount.amount,
     meta: { className: "text-right finstack-numeric" },
-    cell: (context) => <MoneyValue value={context.row.original.money} />,
+    cell: (context) => (
+      <MoneyValue value={context.row.original.amount as Money} />
+    ),
   },
-  ...(withPct
-    ? [
-        {
-          id: "pct",
-          header: "% of total",
-          accessorFn: (row: FactorRow) => formatRaw(row.pct ?? null),
-          meta: { className: "text-right finstack-numeric" },
-        } satisfies ColumnDef<{}, FactorRow, any>,
-      ]
-    : []),
+  {
+    id: "pct",
+    header: "% of total",
+    accessorFn: (row) => formatRaw(row.pct_of_total ?? null),
+    meta: { className: "text-right finstack-numeric" },
+  },
 ];
 
 const stepColumns: ColumnDef<{}, Step, any>[] = [
@@ -137,12 +117,12 @@ const stepColumns: ColumnDef<{}, Step, any>[] = [
 ];
 
 /** Signed bars of each factor's returned P&L; the amounts are plotted, never summed. */
-function factorChart(rows: readonly FactorRow[], currency: string) {
+function factorChart(rows: readonly PnlBucketShare[], currency: string) {
   return defineChart({
     marks: [
       barY(rows, {
         x: (row) => labelFor(row.field),
-        y: (row) => Number(row.money.amount),
+        y: (row) => Number(row.amount.amount),
         key: (row) => row.field,
         id: "attribution-factors",
       }),
@@ -166,7 +146,7 @@ function factorChart(rows: readonly FactorRow[], currency: string) {
       content: (marks) => ({
         rows: marks.map((m) => ({
           label: labelFor(m.datum.field),
-          value: `${m.datum.money.currency} ${m.datum.money.amount}`,
+          value: `${m.datum.amount.currency} ${m.datum.amount.amount}`,
         })),
       }),
     },
@@ -252,6 +232,7 @@ function ResidualBadge({
  */
 export function PnlAttributionReport({
   attribution,
+  buckets,
   loading,
   error,
   ...props
@@ -262,36 +243,36 @@ export function PnlAttributionReport({
         {error}
       </p>
     );
-  if (!attribution)
+  if (!attribution || !buckets)
     return (
       <p role="status" className="font-sans text-sm text-muted-foreground">
         {loading ? "Attributing P&L…" : "No P&L attribution"}
       </p>
     );
-  return <AttributionView attribution={attribution} {...props} />;
+  return (
+    <AttributionView attribution={attribution} buckets={buckets} {...props} />
+  );
 }
 
 function AttributionView({
   attribution,
+  buckets,
   explain,
   residualWithinTolerance,
-  pctOfTotal,
   density,
-}: Omit<PnlAttributionReportProps, "attribution" | "loading" | "error"> & {
+}: Omit<
+  PnlAttributionReportProps,
+  "attribution" | "buckets" | "loading" | "error"
+> & {
   attribution: PnlAttribution;
+  buckets: readonly PnlBucketShare[];
 }) {
   const currency = attribution.total_pnl.currency;
-  const rows = useMemo(
-    (): FactorRow[] =>
-      attributionFactorFields.map((field) => ({
-        field,
-        money: attribution[field] as Money,
-        pct: pctOfTotal?.[field],
-      })),
-    [attribution, pctOfTotal],
-  );
   const steps = useMemo(() => attribution.waterfall_steps ?? [], [attribution]);
-  const factors = useMemo(() => factorChart(rows, currency), [rows, currency]);
+  const factors = useMemo(
+    () => factorChart(buckets, currency),
+    [buckets, currency],
+  );
   const waterfall = useMemo(
     () => (steps.length ? waterfallChart(steps, currency) : null),
     [steps, currency],
@@ -339,8 +320,8 @@ function AttributionView({
         <FinstackTable
           caption="P&L by factor"
           captionVisibility="sr-only"
-          data={rows}
-          columns={factorColumns(pctOfTotal !== undefined)}
+          data={buckets as PnlBucketShare[]}
+          columns={factorColumns}
           getRowId={(row) => row.field}
           density={density}
         />
