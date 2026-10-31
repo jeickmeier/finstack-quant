@@ -249,7 +249,9 @@ fn performance_facade_exercises_broad_api_surface() {
     assert!(rolling_sharpe.values.iter().all(|value| value.is_finite()));
 
     let ref_date = *perf.get_active_dates().last().expect("last active date");
-    let lookbacks = perf.lookback_returns(ref_date, Some(FiscalConfig::us_federal()));
+    let lookbacks = perf
+        .lookback_returns(Some(ref_date), Some(FiscalConfig::us_federal()))
+        .expect("lookback");
     assert_finite_metric("month-to-date lookback", &lookbacks.mtd, ticker_count);
     assert_finite_metric("quarter-to-date lookback", &lookbacks.qtd, ticker_count);
     assert_finite_metric("year-to-date lookback", &lookbacks.ytd, ticker_count);
@@ -343,7 +345,9 @@ fn performance_lookback_returns_clamps_pre_start_reference_date() {
     .expect("performance");
 
     let ref_date = Date::from_calendar_date(2025, Month::May, 15).expect("ref date");
-    let lookbacks = perf.lookback_returns(ref_date, Some(FiscalConfig::us_federal()));
+    let lookbacks = perf
+        .lookback_returns(Some(ref_date), Some(FiscalConfig::us_federal()))
+        .expect("lookback");
     assert_eq!(lookbacks.mtd, vec![0.0]);
     assert_eq!(lookbacks.qtd, vec![0.0]);
     assert_eq!(lookbacks.ytd, vec![0.0]);
@@ -385,7 +389,9 @@ fn performance_smoke_asserts_fiscal_lookback_and_zero_variance_invariants() {
         .get_active_dates()
         .last()
         .expect("last active date");
-    let lookbacks = rising_perf.lookback_returns(ref_date, Some(config));
+    let lookbacks = rising_perf
+        .lookback_returns(Some(ref_date), Some(config))
+        .expect("lookback");
     assert!(lookbacks.fytd[0] > 0.0);
 }
 
@@ -467,7 +473,9 @@ fn lookback_returns_includes_maximum_reference_date_without_overflow() {
     )
     .expect("maximum-date panel");
     for fiscal_config in [FiscalConfig::calendar_year(), FiscalConfig::us_federal()] {
-        let lookbacks = perf.lookback_returns(Date::MAX, Some(fiscal_config));
+        let lookbacks = perf
+            .lookback_returns(Some(Date::MAX), Some(fiscal_config))
+            .expect("lookback");
         for values in [lookbacks.mtd, lookbacks.qtd, lookbacks.ytd, lookbacks.fytd] {
             assert_eq!(values.len(), 1);
             assert!((values[0] - 0.21).abs() < 1.0e-14);

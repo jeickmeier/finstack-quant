@@ -55,6 +55,7 @@ const fixtures = {
   },
   'rolling_greeks.schema.json': { dates: ['2025-01-02'], alphas: [0.0], betas: [1.0] },
   'lookback_returns.schema.json': {
+    ref_date: '2025-01-02',
     ticker_names: ['FUND'],
     mtd: [0.1],
     qtd: [0.1],

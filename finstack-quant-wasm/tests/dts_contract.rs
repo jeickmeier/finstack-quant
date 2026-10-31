@@ -240,7 +240,7 @@ fn analytics_dts_matches_runtime_hotspots() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "lookbackReturns(refDate: string, fiscalConfig?: FiscalConfig | null): LookbackReturns;",
+        "lookbackReturns(refDate?: string | null, fiscalConfig?: FiscalConfig | null): LookbackReturns;",
     ));
     assert!(contains_ignoring_ws(
         &dts,

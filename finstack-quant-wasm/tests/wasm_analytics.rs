@@ -434,7 +434,9 @@ fn multi_factor_greeks_resolves_to_struct() {
 #[wasm_bindgen_test]
 fn lookback_returns_emit_mtd_qtd_ytd_fytd_arrays() {
     let perf = build_perf();
-    let raw = perf.lookback_returns(JsValue::from("2025-01-12")).unwrap();
+    let raw = perf
+        .lookback_returns(Some(JsValue::from("2025-01-12")))
+        .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert_eq!(value["mtd"].as_array().unwrap().len(), 2);
     assert_eq!(value["qtd"].as_array().unwrap().len(), 2);

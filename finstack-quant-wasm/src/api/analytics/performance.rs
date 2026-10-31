@@ -1240,19 +1240,25 @@ impl JsPerformance {
     /// # Arguments
     ///
     /// * `ref_date` - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
+    ///   Omitted or `null` is the last active date; the result's `ref_date` states
+    ///   the date used.
     /// * `fiscal_config` - Optional `FiscalConfig` handle for FYTD. Omitted or
     ///   `null` is the calendar year (`FiscalConfig::default`).
     ///
     /// # Errors
     ///
-    /// Rejects an invalid ISO `ref_date` or a result that cannot be serialized
-    /// to JavaScript.
-    /// @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
+    /// Rejects an invalid ISO `ref_date`, an omitted one while no dates are active,
+    /// or a result that cannot be serialized to JavaScript.
+    /// @returns The window end `ref_date` and per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
     #[wasm_bindgen(js_name = lookbackReturns)]
-    pub fn lookback_returns(&self, ref_date: JsValue) -> Result<JsValue, JsValue> {
-        let ref_date: &str = &js_string(&ref_date, "refDate")?;
-        let d = parse_iso_date(ref_date)?;
-        to_js_value(&self.inner.lookback_returns(d, None))
+    pub fn lookback_returns(&self, ref_date: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let ref_date = crate::utils::wire::js_opt_date(ref_date.as_ref(), "refDate")?;
+        to_js_value(
+            &self
+                .inner
+                .lookback_returns(ref_date, None)
+                .map_err(to_js_err)?,
+        )
     }
 
     /// Lookback returns for an explicit fiscal calendar.
@@ -1262,20 +1268,24 @@ impl JsPerformance {
     ///
     /// # Errors
     ///
-    /// Rejects an invalid ISO `ref_date` or a result that cannot be serialized
-    /// to JavaScript.
-    /// @param ref_date - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
+    /// Rejects an invalid ISO `ref_date`, an omitted one while no dates are active,
+    /// or a result that cannot be serialized to JavaScript.
+    /// @param ref_date - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end; omitted or `null` is the last active date.
     /// @param fiscal_config - FiscalConfig handle whose start sets the FYTD window.
-    /// @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions.
+    /// @returns The window end `ref_date` and per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions.
     #[wasm_bindgen(js_name = lookbackReturnsWithFiscalConfig)]
     pub fn lookback_returns_with_fiscal_config(
         &self,
-        ref_date: JsValue,
+        ref_date: Option<JsValue>,
         fiscal_config: &JsFiscalConfig,
     ) -> Result<JsValue, JsValue> {
-        let ref_date: &str = &js_string(&ref_date, "refDate")?;
-        let d = parse_iso_date(ref_date)?;
-        to_js_value(&self.inner.lookback_returns(d, Some(fiscal_config.inner)))
+        let ref_date = crate::utils::wire::js_opt_date(ref_date.as_ref(), "refDate")?;
+        to_js_value(
+            &self
+                .inner
+                .lookback_returns(ref_date, Some(fiscal_config.inner))
+                .map_err(to_js_err)?,
+        )
     }
 
     /// Aggregated period statistics for one asset at the given frequency.

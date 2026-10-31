@@ -29204,6 +29204,7 @@
       "lookback": {
         "refDate": "2025-06-30",
         "returns": {
+          "ref_date": "2025-06-30",
           "ticker_names": ["Global Macro Composite", "Benchmark"],
           "mtd": [0.18180985775262454, 0.18953436981124244],
           "qtd": [0.9625756858664355, 0.587208537364615],

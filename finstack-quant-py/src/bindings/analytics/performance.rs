@@ -924,18 +924,18 @@ impl PyPerformance {
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.lookback_returns")]
-    #[pyo3(signature = (ref_date, fiscal_config = None))]
+    #[pyo3(signature = (ref_date = None, fiscal_config = None))]
     fn lookback_returns(
         &self,
-        ref_date: Bound<'_, PyAny>,
+        ref_date: Option<Bound<'_, PyAny>>,
         fiscal_config: Option<&PyFiscalConfig>,
     ) -> PyResult<PyLookbackReturns> {
-        let d = py_to_date(&ref_date)?;
-        Ok(PyLookbackReturns {
-            inner: self
-                .inner
-                .lookback_returns(d, fiscal_config.map(|config| config.inner)),
-        })
+        let ref_date = ref_date.as_ref().map(py_to_date).transpose()?;
+        let inner = self
+            .inner
+            .lookback_returns(ref_date, fiscal_config.map(|config| config.inner))
+            .map_err(analytics_to_py)?;
+        Ok(PyLookbackReturns { inner })
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.period_stats")]

@@ -74,8 +74,10 @@ export function createAnalyticsService(
           const cumulative = handle.cumulativeReturns();
           const drawdowns = handle.getDrawdownSeries();
           const tickerNames = handle.getTickerNames();
-          // The lookback date defaults to the last native active date; Rust rejects a missing one.
-          const refDate = request.lookbackDate ?? activeDates.at(-1)!;
+          const lookback = handle.lookbackReturns(
+            option(request.lookbackDate),
+            fiscal,
+          );
           const correlation = handle.correlationMatrix();
           return {
             tickerNames,
@@ -101,8 +103,8 @@ export function createAnalyticsService(
             monthly: handle.periodicReturns("monthly"),
             annual: handle.periodicReturns("annual"),
             lookback: {
-              refDate,
-              returns: handle.lookbackReturns(refDate, fiscal),
+              refDate: lookback.ref_date,
+              returns: lookback,
               fiscalYearStart: request.fiscalYearStart
                 ? { ...request.fiscalYearStart }
                 : null,
