@@ -12,7 +12,7 @@ export function readCashflows(cashflows: CashflowSchedule): CashflowSchedule {
   validator.parse(cashflows);
   return cashflows;
 }
-/** One row currency's native calendar-year ladder (`cashflows.calendarYearLadder`), in that currency's units. */
+/** One row currency's native calendar-year ladder (`valuations.instruments.calendarYearLadderByCurrency`), in that currency's units. */
 export interface CashflowLadder {
   readonly currency: CashflowRow["currency"];
   readonly rows: readonly CalendarYearLadderRow[];

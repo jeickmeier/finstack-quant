@@ -991,6 +991,15 @@
       "type_name": "ConvertibleGreeks"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/currency_ladder.schema.json",
+      "bytes": 2239,
+      "kind": "output",
+      "path": "schemas/results/1/currency_ladder.schema.json",
+      "summary": "One row currency's calendar-year non-principal, principal and native PV ladder.",
+      "title": "CurrencyLadder",
+      "type_name": "CurrencyLadder"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
       "bytes": 52720,
       "kind": "output",

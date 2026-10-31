@@ -11,6 +11,7 @@ export const instruments = {
   priceInstrumentWithMarket: wasm.priceInstrumentWithMarket,
   instrumentCashflows: wasm.instrumentCashflows,
   instrumentCashflowsWithMarket: wasm.instrumentCashflowsWithMarket,
+  calendarYearLadderByCurrency: wasm.calendarYearLadderByCurrency,
   calculateVar: wasm.calculateVar,
   listModels: wasm.listModels,
   listModelsGrouped: wasm.listModelsGrouped,

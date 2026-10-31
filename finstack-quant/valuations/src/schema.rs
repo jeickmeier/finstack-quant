@@ -719,7 +719,7 @@ pub fn artifacts_slice() -> &'static [SchemaArtifact] {
 /// entry with [`SchemaArtifact::generate`].
 #[must_use]
 pub fn artifacts() -> Vec<SchemaArtifact> {
-    use crate::instruments::cashflow_export::InstrumentCashflowEnvelope;
+    use crate::instruments::cashflow_export::{CurrencyLadder, InstrumentCashflowEnvelope};
     use crate::instruments::composite::{CompositeHistoryRow, CompositeRebalanceResult};
     use crate::instruments::credit_derivatives::cds_index::CdsIndexParams;
     use crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
@@ -913,6 +913,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::instrument_cashflow),
+        finstack_quant_core::schema_artifact!(
+            CurrencyLadder,
+            "results",
+            "currency_ladder",
+            Component,
+            "One row currency's calendar-year non-principal, principal and native PV ladder."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::currency_ladder),
         finstack_quant_core::schema_artifact!(
             ValuationResult,
             "results",
