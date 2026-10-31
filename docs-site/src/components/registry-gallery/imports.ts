@@ -308,6 +308,13 @@ export const importHarnesses = {
       name: "use-margin-call-dates",
       modules: modules.length,
     })),
+  "use-option-calculator": () =>
+    Promise.all([
+      import("@/hooks/models/use-option-calculator/use-option-calculator"),
+    ]).then((modules) => ({
+      name: "use-option-calculator",
+      modules: modules.length,
+    })),
   "use-fx-delta-samples": () =>
     Promise.all([
       import("@/hooks/models/use-fx-delta-samples/use-fx-delta-samples"),

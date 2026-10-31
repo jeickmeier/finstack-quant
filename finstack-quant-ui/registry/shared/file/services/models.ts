@@ -7,16 +7,29 @@ import type {
   FxStrikeSurface,
   MigrationMatrixRequest,
   ModelsApi,
+  OptionCalculatorRequest,
+  OptionCalculatorResult,
   PositionRisk,
   ScoringResult,
 } from "../finstack-contract";
 import { attempt, type ServiceContext } from "./context";
-/** models.volatility evaluators and the surface arbitrage check, the core surface handles they read, models.credit.migration, the Merton model, the credit-scoring functions, the PD master scale and the models.factor.risk position decompositions. */
+/** The closed-form option functions, models.volatility evaluators and the surface arbitrage check, the core surface handles they read, models.credit.migration, the Merton model, the credit-scoring functions, the PD master scale and the models.factor.risk position decompositions. */
 export type ModelsNative = {
   core: Pick<typeof core, "FxDeltaVolSurface" | "VolCube" | "VolSurface">;
-  models: {
+  models: Pick<
+    typeof models,
+    | "bsPrice"
+    | "bsGreeks"
+    | "bsImpliedVol"
+    | "black76Price"
+    | "black76Greeks"
+    | "black76ImpliedVol"
+    | "bachelierPrice"
+    | "bachelierGreeks"
+  > & {
     volatility: Pick<
       typeof models.volatility,
+      | "impliedVolBachelier"
       | "getFxDeltaVol"
       | "getCubeVol"
       | "getCubeNormalVol"
@@ -141,6 +154,117 @@ function score(
     }
     default:
       throw new RangeError("Unsupported scoring model");
+  }
+}
+/**
+ * One closed-form function of the request's model with the named terms in the
+ * facade's positional order (conversion only; tests/models/options pins every
+ * order). Values pass through unchanged, so Rust rejects an invalid one.
+ */
+function optionPrice(
+  native: ModelsNative["models"],
+  r: OptionCalculatorRequest,
+  vol: number,
+) {
+  switch (r.model) {
+    case "black_scholes":
+      return native.bsPrice(
+        r.spot,
+        r.strike,
+        r.rate,
+        r.divYield,
+        vol,
+        r.expiry,
+        r.isCall,
+      );
+    case "black76":
+      return native.black76Price(
+        r.forward,
+        r.strike,
+        r.df,
+        vol,
+        r.expiry,
+        r.isCall,
+      );
+    case "bachelier":
+      return native.bachelierPrice(
+        r.forward,
+        r.strike,
+        vol,
+        r.expiry,
+        r.isCall,
+      );
+    default:
+      throw new RangeError("Unsupported option model");
+  }
+}
+function optionImpliedVol(
+  native: ModelsNative["models"],
+  r: OptionCalculatorRequest,
+  price: number,
+) {
+  switch (r.model) {
+    case "black_scholes":
+      return native.bsImpliedVol(
+        r.spot,
+        r.strike,
+        r.rate,
+        r.divYield,
+        r.expiry,
+        price,
+        r.isCall,
+      );
+    case "black76":
+      return native.black76ImpliedVol(
+        r.forward,
+        r.strike,
+        r.df,
+        r.expiry,
+        price,
+        r.isCall,
+      );
+    case "bachelier":
+      return native.volatility.impliedVolBachelier(
+        price,
+        r.forward,
+        r.strike,
+        r.expiry,
+        r.isCall,
+      );
+    default:
+      throw new RangeError("Unsupported option model");
+  }
+}
+function optionGreeks(
+  native: ModelsNative["models"],
+  r: OptionCalculatorRequest,
+  vol: number,
+) {
+  switch (r.model) {
+    case "black_scholes":
+      // An omitted denominator stays unset so Rust applies its default.
+      return native.bsGreeks(
+        r.spot,
+        r.strike,
+        r.rate,
+        r.divYield,
+        vol,
+        r.expiry,
+        r.isCall,
+        r.thetaDaysPerYear ?? undefined,
+      );
+    case "black76":
+      return native.black76Greeks(r.forward, r.strike, vol, r.expiry, r.isCall);
+    case "bachelier":
+      return native.bachelierGreeks(
+        r.forward,
+        r.strike,
+        vol,
+        r.expiry,
+        r.isCall,
+      );
+    default:
+      throw new RangeError("Unsupported option model");
   }
 }
 const orNull = (values: Float64Array | undefined) =>
@@ -406,6 +530,34 @@ export function createModelsService(
         } finally {
           scale.free();
         }
+      });
+    },
+    optionCalculator(request) {
+      return context.result((): OptionCalculatorResult => {
+        const { model } = request;
+        if (request.mode === "price")
+          return {
+            model,
+            mode: "price",
+            price: optionPrice(native.models, request, request.vol),
+            greeks: attempt(() =>
+              optionGreeks(native.models, request, request.vol),
+            ),
+          };
+        // The solved volatility only passes along to the Greeks call.
+        const impliedVol = optionImpliedVol(
+          native.models,
+          request,
+          request.price,
+        );
+        return {
+          model,
+          mode: "implied_vol",
+          impliedVol,
+          greeks: attempt(() =>
+            optionGreeks(native.models, request, impliedVol),
+          ),
+        };
       });
     },
     positionRisk(request) {

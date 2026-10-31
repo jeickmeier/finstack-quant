@@ -616,6 +616,54 @@ export interface CreditScore {
   /** models.credit.pd.MasterScale.defaultCalibration().mapScore(result), or its native error (Rust rejects a result without an implied PD). */
   grade: Envelope<modelsWire.MasterScaleResult>;
 }
+/** Terms of one European option; each model takes its own, as the facade function documents them. */
+export type OptionTerms =
+  | {
+      readonly model: "black_scholes";
+      readonly spot: number;
+      readonly strike: number;
+      /** Risk-free rate, decimal, continuously compounded. */
+      readonly rate: number;
+      /** Dividend yield or foreign rate, decimal, continuously compounded. */
+      readonly divYield: number;
+      /** Years. */
+      readonly expiry: number;
+      readonly isCall: boolean;
+      /** Theta denominator; omitted is left to Rust's default. */
+      readonly thetaDaysPerYear?: number | null;
+    }
+  | {
+      readonly model: "black76";
+      readonly forward: number;
+      readonly strike: number;
+      /** Discount factor from valuation to expiry. */
+      readonly df: number;
+      /** Years. */
+      readonly expiry: number;
+      readonly isCall: boolean;
+    }
+  | {
+      readonly model: "bachelier";
+      readonly forward: number;
+      readonly strike: number;
+      /** Years. */
+      readonly expiry: number;
+      readonly isCall: boolean;
+    };
+/** An option's terms with a volatility to price, or a price to invert: per unit, discounted under Black-76, undiscounted under Bachelier. */
+export type OptionCalculatorRequest = OptionTerms &
+  (
+    | { readonly mode: "price"; readonly vol: number }
+    | { readonly mode: "implied_vol"; readonly price: number }
+  );
+/** The returned price or implied volatility and the Greeks at that volatility; nothing is computed in TypeScript. */
+export type OptionCalculatorResult = {
+  model: OptionTerms["model"];
+  /** BsGreeks under Black-Scholes, ForwardGreeks otherwise, or Rust's error of that one call. */
+  greeks: Envelope<modelsWire.BsGreeks | modelsWire.ForwardGreeks>;
+} & (
+  { mode: "price"; price: number } | { mode: "implied_vol"; impliedVol: number }
+);
 /** Where a position VaR/ES decomposition comes from. */
 export type PositionRiskSource =
   | {
@@ -1163,6 +1211,10 @@ export interface ModelsApi {
   mertonReport(request: MertonReportRequest): Promise<Envelope<MertonReport>>;
   /** One models.credit.scoring function over its input ratios in the facade's positional order, then models.credit.pd.MasterScale.defaultCalibration().mapScore of the result (kept as an envelope); the scale handle is freed. */
   creditScore(request: CreditScoreRequest): Promise<Envelope<CreditScore>>;
+  /** One closed-form price (bsPrice, black76Price, bachelierPrice) or implied-volatility solve (bsImpliedVol, black76ImpliedVol, models.volatility.impliedVolBachelier) in the facade's positional order, then the model's Greeks at that volatility, kept as an envelope. */
+  optionCalculator(
+    request: OptionCalculatorRequest,
+  ): Promise<Envelope<OptionCalculatorResult>>;
   /** models.factor.risk parametric or historical VaR/ES decomposition, evaluateRiskBudgetFromDecomposition, and buildStressAttribution of a historical source; the budget and stress attribution keep their own native errors. */
   positionRisk(request: PositionRiskRequest): Promise<Envelope<PositionRisk>>;
   /** models.factor.risk.decomposeFactors: the parametric factor and position risk decomposition of a sensitivity matrix under a factor covariance. */
