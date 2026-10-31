@@ -269,14 +269,15 @@ def list_standard_metrics_grouped() -> dict[str, list[str]]:
 
 def metrics_for_instrument(instrument_type: str) -> dict[str, list[str]]:
     """
-    Return the standard metric IDs registered for one instrument type, by group.
+    Return every metric ID the standard registry holds for one instrument type, by group.
 
     The per-instrument counterpart to :func:`list_standard_metrics_grouped`:
     each display group keeps only the metrics the standard registry applies
-    to ``instrument_type``, and groups left empty are omitted. A listed
-    metric is registered for the type; whether it computes under a given
-    pricing model still depends on that model. Metrics outside every display
-    group are not listed.
+    to ``instrument_type``, and groups left empty are omitted. Applicable
+    metrics outside every display group, such as ``all_in_rate`` or
+    ``parity``, are listed under ``"Instrument Specific"``. A listed metric
+    is registered for the type; whether it computes under a given pricing
+    model or market still depends on that model and market.
 
     Parameters
     ----------
@@ -316,7 +317,9 @@ def metric_metadata(keys: list[str]) -> list[dict[str, Any]]:
     keys : list[str]
         Canonical scalar or qualified wire keys; input order and duplicates
         are retained and qualified coordinates require the native composite
-        escaping. Custom names are accepted with unknown units and no group.
+        escaping. Custom names are accepted with unknown units; one the
+        standard registry holds gets the group ``"Instrument Specific"``, any
+        other gets no group.
 
     Returns
     -------
