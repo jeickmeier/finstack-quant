@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type {
   MetricFieldUnit,
   OasResult,
+  TrancheSolveFieldUnits,
   TrancheMetrics,
 } from "finstack-quant-wasm";
 import { Button } from "@/components/ui/button";
@@ -112,9 +113,11 @@ export interface TrancheAnalyticsProps {
   metrics: TrancheTile<TrancheMetrics>;
   /** Native trancheMetricFieldUnits for the result's currency; connect useTrancheMetricFieldUnits. */
   metricUnits: TrancheTile<readonly MetricFieldUnit[]>;
-  /** Native trancheBreakevenCdr result (decimal). */
+  /** Native trancheSolveFieldUnits, the units of the three tiles below; connect useTrancheSolveFieldUnits. */
+  solveUnits: TrancheTile<TrancheSolveFieldUnits>;
+  /** Native trancheBreakevenCdr result. */
   breakevenCdr: TrancheTile<number>;
-  /** Native trancheDiscountMargin result at the price (decimal). */
+  /** Native trancheDiscountMargin result at the price. */
   discountMargin: TrancheTile<number>;
   /** Native trancheOas result at the price, under the applied OasConfig or Rust's default. */
   oas: TrancheTile<OasResult>;
@@ -141,6 +144,7 @@ export function TrancheAnalytics({
   onPriceChange,
   metrics,
   metricUnits,
+  solveUnits,
   breakevenCdr,
   discountMargin,
   oas,
@@ -190,13 +194,12 @@ export function TrancheAnalytics({
         <div className="flex min-w-0 flex-col gap-3">
           <TileFrame title="Break-even CDR">
             <TileState tile={breakevenCdr} idle="No break-even CDR returned">
-              <MeasureValue
-                value={breakevenCdr.value}
-                unit={{
-                  label: "decimal",
-                  source: "valuations.instruments.trancheBreakevenCdr",
-                }}
-              />
+              <TileState tile={solveUnits} idle="No units returned">
+                <MeasureValue
+                  value={breakevenCdr.value}
+                  unit={solveUnits.value?.breakeven_cdr}
+                />
+              </TileState>
             </TileState>
           </TileFrame>
           <TileFrame title="Discount margin">
@@ -208,13 +211,12 @@ export function TrancheAnalytics({
                   : "No discount margin returned"
               }
             >
-              <MeasureValue
-                value={discountMargin.value}
-                unit={{
-                  label: "decimal",
-                  source: "valuations.instruments.trancheDiscountMargin",
-                }}
-              />
+              <TileState tile={solveUnits} idle="No units returned">
+                <MeasureValue
+                  value={discountMargin.value}
+                  unit={solveUnits.value?.discount_margin}
+                />
+              </TileState>
             </TileState>
           </TileFrame>
           <TileFrame title="Option-adjusted spread">
@@ -255,37 +257,29 @@ export function TrancheAnalytics({
                   : "OAS runs on request"
               }
             >
-              {oas.value && (
-                <dl className="flex flex-col gap-1.5 text-sm">
-                  {(
-                    [
-                      ["oas", "decimal"],
-                      ["model_price", "% of current balance"],
-                      ["market_price", "% of current balance"],
-                      ["num_paths", undefined],
-                      ["price_std_error", "% of current balance"],
-                    ] as const
-                  ).map(([field, unit]) => (
-                    <div key={field} className="flex flex-col">
-                      <dt className="text-xs text-muted-foreground">
-                        {labelFor(field)}
-                      </dt>
-                      <dd>
-                        <MeasureValue
-                          value={oas.value![field] as number}
-                          unit={
-                            unit && {
-                              label: unit,
-                              source: `valuations::OasResult::${field}`,
+              <TileState tile={solveUnits} idle="No units returned">
+                {oas.value && solveUnits.value && (
+                  <dl className="flex flex-col gap-1.5 text-sm">
+                    {solveUnits.value.oas.map((unit) => (
+                      <div key={unit.field} className="flex flex-col">
+                        <dt className="text-xs text-muted-foreground">
+                          {labelFor(unit.field)}
+                        </dt>
+                        <dd>
+                          <MeasureValue
+                            value={
+                              oas.value![
+                                unit.field as keyof OasResult
+                              ] as number
                             }
-                          }
-                          showUnavailableUnit={false}
-                        />
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
+                            unit={unit}
+                          />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </TileState>
             </TileState>
           </TileFrame>
         </div>

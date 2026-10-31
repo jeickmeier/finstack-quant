@@ -127,6 +127,7 @@
     "valuations.instruments.trancheMetrics",
     "valuations.instruments.trancheOas",
     "valuations.instruments.trancheScenarioTable",
+    "valuations.instruments.trancheSolveFieldUnits",
     "valuations.instruments.validateInstrumentJson",
     "valuations.valuationResultToJson"
   ],

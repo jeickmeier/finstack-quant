@@ -401,6 +401,33 @@ def tranche_metric_field_units(currency: str | Currency) -> list[dict[str, str]]
     """
     ...
 
+def tranche_solve_field_units() -> dict[str, Any]:
+    """
+    Units of the tranche break-even CDR, discount margin and OAS results.
+
+    Those solvers document their units in prose: the two scalars are decimals
+    (``0.0125`` = 125 bp) and ``OasResult`` prices are percent of the tranche's
+    current balance. Values are never rescaled.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``breakeven_cdr`` and ``discount_margin``, each one record of ``field``,
+        ``label`` and ``source``, and ``oas``, one such record per ``OasResult``
+        field in struct order.
+
+    Notes
+    -----
+    This function does not raise.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import tranche_solve_field_units
+    >>> tranche_solve_field_units()["breakeven_cdr"]["label"]
+    'decimal'
+    """
+    ...
+
 class MetricPricingOverrides:
     """
     Metric-time pricing overrides merged into an instrument before pricing.

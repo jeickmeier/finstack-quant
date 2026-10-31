@@ -3482,6 +3482,13 @@
             "bytes": 6278
           },
           {
+            "path": "schemas/results/1/tranche_solve_field_units.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/tranche_solve_field_units.schema.json",
+            "type_name": "TrancheSolveFieldUnits",
+            "kind": "output",
+            "bytes": 2744
+          },
+          {
             "path": "schemas/results/1/valuation_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
             "type_name": "ValuationResult",
@@ -5667,6 +5674,14 @@
             "type_name": "TrancheMetrics",
             "kind": "output",
             "bytes": 6278
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/tranche_solve_field_units.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/tranche_solve_field_units.schema.json",
+            "type_name": "TrancheSolveFieldUnits",
+            "kind": "output",
+            "bytes": 2744
           },
           {
             "domain": "valuations",

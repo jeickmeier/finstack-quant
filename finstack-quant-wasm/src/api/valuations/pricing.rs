@@ -447,6 +447,16 @@ pub fn calendar_year_ladder_by_currency(envelope: JsValue) -> Result<JsValue, Js
     )
 }
 
+/// Units of the tranche break-even CDR, discount margin and OAS results.
+///
+/// Those solvers document their units in prose and do not state them on the wire.
+/// Values are never rescaled.
+/// @returns `TrancheSolveFieldUnits`: `breakeven_cdr` and `discount_margin`, each one `MetricFieldUnit`, and `oas`, one `MetricFieldUnit` per `OasResult` field in struct order.
+#[wasm_bindgen(js_name = trancheSolveFieldUnits)]
+pub fn tranche_solve_field_units() -> Result<JsValue, JsValue> {
+    to_js_value(&finstack_quant_valuations::pricer::tranche_solve_field_units())
+}
+
 /// Units of the scalar `TrancheMetrics` fields, in struct order.
 ///
 /// `TrancheMetrics` documents these units in prose and does not state them on

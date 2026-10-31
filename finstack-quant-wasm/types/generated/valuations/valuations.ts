@@ -20407,6 +20407,23 @@ export interface TrancheMetrics {
   z_spread_to_call_bp?: number | null;
 }
 /**
+ * The display units of the tranche break-even CDR, discount margin and OAS results.
+ */
+export interface TrancheSolveFieldUnits {
+  /**
+   * Unit of the value `tranche_breakeven_cdr` returns.
+   */
+  breakeven_cdr: MetricFieldUnit;
+  /**
+   * Unit of the value `tranche_discount_margin` returns.
+   */
+  discount_margin: MetricFieldUnit;
+  /**
+   * Unit of every `OasResult` field, in the order the struct declares them.
+   */
+  oas: MetricFieldUnit[];
+}
+/**
  * Bounded structured diagnostics emitted by persisted-contract validation.
  */
 export interface ValidationReport {

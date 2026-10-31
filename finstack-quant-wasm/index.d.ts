@@ -196,6 +196,7 @@ import type {
   MetricFieldUnit,
   MetricMetadata,
   OasResult,
+  TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
   ResultsMeta,
@@ -431,6 +432,7 @@ export type {
   MetricFieldUnit,
   MetricMetadata,
   OasResult,
+  TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
   ResultsMeta,
@@ -23210,6 +23212,11 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
    */
   trancheMetricFieldUnits(currency: string): MetricFieldUnit[];
+  /**
+   * Units of the tranche break-even CDR, discount margin and OAS results.
+   * @returns `TrancheSolveFieldUnits`: `breakeven_cdr` and `discount_margin`, each one `MetricFieldUnit`, and `oas`, one `MetricFieldUnit` per `OasResult` field in struct order.
+   */
+  trancheSolveFieldUnits(): TrancheSolveFieldUnits;
   /**
    * Calendar-year ladders of a cashflow envelope, one per row currency.
    * @param envelope - `InstrumentCashflowEnvelope` returned by `instrumentCashflows`, as an object or JSON.

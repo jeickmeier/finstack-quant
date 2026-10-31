@@ -446,6 +446,16 @@ fn price_driver_fields() -> Vec<&'static str> {
     finstack_quant_valuations::instruments::pricing_overrides::MarketQuoteOverrides::price_driver_fields()
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "tranche_solve_field_units")]
+#[pyfunction]
+#[pyo3(text_signature = "()")]
+fn tranche_solve_field_units(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    serde_to_py(
+        py,
+        &finstack_quant_valuations::pricer::tranche_solve_field_units(),
+    )
+}
+
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "tranche_metric_field_units")]
 #[pyfunction]
 #[pyo3(text_signature = "(currency)")]
@@ -661,6 +671,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(metric_metadata, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(price_driver_fields, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(tranche_metric_field_units, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(tranche_solve_field_units, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(metrics_for_instrument, m)?)?;
     Ok(())
 }
@@ -683,6 +694,7 @@ pub(crate) const EXPORTS: &[&str] = &[
     "price_driver_fields",
     "price_instrument",
     "tranche_metric_field_units",
+    "tranche_solve_field_units",
 ];
 
 /// Price an instrument envelope through the canonical Rust pricer.

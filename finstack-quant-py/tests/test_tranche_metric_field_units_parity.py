@@ -15,9 +15,10 @@ from pathlib import Path
 
 import pytest
 
-from finstack_quant.valuations.instruments import tranche_metric_field_units
+from finstack_quant.valuations.instruments import tranche_metric_field_units, tranche_solve_field_units
 
 FIXTURE = Path(__file__).parent / "fixtures" / "tranche_metric_field_units.json"
+SOLVE_FIXTURE = Path(__file__).parent / "fixtures" / "tranche_solve_field_units.json"
 
 
 def test_units_match_the_records_pinned_for_both_hosts() -> None:
@@ -30,3 +31,10 @@ def test_units_match_the_records_pinned_for_both_hosts() -> None:
 def test_rejects_an_unknown_currency() -> None:
     with pytest.raises(ValueError, match=r"(?i)currency"):
         tranche_metric_field_units("NOT-A-CURRENCY")
+
+
+def test_solve_units_match_the_records_pinned_for_both_hosts() -> None:
+    actual = tranche_solve_field_units()
+    if os.environ.get("UPDATE_TRANCHE_UNITS_PARITY"):
+        SOLVE_FIXTURE.write_text(json.dumps(actual, indent=2) + "\n")
+    assert actual == json.loads(SOLVE_FIXTURE.read_text())

@@ -1032,6 +1032,7 @@ public = [
     "tranche_metrics",
     "tranche_oas",
     "tranche_scenario_table",
+    "tranche_solve_field_units",
     "validate_instrument_json",
     "validate_typed_instrument_json",
 ]
