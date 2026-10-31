@@ -1663,7 +1663,7 @@ class Performance:
 
     def lookback_returns(
         self,
-        ref_date: object,
+        ref_date: object | None = None,
         fiscal_config: FiscalConfig | None = None,
     ) -> LookbackReturns:
         """
@@ -1677,8 +1677,10 @@ class Performance:
 
         Parameters
         ----------
-        ref_date : object
+        ref_date : object, optional
             Reference date (``datetime.date``, ``pd.Timestamp``, or ISO string).
+            ``None`` uses the last active date; ``LookbackReturns.ref_date``
+            states the date used.
         fiscal_config : FiscalConfig, optional
             Fiscal calendar that opens the FYTD window. ``None`` uses the
             calendar year (Rust ``FiscalConfig::default``).
@@ -1692,7 +1694,8 @@ class Performance:
         Raises
         ------
         ValueError
-            If *ref_date* is a string that is not ISO-8601.
+            If *ref_date* is a string that is not ISO-8601, or is ``None`` while
+            no dates are active.
         TypeError
             If *ref_date* is not date-like, or *fiscal_config* is neither a
             ``FiscalConfig`` nor ``None``.

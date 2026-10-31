@@ -6,6 +6,7 @@
 
 #### Changed
 
+- `Performance::lookback_returns` takes `Option<Date>` (Python `ref_date=None`, WASM optional `refDate`) and defaults to the last active date, erroring when none is active; it returns `Result`. `LookbackReturns` gains a required `ref_date` stating the date the windows ended on.
 - `generate_tornado_entries` (Python `generate_tornado_entries`, WASM `statements_analytics.generateTornadoEntries`) returns `None` / `null` for a full-grid result instead of an error. A full grid has no tornado by construction, so a host no longer checks the mode first.
 
 #### Removed

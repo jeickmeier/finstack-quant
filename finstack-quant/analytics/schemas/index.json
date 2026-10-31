@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_returns.schema.json",
-      "bytes": 1351,
+      "bytes": 1728,
       "kind": "component",
       "path": "schemas/analytics/1/lookback_returns.schema.json",
       "summary": "Lookback returns for each period horizon.",

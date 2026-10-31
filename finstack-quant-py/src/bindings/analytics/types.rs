@@ -489,6 +489,11 @@ pub struct PyLookbackReturns {
 
 #[pymethods]
 impl PyLookbackReturns {
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.ref_date")]
+    #[getter]
+    fn ref_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::date_utils::date_to_py(py, self.inner.ref_date)
+    }
     #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.ticker_names")]
     #[getter]
     fn ticker_names(&self) -> Vec<String> {

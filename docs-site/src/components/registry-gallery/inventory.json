@@ -1454,7 +1454,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",
-      "sha256": "854fb65e7217219f57c52658e1f2e3b14cfab5884a32f726734edca87650e9eb"
+      "sha256": "321ffcfe293db4e1d0e560bb9e8f8fb730c44c9412ce6695b1d2625d69930ce8"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/benchmark.json",

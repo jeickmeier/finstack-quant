@@ -993,6 +993,13 @@ impl Performance {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct LookbackReturns {
+    /// Date on which every lookback window ended: the requested date, else the
+    /// last active date of the panel.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub ref_date: Date,
     /// Ticker names aligned with every per-ticker vector below.
     pub ticker_names: Vec<String>,
     /// Month-to-date compounded return per ticker.

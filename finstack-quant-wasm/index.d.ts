@@ -9182,12 +9182,12 @@ declare class Performance {
    * calendar quarter and year. FYTD is the first observation on or after the
    * fiscal calendar start of `fiscalConfig` through `refDate`. Holidays are not
    * skipped. The first included simple return still spans the prior close.
-   * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
+   * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end. Omitted or `null` is the last active date; the result's `ref_date` states the date used.
    * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` is the calendar year (`FiscalConfig::default`).
-   * @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
-   * @throws Error - Rejects an invalid ISO `ref_date` or a result that cannot be serialized to JavaScript.
+   * @returns The window end `ref_date` and per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
+   * @throws Error - Rejects an invalid ISO `ref_date`, an omitted one while no dates are active, or a result that cannot be serialized to JavaScript.
    */
-  lookbackReturns(refDate: string, fiscalConfig?: FiscalConfig | null): LookbackReturns;
+  lookbackReturns(refDate?: string | null, fiscalConfig?: FiscalConfig | null): LookbackReturns;
   /**
    * Aggregated period statistics for one asset at the given frequency. Without
    * a fiscal calendar, Gregorian periods are bucketed with ISO weeks.
