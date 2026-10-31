@@ -95,7 +95,7 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 ///
 /// - Standard: YTM, Discount Margin, DV01, BucketedDV01, CS01, BucketedCS01, Theta
 /// - Custom: YTW (`"ytw"`), YTC (`"ytc"`), YT2Y/3Y/4Y, All-In Rate (`"all_in_rate"`),
-///   OID EIR amortization (`"oid_eir_amortization"`)
+///   OID EIR amortization (`"oid_eir_amortization"`), OID effective rate (`"oid_eir_rate"`)
 ///
 /// # Examples
 ///
@@ -129,6 +129,7 @@ pub(crate) fn register_term_loan_metrics(
         custom: [
             ("all_in_rate", AllInRateCalculator),
             ("oid_eir_amortization", OidEirAmortizationCalculator),
+            ("oid_eir_rate", OidEirRateCalculator),
             // Yield to first call (custom id: ytc)
             ("ytc", YtcCalculator),
             // Yields to fixed horizons
@@ -171,7 +172,7 @@ pub(crate) fn register_term_loan_metrics(
 ///
 /// The fee-inclusive "all-in" borrower cost — the IFRS-9 effective interest
 /// rate that amortizes upfront fees and OID over the loan's life — is a
-/// separate metric, [`OidEirAmortizationCalculator`]
+/// separate metric, [`OidEirRateCalculator`]
 /// (`"oid_eir_rate"`), which solves an XIRR over the full flow set (including
 /// the upfront fee when `OidEirSpec::include_fees`). Use that metric when the
 /// borrower's effective rate inclusive of origination economics is required.
@@ -244,7 +245,25 @@ impl MetricCalculator for OidEirAmortizationCalculator {
         let market = &context.curves;
 
         let schedule = crate::term_loan::cashflows::build_oid_eir_schedule(loan, market)?;
-        Ok(schedule.record(context))
+        schedule.record(context);
+        Ok(schedule.total_amortization())
+    }
+}
+
+/// Computes the effective interest rate (decimal XIRR of the full flow set).
+///
+/// Shares one solve with [`OidEirAmortizationCalculator`]: whichever of the two
+/// runs first stores both results, and the registry then skips the other.
+pub(crate) struct OidEirRateCalculator;
+
+impl MetricCalculator for OidEirRateCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let loan: &TermLoan = context.instrument_as()?;
+        let market = &context.curves;
+
+        let schedule = crate::term_loan::cashflows::build_oid_eir_schedule(loan, market)?;
+        schedule.record(context);
+        Ok(schedule.effective_rate)
     }
 }
 

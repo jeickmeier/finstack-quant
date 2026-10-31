@@ -2726,7 +2726,7 @@ class TermLoanBuilder:
         Parameters
         ----------
         value : dict[str, object] | str
-            Rust ``OidEirSpec`` in serde form (``dict`` or JSON string), e.g. ``{"issue_price_pct": 99.0, ...}``.
+            Rust ``OidEirSpec`` in serde form (``dict`` or JSON string), e.g. ``{"include_fees": false}``.
 
         Returns
         -------

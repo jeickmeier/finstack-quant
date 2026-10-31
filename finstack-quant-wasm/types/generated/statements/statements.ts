@@ -4974,8 +4974,8 @@ export interface RevolvingCredit {
    */
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Effective-interest-rate reporting switch for the
-   * `oid_eir_amortization` metric. `None` (the default) reports with fees
+   * Effective-interest-rate reporting switch for the `oid_eir_rate` and
+   * `oid_eir_amortization` metrics. `None` (the default) reports with fees
    * included, the same as `Some(OidEirSpec::default())`.
    */
   oid_eir?: OidEirSpec | null;

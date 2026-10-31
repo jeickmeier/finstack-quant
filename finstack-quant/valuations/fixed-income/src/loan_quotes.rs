@@ -280,18 +280,22 @@ pub struct OidEirSchedule {
 }
 
 impl OidEirSchedule {
-    /// Store `oid_eir_rate` and the dated `oid_eir_amortization` /
-    /// `oid_eir_carrying_value` series on `context`, returning the total
-    /// amortization.
+    /// Store `oid_eir_rate`, the total `oid_eir_amortization` and the dated
+    /// `oid_eir_amortization` / `oid_eir_carrying_value` series on `context`,
+    /// so requesting both metrics of one solve runs that solve once.
     pub(crate) fn record(
         &self,
         context: &mut finstack_quant_valuations_core::metrics::MetricContext,
-    ) -> f64 {
+    ) {
         use finstack_quant_valuations_core::metrics::MetricId;
 
         context
             .computed
             .insert(MetricId::custom("oid_eir_rate"), self.effective_rate);
+        context.computed.insert(
+            MetricId::custom("oid_eir_amortization"),
+            self.total_amortization(),
+        );
         if !self.periods.is_empty() {
             context.store_bucketed_series(
                 MetricId::custom("oid_eir_amortization"),
@@ -306,6 +310,10 @@ impl OidEirSchedule {
                     .map(|p| (p.date.to_string(), p.closing_balance.amount())),
             );
         }
+    }
+
+    /// Total OID amortization over all periods, in the schedule currency.
+    pub(crate) fn total_amortization(&self) -> f64 {
         self.periods
             .iter()
             .map(|p| p.oid_amortization.amount())

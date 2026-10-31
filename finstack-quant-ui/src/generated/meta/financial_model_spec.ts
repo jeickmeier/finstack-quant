@@ -4499,7 +4499,7 @@ export default [
     "path": "#/$defs/d_756aabf913f51b821a96/properties/oid_eir",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCredit/properties/oid_eir",
     "default": null,
-    "description": "Effective-interest-rate reporting switch for the\n`oid_eir_amortization` metric. `None` (the default) reports with fees\nincluded, the same as `Some(OidEirSpec::default())`."
+    "description": "Effective-interest-rate reporting switch for the `oid_eir_rate` and\n`oid_eir_amortization` metrics. `None` (the default) reports with fees\nincluded, the same as `Some(OidEirSpec::default())`."
   },
   {
     "path": "#/$defs/d_756aabf913f51b821a96/properties/oid_eir/anyOf/0",

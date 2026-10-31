@@ -1,0 +1,70 @@
+{
+  "as_of": "2024-01-01",
+  "model": "discounting",
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2024-01-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            1.0,
+            0.97
+          ],
+          [
+            5.0,
+            0.85
+          ]
+        ],
+        "interp_style": "monotone_convex",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": -0.005,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "fx_policy": null
+      },
+      {
+        "type": "forward",
+        "id": "USD-SOFR-3M",
+        "base": "2024-01-01",
+        "reset_lag": 2,
+        "day_count": "act_360",
+        "tenor": 0.25,
+        "knot_points": [
+          [
+            0.0,
+            0.03
+          ],
+          [
+            5.0,
+            0.03
+          ]
+        ],
+        "projection_grid": null,
+        "interp_style": "linear",
+        "extrapolation": "flat_zero",
+        "rate_calibration": null,
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {},
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "hierarchy": null
+  },
+  "oid_eir_rate": 0.061349529692367025
+}

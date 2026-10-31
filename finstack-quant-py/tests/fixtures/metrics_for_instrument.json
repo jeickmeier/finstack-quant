@@ -15,6 +15,7 @@
       "draw_option_cost",
       "exposure_at_default",
       "oid_eir_amortization",
+      "oid_eir_rate",
       "price_from_dm",
       "utilization_rate",
       "weighted_average_cost"
@@ -22,6 +23,7 @@
     "term_loan": [
       "all_in_rate",
       "oid_eir_amortization",
+      "oid_eir_rate",
       "yt2y",
       "yt3y",
       "yt4y",

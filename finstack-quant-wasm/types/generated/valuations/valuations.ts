@@ -7290,8 +7290,8 @@ export interface RevolvingCredit {
    */
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Effective-interest-rate reporting switch for the
-   * `oid_eir_amortization` metric. `None` (the default) reports with fees
+   * Effective-interest-rate reporting switch for the `oid_eir_rate` and
+   * `oid_eir_amortization` metrics. `None` (the default) reports with fees
    * included, the same as `Some(OidEirSpec::default())`.
    */
   oid_eir?: OidEirSpec | null;
@@ -19950,7 +19950,9 @@ export interface MetricMetadata {
    */
   coordinates: MetricCoordinate[];
   /**
-   * Native display group; absent for a non-standard base metric.
+   * Native display group, the same name [`metrics_for_instrument`] lists the
+   * base metric under; absent for a base metric the standard registry does
+   * not hold.
    */
   group?: string | null;
   /**

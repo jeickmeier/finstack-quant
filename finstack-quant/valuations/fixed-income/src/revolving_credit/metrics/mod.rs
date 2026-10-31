@@ -84,6 +84,7 @@ pub(crate) fn register_revolving_credit_metrics(
             ("exposure_at_default", exposure::ExposureAtDefaultCalculator),
             ("expected_loss", exposure::ExpectedLossCalculator),
             ("oid_eir_amortization", oid_eir::OidEirAmortizationCalculator),
+            ("oid_eir_rate", oid_eir::OidEirRateCalculator),
         ]
     }
 
