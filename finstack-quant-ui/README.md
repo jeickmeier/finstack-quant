@@ -515,7 +515,7 @@ report. Returns are MOIC only: IRR is not part of the native result.
 `statements_analytics.parameterSpecWithPercentages` (the base value is the
 evaluated cell, a missing or non-finite one sent as NaN), runs
 `runSensitivity` and returns its `generateTornadoEntries` at the target metric
-and period, or a null tornado for a `full_grid` run, which Rust cannot rank.
+and period, which Rust returns as null for a `full_grid` run it cannot rank.
 `useGoalSeek` (`use-goal-seek`) passes the target, driver, update flag and an
 optional bracket to `goalSeek`, leaving an unset bracket unset. Below the
 Scenarios tab's scenario set, `StatementSensitivity` shows the native tornado

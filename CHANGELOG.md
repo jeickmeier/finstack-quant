@@ -4,6 +4,10 @@
 
 ### UI boundary: rules decided in Rust
 
+#### Changed
+
+- `generate_tornado_entries` (Python `generate_tornado_entries`, WASM `statements_analytics.generateTornadoEntries`) returns `None` / `null` for a full-grid result instead of an error. A full grid has no tornado by construction, so a host no longer checks the mode first.
+
 #### Removed
 
 - The `rate-input` registry item and the UI's `rateColumn`, `rateToWire`, `convertRate`, `formatRate` and `RatePresentation`. Nothing in the registry used them, and they scaled rate units in JavaScript. Display percent is now `formatPercent`.

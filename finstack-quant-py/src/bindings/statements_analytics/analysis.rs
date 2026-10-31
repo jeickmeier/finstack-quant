@@ -147,15 +147,16 @@ fn run_sensitivity(
 ///
 /// Returns
 /// -------
-/// list[TornadoEntry]
+/// list[TornadoEntry] or None
 ///     Typed entries sorted by descending absolute swing, with parameter IDs
-///     preserving the perturbed ``node@period`` key.
+///     preserving the perturbed ``node@period`` key; ``None`` for a full-grid
+///     run, whose scenarios combine parameters and cannot be ranked.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If ``period`` does not parse, ``result`` is malformed JSON, the run
-///     uses a full grid, a scenario does not contain exactly one perturbed
+///     If ``period`` does not parse, ``result`` is malformed JSON, a
+///     one-at-a-time run's scenario does not contain exactly one perturbed
 ///     parameter, its unperturbed baseline is absent, the target metric/period
 ///     is missing, or a metric value or impact is non-finite.
 ///
@@ -177,20 +178,21 @@ fn generate_tornado_entries(
     result: &Bound<'_, PyAny>,
     metric_node: &str,
     period: &str,
-) -> PyResult<Vec<PyTornadoEntry>> {
+) -> PyResult<Option<Vec<PyTornadoEntry>>> {
     let result = extract_sensitivity_result(result)?;
     let period_id = parse_period_id(period)?;
-    Ok(
-        finstack_quant_statements_analytics::analysis::generate_tornado_entries(
-            &result,
-            metric_node,
-            period_id,
-        )
-        .map_err(statements_to_py)?
-        .into_iter()
-        .map(PyTornadoEntry::from_inner)
-        .collect(),
+    let entries = finstack_quant_statements_analytics::analysis::generate_tornado_entries(
+        &result,
+        metric_node,
+        period_id,
     )
+    .map_err(statements_to_py)?;
+    Ok(entries.map(|entries| {
+        entries
+            .into_iter()
+            .map(PyTornadoEntry::from_inner)
+            .collect()
+    }))
 }
 
 /// Run variance analysis comparing two statement results.

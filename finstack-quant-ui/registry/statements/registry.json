@@ -1085,7 +1085,7 @@
       "type": "registry:hook",
       "title": "useRunSensitivity",
       "description": "Runs a native sensitivity analysis of a statement model and its tornado through the WASM worker.",
-      "docs": "Native statements_analytics.parameterSpecWithPercentages for each parameter (node, period, base value and percentage moves), runSensitivity over the SensitivityConfig of the mode, those parameters and the target metric, then generateTornadoEntries of the result at the target metric and period; a full_grid run, which Rust cannot rank, returns a null tornado. Returns {result, tornado}. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
+      "docs": "Native statements_analytics.parameterSpecWithPercentages for each parameter (node, period, base value and percentage moves), runSensitivity over the SensitivityConfig of the mode, those parameters and the target metric, then generateTornadoEntries of the result at the target metric and period; Rust returns a null tornado for a full_grid run it cannot rank. Returns {result, tornado}. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
       "files": [
         {
           "path": "hooks/use-run-sensitivity/use-run-sensitivity.ts",
