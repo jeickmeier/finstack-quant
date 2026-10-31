@@ -249,7 +249,7 @@
     {
       "name": "tranche-analytics",
       "type": "registry:component",
-      "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. With onOasConfigChange, an OAS configuration disclosure edits the generated OasConfig contract, starting from its Rust example (OasConfig::default()), and hands complete JSON to the host on apply. Nothing is computed, rescaled or defaulted. No worker is required.",
+      "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. With onOasConfigChange, an OAS configuration disclosure edits the generated OasConfig contract, starting from its Rust example (OasConfig::default()), and hands complete JSON to the host on apply. With schedule, the native TrancheCashflows totals and the TrancheCashflows::to_table projection (one row per date; Rust joins and sums the per-kind flows) show as returned. Nothing is computed, rescaled or defaulted. No worker is required.",
       "worker": "none"
     },
     {
@@ -1478,7 +1478,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
-      "sha256": "94d360fe4576d46bd8da054248de3a7a957611a5921ae928eadd50cff42dae53"
+      "sha256": "0fa06a4979f734bb9a6ba39a63b806c6b306d01f864ef6b2092fa79045f370e0"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",

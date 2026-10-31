@@ -203,6 +203,7 @@ import type {
   ResultsMeta,
   ScenarioCell,
   ScenarioTable,
+  TrancheCashflows,
   TrancheMetrics,
   ToleranceConfig,
   ValidationReport,
@@ -440,6 +441,7 @@ export type {
   ResultsMeta,
   ScenarioCell,
   ScenarioTable,
+  TrancheCashflows,
   TrancheMetrics,
   ValidationReport,
 };
@@ -23622,6 +23624,17 @@ export interface ValuationInstrumentsNamespace {
     pool: generated.valuations.AssetPool | string,
     industry: string
   ): generated.valuations.PoolAsset[];
+  /**
+   * One row per payment date of a tranche's flows (mirrors Rust `TrancheCashflows::to_table`).
+   *
+   * Python reaches the same table through `TrancheCashflows.to_dataframe`.
+   * @param cashflows - `TrancheCashflows` plain object or JSON string, as `StructuredCredit.trancheCashflows` returns it.
+   * @returns `TableEnvelope` with a `date` column in ascending order and float `cashflow`, `interest`, `principal`, `pik`, `deferred` and `writedown` columns in the flows' one currency, which the table does not state (read `total_interest.currency`). Flows on one date are summed per kind; a kind with no flow on a date is zero; the columns remain when there are no rows.
+   * @throws Error - Throws with kind `validation` if `cashflows` does not match the `TrancheCashflows` schema or mixes currencies.
+   */
+  trancheCashflowsTable(
+    cashflows: generated.valuations.TrancheCashflows | string
+  ): TableEnvelope;
   /**
    * Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).
    * @param pool - `AssetPool` plain object or JSON string, in any of its three representations.

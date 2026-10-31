@@ -150,6 +150,19 @@ export function useTrancheMetrics(request: TrancheMetricsRequest | null) {
     trancheMetricsOptions(worker.client, worker.session, request),
   );
 }
+/** Native flows and date table of one tranche, or a structured failure. Null disables the call. */
+export function useTrancheSchedule(request: TrancheRequest | null) {
+  return useWorkerQuery((worker) => {
+    const { snapshot, key } = requestSnapshot(request);
+    return workerQueryOptions({
+      client: worker.client,
+      queryKey: ["finstack", worker.session, "trancheSchedule", key] as const,
+      ready: snapshot !== null,
+      missing: "Tranche schedule requires an explicit request and ready worker",
+      queryFn: (ready) => ready.call("trancheSchedule", snapshot!),
+    });
+  });
+}
 /** Native OasResult under the supplied OasConfig, else Rust's default; pass null until the user asks for the solve. */
 export function useTrancheOas(request: TrancheOasRequest | null) {
   return useWorkerQuery((worker) =>

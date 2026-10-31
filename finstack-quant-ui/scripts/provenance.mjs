@@ -367,7 +367,7 @@ const displays = [
     ],
     route: "returned-metrics",
     convention:
-      "Returned TrancheMetrics fields in the units each Rust field documents; break-even CDR, discount margin and OAS as returned decimals; prices percent of current tranche balance; no price default.",
+      "Returned TrancheMetrics fields in the units each Rust field documents; break-even CDR, discount margin and OAS as returned decimals; prices percent of current tranche balance; no price default; cash flows by date only from TrancheCashflows::to_table, with its dates joined and summed in Rust.",
   },
   {
     id: "performance-report",

@@ -18,6 +18,7 @@ import type {
   ScenarioTable,
   StructuredCredit,
   ScenarioResults,
+  TrancheCashflows,
   TrancheMetrics,
   OasResult,
   StatementResult,
@@ -118,6 +119,11 @@ export interface TrancheRequest {
   readonly trancheId: string;
   readonly marketJson: string;
   readonly asOf: string;
+}
+/** One tranche's projected flows and Rust's one-row-per-date projection of them. */
+export interface TrancheSchedule {
+  readonly cashflows: TrancheCashflows;
+  readonly table: TableEnvelope;
 }
 /** Tranche metrics; an omitted price or metric list is left to Rust (deal quote, else model price; no registry metrics). */
 export interface TrancheMetricsRequest extends TrancheRequest {
@@ -1121,6 +1127,8 @@ export interface ValuationsApi {
   newStandardDeal(request: StandardDealRequest): Promise<Envelope<string>>;
   /** valuations.instruments.StructuredCredit.fromJson + its tranches getter. */
   dealTranches(instrumentJson: string): Promise<Envelope<DealTranches>>;
+  /** valuations.instruments.StructuredCredit.fromJson + its trancheCashflows, handed to trancheCashflowsTable; dates are joined and summed in Rust. */
+  trancheSchedule(request: TrancheRequest): Promise<Envelope<TrancheSchedule>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
   scenarioTable(request: ScenarioRequest): Promise<Envelope<ScenarioTable>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheMetrics; no OasConfig or price default is supplied. */

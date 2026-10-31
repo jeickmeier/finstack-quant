@@ -256,6 +256,7 @@ def build_cases() -> dict[str, Any]:
         "deal": deal.to_json(),
         "to_dict": deal.to_dict(),
         "tranche_cashflows": _json(deal.tranche_cashflows("A", sc_market, close)),
+        "tranche_cashflows_table": deal.tranche_cashflows("A", sc_market, close).to_dataframe().to_dict("list"),
         "equity_metrics": _json(equity),
         "diagnostics": _json(deal.run_simulation(sc_market, close).diagnostics),
         "create_waterfall": _json(deal.create_waterfall()),

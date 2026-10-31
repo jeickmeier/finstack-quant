@@ -138,6 +138,22 @@ beforeEach(() => {
           deal.free();
         }
       }
+      case "trancheSchedule": {
+        const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+        try {
+          const cashflows = deal.trancheCashflows(
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+          );
+          return {
+            cashflows,
+            table: native.trancheCashflowsTable(cashflows),
+          };
+        } finally {
+          deal.free();
+        }
+      }
       case "scenarioTable": {
         const deal = native.StructuredCredit.fromJson(request.instrumentJson);
         try {

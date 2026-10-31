@@ -7,6 +7,7 @@ import {
   useTrancheSolveFieldUnits,
   useTrancheMetrics,
   useTrancheOas,
+  useTrancheSchedule,
   type TrancheRequest,
 } from "@/hooks/valuations/use-tranche-analytics/use-tranche-analytics";
 import { TrancheAnalytics } from "@/components/finstack/valuations/components/tranche-analytics/tranche-analytics";
@@ -48,6 +49,7 @@ export function TranchePanel({
     marketPricePct,
     metrics: metrics ?? null,
   });
+  const schedule = useTrancheSchedule(request);
   const metricUnits = useTrancheMetricFieldUnits(
     metricsQuery.data?.currency ?? null,
   );
@@ -91,6 +93,7 @@ export function TranchePanel({
         setOasSolve({ price: marketPricePct, configJson: oasConfig })
       }
       onOasConfigChange={setOasConfig}
+      schedule={tile(schedule)}
       density={density}
     />
   );

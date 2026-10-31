@@ -4590,6 +4590,7 @@
       "priceInstrumentWithMarket",
       "trancheBreakevenCdr",
       "trancheBuilder",
+      "trancheCashflowsTable",
       "trancheDiscountMargin",
       "trancheMetricFieldUnits",
       "trancheMetrics",
@@ -6011,6 +6012,9 @@
     "kind": "function"
   },
   "valuations.instruments.poolReport": {
+    "kind": "function"
+  },
+  "valuations.instruments.trancheCashflowsTable": {
     "kind": "function"
   },
   "valuations.instruments.calculatePoolStats": {

@@ -10,6 +10,7 @@ export type ValuationsNative = {
       | "validateInstrumentJson"
       | "priceInstrumentWithMarket"
       | "instrumentCashflowsWithMarket"
+      | "trancheCashflowsTable"
       | "trancheScenarioTable"
       | "trancheMetrics"
       | "trancheOas"
@@ -118,6 +119,21 @@ export function createValuationsService(
     dealTranches(instrumentJson) {
       return context.result(() =>
         withDeal(instrumentJson, (deal) => deal.tranches),
+      );
+    },
+    trancheSchedule(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) => {
+          const cashflows = deal.trancheCashflows(
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+          );
+          return {
+            cashflows,
+            table: instruments.trancheCashflowsTable(cashflows),
+          };
+        }),
       );
     },
     scenarioTable(request) {

@@ -2229,6 +2229,7 @@ validateCapitalStructureSpecJson = "JSON wire validation through Rust CapitalStr
 valuationResultToJson = "twin of Python ValuationResult.to_json (WASM results are plain objects)"
 
 [parity.js."valuations.instruments".wasm_only]
+trancheCashflowsTable = "twin of Python TrancheCashflows.to_dataframe (WASM cashflows are a plain object, so Rust TrancheCashflows::to_table is a function taking it)"
 FxBarrierOption = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"
 FxDigitalOption = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"
 FxSpot = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"
