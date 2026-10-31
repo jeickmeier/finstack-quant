@@ -125,8 +125,12 @@ it.each(fixture.cases.filter((c) => c.cashflows !== null))(
       expect(rows[i].children[1].textContent).toBe(row.kind);
       expect(rows[i].children[2].textContent).toContain(`${row.currency} `);
       expect(
-        rows[i].children[rows[i].children.length - 1].textContent,
-      ).toContain(`${cashflows.currency} `);
+        [...rows[i].children].some(
+          (cell) =>
+            cell.getAttribute("title") === String(row.pv) &&
+            cell.textContent?.includes(`${cashflows.currency} `),
+        ),
+      ).toBe(true);
     }
     fireEvent.click(within(viewer).getByText("Envelope JSON", { exact: true }));
     fireEvent.click(within(viewer).getByRole("button", { name: "Original" }));

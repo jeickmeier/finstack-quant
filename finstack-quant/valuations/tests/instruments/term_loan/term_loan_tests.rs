@@ -374,6 +374,29 @@ fn term_loan_pik_toggle_and_cash_sweep() {
         cash_coupon_dates.iter().all(|date| *date <= toggle_date),
         "cash interest must stop after PIK is enabled: {cash_coupon_dates:?}"
     );
+
+    // The exported balances follow the capitalisation and the sweep.
+    let envelope = finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
+        &loan,
+        &market,
+        &issue.to_string(),
+        "discounting",
+    )
+    .unwrap();
+    let moved = |row: &finstack_quant_valuations::instruments::cashflow_export::CashflowRow| {
+        row.ending_balance.unwrap() - row.beginning_balance.unwrap()
+    };
+    let sweep_date = Date::from_calendar_date(2025, time::Month::October, 1).unwrap();
+    assert!(envelope
+        .flows
+        .iter()
+        .any(|row| row.date == sweep_date && (moved(row) + 500_000.0).abs() < 1e-6));
+    assert!(envelope
+        .flows
+        .iter()
+        .filter(|row| row.kind == CFKind::Pik)
+        .all(|row| moved(row) > 0.0));
+    assert!(envelope.flows.last().unwrap().ending_balance.unwrap().abs() < 1e-6);
 }
 
 #[test]

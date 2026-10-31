@@ -39,3 +39,18 @@ test('oid_eir_rate matches the value pinned for both hosts', () => {
     `${actual}`
   );
 });
+
+test('cashflow balances match the values pinned for both hosts', () => {
+  const envelope = facade.valuations.instruments.instrumentCashflows(
+    INSTRUMENT,
+    JSON.stringify(PINNED.market),
+    PINNED.as_of,
+    PINNED.model
+  );
+  assert.equal(envelope.flows.length, PINNED.balances.length);
+  envelope.flows.forEach((row, index) => {
+    const [begin, end] = PINNED.balances[index];
+    assert.ok(Math.abs(row.beginning_balance - begin) <= Math.max(REL * Math.abs(begin), 1e-6));
+    assert.ok(Math.abs(row.ending_balance - end) <= Math.max(REL * Math.abs(end), 1e-6));
+  });
+});

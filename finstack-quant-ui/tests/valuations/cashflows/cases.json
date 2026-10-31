@@ -52,6 +52,8 @@
             "year_fraction": 0,
             "discount_factor": 1,
             "discount_curve_id": "USD-OIS",
+            "beginning_balance": 0,
+            "ending_balance": 1000000,
             "native_pv": 0,
             "pv": 0
           },
@@ -69,6 +71,8 @@
             "rate": 0.0425,
             "discount_factor": 0.9791431782217929,
             "discount_curve_id": "USD-OIS",
+            "beginning_balance": 1000000,
+            "ending_balance": 1000000,
             "native_pv": 20806.7925372131,
             "pv": 20806.7925372131
           },
@@ -86,6 +90,8 @@
             "rate": 0.0425,
             "discount_factor": 0.9592481486942815,
             "discount_curve_id": "USD-OIS",
+            "beginning_balance": 1000000,
+            "ending_balance": 1000000,
             "native_pv": 20384.023159753484,
             "pv": 20384.02315975348
           },
@@ -98,6 +104,8 @@
             "year_fraction": 1.0027397260273974,
             "discount_factor": 0.9592481486942815,
             "discount_curve_id": "USD-OIS",
+            "beginning_balance": 1000000,
+            "ending_balance": 0,
             "native_pv": 959248.1486942816,
             "pv": 959248.148694282
           }

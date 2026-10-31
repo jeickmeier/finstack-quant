@@ -17690,7 +17690,12 @@ export interface CashflowRow {
    */
   amount: number;
   /**
-   * Beginning pool balance for the period (agency MBS only).
+   * Outstanding principal before this row, in row currency, for bonds, term
+   * loans and revolving credit facilities: a coupon row keeps it, a principal
+   * row (amortization, PIK, sweep, draw, repayment) moves it, and an issue
+   * funding row starts from zero. For agency MBS it is the pool balance at the
+   * start of the period, shared by every row of that period. Absent for other
+   * instruments and for a schedule with no issue date.
    */
   beginning_balance?: number | null;
   /**
@@ -17714,7 +17719,9 @@ export interface CashflowRow {
    */
   discount_factor: number;
   /**
-   * Ending pool balance for the period (agency MBS only).
+   * Outstanding principal after this row, in row currency, on the same basis
+   * as `beginning_balance`. For agency MBS it is the pool balance at the end
+   * of the period.
    */
   ending_balance?: number | null;
   /**
