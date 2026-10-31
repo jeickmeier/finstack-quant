@@ -80,8 +80,10 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "formatMoney",
     "validateMarket",
     "calendars",
+    "curveQuery",
     // ValuationsApi
     "price",
+    "metricValues",
     "validate",
     "cashflows",
     "scenarioTable",
@@ -150,6 +152,10 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "validateMertonModel",
     "mertonReport",
     "creditScore",
+    "optionCalculator",
+    "analyzeExchangeOffer",
+    "analyzeLme",
+    "tenderRecommendationHurdle",
     "positionRisk",
     "decomposeFactors",
     // StatementsApi

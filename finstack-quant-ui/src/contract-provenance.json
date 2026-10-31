@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "974f04b4d5c4e60af63954e4b98f7eaa83c230469d1a48e3b5dfcd6ead47bd3a",
+          "sha256": "5590246edc27a463671f87aa6ae1e8d170af11df0fa7669f4835963c6cd2a1b3",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -159,7 +159,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
-          "sha256": "2135aa83a66a03128536a9e6980fc0cc12dd8df5e84c23bc19fab1e5c7605597",
+          "sha256": "28b5324823f41cff4fefccf2d5aafd92a7587bd8d3d0a3591772f0cf1a587af0",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "c4472f7adf668b6115f67444435aa579a03a9c1caf945eb0d77858349255625f",
+          "sha256": "b8230fbb7bff0c79e51a2b07673e0dec7f8b13b2904ce7f097db888480ae3b29",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -285,7 +285,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
-          "sha256": "37c1f3debbe88b6ee83dd1958c92664b682e279fee8ecee2494e016cd44e75cb",
+          "sha256": "65117f67eac5804f6b28317d29eb8da23d084b894b9a66e0d30e243f4ee602da",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -327,14 +327,14 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/revolving_credit.schema.json",
-          "sha256": "67273c95fcc06ef55cd3d30fc83c346ae4a774abc0606502e39195fb902c53c5",
+          "sha256": "815f5697fc36f309c884bc769a0a87fb48dcef3532df0833df906a1db0891c7b",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
-          "sha256": "f1f1015f8309b3f2b1ecc2777086958dff6460e6d33d48eedc40946eb287281a",
+          "sha256": "c164dbd24e936875f977b39803df41cd42dd824e2cf54ad6e3ca081868ca4ce9",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -731,8 +731,8 @@
           }
         ],
         "returns": "MetricMetadata[]",
-        "declaration": "/**\n   * Describe canonical metric identifiers using Rust-owned units and coordinates.\n   * @example\n   * ```typescript\n   * import init, { valuations } from \"finstack-quant-wasm\";\n   * await init();\n   * const [ytm, bucket] = valuations.instruments.metricMetadata([\n   *   'ytm',\n   *   'bucketed_dv01::USD-OIS::10y',\n   * ]);\n   * console.log(ytm.unit, bucket.components, bucket.bucketed);\n   * ```\n   * @param keys - Canonical scalar or qualified wire keys in output order. Custom keys retain unknown units; malformed or obsolete encodings are rejected.\n   * @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.\n   * @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.\n   */\n  metricMetadata(keys: string[]): MetricMetadata[];",
-        "sha256": "4446ba78040fcc56da6d6384592b3e20b0fe4b0829fe9dfafee8e859c26d9e56"
+        "declaration": "/**\n   * Describe canonical metric identifiers using Rust-owned units and coordinates.\n   * @example\n   * ```typescript\n   * import init, { valuations } from \"finstack-quant-wasm\";\n   * await init();\n   * const [ytm, bucket] = valuations.instruments.metricMetadata([\n   *   'ytm',\n   *   'bucketed_dv01::USD-OIS::10y',\n   * ]);\n   * console.log(ytm.unit, bucket.components, bucket.bucketed);\n   * ```\n   * @param keys - Canonical scalar or qualified wire keys in output order. A custom key has a unit only when Rust declares one; one the standard registry holds gets the group `\"Instrument Specific\"`, any other gets no group; malformed or obsolete encodings are rejected.\n   * @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.\n   * @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.\n   */\n  metricMetadata(keys: string[]): MetricMetadata[];",
+        "sha256": "d1130422e342f447d20224a033343aceab6a8e0c0cdbd0d05675577f0e5983b8"
       },
       "schemas": [
         {
@@ -1041,7 +1041,7 @@
     {
       "id": "cashflow-viewer",
       "route": "native-envelope-table",
-      "convention": "The returned envelope object, validated against the Rust-generated cashflow schema. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. Its JSON view is a host serialization, not native text. The optional annual ladder is cashflows.calendarYearLadder per row currency (worker partition, first-appearance order) over each flow's native_pv: row-currency PV before FX conversion and any scenario price shock.",
+      "convention": "The returned envelope object, validated against the Rust-generated cashflow schema. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. beginning_balance and ending_balance show as supplied (per row for bonds, term loans and revolvers, per period for agency MBS), never accumulated, and their columns hide only when no row carries one. Its JSON view is a host serialization, not native text. The optional annual ladder is cashflows.calendarYearLadder per row currency (worker partition, first-appearance order) over each flow's native_pv: row-currency PV before FX conversion and any scenario price shock.",
       "api": {
         "name": "valuations.instruments.instrumentCashflows",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -1078,7 +1078,7 @@
           "uri": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/results/1/instrument_cashflow.schema.json",
-          "sha256": "f6c44fb5cecd42b5d6ec83c1f5cd5f44b7dcfe0df6cdc236f15d4f80cc5c0770",
+          "sha256": "49477d2d7e3495890a273d8a030137937017a98d232d8754c83a2b162d4b1eaf",
           "description": "Native cashflow rows, reporting-currency PV and reconciliation status."
         }
       ]
@@ -2030,6 +2030,185 @@
         "returns": "Float64Array",
         "declaration": "/**\n   * Risk-neutral default probabilities over a grid of horizons.\n   *\n   * Python returns the same values as a pandas Series labelled by horizon.\n   * @param horizons - Horizons in years, as a `number[]` or `Float64Array`.\n   * @returns One default probability per horizon, in input order.\n   * @throws Error - Throws a `TypeError` if `horizons` is not an array of numbers.\n   */\n  defaultProbabilities(horizons: NumericArray): Float64Array;",
         "sha256": "d630514295e4e9bbd786e587a8243f7c653fadbe47b93282939119e504f6fb78"
+      }
+    },
+    {
+      "id": "curve-query",
+      "route": "returned-model",
+      "convention": "Returned native values of one stored object per supplied point: DiscountCurve.df and zeroRate (default continuous compounding) and forward (continuously compounded, year fractions only), ForwardCurve.rate (simple, on the curve day count), HazardCurve.sp and hazardRate, and models.volatility.getSurfaceVol (expiry in years, strike in the surface's units, inside the grid). Curve dates pass through as ISO text for Rust to convert with the curve day count; no date, unit or tenor conversion happens here. A point Rust rejects keeps its native error in its cell.",
+      "api": {
+        "name": "models.volatility.getSurfaceVol",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "VolatilityNamespace",
+        "member": "getSurfaceVol",
+        "inputs": [
+          {
+            "name": "surface",
+            "type": "VolSurface",
+            "optional": false
+          },
+          {
+            "name": "expiry",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "strike",
+            "type": "number",
+            "optional": false
+          }
+        ],
+        "returns": "number",
+        "declaration": "/**\n   * Interpolate a volatility surface; coordinates outside the grid are rejected.\n   * @param surface - `core.VolSurface` handle, such as a `materializeCubeTenorSlice` or `materializeFxDeltaSurface` result.\n   * @param expiry - Option expiry in years, within the surface grid.\n   * @param strike - Strike in the surface's own units, within the surface grid.\n   * @returns The interpolated volatility, as a decimal.\n   * @throws Error - Throws a `validation` error if a coordinate is outside the grid.\n   */\n  getSurfaceVol(surface: VolSurface, expiry: number, strike: number): number;",
+        "sha256": "371fef05aaec7efd18d51464de858422992ba6b0a058a91b83d801cb6c5fd517"
+      }
+    },
+    {
+      "id": "loan-yield-card",
+      "route": "returned-model",
+      "convention": "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model.",
+      "api": {
+        "name": "valuations.instruments.priceInstrumentWithMarket",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "priceInstrumentWithMarket",
+        "inputs": [
+          {
+            "name": "instrumentJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "market",
+            "type": "MarketContext",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": "string | null",
+            "optional": true
+          },
+          {
+            "name": "metrics",
+            "type": "string[] | null",
+            "optional": true
+          },
+          {
+            "name": "metricPricingOverrides",
+            "type": "JsonInput | null",
+            "optional": true
+          },
+          {
+            "name": "marketHistory",
+            "type": "JsonInput | null",
+            "optional": true
+          },
+          {
+            "name": "explain",
+            "type": "boolean | null",
+            "optional": true
+          }
+        ],
+        "returns": "ValuationResult",
+        "declaration": "/**\n   * Price an instrument using a pre-parsed `core.MarketContext` handle.\n   *\n   * Avoids the per-call market-parse overhead of `priceInstrument`.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * Their `seed` is a lossless `bigint`; serialize such results with\n   * `valuations.valuationResultToJson`.\n   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.\n   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data for this call.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit, `null`, or `\"default\"` for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result.\n   * @param metricPricingOverrides - Optional JSON object patch applied before validation. Only supplied fields replace stored overrides; `{}` preserves them. Supplied `bump_config` fields merge into the stored object. Explicit `null` clears nullable fields to their Rust fallback. Omit the argument or pass JavaScript `null`/`undefined` to retain the envelope configuration.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Under `\"discounting\"` and `\"hazard_rate\"` it holds one `cashflow_pv` entry per projected cashflow (date, amount, discount factor, curve, survival probability, present value) summing to the price, capped at 1000 entries; other models get one `computation_step` entry stating that no per-flow decomposition exists. Omit or pass `false` for no trace.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, `provenance`, …). `provenance` records the model, requested date, declared market dependencies, scenario adjustment and, when metrics are requested, the finite-difference bump sizes.\n   * @throws Error - Throws a JavaScript exception if an instrument, metric-pricing-override, or market- history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrumentWithMarket(\n    instrumentJson: JsonInput,\n    market: MarketContext,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: JsonInput | null,\n    marketHistory?: JsonInput | null,\n    explain?: boolean | null\n  ): ValuationResult;",
+        "sha256": "887a88441ef4e22d6e41cd856482d6f2b7382acb8c3ae062a92460444b2d5097"
+      }
+    },
+    {
+      "id": "liability-management-card",
+      "route": "returned-model",
+      "convention": "Returned models.credit.liabilityManagement.analyzeExchangeOffer and analyzeLme results as Rust returned them. The tender recommendation is Rust's tender_recommended field; tenderRecommendationHurdle shows beside it as supplied and is never compared here. Amounts are in one caller-defined unit with no currency conversion; percentages are fractions and leverage a multiple. The LME price input is a price, an extension fee or a transferred-asset fraction by structure, as the facade documents.",
+      "api": {
+        "name": "models.credit.liabilityManagement.analyzeExchangeOffer",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "CreditLiabilityManagementNamespace",
+        "member": "analyzeExchangeOffer",
+        "inputs": [
+          {
+            "name": "oldPv",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "newPv",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "consentFee",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "equitySweetenerValue",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "exchangeType",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "ExchangeOfferAnalysis",
+        "declaration": "/**\n   * Compare hold-versus-tender economics for a distressed exchange offer.\n   * Tendering is recommended only when total consideration exceeds the\n   * hold-out present value by more than 2%.\n   * @returns Tender total, NPV pickup, breakeven recovery, and recommendation.\n   * @param oldPv - Present value of the existing claim if it is not tendered, in the caller's monetary unit.\n   * @param newPv - Present value of the new instrument received on tendering, in the same unit as oldPv.\n   * @param consentFee - Cash consent or early-tender fee paid to participating holders, in the same unit as oldPv.\n   * @param equitySweetenerValue - Estimated value of equity or warrants attached to the new instrument, in the same unit as oldPv.\n   * @param exchangeType - Canonical offer structure: par_for_par, discount, uptier, or downtier.\n   * @throws Error - Throws a JavaScript exception if `exchangeType` is unrecognized, any monetary input is negative or non-finite, or the result cannot be converted to a JavaScript object.\n   */\n  analyzeExchangeOffer(\n    oldPv: number,\n    newPv: number,\n    consentFee: number,\n    equitySweetenerValue: number,\n    exchangeType: string\n  ): ExchangeOfferAnalysis;",
+        "sha256": "a5aa9e45ed42a262f0d47bbd03d094a53e0e4605ca3a7b5cb89c1ec64e8a543b"
+      }
+    },
+    {
+      "id": "option-calculator",
+      "route": "returned-model",
+      "convention": "Returned closed-form results of one European option: models.bsPrice, black76Price or bachelierPrice of an entered volatility, or bsImpliedVol, black76ImpliedVol or models.volatility.impliedVolBachelier of an entered price, then bsGreeks, black76Greeks or bachelierGreeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",
+      "api": {
+        "name": "models.bsPrice",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ModelsNamespace",
+        "member": "bsPrice",
+        "inputs": [
+          {
+            "name": "spot",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "strike",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "rate",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "divYield",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "vol",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "expiry",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "isCall",
+            "type": "boolean",
+            "optional": false
+          }
+        ],
+        "returns": "number",
+        "declaration": "/**\n   * Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.\n   *\n   * Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.\n   * Merton (1973): see docs/REFERENCES.md#merton-1973.\n   * Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983.\n   *\n   * @example\n   * ```javascript\n   * import init, { models } from \"finstack-quant-wasm\";\n   * await init();\n   * const price = models.bsPrice(\n   *   100,    // spot\n   *   100,    // strike (ATM)\n   *   0.05,   // rate = 5%\n   *   0.0,    // divYield = 0\n   *   0.20,   // vol = 20%\n   *   1.0,    // expiry = 1 year\n   *   true,   // call\n   * );\n   * // price ≈ 10.45\n   * ```\n   *\n   * @param spot - Spot price of the underlying.\n   * @param strike - Strike of the option.\n   * @param rate - Risk-free rate, **decimal** continuously compounded (e.g. `0.05` for 5%).\n   * @param divYield - Continuous dividend yield (or foreign rate for FX), **decimal** continuously compounded.\n   * @param vol - Annualized volatility, **decimal** (e.g. `0.20` for 20%).\n   * @param expiry - Time to expiry in **years**.\n   * @param isCall - `true` for a call, `false` for a put.\n   * @returns Per-unit option price.\n   * @throws If spot or strike is non-positive, volatility or expiry is negative, any numerical input is non-finite, or discounted legs or price overflow.\n   */\n  bsPrice(\n    spot: number,\n    strike: number,\n    rate: number,\n    divYield: number,\n    vol: number,\n    expiry: number,\n    isCall: boolean\n  ): number;",
+        "sha256": "3c717b280e97c2eb385209100074925b836d8c941896e8a522532d2a92528b57"
       }
     },
     {

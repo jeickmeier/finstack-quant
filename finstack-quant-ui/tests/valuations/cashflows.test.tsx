@@ -125,8 +125,12 @@ it.each(fixture.cases.filter((c) => c.cashflows !== null))(
       expect(rows[i].children[1].textContent).toBe(row.kind);
       expect(rows[i].children[2].textContent).toContain(`${row.currency} `);
       expect(
-        rows[i].children[rows[i].children.length - 1].textContent,
-      ).toContain(`${cashflows.currency} `);
+        [...rows[i].children].some(
+          (cell) =>
+            cell.getAttribute("title") === String(row.pv) &&
+            cell.textContent?.includes(`${cashflows.currency} `),
+        ),
+      ).toBe(true);
     }
     fireEvent.click(within(viewer).getByText("Envelope JSON", { exact: true }));
     fireEvent.click(within(viewer).getByRole("button", { name: "Original" }));
@@ -293,6 +297,80 @@ it("presents returned numbers, row currencies, zero and absent diagnostics witho
       serializeHost(cashflows),
     ),
   );
+});
+const nativeFlows = (type: string) =>
+  envelope(fixture.cases.find((c) => c.type === type)!.cashflows).flows;
+const balanceTable = async (type: string) => {
+  suppliedExport(fixture.cases.find((c) => c.type === type)!.cashflows);
+  return screen.findByRole("table", { name: "Cashflow schedule" });
+};
+it("shows how a PIK loan accretes in the balances Rust supplies, each once", async () => {
+  const flows = nativeFlows("term_loan_pik");
+  const table = await balanceTable("term_loan_pik");
+  const headers = within(table)
+    .getAllByRole("columnheader")
+    .map((header) => header.textContent);
+  expect(headers).toContain("Principal before");
+  expect(headers).toContain("Principal after");
+  expect(within(table).queryByText("Beginning balance")).toBeNull();
+  expect(within(table).queryByText("Ending balance")).toBeNull();
+  const before = headers.indexOf("Principal before");
+  const after = headers.indexOf("Principal after");
+  const rows = table.querySelectorAll("tbody tr");
+  // The issue funding row starts from zero, then every PIK coupon moves the balance.
+  expect(flows[0].kind).toBe("notional");
+  expect(flows[0].beginning_balance).toBe(0);
+  expect(rows[0].children[before].textContent).toBe("USD 0");
+  const pik = flows.findIndex((row) => row.kind === "pik");
+  expect(flows[pik].ending_balance).toBeGreaterThan(
+    flows[pik].beginning_balance!,
+  );
+  for (const [i, row] of flows.entries()) {
+    expect(rows[i].children[before].getAttribute("title")).toBe(
+      String(row.beginning_balance),
+    );
+    expect(rows[i].children[after].getAttribute("title")).toBe(
+      String(row.ending_balance),
+    );
+    expect(rows[i].children[after].textContent).toContain(`${row.currency} `);
+  }
+  const footer = table.querySelector("tfoot tr")!;
+  expect(footer.children[0].getAttribute("colspan")).toBe(
+    String(headers.length - 2),
+  );
+  expect(
+    screen.getByText(/an issue funding row starts from zero/),
+  ).toBeTruthy();
+});
+it("shows the shared per-period balances of an agency MBS pool as supplied", async () => {
+  const flows = nativeFlows("agency_mbs_passthrough");
+  const table = await balanceTable("agency_mbs_passthrough");
+  const headers = within(table)
+    .getAllByRole("columnheader")
+    .map((header) => header.textContent);
+  const before = headers.indexOf("Principal before");
+  const period = flows.filter((row) => row.date === flows[0].date);
+  expect(period.length).toBeGreaterThan(1);
+  expect(new Set(period.map((row) => row.beginning_balance)).size).toBe(1);
+  const rows = table.querySelectorAll("tbody tr");
+  for (const [i, row] of period.entries())
+    expect(rows[i].children[before].getAttribute("title")).toBe(
+      String(row.beginning_balance),
+    );
+});
+it("hides the balance columns only when Rust supplied none", async () => {
+  // A swap's legs carry a reference notional, not an outstanding balance.
+  expect(
+    nativeFlows("xccy_swap").every((row) => row.beginning_balance == null),
+  ).toBe(true);
+  const table = await balanceTable("xccy_swap");
+  expect(
+    within(table).queryByRole("columnheader", { name: "Principal before" }),
+  ).toBeNull();
+  expect(
+    within(table).queryByRole("columnheader", { name: "Principal after" }),
+  ).toBeNull();
+  expect(screen.queryByText(/an issue funding row/)).toBeNull();
 });
 it("keeps the schedule a named keyboard stop inside its scroll container", async () => {
   suppliedExport(fixture.cases[0].cashflows);

@@ -110,7 +110,7 @@
       "type": "array"
     },
     "group": {
-      "description": "Native display group; absent for a non-standard base metric.",
+      "description": "Native display group, the same name [`metrics_for_instrument`] lists the\nbase metric under; absent for a base metric the standard registry does\nnot hold.",
       "type": [
         "string",
         "null"
@@ -126,7 +126,7 @@
     },
     "unit": {
       "$ref": "#/$defs/MetricUnit",
-      "description": "Native unit family; custom or calculator-dependent units remain unknown."
+      "description": "Native unit family; undeclared custom and calculator-dependent units are unknown."
     }
   },
   "required": [

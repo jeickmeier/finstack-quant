@@ -118,7 +118,7 @@ export default [
   {
     "path": "#/$defs/d_674830a94dacf97e7ac8/properties/beginning_balance",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/beginning_balance",
-    "description": "Beginning pool balance for the period (agency MBS only).",
+    "description": "Outstanding principal before this row, in row currency, for bonds, term\nloans and revolving credit facilities: a coupon row keeps it, a principal\nrow (amortization, PIK, sweep, draw, repayment) moves it, and an issue\nfunding row starts from zero. For agency MBS it is the pool balance at the\nstart of the period, shared by every row of that period. Absent for other\ninstruments and for a schedule with no issue date.",
     "format": "double"
   },
   {
@@ -157,7 +157,7 @@ export default [
   {
     "path": "#/$defs/d_674830a94dacf97e7ac8/properties/ending_balance",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/ending_balance",
-    "description": "Ending pool balance for the period (agency MBS only).",
+    "description": "Outstanding principal after this row, in row currency, on the same basis\nas `beginning_balance`. For agency MBS it is the pool balance at the end\nof the period.",
     "format": "double"
   },
   {

@@ -26,6 +26,22 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         Some(self.issue_date)
     }
 
+    fn cashflow_export_terms(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms,
+    > {
+        use finstack_quant_cashflows::CashflowProvider;
+        Ok(
+            finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+                self.cashflow_schedule(market, as_of)?,
+            )
+            .with_schedule_balances(),
+        )
+    }
+
     fn validate_cashflow_export(
         &self,
         model: finstack_quant_valuations_core::pricer::ModelKey,

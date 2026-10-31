@@ -218,6 +218,32 @@ test("benchmark-report multi-factor regression", async ({ page }) => {
   await expect(multi.getByRole("table")).toBeVisible();
   await expect(multi).toHaveScreenshot("benchmark-report-multi-factor.png");
 });
+test("curve-query selected surface", async ({ page }) => {
+  const item = await open(page, "curve-query", "light", "comfortable");
+  // The four item baselines show the browser's first selection, a discount curve.
+  await item.getByRole("button", { name: /^Inspect EQ-VOL, / }).click();
+  const lookup = item.getByRole("region", {
+    name: "Point lookup for EQ-VOL",
+  });
+  await expect(lookup.getByRole("table")).toBeVisible();
+  await expect(lookup).toHaveScreenshot("curve-query-surface.png");
+});
+test("liability-management-card exercise economics", async ({ page }) => {
+  const item = await open(
+    page,
+    "liability-management-card",
+    "light",
+    "comfortable",
+  );
+  // The four item baselines stop above the exercise's table.
+  const exercise = item.getByRole("region", {
+    name: "Liability management exercise",
+  });
+  await expect(exercise.getByRole("table")).toBeVisible();
+  await expect(exercise).toHaveScreenshot(
+    "liability-management-card-exercise.png",
+  );
+});
 test("merton-calculator model parameters", async ({ page }) => {
   const item = await open(page, "merton-calculator", "light", "comfortable");
   // The four item baselines stop inside the term structure, above this table.

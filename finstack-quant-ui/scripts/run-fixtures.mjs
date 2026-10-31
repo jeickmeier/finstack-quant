@@ -7,7 +7,7 @@ import { requireWasm } from "./require-wasm.mjs";
 // bond.json, which the scenario application, horizon return, templates, attribution,
 // cashflows and details embed (attribution also reads the scenario
 // application cases); curves writes the curve-link market that market-browser
-// extends; covenants reads the analyst result that statements writes;
+// extends, and market-browser's snapshot is what curve-query cuts down; covenants reads the analyst result that statements writes;
 // gen-gallery copies the fixtures into docs-site last. Each generator runs in its own process so the
 // WASM instances do not share memory.
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -23,8 +23,10 @@ const generators = [
   "tests/attribution/generate.mjs",
   "tests/valuations/cashflows/generate.mjs",
   "tests/valuations/details/generate.mjs",
+  "tests/valuations/loan-yield/generate.mjs",
   "tests/core/curves/generate.mjs",
   "tests/core/market-browser/generate.mjs",
+  "tests/core/curve-query/generate.mjs",
   "tests/core/cubes/generate.mjs",
   "tests/calibration/generate.mjs",
   "tests/valuations/scenario-table/generate.mjs",
@@ -33,6 +35,8 @@ const generators = [
   "tests/analytics/generate.mjs",
   "tests/models/credit/generate.mjs",
   "tests/models/risk/generate.mjs",
+  "tests/models/options/generate.mjs",
+  "tests/models/liability-management/generate.mjs",
   "tests/margin/generate.mjs",
   "scripts/gen-gallery.mjs",
 ];

@@ -138,7 +138,7 @@ const displays = [
     ],
     route: "native-envelope-table",
     convention:
-      "The returned envelope object, validated against the Rust-generated cashflow schema. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. Its JSON view is a host serialization, not native text. The optional annual ladder is cashflows.calendarYearLadder per row currency (worker partition, first-appearance order) over each flow's native_pv: row-currency PV before FX conversion and any scenario price shock.",
+      "The returned envelope object, validated against the Rust-generated cashflow schema. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. beginning_balance and ending_balance show as supplied (per row for bonds, term loans and revolvers, per period for agency MBS), never accumulated, and their columns hide only when no row carries one. Its JSON view is a host serialization, not native text. The optional annual ladder is cashflows.calendarYearLadder per row currency (worker partition, first-appearance order) over each flow's native_pv: row-currency PV before FX conversion and any scenario price shock.",
   },
   {
     id: "curve-chart",
@@ -440,6 +440,46 @@ const displays = [
     route: "returned-model",
     convention:
       "Returned models.credit.MertonModel results of a model from canonical MertonModel JSON (natively validated) or from a KMV equity calibration Rust performs: default probabilities, distances to default, implied spreads (recovery as a fraction of par) and debt spreads per requested horizon, the CDS par spread and implied equity at the requested maturity, and models.credit.pd.MasterScale.defaultCalibration grades of the default probabilities. Decimals as returned (spreads per year, probabilities and volatilities as fractions), no unit inferred; a measure Rust rejects for the model shows its native error beside the rest.",
+  },
+  {
+    id: "curve-query",
+    api: [
+      "models.volatility.getSurfaceVol",
+      "VolatilityNamespace",
+      "getSurfaceVol",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned native values of one stored object per supplied point: DiscountCurve.df and zeroRate (default continuous compounding) and forward (continuously compounded, year fractions only), ForwardCurve.rate (simple, on the curve day count), HazardCurve.sp and hazardRate, and models.volatility.getSurfaceVol (expiry in years, strike in the surface's units, inside the grid). Curve dates pass through as ISO text for Rust to convert with the curve day count; no date, unit or tenor conversion happens here. A point Rust rejects keeps its native error in its cell.",
+  },
+  {
+    id: "loan-yield-card",
+    api: [
+      "valuations.instruments.priceInstrumentWithMarket",
+      "ValuationInstrumentsNamespace",
+      "priceInstrumentWithMarket",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model.",
+  },
+  {
+    id: "liability-management-card",
+    api: [
+      "models.credit.liabilityManagement.analyzeExchangeOffer",
+      "CreditLiabilityManagementNamespace",
+      "analyzeExchangeOffer",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned models.credit.liabilityManagement.analyzeExchangeOffer and analyzeLme results as Rust returned them. The tender recommendation is Rust's tender_recommended field; tenderRecommendationHurdle shows beside it as supplied and is never compared here. Amounts are in one caller-defined unit with no currency conversion; percentages are fractions and leverage a multiple. The LME price input is a price, an extension fee or a transferred-asset fraction by structure, as the facade documents.",
+  },
+  {
+    id: "option-calculator",
+    api: ["models.bsPrice", "ModelsNamespace", "bsPrice"],
+    route: "returned-model",
+    convention:
+      "Returned closed-form results of one European option: models.bsPrice, black76Price or bachelierPrice of an entered volatility, or bsImpliedVol, black76ImpliedVol or models.volatility.impliedVolBachelier of an entered price, then bsGreeks, black76Greeks or bachelierGreeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",
   },
   {
     id: "credit-scorecard",

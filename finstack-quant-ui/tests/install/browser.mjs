@@ -15,7 +15,7 @@ export async function verifyItem(page, item, evidence, repo, harness) {
       ),
     );
     const envelope = data.cashflows.cases.find(
-      (entry) => entry.type === "xccy_swap",
+      (entry) => entry.type === "term_loan_pik",
     ).cashflows;
     const viewer = page.getByRole("region", { name: "Cashflows", exact: true });
     await expect(
@@ -58,7 +58,7 @@ export async function verifyItem(page, item, evidence, repo, harness) {
     // The annual ladder: one native table per row currency, in the supplied
     // order and row count (years only; the gallery bundle may rewrite digits).
     const ladder = data.cashflows.cases.find(
-      (entry) => entry.type === "xccy_swap",
+      (entry) => entry.type === "term_loan_pik",
     ).ladder;
     await viewer
       .getByRole("radio", { name: "Annual ladder", exact: true })
@@ -77,7 +77,7 @@ export async function verifyItem(page, item, evidence, repo, harness) {
     }
     assert.equal(await group.getByRole("table").count(), ladder.length);
     checks.push(
-      "mixed-currency native envelope tabled; shown JSON is its host serialization; copy and download equal the shown text; annual ladder tabled per row currency",
+      "native envelope of a PIK loan tabled; shown JSON is its host serialization; copy and download equal the shown text; annual ladder tabled per row currency",
     );
   }
   if (item.name === "finstack-chart") {

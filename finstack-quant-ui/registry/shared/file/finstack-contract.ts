@@ -80,6 +80,15 @@ export interface PriceRequest {
   readonly metricPricingOverrides?: string | null;
   readonly marketHistory?: string | null;
 }
+/** A pricing request whose metric ids are each priced on their own call. */
+export interface MetricValuesRequest extends Omit<PriceRequest, "metrics"> {
+  readonly metrics: readonly string[];
+}
+/** One metric id and its native value, or the native error of that id alone; a value is absent when Rust returned none under the id. */
+export interface MetricValue {
+  metric: string;
+  value: Envelope<number | undefined>;
+}
 /** Exact source amount plus the returned rounding stamp; both are snapshotted verbatim and never recomputed. */
 export interface MoneyFormatRequest {
   readonly value: MoneyValue;
@@ -616,6 +625,130 @@ export interface CreditScore {
   /** models.credit.pd.MasterScale.defaultCalibration().mapScore(result), or its native error (Rust rejects a result without an implied PD). */
   grade: Envelope<modelsWire.MasterScaleResult>;
 }
+/** Years from the curve base date, or an ISO date Rust converts with the curve day count. */
+export type CurvePoint = number | string;
+/** One stored curve or surface of a market and the points to read it at. */
+export type CurveQueryRequest = {
+  readonly marketJson: string;
+  /** The stored id, the MarketContext lookup key. */
+  readonly id: string;
+} & (
+  | {
+      readonly kind: "discount";
+      readonly points: readonly CurvePoint[];
+      /** Start and end of each forward rate, in years: DiscountCurve.forward takes no dates. */
+      readonly forwards: readonly (readonly [number, number])[];
+    }
+  | {
+      readonly kind: "forward" | "hazard";
+      readonly points: readonly CurvePoint[];
+    }
+  | {
+      readonly kind: "surface";
+      readonly points: readonly {
+        /** Years. */
+        readonly expiry: number;
+        /** In the surface's own units. */
+        readonly strike: number;
+      }[];
+    }
+);
+/** The returned values per supplied point, each with its own native error; nothing is computed in TypeScript. */
+export type CurveQueryResult =
+  | {
+      kind: "discount";
+      points: {
+        t: CurvePoint;
+        df: Envelope<number>;
+        zeroRate: Envelope<number>;
+      }[];
+      forwards: { t1: number; t2: number; rate: Envelope<number> }[];
+    }
+  | { kind: "forward"; points: { t: CurvePoint; rate: Envelope<number> }[] }
+  | {
+      kind: "hazard";
+      points: {
+        t: CurvePoint;
+        sp: Envelope<number>;
+        hazardRate: Envelope<number>;
+      }[];
+    }
+  | {
+      kind: "surface";
+      points: { expiry: number; strike: number; vol: Envelope<number> }[];
+    };
+/** One distressed exchange offer; amounts in one caller-defined unit, no currency conversion. */
+export interface ExchangeOfferRequest {
+  /** Present value of the existing claim if not tendered. */
+  readonly oldPv: number;
+  /** Present value of the new instrument received on tendering. */
+  readonly newPv: number;
+  /** Cash consent or early-tender fee. */
+  readonly consentFee: number;
+  /** Estimated value of attached equity or warrants. */
+  readonly equitySweetenerValue: number;
+  readonly exchangeType: modelsWire.ExchangeType;
+}
+/** One liability management exercise; amounts in one caller-defined unit, percentages as fractions. */
+export interface LmeRequest {
+  readonly lmeType: modelsWire.LmeType;
+  /** Outstanding face of the target instrument. */
+  readonly notional: number;
+  /** Price, extension fee or transferred-asset fraction, by structure. */
+  readonly repurchasePricePct: number;
+  /** Fraction of holders participating. */
+  readonly optAcceptancePct: number;
+  /** Unset leaves the leverage block out. */
+  readonly ebitda?: number | null;
+}
+/** Terms of one European option; each model takes its own, as the facade function documents them. */
+export type OptionTerms =
+  | {
+      readonly model: "black_scholes";
+      readonly spot: number;
+      readonly strike: number;
+      /** Risk-free rate, decimal, continuously compounded. */
+      readonly rate: number;
+      /** Dividend yield or foreign rate, decimal, continuously compounded. */
+      readonly divYield: number;
+      /** Years. */
+      readonly expiry: number;
+      readonly isCall: boolean;
+      /** Theta denominator; omitted is left to Rust's default. */
+      readonly thetaDaysPerYear?: number | null;
+    }
+  | {
+      readonly model: "black76";
+      readonly forward: number;
+      readonly strike: number;
+      /** Discount factor from valuation to expiry. */
+      readonly df: number;
+      /** Years. */
+      readonly expiry: number;
+      readonly isCall: boolean;
+    }
+  | {
+      readonly model: "bachelier";
+      readonly forward: number;
+      readonly strike: number;
+      /** Years. */
+      readonly expiry: number;
+      readonly isCall: boolean;
+    };
+/** An option's terms with a volatility to price, or a price to invert: per unit, discounted under Black-76, undiscounted under Bachelier. */
+export type OptionCalculatorRequest = OptionTerms &
+  (
+    | { readonly mode: "price"; readonly vol: number }
+    | { readonly mode: "implied_vol"; readonly price: number }
+  );
+/** The returned price or implied volatility and the Greeks at that volatility; nothing is computed in TypeScript. */
+export type OptionCalculatorResult = {
+  model: OptionTerms["model"];
+  /** BsGreeks under Black-Scholes, ForwardGreeks otherwise, or Rust's error of that one call. */
+  greeks: Envelope<modelsWire.BsGreeks | modelsWire.ForwardGreeks>;
+} & (
+  { mode: "price"; price: number } | { mode: "implied_vol"; impliedVol: number }
+);
 /** Where a position VaR/ES decomposition comes from. */
 export type PositionRiskSource =
   | {
@@ -959,6 +1092,8 @@ export interface CoreApi {
   formatMoney(request: MoneyFormatRequest): Promise<Envelope<string>>;
   /** core.MarketContext.fromJson + toJson: canonicalize the complete market and cache its handle. */
   validateMarket(marketJson: string): Promise<Envelope<string>>;
+  /** MarketContext.getDiscount (df, zeroRate, forward), getForward (rate), getHazard (sp, hazardRate) or getSurface (models.volatility.getSurfaceVol), per supplied point, over the cached market handle; each point keeps its own native error and the curve handle is freed. */
+  curveQuery(request: CurveQueryRequest): Promise<Envelope<CurveQueryResult>>;
   /** core.availableCalendars. */
   calendars(): Promise<Envelope<string[]>>;
 }
@@ -966,6 +1101,8 @@ export interface CoreApi {
 export interface ValuationsApi {
   /** valuations.instruments.validateInstrumentJson + priceInstrumentWithMarket over the cached market handle. */
   price(request: PriceRequest): Promise<Envelope<ValuationResult>>;
+  /** valuations.instruments.priceInstrumentWithMarket once per supplied metric id: one failing id fails a whole native request, so each id keeps its own value or native error. */
+  metricValues(request: MetricValuesRequest): Promise<Envelope<MetricValue[]>>;
   /** valuations.instruments.validateInstrumentJson: validate and canonicalize instrument JSON. */
   validate(instrumentJson: string): Promise<Envelope<string>>;
   /** valuations.instruments.validateInstrumentJson + instrumentCashflowsWithMarket over the cached market handle; the native envelope object. */
@@ -986,7 +1123,7 @@ export interface ValuationsApi {
   trancheBreakevenCdr(request: TrancheRequest): Promise<Envelope<number>>;
   /** valuations.instruments.listModelsGrouped. */
   models(): Promise<Envelope<Record<string, string[]>>>;
-  /** valuations.instruments.metricsForInstrument: standard metrics registered for one instrument type, by native display group. */
+  /** valuations.instruments.metricsForInstrument: every metric registered for one instrument type, by native display group, with those outside a group under "Instrument Specific". */
   metrics(instrumentType: string): Promise<Envelope<Record<string, string[]>>>;
   /** valuations.instruments.metricMetadata: native per-key interpretation (units, decoded coordinates, groups) for metric keys. */
   metricMetadata(keys: readonly string[]): Promise<Envelope<MetricMetadata[]>>;
@@ -1163,6 +1300,18 @@ export interface ModelsApi {
   mertonReport(request: MertonReportRequest): Promise<Envelope<MertonReport>>;
   /** One models.credit.scoring function over its input ratios in the facade's positional order, then models.credit.pd.MasterScale.defaultCalibration().mapScore of the result (kept as an envelope); the scale handle is freed. */
   creditScore(request: CreditScoreRequest): Promise<Envelope<CreditScore>>;
+  /** models.credit.liabilityManagement.analyzeExchangeOffer, including Rust's tender_recommended. */
+  analyzeExchangeOffer(
+    request: ExchangeOfferRequest,
+  ): Promise<Envelope<modelsWire.ExchangeOfferAnalysis>>;
+  /** models.credit.liabilityManagement.analyzeLme. */
+  analyzeLme(request: LmeRequest): Promise<Envelope<modelsWire.LmeAnalysis>>;
+  /** models.credit.liabilityManagement.tenderRecommendationHurdle. */
+  tenderRecommendationHurdle(): Promise<Envelope<number>>;
+  /** One closed-form price (bsPrice, black76Price, bachelierPrice) or implied-volatility solve (bsImpliedVol, black76ImpliedVol, models.volatility.impliedVolBachelier) in the facade's positional order, then the model's Greeks at that volatility, kept as an envelope. */
+  optionCalculator(
+    request: OptionCalculatorRequest,
+  ): Promise<Envelope<OptionCalculatorResult>>;
   /** models.factor.risk parametric or historical VaR/ES decomposition, evaluateRiskBudgetFromDecomposition, and buildStressAttribution of a historical source; the budget and stress attribution keep their own native errors. */
   positionRisk(request: PositionRiskRequest): Promise<Envelope<PositionRisk>>;
   /** models.factor.risk.decomposeFactors: the parametric factor and position risk decomposition of a sensitivity matrix under a factor covariance. */

@@ -378,14 +378,16 @@ pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
     to_js_value(&map)
 }
 
-/// List the standard metrics registered for one instrument type, grouped by
-/// display category.
+/// List every metric the standard registry holds for one instrument type,
+/// grouped by display category.
 ///
 /// The per-instrument counterpart to `listStandardMetricsGrouped`: each group
 /// keeps only the metrics the standard registry applies to `instrumentType`,
-/// and groups left empty are omitted. A listed metric is registered for the
-/// type; whether it computes under a given pricing model still depends on that
-/// model. Metrics outside every display group are not listed.
+/// and groups left empty are omitted. Applicable metrics outside every display
+/// group, such as `all_in_rate` or `parity`, are listed under
+/// `"Instrument Specific"`. A listed metric is registered for the type; whether
+/// it computes under a given pricing model or market still depends on that
+/// model and market.
 ///
 /// # Arguments
 ///
@@ -404,8 +406,10 @@ pub fn metrics_for_instrument(instrument_type: JsValue) -> Result<JsValue, JsVal
 ///
 /// # Arguments
 ///
-/// * `keys` - Canonical scalar or qualified wire keys in output order. Custom
-///   keys retain unknown units; malformed or obsolete encodings are rejected.
+/// * `keys` - Canonical scalar or qualified wire keys in output order. A custom
+///   key has a unit only when Rust declares one; one the standard registry holds gets the group
+///   `"Instrument Specific"`, any other gets no group; malformed or obsolete
+///   encodings are rejected.
 /// @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.
 /// @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.
 #[wasm_bindgen(js_name = metricMetadata)]

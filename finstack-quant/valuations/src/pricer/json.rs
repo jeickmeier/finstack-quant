@@ -317,18 +317,20 @@ pub fn list_standard_metrics_grouped() -> BTreeMap<String, Vec<String>> {
         .collect()
 }
 
-/// List the standard metrics registered for one instrument type, grouped by
-/// display category.
+/// List every metric the standard registry holds for one instrument type,
+/// grouped by display category.
 ///
 /// This is the per-instrument counterpart to [`list_standard_metrics_grouped`]:
 /// each group keeps only the metrics for which the standard registry's
 /// [`MetricRegistry::is_applicable`](crate::metrics::MetricRegistry::is_applicable)
-/// holds for `instrument_type`, and groups left empty are omitted. A listed
-/// metric is registered for the type; whether it computes under a particular
-/// pricing model still depends on that model. Metrics outside every display
-/// group are not listed (see
-/// [`MetricRegistry::metrics_for_instrument`](crate::metrics::MetricRegistry::metrics_for_instrument)
-/// for the flat, ungrouped list).
+/// holds for `instrument_type`, and groups left empty are omitted. Applicable
+/// metrics outside every [`MetricGroup`](crate::metrics::MetricGroup), such as
+/// `all_in_rate` or `parity`, are listed under
+/// [`MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME`](crate::metrics::MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME),
+/// so the values of the map are exactly
+/// [`MetricRegistry::metrics_for_instrument`](crate::metrics::MetricRegistry::metrics_for_instrument).
+/// A listed metric is registered for the type; whether it computes under a
+/// particular pricing model or market still depends on that model and market.
 ///
 /// # Arguments
 ///
@@ -365,7 +367,7 @@ pub fn metrics_for_instrument(
             Error::Validation(format!("Unknown instrument type: '{instrument_type}'. {e}"))
         })?;
     let registry = crate::pricer::STANDARD.metrics();
-    Ok(registry
+    let mut groups: BTreeMap<String, Vec<String>> = registry
         .available_metrics_grouped()
         .into_iter()
         .filter_map(|(group, metrics)| {
@@ -376,7 +378,28 @@ pub fn metrics_for_instrument(
                 .collect();
             (!ids.is_empty()).then(|| (group.display_name().to_string(), ids))
         })
-        .collect())
+        .collect();
+    let ungrouped: Vec<String> = registry
+        .metrics_for_instrument(instrument)
+        .into_iter()
+        .filter(|metric| display_group(metric).is_none())
+        .map(|metric| metric.to_string())
+        .collect();
+    if !ungrouped.is_empty() {
+        groups.insert(
+            crate::metrics::MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME.to_string(),
+            ungrouped,
+        );
+    }
+    Ok(groups)
+}
+
+/// The [`MetricGroup`](crate::metrics::MetricGroup) holding `metric`, if any.
+fn display_group(metric: &MetricId) -> Option<crate::metrics::MetricGroup> {
+    crate::metrics::MetricGroup::ALL
+        .iter()
+        .copied()
+        .find(|group| group.metrics().contains(metric))
 }
 
 /// Canonical per-key metric interpretation for host presentation.
@@ -392,9 +415,11 @@ pub struct MetricMetadata {
     pub components: Vec<String>,
     /// How each entry of `components` orders along its axis, aligned with it.
     pub coordinates: Vec<MetricCoordinate>,
-    /// Native unit family; custom or calculator-dependent units remain unknown.
+    /// Native unit family; undeclared custom and calculator-dependent units are unknown.
     pub unit: crate::metrics::MetricUnit,
-    /// Native display group; absent for a non-standard base metric.
+    /// Native display group, the same name [`metrics_for_instrument`] lists the
+    /// base metric under; absent for a base metric the standard registry does
+    /// not hold.
     pub group: Option<String>,
     /// Whether this is a DV01/CS01 bucket with nonempty identifier and bucket coordinates.
     pub bucketed: bool,
@@ -443,7 +468,10 @@ impl MetricCoordinate {
 ///
 /// * `keys` - Canonical wire metric keys in desired output order. Qualified keys
 ///   retain their original spelling and use the native composite codec to decode
-///   coordinates. Custom names are accepted with unknown units and no group.
+///   coordinates. A custom name the standard registry holds gets
+///   [`MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME`](crate::metrics::MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME);
+///   any other is accepted with no group. A custom name has a unit only when
+///   [`MetricId::unit`] declares one, and is otherwise unknown.
 ///
 /// # Returns
 ///
@@ -459,10 +487,15 @@ pub fn metric_metadata(keys: &[String]) -> finstack_quant_core::Result<Vec<Metri
             let id: MetricId = key.parse()?;
             let base = id.base();
             let components = id.decode_components(&base).unwrap_or_default();
-            let group = crate::metrics::MetricGroup::ALL
-                .iter()
-                .find(|group| group.metrics().contains(&base))
-                .map(|group| group.display_name().to_string());
+            let group = match display_group(&base) {
+                Some(group) => Some(group.display_name().to_string()),
+                None => crate::pricer::STANDARD
+                    .metrics()
+                    .has_metric(base.clone())
+                    .then(|| {
+                        crate::metrics::MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME.to_string()
+                    }),
+            };
             let bucketed = (base == MetricId::BucketedDv01 || base == MetricId::BucketedCs01)
                 && components.len() == 2
                 && components.iter().all(|component| !component.is_empty());
@@ -1371,9 +1404,68 @@ mod tests {
         assert!(!fx.is_empty());
         for (group, ids) in &fx {
             assert!(!ids.is_empty(), "empty group {group} must be omitted");
+            if group == crate::metrics::MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME {
+                continue;
+            }
             let standard = all.get(group).expect("group of the standard listing");
             assert!(ids.iter().all(|id| standard.contains(id)));
         }
+    }
+
+    #[test]
+    fn metrics_for_instrument_lists_exactly_what_the_registry_applies() {
+        use crate::metrics::MetricGroup;
+        assert!(
+            MetricGroup::ALL
+                .iter()
+                .all(|group| group.display_name() != MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME),
+            "the ungrouped name must not merge with a real group"
+        );
+        for ty in [
+            "bond",
+            "term_loan",
+            "revolving_credit",
+            "convertible_bond",
+            "fx_option",
+        ] {
+            let instrument: crate::pricer::InstrumentType = ty.parse().expect("known type");
+            let mut listed: Vec<String> = metrics_for_instrument(ty)
+                .expect("known type")
+                .into_values()
+                .flatten()
+                .collect();
+            listed.sort();
+            let registered: Vec<String> = crate::pricer::STANDARD
+                .metrics()
+                .metrics_for_instrument(instrument)
+                .iter()
+                .map(ToString::to_string)
+                .collect();
+            assert_eq!(listed, registered, "{ty}");
+        }
+    }
+
+    #[test]
+    fn metrics_for_instrument_surfaces_custom_ids_and_metadata_agrees() {
+        use crate::metrics::MetricGroup;
+        let ungrouped = |ty: &str| {
+            metrics_for_instrument(ty)
+                .expect("known type")
+                .remove(MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME)
+                .unwrap_or_default()
+        };
+        assert!(ungrouped("term_loan").contains(&"all_in_rate".to_string()));
+        assert!(ungrouped("term_loan").contains(&"yt3y".to_string()));
+        assert!(ungrouped("revolving_credit").contains(&"utilization_rate".to_string()));
+        assert!(ungrouped("convertible_bond").contains(&"parity".to_string()));
+
+        let metadata = metric_metadata(&["all_in_rate".to_string(), "no_such_metric".to_string()])
+            .expect("metadata");
+        assert_eq!(
+            metadata[0].group.as_deref(),
+            Some(MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME)
+        );
+        assert_eq!(metadata[1].group, None);
     }
 
     #[test]

@@ -53,6 +53,10 @@ import { Example as Example49 } from "./examples/horizon-return-report";
 import { Example as Example50 } from "./examples/scenario-pnl-table";
 import { Example as Example51 } from "./examples/benchmark-report";
 import { Example as Example52 } from "./examples/merton-calculator";
+import { Example as Example72 } from "./examples/curve-query";
+import { Example as Example73 } from "./examples/loan-yield-card";
+import { Example as Example74 } from "./examples/liability-management-card";
+import { Example as Example71 } from "./examples/option-calculator";
 import { Example as Example53 } from "./examples/csa-editor";
 import { Example as Example54 } from "./examples/margin-call-table";
 import { Example as Example55 } from "./examples/portfolio-margin-report";
@@ -125,6 +129,10 @@ const examples = {
   "scenario-pnl-table": Example50,
   "benchmark-report": Example51,
   "merton-calculator": Example52,
+  "curve-query": Example72,
+  "loan-yield-card": Example73,
+  "liability-management-card": Example74,
+  "option-calculator": Example71,
   "csa-editor": Example53,
   "margin-call-table": Example54,
   "portfolio-margin-report": Example55,

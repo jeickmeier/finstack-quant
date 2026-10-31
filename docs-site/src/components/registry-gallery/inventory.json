@@ -61,6 +61,12 @@
       "worker": "none"
     },
     {
+      "name": "curve-query",
+      "type": "registry:component",
+      "docs": "Reads one stored curve or surface at supplied points: discount factor and continuously compounded zero rate, plus continuously compounded forward rates over year-fraction intervals, of a discount curve; the forward rate of a forward curve; survival probability and hazard rate of a hazard curve; volatility of a stored surface at an expiry and strike. Curve points are years from the base date or ISO dates, which pass through as entered for Rust to convert with the curve day count. A point Rust rejects shows its native error in its own cell; an id the market does not hold is the whole error. Look up passes the lookup to the caller (usually, with the market, the useCurveQuery request). Mount it in market-context-browser through renderObject with curveQueryTarget, which names the queryable target of a browser entry. Accepts target, defaultPoints, defaultForwards, onSubmit, result, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
       "name": "decimal-input",
       "type": "registry:ui",
       "docs": "Controlled decimal-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
@@ -163,6 +169,12 @@
       "worker": "none"
     },
     {
+      "name": "loan-yield-card",
+      "type": "registry:component",
+      "docs": "Shows the metric ids a loan analyst reads together: ytm, ytw, ytc, yt2y, yt3y, yt4y, discount_margin, all_in_rate, oid_eir_rate, oid_eir_amortization and embedded_option_value. applicableLoanYieldMetrics keeps those Rust lists for the instrument type (metricsForInstrument); pass the result to useMetricValues, which prices each id on its own call because one failing id fails a whole native request, and useMetricMetadata for units and groups. An id Rust rejects (embedded_option_value without the tree model, discount_margin on a fixed loan or on a callable loan without a quote) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. Unit shows what metricMetadata declares and says not declared otherwise; values are never rescaled. Accepts rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "metric-picker",
       "type": "registry:ui",
       "docs": "Controlled metric-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
@@ -213,7 +225,7 @@
     {
       "name": "cashflow-viewer",
       "type": "registry:component",
-      "docs": "Table of the supplied native cashflow envelope object with row-currency amounts and reporting-currency PV, validated against the Rust schema. Rust supplies totals and reconciliation. An optional ladder prop (the native cashflows.calendarYearLadder rows per row currency, as useCashflowLadder returns them) adds a Schedule / Annual ladder toggle with one table per currency in native PV. Envelope JSON (a host serialization of the object) is available for copy/download. Accepts cashflows, ladder, loading and error props; no worker or query provider required.",
+      "docs": "Table of the supplied native cashflow envelope object with row-currency amounts and reporting-currency PV, validated against the Rust schema. Rust supplies totals and reconciliation. Principal before and after columns show the supplied beginning_balance and ending_balance (per row for bonds, term loans and revolvers, per period for agency MBS), hidden only when no row carries one; nothing is accumulated. An optional ladder prop (the native cashflows.calendarYearLadder rows per row currency, as useCashflowLadder returns them) adds a Schedule / Annual ladder toggle with one table per currency in native PV. Envelope JSON (a host serialization of the object) is available for copy/download. Accepts cashflows, ladder, loading and error props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -388,6 +400,18 @@
       "name": "margin-call-table",
       "type": "registry:component",
       "docs": "Display-only view of what useVm, useMarginCalls and useMarginCallDates return. The variation margin section shows the Rust call decision (margin.vmResultRequiresCall) as a badge, the Rust net margin (margin.vmResultNetMargin: post minus collect, positive when the desk posts) in the result's currency, the date and settlement date, and the VmResult money terms (gross exposure, threshold, independent amount, net exposure, collateral balance, unrounded call, MTA, rounding increment, post and collect amounts) as exact money. The margin calls section lists VmCalculator#generateMarginCalls in returned order; the call dates section lists VmCalculator#marginCallDates. Nothing is netted, thresholded or rounded. Accepts vm, calls, callDates, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "liability-management-card",
+      "type": "registry:component",
+      "docs": "Two forms. Exchange offer, the holder's view: hold-out PV, new instrument PV, consent fee, equity sweetener and offer structure, with the returned tender total, NPV pickup, breakeven recovery and tender_recommended, which is Rust's field and never compared here; the hurdle Rust applies shows beside it as supplied. Liability management exercise, the issuer's view: structure, notional, participation, EBITDA and a price input that Rust reads as a price, an extension fee or a transferred-asset fraction by structure, with the returned cost, par retired, discount capture, holder impact and, for a positive EBITDA, the leverage block. Amounts use one unit you choose, with no currency conversion; percentages are fractions. An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset. Each analysis shows its own native error. Accepts defaultExchange, defaultLme, onExchangeSubmit, onLmeSubmit, exchange, lme, hurdle, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "option-calculator",
+      "type": "registry:component",
+      "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. A price Rust cannot invert is the whole error; Greeks Rust rejects (at zero volatility under Black-Scholes) show their native error beside the price. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
       "worker": "none"
     },
     {
@@ -575,7 +599,15 @@
       "type": "registry:file"
     },
     {
+      "name": "use-curve-query",
+      "type": "registry:hook"
+    },
+    {
       "name": "use-market-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-metric-values",
       "type": "registry:hook"
     },
     {
@@ -728,6 +760,14 @@
     },
     {
       "name": "use-margin-call-dates",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-liability-management",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-option-calculator",
       "type": "registry:hook"
     },
     {
@@ -1417,6 +1457,10 @@
       "sha256": "87b45db4b2e5180dcdbd7b4ca1f92e767ed56ffd9a108c9b1b8dd40ded0d89aa"
     },
     {
+      "path": "finstack-quant-ui/tests/core/curve-query/cases.json",
+      "sha256": "19d4893bfa09d59477fd258f6dde63ce33a771b1a3112c5a9200a4ecbe0ff35d"
+    },
+    {
       "path": "finstack-quant-ui/tests/core/cubes/cases.json",
       "sha256": "ca9cb5f4fb61af07d7f6a8cfc03eb08407b13fc5a2825cadc944732986fc333f"
     },
@@ -1434,7 +1478,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "8415df392c3097a662ce8d4450098e58bb624fe9e4b3421d02c910d5d15b66ae"
+      "sha256": "9689871d433aa03c314eb570f0f8245e0c2cc661b999c74d761083b924e71c6a"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
+      "sha256": "a4e8b76537de7b44526868f1d8cd0deb7a5bb77f3b72197ae66c20927fe07c1d"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
@@ -1475,6 +1523,14 @@
     {
       "path": "finstack-quant-ui/tests/models/risk/cases.json",
       "sha256": "87628356e80638606a1e4e17876b0d4058d6277d555d1b4e5faf9517ce060a4e"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/options/cases.json",
+      "sha256": "9fb6c54c8b7050e0ff8d768ead41b3d375a19f766dd3b60fa1e1229cabb44e09"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/liability-management/cases.json",
+      "sha256": "6f51a7c35d8889becbb50185a69a67e4a744c692a82d85d261b9594cc9a872bf"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/margin/simm.json",

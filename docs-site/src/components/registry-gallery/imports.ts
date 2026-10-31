@@ -49,11 +49,22 @@ export const importHarnesses = {
       name: "finstack-worker",
       modules: modules.length,
     })),
+  "use-curve-query": () =>
+    Promise.all([import("@/hooks/core/use-curve-query/use-curve-query")]).then(
+      (modules) => ({ name: "use-curve-query", modules: modules.length }),
+    ),
   "use-market-validator": () =>
     Promise.all([
       import("@/hooks/core/use-market-validator/use-market-validator"),
     ]).then((modules) => ({
       name: "use-market-validator",
+      modules: modules.length,
+    })),
+  "use-metric-values": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-metric-values/use-metric-values"),
+    ]).then((modules) => ({
+      name: "use-metric-values",
       modules: modules.length,
     })),
   "use-price-instrument": () =>
@@ -306,6 +317,20 @@ export const importHarnesses = {
       import("@/hooks/margin/use-margin-call-dates/use-margin-call-dates"),
     ]).then((modules) => ({
       name: "use-margin-call-dates",
+      modules: modules.length,
+    })),
+  "use-liability-management": () =>
+    Promise.all([
+      import("@/hooks/models/use-liability-management/use-liability-management"),
+    ]).then((modules) => ({
+      name: "use-liability-management",
+      modules: modules.length,
+    })),
+  "use-option-calculator": () =>
+    Promise.all([
+      import("@/hooks/models/use-option-calculator/use-option-calculator"),
+    ]).then((modules) => ({
+      name: "use-option-calculator",
       modules: modules.length,
     })),
   "use-fx-delta-samples": () =>

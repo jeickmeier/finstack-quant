@@ -921,6 +921,73 @@ impl CashFlowSchedule {
         Ok(closing)
     }
 
+    /// Outstanding principal before and after each flow, aligned with
+    /// [`Self::get_flows`].
+    ///
+    /// Replays the same path as [`Self::outstanding_by_date`], one row at a
+    /// time. An amortization, PIK, draw or repayment row moves the balance, in
+    /// replay order. The issue funding row, which the opening notional already
+    /// counts, goes from zero to that notional. A row that moves nothing keeps
+    /// the balance it sits at: for a coupon that is the balance just before its
+    /// accrual end, so a coupon paid after a principal date on the accrual end
+    /// still shows the principal it accrued on. A balance within half a minor
+    /// currency unit of zero reads as zero: it is the float residue of the
+    /// amortization amounts, not principal.
+    ///
+    /// # Returns
+    ///
+    /// One `(before, after)` pair per flow, in the notional currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `meta.issue_date` is unset, and propagates
+    /// currency mismatches or decimal overflow from balance replay.
+    pub fn balances_by_flow(&self) -> finstack_quant_core::Result<Vec<(Money, Money)>> {
+        let issue = self.meta.issue_date.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "balances_by_flow: schedule.meta.issue_date is required to identify the initial funding flow"
+                    .into(),
+            )
+        })?;
+        let mut outstanding = self.notional.initial;
+        let mut balances = vec![(outstanding, outstanding); self.flows.len()];
+        let mut path: Vec<(Date, Money)> = Vec::new();
+        for (index, is_initial_funding) in self.balance_replay_order(issue, |_| true) {
+            let flow = &self.flows[index];
+            let before = if is_initial_funding {
+                Money::from((0_i64, outstanding.currency()))
+            } else {
+                outstanding
+            };
+            apply_flow_to_outstanding(&mut outstanding, flow, is_initial_funding)?;
+            balances[index] = (before, outstanding);
+            if outstanding != before {
+                path.push((flow.get_balance_date(), outstanding));
+            }
+        }
+        for (flow, balance) in self.flows.iter().zip(&mut balances) {
+            if let (Some(accrual), true) = (&flow.accrual, balance.0 == balance.1) {
+                let moved = path.partition_point(|(date, _)| *date < accrual.end);
+                let held = moved
+                    .checked_sub(1)
+                    .map_or(self.notional.initial, |last| path[last].1);
+                *balance = (held, held);
+            }
+        }
+        let currency = self.notional.initial.currency();
+        let residue = 0.5 * 10f64.powi(-i32::from(currency.decimals()));
+        let settle = |money: &mut Money| {
+            if money.amount().abs() < residue {
+                *money = Money::from((0_i64, currency));
+            }
+        };
+        for (before, after) in &mut balances {
+            settle(before);
+            settle(after);
+        }
+        Ok(balances)
+    }
+
     /// Issue date, else the first flow date: where the issue funding row sits.
     fn funding_anchor(&self) -> Option<Date> {
         self.meta
