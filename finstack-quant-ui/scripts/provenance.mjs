@@ -138,7 +138,7 @@ const displays = [
     ],
     route: "native-envelope-table",
     convention:
-      "The returned envelope object, validated against the Rust-generated cashflow schema. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. Its JSON view is a host serialization, not native text. The optional annual ladder is cashflows.calendarYearLadder per row currency (worker partition, first-appearance order) over each flow's native_pv: row-currency PV before FX conversion and any scenario price shock.",
+      "The returned envelope object, validated against the Rust-generated cashflow schema. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. beginning_balance and ending_balance show as supplied (per row for bonds, term loans and revolvers, per period for agency MBS), never accumulated, and their columns hide only when no row carries one. Its JSON view is a host serialization, not native text. The optional annual ladder is cashflows.calendarYearLadder per row currency (worker partition, first-appearance order) over each flow's native_pv: row-currency PV before FX conversion and any scenario price shock.",
   },
   {
     id: "curve-chart",

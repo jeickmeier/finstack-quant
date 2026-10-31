@@ -31,14 +31,34 @@ function patch(value, patches) {
   return value;
 }
 const inputs = [{ type: "bond", request: (await read(bondPath)).request }];
-for (const type of ["fx_swap", "xccy_swap", "equity_option"]) {
-  const entry = manifest.cases.find((c) => c.type === type);
+// A PIK loan shows how the balance accretes; the agency pool shows per-period balances.
+const pikLoan = [
+  { path: ["instrument", "spec", "id"], value: "TERM-LOAN-USD-5Y-PIK" },
+  { path: ["instrument", "spec", "coupon_type"], value: "pik" },
+  { path: ["instrument", "spec", "amortization"], value: "none" },
+];
+// A one-year remaining pool: enough periods to show the balance, not 1,014 rows.
+const shortPool = [
+  { path: ["instrument", "spec", "maturity"], value: "2024-12-28" },
+  { path: ["instrument", "spec", "wam_months"], value: 12 },
+];
+for (const [type, manifestType, extraPatches] of [
+  ["fx_swap", "fx_swap", []],
+  ["xccy_swap", "xccy_swap", []],
+  ["equity_option", "equity_option", []],
+  ["term_loan_pik", "term_loan", pikLoan],
+  ["agency_mbs_passthrough", "agency_mbs_passthrough", shortPool],
+]) {
+  const entry = manifest.cases.find((c) => c.type === manifestType);
   inputs.push({
     type,
     request: {
       ...entry.request,
       instrumentJson: JSON.stringify(
-        patch(await source(entry.instrumentSource), entry.instrumentPatches),
+        patch(await source(entry.instrumentSource), [
+          ...entry.instrumentPatches,
+          ...extraPatches,
+        ]),
       ),
       marketJson: JSON.stringify(
         patch(await source(entry.marketSource), entry.marketPatches),

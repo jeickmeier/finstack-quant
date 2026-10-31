@@ -36,8 +36,19 @@ const extraDiagnostics = [
   ["conditional_default_prob", "Interval default probability"],
   ["inflation_index_ratio", "Inflation ratio"],
   ["prepayment_smm", "Prepayment SMM"],
-  ["beginning_balance", "Beginning balance"],
-  ["ending_balance", "Ending balance"],
+] as const;
+/** The envelope's balance fields, labelled for what Rust documents them to be. */
+const balances = [
+  [
+    "beginning_balance",
+    "Principal before",
+    "Outstanding principal before this row, in the row currency; for agency MBS, the pool balance at the start of the period",
+  ],
+  [
+    "ending_balance",
+    "Principal after",
+    "Outstanding principal after this row, in the row currency; for agency MBS, the pool balance at the end of the period",
+  ],
 ] as const;
 const views = [
   { value: "schedule", label: "Schedule" },
@@ -126,6 +137,9 @@ export function CashflowViewer({
     ? `Cashflows unavailable: ${suppliedError}`
     : presentation.error;
   const columns = diagnostics.filter(([key]) =>
+    schedule?.flows.some((row) => row[key] != null),
+  );
+  const balanceColumns = balances.filter(([key]) =>
     schedule?.flows.some((row) => row[key] != null),
   );
   const hasExtra = schedule?.flows.some((row) =>
@@ -226,6 +240,16 @@ export function CashflowViewer({
                     <TableHead scope="col" className="text-right">
                       Amount
                     </TableHead>
+                    {balanceColumns.map(([key, label, title]) => (
+                      <TableHead
+                        key={key}
+                        scope="col"
+                        className="text-right"
+                        title={title}
+                      >
+                        {label}
+                      </TableHead>
+                    ))}
                     {columns.map(([key, label, title]) => (
                       <TableHead
                         key={key}
@@ -272,6 +296,27 @@ export function CashflowViewer({
                           })}
                         </span>
                       </TableCell>
+                      {balanceColumns.map(([key]) => {
+                        const balance = row[key];
+                        return (
+                          <TableCell
+                            key={key}
+                            className={`${cell} ${numeric} align-top`}
+                            title={
+                              balance == null ? undefined : String(balance)
+                            }
+                          >
+                            <span className="whitespace-nowrap">
+                              {balance == null
+                                ? formatRaw(balance)
+                                : formatRawMoney({
+                                    amount: String(balance),
+                                    currency: row.currency,
+                                  })}
+                            </span>
+                          </TableCell>
+                        );
+                      })}
                       {columns.map(([key]) => (
                         <TableCell
                           key={key}
@@ -345,13 +390,13 @@ export function CashflowViewer({
                 <TableFooter>
                   <TableRow>
                     <TableCell
-                      colSpan={3 + columns.length}
+                      colSpan={3 + balanceColumns.length + columns.length}
                       className="text-right print:hidden"
                     >
                       Total PV · {schedule.currency}
                     </TableCell>
                     <TableCell
-                      colSpan={3}
+                      colSpan={3 + balanceColumns.length}
                       className="hidden text-right print:table-cell"
                     >
                       Total PV · {schedule.currency}
@@ -392,6 +437,8 @@ export function CashflowViewer({
             <p className="mt-2 text-xs text-muted-foreground">
               Amounts use each row’s currency. PV and total PV use reporting
               currency {schedule.currency}.
+              {balanceColumns.length > 0 &&
+                " Principal before and after are the outstanding principal Rust supplies per row, in the row currency: an issue funding row starts from zero, and rows of one agency MBS period share its pool balances."}
             </p>
           )}
         </>

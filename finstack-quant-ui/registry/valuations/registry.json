@@ -335,7 +335,7 @@
       "type": "registry:component",
       "title": "Cashflow viewer",
       "description": "Table of a supplied native cashflow envelope with row-currency amounts, reporting-currency PV, an optional native annual ladder per row currency and a JSON export.",
-      "docs": "Table of the supplied native cashflow envelope object with row-currency amounts and reporting-currency PV, validated against the Rust schema. Rust supplies totals and reconciliation. An optional ladder prop (the native cashflows.calendarYearLadder rows per row currency, as useCashflowLadder returns them) adds a Schedule / Annual ladder toggle with one table per currency in native PV. Envelope JSON (a host serialization of the object) is available for copy/download. Accepts cashflows, ladder, loading and error props; no worker or query provider required.",
+      "docs": "Table of the supplied native cashflow envelope object with row-currency amounts and reporting-currency PV, validated against the Rust schema. Rust supplies totals and reconciliation. Principal before and after columns show the supplied beginning_balance and ending_balance (per row for bonds, term loans and revolvers, per period for agency MBS), hidden only when no row carries one; nothing is accumulated. An optional ladder prop (the native cashflows.calendarYearLadder rows per row currency, as useCashflowLadder returns them) adds a Schedule / Annual ladder toggle with one table per currency in native PV. Envelope JSON (a host serialization of the object) is available for copy/download. Accepts cashflows, ladder, loading and error props; no worker or query provider required.",
       "files": [
         {
           "path": "components/cashflow-viewer/cashflow-viewer.tsx",
