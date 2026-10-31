@@ -17,6 +17,7 @@ import type {
   MoneyValue,
   ScenarioTable,
   ScenarioTableFieldUnits,
+  PoolReportFieldUnits,
   StructuredCredit,
   ScenarioResults,
   TrancheCashflows,
@@ -114,6 +115,14 @@ export interface StandardDealRequest {
 }
 /** The native capital structure of a deal, as StructuredCredit's tranches getter returns it. */
 export type DealTranches = StructuredCredit["tranches"];
+/** Native report of a deal's collateral pool. */
+export type PoolReport = ReturnType<typeof valuations.instruments.poolReport>;
+/** One deal's collateral pool at a date. */
+export interface PoolReportRequest {
+  readonly instrumentJson: string;
+  /** ISO-8601 date the remaining maturities are measured from. */
+  readonly asOf: string;
+}
 /** One tranche of a structured-credit deal, priced on a complete market at a valuation date. */
 export interface TrancheRequest {
   readonly instrumentJson: string;
@@ -1130,6 +1139,8 @@ export interface ValuationsApi {
   dealTranches(instrumentJson: string): Promise<Envelope<DealTranches>>;
   /** valuations.instruments.StructuredCredit.fromJson + its trancheCashflows, handed to trancheCashflowsTable; dates are joined and summed in Rust. */
   trancheSchedule(request: TrancheRequest): Promise<Envelope<TrancheSchedule>>;
+  /** valuations.instruments.poolReport over the deal's pool: statistics, WARF and concentration. */
+  poolReport(request: PoolReportRequest): Promise<Envelope<PoolReport>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
   scenarioTable(request: ScenarioRequest): Promise<Envelope<ScenarioTable>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheMetrics; no OasConfig or price default is supplied. */
@@ -1160,6 +1171,10 @@ export interface ValuationsApi {
   scenarioTableFieldUnits(
     currency: string,
   ): Promise<Envelope<ScenarioTableFieldUnits>>;
+  /** valuations.instruments.poolReportFieldUnits: units of a pool report's fields. */
+  poolReportFieldUnits(
+    currency: string,
+  ): Promise<Envelope<PoolReportFieldUnits>>;
   /** valuations.instruments.trancheSolveFieldUnits: units of the break-even CDR, discount margin and OAS results. */
   trancheSolveFieldUnits(): Promise<Envelope<TrancheSolveFieldUnits>>;
   /** valuations.valuationResultToJson over the host-serialized result: native canonical JSON. */

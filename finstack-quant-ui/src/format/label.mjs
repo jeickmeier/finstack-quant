@@ -63,6 +63,7 @@ const acronyms = new Set([
   "trs",
   "tvpi",
   "vol",
+  "wac",
   "wal",
   "wam",
   "warf",

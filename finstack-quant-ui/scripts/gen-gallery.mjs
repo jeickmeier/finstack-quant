@@ -32,6 +32,7 @@ const sources = {
   calibration: "tests/calibration/cases.json",
   scenarios: "tests/valuations/scenario-table/cases.json",
   trancheAnalytics: "tests/valuations/scenario-table/tranche-analytics.json",
+  poolReport: "tests/valuations/scenario-table/pool-report.json",
   cashflows: "tests/valuations/cashflows/cases.json",
   loanYield: "tests/valuations/loan-yield/cases.json",
   marketScenario: "tests/scenarios/application/cases.json",

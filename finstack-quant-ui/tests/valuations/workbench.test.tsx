@@ -154,6 +154,16 @@ beforeEach(() => {
           deal.free();
         }
       }
+      case "poolReport": {
+        const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+        try {
+          return native.poolReport(deal.pool, request.asOf);
+        } finally {
+          deal.free();
+        }
+      }
+      case "poolReportFieldUnits":
+        return native.poolReportFieldUnits(request);
       case "scenarioTableFieldUnits":
         return native.scenarioTableFieldUnits(request);
       case "scenarioTable": {
@@ -889,6 +899,24 @@ it(
     expect(metricCalls.at(-1)![1]).toMatchObject({
       instrumentJson: family.instrumentJson,
       trancheId: tranche,
+    });
+    // The built deal reaches the pool report, which runs only when opened.
+    expect(call.mock.calls.some(([method]) => method === "poolReport")).toBe(
+      false,
+    );
+    fireEvent.click(screen.getByText("Pool report", { selector: "summary" }));
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector('[aria-label="Pool report"] table'),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    expect(
+      call.mock.calls.find(([method]) => method === "poolReport")![1],
+    ).toEqual({
+      instrumentJson: family.instrumentJson,
+      asOf: expect.any(String),
     });
     // The grid and the price extent come from Rust's example and the returned prices.
     fireEvent.click(screen.getByText("Scenarios", { selector: "summary" }));

@@ -15,6 +15,7 @@ import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import fixture from "./scenario-table/cases.json";
 import tranches from "./scenario-table/tranche-analytics.json";
 import standardDeals from "./scenario-table/standard-deals.json";
+import poolReports from "./scenario-table/pool-report.json";
 import { budget } from "../shared/budget";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -142,6 +143,39 @@ it(
       expect(
         unwrap(await worker.proxy.scenarioTableFieldUnits(c.table.currency)),
       ).toEqual(c.units);
+  },
+  budget(30000),
+);
+it(
+  "returns the native pool report and its units through the real worker",
+  async () => {
+    for (const c of poolReports.cases) {
+      const request = {
+        instrumentJson: JSON.stringify(c.instrument),
+        asOf: c.asOf,
+      };
+      const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+      try {
+        expect(unwrap(await worker.proxy.poolReport(request))).toEqual(
+          native.poolReport(deal.pool, c.asOf),
+        );
+      } finally {
+        deal.free();
+      }
+      // JSON has no negative zero, which Rust's sum over no rows returns.
+      expect(c.report).toEqual(
+        JSON.parse(
+          JSON.stringify(unwrap(await worker.proxy.poolReport(request))),
+        ),
+      );
+      expect(
+        unwrap(
+          await worker.proxy.poolReportFieldUnits(
+            c.report.total_balance.currency,
+          ),
+        ),
+      ).toEqual(c.units);
+    }
   },
   budget(30000),
 );

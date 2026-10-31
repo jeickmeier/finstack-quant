@@ -1,13 +1,30 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useDealTranches } from "@/hooks/valuations/use-tranche-analytics/use-tranche-analytics";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { ScenarioPanel } from "./scenario-panel";
 import { scenarioGridModule } from "./scenario-grid";
+import { PoolPanel } from "./pool-panel";
 import { TranchePanel } from "./tranche-panel";
+/** A disclosure whose content, and so its native calls, mounts when first opened. */
+function DealSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>{title}</summary>
+      {open && children}
+    </details>
+  );
+}
 /**
- * Selects one of the completed deal's native tranches and shows its analytics and
- * scenarios. The host's seeds are optional: the selection falls back to the first
+ * Shows the completed deal's pool report, selects one of its native tranches and
+ * shows that tranche's analytics and scenarios. The host's seeds are optional: the selection falls back to the first
  * returned tranche and the scenario grid to the schema's Rust example.
  */
 export function StructuredCreditPanel({
@@ -49,6 +66,15 @@ export function StructuredCreditPanel({
   const selected = { ...request, trancheId };
   return (
     <div className="flex flex-col gap-3">
+      <DealSection title="Pool report">
+        <PoolPanel
+          request={{
+            instrumentJson: request.instrumentJson,
+            asOf: request.asOf,
+          }}
+          density={density}
+        />
+      </DealSection>
       <div className="w-72">
         <EnumField
           label="Tranche"

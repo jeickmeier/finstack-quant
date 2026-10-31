@@ -1778,6 +1778,32 @@
       }
     },
     {
+      "id": "pool-report",
+      "route": "returned-report",
+      "convention": "Returned PoolReport fields in the units poolReportFieldUnits states: statistics, Moody's WARF and concentration tables by obligor, industry and rating, in Rust's row order with balance_pct in percent points of total_balance. A null key is shown as missing, never dropped; nothing is summed, sorted or grouped here.",
+      "api": {
+        "name": "valuations.instruments.poolReport",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "poolReport",
+        "inputs": [
+          {
+            "name": "pool",
+            "type": "generated.valuations.AssetPool | string",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.valuations.PoolReport",
+        "declaration": "/**\n   * Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).\n   * @param pool - `AssetPool` plain object or JSON string, in any of its three representations.\n   * @param asOf - ISO-8601 date the remaining maturities are measured from. It also stands in for the closing date when a pool is normalized: it ages representative lines and counts the delayed draws already funded on instrument collateral.\n   * @returns `PoolReport` plain object: `total_balance` (the denominator of every share), `stats` (`PoolStats` of the same rows), `warf` (Moody's rating factor weighted by balance over the performing rows, unrated assets at the `NR` factor) and `by_obligor`, `by_industry`, `by_rating`, each a list of `PoolConcentrationEntry` with `balance_pct` in percent points. An empty pool reports zero balances and empty tables. `poolReportFieldUnits` states every unit.\n   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, the pool cannot be normalized, an asset is not in the pool's base currency, or a rating has no Moody's factor.\n   */\n  poolReport(\n    pool: generated.valuations.AssetPool | string,\n    asOf: string\n  ): generated.valuations.PoolReport;",
+        "sha256": "a75937f578b29d96fb235b458e2c83b704b5cb84d9293dad7ffb105462e85884"
+      }
+    },
+    {
       "id": "performance-report",
       "route": "returned-analytics",
       "deferred": "machine-readable-units",

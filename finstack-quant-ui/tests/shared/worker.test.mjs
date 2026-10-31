@@ -94,6 +94,8 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "trancheMetricFieldUnits",
     "trancheSolveFieldUnits",
     "scenarioTableFieldUnits",
+    "poolReport",
+    "poolReportFieldUnits",
     "trancheOas",
     "trancheDiscountMargin",
     "trancheBreakevenCdr",

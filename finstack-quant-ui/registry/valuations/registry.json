@@ -522,6 +522,40 @@
       }
     },
     {
+      "name": "pool-report",
+      "type": "registry:component",
+      "title": "Pool report",
+      "description": "Displays a structured-credit collateral pool's native statistics, WARF and concentration by obligor, industry and rating.",
+      "docs": "Present a native valuations.instruments.poolReport result: total balance, WARF and PoolStats tiles, then concentration tables by obligor, industry and rating in Rust's row order. Every unit comes from native poolReportFieldUnits for the report's currency. A null key means the attribute is missing on those assets and shows as such. Nothing is summed, sorted, grouped or rescaled. No worker is required.",
+      "files": [
+        {
+          "path": "components/pool-report/pool-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/pool-report/pool-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/measure-value"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8",
+        "finstack-quant-wasm@0.11.0"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "tranche-analytics",
       "type": "registry:component",
       "title": "Tranche analytics",
@@ -573,7 +607,7 @@
       "type": "registry:block",
       "title": "Pricing workbench",
       "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows, tranche analytics and scenarios.",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "files": [
         {
           "path": "blocks/pricing-workbench/pricing-workbench.tsx",
@@ -619,6 +653,11 @@
           "path": "blocks/pricing-workbench/structured-credit-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/structured-credit-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/pool-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/pool-panel.tsx"
         },
         {
           "path": "blocks/pricing-workbench/tranche-panel.tsx",
@@ -670,6 +709,8 @@
         "@finstack/scenario-heatmap",
         "@finstack/use-tranche-analytics",
         "@finstack/tranche-analytics",
+        "@finstack/use-deal-report",
+        "@finstack/pool-report",
         "button",
         "label",
         "popover",
@@ -915,6 +956,32 @@
           "path": "hooks/use-scenario-table/use-scenario-table.ts",
           "type": "registry:hook",
           "target": "hooks/valuations/use-scenario-table/use-scenario-table.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-deal-report",
+      "type": "registry:hook",
+      "title": "useDealReport",
+      "description": "Fetches a structured-credit deal's native pool report and its units through the WASM worker.",
+      "docs": "usePoolReport calls valuations.instruments.poolReport over the deal's pool and usePoolReportFieldUnits calls poolReportFieldUnits for the report's currency, each keyed by its complete immutable request and the worker session; null disables a call. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-deal-report/use-deal-report.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-deal-report/use-deal-report.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],

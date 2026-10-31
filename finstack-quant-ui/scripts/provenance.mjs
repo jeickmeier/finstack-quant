@@ -370,6 +370,17 @@ const displays = [
       "Returned TrancheMetrics fields in the units each Rust field documents; break-even CDR, discount margin and OAS as returned decimals; prices percent of current tranche balance; no price default; cash flows by date only from TrancheCashflows::to_table, with its dates joined and summed in Rust.",
   },
   {
+    id: "pool-report",
+    api: [
+      "valuations.instruments.poolReport",
+      "ValuationInstrumentsNamespace",
+      "poolReport",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned PoolReport fields in the units poolReportFieldUnits states: statistics, Moody's WARF and concentration tables by obligor, industry and rating, in Rust's row order with balance_pct in percent points of total_balance. A null key is shown as missing, never dropped; nothing is summed, sorted or grouped here.",
+  },
+  {
     id: "performance-report",
     api: ["analytics.Performance#summary", "Performance", "summary"],
     route: "returned-analytics",
