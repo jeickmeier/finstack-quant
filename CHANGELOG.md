@@ -7,7 +7,9 @@
 #### Added
 
 - `PeriodDiagnostics.waterfall` (`PeriodWaterfall`): each period's tier allocations, `PaymentRecord`s, diversions and carried cash, on the `SimulationDiagnostics.periods` that `StructuredCredit::run_simulation` returns (Python `run_simulation`, WASM `runSimulation`). `PaymentRecord` gains `is_principal`.
-- `PeriodDiagnostics.non_waterfall_payments` (`NonWaterfallPayment`, `NonWaterfallSource`): cash paid to a tranche outside the waterfall (routed reserve interest, redemption, terminal releases). Per tranche and date, payment records plus these sum to the tranche's interest and principal flows.
+- `PeriodDiagnostics.non_waterfall_payments` (`NonWaterfallPayment`, `NonWaterfallSource`): cash paid to a tranche outside the waterfall (routed reserve interest, redemption, terminal releases). Per tranche and date, payment records plus these sum to the tranche's cash flows.
+- `PeriodDiagnostics.credit_enhancement` (`TrancheCreditEnhancement`): each tranche's end-of-period share of collateral beneath it, generalising the function the `MinCreditEnhancement` step-down trigger reads.
+- `SimulationDiagnostics.first_breaches` (`CoverageTestBreach`; Python `SimulationDiagnostics.first_breaches`): each coverage test's first failing payment date, including tranche triggers that never reach `coverage_tests`.
 
 #### Changed
 

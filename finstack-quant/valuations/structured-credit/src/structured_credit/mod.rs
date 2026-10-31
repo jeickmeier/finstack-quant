@@ -58,8 +58,9 @@ pub use pricing::execute_waterfall;
 pub use pricing::coverage_tests::{TestContext, TestResult};
 pub use pricing::waterfall::WaterfallContext;
 pub use pricing::{
-    CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource, PeriodDiagnostics,
-    PeriodWaterfall, SimulationDiagnostics, SimulationRun,
+    CoverageTestBreach, CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource,
+    PeriodDiagnostics, PeriodWaterfall, SimulationDiagnostics, SimulationRun,
+    TrancheCreditEnhancement,
 };
 
 pub use metrics::{

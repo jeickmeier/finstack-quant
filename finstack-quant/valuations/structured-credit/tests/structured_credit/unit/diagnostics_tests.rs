@@ -290,6 +290,7 @@ fn table_period(payment_date: Date, balance: f64) -> PeriodDiagnostics {
             recovery_proceeds: usd(0.0),
         },
         non_waterfall_payments: Vec::new(),
+        credit_enhancement: Vec::new(),
     }
 }
 
@@ -304,6 +305,7 @@ fn table_diagnostics(periods: Vec<PeriodDiagnostics>) -> SimulationDiagnostics {
         reserve_replenished: usd(0.0),
         early_amortization_date: None,
         tranche_draws: Vec::new(),
+        first_breaches: Vec::new(),
     }
 }
 

@@ -889,3 +889,17 @@ def test_period_detail_reconciles_with_tranche_flows_on_a_called_deal() -> None:
                     reported[payment["payment_date"]] = reported.get(payment["payment_date"], 0.0) + cash
         for date in booked.keys() | reported.keys():
             assert reported.get(date, 0.0) == pytest.approx(booked.get(date, 0.0), abs=1e-6), (tranche_id, date)
+
+
+def test_first_breaches_and_credit_enhancement_come_from_run_simulation() -> None:
+    diagnostics = _clo().run_simulation(_market(), CLOSE).diagnostics
+    assert [entry["test_id"] for entry in diagnostics.first_breaches] == ["OC_A"]
+    failing = [
+        period["payment_date"]
+        for period in diagnostics.periods
+        if any(not test["passing"] for test in period["coverage_tests"])
+    ]
+    assert diagnostics.first_breaches[0]["first_breach"] == (failing[0] if failing else None)
+    first = diagnostics.periods[0]["credit_enhancement"]
+    assert [entry["tranche_id"] for entry in first] == ["A", "B", "E"]
+    assert first[0]["credit_enhancement"] > first[1]["credit_enhancement"] > first[2]["credit_enhancement"]

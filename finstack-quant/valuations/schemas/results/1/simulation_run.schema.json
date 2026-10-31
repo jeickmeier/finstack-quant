@@ -279,6 +279,30 @@
       ],
       "type": "object"
     },
+    "CoverageTestBreach": {
+      "description": "When one coverage test first failed over a simulation.",
+      "properties": {
+        "first_breach": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First payment date this simulation found the test failing; a later cure\ndoes not clear it. `None` when it never failed."
+        },
+        "test_id": {
+          "description": "Id of the test: `CoverageTestDiagnostic::test_id` for a test the\nwaterfall carries (`OC_<tranche>`), or `OC_<tranche>_trigger` /\n`IC_<tranche>_trigger` for a tranche's own `oc_trigger` / `ic_trigger`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "test_id"
+      ],
+      "type": "object"
+    },
     "CoverageTestDiagnostic": {
       "description": "One coverage test as the waterfall executor evaluated it in a period.",
       "properties": {
@@ -503,6 +527,13 @@
           },
           "type": "array"
         },
+        "credit_enhancement": {
+          "description": "Every tranche's credit enhancement on this period's end-of-period\nbalances, in `TrancheStructure` order. The step-down trigger\n`MinCreditEnhancement` reads the senior tranche's value from the same\nfunction on the next payment date, before that date's principal is paid,\nso with no losses or draws in between it tests this period's number.",
+          "items": {
+            "$ref": "#/$defs/TrancheCreditEnhancement"
+          },
+          "type": "array"
+        },
         "defaults": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Par that defaulted (charged off) this period."
@@ -529,7 +560,7 @@
           "description": "Interest collected from the pool (including servicer advances)."
         },
         "non_waterfall_payments": {
-          "description": "Cash paid to tranches outside the waterfall: reserve interest routed to\na tranche, and, on the deal's last period, its redemption and terminal\nreleases. Together with `waterfall.payment_records` this is every\ntranche's interest and principal cash: per tranche and date, the two\nsum to the tranche's `interest_flows` plus `principal_flows`.",
+          "description": "Cash paid to tranches outside the waterfall: reserve interest routed to\na tranche, and, on the deal's last period, its redemption and terminal\nreleases. Together with `waterfall.payment_records` this is every\ntranche's cash: per tranche and date, the two sum to the tranche's\n`cashflows`, and to its `interest_flows` plus `principal_flows`. The one\nexception to the second sum is residual cash a custom waterfall pays a\ndebt class beyond its interest claim, which the engine books to\n`cashflows` alone.",
           "items": {
             "$ref": "#/$defs/NonWaterfallPayment"
           },
@@ -613,7 +644,8 @@
         "excess_spread",
         "coverage_tests",
         "waterfall",
-        "non_waterfall_payments"
+        "non_waterfall_payments",
+        "credit_enhancement"
       ],
       "type": "object"
     },
@@ -779,6 +811,13 @@
           "default": null,
           "description": "Payment date on which an early-amortization event (or a coverage-test\nacceleration) ended the revolving period, when one fired."
         },
+        "first_breaches": {
+          "description": "First failure of each coverage test, one entry per test sorted by\n`test_id`. Covers every test the waterfall carries (each also on\n`periods[i].coverage_tests`) and every tranche `oc_trigger` /\n`ic_trigger`, whatever its consequence (only a breached `DivertCashFlow`\ntrigger is on `coverage_tests`, for the periods it is in breach). A deal\nwith no coverage test has no entries.",
+          "items": {
+            "$ref": "#/$defs/CoverageTestBreach"
+          },
+          "type": "array"
+        },
         "periods": {
           "default": [],
           "description": "Per-period deal accounting, in payment order. A deal with no payment\nperiod left that still settles cash (a fully defaulted pool with\nrecoveries pending, or a funded reserve) has one record, holding that\nsettlement in `non_waterfall_payments`.",
@@ -857,7 +896,8 @@
         "draws_from_reserve",
         "draws_from_principal",
         "unfunded_draws",
-        "reserve_replenished"
+        "reserve_replenished",
+        "first_breaches"
       ],
       "type": "object"
     },
@@ -1068,6 +1108,25 @@
         "total_writedown"
       ],
       "type": "object"
+    },
+    "TrancheCreditEnhancement": {
+      "description": "One tranche's credit enhancement at a period's end.",
+      "properties": {
+        "credit_enhancement": {
+          "description": "Share of the collateral beneath this tranche, as a decimal (`0.30` is\n30%): `(C − N) ÷ C`, where `C` is the collateral balance plus the\ncontrolled-accumulation funding account and `N` the balances of this\ntranche and every tranche paid ahead of it (`payment_priority` at or\nbelow its own). Deferred interest is not in `N`. Negative when the notes\nexceed the collateral, and zero when there is no collateral. Pari-passu\nclasses rank by `payment_priority`, so each is enhanced only by those\nranked after it; an equity class's value is the collateral left above\nthe whole structure.",
+          "format": "double",
+          "type": "number"
+        },
+        "tranche_id": {
+          "description": "Id of the tranche (`Tranche::id`).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tranche_id",
+        "credit_enhancement"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
@@ -1085,6 +1144,7 @@
           "currency": "USD"
         },
         "early_amortization_date": null,
+        "first_breaches": [],
         "periods": [],
         "reserve_balance_path": [],
         "reserve_interest_paid": [],

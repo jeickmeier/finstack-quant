@@ -715,11 +715,23 @@ maps cannot be JSON. Cash that reaches a tranche outside the waterfall is on
 `PeriodDiagnostics::non_waterfall_payments` (`NonWaterfallPayment`, tagged with a
 `NonWaterfallSource`): reserve interest routed to a tranche on the period that
 earned it, and the redemption and terminal releases on the deal's last period.
-Per tranche and date the two sum to the tranche's `interest_flows` plus
-`principal_flows`. A recovery settling after the last period carries its own
+Per tranche and date the two sum to the tranche's `cashflows`, and to its
+`interest_flows` plus `principal_flows` except for residual cash a custom
+waterfall pays a debt class beyond its interest claim, which the engine books to
+`cashflows` alone. A recovery settling after the last period carries its own
 later `payment_date`; a deal with no payment period left that still settles cash
 has one record holding that settlement. Monte Carlo and OAS paths build the same
 record and discard it with the path.
+
+`PeriodDiagnostics::credit_enhancement` holds each tranche's end-of-period share
+of collateral beneath it, a decimal `(C − N) ÷ C`, with `C` the collateral plus
+the funding account and `N` the balances of the tranche and every tranche paid
+ahead of it. The `MinCreditEnhancement` step-down trigger reads the senior value
+from the same function on the next payment date, before that date's principal.
+`SimulationDiagnostics::first_breaches` lists each coverage test once, sorted by
+id, with its first failing payment date or `None`: the tests the waterfall
+carries and every tranche `oc_trigger` / `ic_trigger` (`OC_<tranche>_trigger`),
+including the ones that divert nothing and so never appear on `coverage_tests`.
 
 `SimulationDiagnostics::to_table()` owns the nineteen-column period export used
 by Python `to_dataframe()`. It retains period order and duplicate dates, joins

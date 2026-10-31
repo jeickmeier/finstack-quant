@@ -345,7 +345,8 @@ fn simulation_diagnostics_value() -> Value {
         "unfunded_draws": zero,
         "reserve_replenished": zero,
         "early_amortization_date": null,
-        "tranche_draws": []
+        "tranche_draws": [],
+        "first_breaches": []
     })
 }
 

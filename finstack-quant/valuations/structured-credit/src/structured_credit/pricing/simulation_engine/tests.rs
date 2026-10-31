@@ -2986,6 +2986,7 @@ mod cases {
 
     // ── Period waterfall detail and its reconciliation to tranche flows ──
 
+    use super::super::state::tranche_credit_enhancement;
     use crate::structured_credit::types::CallAssumption;
 
     /// The records and the booked flows are the same `Money` values: float noise
@@ -3297,5 +3298,252 @@ mod cases {
             settlement.non_waterfall_payments[0].principal,
             Money::from((1_000_000_i64, Currency::USD))
         );
+    }
+
+    /// Residual cash a custom waterfall pays a debt class beyond its interest
+    /// claim reaches `cashflows` but neither flow vector (`record_tranche_flows`
+    /// caps interest at the claim). The records report the cash the class got.
+    #[test]
+    fn residual_to_a_debt_class_reconciles_to_cashflows_only() {
+        use crate::structured_credit::types::{
+            PaymentCalculation, PaymentType, Recipient, Waterfall, WaterfallTier,
+        };
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.waterfall = Some(
+            Waterfall::builder(Currency::USD)
+                .add_tier(
+                    WaterfallTier::new("interest", 1, PaymentType::Interest)
+                        .add_recipient(Recipient::tranche_interest("a_interest", "CLASS_A")),
+                )
+                .add_tier(
+                    WaterfallTier::new("principal", 2, PaymentType::Principal)
+                        .add_recipient(Recipient::tranche_principal("a", "CLASS_A", None))
+                        .add_recipient(Recipient::tranche_principal("b", "CLASS_B", None)),
+                )
+                .add_tier(
+                    WaterfallTier::new("residual", 3, PaymentType::Residual).add_recipient(
+                        Recipient::new(
+                            "b_residual",
+                            RecipientType::Tranche("CLASS_B".to_string()),
+                            PaymentCalculation::ResidualCash,
+                        ),
+                    ),
+                )
+                .build()
+                .expect("waterfall"),
+        );
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let run = deal
+            .run_simulation(&market, deal.closing_date)
+            .expect("simulation");
+        let first = &run.diagnostics.periods[0];
+        let date = first.payment_date;
+        let flows = &run.tranches["CLASS_B"];
+        let paid: f64 = first
+            .waterfall
+            .payment_records
+            .iter()
+            .filter(|record| record.recipient == RecipientType::Tranche("CLASS_B".to_string()))
+            .map(|record| record.paid_amount.amount())
+            .sum();
+        assert!(paid > 0.0);
+        assert!((paid - sum_on(&flows.cashflows, date)).abs() <= RECONCILE_TOLERANCE);
+        assert_eq!(sum_on(&flows.interest_flows, date), 0.0);
+        assert_eq!(sum_on(&flows.principal_flows, date), 0.0);
+    }
+
+    // ── First coverage breach and credit enhancement ─────────────────────
+
+    fn breach<'a>(run: &'a SimulationRun, test_id: &str) -> &'a CoverageTestBreach {
+        run.diagnostics
+            .first_breaches
+            .iter()
+            .find(|breach| breach.test_id == test_id)
+            .expect("test listed")
+    }
+
+    /// A pool eroding through an OC level: the first failing period is reported,
+    /// not the first period and not a later one.
+    #[test]
+    fn first_breach_is_the_first_failing_period() {
+        use crate::structured_credit::types::CoverageTestSpec;
+        let mut deal = oc_trigger_deal(vec![CoverageTestSpec::oc("CLASS_A", 1.20)]);
+        // No recovery cash pays the senior note down, so the ratio only erodes.
+        deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
+        let run = run_reconciled(&deal);
+        let tests: Vec<(Date, bool)> = run
+            .diagnostics
+            .periods
+            .iter()
+            .flat_map(|period| {
+                period
+                    .coverage_tests
+                    .iter()
+                    .map(|test| (period.payment_date, test.passing))
+            })
+            .collect();
+        let failing = tests
+            .iter()
+            .position(|(_, passing)| !passing)
+            .expect("the test fails");
+        assert!(failing > 0, "the test passes at first");
+        assert_eq!(
+            breach(&run, "OC_CLASS_A").first_breach,
+            Some(tests[failing].0)
+        );
+    }
+
+    /// A test that never fails is still listed, with no date.
+    #[test]
+    fn first_breach_is_none_when_the_test_always_passes() {
+        use crate::structured_credit::types::CoverageTestSpec;
+        let mut deal = oc_trigger_deal(vec![CoverageTestSpec::oc("CLASS_A", 1.01)]);
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        let run = run_reconciled(&deal);
+        assert_eq!(
+            run.diagnostics.first_breaches,
+            vec![CoverageTestBreach {
+                test_id: "OC_CLASS_A".to_string(),
+                first_breach: None,
+            }]
+        );
+    }
+
+    /// One entry per test, sorted by id; none for a deal without tests.
+    #[test]
+    fn first_breaches_are_sorted_by_test_id() {
+        use crate::structured_credit::types::CoverageTestSpec;
+        let deal = clo_with_mezz(vec![
+            CoverageTestSpec::oc("CLASS_B", 1.01),
+            CoverageTestSpec::oc("CLASS_A", 1.01),
+            CoverageTestSpec::ic("CLASS_A", 1.01),
+        ]);
+        let run = run_reconciled(&deal);
+        let ids: Vec<&str> = run
+            .diagnostics
+            .first_breaches
+            .iter()
+            .map(|breach| breach.test_id.as_str())
+            .collect();
+        assert_eq!(ids, vec!["IC_CLASS_A", "OC_CLASS_A", "OC_CLASS_B"]);
+        assert!(run_reconciled(&clo_with_mezz(Vec::new()))
+            .diagnostics
+            .first_breaches
+            .is_empty());
+    }
+
+    /// A tranche trigger that diverts nothing never reaches `coverage_tests`,
+    /// and its first breach is still reported under its trigger id.
+    #[test]
+    fn tranche_trigger_without_a_diversion_reports_its_first_breach() {
+        use crate::structured_credit::types::{CoverageTrigger, TriggerConsequence};
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.tranches.tranches[0].oc_trigger = Some(CoverageTrigger::new(
+            2.0,
+            TriggerConsequence::StopReinvestment,
+        ));
+        let run = run_reconciled(&deal);
+        let first = &run.diagnostics.periods[0];
+        assert!(first.coverage_tests.is_empty());
+        assert_eq!(
+            breach(&run, "OC_CLASS_A_trigger").first_breach,
+            Some(first.payment_date)
+        );
+    }
+
+    /// A diverting trigger reports one entry under one id, whichever source saw it.
+    #[test]
+    fn diverting_tranche_trigger_has_one_entry() {
+        use crate::structured_credit::types::{CoverageTrigger, TriggerConsequence};
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.tranches.tranches[0].oc_trigger = Some(CoverageTrigger::new(
+            2.0,
+            TriggerConsequence::DivertCashFlow,
+        ));
+        let run = run_reconciled(&deal);
+        let first = &run.diagnostics.periods[0];
+        assert_eq!(first.coverage_tests[0].test_id, "OC_CLASS_A_trigger");
+        assert_eq!(run.diagnostics.first_breaches.len(), 1);
+        assert_eq!(
+            breach(&run, "OC_CLASS_A_trigger").first_breach,
+            Some(first.payment_date)
+        );
+    }
+
+    /// 7M / 2M / 1M notes over 10M of collateral: 30%, 10%, 0%.
+    #[test]
+    fn credit_enhancement_matches_a_hand_calculation() {
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        let run = run_reconciled(&deal);
+        let first = &run.diagnostics.periods[0];
+        assert_eq!(first.pool_balance.amount(), 10_000_000.0);
+        let values: Vec<(&str, f64)> = first
+            .credit_enhancement
+            .iter()
+            .map(|ce| (ce.tranche_id.as_str(), ce.credit_enhancement))
+            .collect();
+        assert_eq!(
+            values,
+            vec![("CLASS_A", 0.3), ("CLASS_B", 0.1), ("EQUITY", 0.0)]
+        );
+    }
+
+    /// With prepayments and defaults: `(pool − notes at or ahead) ÷ pool` on the
+    /// balances the row and the tranche flows report at that period's end.
+    #[test]
+    fn credit_enhancement_follows_end_of_period_balances() {
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+        let run = run_reconciled(&deal);
+        let period = &run.diagnostics.periods[3];
+        let balance = |id: &str, original: f64| {
+            let flows = &run.tranches[id];
+            let retired: f64 = flows
+                .principal_flows
+                .iter()
+                .chain(&flows.writedown_flows)
+                .filter(|(date, _)| *date <= period.payment_date)
+                .map(|(_, amount)| amount.amount())
+                .sum();
+            original - retired
+        };
+        let pool = period.pool_balance.amount();
+        let class_a = balance("CLASS_A", 7_000_000.0);
+        let class_b = balance("CLASS_B", 2_000_000.0);
+        assert!(
+            (period.credit_enhancement[0].credit_enhancement - (pool - class_a) / pool).abs()
+                < 1e-9
+        );
+        assert!(
+            (period.credit_enhancement[1].credit_enhancement - (pool - class_a - class_b) / pool)
+                .abs()
+                < 1e-9
+        );
+        assert!(period.credit_enhancement[0].credit_enhancement > 0.3);
+    }
+
+    /// The step-down trigger reads the recorded function's senior value.
+    #[test]
+    fn step_down_metric_is_the_senior_tranche_credit_enhancement() {
+        let deal = clo_with_mezz(Vec::new());
+        let mut state = SimulationState::new(
+            &deal.pool,
+            &deal.tranches,
+            deal.closing_date,
+            deal.closing_date,
+            0,
+        )
+        .expect("state");
+        state.principal_funding_account = Money::from((500_000_i64, Currency::USD));
+        let senior = deal
+            .tranches
+            .tranches
+            .iter()
+            .find(|tranche| tranche.id.as_str() == "CLASS_A")
+            .expect("senior");
+        let value = tranche_credit_enhancement(&state, senior);
+        assert_eq!(value, (10_500_000.0 - 7_000_000.0) / 10_500_000.0);
+        assert_eq!(step_down_metrics(&state).credit_enhancement, value);
     }
 }

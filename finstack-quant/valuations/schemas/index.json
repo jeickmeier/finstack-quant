@@ -1019,7 +1019,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
-      "bytes": 51882,
+      "bytes": 55209,
       "kind": "output",
       "path": "schemas/results/1/facility_projection.schema.json",
       "summary": "Projected cashflows of an asset-backed facility and its residual.",
@@ -1109,7 +1109,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
-      "bytes": 22257,
+      "bytes": 25550,
       "kind": "output",
       "path": "schemas/results/1/simulation_diagnostics.schema.json",
       "summary": "Deal-level accounting produced alongside the tranche cashflows.",
@@ -1118,7 +1118,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
-      "bytes": 48793,
+      "bytes": 52120,
       "kind": "output",
       "path": "schemas/results/1/simulation_run.schema.json",
       "summary": "Tranche cashflows and deal accounting from one deterministic simulation.",

@@ -2722,7 +2722,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.40755688020514313
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09799027226754423
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.005198597044988744
+            }
+          ]
         },
         {
           "payment_date": "2024-07-01",
@@ -2941,7 +2955,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.41535473944413315
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09591645694416295
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.010562970555827118
+            }
+          ]
         },
         {
           "payment_date": "2024-10-01",
@@ -3160,7 +3188,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.42340126222343016
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09377651036033643
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.016098406927361506
+            }
+          ]
         },
         {
           "payment_date": "2025-01-02",
@@ -3379,7 +3421,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.43170437809836143
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09156832367659234
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.02181036113066403
+            }
+          ]
         },
         {
           "payment_date": "2025-04-01",
@@ -3598,7 +3654,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.4426299098706276
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09164736118854229
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.025346821705486113
+            }
+          ]
         },
         {
           "payment_date": "2025-07-01",
@@ -3817,7 +3887,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.4539038425728107
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09172891910345644
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.028996055386328278
+            }
+          ]
         },
         {
           "payment_date": "2025-10-01",
@@ -4036,7 +4120,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.46553728625524887
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09181307779369062
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.03276165836016212
+            }
+          ]
         },
         {
           "payment_date": "2026-01-02",
@@ -4255,7 +4353,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.47754170525326783
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09189992019457266
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.036647341491659075
+            }
+          ]
         },
         {
           "payment_date": "2026-04-01",
@@ -4474,7 +4586,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.48992892948486205
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09198953188612587
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.04065693398011953
+            }
+          ]
         },
         {
           "payment_date": "2026-07-01",
@@ -4693,7 +4819,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5027111661086521
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09208200117741128
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.04479438713300233
+            }
+          ]
         },
         {
           "payment_date": "2026-10-01",
@@ -4912,7 +5052,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5159010115535936
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09217741919354991
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.049063778259797984
+            }
+          ]
         },
         {
           "payment_date": "2027-01-04",
@@ -5131,7 +5285,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5295114639322993
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.0922758799655241
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.05346931469006766
+            }
+          ]
         },
         {
           "payment_date": "2027-04-01",
@@ -5350,7 +5518,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5435559358502068
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09237748052284106
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.058015337919614225
+            }
+          ]
         },
         {
           "payment_date": "2027-07-01",
@@ -5569,7 +5751,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5580482676232118
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09248232098915149
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.06270632788886858
+            }
+          ]
         },
         {
           "payment_date": "2027-10-01",
@@ -5788,7 +5984,21 @@
               "currency": "USD"
             }
           },
-          "non_waterfall_payments": []
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5730027409167966
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09259050468091931
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.06754690739770638
+            }
+          ]
         },
         {
           "payment_date": "2028-01-03",
@@ -6032,6 +6242,20 @@
                 "currency": "USD"
               }
             }
+          ],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5860764524368762
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09034449782601967
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.07489948704426586
+            }
           ]
         }
       ],
@@ -6167,7 +6391,13 @@
         "currency": "USD"
       },
       "early_amortization_date": null,
-      "tranche_draws": []
+      "tranche_draws": [],
+      "first_breaches": [
+        {
+          "test_id": "OC_A",
+          "first_breach": null
+        }
+      ]
     },
     "create_waterfall": {
       "tiers": [
