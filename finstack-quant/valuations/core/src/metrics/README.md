@@ -70,6 +70,8 @@ Discovery:
 - Per instrument type: `finstack_quant_valuations::pricer::metrics_for_instrument("fx_option")`
   (Python `metrics_for_instrument`, WASM `valuations.instruments.metricsForInstrument`)
   keeps only the grouped metrics `MetricRegistry::is_applicable` allows for that type
+  and lists the applicable metrics outside every group under
+  `MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME`
 
 At API boundaries, parse user-supplied names with `MetricId::parse_strict`,
 which rejects anything not in `get_standard()`.

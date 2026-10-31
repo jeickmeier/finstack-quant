@@ -143,6 +143,40 @@ fn test_all_in_rate_unchanged_by_upfront_fee_oid_eir_captures_it() {
 }
 
 #[test]
+fn test_oid_eir_rate_is_requestable_and_equals_the_amortization_side_output() {
+    let loan = term_loan(
+        Some(Money::new(200_000.0, Currency::USD).expect("valid money fixture")),
+        false,
+    );
+    assert!(loan.oid_eir.is_none());
+    let direct = metric(&loan, MetricId::custom("oid_eir_rate"), "oid_eir_rate");
+    let via_amortization = metric(
+        &loan,
+        MetricId::custom("oid_eir_amortization"),
+        "oid_eir_rate",
+    );
+    assert_eq!(direct, via_amortization);
+    assert!(
+        direct > 0.06,
+        "fee-inclusive EIR above the coupon: {direct}"
+    );
+
+    // One solve fills both, so the amortization is already there on a
+    // rate-only request and the registry does not run its calculator.
+    let total_on_rate_request = metric(
+        &loan,
+        MetricId::custom("oid_eir_rate"),
+        "oid_eir_amortization",
+    );
+    let total_requested = metric(
+        &loan,
+        MetricId::custom("oid_eir_amortization"),
+        "oid_eir_amortization",
+    );
+    assert_eq!(total_on_rate_request, total_requested);
+}
+
+#[test]
 fn test_embedded_option_value_zero_for_non_callable() {
     let loan = term_loan(None, false);
     let eov = metric(

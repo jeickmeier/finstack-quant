@@ -575,8 +575,8 @@ export interface D_2D9B65Cc4D957Fd6344E {
   maturity: Date6;
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Effective-interest-rate reporting switch for the
-   * `oid_eir_amortization` metric. `None` (the default) reports with fees
+   * Effective-interest-rate reporting switch for the `oid_eir_rate` and
+   * `oid_eir_amortization` metrics. `None` (the default) reports with fees
    * included, the same as `Some(OidEirSpec::default())`.
    */
   oid_eir?: D_2E0Bc1103181D92528Ce | null;

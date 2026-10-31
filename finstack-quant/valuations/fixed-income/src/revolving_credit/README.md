@@ -415,6 +415,7 @@ Registered for `InstrumentType::RevolvingCredit` in `metrics/mod.rs`:
 | `Ytm` | IRR of the holder-view flows after settlement against the quoted or model price, on the facility day count |
 | `custom("all_in_rate")` | Running cash cost: interest plus every fee after the valuation date over the time-weighted drawn balance |
 | `custom("accrued_interest")` | Cash interest accrued to the settlement date, in the facility currency |
+| `custom("oid_eir_rate")` | Origination effective interest rate, decimal; one solve shared with `oid_eir_amortization` |
 | `custom("oid_eir_amortization")` | Total EIR amortization; stores `oid_eir_rate` and the dated amortization and carrying-value series |
 
 `Theta` is registered universally by `pricer::STANDARD.metrics()`.

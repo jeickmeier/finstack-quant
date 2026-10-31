@@ -174,11 +174,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twenty native fixture generators under
+`mise run ui-fixtures` runs the twenty-four native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
-horizon return, scenario templates, attribution, cashflows → details;
-portfolio → portfolio margin; curves → market-browser; cubes, calibration,
-scenario-table; statements → covenants; analytics; models credit and risk;
+horizon return, scenario templates, attribution, cashflows → details; loan yields;
+portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
+scenario-table; statements → covenants; analytics; models credit, risk, options and liability management;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -469,6 +469,7 @@ clone values; export through the worker's `exportResult` method for native
 canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns the native cashflow
 envelope object. `CashflowViewer` accepts that object as `cashflows` plus optional loading/error props and needs no provider. It presents native rows in a table, with `serializeHost` JSON copy/download in a secondary **Envelope JSON** disclosure;
 unsupported export preserves caller pricing/model state and shows the native error. The workbench owns one cashflow query for both display and its print snapshot.
+**Principal before** and **Principal after** show the envelope's `beginning_balance` and `ending_balance` as supplied, in the row currency. Rust fills them per row for bonds, term loans and revolvers (a coupon shows the principal it accrued on, a PIK, amortization, sweep, draw or repayment row moves it, and an issue funding row starts from zero) and per period for agency MBS (rows of one period share the pool balances); nothing is accumulated in JavaScript, and the columns hide only when no row carries a balance.
 `useCashflowLadder` (the individual `use-cashflow-ladder` item, beside
 `use-cashflows`) takes that envelope object and calls
 `valuations.instruments.calendarYearLadderByCurrency`: one ladder per row
@@ -554,9 +555,9 @@ empty), a fan of bands between the returned percentiles paired from the
 outside in (the unpaired middle one a line), the percentile table, the breach
 readout and the warnings, all as returned.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
-`useMetrics(instrumentType)` returns the standard metrics Rust registers for
-that type (`metricsForInstrument`), grouped by native category; `null` disables
-it. `PricingParamsForm` reports selected metrics the type does not offer and
+`useMetrics(instrumentType)` returns every metric Rust registers for that type
+(`metricsForInstrument`), by native group, with those outside a group under
+"Instrument Specific"; `null` disables it. `PricingParamsForm` reports selected metrics the type does not offer and
 never drops them.
 `useInstrumentValidator` accepts canonical text and an optional abort signal;
 `SchemaForm` owns the 250ms debounce and prevents superseded responses from
@@ -940,6 +941,92 @@ rest of the report. `MertonCalculator` composes `SchemaForm` over the generated
 caller's request) or an equity-calibration form with the horizon and CDS
 inputs, and shows the returned report. The native fixture (the facade example
 firm and a KMV calibration) is `tests/models/credit/merton.json`.
+
+## Curve query
+
+`useCurveQuery` (`@finstack/use-curve-query`) reads one stored object of a market
+at supplied points over the cached market handle: `MarketContext.getDiscount`
+(`df`, `zeroRate`, `forward`), `getForward` (`rate`), `getHazard` (`sp`,
+`hazardRate`) or `getSurface` (`models.volatility.getSurfaceVol`). `CurveQuery`
+is a separate item, so `market-context-browser` still needs no worker; a host
+mounts it through the browser's `renderObject` slot with `curveQueryTarget(entry)`,
+which names the queryable target of a browser entry and is null for the rest, and
+the slot replaces the stored chart, so a host that wants both renders
+`StoredCurveView` beside it.
+
+Curve points are years from the base date or ISO dates. Dates pass through as
+entered and Rust converts them with the curve day count; JavaScript never turns
+a date into a year fraction. `DiscountCurve.forward` and `getSurfaceVol` take
+year fractions only, so forward intervals and surface expiries are entered in
+years and labelled so. A point Rust rejects keeps its native error in its own
+cell (a malformed date, a reversed interval, a coordinate outside the surface
+grid); an id the market does not hold is the whole error. The zero rate uses
+the Rust default compounding, continuous. The native fixture, which cuts the
+market-browser snapshot down and adds a stored surface, is
+`tests/core/curve-query/cases.json`.
+
+## Loan yield card
+
+`useMetricValues` (`@finstack/use-metric-values`) prices each supplied metric id
+on its own `valuations.instruments.priceInstrumentWithMarket` call over the cached
+market handle. It exists because one failing id fails a whole native request: a
+request for `ytm`, `discount_margin` and `all_in_rate` on a fixed loan returns only
+the discount-margin error, so a card asking for them together would go blank. Each
+id keeps its value or its native error; a malformed instrument or market is the
+whole error.
+
+`LoanYieldCard` is the view over it, for term loans: `ytm`, `ytw`, `ytc`, `yt2y`,
+`yt3y`, `yt4y`, `discount_margin`, `all_in_rate`, `oid_eir_rate`,
+`oid_eir_amortization` and `embedded_option_value`. `applicableLoanYieldMetrics`
+keeps those `metricsForInstrument` lists for the type, and all eleven are listed
+for `term_loan`. An id Rust rejects shows its error in its row:
+`embedded_option_value` on a callable loan needs the `tree` model, and
+`discount_margin` needs a floating loan and, when callable, a
+`quoted_clean_price_pct`. Yields solve to that quote when the instrument carries
+one, otherwise to the model price, which differs by model. Unit and group are what
+`metricMetadata` declares. It declares no unit for the ids outside a metric group
+(`ytc`, `yt2y`, `yt3y`, `yt4y`, `all_in_rate`, `oid_eir_rate`,
+`oid_eir_amortization`), so the card says "not declared" and never rescales.
+`oid_eir_amortization` shows Rust's total; the per-date keys Rust also returns are
+not shown. The revolver's own card is a later item; on a revolver this card shows
+the five ids Rust lists. The native fixture is
+`tests/valuations/loan-yield/cases.json`.
+
+## Option calculator
+
+`useOptionCalculator` (`@finstack/use-option-calculator`) calls one closed-form
+function per request: `models.bsPrice`, `black76Price` or `bachelierPrice` of a
+volatility, or `models.bsImpliedVol`, `black76ImpliedVol` or
+`models.volatility.impliedVolBachelier` of a price, then `bsGreeks`,
+`black76Greeks` or `bachelierGreeks` at that volatility. Named terms pass in the
+facade's positional order, which differs by function
+(`tests/models/options/option-calculator.test.tsx` pins every order against
+native output). A price Rust cannot invert (below intrinsic value, say) is the
+whole error; Greeks Rust rejects (zero volatility under Black-Scholes) keep their
+message beside the price. `bsGreeksIsValid` is not wired: `bsGreeks` already
+rejects a non-finite Greek and its closed form cannot return a negative gamma or
+vega, so the check could not fail on a returned result.
+`OptionCalculator` shows the conventions the facade documents: Black-76 prices
+are discounted and Bachelier prices undiscounted, Black-Scholes vega and rhos are
+per 1% move and theta per day, and forward-Greek vega is per unit of volatility.
+The native fixture is `tests/models/options/cases.json`.
+
+## Liability management card
+
+`useExchangeOffer` and `useLme` (`@finstack/use-liability-management`) call
+`models.credit.liabilityManagement.analyzeExchangeOffer` and `analyzeLme`, and
+`useTenderRecommendationHurdle` reads `tenderRecommendationHurdle`. Each is one
+native call; `tests/models/liability-management/liability-management-card.test.tsx`
+pins the positional order against the fields Rust echoes.
+`LiabilityManagementCard` has a form and a table per analysis. The recommendation
+is Rust's `tender_recommended`: the card never compares `tender_total` with the
+hurdle, which it shows beside the badge as supplied, as a multiple of the hold-out
+PV. Amounts use one unit the caller chooses and Rust converts no currency;
+percentages are fractions (0.60 is 60 cents, and 60 is rejected), and the price
+input means a price, an extension fee or a transferred-asset fraction by structure.
+An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset,
+which leaves the leverage block out. Leverage covers the target instrument's debt
+only. The native fixture is `tests/models/liability-management/cases.json`.
 
 ## Credit scorecard
 

@@ -32,9 +32,16 @@
 //! index-linked bonds supply index ratios and
 //! prepaying pools supply their paydown states.
 //!
+//! `beginning_balance` and `ending_balance` are populated for bonds, term loans
+//! and revolving credit facilities, row by row from the schedule's own balance
+//! path, and for agency MBS pools, period by period from the pool state. Every
+//! other instrument exports `null`: swap and option legs carry a reference
+//! notional rather than an outstanding balance, inflation-linked principal is
+//! indexed rather than replayed, and a bond with custom flows and no issue date
+//! has no path to replay.
+//!
 //! **CMO tranche pool state** is intentionally exported as `null`: the waterfall
 //! engine does not yet expose a stable per-tranche balance hook for this path.
-//! Consumers should not treat `null` as missing data for non-CMO instruments.
 
 use finstack_quant_cashflows::aggregation::credit_adjusted_cashflow_pvs;
 use finstack_quant_core::cashflow::CFKind;
@@ -229,10 +236,17 @@ pub struct CashflowRow {
     /// Single Monthly Mortality for the period (populated for agency MBS).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prepayment_smm: Option<f64>,
-    /// Beginning pool balance for the period (agency MBS only).
+    /// Outstanding principal before this row, in row currency, for bonds, term
+    /// loans and revolving credit facilities: a coupon row keeps it, a principal
+    /// row (amortization, PIK, sweep, draw, repayment) moves it, and an issue
+    /// funding row starts from zero. For agency MBS it is the pool balance at the
+    /// start of the period, shared by every row of that period. Absent for other
+    /// instruments and for a schedule with no issue date.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beginning_balance: Option<f64>,
-    /// Ending pool balance for the period (agency MBS only).
+    /// Outstanding principal after this row, in row currency, on the same basis
+    /// as `beginning_balance`. For agency MBS it is the pool balance at the end
+    /// of the period.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ending_balance: Option<f64>,
     /// Present value in row currency, before FX conversion and before any
@@ -399,6 +413,9 @@ pub struct CashflowExportTerms {
     /// Inflation index ratio per flow date for index-linked flows; a date
     /// without a ratio exports an empty cell.
     pub index_ratios: Option<HashMap<Date, f64>>,
+    /// Outstanding principal `(before, after)` per flow, aligned with
+    /// `schedule`; see [`Self::with_schedule_balances`].
+    pub flow_balances: Option<Vec<(f64, f64)>>,
 }
 
 impl CashflowExportTerms {
@@ -417,7 +434,24 @@ impl CashflowExportTerms {
             reporting_currency: None,
             pool_states: None,
             index_ratios: None,
+            flow_balances: None,
         }
+    }
+
+    /// Export the balance path of `schedule` on each row, for an instrument
+    /// whose notional is an outstanding principal balance.
+    ///
+    /// A schedule that cannot replay balances, such as custom flows with no
+    /// issue date, leaves the balance columns empty.
+    #[must_use]
+    pub fn with_schedule_balances(mut self) -> Self {
+        self.flow_balances = self.schedule.balances_by_flow().ok().map(|balances| {
+            balances
+                .into_iter()
+                .map(|(before, after)| (before.amount(), after.amount()))
+                .collect()
+        });
+        self
     }
 }
 
@@ -619,6 +653,10 @@ fn envelope_for_priced(
             crate::instruments::common_impl::helpers::apply_scenario_raw_value(instrument, base_pv);
 
         let mbs_row = mbs_state.as_ref().and_then(|m| m.get(&flow.date));
+        let row_balance = terms
+            .flow_balances
+            .as_ref()
+            .map(|balances| balances[row_index]);
 
         // A missing inflation index ratio is indistinguishable from a data
         // outage when it lands in the export as a blank cell, so log loudly
@@ -656,8 +694,12 @@ fn envelope_for_priced(
             conditional_default_prob,
             inflation_index_ratio,
             prepayment_smm: mbs_row.map(|s| s.smm),
-            beginning_balance: mbs_row.map(|s| s.beginning_balance),
-            ending_balance: mbs_row.map(|s| s.ending_balance),
+            beginning_balance: mbs_row
+                .map(|s| s.beginning_balance)
+                .or(row_balance.map(|(before, _)| before)),
+            ending_balance: mbs_row
+                .map(|s| s.ending_balance)
+                .or(row_balance.map(|(_, after)| after)),
             native_pv,
             fx_rate,
             pv,

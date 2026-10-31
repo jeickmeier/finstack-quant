@@ -112,7 +112,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1257771
+            "bytes": 1257791
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
@@ -1997,7 +1997,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1151109
+            "bytes": 1151129
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2126,7 +2126,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 385073
+            "bytes": 385093
           },
           {
             "path": "schemas/statements/1/forecast_parameters.schema.json",
@@ -2681,7 +2681,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1004905
+            "bytes": 1004925
           },
           {
             "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -2751,7 +2751,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
             "type_name": "StandardDealParams",
             "kind": "component",
-            "bytes": 234245
+            "bytes": 234265
           },
           {
             "path": "schemas/common/1/swaption_conventions.schema.json",
@@ -2842,7 +2842,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1012818
+            "bytes": 1012838
           },
           {
             "path": "schemas/instruments/1/credit_derivatives/cds_index.schema.json",
@@ -2933,7 +2933,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 191292
+            "bytes": 191312
           },
           {
             "path": "schemas/instruments/1/equity/private_markets_fund.schema.json",
@@ -2996,7 +2996,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1011795
+            "bytes": 1011815
           },
           {
             "path": "schemas/instruments/1/exotics/callable_range_accrual.schema.json",
@@ -3059,7 +3059,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 280949
+            "bytes": 280969
           },
           {
             "path": "schemas/instruments/1/fixed_income/bond.schema.json",
@@ -3101,14 +3101,14 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 63750
+            "bytes": 63770
           },
           {
             "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 396729
+            "bytes": 396749
           },
           {
             "path": "schemas/instruments/1/fixed_income/term_loan.schema.json",
@@ -3213,7 +3213,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1102797
+            "bytes": 1102817
           },
           {
             "path": "schemas/instruments/1/rates/basis_swap.schema.json",
@@ -3353,7 +3353,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1014426
+            "bytes": 1014446
           },
           {
             "path": "schemas/results/1/convertible_greeks.schema.json",
@@ -3395,7 +3395,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
             "type_name": "InstrumentCashflowEnvelope",
             "kind": "output",
-            "bytes": 20266
+            "bytes": 20740
           },
           {
             "path": "schemas/results/1/listed_product_coverage.schema.json",
@@ -3430,7 +3430,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
             "type_name": "MetricMetadata",
             "kind": "output",
-            "bytes": 4630
+            "bytes": 4734
           },
           {
             "path": "schemas/results/1/oas_result.schema.json",
@@ -3641,7 +3641,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1257771
+            "bytes": 1257791
           },
           {
             "domain": "attribution",
@@ -4537,7 +4537,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1151109
+            "bytes": 1151129
           },
           {
             "domain": "scenarios",
@@ -4593,7 +4593,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 385073
+            "bytes": 385093
           },
           {
             "domain": "statements",
@@ -4761,7 +4761,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1004905
+            "bytes": 1004925
           },
           {
             "domain": "valuations",
@@ -4841,7 +4841,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
             "type_name": "StandardDealParams",
             "kind": "component",
-            "bytes": 234245
+            "bytes": 234265
           },
           {
             "domain": "valuations",
@@ -4945,7 +4945,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1012818
+            "bytes": 1012838
           },
           {
             "domain": "valuations",
@@ -5049,7 +5049,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 191292
+            "bytes": 191312
           },
           {
             "domain": "valuations",
@@ -5121,7 +5121,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1011795
+            "bytes": 1011815
           },
           {
             "domain": "valuations",
@@ -5193,7 +5193,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 280949
+            "bytes": 280969
           },
           {
             "domain": "valuations",
@@ -5241,7 +5241,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 63750
+            "bytes": 63770
           },
           {
             "domain": "valuations",
@@ -5249,7 +5249,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 396729
+            "bytes": 396749
           },
           {
             "domain": "valuations",
@@ -5369,7 +5369,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1102797
+            "bytes": 1102817
           },
           {
             "domain": "valuations",
@@ -5529,7 +5529,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1014426
+            "bytes": 1014446
           },
           {
             "domain": "valuations",
@@ -5577,7 +5577,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
             "type_name": "InstrumentCashflowEnvelope",
             "kind": "output",
-            "bytes": 20266
+            "bytes": 20740
           },
           {
             "domain": "valuations",
@@ -5617,7 +5617,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
             "type_name": "MetricMetadata",
             "kind": "output",
-            "bytes": 4630
+            "bytes": 4734
           },
           {
             "domain": "valuations",

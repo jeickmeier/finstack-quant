@@ -23194,7 +23194,7 @@ export interface ValuationInstrumentsNamespace {
    * ]);
    * console.log(ytm.unit, bucket.components, bucket.bucketed);
    * ```
-   * @param keys - Canonical scalar or qualified wire keys in output order. Custom keys retain unknown units; malformed or obsolete encodings are rejected.
+   * @param keys - Canonical scalar or qualified wire keys in output order. A custom key has a unit only when Rust declares one; one the standard registry holds gets the group `"Instrument Specific"`, any other gets no group; malformed or obsolete encodings are rejected.
    * @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.
    * @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.
    */
@@ -27207,7 +27207,7 @@ export interface CreditLgdNamespace {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const hurdle = models.credit.liabilityManagement.tenderRecommendationHurdle();
- * console.log(hurdle); // 0.02
+ * console.log(hurdle); // 1.02
  * ```
  */
 export interface CreditLiabilityManagementNamespace {
@@ -27250,7 +27250,7 @@ export interface CreditLiabilityManagementNamespace {
   /**
    * Minimum NPV ratio at which a tender is recommended. Twin of the Rust and
    * Python constant `TENDER_RECOMMENDATION_HURDLE`: a holder is advised to
-   * tender when the tender NPV is at least `old_npv` times this hurdle.
+   * tender when the tender NPV exceeds `old_npv` times this hurdle.
    * @returns The dimensionless hurdle multiple.
    */
   tenderRecommendationHurdle(): number;
@@ -29488,8 +29488,8 @@ export interface ModelsNamespace {
     forward: number,
     strike: number,
     df: number,
-    expiry: number,
     vol: number,
+    expiry: number,
     isCall: boolean
   ): number;
   /**
@@ -29508,8 +29508,8 @@ export interface ModelsNamespace {
   black76Greeks(
     forward: number,
     strike: number,
-    expiry: number,
     vol: number,
+    expiry: number,
     isCall: boolean
   ): ForwardGreeks;
   /**

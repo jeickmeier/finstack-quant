@@ -7290,8 +7290,8 @@ export interface RevolvingCredit {
    */
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Effective-interest-rate reporting switch for the
-   * `oid_eir_amortization` metric. `None` (the default) reports with fees
+   * Effective-interest-rate reporting switch for the `oid_eir_rate` and
+   * `oid_eir_amortization` metrics. `None` (the default) reports with fees
    * included, the same as `Some(OidEirSpec::default())`.
    */
   oid_eir?: OidEirSpec | null;
@@ -17690,7 +17690,12 @@ export interface CashflowRow {
    */
   amount: number;
   /**
-   * Beginning pool balance for the period (agency MBS only).
+   * Outstanding principal before this row, in row currency, for bonds, term
+   * loans and revolving credit facilities: a coupon row keeps it, a principal
+   * row (amortization, PIK, sweep, draw, repayment) moves it, and an issue
+   * funding row starts from zero. For agency MBS it is the pool balance at the
+   * start of the period, shared by every row of that period. Absent for other
+   * instruments and for a schedule with no issue date.
    */
   beginning_balance?: number | null;
   /**
@@ -17714,7 +17719,9 @@ export interface CashflowRow {
    */
   discount_factor: number;
   /**
-   * Ending pool balance for the period (agency MBS only).
+   * Outstanding principal after this row, in row currency, on the same basis
+   * as `beginning_balance`. For agency MBS it is the pool balance at the end
+   * of the period.
    */
   ending_balance?: number | null;
   /**
@@ -19950,7 +19957,9 @@ export interface MetricMetadata {
    */
   coordinates: MetricCoordinate[];
   /**
-   * Native display group; absent for a non-standard base metric.
+   * Native display group, the same name [`metrics_for_instrument`] lists the
+   * base metric under; absent for a base metric the standard registry does
+   * not hold.
    */
   group?: string | null;
   /**
@@ -19962,7 +19971,7 @@ export interface MetricMetadata {
    */
   metric: string;
   /**
-   * Native unit family; custom or calculator-dependent units remain unknown.
+   * Native unit family; undeclared custom and calculator-dependent units are unknown.
    */
   unit: MetricUnit;
 }

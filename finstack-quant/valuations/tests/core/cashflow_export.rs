@@ -554,3 +554,251 @@ fn rejects_unsupported_model_for_equity_option_style_instrument() {
 // by the workspace-wide test suite (see `tests/instruments/cds/`). The
 // per-flow PV formula here is byte-identical to the one validated by
 // `period_pv.rs::test_periodized_pv_credit_adjusted_matches_detailed_engine`.
+
+/// Outstanding principal a row moves, read only from exported fields.
+fn principal_effect(row: &CashflowRow) -> f64 {
+    if let Some(delta) = row.principal_delta {
+        return delta;
+    }
+    match row.kind {
+        CFKind::Pik => row.amount,
+        CFKind::Amortization
+        | CFKind::PrePayment
+        | CFKind::DefaultedNotional
+        | CFKind::Notional => -row.amount,
+        _ => 0.0,
+    }
+}
+
+/// Each row rolls its opening balance to its closing balance, and each principal
+/// row opens where the previous one closed. Rows that move nothing need not
+/// chain: a coupon paid after its period's balance date opens at the later balance.
+fn assert_balances_roll(envelope: &InstrumentCashflowEnvelope, opening: f64, closing: f64) {
+    let mut previous: Option<f64> = None;
+    for row in &envelope.flows {
+        let begin = row.beginning_balance.expect("beginning balance");
+        let end = row.ending_balance.expect("ending balance");
+        assert!(
+            (begin + principal_effect(row) - end).abs() < 1e-6,
+            "{} {:?}: {begin} + {} != {end}",
+            row.date,
+            row.kind,
+            principal_effect(row)
+        );
+        if principal_effect(row) == 0.0 {
+            continue;
+        }
+        if let Some(previous) = previous {
+            assert!(
+                (previous - begin).abs() < 1e-6,
+                "{} opens at {begin}",
+                row.date
+            );
+        }
+        previous = Some(end);
+    }
+    let first = envelope.flows.first().expect("flows");
+    assert!((first.beginning_balance.expect("begin") - opening).abs() < 1e-6);
+    assert!((previous.expect("flows") - closing).abs() < 1e-6);
+    if closing == 0.0 {
+        assert_eq!(
+            previous,
+            Some(0.0),
+            "a repaid balance closes at exactly zero"
+        );
+    }
+}
+
+fn balance_market(as_of: Date) -> MarketContext {
+    MarketContext::new().insert(
+        DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, 0.97), (10.0, 0.70)])
+            .build()
+            .expect("curve"),
+    )
+}
+
+fn balance_bond(id: &str) -> Bond {
+    Bond::fixed(
+        id,
+        Money::from((1_000_000_i64, Currency::USD)),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("rate"),
+        Date::from_calendar_date(2025, Month::January, 15).expect("date"),
+        Date::from_calendar_date(2030, Month::January, 15).expect("date"),
+        finstack_quant_core::dates::StubKind::ShortFront,
+        "USD-OIS",
+    )
+    .expect("bond")
+}
+
+fn export(instrument: &dyn Instrument, as_of: Date) -> InstrumentCashflowEnvelope {
+    instrument_cashflows(
+        instrument,
+        &balance_market(as_of),
+        &as_of.to_string(),
+        "discounting",
+    )
+    .expect("envelope")
+}
+
+#[test]
+fn bullet_bond_balances_hold_until_redemption() {
+    let as_of = Date::from_calendar_date(2026, Month::March, 1).expect("date");
+    let envelope = export(&balance_bond("BOND-BULLET"), as_of);
+    assert_balances_roll(&envelope, 1_000_000.0, 0.0);
+    for row in envelope
+        .flows
+        .iter()
+        .filter(|row| row.kind == CFKind::Fixed)
+    {
+        assert_eq!(row.beginning_balance, Some(1_000_000.0));
+        assert_eq!(row.ending_balance, Some(1_000_000.0));
+    }
+}
+
+#[test]
+fn issue_funding_row_opens_from_zero() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 15).expect("date");
+    let envelope = export(&balance_bond("BOND-FUNDING"), as_of);
+    let funding = &envelope.flows[0];
+    assert_eq!(funding.kind, CFKind::Notional);
+    assert_eq!(funding.beginning_balance, Some(0.0));
+    assert_eq!(funding.ending_balance, Some(1_000_000.0));
+    assert_balances_roll(&envelope, 0.0, 0.0);
+}
+
+#[test]
+fn amortizing_term_loan_balances_match_the_schedule_path() {
+    let json = include_str!("../instruments/json_examples/term_loan.json");
+    let instrument =
+        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(json, None)
+            .expect("example loan");
+    let as_of = Date::from_calendar_date(2025, Month::February, 1).expect("date");
+    let envelope = export(instrument.as_instrument(), as_of);
+    let opening = envelope.flows[0].beginning_balance.expect("begin");
+    // 2.5% of remaining a quarter from 10m, four quarters paid before as_of.
+    assert!(
+        (opening - 10_000_000.0 * 0.975_f64.powi(4)).abs() < 1e-3,
+        "{opening}"
+    );
+    assert_balances_roll(&envelope, opening, 0.0);
+    // A coupon shows the principal it accrued on, even when it pays on a
+    // business-day-adjusted date after the amortization of its accrual end.
+    for row in envelope
+        .flows
+        .iter()
+        .filter(|row| row.kind == CFKind::Fixed)
+    {
+        let accrued_on = row.accrual_notional.expect("accrual notional");
+        assert!(
+            (row.beginning_balance.expect("begin") - accrued_on).abs() < 1e-6,
+            "{}",
+            row.date
+        );
+        assert_eq!(row.beginning_balance, row.ending_balance);
+    }
+    let amortization: Vec<_> = envelope
+        .flows
+        .iter()
+        .filter(|row| row.kind == CFKind::Amortization)
+        .collect();
+    assert!(!amortization.is_empty());
+    assert!(amortization
+        .iter()
+        .all(|row| row.ending_balance < row.beginning_balance));
+}
+
+#[test]
+fn pik_bond_balance_capitalises_every_coupon() {
+    let mut bond = balance_bond("BOND-PIK");
+    let finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) =
+        &mut bond.cashflow_spec
+    else {
+        panic!("fixed bond");
+    };
+    spec.coupon_type = finstack_quant_cashflows::builder::CouponType::Pik;
+    let as_of = Date::from_calendar_date(2025, Month::January, 16).expect("date");
+    let envelope = export(&bond, as_of);
+    assert_balances_roll(&envelope, 1_000_000.0, 0.0);
+
+    let pik: Vec<_> = envelope
+        .flows
+        .iter()
+        .filter(|row| row.kind == CFKind::Pik)
+        .collect();
+    assert!(!pik.is_empty());
+    for row in &pik {
+        assert!(row.ending_balance.expect("end") > row.beginning_balance.expect("begin"));
+    }
+    // The redemption repays the capitalised balance, not the original face.
+    let redeemed = envelope
+        .flows
+        .iter()
+        .find(|row| row.kind == CFKind::Notional)
+        .expect("redemption");
+    assert_eq!(
+        redeemed.beginning_balance,
+        pik.last().expect("pik").ending_balance
+    );
+    assert!((redeemed.amount - redeemed.beginning_balance.expect("begin")).abs() < 1e-6);
+    assert!(redeemed.amount > 1_000_000.0);
+}
+
+#[test]
+fn revolver_balances_follow_draws_and_repayments() {
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("date");
+    let draw = Date::from_calendar_date(2025, Month::June, 2).expect("date");
+    let repay = Date::from_calendar_date(2026, Month::March, 2).expect("date");
+    let mut facility = RevolvingCredit::example().expect("example facility");
+    facility.issue_date = issue;
+    facility.maturity = maturity;
+    facility.rate = RateSpec::Fixed { rate: 0.05 };
+    facility.drawn = Money::new(10_000_000.0, Currency::USD).expect("money");
+    facility.commitment = Money::new(50_000_000.0, Currency::USD).expect("money");
+    facility.draw_repay_spec = DrawRepaySpec::Deterministic(vec![
+        finstack_quant_valuations::instruments::fixed_income::revolving_credit::DrawRepayEvent {
+            date: draw,
+            amount: Money::new(5_000_000.0, Currency::USD).expect("money"),
+            is_draw: true,
+        },
+        finstack_quant_valuations::instruments::fixed_income::revolving_credit::DrawRepayEvent {
+            date: repay,
+            amount: Money::new(2_000_000.0, Currency::USD).expect("money"),
+            is_draw: false,
+        },
+    ]);
+    let as_of = issue;
+    let envelope = export(&facility, as_of);
+    assert_balances_roll(&envelope, 10_000_000.0, 0.0);
+    let at = |date: Date| {
+        envelope
+            .flows
+            .iter()
+            .find(|row| row.date == date && row.kind == CFKind::Notional)
+            .expect("principal row")
+    };
+    assert_eq!(at(draw).ending_balance, Some(15_000_000.0));
+    assert_eq!(at(repay).ending_balance, Some(13_000_000.0));
+}
+
+#[test]
+fn balances_stay_empty_for_instruments_without_an_outstanding_principal() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+    let terms = CashflowExportTerms::from_schedule(
+        finstack_quant_cashflows::schedule_from_dated_flows(
+            vec![(
+                Date::from_calendar_date(2025, Month::June, 2).expect("date"),
+                Money::from((100_i64, Currency::USD)),
+            )],
+            CFKind::Fixed,
+            DayCount::Act360,
+            finstack_quant_cashflows::ScheduleBuildOpts::default(),
+        )
+        .expect("schedule"),
+    );
+    assert!(terms.flow_balances.is_none(), "not requested at {as_of}");
+    let no_issue_date = terms.with_schedule_balances();
+    assert!(no_issue_date.flow_balances.is_none());
+}
