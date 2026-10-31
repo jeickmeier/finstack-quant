@@ -20,7 +20,9 @@ use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
 use finstack_quant_statements::capital_structure::{
     BondConventionParams, SwapConventions, SwapParams,
 };
-use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
+use finstack_quant_statements::types::{
+    AmountOrScalar, FinancialStatementInstrument, RollupMethod,
+};
 use pyo3::prelude::*;
 
 #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder")]
@@ -82,6 +84,14 @@ impl PyMixedNodeBuilder {
     #[doc = pydoc!("finstack_quant.statements._builder", "MixedNodeBuilder.name")]
     fn name<'py>(mut slf: PyRefMut<'py, Self>, name: &str) -> PyResult<PyRefMut<'py, Self>> {
         slf.builder_mut()?.name(name);
+        Ok(slf)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._builder", "MixedNodeBuilder.rollup")]
+    fn rollup<'py>(mut slf: PyRefMut<'py, Self>, rollup: &str) -> PyResult<PyRefMut<'py, Self>> {
+        let method: RollupMethod =
+            finstack_quant_core::wire::serde_parse(rollup).map_err(core_to_py)?;
+        slf.builder_mut()?.rollup(method);
         Ok(slf)
     }
 
@@ -274,6 +284,21 @@ impl PyModelBuilder {
             .collect::<PyResult<Vec<_>>>()?;
         slf.builder_mut()?
             .availability_dates(node_id, &parsed)
+            .map_err(statements_to_py)?;
+        Ok(slf)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.rollup")]
+    #[pyo3(text_signature = "($self, node_id, rollup)")]
+    fn rollup<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        node_id: &str,
+        rollup: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let method: RollupMethod =
+            finstack_quant_core::wire::serde_parse(rollup).map_err(core_to_py)?;
+        slf.builder_mut()?
+            .rollup(node_id, method)
             .map_err(statements_to_py)?;
         Ok(slf)
     }

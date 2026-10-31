@@ -31197,6 +31197,13 @@ export interface ModelBuilder extends WasmOwned {
    */
   availabilityDates(nodeId: string, availabilityDates: Record<string, string> | string): void;
   /**
+   * Declare how an existing line rolls up to a coarser reporting frequency.
+   * @param nodeId - Existing node to declare the method on.
+   * @param rollup - `"sum"` for flows, `"period_end"` for balances and trailing metrics, `"formula"` for ratios. A rollup rejects `"formula"` on a node without a formula, and a `RollupSpec` entry for the node overrides this declaration.
+   * @throws Error with kind `validation` if `rollup` is not a recognized method, the node does not exist or the builder was consumed.
+   */
+  rollup(nodeId: string, rollup: generated.statements.RollupMethod): void;
+  /**
    * Add a calculated node defined by a DSL formula.
    *
    * Twin of Python `ModelBuilder.compute` (Rust `ModelBuilder::compute`).
@@ -31528,6 +31535,12 @@ export interface MixedNodeBuilder extends WasmOwned {
    * @throws Error with kind `validation` if the builder was consumed.
    */
   name(name: string): void;
+  /**
+   * Declare how this line rolls up to a coarser reporting frequency.
+   * @param rollup - `"sum"` for flows, `"period_end"` for balances and trailing metrics, `"formula"` for ratios. A rollup rejects `"formula"` on a node without a formula, and a `RollupSpec` entry for the node overrides this declaration.
+   * @throws Error with kind `validation` if `rollup` is not a recognized method or the builder was consumed.
+   */
+  rollup(rollup: generated.statements.RollupMethod): void;
   /**
    * Finish the node and return the model builder.
    *

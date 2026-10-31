@@ -48,11 +48,13 @@ def built_model() -> st.FinancialModelSpec:
     builder.forecast("revenue", st.ForecastSpec.growth(0.05))
     builder.compute("profit", "revenue * 0.5")
     builder.value_money("cash", {Q1: Money(100.0, "USD"), Q2: Money(110.0, "USD")})
+    builder.rollup("cash", "period_end")
     builder.with_meta("currency", "USD")
     mixed = builder.mixed("capex")
     mixed.values({Q1: 10.0})
     mixed.formula("revenue * 0.1")
     mixed.name("Capex")
+    mixed.rollup("formula")
     return mixed.build().build()
 
 

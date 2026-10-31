@@ -200,6 +200,64 @@ fn a_declared_method_applies_with_an_empty_spec() {
     close(annual.get("debt_draws", &year), 10.0);
 }
 
+/// Every line built through the public builder can declare its method: mixed
+/// lines on the mixed builder, the others on `ModelBuilder::rollup`.
+#[test]
+fn lines_built_through_the_builder_roll_up_with_their_declared_method() {
+    let quarter_values: Vec<(PeriodId, f64)> =
+        (1..=4).map(|i| (q(2024, i), f64::from(i) * 10.0)).collect();
+    let scalars: Vec<(PeriodId, AmountOrScalar)> = quarter_values
+        .iter()
+        .map(|(period, value)| (*period, AmountOrScalar::scalar(*value)))
+        .collect();
+
+    let mut builder = ModelBuilder::new("builder-declared");
+    builder.periods("2024Q1..Q4", None).expect("valid periods");
+    builder.value("flow", &scalars);
+    builder.value("balance", &scalars);
+    builder
+        .rollup("balance", RollupMethod::PeriodEnd)
+        .expect("known node");
+    builder.compute("ratio", "balance / flow").expect("formula");
+    builder
+        .rollup("ratio", RollupMethod::Formula)
+        .expect("known node");
+    let mut mixed = builder.mixed("mixed_balance");
+    mixed.values(&scalars);
+    mixed.rollup(RollupMethod::PeriodEnd);
+    let builder = mixed.build().expect("mixed node");
+    let mut mixed = builder.mixed("mixed_flow");
+    mixed.values(&scalars);
+    let model = mixed
+        .build()
+        .expect("mixed node")
+        .build()
+        .expect("model builds");
+
+    let annual = Evaluator::new()
+        .evaluate(&model)
+        .expect("evaluation")
+        .rollup(&model, &empty_annual_spec())
+        .expect("annual rollup");
+    let year = PeriodId::annual(2024);
+
+    close(annual.get("flow", &year), 100.0);
+    close(annual.get("balance", &year), 40.0);
+    close(annual.get("ratio", &year), 0.4);
+    close(annual.get("mixed_balance", &year), 40.0);
+    close(annual.get("mixed_flow", &year), 100.0);
+}
+
+#[test]
+fn a_rollup_declared_on_an_unknown_node_is_an_error_naming_it() {
+    let mut builder = ModelBuilder::new("unknown");
+    let error = builder
+        .rollup("ghost", RollupMethod::Sum)
+        .expect_err("unknown node rejected")
+        .to_string();
+    assert!(error.contains("ghost"), "{error}");
+}
+
 #[test]
 fn a_line_declaring_nothing_sums_whatever_its_tags_say() {
     let model = declared_model();
