@@ -960,9 +960,8 @@ per model) is `tests/models/credit/scorecard.json`.
 `usePositionRisk` (`@finstack/use-position-risk`) decomposes position VaR and
 ES with `models.factor.risk.parametricVarDecomposition` (weights and a
 position covariance) or `historicalVarDecomposition` (position-major scenario
-P&L). With a budget it calls `evaluateRiskBudget` over
-`positionComponentVar(decomposition, id)` of each position, the target shares
-and the returned portfolio VaR; for a historical source it also calls
+P&L). With a budget it calls `evaluateRiskBudgetFromDecomposition` over the
+decomposition and the target shares; for a historical source it also calls
 `buildStressAttribution` of the same P&L. Omitted confidence, incremental flag
 and utilization threshold are left to Rust; the budget and stress attribution
 keep their own native errors beside the decomposition. `PortfolioRiskReport`

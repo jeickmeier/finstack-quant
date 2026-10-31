@@ -644,7 +644,7 @@ export interface PositionRiskRequest {
   /** Tail confidence as a decimal in (0.5, 1); omitted is left to Rust (0.95). */
   readonly confidence?: number | null;
   readonly source: PositionRiskSource;
-  /** Target shares of portfolio VaR per position for models.factor.risk.evaluateRiskBudget; omitted skips the budget. */
+  /** Target shares of portfolio VaR per position for models.factor.risk.evaluateRiskBudgetFromDecomposition; omitted skips the budget. */
   readonly budget?: {
     readonly targets: readonly number[];
     /** Actual-to-target ratio that flags a breach; omitted is left to Rust. */
@@ -659,7 +659,7 @@ export type StressAttribution = ReturnType<
 export interface PositionRisk {
   /** The returned PositionRiskDecomposition (losses negative). */
   decomposition: PositionRiskDecomposition;
-  /** evaluateRiskBudget over positionComponentVar of each position and the portfolio VaR, or its native error; null without a budget. */
+  /** evaluateRiskBudgetFromDecomposition over the decomposition, or its native error; null without a budget. */
   budget: Envelope<RiskBudgetResult> | null;
   /** buildStressAttribution of a historical source's P&L, or its native error; null for a parametric source. */
   stress: Envelope<StressAttribution> | null;
@@ -1164,7 +1164,7 @@ export interface ModelsApi {
   mertonReport(request: MertonReportRequest): Promise<Envelope<MertonReport>>;
   /** One models.credit.scoring function over its input ratios in the facade's positional order, then models.credit.pd.MasterScale.defaultCalibration().mapScore of the result (kept as an envelope); the scale handle is freed. */
   creditScore(request: CreditScoreRequest): Promise<Envelope<CreditScore>>;
-  /** models.factor.risk parametric or historical VaR/ES decomposition, evaluateRiskBudget over positionComponentVar per position, and buildStressAttribution of a historical source; the budget and stress attribution keep their own native errors. */
+  /** models.factor.risk parametric or historical VaR/ES decomposition, evaluateRiskBudgetFromDecomposition, and buildStressAttribution of a historical source; the budget and stress attribution keep their own native errors. */
   positionRisk(request: PositionRiskRequest): Promise<Envelope<PositionRisk>>;
   /** models.factor.risk.decomposeFactors: the parametric factor and position risk decomposition of a sensitivity matrix under a factor covariance. */
   decomposeFactors(

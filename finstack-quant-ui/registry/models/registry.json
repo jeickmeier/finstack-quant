@@ -617,7 +617,7 @@
       "type": "registry:hook",
       "title": "usePositionRisk",
       "description": "Decomposes position VaR and ES with native models.factor.risk, evaluates a risk budget and attributes tail stress through the WASM worker.",
-      "docs": "models.factor.risk.parametricVarDecomposition(positionIds, weights, covariance, confidence, computeIncremental) or historicalVarDecomposition(positionIds, pnls, confidence); then, when a budget is requested, evaluateRiskBudget over positionComponentVar of each position, the targets and the returned portfolio VaR; and, for a historical source, buildStressAttribution of the same P&L. Omitted confidence, incremental flag and utilization threshold are left to Rust. The budget and stress attribution keep their own native errors beside the decomposition. Keyed on the complete request (non-finite values stay distinct) and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "docs": "models.factor.risk.parametricVarDecomposition(positionIds, weights, covariance, confidence, computeIncremental) or historicalVarDecomposition(positionIds, pnls, confidence); then, when a budget is requested, evaluateRiskBudgetFromDecomposition over the decomposition and the targets; and, for a historical source, buildStressAttribution of the same P&L. Omitted confidence, incremental flag and utilization threshold are left to Rust. The budget and stress attribution keep their own native errors beside the decomposition. Keyed on the complete request (non-finite values stay distinct) and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
       "files": [
         {
           "path": "hooks/use-position-risk/use-position-risk.ts",

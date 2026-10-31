@@ -3043,6 +3043,7 @@
       "decomposeFactors",
       "defaultUtilizationThreshold",
       "evaluateRiskBudget",
+      "evaluateRiskBudgetFromDecomposition",
       "historicalVarDecomposition",
       "parametricVarDecomposition",
       "positionComponentVar"
@@ -3055,6 +3056,9 @@
     "kind": "function"
   },
   "models.factor.risk.evaluateRiskBudget": {
+    "kind": "function"
+  },
+  "models.factor.risk.evaluateRiskBudgetFromDecomposition": {
     "kind": "function"
   },
   "models.factor.risk.buildStressAttribution": {

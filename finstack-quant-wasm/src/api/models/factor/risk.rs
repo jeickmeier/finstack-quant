@@ -149,6 +149,46 @@ pub fn evaluate_risk_budget(
     Ok(js)
 }
 
+/// Evaluate a risk budget against a position risk decomposition.
+///
+/// Twin of Python `evaluate_risk_budget_from_decomposition` (Rust
+/// `evaluate_risk_budget_from_decomposition`): reads each position's component
+/// VaR and the portfolio VaR from `decomp`. Rows keep the decomposition's order.
+/// @param decomp - `PositionRiskDecomposition` object or JSON, as returned by `parametricVarDecomposition` or `historicalVarDecomposition`.
+/// @param target_var_pct - Target fraction of portfolio VaR in `[0, 1]` per position, aligned with `decomp.var_contributions`; non-empty targets must sum to one within 0.05.
+/// @param utilization_threshold - Optional actual-to-target ratio that flags a budget breach; omit for the Rust default of 1.2.
+/// @returns `RiskBudgetResult`: per-position `positions` rows, `total_overbudget` and `has_breach`.
+///
+/// # Errors
+///
+/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
+/// `validation` error if `decomp` is malformed, `targetVarPct` does not have one
+/// entry per position, targets are non-finite, outside [0, 1] or do not sum to
+/// one, the threshold is non-positive, or nonzero component VaR is paired with
+/// zero portfolio VaR.
+#[wasm_bindgen(js_name = evaluateRiskBudgetFromDecomposition)]
+pub fn evaluate_risk_budget_from_decomposition(
+    decomp: JsValue,
+    target_var_pct: JsValue,
+    utilization_threshold: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let decomp: PositionRiskDecomposition = from_js_json(&decomp, "decomp")?;
+    let target_var_pct = js_f64_seq(&target_var_pct, "targetVarPct")?;
+    let utilization_threshold = js_opt_f64(utilization_threshold.as_ref(), "utilizationThreshold")?;
+    let result = finstack_quant_factor::risk::evaluate_risk_budget_from_decomposition(
+        &decomp,
+        &target_var_pct,
+        utilization_threshold,
+    )
+    .map_err(to_js_err)?;
+    let js = crate::utils::to_js_value(&result)?;
+    let positions = js_sys::Reflect::get(&js, &JsValue::from("positions"))?;
+    crate::utils::restore_non_finite_rows::<finstack_quant_factor::risk::PositionBudgetEntry>(
+        &positions,
+    )?;
+    Ok(js)
+}
+
 // Stress attribution and lookups
 
 /// Default utilization threshold of `evaluateRiskBudget`. Twin of the Rust and
