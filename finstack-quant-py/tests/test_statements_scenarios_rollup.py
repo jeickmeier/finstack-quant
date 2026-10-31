@@ -205,6 +205,37 @@ def test_a_line_declares_its_rollup_method_on_the_node() -> None:
     assert quarterly.rollup(model, listed).get("margin", "2025") == annual.get("margin", "2025")
 
 
+def test_builder_lines_roll_up_with_their_declared_method() -> None:
+    values = list(zip(QUARTERS, [10.0, 20.0, 30.0, 40.0], strict=True))
+    builder = ModelBuilder("builder-declared")
+    builder.periods("2025Q1..Q4", None)
+    builder.value("flow", values)
+    builder.value("balance", values).rollup("balance", "period_end")
+    builder.compute("ratio", "balance / flow").rollup("ratio", "formula")
+    mixed = builder.mixed("mixed_balance").values(values).rollup("period_end")
+    builder = mixed.build()
+    model = builder.mixed("mixed_flow").values(values).build().build()
+    assert model.get_node("mixed_balance").rollup == "period_end"
+
+    annual = Evaluator().evaluate(model).rollup(model, RollupSpec("annual"))
+    assert annual.get("flow", "2025") == pytest.approx(100.0)
+    assert annual.get("balance", "2025") == pytest.approx(40.0)
+    assert annual.get("ratio", "2025") == pytest.approx(0.4)
+    assert annual.get("mixed_balance", "2025") == pytest.approx(40.0)
+
+
+def test_builder_rollup_rejects_unknown_nodes_and_methods() -> None:
+    builder = ModelBuilder("rejects")
+    builder.periods("2025Q1..Q4", None)
+    with pytest.raises(ValueError, match="ghost"):
+        builder.rollup("ghost", "sum")
+    builder.value("cash", [(QUARTERS[0], 1.0)])
+    with pytest.raises(ValueError, match="closing"):
+        builder.rollup("cash", "closing")
+    with pytest.raises(ValueError, match="closing"):
+        builder.mixed("other").rollup("closing")
+
+
 def test_rollup_rejects_a_declared_formula_without_a_formula() -> None:
     builder = ModelBuilder("no-formula")
     builder.periods("2025Q1..Q4", None)

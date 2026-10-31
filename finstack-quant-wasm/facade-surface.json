@@ -4002,6 +4002,7 @@
       "periods",
       "periodsExplicit",
       "reportingCurrency",
+      "rollup",
       "value",
       "valueMoney",
       "valueScalar",
@@ -4016,7 +4017,7 @@
     "kind": "class",
     "constructor": false,
     "statics": [],
-    "methods": ["build", "forecast", "formula", "free", "name", "values", "valuesMoney"],
+    "methods": ["build", "forecast", "formula", "free", "name", "rollup", "values", "valuesMoney"],
     "getters": []
   },
   "statements.validateFinancialModelJson": {

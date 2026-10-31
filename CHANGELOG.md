@@ -25,6 +25,7 @@
 #### Added
 
 - `NodeSpec.rollup` (Rust `NodeSpec::with_rollup`, Python `NodeSpec(..., rollup=...)`, WASM through the JSON model): each statement line declares its rollup method on the node. `StatementResult::rollup` resolves a line as its entry in `RollupSpec::methods`, then its declaration, then `sum`, so an empty spec gives every host the same numbers. A line resolving to `formula` with no formula is an error naming the node. `RollupMethod` moved from `statements::evaluator` to `statements::types`.
+- `ModelBuilder::rollup(node_id, method)` and `MixedNodeBuilder::rollup(method)` (Python `rollup`, WASM `rollup`) declare a line's method from the public builder, so no line has to drop to `NodeSpec` and `insert_node`.
 - `RollupSpec::default_for(&model, frequency)` (Python `RollupSpec.default_for`, WASM `statements.rollupSpecDefaultFor`) lists the declared methods so a host can seed its choices. The tag rule it briefly carried is gone: `balance_sheet`, `ratio` and `metric` tags no longer choose a method anywhere, so a model that relied on them sums until its lines declare `rollup`. The statements workbench no longer decides in JavaScript, and it now sends an explicit `sum` so choosing Sum overrides a line's declaration.
 
 ### Analytics: one path per capability
