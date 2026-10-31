@@ -292,6 +292,8 @@ fn bare_string_returns_are_named_or_allowlisted() {
         // ISO-8601 dates of the underlying swap.
         ("Swaption", "getUnderlyingStartDate"),
         ("Swaption", "getUnderlyingMaturity"),
+        // ISO-8601 valuation date after a scenario's time roll.
+        ("ScenariosNamespace", "applicationReportEffectiveAsOf"),
     ];
     let dts = index_dts();
     let offenders: Vec<String> = members(&dts)
