@@ -820,6 +820,22 @@ impl TermLoan {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for TermLoan {
+    fn cashflow_export_terms(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms,
+    > {
+        use finstack_quant_cashflows::CashflowProvider;
+        Ok(
+            finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+                self.cashflow_schedule(market, as_of)?,
+            )
+            .with_schedule_balances(),
+        )
+    }
+
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::TermLoan,
         crate::FIXED_INCOME

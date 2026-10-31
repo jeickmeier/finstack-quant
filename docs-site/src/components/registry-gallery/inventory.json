@@ -1434,7 +1434,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "8415df392c3097a662ce8d4450098e58bb624fe9e4b3421d02c910d5d15b66ae"
+      "sha256": "d024500b6ef4a476a7e8297ae5ed3ccda3ed070f35da69cfafa8afd94785848b"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",

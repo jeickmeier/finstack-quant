@@ -1316,7 +1316,10 @@ class InstrumentCashflowEnvelope:
             ``rate``, ``reset_date``, ``discount_factor``,
             ``discount_curve_id``, ``survival_probability``,
             ``conditional_default_prob``, ``inflation_index_ratio``,
-            ``prepayment_smm``, ``beginning_balance``, ``ending_balance``,
+            ``prepayment_smm``, ``beginning_balance``, ``ending_balance``
+            (outstanding principal before and after the row for bonds, term
+            loans and revolving credit, a period's pool balances for agency
+            MBS, null otherwise),
             ``native_pv`` (row currency, before FX and scenario shock),
             ``fx_rate`` (reporting per row currency) and ``pv``. The four date
             columns are ``datetime64`` and fields the model does not populate
