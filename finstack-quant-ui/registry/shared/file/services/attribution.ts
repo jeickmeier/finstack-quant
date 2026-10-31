@@ -24,6 +24,7 @@ export function createAttributionService(
         // Canonical market texts are spliced into AttributionInputs, never parsed;
         // every option beyond the method stays unset so Rust applies its defaults.
         const inputs = `{"as_of_t0":${JSON.stringify(request.asOfT0)},"as_of_t1":${JSON.stringify(request.asOfT1)},"market_t0":${context.market(request.marketT0Json).json},"market_t1":${context.market(request.marketT1Json).json},"method":${JSON.stringify(request.method)}}`;
+        // finstack-compose: Rust's own text, check and shares per returned attribution
         return api
           .attributePnlMany(inputs, [...request.instrumentJsons])
           .map((attribution) => ({

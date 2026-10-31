@@ -4,6 +4,8 @@
 
 ### UI boundary: rules decided in Rust
 
+`check-worker-compose` (`ui-check`) now flags a worker service that decides from a native result; pure composition takes `// finstack-compose: <reason>`.
+
 #### Changed
 
 - `Performance::lookback_returns` takes `Option<Date>` (Python `ref_date=None`, WASM optional `refDate`) and defaults to the last active date, erroring when none is active; it returns `Result`. `LookbackReturns` gains a required `ref_date` stating the date the windows ended on.
