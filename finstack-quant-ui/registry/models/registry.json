@@ -2,6 +2,68 @@
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "items": [
     {
+      "name": "option-calculator",
+      "type": "registry:component",
+      "title": "Option calculator",
+      "description": "Calculator of a European option under Black-Scholes, Black-76 or Bachelier: the price or implied volatility and the Greeks, as Rust returned them.",
+      "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. A price Rust cannot invert is the whole error; Greeks Rust rejects (at zero volatility under Black-Scholes) show their native error beside the price. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/option-calculator/option-calculator.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/option-calculator/option-calculator.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "button"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-option-calculator",
+      "type": "registry:hook",
+      "title": "useOptionCalculator",
+      "description": "Runs a native Black-Scholes, Black-76 or Bachelier price or implied volatility with its Greeks through the WASM worker.",
+      "docs": "One closed-form price or implied-volatility solve (models.bsPrice, black76Price, bachelierPrice, bsImpliedVol, black76ImpliedVol, models.volatility.impliedVolBachelier) in the facade's positional order, then the model's Greeks at that volatility. Null means no request. Requires FinstackQueryProvider. A price or solve Rust rejects is the hook error; Greeks Rust rejects carry their native error beside the value.",
+      "files": [
+        {
+          "path": "hooks/use-option-calculator/use-option-calculator.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-option-calculator/use-option-calculator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "monte-carlo-diagnostics",
       "type": "registry:component",
       "title": "Monte Carlo diagnostics",

@@ -391,6 +391,12 @@
       "worker": "none"
     },
     {
+      "name": "option-calculator",
+      "type": "registry:component",
+      "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. A price Rust cannot invert is the whole error; Greeks Rust rejects (at zero volatility under Black-Scholes) show their native error beside the price. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
       "name": "monte-carlo-diagnostics",
       "type": "registry:component",
       "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat.",
@@ -728,6 +734,10 @@
     },
     {
       "name": "use-margin-call-dates",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-option-calculator",
       "type": "registry:hook"
     },
     {
@@ -1475,6 +1485,10 @@
     {
       "path": "finstack-quant-ui/tests/models/risk/cases.json",
       "sha256": "87628356e80638606a1e4e17876b0d4058d6277d555d1b4e5faf9517ce060a4e"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/options/cases.json",
+      "sha256": "9fb6c54c8b7050e0ff8d768ead41b3d375a19f766dd3b60fa1e1229cabb44e09"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/margin/simm.json",

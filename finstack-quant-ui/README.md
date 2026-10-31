@@ -174,11 +174,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twenty native fixture generators under
+`mise run ui-fixtures` runs the twenty-one native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details;
 portfolio → portfolio margin; curves → market-browser; cubes, calibration,
-scenario-table; statements → covenants; analytics; models credit and risk;
+scenario-table; statements → covenants; analytics; models credit, risk and options;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -940,6 +940,25 @@ rest of the report. `MertonCalculator` composes `SchemaForm` over the generated
 caller's request) or an equity-calibration form with the horizon and CDS
 inputs, and shows the returned report. The native fixture (the facade example
 firm and a KMV calibration) is `tests/models/credit/merton.json`.
+
+## Option calculator
+
+`useOptionCalculator` (`@finstack/use-option-calculator`) calls one closed-form
+function per request: `models.bsPrice`, `black76Price` or `bachelierPrice` of a
+volatility, or `models.bsImpliedVol`, `black76ImpliedVol` or
+`models.volatility.impliedVolBachelier` of a price, then `bsGreeks`,
+`black76Greeks` or `bachelierGreeks` at that volatility. Named terms pass in the
+facade's positional order, which differs by function
+(`tests/models/options/option-calculator.test.tsx` pins every order against
+native output). A price Rust cannot invert (below intrinsic value, say) is the
+whole error; Greeks Rust rejects (zero volatility under Black-Scholes) keep their
+message beside the price. `bsGreeksIsValid` is not wired: `bsGreeks` already
+rejects a non-finite Greek and its closed form cannot return a negative gamma or
+vega, so the check could not fail on a returned result.
+`OptionCalculator` shows the conventions the facade documents: Black-76 prices
+are discounted and Bachelier prices undiscounted, Black-Scholes vega and rhos are
+per 1% move and theta per day, and forward-Greek vega is per unit of volatility.
+The native fixture is `tests/models/options/cases.json`.
 
 ## Credit scorecard
 

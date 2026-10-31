@@ -442,6 +442,13 @@ const displays = [
       "Returned models.credit.MertonModel results of a model from canonical MertonModel JSON (natively validated) or from a KMV equity calibration Rust performs: default probabilities, distances to default, implied spreads (recovery as a fraction of par) and debt spreads per requested horizon, the CDS par spread and implied equity at the requested maturity, and models.credit.pd.MasterScale.defaultCalibration grades of the default probabilities. Decimals as returned (spreads per year, probabilities and volatilities as fractions), no unit inferred; a measure Rust rejects for the model shows its native error beside the rest.",
   },
   {
+    id: "option-calculator",
+    api: ["models.bsPrice", "ModelsNamespace", "bsPrice"],
+    route: "returned-model",
+    convention:
+      "Returned closed-form results of one European option: models.bsPrice, black76Price or bachelierPrice of an entered volatility, or bsImpliedVol, black76ImpliedVol or models.volatility.impliedVolBachelier of an entered price, then bsGreeks, black76Greeks or bachelierGreeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",
+  },
+  {
     id: "credit-scorecard",
     api: [
       "models.credit.scoring.zmijewskiScore",

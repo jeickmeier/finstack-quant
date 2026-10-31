@@ -2033,6 +2033,57 @@
       }
     },
     {
+      "id": "option-calculator",
+      "route": "returned-model",
+      "convention": "Returned closed-form results of one European option: models.bsPrice, black76Price or bachelierPrice of an entered volatility, or bsImpliedVol, black76ImpliedVol or models.volatility.impliedVolBachelier of an entered price, then bsGreeks, black76Greeks or bachelierGreeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",
+      "api": {
+        "name": "models.bsPrice",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ModelsNamespace",
+        "member": "bsPrice",
+        "inputs": [
+          {
+            "name": "spot",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "strike",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "rate",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "divYield",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "vol",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "expiry",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "isCall",
+            "type": "boolean",
+            "optional": false
+          }
+        ],
+        "returns": "number",
+        "declaration": "/**\n   * Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.\n   *\n   * Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.\n   * Merton (1973): see docs/REFERENCES.md#merton-1973.\n   * Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983.\n   *\n   * @example\n   * ```javascript\n   * import init, { models } from \"finstack-quant-wasm\";\n   * await init();\n   * const price = models.bsPrice(\n   *   100,    // spot\n   *   100,    // strike (ATM)\n   *   0.05,   // rate = 5%\n   *   0.0,    // divYield = 0\n   *   0.20,   // vol = 20%\n   *   1.0,    // expiry = 1 year\n   *   true,   // call\n   * );\n   * // price ≈ 10.45\n   * ```\n   *\n   * @param spot - Spot price of the underlying.\n   * @param strike - Strike of the option.\n   * @param rate - Risk-free rate, **decimal** continuously compounded (e.g. `0.05` for 5%).\n   * @param divYield - Continuous dividend yield (or foreign rate for FX), **decimal** continuously compounded.\n   * @param vol - Annualized volatility, **decimal** (e.g. `0.20` for 20%).\n   * @param expiry - Time to expiry in **years**.\n   * @param isCall - `true` for a call, `false` for a put.\n   * @returns Per-unit option price.\n   * @throws If spot or strike is non-positive, volatility or expiry is negative, any numerical input is non-finite, or discounted legs or price overflow.\n   */\n  bsPrice(\n    spot: number,\n    strike: number,\n    rate: number,\n    divYield: number,\n    vol: number,\n    expiry: number,\n    isCall: boolean\n  ): number;",
+        "sha256": "3c717b280e97c2eb385209100074925b836d8c941896e8a522532d2a92528b57"
+      }
+    },
+    {
       "id": "credit-scorecard",
       "route": "returned-model",
       "convention": "Returned models.credit.scoring ScoringResult of one model (Altman Z, Z', Z'' or EM, Ohlson O, Zmijewski) over ratios entered in the fields of its generated input contract and passed in the facade's positional order: score, zone and implied PD as returned (probabilities as fractions), and models.credit.pd.MasterScale.defaultCalibration().mapScore of the result, or Rust's error when the result has no implied PD (the Altman models). No zone, threshold or grade is derived here.",
