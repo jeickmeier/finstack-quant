@@ -74,18 +74,23 @@ impl MetricId {
 
     /// Unit family of this metric's value.
     ///
-    /// Composite keys inherit the unit of their base metric. Custom metrics
-    /// and standard metrics whose unit is calculator-dependent (for example
-    /// `ir_convexity`, `inflation_convexity`) return [`MetricUnit::Unknown`].
+    /// Composite keys inherit the unit of their base metric. A custom metric
+    /// has a unit only when listed in `explicit_unit`, as the loan yields are;
+    /// any other custom metric, and a standard metric whose unit is
+    /// calculator-dependent (for example `ir_convexity`, `inflation_convexity`),
+    /// returns [`MetricUnit::Unknown`].
     pub fn unit(&self) -> MetricUnit {
         let base = self.base();
+        if let Some(unit) = explicit_unit(base.as_str()) {
+            return unit;
+        }
         if base.is_custom() {
             return MetricUnit::Unknown;
         }
         // Everything not listed explicitly is a PV component, a
         // currency-per-bump sensitivity or a notional-scaled Greek, all of
         // which are currency amounts.
-        explicit_unit(base.as_str()).unwrap_or(MetricUnit::Currency)
+        MetricUnit::Currency
     }
 }
 
@@ -128,7 +133,16 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "abs_ce_level"
         | "expense_ratio"
         | "variance_expected"
-        | "variance_realized" => Decimal,
+        | "variance_realized"
+        // Custom loan yields.
+        | "ytc"
+        | "yt2y"
+        | "yt3y"
+        | "yt4y"
+        | "all_in_rate"
+        | "oid_eir_rate" => Decimal,
+        // A custom loan total in the facility currency.
+        "oid_eir_amortization" => Currency,
         // Basis points.
         "par_spread"
         | "basis_par_spread"
@@ -198,6 +212,18 @@ mod tests {
         assert_eq!(MetricId::CleanPrice.unit(), MetricUnit::Currency);
         assert_eq!(MetricId::Accrued.unit(), MetricUnit::Currency);
         assert_eq!(MetricId::IrConvexity.unit(), MetricUnit::Unknown);
+    }
+
+    #[test]
+    fn custom_loan_metrics_declare_their_units() {
+        for id in ["ytc", "yt2y", "yt3y", "yt4y", "all_in_rate", "oid_eir_rate"] {
+            assert_eq!(MetricId::custom(id).unit(), MetricUnit::Decimal, "{id}");
+        }
+        assert_eq!(
+            MetricId::custom("oid_eir_amortization").unit(),
+            MetricUnit::Currency
+        );
+        assert_eq!(MetricId::custom("my_metric").unit(), MetricUnit::Unknown);
     }
 
     #[test]

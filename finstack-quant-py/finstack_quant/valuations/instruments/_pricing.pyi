@@ -317,8 +317,8 @@ def metric_metadata(keys: list[str]) -> list[dict[str, Any]]:
     keys : list[str]
         Canonical scalar or qualified wire keys; input order and duplicates
         are retained and qualified coordinates require the native composite
-        escaping. Custom names are accepted with unknown units; one the
-        standard registry holds gets the group ``"Instrument Specific"``, any
+        escaping. Custom names are accepted, with a unit only when Rust declares
+        one; one the standard registry holds gets the group ``"Instrument Specific"``, any
         other gets no group.
 
     Returns

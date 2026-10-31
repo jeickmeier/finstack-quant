@@ -1478,11 +1478,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "0645b27a6dca79bc649bbab1c83b3c00d4b46d494fc26988aad58645c87aa890"
+      "sha256": "9689871d433aa03c314eb570f0f8245e0c2cc661b999c74d761083b924e71c6a"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
-      "sha256": "f7ca86b9b989ff7e31e4002ea3e90bc725e994d610c10b7022cb5ad1ac728d81"
+      "sha256": "a4e8b76537de7b44526868f1d8cd0deb7a5bb77f3b72197ae66c20927fe07c1d"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",

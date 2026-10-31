@@ -1436,7 +1436,7 @@
             "discount_factor": 0.8595775700357209,
             "discount_curve_id": "USD-OIS",
             "beginning_balance": 13528386.842907196,
-            "ending_balance": -4.9e-9,
+            "ending_balance": 0,
             "native_pv": 11628697.888929388,
             "pv": 11628697.88892939
           }
