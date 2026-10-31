@@ -100,7 +100,10 @@ const workbench = [
     undefined,
     undefined,
   );
-  const asOfT1 = applied.report.time_roll?.new_date ?? bond.asOf;
+  const asOfT1 = native.applicationReportEffectiveAsOf(
+    applied.report,
+    bond.asOf,
+  );
   const marketT1 = canonicalMarket(JSON.stringify(applied.market));
   return {
     scenario,

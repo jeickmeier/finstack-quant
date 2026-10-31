@@ -304,6 +304,41 @@ class ApplicationReport:
         """
         ...
 
+    def effective_as_of(self, as_of: object) -> datetime.date:
+        """
+        The valuation date that holds after this scenario.
+
+        A time roll rebases the market, so a re-valuation of the shocked market
+        must use the rolled date; a scenario without a roll leaves the date alone.
+
+        Parameters
+        ----------
+        as_of : object
+            Valuation date the scenario was applied at (``datetime.date``,
+            ``pd.Timestamp`` or ISO string), returned unchanged without a roll.
+
+        Returns
+        -------
+        datetime.date
+            The roll's new date, else ``as_of``.
+
+        Raises
+        ------
+        ValueError
+            If ``as_of`` is a string that is not ISO-8601.
+        TypeError
+            If ``as_of`` is not a date-like value.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import MarketContext
+        >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario
+        >>> report = apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").report
+        >>> report.effective_as_of("2025-01-15").isoformat()
+        '2025-01-15'
+        """
+        ...
+
     def to_json(self) -> str:
         """
         Serialize this report to canonical JSON.

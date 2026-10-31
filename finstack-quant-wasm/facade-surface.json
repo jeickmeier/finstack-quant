@@ -3808,6 +3808,7 @@
   "scenarios": {
     "kind": "namespace",
     "keys": [
+      "applicationReportEffectiveAsOf",
       "applyScenario",
       "buildFromTemplate",
       "buildTemplateComponent",
@@ -3883,6 +3884,9 @@
     "kind": "function"
   },
   "scenarios.scenarioSpecMutatesInstruments": {
+    "kind": "function"
+  },
+  "scenarios.applicationReportEffectiveAsOf": {
     "kind": "function"
   },
   "scenarios.horizonResultExplainText": {

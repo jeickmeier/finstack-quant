@@ -63,6 +63,31 @@ pub fn horizon_result_explain(result: JsValue) -> Result<String, JsValue> {
     Ok(horizon_result(&result)?.to_string())
 }
 
+/// The valuation date that holds after a scenario.
+///
+/// Free-function twin of Python `ApplicationReport.effective_as_of` (Rust
+/// `ApplicationReport::effective_as_of`). A time roll rebases the market, so a
+/// re-valuation of the shocked market must use the rolled date.
+/// @param report - `ApplicationReport` returned by `applyScenario`, as an object or JSON.
+/// @param as_of - ISO-8601 valuation date the scenario was applied at, returned unchanged without a roll.
+/// @returns ISO-8601 date: the roll's new date, else `asOf`.
+///
+/// # Errors
+///
+/// Throws a `TypeError` when an argument has the wrong type, and a `validation`
+/// error when `report` is not an `ApplicationReport` or `asOf` is not an ISO date.
+#[wasm_bindgen(js_name = applicationReportEffectiveAsOf)]
+pub fn application_report_effective_as_of(
+    report: JsValue,
+    as_of: JsValue,
+) -> Result<String, JsValue> {
+    let report: finstack_quant_scenarios::ApplicationReport = from_js_json(&report, "report")?;
+    let as_of = crate::utils::wire::js_date(&as_of, "asOf")?;
+    Ok(crate::utils::date::date_to_iso(
+        report.effective_as_of(as_of),
+    ))
+}
+
 /// One attribution factor's P&L as a fraction of the initial value.
 ///
 /// Free-function twin of Python `HorizonResult.factor_contribution` (Rust

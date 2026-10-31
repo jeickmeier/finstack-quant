@@ -11,6 +11,7 @@ export type ScenariosNative = {
     | "scenarioSpecRequiresInstruments"
     | "scenarioSpecMutatesInstruments"
     | "applyScenario"
+    | "applicationReportEffectiveAsOf"
     | "computeHorizonReturn"
     | "horizonResultExplainText"
     | "listBuiltinTemplateMetadata"
@@ -79,8 +80,10 @@ export function createScenariosService(
         return {
           report: applied.report,
           marketJson: context.market(JSON.stringify(applied.market)).json,
-          // A roll rebases the market, so the shocked price uses the new date.
-          asOf: applied.report.time_roll?.new_date ?? request.asOf,
+          asOf: api.applicationReportEffectiveAsOf(
+            applied.report,
+            request.asOf,
+          ),
           instrumentJson,
         };
       });
