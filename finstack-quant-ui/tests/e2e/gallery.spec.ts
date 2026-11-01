@@ -261,7 +261,7 @@ test("coverage-test-chart a trigger with no ratio by date", async ({
   await report.getByRole("combobox", { name: "Test" }).click();
   await page.getByRole("option", { name: "OC_EQUITY_trigger" }).click();
   await expect(
-    report.getByText(/no ratio, trigger or cushion for/),
+    report.getByText(/^Recorded on 0 of \d+ dates\.$/),
   ).toBeVisible();
   await expect(
     report.getByText("First breach 2026-07-01", { exact: false }),

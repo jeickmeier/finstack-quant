@@ -829,21 +829,16 @@ def test_absent_values_are_none_not_zero_or_infinity() -> None:
     assert metrics.cash_on_cash[0][1] is None
     assert metrics.to_dataframe()["cash_on_cash"].isna().all()
 
-    diagnostics = SimulationDiagnostics.from_json(
-        json.dumps({
-            "periods": [],
-            "reserve_balance_path": [],
-            "reserve_interest_paid": [],
-            "draws_from_reserve": {"amount": "0", "currency": "USD"},
-            "draws_from_principal": {"amount": "0", "currency": "USD"},
-            "unfunded_draws": {"amount": "0", "currency": "USD"},
-            "reserve_replenished": {"amount": "0", "currency": "USD"},
-            "early_amortization_date": None,
-            "tranche_draws": [],
-            "first_breaches": [],
-        })
-    )
-    assert diagnostics.coverage_tests_dataframe().empty
+    # The UI's retired-senior fixture: Rust's own record of a note paid off mid-deal.
+    charts = Path(__file__).parents[2] / "finstack-quant-ui/tests/valuations/scenario-table/deal-charts.json"
+    retired = next(case for case in json.loads(charts.read_text())["cases"] if case["name"] == "retired-senior")
+    diagnostics = SimulationDiagnostics.from_json(json.dumps(retired["run"]["diagnostics"]))
+    frame = diagnostics.coverage_tests_dataframe()
+    senior = frame[frame["test_id"] == "OC_SENIOR"]
+    assert senior["ratio"].isna().any()
+    assert senior["ratio"].notna().any()
+    assert (senior["ratio"].isna() == senior["cushion"].isna()).all()
+    assert senior["passing"].all()
 
 
 def test_asset_pool_exposes_the_rust_collateral_analytics() -> None:
