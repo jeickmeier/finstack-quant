@@ -126,7 +126,11 @@ pub enum PaymentCalculation {
         /// Rounding convention.
         rounding: Option<RoundingConvention>,
     },
-    /// All remaining cash
+    /// All remaining cash.
+    ///
+    /// For the residual holder ([`RecipientType::Equity`]) this is uncapped. Paid
+    /// to a debt class it is a turbo: principal paydown, capped at the balance the
+    /// class has left, with the excess passing to the next recipient or tier.
     ResidualCash,
     /// Reserve account replenishment (up to target balance).
     ///

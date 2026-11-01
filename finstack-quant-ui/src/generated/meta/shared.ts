@@ -24083,7 +24083,7 @@ export default [
     "path": "#/$defs/PaymentCalculation/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/5",
     "const": "residual_cash",
-    "description": "All remaining cash"
+    "description": "All remaining cash.\n\nFor the residual holder ([`RecipientType::Equity`]) this is uncapped. Paid\nto a debt class it is a turbo: principal paydown, capped at the balance the\nclass has left, with the excess passing to the next recipient or tier."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/6",

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Structured credit: residual cash paid to a debt class is a turbo
+
+Moves values for any custom waterfall that pays `PaymentCalculation::ResidualCash` to a debt class. A note is owed its coupon and the return of its balance, so remaining cash directed at one is the turbo feature of ABS and CLO interest waterfalls. An extra coupon has no contractual basis and would not retire the balance the coverage tests read. Model income or subordinated notes that truly take the residual with `TrancheSeniority::Equity`, whose treatment does not change.
+
+#### Changed
+
+- Breaking: residual cash paid to a debt class is now principal. It is booked to `principal_flows` and `total_principal`, retires the balance, is capped at the balance the class has left in the period, and passes the excess to the next recipient or tier. It does not repay deferred interest first. It used to reach `cashflows` only, uncapped, with the balance untouched.
+- Values on a 10,000,000 CLO with a 2,000,000 `CLASS_B` that takes the residual: first-period (2024-04-01) `CLASS_B` cash stays 110,769.19, with principal moving from 0 to 110,769.19. Lifetime `CLASS_B` cash moves from 4,004,045.88 to 2,000,000.00 and `total_principal` stays 2,000,000.00. The 2,004,045.88 that was booked as neither interest nor principal now flows on past the class.
+
 ### Structured credit: the standard deal families come from Rust
 
 #### Added

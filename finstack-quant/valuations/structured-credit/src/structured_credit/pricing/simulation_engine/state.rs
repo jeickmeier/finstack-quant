@@ -376,9 +376,9 @@ pub struct PeriodDiagnostics {
     /// releases. Together with `waterfall.payment_records` this is every
     /// tranche's cash: per tranche and date, the two sum to the tranche's
     /// `cashflows`, and to its `interest_flows` plus `principal_flows`. The one
-    /// exception to the second sum is residual cash a custom waterfall pays a
-    /// debt class beyond its interest claim, which the engine books to
-    /// `cashflows` alone.
+    /// exception to the second sum is a fixed or percentage amount a custom
+    /// waterfall pays a debt class beyond its interest claim, which the engine
+    /// books to `cashflows` alone.
     pub non_waterfall_payments: Vec<NonWaterfallPayment>,
     /// Every tranche's credit enhancement on this period's end-of-period
     /// balances, in `TrancheStructure` order. The step-down trigger

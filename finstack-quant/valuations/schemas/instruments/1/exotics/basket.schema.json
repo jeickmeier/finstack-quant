@@ -16682,7 +16682,7 @@
         },
         {
           "const": "residual_cash",
-          "description": "All remaining cash",
+          "description": "All remaining cash.\n\nFor the residual holder ([`RecipientType::Equity`]) this is uncapped. Paid\nto a debt class it is a turbo: principal paydown, capped at the balance the\nclass has left, with the excess passing to the next recipient or tier.",
           "type": "string"
         },
         {

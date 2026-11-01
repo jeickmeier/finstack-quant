@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1005021,
+      "bytes": 1005249,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -317,7 +317,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1012934,
+      "bytes": 1013162,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -515,7 +515,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1011911,
+      "bytes": 1012139,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -659,7 +659,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 396845,
+      "bytes": 397073,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -794,7 +794,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1102913,
+      "bytes": 1103141,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -974,7 +974,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1014542,
+      "bytes": 1014770,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",
@@ -1028,7 +1028,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
-      "bytes": 56452,
+      "bytes": 56467,
       "kind": "output",
       "path": "schemas/results/1/facility_projection.schema.json",
       "summary": "Projected cashflows of an asset-backed facility and its residual.",
@@ -1145,7 +1145,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
-      "bytes": 26793,
+      "bytes": 26808,
       "kind": "output",
       "path": "schemas/results/1/simulation_diagnostics.schema.json",
       "summary": "Deal-level accounting produced alongside the tranche cashflows.",
@@ -1163,7 +1163,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
-      "bytes": 53363,
+      "bytes": 53378,
       "kind": "output",
       "path": "schemas/results/1/simulation_run.schema.json",
       "summary": "Tranche cashflows and deal accounting from one deterministic simulation.",
