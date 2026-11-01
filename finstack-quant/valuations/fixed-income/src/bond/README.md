@@ -140,6 +140,9 @@ risk-free benchmark PV, not a corporate market value. Choose one credit basis:
 - **Straight bond:** calibrate `ZSpread` from a clean market quote with
   `pricing::quote_conversions::compute_quotes`, or set `quoted_z_spread` as the
   price driver. The Z-spread shifts the risk-free discount curve.
+- **Worst workout:** `pricing::quote_conversions::bond_workout_ladder` returns
+  the yield and I-spread to every call, put and maturity exit, with the row the
+  `ytw` metric selects marked.
 - **Rates-only callable/putable bond:** use `ModelKey::Tree`; calibrate or
   supply `quoted_oas` for the option-adjusted spread over the risk-free curve.
 - **Hazard basis:** set `credit_curve_id` to a calibrated survival/hazard curve

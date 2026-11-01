@@ -23678,6 +23678,19 @@ export interface ValuationInstrumentsNamespace {
     cashflows: generated.valuations.TrancheCashflows | string
   ): TableEnvelope;
   /**
+   * Yield and I-spread to every call, put and maturity exit of a bond at one market price, with the worst marked (mirrors Rust `bond_workout_ladder`).
+   * @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights must carry `quoted_clean_price_pct`; one with none falls back to its model price.
+   * @param marketJson - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index and make-whole reference curves.
+   * @param asOf - ISO-8601 valuation date; the quote date and coupon entitlement follow the bond's settlement convention.
+   * @returns `BondWorkoutLadder` plain object: `clean_price_pct` and `dirty_price`, the one price every exit is solved at, and `rows` in date order, each with `date`, `kind` (`call`, `put` or `maturity`), `redemption_price_pct` in percent of the principal redeemed, `redemption_amount`, `make_whole`, `yield_rate` and `i_spread` as decimals or `null` when the path has no finite yield (an exit on the quote date, or same-day cash at or above the price; a worst row can be `null`, where the `ytw` metric is negative infinity), and `is_worst`.
+   * @throws Error - Throws with kind `not_found` if a bond with exercise rights has no quoted clean price or a curve is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if a yield cannot be solved.
+   */
+  bondWorkoutLadder(
+    bond: Bond,
+    marketJson: string,
+    asOf: string
+  ): generated.valuations.BondWorkoutLadder;
+  /**
    * Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).
    * @param pool - `AssetPool` plain object or JSON string, in any of its three representations.
    * @param asOf - ISO-8601 date the remaining maturities are measured from. It also stands in for the closing date when a pool is normalized: it ages representative lines and counts the delayed draws already funded on instrument collateral.

@@ -309,6 +309,28 @@ pub(super) fn pool_stats() -> Result<Vec<Value>> {
     )?)
 }
 
+/// The workout ladder of the example callable bond at 108 clean on a flat curve.
+pub(super) fn bond_workout_ladder() -> Result<Vec<Value>> {
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions;
+    use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+    let as_of = date(2025, time::Month::January, 15)?;
+    let mut bond = Bond::example_callable()?;
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(108.0);
+    let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (10.0, 0.70)])
+        .build()?;
+    let market = MarketContext::new().insert(curve);
+    example(&quote_conversions::bond_workout_ladder(
+        &bond, &market, as_of,
+    )?)
+}
+
 /// Report on the canonical example CLO pool at its closing date.
 pub(super) fn pool_report() -> Result<Vec<Value>> {
     let deal = structured_credit::StructuredCredit::example()?;

@@ -27,7 +27,7 @@ import pytest
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
-from finstack_quant.core.market_data import HazardCurve, VolSurface
+from finstack_quant.core.market_data import DiscountCurve, HazardCurve, MarketContext, VolSurface
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Bps, Rate
 from finstack_quant.models.credit import MertonModel
@@ -100,6 +100,26 @@ def _pool_report_case(pool: ins.AssetPool, close: datetime.date) -> dict[str, An
     return {
         "pool": pool_json,
         "report": ins.pool_report(ins.AssetPool.from_json(pool_json), close).to_dict(),
+    }
+
+
+def _bond_workout_ladder_case() -> dict[str, Any]:
+    """Ladders of a callable at a premium, and of one with a call on the quote date."""
+    as_of = datetime.date(2025, 1, 15)
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+    spec = json.loads(ins.Bond.example_callable().to_json())
+    spec["instrument"]["spec"]["instrument_pricing_overrides"] = {"market_quotes": {"quoted_clean_price_pct": 108.0}}
+    callable_json = json.dumps(spec)
+    calls = spec["instrument"]["spec"]["call_put"]["calls"]
+    calls.insert(0, {**calls[0], "start": "2025-01-17", "end": "2025-01-17"})
+    quote_date_call_json = json.dumps(spec)
+    return {
+        "market": market.to_json(),
+        "as_of": as_of.isoformat(),
+        "cases": [
+            {"bond": bond, "ladder": ins.bond_workout_ladder(ins.Bond.from_json(bond), market, as_of).to_dict()}
+            for bond in (callable_json, quote_date_call_json)
+        ],
     }
 
 
@@ -290,6 +310,8 @@ def build_cases() -> dict[str, Any]:
         "pool_report": _pool_report_case(deal.pool, close),
         "standard_deal_families": ins.standard_deal_families(),
     }
+
+    cases["bond_workout_ladder"] = _bond_workout_ladder_case()
 
     # -- Merton Monte Carlo ------------------------------------------------
     merton = MertonModel(100.0, 0.25, 60.0, 0.04)

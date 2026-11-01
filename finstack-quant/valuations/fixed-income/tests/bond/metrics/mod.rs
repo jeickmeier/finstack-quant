@@ -32,5 +32,6 @@ mod quote_engine;
 mod spreads;
 mod theta;
 mod wal;
+mod workout_ladder;
 mod ytm;
 mod ytw;

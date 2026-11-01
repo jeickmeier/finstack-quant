@@ -4556,6 +4556,7 @@
       "assetPoolWeightedAvgSpreadBp",
       "assetPoolWithReserve",
       "bondFromCashflowsJson",
+      "bondWorkoutLadder",
       "calculatePoolStats",
       "calculateVar",
       "calendarYearLadderByCurrency",
@@ -6028,6 +6029,9 @@
     "kind": "function"
   },
   "valuations.instruments.poolReport": {
+    "kind": "function"
+  },
+  "valuations.instruments.bondWorkoutLadder": {
     "kind": "function"
   },
   "valuations.instruments.trancheCashflowsTable": {
