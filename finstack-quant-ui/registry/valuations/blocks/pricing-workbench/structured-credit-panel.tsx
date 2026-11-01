@@ -7,6 +7,7 @@ import { scenarioGridModule } from "./scenario-grid";
 import { PoolPanel } from "./pool-panel";
 import { TranchePanel } from "./tranche-panel";
 import { WaterfallPanel } from "./waterfall-panel";
+import { CoveragePanel } from "./coverage-panel";
 /** A disclosure whose content, and so its native calls, mounts when first opened. */
 function DealSection({
   title,
@@ -24,7 +25,7 @@ function DealSection({
   );
 }
 /**
- * Shows the completed deal's pool and waterfall reports, selects one of its native tranches and
+ * Shows the completed deal's pool and waterfall reports and coverage tests, selects one of its native tranches and
  * shows that tranche's analytics and scenarios. The host's seeds are optional: the selection falls back to the first
  * returned tranche and the scenario grid to the schema's Rust example.
  */
@@ -78,6 +79,9 @@ export function StructuredCreditPanel({
       </DealSection>
       <DealSection title="Waterfall report">
         <WaterfallPanel request={request} density={density} />
+      </DealSection>
+      <DealSection title="Coverage tests">
+        <CoveragePanel request={request} density={density} />
       </DealSection>
       <div className="w-72">
         <EnumField

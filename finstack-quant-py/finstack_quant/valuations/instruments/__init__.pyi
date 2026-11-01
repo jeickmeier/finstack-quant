@@ -152,6 +152,7 @@ from finstack_quant.valuations.instruments._pricing import (
     price_instrument as price_instrument,
     pool_report_field_units as pool_report_field_units,
     scenario_table_field_units as scenario_table_field_units,
+    simulation_field_units as simulation_field_units,
     tranche_metric_field_units as tranche_metric_field_units,
     tranche_solve_field_units as tranche_solve_field_units,
 )
@@ -273,6 +274,7 @@ __all__ = [
     "pool_report",
     "pool_report_field_units",
     "scenario_table_field_units",
+    "simulation_field_units",
     "pretty_instrument_json",
     "price_driver_fields",
     "price_instrument",

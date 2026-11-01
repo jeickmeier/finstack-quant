@@ -738,6 +738,62 @@ pub fn pool_report_field_units(currency: Currency) -> PoolReportFieldUnits {
     }
 }
 
+/// Units of the charted `SimulationDiagnostics` series, which do not appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct SimulationFieldUnits {
+    /// Unit of each numeric `CoverageTestDiagnostic` field, in the order the
+    /// struct declares them.
+    pub coverage_tests: Vec<MetricFieldUnit>,
+    /// Unit of `PeriodWaterfall::diverted_cash` and of each diversion's amount.
+    pub diverted_cash: MetricFieldUnit,
+    /// Unit of `TrancheCreditEnhancement::credit_enhancement`.
+    pub credit_enhancement: MetricFieldUnit,
+    /// Unit of `PeriodDiagnostics::excess_spread`.
+    pub excess_spread: MetricFieldUnit,
+}
+
+/// Units of the coverage, diversion, enhancement and excess-spread series of a
+/// structured-credit simulation, the one place a host reads them from.
+///
+/// Coverage ratios, triggers and cushions are in times covered, credit enhancement
+/// is a decimal share of the collateral and excess spread an annual decimal of the opening pool
+/// balance. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The deal currency of the simulation being labelled, as its
+///   `Money` amounts state it; it names the unit of `diverted_cash`.
+///
+/// # Returns
+///
+/// One record per charted field, grouped by the struct holding it.
+pub fn simulation_field_units(currency: Currency) -> SimulationFieldUnits {
+    let unit = |owner: &str, field: &str, label: String| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::{owner}::{field}"),
+    };
+    SimulationFieldUnits {
+        coverage_tests: ["ratio", "trigger_level", "cushion"]
+            .into_iter()
+            .map(|field| unit("CoverageTestDiagnostic", field, "times covered".to_string()))
+            .collect(),
+        diverted_cash: unit("PeriodWaterfall", "diverted_cash", currency.to_string()),
+        credit_enhancement: unit(
+            "TrancheCreditEnhancement",
+            "credit_enhancement",
+            "decimal share of collateral".to_string(),
+        ),
+        excess_spread: unit(
+            "PeriodDiagnostics",
+            "excess_spread",
+            "annual decimal of opening pool balance".to_string(),
+        ),
+    }
+}
+
 /// List every pricing model key that has a pricer in the standard registry.
 ///
 /// The list is **registry-derived**, not enum-derived: it reports real dispatch
@@ -1354,6 +1410,42 @@ mod tests {
         assert_eq!(units.measures[0].label, "% of current balance");
         assert_eq!(units.measures[2].label, "EUR");
         assert_eq!(units.measures[1].source, "valuations::ScenarioCell::wal");
+    }
+
+    #[test]
+    fn simulation_units_list_every_coverage_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::CoverageTestDiagnostic;
+        let diagnostic = CoverageTestDiagnostic {
+            test_id: "OC_A".to_string(),
+            ratio: 0.0,
+            trigger_level: 0.0,
+            cushion: 0.0,
+            passing: true,
+        };
+        let value = serde_json::to_value(&diagnostic).expect("serialize");
+        let mut declared: Vec<&str> = value
+            .as_object()
+            .expect("object")
+            .iter()
+            .filter(|(_, field)| field.is_number())
+            .map(|(name, _)| name.as_str())
+            .collect();
+        declared.sort_unstable();
+        let units = simulation_field_units(Currency::EUR);
+        let order: Vec<&str> = units
+            .coverage_tests
+            .iter()
+            .map(|unit| unit.field.as_str())
+            .collect();
+        assert_eq!(order, ["ratio", "trigger_level", "cushion"]);
+        let mut listed = order;
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units.diverted_cash.label, "EUR");
+        assert_eq!(
+            units.excess_spread.source,
+            "valuations::PeriodDiagnostics::excess_spread"
+        );
     }
 
     #[test]

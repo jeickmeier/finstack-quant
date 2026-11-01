@@ -350,7 +350,15 @@ pub struct PeriodDiagnostics {
     /// Servicer advances of missed principal and interest outstanding at
     /// period end (not yet repaid by cures or liquidations).
     pub servicer_advances_outstanding: Money,
-    /// Annualized excess spread realized this period (decimal).
+    /// Excess spread realized this period, annualized, as a decimal of the
+    /// opening pool balance (`0.02` is 2% a year): `(I − D − F − L) ÷ P × 12 ÷ m`.
+    /// `I` is `interest_collections`, `D` the debt coupons due this period, `F`
+    /// the service-provider and manager fees paid through the waterfall (not
+    /// special-servicing fees, already out of `I`), `L` the period's defaults less
+    /// pool recoveries, floored at zero, `P` the pool balance before this period's
+    /// flows and `m` the months in the period. The early-amortization excess-spread
+    /// test reads this number. Zero when `P` is zero and on a settlement record,
+    /// where no waterfall ran.
     pub excess_spread: f64,
     /// Every coverage test the executor evaluated this period.
     pub coverage_tests: Vec<CoverageTestDiagnostic>,
@@ -478,7 +486,9 @@ pub struct SimulationDiagnostics {
     /// `periods[i].coverage_tests`) and every tranche `oc_trigger` /
     /// `ic_trigger`, whatever its consequence (only a breached `DivertCashFlow`
     /// trigger is on `coverage_tests`, for the periods it is in breach). A deal
-    /// with no coverage test has no entries.
+    /// with no coverage test has no entries, and a test the waterfall carries is
+    /// listed only if a period evaluated it, so a settlement with no waterfall run
+    /// lists none of those.
     pub first_breaches: Vec<CoverageTestBreach>,
 }
 

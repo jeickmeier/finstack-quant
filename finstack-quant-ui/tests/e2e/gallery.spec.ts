@@ -253,6 +253,20 @@ test("waterfall-report period detail", async ({ page }) => {
   ).toBeVisible();
   await expect(report).toHaveScreenshot("waterfall-report-period-detail.png");
 });
+test("coverage-test-chart a trigger with no ratio by date", async ({
+  page,
+}) => {
+  const item = await open(page, "coverage-test-chart", "light", "comfortable");
+  const report = item.getByRole("region", { name: "Coverage tests" });
+  await report.getByRole("combobox", { name: "Test" }).click();
+  await page.getByRole("option", { name: "OC_EQUITY_trigger" }).click();
+  await expect(
+    report.getByText(/no ratio, trigger or cushion for/),
+  ).toBeVisible();
+  await expect(
+    report.getByText("First breach 2026-07-01", { exact: false }),
+  ).toBeVisible();
+});
 test("merton-calculator model parameters", async ({ page }) => {
   const item = await open(page, "merton-calculator", "light", "comfortable");
   // The four item baselines stop inside the term structure, above this table.

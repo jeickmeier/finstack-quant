@@ -392,6 +392,17 @@ const displays = [
       "Returned SimulationDiagnostics.periods in payment order, in the deal currency each Money states: the period's PeriodWaterfall, and on expand its tier allocations and payment records in execution order, diversions and non-waterfall payments with their own dates. The is_principal, diverted and had_diversions flags are Rust's. Nothing is summed, joined by date, sorted or classified here.",
   },
   {
+    id: "coverage-test-chart",
+    api: [
+      "StructuredCredit#runSimulation",
+      "StructuredCredit",
+      "runSimulation",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned SimulationDiagnostics.first_breaches in Rust's order and, for the selected test, periods[].coverage_tests' ratio, trigger_level, cushion and passing on the dates Rust recorded them, in the units simulationFieldUnits states. The first breach date, cushion and pass or fail are Rust's. A trigger with a first_breaches entry and no coverage_tests row is reported as having no ratio by date. waterfall.diverted_cash and diverted_amounts are shown for the deal, not attributed to a test. Nothing is computed, joined by date, sorted or classified here.",
+  },
+  {
     id: "performance-report",
     api: ["analytics.Performance#summary", "Performance", "summary"],
     route: "returned-analytics",

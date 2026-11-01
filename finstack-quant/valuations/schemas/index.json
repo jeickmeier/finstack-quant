@@ -1019,7 +1019,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
-      "bytes": 55209,
+      "bytes": 55918,
       "kind": "output",
       "path": "schemas/results/1/facility_projection.schema.json",
       "summary": "Projected cashflows of an asset-backed facility and its residual.",
@@ -1136,7 +1136,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
-      "bytes": 25550,
+      "bytes": 26259,
       "kind": "output",
       "path": "schemas/results/1/simulation_diagnostics.schema.json",
       "summary": "Deal-level accounting produced alongside the tranche cashflows.",
@@ -1144,8 +1144,17 @@
       "type_name": "SimulationDiagnostics"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/simulation_field_units.schema.json",
+      "bytes": 2970,
+      "kind": "output",
+      "path": "schemas/results/1/simulation_field_units.schema.json",
+      "summary": "The display units of a simulation's coverage, diversion, enhancement and excess-spread series.",
+      "title": "SimulationFieldUnits",
+      "type_name": "SimulationFieldUnits"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
-      "bytes": 52120,
+      "bytes": 52829,
       "kind": "output",
       "path": "schemas/results/1/simulation_run.schema.json",
       "summary": "Tranche cashflows and deal accounting from one deterministic simulation.",

@@ -34,6 +34,7 @@ const sources = {
   trancheAnalytics: "tests/valuations/scenario-table/tranche-analytics.json",
   poolReport: "tests/valuations/scenario-table/pool-report.json",
   waterfallReport: "tests/valuations/scenario-table/waterfall-report.json",
+  dealCharts: "tests/valuations/scenario-table/deal-charts.json",
   cashflows: "tests/valuations/cashflows/cases.json",
   loanYield: "tests/valuations/loan-yield/cases.json",
   marketScenario: "tests/scenarios/application/cases.json",

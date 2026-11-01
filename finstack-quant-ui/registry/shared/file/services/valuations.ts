@@ -24,6 +24,7 @@ export type ValuationsNative = {
       | "trancheMetricFieldUnits"
       | "trancheSolveFieldUnits"
       | "scenarioTableFieldUnits"
+      | "simulationFieldUnits"
       | "poolReport"
       | "poolReportFieldUnits"
     >;
@@ -230,6 +231,8 @@ export function createValuationsService(
       context.result(() => instruments.trancheMetricFieldUnits(currency)),
     scenarioTableFieldUnits: (currency) =>
       context.result(() => instruments.scenarioTableFieldUnits(currency)),
+    simulationFieldUnits: (currency) =>
+      context.result(() => instruments.simulationFieldUnits(currency)),
     poolReportFieldUnits: (currency) =>
       context.result(() => instruments.poolReportFieldUnits(currency)),
     trancheSolveFieldUnits: () =>

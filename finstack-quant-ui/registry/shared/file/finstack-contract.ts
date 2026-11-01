@@ -17,6 +17,7 @@ import type {
   MoneyValue,
   ScenarioTable,
   ScenarioTableFieldUnits,
+  SimulationFieldUnits,
   PoolReportFieldUnits,
   StructuredCredit,
   ScenarioResults,
@@ -1183,6 +1184,10 @@ export interface ValuationsApi {
   scenarioTableFieldUnits(
     currency: string,
   ): Promise<Envelope<ScenarioTableFieldUnits>>;
+  /** valuations.instruments.simulationFieldUnits: units of a simulation's charted series. */
+  simulationFieldUnits(
+    currency: string,
+  ): Promise<Envelope<SimulationFieldUnits>>;
   /** valuations.instruments.poolReportFieldUnits: units of a pool report's fields. */
   poolReportFieldUnits(
     currency: string,

@@ -466,6 +466,41 @@ def scenario_table_field_units(currency: str | Currency) -> dict[str, Any]:
     """
     ...
 
+def simulation_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of a structured-credit simulation's charted series, the one place a host reads them from.
+
+    Coverage ratios, triggers and cushions are in times covered, credit enhancement
+    is a decimal share of the collateral and excess spread an annual decimal of the opening pool
+    balance. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        Deal currency of the simulation being labelled, an ISO-4217 code in any
+        ASCII case or a ``Currency``. It names the unit of ``diverted_cash``.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``coverage_tests``, one record of ``field``, ``label`` and ``source`` per
+        numeric coverage-test field (``ratio``, ``trigger_level``, ``cushion``) in
+        struct order; and one such record each for ``diverted_cash``,
+        ``credit_enhancement`` and ``excess_spread``.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import simulation_field_units
+    >>> simulation_field_units("USD")["diverted_cash"]["label"]
+    'USD'
+    """
+    ...
+
 def pool_report_field_units(currency: str | Currency) -> dict[str, Any]:
     """
     Units of the :class:`PoolReport` fields, the one place a host reads them from.

@@ -321,3 +321,80 @@ await emit(
     cases: waterfallCases,
   }),
 );
+// Coverage and enhancement charts on the UI market: the example CLO cut to three years
+// with three classes. OC_SENIOR passes, breaches and cures; OC_MEZZ passes then stays in
+// breach, diverting cash; IC_SENIOR never fails; the equity class's oc_trigger traps
+// excess spread instead of diverting, so it has a first breach and no coverage_tests
+// row. The same deal cut to its first payment date has one period; the example cut to
+// one year has no tests; the no-asset deal settles in one period with no waterfall run.
+const chartMoney = (amount) => ({ amount: String(amount), currency: "USD" });
+const chartTranche = (base, id, seniority, attach, detach, amount, rate) => ({
+  ...structuredClone(base),
+  id,
+  seniority,
+  attach_pct: attach,
+  detach_pct: detach,
+  original_balance: chartMoney(amount),
+  current_balance: chartMoney(amount),
+  coupon: { fixed: { rate } },
+});
+const covered = structuredClone(instrument);
+{
+  const spec = covered.instrument.spec;
+  const base = spec.tranches.tranches[0];
+  spec.maturity = "2027-01-01";
+  spec.prepayment_spec = { curve: "constant", cpr: 0.03 };
+  spec.default_spec = { curve: "constant", cdr: 0.06 };
+  spec.recovery_spec = { rate: 0.5, recovery_lag: 0 };
+  spec.tranches.tranches = [
+    chartTranche(base, "SENIOR", "senior", 30, 100, 70000000, 0.05),
+    chartTranche(base, "MEZZ", "mezzanine", 15, 30, 15000000, 0.08),
+    {
+      ...chartTranche(base, "EQUITY", "equity", 0, 15, 15000000, 0),
+      oc_trigger: {
+        trigger_level: 0.95,
+        cure_level: null,
+        breach_date: null,
+        consequence: "trap_excess_spread",
+      },
+    },
+  ];
+  spec.coverage_triggers = [
+    { id: "OC_SENIOR", kind: "oc", tranche_id: "SENIOR", trigger_level: 1.415 },
+    { id: "OC_MEZZ", kind: "oc", tranche_id: "MEZZ", trigger_level: 1.16 },
+    { id: "IC_SENIOR", kind: "ic", tranche_id: "SENIOR", trigger_level: 1.05 },
+  ];
+}
+const untested = structuredClone(instrument);
+untested.instrument.spec.maturity = "2025-01-01";
+const onePeriod = structuredClone(covered);
+onePeriod.instrument.spec.maturity = "2024-04-01";
+const chartCases = [
+  { name: "covered", input: covered },
+  { name: "untested", input: untested },
+  { name: "settlement", input: settlement },
+  { name: "one-period", input: onePeriod },
+].map(({ name, input }) => {
+  const instrumentJson = native.validateInstrumentJson(JSON.stringify(input));
+  const deal = native.StructuredCredit.fromJson(instrumentJson);
+  try {
+    return {
+      name,
+      instrument: JSON.parse(instrumentJson),
+      run: deal.runSimulation(marketJson, asOf),
+    };
+  } finally {
+    deal.free();
+  }
+});
+await emit(
+  new URL("./deal-charts.json", import.meta.url),
+  JSON.stringify({
+    instrumentSource,
+    marketSource,
+    marketSha256: createHash("sha256").update(marketJson).digest("hex"),
+    asOf,
+    units: native.simulationFieldUnits("USD"),
+    cases: chartCases,
+  }),
+);

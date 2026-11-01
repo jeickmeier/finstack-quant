@@ -274,6 +274,13 @@ test("a standard deal family builds, prices and lists its native tranches", asyn
   await expect(
     waterfall.getByRole("table", { name: "Payment records" }),
   ).toBeVisible();
+  // ... and its coverage tests, as far as this family's waterfall carries any.
+  await results.locator("summary", { hasText: /^Coverage tests$/ }).click();
+  await expect(
+    results
+      .getByRole("region", { name: "Coverage tests" })
+      .or(results.getByText(/returned no coverage tests/)),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 

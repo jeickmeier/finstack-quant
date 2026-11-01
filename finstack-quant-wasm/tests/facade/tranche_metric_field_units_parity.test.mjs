@@ -67,3 +67,19 @@ test('scenarioTableFieldUnits matches the records pinned for both hosts', () => 
     SCENARIO_PINNED
   );
 });
+
+const SIMULATION_PINNED = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/fixtures/simulation_field_units.json',
+      import.meta.url
+    )
+  )
+);
+
+test('simulationFieldUnits matches the records pinned for both hosts', () => {
+  assert.deepEqual(
+    plain(facade.valuations.instruments.simulationFieldUnits('EUR')),
+    SIMULATION_PINNED
+  );
+});

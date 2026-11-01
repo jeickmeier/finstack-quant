@@ -743,7 +743,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::metrics::risk::MarketHistory;
     use crate::pricer::{
         MetricFieldUnit, MetricMetadata, PoolReportFieldUnits, ScenarioTableFieldUnits,
-        TrancheSolveFieldUnits,
+        SimulationFieldUnits, TrancheSolveFieldUnits,
     };
     use crate::results::ValuationResult;
     use finstack_quant_core::contract::{Diagnostic, ValidationReport};
@@ -1076,6 +1076,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::scenario_table_field_units),
+        finstack_quant_core::schema_artifact!(
+            SimulationFieldUnits,
+            "results",
+            "simulation_field_units",
+            Component,
+            "The display units of a simulation's coverage, diversion, enhancement and excess-spread series."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::simulation_field_units),
         finstack_quant_core::schema_artifact!(
             MetricMetadata,
             "results",

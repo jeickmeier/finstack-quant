@@ -153,7 +153,9 @@ class SimulationDiagnostics:
         Lists every test the waterfall carries (``OC_<tranche>``) and every
         tranche ``oc_trigger`` / ``ic_trigger`` (``OC_<tranche>_trigger``),
         whatever its consequence. A later cure does not clear a date. A deal
-        with no coverage test returns an empty list.
+        with no coverage test returns an empty list, and a test the waterfall
+        carries is listed only if a period evaluated it, so a settlement with no
+        waterfall run lists none of those.
 
         Returns
         -------
@@ -175,7 +177,7 @@ class SimulationDiagnostics:
         Returns
         -------
         list[dict[str, Any]]
-            ``payment_date``, ``pool_balance``, ``pool_factor``, ``wac``, ``weighted_avg_spread_bp``, ``warf``, the period's collections, defaults, recoveries, reinvested par, fees paid, the cash-account balances, ``delinquent_balance``, ``servicer_advances_outstanding``, ``excess_spread``, the ``coverage_tests`` the executor evaluated, ``waterfall`` (how the period's waterfall ran: ``total_available``, ``tier_allocations``, ``payment_records`` with each recipient's requested and paid amounts and an ``is_principal`` flag, ``diverted_amounts``, ``diverted_cash``, ``had_diversions``, ``remaining_interest``, ``remaining_principal``, ``principal_used_for_interest``, ``recovery_proceeds``) and ``non_waterfall_payments`` (cash paid to a tranche outside the waterfall: ``payment_date``, ``tranche_id``, ``source``, ``interest``, ``principal``, ``incentive_fee``; a recovery settling after the last period sits on that period with its own later date). Per tranche and date, ``payment_records`` plus ``non_waterfall_payments`` sum to the tranche's cash flows. ``credit_enhancement`` lists each tranche's ``tranche_id`` and ``credit_enhancement`` at period end: the decimal share of collateral beneath it, ``(C - N) / C`` with ``C`` the collateral plus the funding account and ``N`` the balances of the tranche and every tranche paid ahead of it. Amounts are in the deal currency.
+            ``payment_date``, ``pool_balance``, ``pool_factor``, ``wac``, ``weighted_avg_spread_bp``, ``warf``, the period's collections, defaults, recoveries, reinvested par, fees paid, the cash-account balances, ``delinquent_balance``, ``servicer_advances_outstanding``, ``excess_spread`` (realized this period, annualized, as a decimal of the opening pool balance: pool interest less debt coupons due, service-provider and manager fees paid through the waterfall and net charge-offs; zero on a settlement record), the ``coverage_tests`` the executor evaluated, ``waterfall`` (how the period's waterfall ran: ``total_available``, ``tier_allocations``, ``payment_records`` with each recipient's requested and paid amounts and an ``is_principal`` flag, ``diverted_amounts``, ``diverted_cash``, ``had_diversions``, ``remaining_interest``, ``remaining_principal``, ``principal_used_for_interest``, ``recovery_proceeds``) and ``non_waterfall_payments`` (cash paid to a tranche outside the waterfall: ``payment_date``, ``tranche_id``, ``source``, ``interest``, ``principal``, ``incentive_fee``; a recovery settling after the last period sits on that period with its own later date). Per tranche and date, ``payment_records`` plus ``non_waterfall_payments`` sum to the tranche's cash flows. ``credit_enhancement`` lists each tranche's ``tranche_id`` and ``credit_enhancement`` at period end: the decimal share of collateral beneath it, ``(C - N) / C`` with ``C`` the collateral plus the funding account and ``N`` the balances of the tranche and every tranche paid ahead of it. Amounts are in the deal currency.
 
         Raises
         ------

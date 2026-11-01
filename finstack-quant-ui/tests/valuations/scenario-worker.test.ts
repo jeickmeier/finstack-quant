@@ -17,6 +17,7 @@ import tranches from "./scenario-table/tranche-analytics.json";
 import standardDeals from "./scenario-table/standard-deals.json";
 import poolReports from "./scenario-table/pool-report.json";
 import waterfallReports from "./scenario-table/waterfall-report.json";
+import dealCharts from "./scenario-table/deal-charts.json";
 import { budget } from "../shared/budget";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -203,6 +204,28 @@ it(
       marketJson: "{}",
       asOf: waterfallReports.asOf,
     });
+    expect(failed.ok).toBe(false);
+  },
+  budget(30000),
+);
+it(
+  "returns the native simulation and its units for the coverage and enhancement charts",
+  async () => {
+    expect(dealCharts.units).toEqual(
+      unwrap(await worker.proxy.simulationFieldUnits("USD")),
+    );
+    expect(dealCharts.units).toEqual(native.simulationFieldUnits("USD"));
+    for (const c of dealCharts.cases) {
+      const run = unwrap(
+        await worker.proxy.runSimulation({
+          instrumentJson: JSON.stringify(c.instrument),
+          marketJson,
+          asOf: dealCharts.asOf,
+        }),
+      );
+      expect(c.run).toEqual(JSON.parse(JSON.stringify(run)));
+    }
+    const failed = await worker.proxy.simulationFieldUnits("NOT-A-CODE");
     expect(failed.ok).toBe(false);
   },
   budget(30000),

@@ -1,0 +1,34 @@
+{
+  "coverage_tests": [
+    {
+      "field": "ratio",
+      "label": "times covered",
+      "source": "valuations::CoverageTestDiagnostic::ratio"
+    },
+    {
+      "field": "trigger_level",
+      "label": "times covered",
+      "source": "valuations::CoverageTestDiagnostic::trigger_level"
+    },
+    {
+      "field": "cushion",
+      "label": "times covered",
+      "source": "valuations::CoverageTestDiagnostic::cushion"
+    }
+  ],
+  "diverted_cash": {
+    "field": "diverted_cash",
+    "label": "EUR",
+    "source": "valuations::PeriodWaterfall::diverted_cash"
+  },
+  "credit_enhancement": {
+    "field": "credit_enhancement",
+    "label": "decimal share of collateral",
+    "source": "valuations::TrancheCreditEnhancement::credit_enhancement"
+  },
+  "excess_spread": {
+    "field": "excess_spread",
+    "label": "annual decimal of opening pool balance",
+    "source": "valuations::PeriodDiagnostics::excess_spread"
+  }
+}
