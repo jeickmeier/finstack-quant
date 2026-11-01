@@ -159,6 +159,13 @@ export function createValuationsService(
         ),
       );
     },
+    runSimulation(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          deal.runSimulation(request.marketJson, request.asOf),
+        ),
+      );
+    },
     trancheMetrics(request) {
       return context.result(() =>
         withDeal(request.instrumentJson, (deal) =>

@@ -556,6 +556,41 @@
       }
     },
     {
+      "name": "waterfall-report",
+      "type": "registry:component",
+      "title": "Waterfall report",
+      "description": "One row per simulated structured-credit period showing the waterfall's cash, with tier allocations, payment records, diversions and non-waterfall payments on expand.",
+      "docs": "Present a native StructuredCredit.runSimulation result: one row per SimulationDiagnostics.periods entry in Rust's order with PeriodWaterfall's total available, recovery proceeds, diverted cash, carried interest and principal, whether a coverage test failed, and how many payments went outside the waterfall. Expanding a period shows the principal used for interest, its tier allocations and payment records in execution order, its diversions and its non-waterfall payments with their own dates. A settlement-only deal has one row, holding its settlement in non-waterfall payments. The caption names the deal currency Rust states on each amount, and each amount shows every digit. Nothing is summed, joined by date, sorted or classified. No worker is required.",
+      "files": [
+        {
+          "path": "components/waterfall-report/waterfall-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/waterfall-report/waterfall-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "button",
+        "table"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8",
+        "finstack-quant-wasm@0.11.0"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "tranche-analytics",
       "type": "registry:component",
       "title": "Tranche analytics",
@@ -607,7 +642,7 @@
       "type": "registry:block",
       "title": "Pricing workbench",
       "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows, tranche analytics and scenarios.",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report over the deal's runSimulation, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "files": [
         {
           "path": "blocks/pricing-workbench/pricing-workbench.tsx",
@@ -658,6 +693,11 @@
           "path": "blocks/pricing-workbench/pool-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/pool-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/waterfall-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/waterfall-panel.tsx"
         },
         {
           "path": "blocks/pricing-workbench/tranche-panel.tsx",
@@ -711,6 +751,7 @@
         "@finstack/tranche-analytics",
         "@finstack/use-deal-report",
         "@finstack/pool-report",
+        "@finstack/waterfall-report",
         "button",
         "label",
         "popover",
@@ -975,8 +1016,8 @@
       "name": "use-deal-report",
       "type": "registry:hook",
       "title": "useDealReport",
-      "description": "Fetches a structured-credit deal's native pool report and its units through the WASM worker.",
-      "docs": "usePoolReport calls valuations.instruments.poolReport over the deal's pool and usePoolReportFieldUnits calls poolReportFieldUnits for the report's currency, each keyed by its complete immutable request and the worker session; null disables a call. Native errors are returned unchanged.",
+      "description": "Fetches a structured-credit deal's native pool report, its units and its simulation through the WASM worker.",
+      "docs": "usePoolReport calls valuations.instruments.poolReport over the deal's pool and usePoolReportFieldUnits calls poolReportFieldUnits for the report's currency, and useDealSimulation calls StructuredCredit.runSimulation, each keyed by its complete immutable request and the worker session; null disables a call. Native errors are returned unchanged.",
       "files": [
         {
           "path": "hooks/use-deal-report/use-deal-report.ts",

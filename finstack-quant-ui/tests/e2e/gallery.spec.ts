@@ -244,6 +244,15 @@ test("liability-management-card exercise economics", async ({ page }) => {
     "liability-management-card-exercise.png",
   );
 });
+test("waterfall-report period detail", async ({ page }) => {
+  const item = await open(page, "waterfall-report", "light", "comfortable");
+  const report = item.getByRole("region", { name: "Waterfall report" });
+  await report.getByRole("button", { expanded: false }).first().click();
+  await expect(
+    report.getByRole("table", { name: "Payment records" }),
+  ).toBeVisible();
+  await expect(report).toHaveScreenshot("waterfall-report-period-detail.png");
+});
 test("merton-calculator model parameters", async ({ page }) => {
   const item = await open(page, "merton-calculator", "light", "comfortable");
   // The four item baselines stop inside the term structure, above this table.

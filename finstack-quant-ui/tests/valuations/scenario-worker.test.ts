@@ -16,6 +16,7 @@ import fixture from "./scenario-table/cases.json";
 import tranches from "./scenario-table/tranche-analytics.json";
 import standardDeals from "./scenario-table/standard-deals.json";
 import poolReports from "./scenario-table/pool-report.json";
+import waterfallReports from "./scenario-table/waterfall-report.json";
 import { budget } from "../shared/budget";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -176,6 +177,33 @@ it(
         ),
       ).toEqual(c.units);
     }
+  },
+  budget(30000),
+);
+it(
+  "returns the native deal simulation through the real worker",
+  async () => {
+    for (const c of waterfallReports.cases) {
+      const request = {
+        instrumentJson: JSON.stringify(c.instrument),
+        marketJson,
+        asOf: waterfallReports.asOf,
+      };
+      const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+      const run = unwrap(await worker.proxy.runSimulation(request));
+      try {
+        expect(run).toEqual(deal.runSimulation(marketJson, request.asOf));
+      } finally {
+        deal.free();
+      }
+      expect(c.run).toEqual(JSON.parse(JSON.stringify(run)));
+    }
+    const failed = await worker.proxy.runSimulation({
+      instrumentJson: JSON.stringify(waterfallReports.cases[0]!.instrument),
+      marketJson: "{}",
+      asOf: waterfallReports.asOf,
+    });
+    expect(failed.ok).toBe(false);
   },
   budget(30000),
 );

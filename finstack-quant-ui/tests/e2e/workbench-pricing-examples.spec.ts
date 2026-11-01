@@ -267,6 +267,13 @@ test("a standard deal family builds, prices and lists its native tranches", asyn
   const pool = results.getByRole("region", { name: "Pool report" });
   await expect(pool).toContainText("WARF");
   await expect(pool.getByRole("table", { name: "By rating" })).toBeVisible();
+  // ... and its native waterfall, one row per simulated period with detail on expand.
+  await results.locator("summary", { hasText: /^Waterfall report$/ }).click();
+  const waterfall = results.getByRole("region", { name: "Waterfall report" });
+  await waterfall.getByRole("button", { expanded: false }).first().click();
+  await expect(
+    waterfall.getByRole("table", { name: "Payment records" }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 

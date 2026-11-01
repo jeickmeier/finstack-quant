@@ -164,6 +164,14 @@ beforeEach(() => {
       }
       case "poolReportFieldUnits":
         return native.poolReportFieldUnits(request);
+      case "runSimulation": {
+        const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+        try {
+          return deal.runSimulation(request.marketJson, request.asOf);
+        } finally {
+          deal.free();
+        }
+      }
       case "scenarioTableFieldUnits":
         return native.scenarioTableFieldUnits(request);
       case "scenarioTable": {
@@ -917,6 +925,29 @@ it(
     ).toEqual({
       instrumentJson: family.instrumentJson,
       asOf: expect.any(String),
+    });
+    // ... and the waterfall report, on the completed request's market and date.
+    expect(call.mock.calls.some(([method]) => method === "runSimulation")).toBe(
+      false,
+    );
+    fireEvent.click(
+      screen.getByText("Waterfall report", { selector: "summary" }),
+    );
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector('[aria-label="Waterfall report"] table'),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    const simulated = call.mock.calls.find(
+      ([method]) => method === "runSimulation",
+    )![1];
+    const lastPrice = prices().at(-1)!;
+    expect(simulated).toEqual({
+      instrumentJson: family.instrumentJson,
+      marketJson: lastPrice.marketJson,
+      asOf: lastPrice.asOf,
     });
     // The grid and the price extent come from Rust's example and the returned prices.
     fireEvent.click(screen.getByText("Scenarios", { selector: "summary" }));

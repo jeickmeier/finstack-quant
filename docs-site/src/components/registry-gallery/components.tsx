@@ -57,6 +57,7 @@ import { Example as Example72 } from "./examples/curve-query";
 import { Example as Example73 } from "./examples/loan-yield-card";
 import { Example as Example74 } from "./examples/liability-management-card";
 import { Example as Example75 } from "./examples/pool-report";
+import { Example as Example76 } from "./examples/waterfall-report";
 import { Example as Example71 } from "./examples/option-calculator";
 import { Example as Example53 } from "./examples/csa-editor";
 import { Example as Example54 } from "./examples/margin-call-table";
@@ -133,6 +134,7 @@ const examples = {
   "curve-query": Example72,
   "loan-yield-card": Example73,
   "liability-management-card": Example74,
+  "waterfall-report": Example76,
   "pool-report": Example75,
   "option-calculator": Example71,
   "csa-editor": Example53,
