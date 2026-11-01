@@ -536,6 +536,32 @@ def equity_metrics_field_units(currency: str | Currency) -> dict[str, Any]:
     """
     ...
 
+def standard_deal_families() -> list[dict[str, Any]]:
+    """
+    Deal families :meth:`StructuredCredit.new_standard` accepts, the one place a host reads them from.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        One record per family in ``abs``, ``clo``, ``cmbs``, ``rmbs`` order:
+        ``deal_type``, the ``new_standard`` argument; ``profile_id``, the registry
+        profile supplying the family's frequency and credit assumptions; and
+        ``example``, complete ``StandardDealParams`` that ``new_standard`` accepts for
+        the family, with its id, tranche ids and ``pool.deal_type`` naming the family.
+
+    Raises
+    ------
+    ValueError
+        If an example cannot be constructed, which its fixed inputs do not trigger.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import standard_deal_families
+    >>> [(family["deal_type"], family["profile_id"]) for family in standard_deal_families()][0]
+    ('abs', 'abs_auto_standard')
+    """
+    ...
+
 def pool_report_field_units(currency: str | Currency) -> dict[str, Any]:
     """
     Units of the :class:`PoolReport` fields, the one place a host reads them from.

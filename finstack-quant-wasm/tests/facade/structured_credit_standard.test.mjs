@@ -26,6 +26,32 @@ for (const family of ['abs', 'clo', 'cmbs', 'rmbs']) {
   });
 }
 
+test('standardDealFamilies lists what newStandard accepts, and a contradicting pool is refused', () => {
+  const families = valuations.instruments.standardDealFamilies();
+  assert.deepEqual(
+    families.map((family) => [family.deal_type, family.profile_id]),
+    [
+      ['abs', 'abs_auto_standard'],
+      ['clo', 'clo_standard'],
+      ['cmbs', 'cmbs_standard'],
+      ['rmbs', 'rmbs_standard'],
+    ]
+  );
+  for (const family of families) {
+    assert.equal(family.example.pool.deal_type, family.deal_type);
+    const deal = valuations.instruments.StructuredCredit.newStandard(
+      family.deal_type,
+      family.example
+    );
+    assert.equal(deal.toDict().id, `${family.deal_type.toUpperCase()}-EXAMPLE`);
+    deal.free();
+  }
+  assert.throws(
+    () => valuations.instruments.StructuredCredit.newStandard('abs', families[1].example),
+    (error) => error.kind === 'validation' && /contradicts the abs family/.test(error.message)
+  );
+});
+
 test('newStandard accepts a null construction calendar and rejects unsupported profiles', () => {
   const params = standardParams();
   params.calendar_id = null;

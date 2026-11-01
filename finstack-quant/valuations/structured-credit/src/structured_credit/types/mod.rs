@@ -29,7 +29,7 @@ pub(crate) mod tranches;
 pub(crate) mod waterfall;
 
 mod constructors;
-pub use constructors::StandardDealParams;
+pub use constructors::{standard_deal_families, StandardDealFamily, StandardDealParams};
 mod instrument;
 mod pricing_methods;
 mod resolved;

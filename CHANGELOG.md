@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Structured credit: the standard deal families come from Rust
+
+#### Added
+
+- `standard_deal_families()` (`StandardDealFamily`; Python `standard_deal_families`, WASM `valuations.instruments.standardDealFamilies`) returns each family `new_standard` accepts with its registry profile id and an example `StandardDealParams` whose `id`, tranche ids and `pool.deal_type` name the family.
+
+#### Changed
+
+- Breaking: `StructuredCredit::new_standard` returns a validation error when `pool.deal_type` contradicts the family. It must equal the family, and the `abs` family also takes `auto` and `card` pools, which have no constructor of their own.
+
 ### Structured credit: absent values are null, not zero or infinity
 
 Wire changes. Each field below is now nullable; every value that exists is unchanged. An engine's pass, fail and pricing logic does not move.

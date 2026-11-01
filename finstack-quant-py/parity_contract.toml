@@ -1033,6 +1033,7 @@ public = [
     "price_instrument",
     "scenario_table_field_units",
     "simulation_field_units",
+    "standard_deal_families",
     "tranche_breakeven_cdr",
     "tranche_discount_margin",
     "tranche_metric_field_units",

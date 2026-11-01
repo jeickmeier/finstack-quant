@@ -503,6 +503,15 @@ pub fn simulation_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
     ))
 }
 
+/// Deal families `StructuredCredit.newStandard` accepts, the one place a host reads them from.
+///
+/// @returns `StandardDealFamily[]` in `abs`, `clo`, `cmbs`, `rmbs` order: `deal_type`, the `newStandard` argument; `profile_id`, the registry profile supplying the family's frequency and credit assumptions; and `example`, complete `StandardDealParams` that `newStandard` accepts for the family, with its id, tranche ids and `pool.deal_type` naming the family.
+/// @throws Error - Throws a `validation` error if an example cannot be constructed, which its fixed inputs do not trigger.
+#[wasm_bindgen(js_name = standardDealFamilies)]
+pub fn standard_deal_families() -> Result<JsValue, JsValue> {
+    to_js_value(&finstack_quant_valuations::instruments::fixed_income::structured_credit::standard_deal_families().map_err(crate::utils::to_js_err)?)
+}
+
 /// Units of the `EquityMetrics` fields, the one place a host reads them from.
 ///
 /// The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV a percent of the

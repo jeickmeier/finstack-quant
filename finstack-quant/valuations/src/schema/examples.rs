@@ -398,6 +398,12 @@ pub(super) fn standard_deal_params() -> Result<Vec<Value>> {
     })
 }
 
+/// The first family `standard_deal_families` lists.
+pub(super) fn standard_deal_family() -> Result<Vec<Value>> {
+    let families = structured_credit::standard_deal_families()?;
+    example(&families[0])
+}
+
 /// One simulation run carrying the senior tranche's quarterly payment.
 pub(super) fn simulation_run() -> Result<Vec<Value>> {
     example_from_json::<structured_credit::SimulationRun>(json!({

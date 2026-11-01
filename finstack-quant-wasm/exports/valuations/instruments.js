@@ -25,6 +25,7 @@ export const instruments = {
   scenarioTableFieldUnits: wasm.scenarioTableFieldUnits,
   simulationFieldUnits: wasm.simulationFieldUnits,
   equityMetricsFieldUnits: wasm.equityMetricsFieldUnits,
+  standardDealFamilies: wasm.standardDealFamilies,
   trancheMetricFieldUnits: wasm.trancheMetricFieldUnits,
   trancheDiscountMargin: wasm.trancheDiscountMargin,
   trancheBreakevenCdr: wasm.trancheBreakevenCdr,

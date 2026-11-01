@@ -709,9 +709,9 @@ handle_setters!(JsTrancheBuilder, "TrancheBuilder", {
 impl JsStructuredCredit {
     /// Construct a validated standard deal from its registry profile and input record.
     /// @param deal_type - Registry family: `abs`, `clo`, `cmbs` or `rmbs`; other deal types are rejected.
-    /// @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar.
+    /// @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar, and `pool.deal_type` must be the family (`abs` also takes `auto` and `card` pools).
     /// @returns The deal with its selected registry assumptions and validated structure.
-    /// @throws Error - Throws with kind `validation` for an unsupported profile, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
+    /// @throws Error - Throws with kind `validation` for an unsupported profile, a pool that contradicts the family, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
     #[wasm_bindgen(js_name = newStandard)]
     pub fn new_standard(
         deal_type: JsValue,

@@ -48,6 +48,72 @@ fn create_single_tranche() -> TrancheStructure {
     TrancheStructure::new(vec![tranche]).unwrap()
 }
 
+/// The listing is the constructor's: each family builds from its own example, whose
+/// identifiers and pool name that family.
+#[test]
+fn standard_deal_families_are_what_new_standard_accepts() {
+    let families =
+        finstack_quant_valuations_structured_credit::structured_credit::standard_deal_families()
+            .expect("families");
+    assert_eq!(
+        families
+            .iter()
+            .map(|family| (family.deal_type, family.profile_id.as_str()))
+            .collect::<Vec<_>>(),
+        vec![
+            (DealType::Abs, "abs_auto_standard"),
+            (DealType::Clo, "clo_standard"),
+            (DealType::Cmbs, "cmbs_standard"),
+            (DealType::Rmbs, "rmbs_standard"),
+        ]
+    );
+    for family in families {
+        let name = family.deal_type.to_string().to_uppercase();
+        assert_eq!(family.example.id.as_str(), format!("{name}-EXAMPLE"));
+        assert_eq!(family.example.pool.deal_type, family.deal_type);
+        assert_eq!(
+            family.example.tranches.tranches[0].id.as_str(),
+            format!("{name}NOTES-A")
+        );
+        let deal = StructuredCredit::new_standard(family.deal_type, family.example).expect("deal");
+        assert_eq!(deal.deal_type, family.deal_type);
+    }
+}
+
+/// A pool of another family is an error; auto and card pools are ABS.
+#[test]
+fn new_standard_rejects_a_pool_that_contradicts_the_family() {
+    let params = |deal_type: DealType| {
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "DEAL".into(),
+            pool: AssetPool {
+                deal_type,
+                ..create_pool_with_balance(100_000_000.0)
+            },
+            tranches: create_single_tranche(),
+            closing_date: test_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        }
+    };
+    for (family, pool) in [
+        (DealType::Clo, DealType::Abs),
+        (DealType::Abs, DealType::Clo),
+        (DealType::Abs, DealType::Rmbs),
+        (DealType::Cmbs, DealType::Rmbs),
+        (DealType::Rmbs, DealType::Auto),
+    ] {
+        let error = StructuredCredit::new_standard(family, params(pool))
+            .expect_err("contradiction")
+            .to_string();
+        assert!(error.contains("contradicts"), "{error}");
+    }
+    for pool in [DealType::Abs, DealType::Auto, DealType::Card] {
+        StructuredCredit::new_standard(DealType::Abs, params(pool)).expect("an ABS pool");
+    }
+}
+
 #[test]
 fn per_type_constructors_set_expected_assumptions() {
     let pool = create_pool_with_balance(1_000_000.0);
@@ -67,19 +133,19 @@ fn per_type_constructors_set_expected_assumptions() {
             0.02,
         ),
         (
-            StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "CLO".into(), pool: p(), tranches: t(), closing_date: closing, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+            StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "CLO".into(), pool: AssetPool { deal_type: DealType::Clo, ..p() }, tranches: t(), closing_date: closing, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
             DealType::Clo,
             Tenor::quarterly(),
             0.02,
         ),
         (
-            StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "CMBS".into(), pool: p(), tranches: t(), closing_date: closing, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+            StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "CMBS".into(), pool: AssetPool { deal_type: DealType::Cmbs, ..p() }, tranches: t(), closing_date: closing, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
             DealType::Cmbs,
             Tenor::monthly(),
             0.005,
         ),
         (
-            StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "RMBS".into(), pool: p(), tranches: t(), closing_date: closing, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+            StructuredCredit::new_standard(finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs, finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams { id: "RMBS".into(), pool: AssetPool { deal_type: DealType::Rmbs, ..p() }, tranches: t(), closing_date: closing, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
             DealType::Rmbs,
             Tenor::monthly(),
             0.006,
@@ -116,7 +182,10 @@ fn clo_registry_profile_is_the_single_source_of_clo_defaults() {
         finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
         finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
             id: "CLO".into(),
-            pool: create_pool_with_balance(100_000_000.0),
+            pool: AssetPool {
+                deal_type: DealType::Clo,
+                ..create_pool_with_balance(100_000_000.0)
+            },
             tranches: create_single_tranche(),
             closing_date: test_date(),
             maturity: maturity_date(),
@@ -285,7 +354,10 @@ fn standard_constructor_rejects_invalid_nested_collateral_before_pricing() {
         DealType::Cmbs,
         StandardDealParams {
             id: "INVALID-COLLATERAL".into(),
-            pool,
+            pool: AssetPool {
+                deal_type: DealType::Cmbs,
+                ..pool
+            },
             tranches: create_single_tranche(),
             closing_date: test_date(),
             maturity: maturity_date(),

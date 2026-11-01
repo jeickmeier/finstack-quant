@@ -20,6 +20,7 @@ There is **no `prelude` module** — import the names you need directly.
 |------|---------|
 | `StructuredCredit` | The instrument. `new_standard(deal_type, params)` apply deal-type defaults; `builder()` for full control; `example()` for a canonical deal. |
 | `DealType`, `AssetType`, `TrancheSeniority` | `DealType::{Clo, Cbo, Abs, Rmbs, Cmbs, Auto, Card}` and pool/tranche taxonomy. Only `Abs`, `Clo`, `Cmbs` and `Rmbs` have `new_*` constructors and registry profiles. |
+| `standard_deal_families`, `StandardDealFamily` | Each family `StructuredCredit::new_standard` accepts, with its registry profile id and an example of its inputs. `new_standard` rejects a `pool.deal_type` that contradicts the family. |
 | `AssetPool`, `PoolAsset`, `RepLine`, `PoolStats`, `calculate_pool_stats`, `PoolReport`, `PoolConcentrationEntry`, `pool_report` | Collateral pool and its aggregates. `pool_report` is the one call for a pool screen: `PoolStats`, WARF and concentration tables by obligor, industry and rating. Floating rows (`forward_curve_id` + `spread_bp`) may carry `index_floor_bp`, a floor on the index in basis points applied before the spread. |
 | `Tranche`, `TrancheBuilder`, `TrancheStructure` | Capital structure; tranche coupons are the cashflows `RateSpec`. |
 | `Waterfall`, `WaterfallBuilder`, `WaterfallTier`, `Recipient`, `RecipientType`, `PaymentType`, `PaymentCalculation`, `AllocationMode` | Waterfall construction. |

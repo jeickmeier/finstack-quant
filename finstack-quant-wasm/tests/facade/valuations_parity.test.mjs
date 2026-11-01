@@ -475,6 +475,11 @@ test('structured-credit deal analytics match Python', () => {
     close(Number(actual.amount), expected.amount, TIGHT, label);
     assert.equal(actual.currency, expected.currency, label);
   };
+  same(
+    plain(instruments.standardDealFamilies()),
+    sc.standard_deal_families,
+    'standard deal families'
+  );
   sameMoney(instruments.assetPoolTotalBalance(pool), analytics.total_balance, 'total balance');
   sameMoney(
     instruments.assetPoolPerformingBalance(pool),

@@ -1171,6 +1171,15 @@
       "type_name": "SimulationRun"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/standard_deal_family.schema.json",
+      "bytes": 5325,
+      "kind": "output",
+      "path": "schemas/results/1/standard_deal_family.schema.json",
+      "summary": "One deal family the standard structured-credit constructor accepts, with its registry profile and an example of its inputs.",
+      "title": "StandardDealFamily",
+      "type_name": "StandardDealFamily"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/tranche_cashflows.schema.json",
       "bytes": 24688,
       "kind": "output",

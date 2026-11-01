@@ -3503,6 +3503,13 @@
             "bytes": 53363
           },
           {
+            "path": "schemas/results/1/standard_deal_family.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/standard_deal_family.schema.json",
+            "type_name": "StandardDealFamily",
+            "kind": "output",
+            "bytes": 5325
+          },
+          {
             "path": "schemas/results/1/tranche_cashflows.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/tranche_cashflows.schema.json",
             "type_name": "TrancheCashflows",
@@ -5733,6 +5740,14 @@
             "type_name": "SimulationRun",
             "kind": "output",
             "bytes": 53363
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/standard_deal_family.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/standard_deal_family.schema.json",
+            "type_name": "StandardDealFamily",
+            "kind": "output",
+            "bytes": 5325
           },
           {
             "domain": "valuations",

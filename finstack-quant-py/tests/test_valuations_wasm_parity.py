@@ -288,6 +288,7 @@ def build_cases() -> dict[str, Any]:
             "pool_stats": ins.calculate_pool_stats(deal.pool, close).to_dict(),
         },
         "pool_report": _pool_report_case(deal.pool, close),
+        "standard_deal_families": ins.standard_deal_families(),
     }
 
     # -- Merton Monte Carlo ------------------------------------------------

@@ -446,6 +446,15 @@ fn price_driver_fields() -> Vec<&'static str> {
     finstack_quant_valuations::instruments::pricing_overrides::MarketQuoteOverrides::price_driver_fields()
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "standard_deal_families")]
+#[pyfunction]
+#[pyo3(text_signature = "()")]
+fn standard_deal_families(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    let families = finstack_quant_valuations::instruments::fixed_income::structured_credit::standard_deal_families()
+        .map_err(core_to_py)?;
+    serde_to_py(py, &families)
+}
+
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "tranche_solve_field_units")]
 #[pyfunction]
 #[pyo3(text_signature = "()")]
@@ -727,6 +736,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(metric_metadata, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(price_driver_fields, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(pool_report_field_units, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(standard_deal_families, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(scenario_table_field_units, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(simulation_field_units, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(equity_metrics_field_units, m)?)?;
@@ -754,6 +764,7 @@ pub(crate) const EXPORTS: &[&str] = &[
     "price_driver_fields",
     "price_instrument",
     "pool_report_field_units",
+    "standard_deal_families",
     "scenario_table_field_units",
     "simulation_field_units",
     "equity_metrics_field_units",

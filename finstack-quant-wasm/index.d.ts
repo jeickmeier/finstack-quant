@@ -200,6 +200,7 @@ import type {
   ScenarioTableFieldUnits,
   SimulationFieldUnits,
   EquityMetricsFieldUnits,
+  StandardDealFamily,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
@@ -441,6 +442,7 @@ export type {
   ScenarioTableFieldUnits,
   SimulationFieldUnits,
   EquityMetricsFieldUnits,
+  StandardDealFamily,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
@@ -22119,12 +22121,12 @@ export interface StructuredCreditConstructor {
    * example.free();
    * ```
    * @param dealType - Registry family: `abs`, `clo`, `cmbs` or `rmbs`; other deal types are rejected.
-   * @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar.
+   * @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar, and `pool.deal_type` must be the family (`abs` also takes `auto` and `card` pools).
    * @returns The deal with its selected registry assumptions and validated structure.
-   * @throws Error - Throws with kind `validation` for an unsupported profile, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
+   * @throws Error - Throws with kind `validation` for an unsupported profile, a pool that contradicts the family, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
    */
   newStandard(
-    dealType: 'abs' | 'clo' | 'cmbs' | 'rmbs',
+    dealType: generated.valuations.StandardDealFamily['deal_type'],
     params: generated.valuations.StandardDealParams | string
   ): StructuredCredit;
 }
@@ -23242,6 +23244,13 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
    */
   equityMetricsFieldUnits(currency: string): EquityMetricsFieldUnits;
+  /**
+   * Deal families `StructuredCredit.newStandard` accepts, the one place a host reads them from.
+   *
+   * @returns `StandardDealFamily[]` in `abs`, `clo`, `cmbs`, `rmbs` order: `deal_type`, the `newStandard` argument; `profile_id`, the registry profile supplying the family's frequency and credit assumptions; and `example`, complete `StandardDealParams` that `newStandard` accepts for the family, with its id, tranche ids and `pool.deal_type` naming the family.
+   * @throws Error - Throws a `validation` error if an example cannot be constructed, which its fixed inputs do not trigger.
+   */
+  standardDealFamilies(): StandardDealFamily[];
   /**
    * Units of the `PoolReport` fields, the one place a host reads them from.
    * @param currency - ISO-4217 code of the pool's base currency, in any ASCII case; it names the unit of `total_balance`, `undrawn_commitment` and each row's `balance`.
