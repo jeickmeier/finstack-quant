@@ -222,9 +222,7 @@ export function CreditEnhancementChart({
       ) : (
         <p role="status" className="m-0 text-sm text-muted-foreground">
           The simulation returned one period, on {periods[0].payment_date}. A
-          chart by date needs two, so what it returned is listed instead. A
-          settlement ran no waterfall, so its excess spread is the zero Rust
-          records for it.
+          chart by date needs two, so what it returned is listed instead.
         </p>
       )}
       <FinstackTable

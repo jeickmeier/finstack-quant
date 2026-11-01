@@ -17,7 +17,7 @@ import {
   TrancheAnalytics,
   type TrancheScheduleValue,
 } from "@/components/finstack/valuations/components/tranche-analytics/tranche-analytics";
-import { formatRawMoney } from "@/lib/finstack/format/format";
+import { formatRawMoney, groupDecimal } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { TranchePanel } from "@/components/finstack/valuations/blocks/pricing-workbench/tranche-panel";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
@@ -189,11 +189,28 @@ it("shows one tranche's native cash flows by date and totals exactly as returned
     .getAllByRole("columnheader")
     .map((cell) => cell.textContent);
   expect(headers).toEqual(schedule.table.columns.map((c) => labelFor(c.name)));
-  const dates = schedule.table.columns[0]!.data.values as string[];
-  expect(within(rows[1]!).getAllByRole("cell")[0]!.textContent).toBe(dates[0]);
-  expect(
-    tile.getByText(labelFor("total_writedown")).nextSibling!.textContent,
-  ).toBe(formatRawMoney(schedule.cashflows.total_writedown));
+  // Every row, every column, in Rust's order.
+  const shown = (value: string | number) =>
+    typeof value === "number" ? groupDecimal(String(value)) : value;
+  const columns = schedule.table.columns.map(
+    (column) => column.data.values as (string | number)[],
+  );
+  rows.slice(1).forEach((row, index) => {
+    expect(
+      [...row.querySelectorAll("th,td")].map((cell) => cell.textContent),
+    ).toEqual(columns.map((column) => shown(column[index]!)));
+  });
+  for (const field of [
+    "total_interest",
+    "total_principal",
+    "total_pik",
+    "total_deferred",
+    "total_writedown",
+    "final_balance",
+  ] as const)
+    expect(tile.getByText(labelFor(field)).nextSibling!.textContent).toBe(
+      formatRawMoney(schedule.cashflows[field]),
+    );
 });
 it("shows the schedule's own native error without hiding the other tiles", () => {
   render(

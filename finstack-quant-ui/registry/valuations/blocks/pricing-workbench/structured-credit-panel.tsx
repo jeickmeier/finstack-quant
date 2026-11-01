@@ -28,8 +28,8 @@ function DealSection({
 }
 /**
  * Shows the completed deal's pool and waterfall reports, coverage tests, enhancement and equity tranche, selects one of its native tranches and
- * shows that tranche's analytics and scenarios. The host's seeds are optional: the selection falls back to the first
- * returned tranche and the scenario grid to the schema's Rust example.
+ * shows that tranche's analytics and scenarios. The host's seeds are optional: with no seed the selection is the first
+ * returned tranche, a seed Rust does not know shows Rust's error, and the scenario grid falls back to the schema's Rust example.
  */
 export function StructuredCreditPanel({
   request,
@@ -52,19 +52,19 @@ export function StructuredCreditPanel({
 }) {
   const [chosen, setChosen] = useState(seeds?.trancheId);
   const tranches = useDealTranches(request.instrumentJson);
-  const ids = tranches.data?.tranches.map((tranche) => tranche.id) ?? [];
-  const trancheId =
-    chosen !== undefined && ids.includes(chosen) ? chosen : ids[0];
   if (tranches.error)
     return (
       <p role="alert" className="text-sm text-error">
         {tranches.error.message}
       </p>
     );
-  if (trancheId === undefined)
+  const ids = tranches.data?.tranches.map((tranche) => tranche.id);
+  // A seed Rust does not know goes to Rust, whose error is what the host needs to see.
+  const trancheId = chosen ?? ids?.[0];
+  if (!ids || trancheId === undefined)
     return (
       <p role="status" className="text-sm text-muted-foreground">
-        {tranches.data ? "This deal has no tranches." : "Loading tranches…"}
+        {ids ? "This deal has no tranches." : "Loading tranches…"}
       </p>
     );
   const selected = { ...request, trancheId };
