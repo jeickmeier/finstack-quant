@@ -460,6 +460,28 @@ impl StructuredCredit {
                     PaymentCalculation::TranchePrincipal { tranche_id, .. } => {
                         referenced.push(tranche_id.as_str());
                     }
+                    // The engine sets the amount from the balance the cap built
+                    // and settles the payment against that balance by this id,
+                    // so anything else pays interest no claim stands behind.
+                    PaymentCalculation::NetWacCarryover { tranche_id, .. } => {
+                        referenced.push(tranche_id.as_str());
+                        let accrues = self
+                            .waterfall_rules
+                            .as_ref()
+                            .and_then(|rules| rules.afc.as_ref())
+                            .is_some_and(|afc| {
+                                afc.carryover && afc.capped_tranches.contains(tranche_id)
+                            });
+                        if !accrues || recipient.id != format!("net_wac_carryover_{tranche_id}") {
+                            return Err(invalid(format!(
+                                "custom waterfall tier '{}' recipient '{}' repays net-WAC \
+                                 carryover for tranche '{tranche_id}'; the recipient must be \
+                                 named 'net_wac_carryover_{tranche_id}' and the tranche must \
+                                 accrue carryover under waterfall_rules.afc",
+                                tier.id, recipient.id
+                            )));
+                        }
+                    }
                     _ => {}
                 }
                 for id in referenced {

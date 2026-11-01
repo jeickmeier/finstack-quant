@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Structured credit: a custom waterfall pays a debt class only what a note is owed
+
+Per tranche and date, `interest_flows` plus `principal_flows` now equals `cashflows` with no exception. A note is owed interest at its rate and the return of its balance. A fixed or percentage amount is a fee formula with no contractual basis as either: it cannot be an extra coupon, and treating it as principal would silently retire the notional of what is usually an interest-only strip or a misrouted fee. So these waterfalls are now refused rather than reclassified.
+
+#### Changed
+
+- Breaking: `validate_custom_waterfall` and `validate_tiers` reject a `RecipientType::Tranche` paid by `FixedAmount`, `PercentageOfCollateral`, `PercentageOfSpecialServiced`, `IncentiveFee` or `ReserveReplenishment` (`ValidationError::NonNoteCalculation`), or by an interest, principal or carryover calculation naming another tranche (`ValidationError::TrancheMismatch`). `run_simulation` raises the same error. A fixed periodic paydown has no representation for now: `TranchePrincipal.target_balance` is a single target, not a schedule. Model a class that takes excess cash with `TrancheSeniority::Equity`.
+- Breaking: a custom `NetWacCarryover` recipient must be named `net_wac_carryover_<tranche_id>` and the tranche must accrue carryover under `waterfall_rules.afc`.
+- A debt class's non-principal cash is booked in full as interest instead of being capped at the claim. Only a coupon rounded above its claim moves: with `RoundingConvention::Ceiling` on a 7,000,000 `CLASS_A`, 2024-04-01 interest gains the 0.0078 that used to reach `cashflows` alone.
+- What each rejected case booked as neither interest nor principal over the life of a 10,000,000 CLO with a 2,000,000 `CLASS_B`, in a residual tier ahead of equity: `FixedAmount` 50,000 per period 1,000,000.00 (lifetime cash 3,000,000.00); `PercentageOfCollateral` 1% annualized 446,980.89, 1% per period 1,762,221.97; `PercentageOfSpecialServiced` 10% per period 1,803,433.16; `IncentiveFee` 200,809.17; `ReserveReplenishment` 1,948,016.20; a misnamed `NetWacCarryover` of 10,000 per period 200,000.00. No template waterfall or checked-in fixture used these, so no standard deal's values move.
+
 ### Structured credit: residual cash paid to a debt class is a turbo
 
 Moves values for any custom waterfall that pays `PaymentCalculation::ResidualCash` to a debt class. A note is owed its coupon and the return of its balance, so remaining cash directed at one is the turbo feature of ABS and CLO interest waterfalls. An extra coupon has no contractual basis and would not retire the balance the coverage tests read. Model income or subordinated notes that truly take the residual with `TrancheSeniority::Equity`, whose treatment does not change.

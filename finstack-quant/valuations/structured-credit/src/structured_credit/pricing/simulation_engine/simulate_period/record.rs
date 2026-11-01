@@ -96,13 +96,6 @@ pub(super) fn record_tranche_flows(
                 .sum::<f64>(),
             state.currency,
         )?;
-        let total_interest_claim = if tranche.pik_enabled {
-            current_interest_due
-        } else {
-            existing_deferred.checked_add(current_interest_due)?
-        }
-        .checked_add(carryover_paid)?;
-
         let payment_received = waterfall_result
             .distributions
             .get(recipient_key)
@@ -127,9 +120,10 @@ pub(super) fn record_tranche_flows(
         // mechanics were built for.
         //
         // The waterfall already knows which payments were `TranchePrincipal`;
-        // `principal_distributions` reports it. Interest is then the remainder,
-        // capped by the claim so a residual/equity distribution against a zero
-        // interest claim cannot be misbooked as a coupon.
+        // `principal_distributions` reports it. Interest is then the remainder:
+        // validation leaves a debt class only its coupon, carryover and
+        // principal, so what is not principal is its coupon, and every unit of
+        // cash is booked as one or the other.
         let principal_from_waterfall = waterfall_result
             .principal_distributions
             .get(recipient_key)
@@ -142,16 +136,9 @@ pub(super) fn record_tranche_flows(
                 .max(0.0),
             state.currency,
         )?;
-        let interest_portion = payment_received
+        let interest_paid = payment_received
             .checked_sub(principal_classified)
             .unwrap_or(Money::from((0_i64, state.currency)));
-        let interest_paid = if tranche.seniority == TrancheSeniority::Equity {
-            interest_portion
-        } else if interest_portion.amount() >= total_interest_claim.amount() {
-            total_interest_claim
-        } else {
-            interest_portion
-        };
         let deferred_repaid = Money::new(
             interest_paid
                 .amount()

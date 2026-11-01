@@ -285,7 +285,7 @@
           "description": "Interest collected from the pool (including servicer advances)."
         },
         "non_waterfall_payments": {
-          "description": "Cash paid to tranches outside the waterfall: reserve interest routed to\na tranche, and, on the deal's last period, its redemption and terminal\nreleases. Together with `waterfall.payment_records` this is every\ntranche's cash: per tranche and date, the two sum to the tranche's\n`cashflows`, and to its `interest_flows` plus `principal_flows`. The one\nexception to the second sum is a fixed or percentage amount a custom\nwaterfall pays a debt class beyond its interest claim, which the engine\nbooks to `cashflows` alone.",
+          "description": "Cash paid to tranches outside the waterfall: reserve interest routed to\na tranche, and, on the deal's last period, its redemption and terminal\nreleases. Together with `waterfall.payment_records` this is every\ntranche's cash: per tranche and date, the two sum to the tranche's\n`cashflows`, and to its `interest_flows` plus `principal_flows`.",
           "items": {
             "$ref": "#/$defs/NonWaterfallPayment"
           },
