@@ -264,7 +264,7 @@
           "description": "Delinquent collateral balance at period end (delinquency model)."
         },
         "excess_spread": {
-          "description": "Annualized excess spread realized this period (decimal).",
+          "description": "Excess spread realized this period, annualized, as a decimal of the\nopening pool balance (`0.02` is 2% a year): `(I − D − F − L) ÷ P × 12 ÷ m`.\n`I` is `interest_collections`, `D` the debt coupons due this period, `F`\nthe service-provider and manager fees paid through the waterfall (not\nspecial-servicing fees, already out of `I`), `L` the period's defaults less\npool recoveries, floored at zero, `P` the pool balance before this period's\nflows and `m` the months in the period. The early-amortization excess-spread\ntest reads this number. Zero when `P` is zero and on a settlement record,\nwhere no waterfall ran.",
           "format": "double",
           "type": "number"
         },
@@ -580,7 +580,7 @@
       "description": "Payment date on which an early-amortization event (or a coverage-test\nacceleration) ended the revolving period, when one fired."
     },
     "first_breaches": {
-      "description": "First failure of each coverage test, one entry per test sorted by\n`test_id`. Covers every test the waterfall carries (each also on\n`periods[i].coverage_tests`) and every tranche `oc_trigger` /\n`ic_trigger`, whatever its consequence (only a breached `DivertCashFlow`\ntrigger is on `coverage_tests`, for the periods it is in breach). A deal\nwith no coverage test has no entries.",
+      "description": "First failure of each coverage test, one entry per test sorted by\n`test_id`. Covers every test the waterfall carries (each also on\n`periods[i].coverage_tests`) and every tranche `oc_trigger` /\n`ic_trigger`, whatever its consequence (only a breached `DivertCashFlow`\ntrigger is on `coverage_tests`, for the periods it is in breach). A deal\nwith no coverage test has no entries, and a test the waterfall carries is\nlisted only if a period evaluated it, so a settlement with no waterfall run\nlists none of those.",
       "items": {
         "$ref": "#/$defs/CoverageTestBreach"
       },

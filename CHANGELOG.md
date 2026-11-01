@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Structured credit: units of a simulation's charted series
+
+#### Added
+
+- `simulation_field_units(currency)` (`SimulationFieldUnits`; WASM `simulationFieldUnits`) states the unit of each `CoverageTestDiagnostic` number, `diverted_cash`, `credit_enhancement` and `excess_spread`.
+
+#### Changed
+
+- `PeriodDiagnostics.excess_spread` now documents its definition; its value is unchanged.
+
 ### Structured credit: scenario table currency and units
 
 #### Added

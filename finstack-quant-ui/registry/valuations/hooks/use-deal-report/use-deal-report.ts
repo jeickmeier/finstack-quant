@@ -27,6 +27,23 @@ export function useDealSimulation(request: DealSimulationRequest | null) {
     });
   });
 }
+/** Native units of a simulation's charted series for the deal currency. Null disables the call. */
+export function useSimulationFieldUnits(currency: string | null) {
+  return useWorkerQuery((worker) =>
+    workerQueryOptions({
+      client: worker.client,
+      queryKey: [
+        "finstack",
+        worker.session,
+        "simulationFieldUnits",
+        currency,
+      ] as const,
+      ready: currency !== null,
+      missing: "Simulation units require a currency and ready worker",
+      queryFn: (ready) => ready.call("simulationFieldUnits", currency!),
+    }),
+  );
+}
 /** Native statistics, WARF and concentration of the deal's pool, or a structured failure. Null disables the call. */
 export function usePoolReport(request: PoolReportRequest | null) {
   return useWorkerQuery((worker) => {

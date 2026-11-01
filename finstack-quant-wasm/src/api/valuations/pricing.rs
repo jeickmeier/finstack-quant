@@ -487,6 +487,22 @@ pub fn scenario_table_field_units(currency: JsValue) -> Result<JsValue, JsValue>
     to_js_value(&finstack_quant_valuations::pricer::scenario_table_field_units(currency))
 }
 
+/// Units of a structured-credit simulation's charted series, the one place a host reads them from.
+///
+/// Coverage ratios, triggers and cushions are in times covered, credit enhancement
+/// is a decimal share of the collateral and excess spread an annual decimal of the opening pool
+/// balance. Values are never rescaled.
+/// @param currency - ISO-4217 code of the simulation's deal currency, in any ASCII case; it names the unit of `diverted_cash`.
+/// @returns `SimulationFieldUnits`: `coverage_tests`, one `MetricFieldUnit` per numeric coverage-test field (`ratio`, `trigger_level`, `cushion`) in struct order, and one each for `diverted_cash`, `credit_enhancement` and `excess_spread`.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = simulationFieldUnits)]
+pub fn simulation_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::simulation_field_units(
+        currency,
+    ))
+}
+
 /// Units of the `PoolReport` fields, the one place a host reads them from.
 ///
 /// `PoolStats` mixes a decimal coupon, a basis-point spread and a percent-point

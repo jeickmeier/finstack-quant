@@ -1830,6 +1830,32 @@
       }
     },
     {
+      "id": "coverage-test-chart",
+      "route": "returned-report",
+      "convention": "Returned SimulationDiagnostics.first_breaches in Rust's order and, for the selected test, periods[].coverage_tests' ratio, trigger_level, cushion and passing on the dates Rust recorded them, in the units simulationFieldUnits states. The first breach date, cushion and pass or fail are Rust's. A trigger with a first_breaches entry and no coverage_tests row is reported as having no ratio by date. waterfall.diverted_cash and diverted_amounts are shown for the deal, not attributed to a test. Nothing is computed, joined by date, sorted or classified here.",
+      "api": {
+        "name": "StructuredCredit#runSimulation",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StructuredCredit",
+        "member": "runSimulation",
+        "inputs": [
+          {
+            "name": "marketJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.valuations.SimulationRun",
+        "declaration": "/**\n   * Run the deterministic simulation and return the deal-level accounting.\n   *\n   * Mirrors Rust `StructuredCredit::run_simulation`.\n   * @param marketJson - Canonical market-context JSON (string or plain object) supplying discount and forward curves.\n   * @param asOf - Requested ISO-8601 valuation date; lifecycle policy resolves the effective date.\n   * @returns `SimulationRun` with `tranches` keyed by tranche identifier and complete `diagnostics`.\n   * @throws Error - Throws with kind `not_found` if a curve is missing, `validation` if the deal or dates are invalid, and `computation` if simulation fails.\n   */\n  runSimulation(marketJson: JsonInput, asOf: string): generated.valuations.SimulationRun;",
+        "sha256": "0985a0aa86be8b5e7e185a6432167e8eac5d9823dcec7cab08c22904b616a28f"
+      }
+    },
+    {
       "id": "performance-report",
       "route": "returned-analytics",
       "deferred": "machine-readable-units",

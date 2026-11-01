@@ -198,6 +198,7 @@ import type {
   OasResult,
   PoolReportFieldUnits,
   ScenarioTableFieldUnits,
+  SimulationFieldUnits,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
@@ -437,6 +438,7 @@ export type {
   OasResult,
   PoolReportFieldUnits,
   ScenarioTableFieldUnits,
+  SimulationFieldUnits,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
@@ -23220,6 +23222,15 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
    */
   scenarioTableFieldUnits(currency: string): ScenarioTableFieldUnits;
+  /**
+   * Units of a structured-credit simulation's charted series, the one place a host reads them from.
+   *
+   * Coverage ratios, triggers and cushions are in times covered, credit enhancement is a decimal share of the collateral and excess spread an annual decimal of the opening pool balance. Values are never rescaled.
+   * @param currency - ISO-4217 code of the simulation's deal currency, in any ASCII case; it names the unit of `diverted_cash`.
+   * @returns `SimulationFieldUnits`: `coverage_tests`, one `MetricFieldUnit` per numeric coverage-test field (`ratio`, `trigger_level`, `cushion`) in struct order, and one each for `diverted_cash`, `credit_enhancement` and `excess_spread`.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  simulationFieldUnits(currency: string): SimulationFieldUnits;
   /**
    * Units of the `PoolReport` fields, the one place a host reads them from.
    * @param currency - ISO-4217 code of the pool's base currency, in any ASCII case; it names the unit of `total_balance`, `undrawn_commitment` and each row's `balance`.

@@ -19437,7 +19437,9 @@ export interface SimulationDiagnostics {
    * `periods[i].coverage_tests`) and every tranche `oc_trigger` /
    * `ic_trigger`, whatever its consequence (only a breached `DivertCashFlow`
    * trigger is on `coverage_tests`, for the periods it is in breach). A deal
-   * with no coverage test has no entries.
+   * with no coverage test has no entries, and a test the waterfall carries is
+   * listed only if a period evaluated it, so a settlement with no waterfall run
+   * lists none of those.
    */
   first_breaches: CoverageTestBreach[];
   /**
@@ -19498,7 +19500,15 @@ export interface PeriodDiagnostics {
    */
   delinquent_balance: Money;
   /**
-   * Annualized excess spread realized this period (decimal).
+   * Excess spread realized this period, annualized, as a decimal of the
+   * opening pool balance (`0.02` is 2% a year): `(I − D − F − L) ÷ P × 12 ÷ m`.
+   * `I` is `interest_collections`, `D` the debt coupons due this period, `F`
+   * the service-provider and manager fees paid through the waterfall (not
+   * special-servicing fees, already out of `I`), `L` the period's defaults less
+   * pool recoveries, floored at zero, `P` the pool balance before this period's
+   * flows and `m` the months in the period. The early-amortization excess-spread
+   * test reads this number. Zero when `P` is zero and on a settlement record,
+   * where no waterfall ran.
    */
   excess_spread: number;
   /**
@@ -20558,6 +20568,28 @@ export interface ScenarioTableFieldUnits {
    * Unit of each measure `ScenarioCell` reports, in the order the struct declares them.
    */
   measures: MetricFieldUnit[];
+}
+/**
+ * The display units of a simulation's coverage, diversion, enhancement and excess-spread series.
+ */
+export interface SimulationFieldUnits {
+  /**
+   * Unit of each numeric `CoverageTestDiagnostic` field, in the order the
+   * struct declares them.
+   */
+  coverage_tests: MetricFieldUnit[];
+  /**
+   * Unit of `TrancheCreditEnhancement::credit_enhancement`.
+   */
+  credit_enhancement: MetricFieldUnit;
+  /**
+   * Unit of `PeriodWaterfall::diverted_cash` and of each diversion's amount.
+   */
+  diverted_cash: MetricFieldUnit;
+  /**
+   * Unit of `PeriodDiagnostics::excess_spread`.
+   */
+  excess_spread: MetricFieldUnit;
 }
 /**
  * Tranche cashflows and deal accounting from one deterministic simulation.

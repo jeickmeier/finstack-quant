@@ -732,6 +732,15 @@ from the same function on the next payment date, before that date's principal.
 id, with its first failing payment date or `None`: the tests the waterfall
 carries and every tranche `oc_trigger` / `ic_trigger` (`OC_<tranche>_trigger`),
 including the ones that divert nothing and so never appear on `coverage_tests`.
+A test the waterfall carries is listed only if a period evaluated it, so a
+settlement with no waterfall run lists none of those.
+
+`PeriodDiagnostics::excess_spread` is the realized number the early-amortization
+test reads: pool interest less the debt coupons due, the service-provider and
+manager fees paid through the waterfall and the period's net charge-off, as an
+annual decimal of the opening pool balance. `AbsExcessSpread` is a different,
+static card-trust metric in percent. `simulation_field_units(currency)` states
+the units of these charted series for a host.
 
 `SimulationDiagnostics::to_table()` owns the nineteen-column period export used
 by Python `to_dataframe()`. It retains period order and duplicate dates, joins

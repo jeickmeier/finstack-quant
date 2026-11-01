@@ -4589,6 +4589,7 @@
       "priceInstrument",
       "priceInstrumentWithMarket",
       "scenarioTableFieldUnits",
+      "simulationFieldUnits",
       "trancheBreakevenCdr",
       "trancheBuilder",
       "trancheCashflowsTable",
@@ -4843,6 +4844,9 @@
     "kind": "function"
   },
   "valuations.instruments.scenarioTableFieldUnits": {
+    "kind": "function"
+  },
+  "valuations.instruments.simulationFieldUnits": {
     "kind": "function"
   },
   "valuations.instruments.trancheMetricFieldUnits": {

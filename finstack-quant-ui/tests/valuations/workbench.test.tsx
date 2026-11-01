@@ -174,6 +174,8 @@ beforeEach(() => {
       }
       case "scenarioTableFieldUnits":
         return native.scenarioTableFieldUnits(request);
+      case "simulationFieldUnits":
+        return native.simulationFieldUnits(request);
       case "scenarioTable": {
         const deal = native.StructuredCredit.fromJson(request.instrumentJson);
         try {
@@ -949,6 +951,21 @@ it(
       marketJson: lastPrice.marketJson,
       asOf: lastPrice.asOf,
     });
+    // ... and the coverage tests, from that same simulation in Rust's units.
+    fireEvent.click(
+      screen.getByText("Coverage tests", { selector: "summary" }),
+    );
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector('[aria-label="Coverage tests"]') ??
+            screen.queryByText(/returned no coverage tests/),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    expect(
+      call.mock.calls.filter(([method]) => method === "runSimulation"),
+    ).toHaveLength(1);
     // The grid and the price extent come from Rust's example and the returned prices.
     fireEvent.click(screen.getByText("Scenarios", { selector: "summary" }));
     await waitFor(
