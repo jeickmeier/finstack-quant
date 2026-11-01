@@ -16,7 +16,14 @@ import type {
   MetricMetadata,
   MoneyValue,
   ScenarioTable,
+  ScenarioTableFieldUnits,
+  SimulationFieldUnits,
+  EquityMetricsFieldUnits,
+  StandardDealFamily,
+  PoolReportFieldUnits,
+  StructuredCredit,
   ScenarioResults,
+  TrancheCashflows,
   TrancheMetrics,
   OasResult,
   StatementResult,
@@ -102,12 +109,49 @@ export interface ScenarioRequest {
   /** Complete native ScenarioGrid JSON; no model inputs are inferred. */
   readonly gridJson: string;
 }
+/** One of the deal families StructuredCredit.newStandard accepts; standardDealFamilies lists them. */
+export type StandardDealType = StandardDealFamily["deal_type"];
+/** A registry deal family and its complete native StandardDealParams JSON. */
+export interface StandardDealRequest {
+  readonly dealType: StandardDealType;
+  readonly paramsJson: string;
+}
+/** The native capital structure of a deal, as StructuredCredit's tranches getter returns it. */
+export type DealTranches = StructuredCredit["tranches"];
+/** Native report of a deal's collateral pool. */
+export type PoolReport = ReturnType<typeof valuations.instruments.poolReport>;
+/** One deal's collateral pool at a date. */
+export interface PoolReportRequest {
+  readonly instrumentJson: string;
+  /** ISO-8601 date the remaining maturities are measured from. */
+  readonly asOf: string;
+}
+/** Native tranche flows and period-by-period deal accounting of one deterministic simulation. */
+export type SimulationRun = ReturnType<StructuredCredit["runSimulation"]>;
+/** One structured-credit deal simulated on a complete market at a valuation date. */
+export interface DealSimulationRequest {
+  readonly instrumentJson: string;
+  readonly marketJson: string;
+  readonly asOf: string;
+}
+/** Native residual-class IRR, MOIC, NAV and cash-on-cash of one deterministic projection. */
+export type EquityMetrics = ReturnType<StructuredCredit["equityMetrics"]>;
+/** One structured-credit deal's equity metrics at a purchase price. */
+export interface EquityMetricsRequest extends DealSimulationRequest {
+  /** Percent of the equity's current balance; null leaves the price to Rust's default. */
+  readonly purchasePricePct: number | null;
+}
 /** One tranche of a structured-credit deal, priced on a complete market at a valuation date. */
 export interface TrancheRequest {
   readonly instrumentJson: string;
   readonly trancheId: string;
   readonly marketJson: string;
   readonly asOf: string;
+}
+/** One tranche's projected flows and Rust's one-row-per-date projection of them. */
+export interface TrancheSchedule {
+  readonly cashflows: TrancheCashflows;
+  readonly table: TableEnvelope;
 }
 /** Tranche metrics; an omitted price or metric list is left to Rust (deal quote, else model price; no registry metrics). */
 export interface TrancheMetricsRequest extends TrancheRequest {
@@ -1107,6 +1151,24 @@ export interface ValuationsApi {
   validate(instrumentJson: string): Promise<Envelope<string>>;
   /** valuations.instruments.validateInstrumentJson + instrumentCashflowsWithMarket over the cached market handle; the native envelope object. */
   cashflows(request: CashflowRequest): Promise<Envelope<CashflowEnvelope>>;
+  /** valuations.instruments.standardDealFamilies: the families newStandard accepts, each with its registry profile id and example inputs. */
+  standardDealFamilies(): Promise<Envelope<StandardDealFamily[]>>;
+  /** valuations.instruments.StructuredCredit.newStandard + toJson: the canonical instrument JSON of a deal under its family's registry assumptions. */
+  newStandardDeal(request: StandardDealRequest): Promise<Envelope<string>>;
+  /** valuations.instruments.StructuredCredit.fromJson + its tranches getter. */
+  dealTranches(instrumentJson: string): Promise<Envelope<DealTranches>>;
+  /** valuations.instruments.StructuredCredit.fromJson + its trancheCashflows, handed to trancheCashflowsTable; dates are joined and summed in Rust. */
+  trancheSchedule(request: TrancheRequest): Promise<Envelope<TrancheSchedule>>;
+  /** StructuredCredit.runSimulation: the deal's tranche flows and accounting by period. */
+  runSimulation(
+    request: DealSimulationRequest,
+  ): Promise<Envelope<SimulationRun>>;
+  /** StructuredCredit.equityMetrics: the deal's equity tranche, or the native failure when it has none. */
+  equityMetrics(
+    request: EquityMetricsRequest,
+  ): Promise<Envelope<EquityMetrics>>;
+  /** valuations.instruments.poolReport over the deal's pool: statistics, WARF and concentration. */
+  poolReport(request: PoolReportRequest): Promise<Envelope<PoolReport>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
   scenarioTable(request: ScenarioRequest): Promise<Envelope<ScenarioTable>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheMetrics; no OasConfig or price default is supplied. */
@@ -1133,6 +1195,22 @@ export interface ValuationsApi {
   trancheMetricFieldUnits(
     currency: string,
   ): Promise<Envelope<MetricFieldUnit[]>>;
+  /** valuations.instruments.scenarioTableFieldUnits: units of a scenario table's axes and measures. */
+  scenarioTableFieldUnits(
+    currency: string,
+  ): Promise<Envelope<ScenarioTableFieldUnits>>;
+  /** valuations.instruments.simulationFieldUnits: units of a simulation's charted series. */
+  simulationFieldUnits(
+    currency: string,
+  ): Promise<Envelope<SimulationFieldUnits>>;
+  /** valuations.instruments.equityMetricsFieldUnits: units of an equity tranche's metrics. */
+  equityMetricsFieldUnits(
+    currency: string,
+  ): Promise<Envelope<EquityMetricsFieldUnits>>;
+  /** valuations.instruments.poolReportFieldUnits: units of a pool report's fields. */
+  poolReportFieldUnits(
+    currency: string,
+  ): Promise<Envelope<PoolReportFieldUnits>>;
   /** valuations.instruments.trancheSolveFieldUnits: units of the break-even CDR, discount margin and OAS results. */
   trancheSolveFieldUnits(): Promise<Envelope<TrancheSolveFieldUnits>>;
   /** valuations.valuationResultToJson over the host-serialized result: native canonical JSON. */

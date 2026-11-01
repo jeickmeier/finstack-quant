@@ -32,7 +32,10 @@ crate::bindings::macros::wire_methods!(
 impl PyEquityMetrics {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.cash_on_cash")]
     #[getter]
-    fn cash_on_cash<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
+    fn cash_on_cash<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Vec<(Bound<'py, PyAny>, Option<f64>)>> {
         self.inner
             .cash_on_cash
             .iter()
@@ -64,7 +67,7 @@ impl PyEquityMetrics {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "EquityMetrics(tranche_id={:?}, irr={}, moic={}, nav_pct={})",
+            "EquityMetrics(tranche_id={:?}, irr={}, moic={:?}, nav_pct={})",
             self.inner.tranche_id,
             opt_repr(self.inner.irr),
             self.inner.moic,
@@ -87,7 +90,7 @@ crate::bindings::macros::py_getters!(PyEquityMetrics |s| {
     irr -> Option<f64> = s.inner.irr;
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.moic")]
-    moic -> f64 = s.inner.moic;
+    moic -> Option<f64> = s.inner.moic;
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.nav_pct")]
     nav_pct -> f64 = s.inner.nav_pct;

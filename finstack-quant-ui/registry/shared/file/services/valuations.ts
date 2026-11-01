@@ -10,6 +10,7 @@ export type ValuationsNative = {
       | "validateInstrumentJson"
       | "priceInstrumentWithMarket"
       | "instrumentCashflowsWithMarket"
+      | "trancheCashflowsTable"
       | "trancheScenarioTable"
       | "trancheMetrics"
       | "trancheOas"
@@ -22,6 +23,12 @@ export type ValuationsNative = {
       | "priceDriverFields"
       | "trancheMetricFieldUnits"
       | "trancheSolveFieldUnits"
+      | "scenarioTableFieldUnits"
+      | "simulationFieldUnits"
+      | "equityMetricsFieldUnits"
+      | "poolReport"
+      | "poolReportFieldUnits"
+      | "standardDealFamilies"
     >;
   };
 };
@@ -102,6 +109,41 @@ export function createValuationsService(
         );
       });
     },
+    standardDealFamilies: () =>
+      context.result(() => instruments.standardDealFamilies()),
+    newStandardDeal(request) {
+      return context.result(() => {
+        const deal = instruments.StructuredCredit.newStandard(
+          request.dealType,
+          request.paramsJson,
+        );
+        try {
+          return deal.toJson();
+        } finally {
+          deal.free();
+        }
+      });
+    },
+    dealTranches(instrumentJson) {
+      return context.result(() =>
+        withDeal(instrumentJson, (deal) => deal.tranches),
+      );
+    },
+    trancheSchedule(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) => {
+          const cashflows = deal.trancheCashflows(
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+          );
+          return {
+            cashflows,
+            table: instruments.trancheCashflowsTable(cashflows),
+          };
+        }),
+      );
+    },
     scenarioTable(request) {
       return context.result(() =>
         withDeal(request.instrumentJson, (deal) =>
@@ -111,6 +153,31 @@ export function createValuationsService(
             request.marketJson,
             request.asOf,
             request.gridJson,
+          ),
+        ),
+      );
+    },
+    poolReport(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.poolReport(deal.pool, request.asOf),
+        ),
+      );
+    },
+    runSimulation(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          deal.runSimulation(request.marketJson, request.asOf),
+        ),
+      );
+    },
+    equityMetrics(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          deal.equityMetrics(
+            request.marketJson,
+            request.asOf,
+            request.purchasePricePct,
           ),
         ),
       );
@@ -177,6 +244,14 @@ export function createValuationsService(
       context.result(() => instruments.priceDriverFields()),
     trancheMetricFieldUnits: (currency) =>
       context.result(() => instruments.trancheMetricFieldUnits(currency)),
+    scenarioTableFieldUnits: (currency) =>
+      context.result(() => instruments.scenarioTableFieldUnits(currency)),
+    simulationFieldUnits: (currency) =>
+      context.result(() => instruments.simulationFieldUnits(currency)),
+    equityMetricsFieldUnits: (currency) =>
+      context.result(() => instruments.equityMetricsFieldUnits(currency)),
+    poolReportFieldUnits: (currency) =>
+      context.result(() => instruments.poolReportFieldUnits(currency)),
     trancheSolveFieldUnits: () =>
       context.result(() => instruments.trancheSolveFieldUnits()),
     exportResult: (value) =>

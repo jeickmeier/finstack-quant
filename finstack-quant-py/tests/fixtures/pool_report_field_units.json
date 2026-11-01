@@ -1,0 +1,71 @@
+{
+  "total_balance": {
+    "field": "total_balance",
+    "label": "EUR",
+    "source": "valuations::PoolReport::total_balance"
+  },
+  "warf": {
+    "field": "warf",
+    "label": "Moody's rating factor",
+    "source": "valuations::PoolReport::warf"
+  },
+  "stats": [
+    {
+      "field": "wac",
+      "label": "annual decimal, fixed-rate only",
+      "source": "valuations::PoolStats::wac"
+    },
+    {
+      "field": "weighted_avg_spread_bp",
+      "label": "bp",
+      "source": "valuations::PoolStats::weighted_avg_spread_bp"
+    },
+    {
+      "field": "weighted_avg_maturity",
+      "label": "years",
+      "source": "valuations::PoolStats::weighted_avg_maturity"
+    },
+    {
+      "field": "diversity_score",
+      "label": "score",
+      "source": "valuations::PoolStats::diversity_score"
+    },
+    {
+      "field": "num_obligors",
+      "label": "named obligors",
+      "source": "valuations::PoolStats::num_obligors"
+    },
+    {
+      "field": "num_industries",
+      "label": "named industries",
+      "source": "valuations::PoolStats::num_industries"
+    },
+    {
+      "field": "defaulted_balance_pct",
+      "label": "% of current pool balance",
+      "source": "valuations::PoolStats::defaulted_balance_pct"
+    },
+    {
+      "field": "undrawn_commitment",
+      "label": "EUR",
+      "source": "valuations::PoolStats::undrawn_commitment"
+    }
+  ],
+  "concentration": [
+    {
+      "field": "balance",
+      "label": "EUR",
+      "source": "valuations::PoolConcentrationEntry::balance"
+    },
+    {
+      "field": "balance_pct",
+      "label": "% of current pool balance",
+      "source": "valuations::PoolConcentrationEntry::balance_pct"
+    },
+    {
+      "field": "asset_count",
+      "label": "assets",
+      "source": "valuations::PoolConcentrationEntry::asset_count"
+    }
+  ]
+}

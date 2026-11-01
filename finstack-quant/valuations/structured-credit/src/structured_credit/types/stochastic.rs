@@ -44,8 +44,9 @@ impl StructuredCredit {
         let (prepay, default, corr) = match self.deal_type {
             DealType::Rmbs => (
                 // Pool WAC is the coupon side of the Richard-Roll incentive;
-                // market rate arrives via `tree_config.market_refi_rate`.
-                rmbs_prepay_spec(self.pool.wac()),
+                // market rate arrives via `tree_config.market_refi_rate`. A pool
+                // with no fixed-rate balance has no WAC; the model takes zero.
+                rmbs_prepay_spec(self.pool.wac().unwrap_or(0.0)),
                 rmbs_default_spec(),
                 rmbs_correlation_structure()?,
             ),

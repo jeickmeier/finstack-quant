@@ -377,6 +377,46 @@ test('equity option and convertible analytics match Python', () => {
   same(plain(convertible.greeks(data.market, '2024-06-20')), data.greeks, 'greeks', 1e-4);
 });
 
+test('structured-credit period detail says who was paid', () => {
+  const sc = golden.structured;
+  const deal = instruments.StructuredCredit.fromJson(sc.deal);
+  const { periods } = deal.runSimulation(sc.market, sc.as_of).diagnostics;
+  const coupon = periods[0].waterfall.payment_records.find(
+    (record) => record.recipient.tranche === 'A' && !record.is_principal
+  );
+  assert.ok(Number(coupon.paid_amount.amount) > 0);
+  // The deal is called in 2028: the redemption is outside the waterfall.
+  const redemption = periods.at(-1).non_waterfall_payments.filter((p) => p.source === 'redemption');
+  assert.deepEqual(
+    redemption.map((p) => p.tranche_id),
+    ['A', 'B', 'E']
+  );
+  same(periods, sc.diagnostics.periods, 'periods', LOOSE);
+});
+
+test('structured-credit first breaches and credit enhancement come from runSimulation', () => {
+  const sc = golden.structured;
+  const { diagnostics } = instruments.StructuredCredit.fromJson(sc.deal).runSimulation(
+    sc.market,
+    sc.as_of
+  );
+  assert.deepEqual(
+    diagnostics.first_breaches.map((entry) => entry.test_id),
+    ['OC_A']
+  );
+  same(diagnostics.first_breaches, sc.diagnostics.first_breaches, 'first breaches');
+  assert.deepEqual(
+    diagnostics.periods[0].credit_enhancement.map((entry) => entry.tranche_id),
+    ['A', 'B', 'E']
+  );
+  same(
+    diagnostics.periods[0].credit_enhancement,
+    sc.diagnostics.periods[0].credit_enhancement,
+    'credit enhancement',
+    LOOSE
+  );
+});
+
 test('structured-credit deal analytics match Python', () => {
   const sc = golden.structured;
   const deal = instruments.StructuredCredit.fromJson(sc.deal);
@@ -391,6 +431,13 @@ test('structured-credit deal analytics match Python', () => {
   same(plain(deal.equityMetrics(sc.market, sc.as_of)), sc.equity_metrics, 'equity', LOOSE);
   const simulation = deal.runSimulation(sc.market, sc.as_of);
   same(plain(simulation.tranches.A), sc.tranche_cashflows, 'simulation flows', LOOSE);
+  const table = plain(instruments.trancheCashflowsTable(sc.tranche_cashflows));
+  same(
+    Object.fromEntries(table.columns.map((column) => [column.name, column.data.values])),
+    sc.tranche_cashflows_table,
+    'tranche cashflow table',
+    LOOSE
+  );
   same(plain(simulation.diagnostics), sc.diagnostics, 'diag', LOOSE);
   const waterfall = deal.createWaterfall();
   same(plain(waterfall), sc.create_waterfall, 'waterfall');
@@ -428,6 +475,11 @@ test('structured-credit deal analytics match Python', () => {
     close(Number(actual.amount), expected.amount, TIGHT, label);
     assert.equal(actual.currency, expected.currency, label);
   };
+  same(
+    plain(instruments.standardDealFamilies()),
+    sc.standard_deal_families,
+    'standard deal families'
+  );
   sameMoney(instruments.assetPoolTotalBalance(pool), analytics.total_balance, 'total balance');
   sameMoney(
     instruments.assetPoolPerformingBalance(pool),
@@ -435,19 +487,17 @@ test('structured-credit deal analytics match Python', () => {
     'performing balance'
   );
   close(instruments.assetPoolWac(pool), analytics.wac, TIGHT, 'wac');
-  close(
-    instruments.assetPoolWeightedAvgSpreadBp(pool),
-    analytics.weighted_avg_spread_bp,
-    TIGHT,
-    'was'
-  );
+  // The example pool is all fixed-rate: Rust's None, undefined here and null in the golden.
+  assert.equal(analytics.weighted_avg_spread_bp, null);
+  assert.equal(instruments.assetPoolWeightedAvgSpreadBp(pool), undefined);
   close(
     instruments.assetPoolWeightedAvgMaturity(pool, sc.as_of),
     analytics.weighted_avg_maturity,
     TIGHT,
     'wam'
   );
-  close(instruments.assetPoolDiversityScore(pool), analytics.diversity_score, TIGHT, 'diversity');
+  assert.equal(analytics.diversity_score, null);
+  assert.equal(instruments.assetPoolDiversityScore(pool), undefined);
   same(
     plain(instruments.assetPoolAssetsByObligor(pool, 'NOBODY')),
     analytics.assets_by_obligor,
@@ -459,6 +509,17 @@ test('structured-credit deal analytics match Python', () => {
     'by industry'
   );
   same(plain(instruments.calculatePoolStats(pool, sc.as_of)), analytics.pool_stats, 'pool stats');
+  const report = plain(instruments.poolReport(sc.pool_report.pool, sc.as_of));
+  same(report, sc.pool_report.report, 'pool report');
+  assert.deepEqual(
+    report.by_obligor.map((row) => [row.key, row.balance_pct, row.asset_count]),
+    [
+      ['X', 40, 2],
+      ['Y', 30, 1],
+      ['Z', 20, 1],
+      [null, 10, 1],
+    ]
+  );
 });
 
 test('Merton Monte Carlo bond pricing matches Python', () => {

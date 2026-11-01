@@ -709,9 +709,9 @@ handle_setters!(JsTrancheBuilder, "TrancheBuilder", {
 impl JsStructuredCredit {
     /// Construct a validated standard deal from its registry profile and input record.
     /// @param deal_type - Registry family: `abs`, `clo`, `cmbs` or `rmbs`; other deal types are rejected.
-    /// @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar.
+    /// @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar, and `pool.deal_type` must be the family (`abs` also takes `auto` and `card` pools).
     /// @returns The deal with its selected registry assumptions and validated structure.
-    /// @throws Error - Throws with kind `validation` for an unsupported profile, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
+    /// @throws Error - Throws with kind `validation` for an unsupported profile, a pool that contradicts the family, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
     #[wasm_bindgen(js_name = newStandard)]
     pub fn new_standard(
         deal_type: JsValue,
@@ -803,9 +803,9 @@ impl JsStructuredCredit {
     /// Equity-tranche return metrics (mirrors Rust `calculate_equity_metrics`).
     /// @param market_json - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
     /// @param as_of - ISO-8601 valuation date.
-    /// @param purchase_price_pct - Optional equity purchase price in percent of its balance (`60` = 60%); omit to invest at the model net asset value.
-    /// @returns `EquityMetrics` plain object with IRR, MOIC, NAV in percent of balance and cash-on-cash yields.
-    /// @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
+    /// @param purchase_price_pct - Optional equity purchase price in percent of its current balance (`60` = 60%); omit to invest at par. Must be finite and non-negative.
+    /// @returns `EquityMetrics` plain object: `invested`; `irr`, an annual XIRR (ACT/365F) decimal or `null` when no rate solves; `moic`, a multiple of invested; `nav_pct`, the distributions discounted on the deal's discount curve as a percent of current balance; and `cash_on_cash`, each distribution as an unannualized decimal share of invested. `equityMetricsFieldUnits` states the units.
+    /// @throws Error - Throws with kind `not_found` if a curve is missing or the simulation records no equity tranche, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
     #[wasm_bindgen(js_name = equityMetrics)]
     pub fn equity_metrics(
         &self,

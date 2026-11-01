@@ -28,6 +28,10 @@ pub(super) struct TrancheTriggerState {
     tranche_id: String,
     oc: bool,
     pub(super) trigger: CoverageTrigger,
+    /// Id the trigger is evaluated under.
+    pub(super) test_id: String,
+    /// First payment date this simulation found the trigger in breach.
+    pub(super) first_breach: Option<Date>,
 }
 
 pub(super) fn initial_states(tranches: &TrancheStructure) -> Vec<TrancheTriggerState> {
@@ -41,10 +45,19 @@ pub(super) fn initial_states(tranches: &TrancheStructure) -> Vec<TrancheTriggerS
             ]
             .into_iter()
             .filter_map(|(oc, trigger)| {
-                trigger.map(|trigger| TrancheTriggerState {
-                    tranche_id: tranche.id.to_string(),
-                    oc,
-                    trigger,
+                trigger.map(|trigger| {
+                    let kind = if oc {
+                        CoverageTestType::Oc
+                    } else {
+                        CoverageTestType::Ic
+                    };
+                    TrancheTriggerState {
+                        tranche_id: tranche.id.to_string(),
+                        oc,
+                        trigger,
+                        test_id: format!("{}_{}_trigger", kind.label(), tranche.id),
+                        first_breach: None,
+                    }
                 })
             })
         })
@@ -170,7 +183,7 @@ pub(super) fn advance(
         } else {
             CoverageTestSpec::ic(saved.tranche_id.clone(), level)
         };
-        spec.id = format!("{}_trigger", spec.id);
+        spec.id.clone_from(&saved.test_id);
         specs.push(spec);
     }
     let waterfall_specs: Vec<CoverageTestSpec> = waterfall.coverage_tests().cloned().collect();
@@ -264,6 +277,7 @@ pub(super) fn advance(
                 ))
             })?;
         if saved.trigger.update(result.ratio, period.payment) {
+            saved.first_breach.get_or_insert(period.payment);
             match saved.trigger.consequence {
                 TriggerConsequence::DivertCashFlow => actions.diversions.push(spec.clone()),
                 TriggerConsequence::TrapExcessSpread => actions.trap = true,

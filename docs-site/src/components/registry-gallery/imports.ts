@@ -99,6 +99,13 @@ export const importHarnesses = {
       name: "use-scenario-table",
       modules: modules.length,
     })),
+  "use-deal-report": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-deal-report/use-deal-report"),
+    ]).then((modules) => ({
+      name: "use-deal-report",
+      modules: modules.length,
+    })),
   "use-tranche-analytics": () =>
     Promise.all([
       import("@/hooks/valuations/use-tranche-analytics/use-tranche-analytics"),
@@ -635,6 +642,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/scenario_grid"),
     ]).then((modules) => ({
       name: "contract-scenario-grid",
+      modules: modules.length,
+    })),
+  "contract-standard-deal-params": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/standard_deal_params.json"),
+      import("@/lib/finstack/generated/types/standard_deal_params"),
+      import("@/lib/finstack/generated/meta/standard_deal_params"),
+    ]).then((modules) => ({
+      name: "contract-standard-deal-params",
       modules: modules.length,
     })),
   "contract-covenant-engine": () =>

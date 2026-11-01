@@ -1,0 +1,209 @@
+{
+  "$defs": {
+    "PoolConcentrationEntry": {
+      "additionalProperties": false,
+      "description": "Balance held by one obligor, industry or rating, as a row of a [`PoolReport`]\nconcentration table.",
+      "properties": {
+        "asset_count": {
+          "description": "Number of asset rows grouped, zero-balance rows included.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "balance": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Current balance of the row's assets, defaulted assets included, in the\npool's base currency."
+        },
+        "balance_pct": {
+          "description": "`balance` in percent points of [`PoolReport::total_balance`] (`20.0` =\n20%), the convention of `ConcentrationLimit::max_pct` and\n`PoolStats::defaulted_balance_pct`, so a share compares to a limit\ndirectly. The rows of one table sum to `100.0`; `0.0` when the pool\nbalance is not positive.",
+          "format": "double",
+          "type": "number"
+        },
+        "key": {
+          "description": "Obligor id, industry or rating wire form (`\"BB+\"`) this row groups, or\n`null` for the assets that carry no value on the dimension. A null key\ncannot collide with a real name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "balance",
+        "balance_pct",
+        "asset_count"
+      ],
+      "type": "object"
+    },
+    "PoolStats": {
+      "additionalProperties": false,
+      "description": "AssetPool-level performance statistics",
+      "properties": {
+        "defaulted_balance_pct": {
+          "description": "Balance of assets currently carried as defaulted, in percent points\nof the current total pool balance (defaulted assets included in the\ndenominator; `10.0` = 10%).",
+          "format": "double",
+          "type": "number"
+        },
+        "diversity_score": {
+          "description": "Diversity score (Moody's methodology) of the assets that name an obligor;\n`None` when none does. See [`AssetPool::diversity_score`].",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "num_industries": {
+          "description": "Number of distinct `PoolAsset::industry` values. Assets naming no industry\nare not counted.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "num_obligors": {
+          "description": "Number of distinct `PoolAsset::obligor_id` values. Assets naming no obligor\nare not counted.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "undrawn_commitment": {
+          "default": 0.0,
+          "description": "Undrawn commitment across revolving and delayed-draw collateral\n(`commitment − balance`, performing assets only).",
+          "format": "double",
+          "type": "number"
+        },
+        "wac": {
+          "description": "Weighted-average coupon (annual decimal) of the performing fixed-rate\ncollateral; `None` when there is none. See [`AssetPool::wac`].",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weighted_avg_maturity": {
+          "description": "Weighted average maturity (WAM) in years; `None` when the pool balance is\nzero.\n\nFor weighted average life, which weights principal cashflows rather\nthan maturities, use the `wal` metric.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weighted_avg_spread_bp": {
+          "description": "Weighted-average spread in basis points of the performing collateral\nthat carries an explicit `spread_bp`; `None` when there is none. See\n[`AssetPool::weighted_avg_spread_bp`].",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "num_obligors",
+        "num_industries",
+        "defaulted_balance_pct"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/pool_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Collateral-pool statistics, WARF and concentration by obligor, industry and rating.",
+  "examples": [
+    {
+      "by_industry": [
+        {
+          "asset_count": 1,
+          "balance": {
+            "amount": "100000000",
+            "currency": "USD"
+          },
+          "balance_pct": 100.0,
+          "key": null
+        }
+      ],
+      "by_obligor": [
+        {
+          "asset_count": 1,
+          "balance": {
+            "amount": "100000000",
+            "currency": "USD"
+          },
+          "balance_pct": 100.0,
+          "key": null
+        }
+      ],
+      "by_rating": [
+        {
+          "asset_count": 1,
+          "balance": {
+            "amount": "100000000",
+            "currency": "USD"
+          },
+          "balance_pct": 100.0,
+          "key": null
+        }
+      ],
+      "stats": {
+        "defaulted_balance_pct": 0.0,
+        "diversity_score": null,
+        "num_industries": 0,
+        "num_obligors": 0,
+        "undrawn_commitment": 0.0,
+        "wac": 0.07,
+        "weighted_avg_maturity": 10.0082191781,
+        "weighted_avg_spread_bp": null
+      },
+      "total_balance": {
+        "amount": "100000000",
+        "currency": "USD"
+      },
+      "warf": 3650.0
+    }
+  ],
+  "properties": {
+    "by_industry": {
+      "description": "Balance per `PoolAsset::industry`.",
+      "items": {
+        "$ref": "#/$defs/PoolConcentrationEntry"
+      },
+      "type": "array"
+    },
+    "by_obligor": {
+      "description": "Balance per `PoolAsset::obligor_id`.",
+      "items": {
+        "$ref": "#/$defs/PoolConcentrationEntry"
+      },
+      "type": "array"
+    },
+    "by_rating": {
+      "description": "Balance per `PoolAsset::rating` wire form. An asset with no rating is in\nthe null-key row, not in an explicit `\"NR\"` row, although WARF weights\nboth with the `NR` factor.",
+      "items": {
+        "$ref": "#/$defs/PoolConcentrationEntry"
+      },
+      "type": "array"
+    },
+    "stats": {
+      "$ref": "#/$defs/PoolStats",
+      "description": "[`calculate_pool_stats`] of the same rows. Its fields mix units: `wac` is\na decimal, `weighted_avg_spread_bp` basis points and\n`defaulted_balance_pct` percent points."
+    },
+    "total_balance": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Current balance of every asset row, defaulted assets included, in the\npool's base currency: the denominator of each `balance_pct`."
+    },
+    "warf": {
+      "description": "Moody's weighted-average rating factor, the number `CloWarfCalculator`\nand `PeriodDiagnostics::warf` report: weighted by balance over the\nperforming rows only (defaulted and non-positive-balance rows are out of\nboth numerator and denominator). An unrated asset takes the Moody's table\nfactor for `NR`. `None` when no performing balance remains; the\n`clo_warf` metric, which must return a number, reports `0.0` there.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "total_balance",
+    "stats",
+    "by_obligor",
+    "by_industry",
+    "by_rating"
+  ],
+  "title": "PoolReport",
+  "type": "object"
+}

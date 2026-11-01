@@ -1,0 +1,2156 @@
+{
+  "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
+  "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
+  "marketSha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
+  "asOf": "2024-01-01",
+  "units": {
+    "invested": {
+      "field": "invested",
+      "label": "USD",
+      "source": "valuations::EquityMetrics::invested"
+    },
+    "irr": {
+      "field": "irr",
+      "label": "annual decimal, ACT/365F",
+      "source": "valuations::EquityMetrics::irr"
+    },
+    "moic": {
+      "field": "moic",
+      "label": "multiple of invested",
+      "source": "valuations::EquityMetrics::moic"
+    },
+    "nav_pct": {
+      "field": "nav_pct",
+      "label": "% of current balance",
+      "source": "valuations::EquityMetrics::nav_pct"
+    },
+    "cash_on_cash": {
+      "field": "cash_on_cash",
+      "label": "decimal share of invested",
+      "source": "valuations::EquityMetrics::cash_on_cash"
+    },
+    "purchase_price": {
+      "field": "purchase_price_pct",
+      "label": "% of current balance; omitted means par",
+      "source": "valuations::calculate_equity_metrics::purchase_price_pct"
+    }
+  },
+  "cases": [
+    {
+      "name": "paying",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [
+                {
+                  "id": "COLLATERAL-1",
+                  "asset_type": {
+                    "type": "high_yield_bond"
+                  },
+                  "balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.07,
+                  "spread_bp": null,
+                  "forward_curve_id": null,
+                  "maturity": "2034-01-01",
+                  "rating": null,
+                  "industry": null,
+                  "obligor_id": null,
+                  "defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "SENIOR",
+                  "attach_pct": 30,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.05
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "MEZZ",
+                  "attach_pct": 15,
+                  "detach_pct": 30,
+                  "seniority": "mezzanine",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.08
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "EQUITY",
+                  "attach_pct": 0,
+                  "detach_pct": 15,
+                  "seniority": "equity",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.1
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.01
+            },
+            "recovery_spec": {
+              "rate": 0.5,
+              "recovery_lag": 0
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "purchasePricePct": null,
+      "result": {
+        "value": {
+          "tranche_id": "EQUITY",
+          "currency": "USD",
+          "invested": 15000000,
+          "irr": 0.09338935355656519,
+          "moic": 1.752689754985699,
+          "nav_pct": 143.3056753377453,
+          "cash_on_cash": [
+            ["2024-04-01", 0.03861124935627365],
+            ["2024-07-01", 0.03755118903702952],
+            ["2024-10-01", 0.03692261002569466],
+            ["2025-01-02", 0.03591099361698972],
+            ["2025-04-01", 0.03416884046609833],
+            ["2025-07-01", 0.033603980504608444],
+            ["2025-10-01", 0.033045519584329],
+            ["2026-01-02", 0.03214416936417299],
+            ["2026-04-01", 0.030588704949088732],
+            ["2026-07-01", 0.030087017702221247],
+            ["2026-10-01", 0.02959103200107229],
+            ["2027-01-04", 0.028787928954913226],
+            ["2027-04-01", 0.02739880420343327],
+            ["2027-07-01", 0.026953403845294245],
+            ["2027-10-01", 0.026513083564390433],
+            ["2028-01-03", 0.025797518750262698],
+            ["2028-04-03", 0.0248294537794882],
+            ["2028-07-03", 0.024161353898772327],
+            ["2028-10-02", 0.023770631507307],
+            ["2029-01-02", 0.023133063257919195],
+            ["2029-04-02", 0.02202420104519256],
+            ["2029-07-02", 0.02167363739642136],
+            ["2029-10-01", 0.021327106724445644],
+            ["2030-01-02", 0.020759033414241092],
+            ["2030-04-01", 0.019767831225061754],
+            ["2030-07-01", 0.01945708199282655],
+            ["2030-10-01", 0.019149926142916218],
+            ["2031-01-02", 0.018643772823523967],
+            ["2031-04-01", 0.01775740571532522],
+            ["2031-07-01", 0.017482131128223607],
+            ["2031-10-01", 0.017210058244773434],
+            ["2032-01-02", 0.01675907563719494],
+            ["2032-04-01", 0.016143517881551665],
+            ["2032-07-01", 0.015722449907862413],
+            ["2032-10-01", 0.015481635947528247],
+            ["2033-01-03", 0.015079810444175794],
+            ["2033-04-01", 0.014370077972054853],
+            ["2033-07-01", 0.014154573940520573],
+            ["2033-10-03", 0.013941611680682727],
+            ["2034-01-03", 0.8122142673518173]
+          ]
+        }
+      }
+    },
+    {
+      "name": "discounted",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [
+                {
+                  "id": "COLLATERAL-1",
+                  "asset_type": {
+                    "type": "high_yield_bond"
+                  },
+                  "balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.07,
+                  "spread_bp": null,
+                  "forward_curve_id": null,
+                  "maturity": "2034-01-01",
+                  "rating": null,
+                  "industry": null,
+                  "obligor_id": null,
+                  "defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "SENIOR",
+                  "attach_pct": 30,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.05
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "MEZZ",
+                  "attach_pct": 15,
+                  "detach_pct": 30,
+                  "seniority": "mezzanine",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.08
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "EQUITY",
+                  "attach_pct": 0,
+                  "detach_pct": 15,
+                  "seniority": "equity",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.1
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.01
+            },
+            "recovery_spec": {
+              "rate": 0.5,
+              "recovery_lag": 0
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "purchasePricePct": 60,
+      "result": {
+        "value": {
+          "tranche_id": "EQUITY",
+          "currency": "USD",
+          "invested": 9000000,
+          "irr": 0.2113734245896592,
+          "moic": 2.921149591642832,
+          "nav_pct": 143.3056753377453,
+          "cash_on_cash": [
+            ["2024-04-01", 0.06435208226045608],
+            ["2024-07-01", 0.06258531506171586],
+            ["2024-10-01", 0.061537683376157774],
+            ["2025-01-02", 0.0598516560283162],
+            ["2025-04-01", 0.05694806744349722],
+            ["2025-07-01", 0.05600663417434741],
+            ["2025-10-01", 0.055075865973881664],
+            ["2026-01-02", 0.053573615606954984],
+            ["2026-04-01", 0.050981174915147885],
+            ["2026-07-01", 0.050145029503702074],
+            ["2026-10-01", 0.04931838666845382],
+            ["2027-01-04", 0.04797988159152204],
+            ["2027-04-01", 0.04566467367238878],
+            ["2027-07-01", 0.04492233974215708],
+            ["2027-10-01", 0.04418847260731739],
+            ["2028-01-03", 0.042995864583771165],
+            ["2028-04-03", 0.04138242296581367],
+            ["2028-07-03", 0.040268923164620544],
+            ["2028-10-02", 0.039617719178845],
+            ["2029-01-02", 0.03855510542986532],
+            ["2029-04-02", 0.0367070017419876],
+            ["2029-07-02", 0.036122728994035604],
+            ["2029-10-01", 0.03554517787407608],
+            ["2030-01-02", 0.03459838902373515],
+            ["2030-04-01", 0.03294638537510292],
+            ["2030-07-01", 0.03242846998804425],
+            ["2030-10-01", 0.03191654357152703],
+            ["2031-01-02", 0.031072954705873276],
+            ["2031-04-01", 0.029595676192208698],
+            ["2031-07-01", 0.02913688521370601],
+            ["2031-10-01", 0.02868343040795572],
+            ["2032-01-02", 0.02793179272865823],
+            ["2032-04-01", 0.026905863135919444],
+            ["2032-07-01", 0.026204083179770687],
+            ["2032-10-01", 0.025802726579213744],
+            ["2033-01-03", 0.025133017406959657],
+            ["2033-04-01", 0.023950129953424756],
+            ["2033-07-01", 0.023590956567534287],
+            ["2033-10-03", 0.023236019467804545],
+            ["2034-01-03", 1.3536904455863623]
+          ]
+        }
+      }
+    },
+    {
+      "name": "negative-price",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [
+                {
+                  "id": "COLLATERAL-1",
+                  "asset_type": {
+                    "type": "high_yield_bond"
+                  },
+                  "balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.07,
+                  "spread_bp": null,
+                  "forward_curve_id": null,
+                  "maturity": "2034-01-01",
+                  "rating": null,
+                  "industry": null,
+                  "obligor_id": null,
+                  "defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "SENIOR",
+                  "attach_pct": 30,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.05
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "MEZZ",
+                  "attach_pct": 15,
+                  "detach_pct": 30,
+                  "seniority": "mezzanine",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.08
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "EQUITY",
+                  "attach_pct": 0,
+                  "detach_pct": 15,
+                  "seniority": "equity",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.1
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.01
+            },
+            "recovery_spec": {
+              "rate": 0.5,
+              "recovery_lag": 0
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "purchasePricePct": -1,
+      "result": {
+        "error": {
+          "name": "FinstackError",
+          "kind": "validation",
+          "message": "Validation error: purchase_price_pct (-1) must be a finite non-negative percent"
+        }
+      }
+    },
+    {
+      "name": "zero-price",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [
+                {
+                  "id": "COLLATERAL-1",
+                  "asset_type": {
+                    "type": "high_yield_bond"
+                  },
+                  "balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.07,
+                  "spread_bp": null,
+                  "forward_curve_id": null,
+                  "maturity": "2034-01-01",
+                  "rating": null,
+                  "industry": null,
+                  "obligor_id": null,
+                  "defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "SENIOR",
+                  "attach_pct": 30,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.05
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "MEZZ",
+                  "attach_pct": 15,
+                  "detach_pct": 30,
+                  "seniority": "mezzanine",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.08
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "EQUITY",
+                  "attach_pct": 0,
+                  "detach_pct": 15,
+                  "seniority": "equity",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.1
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.01
+            },
+            "recovery_spec": {
+              "rate": 0.5,
+              "recovery_lag": 0
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "purchasePricePct": 0,
+      "result": {
+        "value": {
+          "tranche_id": "EQUITY",
+          "currency": "USD",
+          "invested": 0,
+          "irr": null,
+          "moic": null,
+          "nav_pct": 143.3056753377453,
+          "cash_on_cash": [
+            ["2024-04-01", null],
+            ["2024-07-01", null],
+            ["2024-10-01", null],
+            ["2025-01-02", null],
+            ["2025-04-01", null],
+            ["2025-07-01", null],
+            ["2025-10-01", null],
+            ["2026-01-02", null],
+            ["2026-04-01", null],
+            ["2026-07-01", null],
+            ["2026-10-01", null],
+            ["2027-01-04", null],
+            ["2027-04-01", null],
+            ["2027-07-01", null],
+            ["2027-10-01", null],
+            ["2028-01-03", null],
+            ["2028-04-03", null],
+            ["2028-07-03", null],
+            ["2028-10-02", null],
+            ["2029-01-02", null],
+            ["2029-04-02", null],
+            ["2029-07-02", null],
+            ["2029-10-01", null],
+            ["2030-01-02", null],
+            ["2030-04-01", null],
+            ["2030-07-01", null],
+            ["2030-10-01", null],
+            ["2031-01-02", null],
+            ["2031-04-01", null],
+            ["2031-07-01", null],
+            ["2031-10-01", null],
+            ["2032-01-02", null],
+            ["2032-04-01", null],
+            ["2032-07-01", null],
+            ["2032-10-01", null],
+            ["2033-01-03", null],
+            ["2033-04-01", null],
+            ["2033-07-01", null],
+            ["2033-10-03", null],
+            ["2034-01-03", null]
+          ]
+        }
+      }
+    },
+    {
+      "name": "starved",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [
+                {
+                  "id": "COLLATERAL-1",
+                  "asset_type": {
+                    "type": "high_yield_bond"
+                  },
+                  "balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.07,
+                  "spread_bp": null,
+                  "forward_curve_id": null,
+                  "maturity": "2034-01-01",
+                  "rating": null,
+                  "industry": null,
+                  "obligor_id": null,
+                  "defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "SENIOR",
+                  "attach_pct": 30,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.6
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "MEZZ",
+                  "attach_pct": 15,
+                  "detach_pct": 30,
+                  "seniority": "mezzanine",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.6
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "EQUITY",
+                  "attach_pct": 0,
+                  "detach_pct": 15,
+                  "seniority": "equity",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.1
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.01
+            },
+            "recovery_spec": {
+              "rate": 0.5,
+              "recovery_lag": 0
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "purchasePricePct": null,
+      "result": {
+        "value": {
+          "tranche_id": "EQUITY",
+          "currency": "USD",
+          "invested": 15000000,
+          "irr": null,
+          "moic": 0,
+          "nav_pct": 0,
+          "cash_on_cash": []
+        }
+      }
+    },
+    {
+      "name": "zero-balance",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [
+                {
+                  "id": "COLLATERAL-1",
+                  "asset_type": {
+                    "type": "high_yield_bond"
+                  },
+                  "balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.07,
+                  "spread_bp": null,
+                  "forward_curve_id": null,
+                  "maturity": "2034-01-01",
+                  "rating": null,
+                  "industry": null,
+                  "obligor_id": null,
+                  "defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "SENIOR",
+                  "attach_pct": 30,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.05
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "MEZZ",
+                  "attach_pct": 15,
+                  "detach_pct": 30,
+                  "seniority": "mezzanine",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.08
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "EQUITY",
+                  "attach_pct": 0,
+                  "detach_pct": 15,
+                  "seniority": "equity",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.1
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.01
+            },
+            "recovery_spec": {
+              "rate": 0.5,
+              "recovery_lag": 0
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "purchasePricePct": null,
+      "result": {
+        "value": {
+          "tranche_id": "EQUITY",
+          "currency": "USD",
+          "invested": 0,
+          "irr": null,
+          "moic": null,
+          "nav_pct": 0,
+          "cash_on_cash": [
+            ["2024-04-01", null],
+            ["2024-07-01", null],
+            ["2024-10-01", null],
+            ["2025-01-02", null],
+            ["2025-04-01", null],
+            ["2025-07-01", null],
+            ["2025-10-01", null],
+            ["2026-01-02", null],
+            ["2026-04-01", null],
+            ["2026-07-01", null],
+            ["2026-10-01", null],
+            ["2027-01-04", null],
+            ["2027-04-01", null],
+            ["2027-07-01", null],
+            ["2027-10-01", null],
+            ["2028-01-03", null],
+            ["2028-04-03", null],
+            ["2028-07-03", null],
+            ["2028-10-02", null],
+            ["2029-01-02", null],
+            ["2029-04-02", null],
+            ["2029-07-02", null],
+            ["2029-10-01", null],
+            ["2030-01-02", null],
+            ["2030-04-01", null],
+            ["2030-07-01", null],
+            ["2030-10-01", null],
+            ["2031-01-02", null],
+            ["2031-04-01", null],
+            ["2031-07-01", null],
+            ["2031-10-01", null],
+            ["2032-01-02", null],
+            ["2032-04-01", null],
+            ["2032-07-01", null],
+            ["2032-10-01", null],
+            ["2033-01-03", null],
+            ["2033-04-01", null],
+            ["2033-07-01", null],
+            ["2033-10-03", null],
+            ["2034-01-03", null]
+          ]
+        }
+      }
+    },
+    {
+      "name": "wiped-out",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [
+                {
+                  "id": "COLLATERAL-1",
+                  "asset_type": {
+                    "type": "high_yield_bond"
+                  },
+                  "balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.07,
+                  "spread_bp": null,
+                  "forward_curve_id": null,
+                  "maturity": "2034-01-01",
+                  "rating": null,
+                  "industry": null,
+                  "obligor_id": null,
+                  "defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "SENIOR",
+                  "attach_pct": 30,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.05
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "MEZZ",
+                  "attach_pct": 15,
+                  "detach_pct": 30,
+                  "seniority": "mezzanine",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.08
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "EQUITY",
+                  "attach_pct": 0,
+                  "detach_pct": 15,
+                  "seniority": "equity",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.1
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.9
+            },
+            "recovery_spec": {
+              "rate": 0,
+              "recovery_lag": 0
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "purchasePricePct": null,
+      "result": {
+        "value": {
+          "tranche_id": "EQUITY",
+          "currency": "USD",
+          "invested": 15000000,
+          "irr": -0.9999999732249882,
+          "moic": 0.012945502235764114,
+          "nav_pct": 1.2847567203272243,
+          "cash_on_cash": [["2024-04-01", 0.012945502235764114]]
+        }
+      }
+    },
+    {
+      "name": "no-equity",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [
+                {
+                  "id": "COLLATERAL-1",
+                  "asset_type": {
+                    "type": "high_yield_bond"
+                  },
+                  "balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.07,
+                  "spread_bp": null,
+                  "forward_curve_id": null,
+                  "maturity": "2034-01-01",
+                  "rating": null,
+                  "industry": null,
+                  "obligor_id": null,
+                  "defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "CLONOTES-A",
+                  "attach_pct": 0,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.06
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.2
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.02
+            },
+            "recovery_spec": {
+              "rate": 0.6,
+              "recovery_lag": 12
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "purchasePricePct": null,
+      "result": {
+        "error": {
+          "name": "FinstackError",
+          "kind": "validation",
+          "message": "Validation error: deal has no equity tranche"
+        }
+      }
+    },
+    {
+      "name": "no-assets",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "currency": "USD",
+              "assets": [],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "SENIOR",
+                  "attach_pct": 30,
+                  "detach_pct": 100,
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "70000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.05
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "MEZZ",
+                  "attach_pct": 15,
+                  "detach_pct": 30,
+                  "seniority": "mezzanine",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.08
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                },
+                {
+                  "id": "EQUITY",
+                  "attach_pct": 0,
+                  "detach_pct": 15,
+                  "seniority": "equity",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "attributes": {}
+                }
+              ]
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "curve": "constant",
+              "cpr": 0.1
+            },
+            "default_spec": {
+              "curve": "constant",
+              "cdr": 0.01
+            },
+            "recovery_spec": {
+              "rate": 0.5,
+              "recovery_lag": 0
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "purchasePricePct": null,
+      "result": {
+        "error": {
+          "name": "FinstackError",
+          "kind": "not_found",
+          "message": "Requested item not found: tranche \"EQUITY\" of deal \"CLO-EXAMPLE\""
+        }
+      }
+    }
+  ]
+}

@@ -524,6 +524,9 @@ impl PyScenarioTable {
 crate::bindings::macros::py_getters!(PyScenarioTable |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable.tranche_id")]
     tranche_id -> &str = &s.inner.tranche_id;
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable.currency")]
+    currency -> String = s.inner.currency.to_string();
 });
 
 /// Names registered by this module, in the order they appear in `__all__`.

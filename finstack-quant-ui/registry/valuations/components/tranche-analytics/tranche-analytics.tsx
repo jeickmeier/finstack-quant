@@ -4,13 +4,17 @@ import type { ReactNode } from "react";
 import type {
   MetricFieldUnit,
   OasResult,
+  TableEnvelope as NativeTable,
+  TrancheCashflows,
   TrancheSolveFieldUnits,
   TrancheMetrics,
 } from "finstack-quant-wasm";
 import { Button } from "@/components/ui/button";
+import { formatRawMoney } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import { TableEnvelope } from "@/components/finstack/shared/table/table-envelope/table-envelope";
 import { MeasureValue } from "@/components/finstack/valuations/primitives/measure-value/measure-value";
 import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
 import { oasConfigModule } from "./oas-config";
@@ -61,6 +65,20 @@ const columns: ColumnDef<{}, Row, any>[] = [
     meta: { className: "text-right finstack-numeric" },
   },
 ];
+/** TrancheCashflows' scalar totals, in the struct's order; each is shown as returned. */
+const scheduleTotals = [
+  "total_interest",
+  "total_principal",
+  "total_pik",
+  "total_deferred",
+  "total_writedown",
+  "final_balance",
+] as const;
+/** Native flows of one tranche and Rust's projection of them into one row per date. */
+export interface TrancheScheduleValue {
+  cashflows: TrancheCashflows;
+  table: NativeTable;
+}
 function TileFrame({
   title,
   children,
@@ -129,6 +147,8 @@ export interface TrancheAnalyticsProps {
    * this to hide the form and leave the configuration to the host.
    */
   onOasConfigChange?: (json: string) => void;
+  /** Native trancheCashflows and trancheCashflowsTable; omit to hide the schedule. Rust joins and sums the dates. */
+  schedule?: TrancheTile<TrancheScheduleValue>;
   density?: "compact" | "comfortable";
 }
 /**
@@ -150,6 +170,7 @@ export function TrancheAnalytics({
   oas,
   onSolveOas,
   onOasConfigChange,
+  schedule,
   density,
 }: TrancheAnalyticsProps) {
   const noPrice = price.trim() === "";
@@ -284,6 +305,34 @@ export function TrancheAnalytics({
           </TileFrame>
         </div>
       </div>
+      {schedule && (
+        <TileFrame title="Cash flows by date">
+          <TileState tile={schedule} idle="No cash flows returned">
+            {schedule.value && (
+              <div className="flex flex-col gap-2">
+                <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                  {scheduleTotals.map((field) => (
+                    <div key={field} className="flex flex-col">
+                      <dt className="text-xs text-muted-foreground">
+                        {labelFor(field)}
+                      </dt>
+                      <dd className="finstack-numeric">
+                        {formatRawMoney(schedule.value!.cashflows[field])}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                <TableEnvelope
+                  envelope={schedule.value.table}
+                  caption={`${trancheId} cash flows by date, in ${schedule.value.cashflows.total_interest.currency}`}
+                  density={density}
+                  emptyState="No cash flows returned"
+                />
+              </div>
+            )}
+          </TileState>
+        </TileFrame>
+      )}
     </section>
   );
 }

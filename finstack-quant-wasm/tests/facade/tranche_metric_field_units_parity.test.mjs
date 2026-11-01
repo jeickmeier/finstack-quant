@@ -35,3 +35,67 @@ const SOLVE_PINNED = JSON.parse(
 test('trancheSolveFieldUnits matches the records pinned for both hosts', () => {
   assert.deepEqual(plain(facade.valuations.instruments.trancheSolveFieldUnits()), SOLVE_PINNED);
 });
+
+const POOL_REPORT_PINNED = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/fixtures/pool_report_field_units.json',
+      import.meta.url
+    )
+  )
+);
+
+test('poolReportFieldUnits matches the records pinned for both hosts', () => {
+  assert.deepEqual(
+    plain(facade.valuations.instruments.poolReportFieldUnits('EUR')),
+    POOL_REPORT_PINNED
+  );
+});
+
+const SCENARIO_PINNED = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/fixtures/scenario_table_field_units.json',
+      import.meta.url
+    )
+  )
+);
+
+test('scenarioTableFieldUnits matches the records pinned for both hosts', () => {
+  assert.deepEqual(
+    plain(facade.valuations.instruments.scenarioTableFieldUnits('EUR')),
+    SCENARIO_PINNED
+  );
+});
+
+const SIMULATION_PINNED = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/fixtures/simulation_field_units.json',
+      import.meta.url
+    )
+  )
+);
+
+test('simulationFieldUnits matches the records pinned for both hosts', () => {
+  assert.deepEqual(
+    plain(facade.valuations.instruments.simulationFieldUnits('EUR')),
+    SIMULATION_PINNED
+  );
+});
+
+const EQUITY_PINNED = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/fixtures/equity_metrics_field_units.json',
+      import.meta.url
+    )
+  )
+);
+
+test('equityMetricsFieldUnits matches the records pinned for both hosts', () => {
+  assert.deepEqual(
+    plain(facade.valuations.instruments.equityMetricsFieldUnits('EUR')),
+    EQUITY_PINNED
+  );
+});

@@ -196,12 +196,18 @@ import type {
   MetricFieldUnit,
   MetricMetadata,
   OasResult,
+  PoolReportFieldUnits,
+  ScenarioTableFieldUnits,
+  SimulationFieldUnits,
+  EquityMetricsFieldUnits,
+  StandardDealFamily,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
   ResultsMeta,
   ScenarioCell,
   ScenarioTable,
+  TrancheCashflows,
   TrancheMetrics,
   ToleranceConfig,
   ValidationReport,
@@ -432,12 +438,18 @@ export type {
   MetricFieldUnit,
   MetricMetadata,
   OasResult,
+  PoolReportFieldUnits,
+  ScenarioTableFieldUnits,
+  SimulationFieldUnits,
+  EquityMetricsFieldUnits,
+  StandardDealFamily,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
   ResultsMeta,
   ScenarioCell,
   ScenarioTable,
+  TrancheCashflows,
   TrancheMetrics,
   ValidationReport,
 };
@@ -22006,9 +22018,9 @@ export interface StructuredCredit extends WasmOwned {
    * Equity-tranche return metrics (mirrors Rust `calculate_equity_metrics`).
    * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
    * @param asOf - ISO-8601 valuation date.
-   * @param purchasePricePct - Optional equity purchase price in percent of its balance (`60` = 60%); omit to invest at the model net asset value.
-   * @returns `EquityMetrics` plain object with IRR, MOIC, NAV in percent of balance and cash-on-cash yields.
-   * @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
+   * @param purchasePricePct - Optional equity purchase price in percent of its current balance (`60` = 60%); omit to invest at par. Must be finite and non-negative.
+   * @returns `EquityMetrics` plain object: `invested`; `irr`, an annual XIRR (ACT/365F) decimal or `null` when no rate solves; `moic`, a multiple of invested; `nav_pct`, the distributions discounted on the deal's discount curve as a percent of current balance; and `cash_on_cash`, each distribution as an unannualized decimal share of invested. `equityMetricsFieldUnits` states the units.
+   * @throws Error - Throws with kind `not_found` if a curve is missing or the simulation records no equity tranche, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
    */
   equityMetrics(
     marketJson: JsonInput,
@@ -22109,12 +22121,12 @@ export interface StructuredCreditConstructor {
    * example.free();
    * ```
    * @param dealType - Registry family: `abs`, `clo`, `cmbs` or `rmbs`; other deal types are rejected.
-   * @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar.
+   * @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar, and `pool.deal_type` must be the family (`abs` also takes `auto` and `card` pools).
    * @returns The deal with its selected registry assumptions and validated structure.
-   * @throws Error - Throws with kind `validation` for an unsupported profile, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
+   * @throws Error - Throws with kind `validation` for an unsupported profile, a pool that contradicts the family, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
    */
   newStandard(
-    dealType: 'abs' | 'clo' | 'cmbs' | 'rmbs',
+    dealType: generated.valuations.StandardDealFamily['deal_type'],
     params: generated.valuations.StandardDealParams | string
   ): StructuredCredit;
 }
@@ -23206,6 +23218,47 @@ export interface ValuationInstrumentsNamespace {
    */
   priceDriverFields(): string[];
   /**
+   * Units of the `ScenarioCell` fields, the one place a host reads them from.
+   *
+   * Rates are decimals, the price is percent of the tranche's current balance and the writedown is in currency units. Values are never rescaled.
+   * @param currency - ISO-4217 code of the result's `ScenarioTable.currency`, in any ASCII case; it names the unit of `writedown`.
+   * @returns `ScenarioTableFieldUnits`: `axes`, one `MetricFieldUnit` per swept input (`cpr`, `cdr`, `severity`), and `measures`, one per reported measure (`price`, `wal`, `writedown`), each in struct order.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  scenarioTableFieldUnits(currency: string): ScenarioTableFieldUnits;
+  /**
+   * Units of a structured-credit simulation's charted series, the one place a host reads them from.
+   *
+   * Coverage ratios, triggers and cushions are in times covered, credit enhancement is a decimal share of the collateral and excess spread an annual decimal of the opening pool balance. Values are never rescaled.
+   * @param currency - ISO-4217 code of the simulation's deal currency, in any ASCII case; it names the unit of `diverted_cash`.
+   * @returns `SimulationFieldUnits`: `coverage_tests`, one `MetricFieldUnit` per numeric coverage-test field (`ratio`, `trigger_level`, `cushion`) in struct order, and one each for `diverted_cash`, `credit_enhancement` and `excess_spread`.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  simulationFieldUnits(currency: string): SimulationFieldUnits;
+  /**
+   * Units of the `EquityMetrics` fields, the one place a host reads them from.
+   *
+   * The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV a percent of the equity's current balance and cash-on-cash a decimal share of the invested amount. Values are never rescaled.
+   * @param currency - ISO-4217 code of the result's `currency`, in any ASCII case; it names the unit of `invested`.
+   * @returns `EquityMetricsFieldUnits`: one `MetricFieldUnit` each for `invested`, `irr`, `moic`, `nav_pct` and `cash_on_cash`, and `purchase_price` for the `purchasePricePct` argument of `equityMetrics`: percent of current balance, omitted means par.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  equityMetricsFieldUnits(currency: string): EquityMetricsFieldUnits;
+  /**
+   * Deal families `StructuredCredit.newStandard` accepts, the one place a host reads them from.
+   *
+   * @returns `StandardDealFamily[]` in `abs`, `clo`, `cmbs`, `rmbs` order: `deal_type`, the `newStandard` argument; `profile_id`, the registry profile supplying the family's frequency and credit assumptions; and `example`, complete `StandardDealParams` that `newStandard` accepts for the family, with its id, tranche ids and `pool.deal_type` naming the family.
+   * @throws Error - Throws a `validation` error if an example cannot be constructed, which its fixed inputs do not trigger.
+   */
+  standardDealFamilies(): StandardDealFamily[];
+  /**
+   * Units of the `PoolReport` fields, the one place a host reads them from.
+   * @param currency - ISO-4217 code of the pool's base currency, in any ASCII case; it names the unit of `total_balance`, `undrawn_commitment` and each row's `balance`.
+   * @returns `PoolReportFieldUnits`: `total_balance` and `warf`, each one `MetricFieldUnit`; `stats`, one per `PoolStats` field in struct order; and `concentration`, one per numeric `PoolConcentrationEntry` field in struct order.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  poolReportFieldUnits(currency: string): PoolReportFieldUnits;
+  /**
    * Units of the scalar `TrancheMetrics` fields, in struct order.
    * @param currency - ISO-4217 code of the result's `TrancheMetrics.currency`, in any ASCII case; it names the unit of `pv`, `accrued` and `cs01`.
    * @returns One `MetricFieldUnit` per scalar field: the wire field name, its unit text and the Rust field that documents it. `tranche_id`, `currency` and the `metrics` map are not listed.
@@ -23565,32 +23618,32 @@ export interface ValuationInstrumentsNamespace {
   /**
    * Weighted-average coupon of the performing fixed-rate collateral (mirrors Rust `AssetPool::wac`).
    * @param pool - `AssetPool` plain object or JSON string.
-   * @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `0` when no performing fixed-rate collateral exists.
+   * @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `undefined` when no performing fixed-rate collateral exists.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
    */
-  assetPoolWac(pool: generated.valuations.AssetPool | string): number;
+  assetPoolWac(pool: generated.valuations.AssetPool | string): number | undefined;
   /**
    * Weighted-average spread of the performing collateral that carries an explicit spread (mirrors Rust `AssetPool::weighted_avg_spread_bp`).
    * @param pool - `AssetPool` plain object or JSON string.
-   * @returns Balance-weighted spread in basis points; `0` when no performing asset carries a spread.
+   * @returns Balance-weighted spread in basis points; `undefined` when no performing asset carries a spread.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
    */
-  assetPoolWeightedAvgSpreadBp(pool: generated.valuations.AssetPool | string): number;
+  assetPoolWeightedAvgSpreadBp(pool: generated.valuations.AssetPool | string): number | undefined;
   /**
    * Balance-weighted average remaining maturity (mirrors Rust `AssetPool::weighted_avg_maturity`).
    * @param pool - `AssetPool` plain object or JSON string.
    * @param asOf - ISO-8601 date the remaining maturities are measured from.
-   * @returns Weighted average maturity in years (ACT/365F from `asOf`); `0` for an empty pool.
+   * @returns Weighted average maturity in years (ACT/365F from `asOf`); `undefined` when the pool balance is zero.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
    */
-  assetPoolWeightedAvgMaturity(pool: generated.valuations.AssetPool | string, asOf: string): number;
+  assetPoolWeightedAvgMaturity(pool: generated.valuations.AssetPool | string, asOf: string): number | undefined;
   /**
    * Moody's diversity score of the pool (mirrors Rust `AssetPool::diversity_score`).
    * @param pool - `AssetPool` plain object or JSON string.
-   * @returns Diversity score from the obligor and industry concentrations; `0` when the pool balance cannot be computed.
+   * @returns Diversity score over the assets that name an obligor; `undefined` when none does or the pool balance cannot be summed.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
    */
-  assetPoolDiversityScore(pool: generated.valuations.AssetPool | string): number;
+  assetPoolDiversityScore(pool: generated.valuations.AssetPool | string): number | undefined;
   /**
    * Loan-level assets of one obligor (mirrors Rust `AssetPool::assets_by_obligor`).
    * @param pool - `AssetPool` plain object or JSON string.
@@ -23613,6 +23666,28 @@ export interface ValuationInstrumentsNamespace {
     pool: generated.valuations.AssetPool | string,
     industry: string
   ): generated.valuations.PoolAsset[];
+  /**
+   * One row per payment date of a tranche's flows (mirrors Rust `TrancheCashflows::to_table`).
+   *
+   * Python reaches the same table through `TrancheCashflows.to_dataframe`.
+   * @param cashflows - `TrancheCashflows` plain object or JSON string, as `StructuredCredit.trancheCashflows` returns it.
+   * @returns `TableEnvelope` with a `date` column in ascending order and float `cashflow`, `interest`, `principal`, `pik`, `deferred` and `writedown` columns in the flows' one currency, which the table does not state (read `total_interest.currency`). Flows on one date are summed per kind; a kind with no flow on a date is zero; the columns remain when there are no rows.
+   * @throws Error - Throws with kind `validation` if `cashflows` does not match the `TrancheCashflows` schema or mixes currencies.
+   */
+  trancheCashflowsTable(
+    cashflows: generated.valuations.TrancheCashflows | string
+  ): TableEnvelope;
+  /**
+   * Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).
+   * @param pool - `AssetPool` plain object or JSON string, in any of its three representations.
+   * @param asOf - ISO-8601 date the remaining maturities are measured from. It also stands in for the closing date when a pool is normalized: it ages representative lines and counts the delayed draws already funded on instrument collateral.
+   * @returns `PoolReport` plain object: `total_balance` (the denominator of every share), `stats` (`PoolStats` of the same rows), `warf` (Moody's rating factor weighted by balance over the performing rows, unrated assets at the `NR` factor) and `by_obligor`, `by_industry`, `by_rating`, each a list of `PoolConcentrationEntry` with `balance_pct` in percent points. An empty pool reports zero balances and empty tables. `poolReportFieldUnits` states every unit.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, the pool cannot be normalized, an asset is not in the pool's base currency, or a rating has no Moody's factor.
+   */
+  poolReport(
+    pool: generated.valuations.AssetPool | string,
+    asOf: string
+  ): generated.valuations.PoolReport;
   /**
    * Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).
    * @param pool - `AssetPool` plain object or JSON string.

@@ -265,6 +265,39 @@
       }
     },
     {
+      "name": "contract-standard-deal-params",
+      "type": "registry:lib",
+      "title": "Standard deal params contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust standard_deal_params contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/standard_deal_params.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/standard_deal_params.json"
+        },
+        {
+          "path": "src/generated/types/standard_deal_params.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/standard_deal_params.ts"
+        },
+        {
+          "path": "src/generated/meta/standard_deal_params.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/standard_deal_params.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/shared-schema-defs"],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-covenant-engine",
       "type": "registry:lib",
       "title": "Covenant engine contract",

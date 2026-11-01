@@ -1,6 +1,9 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { TrancheAnalytics } from "@/components/finstack/valuations/components/tranche-analytics/tranche-analytics";
+import {
+  TrancheAnalytics,
+  type TrancheScheduleValue,
+} from "@/components/finstack/valuations/components/tranche-analytics/tranche-analytics";
 import type {
   MetricFieldUnit,
   TrancheSolveFieldUnits,
@@ -31,6 +34,9 @@ export function Example({ density = "compact" }: ExampleProps) {
       // Shows the OasConfig disclosure; the captured OAS used Rust's default,
       // so this static example discards an applied configuration.
       onOasConfigChange={() => {}}
+      schedule={{
+        value: results.schedule.value as unknown as TrancheScheduleValue,
+      }}
       density={density}
     />
   );

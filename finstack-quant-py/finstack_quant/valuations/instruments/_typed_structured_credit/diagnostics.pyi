@@ -146,6 +146,30 @@ class SimulationDiagnostics:
         """
         ...
     @property
+    def first_breaches(self) -> list[dict[str, Any]]:
+        """
+        First failure of each coverage test, sorted by ``test_id``.
+
+        Lists every test the waterfall carries (``OC_<tranche>``) and every
+        tranche ``oc_trigger`` / ``ic_trigger`` (``OC_<tranche>_trigger``),
+        whatever its consequence. A later cure does not clear a date. A deal
+        with no coverage test returns an empty list, and a test the waterfall
+        carries is listed only if a period evaluated it, so a settlement with no
+        waterfall run lists none of those.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            ``test_id`` and ``first_breach``: an ISO 8601 payment date, or
+            ``None`` when the test never failed.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+    @property
     def periods(self) -> list[dict[str, Any]]:
         """
         Per-period deal record as ``PeriodDiagnostics`` serde dicts.
@@ -153,7 +177,7 @@ class SimulationDiagnostics:
         Returns
         -------
         list[dict[str, Any]]
-            ``payment_date``, ``pool_balance``, ``pool_factor``, ``wac``, ``weighted_avg_spread_bp``, ``warf``, the period's collections, defaults, recoveries, reinvested par, fees paid, the cash-account balances, ``delinquent_balance``, ``servicer_advances_outstanding``, ``excess_spread`` and the ``coverage_tests`` the executor evaluated.
+            ``payment_date``, ``pool_balance``, ``pool_factor``, ``wac``, ``weighted_avg_spread_bp``, ``warf`` (each ``None`` where its population is empty), the period's collections, defaults, recoveries, reinvested par, fees paid, the cash-account balances, ``delinquent_balance``, ``servicer_advances_outstanding``, ``excess_spread`` (realized this period, annualized, as a decimal of the opening pool balance: pool interest less debt coupons due, service-provider and manager fees paid through the waterfall and net charge-offs; zero on a settlement record), the ``coverage_tests`` the executor evaluated (``ratio`` and ``cushion`` are ``None`` when the test has no claim outstanding: the notes it covers are retired or owe no interest, and the test passes), ``waterfall`` (how the period's waterfall ran: ``total_available``, ``tier_allocations``, ``payment_records`` with each recipient's requested and paid amounts and an ``is_principal`` flag, ``diverted_amounts``, ``diverted_cash``, ``had_diversions``, ``remaining_interest``, ``remaining_principal``, ``principal_used_for_interest``, ``recovery_proceeds``) and ``non_waterfall_payments`` (cash paid to a tranche outside the waterfall: ``payment_date``, ``tranche_id``, ``source``, ``interest``, ``principal``, ``incentive_fee``; a recovery settling after the last period sits on that period with its own later date). Per tranche and date, ``payment_records`` plus ``non_waterfall_payments`` sum to the tranche's cash flows. ``credit_enhancement`` lists each tranche's ``tranche_id`` and ``credit_enhancement`` at period end: the decimal share of collateral beneath it, ``(C - N) / C`` with ``C`` the collateral plus the funding account and ``N`` the balances of the tranche and every tranche paid ahead of it. Amounts are in the deal currency.
 
         Raises
         ------
@@ -167,7 +191,8 @@ class SimulationDiagnostics:
         One row per simulated period as a pandas ``DataFrame``.
 
         Columns: ``date`` (ISO 8601 string), ``pool_balance``, ``pool_factor``,
-        ``wac`` (decimal), ``weighted_avg_spread_bp``, ``warf``,
+        ``wac`` (decimal), ``weighted_avg_spread_bp``, ``warf`` (each nullable
+        ``Float64``, ``<NA>`` where its population is empty),
         ``interest_collections``, ``principal_collections``, ``defaults``,
         ``recoveries``, ``reinvested_par``, ``fees_paid``, ``reserve_balance``,
         ``reserve_interest``, ``spread_account``, ``funding_account``,
@@ -176,8 +201,8 @@ class SimulationDiagnostics:
         amounts in their stored currency units without FX conversion. Rows keep
         stored period order and duplicate dates. Reserve interest uses the first
         matching date in ``reserve_interest_paid``; missing matches are zero.
-        An empty result retains all nineteen columns with a string date and
-        float64 numeric dtypes.
+        An empty result retains all nineteen columns with a string date, those
+        three nullable ``Float64`` columns and float64 for the other numeric dtypes.
 
         Returns
         -------
@@ -197,6 +222,8 @@ class SimulationDiagnostics:
 
         Columns: ``date`` (ISO 8601 string), ``test_id``, ``ratio``,
         ``trigger_level``, ``cushion`` (ratio minus trigger) and ``passing``.
+        ``ratio`` and ``cushion`` are ``NaN`` when the test has no claim
+        outstanding: the notes it covers are retired or owe no interest.
 
         Returns
         -------

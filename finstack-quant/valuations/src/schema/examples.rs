@@ -179,6 +179,7 @@ pub(super) fn scenario_grid() -> Result<Vec<Value>> {
 pub(super) fn scenario_table() -> Result<Vec<Value>> {
     example_from_json::<structured_credit::ScenarioTable>(json!({
         "tranche_id": "B",
+        "currency": "USD",
         "cells": [
             {"cpr": 0.15, "cdr": 0.02, "severity": 0.4, "price": 99.1, "wal": 5.8, "writedown": 0.0},
             {"cpr": 0.15, "cdr": 0.06, "severity": 0.4, "price": 93.4, "wal": 6.3, "writedown": 0.035}
@@ -248,6 +249,21 @@ pub(super) fn tranche_solve_field_units() -> Result<Vec<Value>> {
     example(&crate::pricer::tranche_solve_field_units())
 }
 
+/// The units of a USD scenario table's cells.
+pub(super) fn scenario_table_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::scenario_table_field_units(Currency::USD))
+}
+
+/// The units of a USD equity tranche's metrics.
+pub(super) fn equity_metrics_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::equity_metrics_field_units(Currency::USD))
+}
+
+/// The units of a USD simulation's charted series.
+pub(super) fn simulation_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::simulation_field_units(Currency::USD))
+}
+
 /// The unit of a tranche's CS01.
 pub(super) fn metric_field_unit() -> Result<Vec<Value>> {
     let units = crate::pricer::tranche_metric_field_units(Currency::USD);
@@ -275,11 +291,11 @@ pub(super) fn equity_metrics() -> Result<Vec<Value>> {
         currency: Currency::USD,
         invested: 40_000_000.0,
         irr: Some(0.142),
-        moic: 1.85,
+        moic: Some(1.85),
         nav_pct: 62.5,
         cash_on_cash: vec![
-            (date(2025, time::Month::April, 15)?, 0.045),
-            (date(2025, time::Month::July, 15)?, 0.047),
+            (date(2025, time::Month::April, 15)?, Some(0.045)),
+            (date(2025, time::Month::July, 15)?, Some(0.047)),
         ],
     })
 }
@@ -291,6 +307,20 @@ pub(super) fn pool_stats() -> Result<Vec<Value>> {
         &deal.pool,
         deal.closing_date,
     )?)
+}
+
+/// Report on the canonical example CLO pool at its closing date.
+pub(super) fn pool_report() -> Result<Vec<Value>> {
+    let deal = structured_credit::StructuredCredit::example()?;
+    example(&structured_credit::pool_report(
+        &deal.pool,
+        deal.closing_date,
+    )?)
+}
+
+/// The units of a USD pool report.
+pub(super) fn pool_report_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::pool_report_field_units(Currency::USD))
 }
 
 /// One quarterly interest payment on a senior floating-rate tranche.
@@ -345,7 +375,8 @@ fn simulation_diagnostics_value() -> Value {
         "unfunded_draws": zero,
         "reserve_replenished": zero,
         "early_amortization_date": null,
-        "tranche_draws": []
+        "tranche_draws": [],
+        "first_breaches": []
     })
 }
 
@@ -365,6 +396,12 @@ pub(super) fn standard_deal_params() -> Result<Vec<Value>> {
         discount_curve_id: deal.discount_curve_id.clone(),
         calendar_id: deal.calendar_id,
     })
+}
+
+/// The first family `standard_deal_families` lists.
+pub(super) fn standard_deal_family() -> Result<Vec<Value>> {
+    let families = structured_credit::standard_deal_families()?;
+    example(&families[0])
 }
 
 /// One simulation run carrying the senior tranche's quarterly payment.

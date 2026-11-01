@@ -11,7 +11,10 @@ class EquityMetrics:
     Residual-class return analytics of one deterministic projection
     (:meth:`StructuredCredit.equity_metrics`'s return value): the XIRR of the
     invested amount against every projected equity distribution, the
-    multiple on invested capital, the NAV and the cash-on-cash series.
+    multiple on invested capital, the NAV and the cash-on-cash series. With
+    nothing invested (a zero price or balance) ``irr``, ``moic`` and each
+    cash-on-cash share are ``None``: each divides by ``invested``.
+    ``equity_metrics_field_units`` states the units.
 
     Examples
     --------
@@ -184,12 +187,13 @@ class EquityMetrics:
     @property
     def irr(self) -> float | None:
         """
-        Annualized XIRR of the equity flows as a decimal.
+        Annualized XIRR (ACT/365F) of the equity flows as a decimal.
 
         Returns
         -------
         float | None
-            ``None`` when no rate solves (for example no positive distribution).
+            ``None`` when no rate solves: nothing invested or no positive
+            distribution. A class that receives little still has a rate, near ``-1.0``.
 
         Notes
         -----
@@ -198,14 +202,15 @@ class EquityMetrics:
         ...
 
     @property
-    def moic(self) -> float:
+    def moic(self) -> float | None:
         """
-        Multiple on invested capital: total distributions over ``invested``.
+        Multiple on invested capital: total distributions over ``invested``, interest and principal.
 
         Returns
         -------
-        float
-            The multiple.
+        float | None
+            The multiple; ``None`` when nothing is invested. A class that receives
+            nothing on a positive investment has a true ``0.0``.
 
         Notes
         -----
@@ -216,12 +221,12 @@ class EquityMetrics:
     @property
     def nav_pct(self) -> float:
         """
-        Discounted value of the distributions as a percent of the invested balance.
+        Distributions discounted on the deal's discount curve to the valuation date, as a percent of the equity's current balance.
 
         Returns
         -------
         float
-            The NAV percent.
+            The NAV percent (``62.5`` is 62.5%); it does not depend on the purchase price.
 
         Notes
         -----
@@ -230,14 +235,14 @@ class EquityMetrics:
         ...
 
     @property
-    def cash_on_cash(self) -> list[tuple[datetime.date, float]]:
+    def cash_on_cash(self) -> list[tuple[datetime.date, float | None]]:
         """
-        Per-distribution cash-on-cash yield (distribution over ``invested``).
+        Each distribution as a decimal share of ``invested``, not annualized.
 
         Returns
         -------
-        list[tuple[datetime.date, float]]
-            ``(date, yield)`` pairs.
+        list[tuple[datetime.date, float | None]]
+            ``(date, share)`` pairs; each share is ``None`` when nothing is invested.
 
         Raises
         ------

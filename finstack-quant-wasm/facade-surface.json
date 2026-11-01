@@ -4566,6 +4566,7 @@
       "cdsTrancheParamsMezzanineTranche",
       "coverageRulesCloStandard",
       "coverageRulesValidate",
+      "equityMetricsFieldUnits",
       "instrumentCashflows",
       "instrumentCashflowsWithMarket",
       "instrumentEnvelopeFromSpec",
@@ -4578,6 +4579,8 @@
       "pikScheduleModeAt",
       "poolAssetFixedRateBond",
       "poolAssetFloatingRateLoan",
+      "poolReport",
+      "poolReportFieldUnits",
       "prepaymentPenaltyFixed",
       "prepaymentPenaltyLockout",
       "prepaymentPenaltyStepDown",
@@ -4586,8 +4589,12 @@
       "priceDriverFields",
       "priceInstrument",
       "priceInstrumentWithMarket",
+      "scenarioTableFieldUnits",
+      "simulationFieldUnits",
+      "standardDealFamilies",
       "trancheBreakevenCdr",
       "trancheBuilder",
+      "trancheCashflowsTable",
       "trancheDiscountMargin",
       "trancheMetricFieldUnits",
       "trancheMetrics",
@@ -4833,6 +4840,21 @@
     "kind": "function"
   },
   "valuations.instruments.priceDriverFields": {
+    "kind": "function"
+  },
+  "valuations.instruments.poolReportFieldUnits": {
+    "kind": "function"
+  },
+  "valuations.instruments.scenarioTableFieldUnits": {
+    "kind": "function"
+  },
+  "valuations.instruments.simulationFieldUnits": {
+    "kind": "function"
+  },
+  "valuations.instruments.equityMetricsFieldUnits": {
+    "kind": "function"
+  },
+  "valuations.instruments.standardDealFamilies": {
     "kind": "function"
   },
   "valuations.instruments.trancheMetricFieldUnits": {
@@ -6003,6 +6025,12 @@
     "kind": "function"
   },
   "valuations.instruments.assetPoolAssetsByIndustry": {
+    "kind": "function"
+  },
+  "valuations.instruments.poolReport": {
+    "kind": "function"
+  },
+  "valuations.instruments.trancheCashflowsTable": {
     "kind": "function"
   },
   "valuations.instruments.calculatePoolStats": {

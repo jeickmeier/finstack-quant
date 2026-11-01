@@ -1,0 +1,102 @@
+{
+  "$defs": {
+    "MetricFieldUnit": {
+      "additionalProperties": false,
+      "description": "The display unit of one scalar field of a result struct.",
+      "properties": {
+        "field": {
+          "description": "Wire name of the field.",
+          "type": "string"
+        },
+        "label": {
+          "description": "Unit text as the field documents it, such as `USD per bp` or `years`.",
+          "type": "string"
+        },
+        "source": {
+          "description": "Canonical Rust field the unit is documented on.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "label",
+        "source"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics_field_units.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The display units of an equity tranche's invested amount, IRR, MOIC, NAV and cash-on-cash.",
+  "examples": [
+    {
+      "cash_on_cash": {
+        "field": "cash_on_cash",
+        "label": "decimal share of invested",
+        "source": "valuations::EquityMetrics::cash_on_cash"
+      },
+      "invested": {
+        "field": "invested",
+        "label": "USD",
+        "source": "valuations::EquityMetrics::invested"
+      },
+      "irr": {
+        "field": "irr",
+        "label": "annual decimal, ACT/365F",
+        "source": "valuations::EquityMetrics::irr"
+      },
+      "moic": {
+        "field": "moic",
+        "label": "multiple of invested",
+        "source": "valuations::EquityMetrics::moic"
+      },
+      "nav_pct": {
+        "field": "nav_pct",
+        "label": "% of current balance",
+        "source": "valuations::EquityMetrics::nav_pct"
+      },
+      "purchase_price": {
+        "field": "purchase_price_pct",
+        "label": "% of current balance; omitted means par",
+        "source": "valuations::calculate_equity_metrics::purchase_price_pct"
+      }
+    }
+  ],
+  "properties": {
+    "cash_on_cash": {
+      "$ref": "#/$defs/MetricFieldUnit",
+      "description": "Unit of each `EquityMetrics::cash_on_cash` value."
+    },
+    "invested": {
+      "$ref": "#/$defs/MetricFieldUnit",
+      "description": "Unit of `EquityMetrics::invested`."
+    },
+    "irr": {
+      "$ref": "#/$defs/MetricFieldUnit",
+      "description": "Unit of `EquityMetrics::irr`."
+    },
+    "moic": {
+      "$ref": "#/$defs/MetricFieldUnit",
+      "description": "Unit of `EquityMetrics::moic`."
+    },
+    "nav_pct": {
+      "$ref": "#/$defs/MetricFieldUnit",
+      "description": "Unit of `EquityMetrics::nav_pct`."
+    },
+    "purchase_price": {
+      "$ref": "#/$defs/MetricFieldUnit",
+      "description": "Unit of the `purchase_price_pct` argument of `calculate_equity_metrics`,\nand what omitting it means."
+    }
+  },
+  "required": [
+    "invested",
+    "irr",
+    "moic",
+    "nav_pct",
+    "cash_on_cash",
+    "purchase_price"
+  ],
+  "title": "EquityMetricsFieldUnits",
+  "type": "object"
+}

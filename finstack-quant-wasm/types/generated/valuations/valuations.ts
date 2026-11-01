@@ -3406,9 +3406,10 @@ export type ShiftMode = "shift_of_subordinate" | "senior_share";
  * - cumulative loss is a fraction of the *original* pool balance;
  * - the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;
  * - credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,
- *   where the senior note is the *single* most-senior tranche by payment
- *   priority — for pari-passu senior classes (e.g. A-1/A-2) only the
- *   lowest-priority one is taken as the reference.
+ *   where the senior note is the tranche with the lowest `payment_priority`.
+ *   `TrancheStructure` gives every tranche a distinct priority, so for
+ *   same-seniority senior classes (e.g. A-1/A-2) this is the first one in
+ *   input order: A-1 is subtracted and A-2, ranked behind it, is not.
  *
  * `MaxDelinquency` reads the delinquent share of the pool, which is zero
  * unless the deal carries a `credit_model.delinquency` model.
@@ -3969,6 +3970,16 @@ export type PathSamplingMethod =
         seed: number;
       };
     };
+/**
+ * Where cash paid to a tranche outside the waterfall came from.
+ */
+export type NonWaterfallSource =
+  | "reserve_interest"
+  | "redemption"
+  | "spread_account_release"
+  | "principal_account_release"
+  | "reserve_account_release"
+  | "recovery_release";
 /**
  * Strongly-typed instrument classification for pricer dispatch.
  *
@@ -18866,21 +18877,42 @@ export interface ConvertibleGreeks {
   [k: string]: unknown;
 }
 /**
+ * When one coverage test first failed over a simulation.
+ */
+export interface CoverageTestBreach {
+  /**
+   * First payment date this simulation found the test failing; a later cure
+   * does not clear it. `None` when it never failed.
+   */
+  first_breach?: DateWire | null;
+  /**
+   * Id of the test: `CoverageTestDiagnostic::test_id` for a test the
+   * waterfall carries (`OC_<tranche>`), or `OC_<tranche>_trigger` /
+   * `IC_<tranche>_trigger` for a tranche's own `oc_trigger` / `ic_trigger`.
+   */
+  test_id: string;
+  [k: string]: unknown;
+}
+/**
  * One coverage test as the waterfall executor evaluated it in a period.
  */
 export interface CoverageTestDiagnostic {
   /**
-   * `ratio − trigger_level`; negative while the test fails.
+   * `ratio − trigger_level`; negative while the test fails. `None` when `ratio`
+   * is, for the same reason.
    */
-  cushion: number;
+  cushion?: number | null;
   /**
    * Whether the test passed in this period.
    */
   passing: boolean;
   /**
    * Ratio the executor computed (OC: collateral ÷ notes; IC: interest ÷ due).
+   * `None` when the test has no claim outstanding: the notes it covers are
+   * retired (OC) or owe no interest (IC), so the denominator is zero and no
+   * ratio exists. Such a test passes.
    */
-  ratio: number;
+  ratio?: number | null;
   /**
    * `CoverageTestSpec::id` of the test.
    */
@@ -18956,6 +18988,28 @@ export interface Diagnostic {
    * Whether the finding is fatal or recoverable.
    */
   severity: Severity;
+}
+/**
+ * Record of a diverted payment from one tier to another recipient.
+ */
+export interface DiversionRecord {
+  /**
+   * Cash diverted, in the deal currency.
+   */
+  amount: Money;
+  /**
+   * Failing coverage tests that caused the diversion, for display.
+   */
+  reason: string;
+  /**
+   * `WaterfallTier::id` of the coverage-test tier that diverted the cash.
+   */
+  source_tier: string;
+  /**
+   * `Recipient::id` that received the cash, or `principal_account` when a
+   * `Reinvest` test retained it as principal proceeds.
+   */
+  target_tranche: string;
 }
 /**
  * Revolving-credit Monte Carlo value with per-path details.
@@ -19307,9 +19361,11 @@ export interface ThreeFactorPathData {
  */
 export interface EquityMetrics {
   /**
-   * Each distribution as a fraction of `invested`, by payment date.
+   * Each distribution as a decimal fraction of `invested`, by payment date and
+   * not annualized; the fractions sum to `moic`. The share is `None` when
+   * nothing is invested.
    */
-  cash_on_cash: [string, number][];
+  cash_on_cash: [string, number | null][];
   /**
    * ISO-4217 code of the currency the amounts are denominated in.
    */
@@ -19320,22 +19376,73 @@ export interface EquityMetrics {
   invested: number;
   /**
    * Annualized IRR of `−invested` on the valuation date against every
-   * projected distribution (XIRR); `None` when no rate solves.
+   * projected distribution (XIRR, ACT/365F), as a decimal; `None` when no rate
+   * solves, as when nothing is invested or no distribution is projected.
    */
   irr?: number | null;
   /**
-   * Multiple on invested capital: total distributions ÷ `invested`.
+   * Multiple on invested capital: total distributions ÷ `invested`, interest
+   * and principal together. `None` when nothing is invested; a class that
+   * receives nothing on a positive investment has a true `0.0`.
    */
-  moic: number;
+  moic?: number | null;
   /**
-   * Present value of the distributions on the deal's discount curve, as a
-   * percent of the equity's current balance.
+   * Present value at the valuation date of the distributions on the deal's
+   * discount curve, as a percent of the equity's current balance (`62.5` =
+   * 62.5%). It does not depend on the purchase price.
    */
   nav_pct: number;
   /**
    * Identifier of the equity tranche.
    */
   tranche_id: string;
+}
+/**
+ * The display units of an equity tranche's invested amount, IRR, MOIC, NAV and cash-on-cash.
+ */
+export interface EquityMetricsFieldUnits {
+  /**
+   * Unit of each `EquityMetrics::cash_on_cash` value.
+   */
+  cash_on_cash: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::invested`.
+   */
+  invested: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::irr`.
+   */
+  irr: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::moic`.
+   */
+  moic: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::nav_pct`.
+   */
+  nav_pct: MetricFieldUnit;
+  /**
+   * Unit of the `purchase_price_pct` argument of `calculate_equity_metrics`,
+   * and what omitting it means.
+   */
+  purchase_price: MetricFieldUnit;
+}
+/**
+ * The display unit of one scalar field of a result struct.
+ */
+export interface MetricFieldUnit {
+  /**
+   * Wire name of the field.
+   */
+  field: string;
+  /**
+   * Unit text as the field documents it, such as `USD per bp` or `years`.
+   */
+  label: string;
+  /**
+   * Canonical Rust field the unit is documented on.
+   */
+  source: string;
 }
 /**
  * Projected cashflows of an asset-backed facility and its residual.
@@ -19383,7 +19490,21 @@ export interface SimulationDiagnostics {
    */
   early_amortization_date?: DateWire | null;
   /**
-   * Per-period deal accounting, in payment order.
+   * First failure of each coverage test, one entry per test sorted by
+   * `test_id`. Covers every test the waterfall carries (each also on
+   * `periods[i].coverage_tests`) and every tranche `oc_trigger` /
+   * `ic_trigger`, whatever its consequence (only a breached `DivertCashFlow`
+   * trigger is on `coverage_tests`, for the periods it is in breach). A deal
+   * with no coverage test has no entries, and a test the waterfall carries is
+   * listed only if a period evaluated it, so a settlement with no waterfall run
+   * lists none of those.
+   */
+  first_breaches: CoverageTestBreach[];
+  /**
+   * Per-period deal accounting, in payment order. A deal with no payment
+   * period left that still settles cash (a fully defaulted pool with
+   * recoveries pending, or a funded reserve) has one record, holding that
+   * settlement in `non_waterfall_payments`.
    */
   periods?: PeriodDiagnostics[];
   /**
@@ -19421,6 +19542,14 @@ export interface PeriodDiagnostics {
    */
   coverage_tests: CoverageTestDiagnostic[];
   /**
+   * Every tranche's credit enhancement on this period's end-of-period
+   * balances, in `TrancheStructure` order. The step-down trigger
+   * `MinCreditEnhancement` reads the senior tranche's value from the same
+   * function on the next payment date, before that date's principal is paid,
+   * so with no losses or draws in between it tests this period's number.
+   */
+  credit_enhancement: TrancheCreditEnhancement[];
+  /**
    * Par that defaulted (charged off) this period.
    */
   defaults: Money;
@@ -19429,7 +19558,15 @@ export interface PeriodDiagnostics {
    */
   delinquent_balance: Money;
   /**
-   * Annualized excess spread realized this period (decimal).
+   * Excess spread realized this period, annualized, as a decimal of the
+   * opening pool balance (`0.02` is 2% a year): `(I − D − F − L) ÷ P × 12 ÷ m`.
+   * `I` is `interest_collections`, `D` the debt coupons due this period, `F`
+   * the service-provider and manager fees paid through the waterfall (not
+   * special-servicing fees, already out of `I`), `L` the period's defaults less
+   * pool recoveries, floored at zero, `P` the pool balance before this period's
+   * flows and `m` the months in the period. The early-amortization excess-spread
+   * test reads this number. Zero when `P` is zero and on a settlement record,
+   * where no waterfall ran.
    */
   excess_spread: number;
   /**
@@ -19444,6 +19581,17 @@ export interface PeriodDiagnostics {
    * Interest collected from the pool (including servicer advances).
    */
   interest_collections: Money;
+  /**
+   * Cash paid to tranches outside the waterfall: reserve interest routed to
+   * a tranche, and, on the deal's last period, its redemption and terminal
+   * releases. Together with `waterfall.payment_records` this is every
+   * tranche's cash: per tranche and date, the two sum to the tranche's
+   * `cashflows`, and to its `interest_flows` plus `principal_flows`. The one
+   * exception to the second sum is residual cash a custom waterfall pays a
+   * debt class beyond its interest claim, which the engine books to
+   * `cashflows` alone.
+   */
+  non_waterfall_payments: NonWaterfallPayment[];
   /**
    * Payment date of the period.
    */
@@ -19484,18 +19632,175 @@ export interface PeriodDiagnostics {
   spread_account: Money;
   /**
    * Weighted-average coupon (annual decimal) of the performing fixed-rate
-   * collateral at period end: the same population as `AssetPool::wac`.
+   * collateral at period end: the same population as `AssetPool::wac`. `None`
+   * when no performing fixed-rate balance remains.
    */
-  wac: number;
+  wac?: number | null;
   /**
-   * Balance-weighted Moody's rating factor of the collateral.
+   * Balance-weighted Moody's rating factor of the performing collateral. `None`
+   * when no performing balance remains.
    */
-  warf: number;
+  warf?: number | null;
   /**
-   * Balance-weighted spread of the floating-rate collateral (basis points).
+   * How this period's waterfall ran.
    */
-  weighted_avg_spread_bp: number;
+  waterfall: PeriodWaterfall;
+  /**
+   * Balance-weighted spread of the performing floating-rate collateral (basis
+   * points). `None` when no performing floating-rate balance remains.
+   */
+  weighted_avg_spread_bp?: number | null;
   [k: string]: unknown;
+}
+/**
+ * One tranche's credit enhancement at a period's end.
+ */
+export interface TrancheCreditEnhancement {
+  /**
+   * Share of the collateral beneath this tranche, as a decimal (`0.30` is
+   * 30%): `(C − N) ÷ C`, where `C` is the collateral balance plus the
+   * controlled-accumulation funding account and `N` the balances of this
+   * tranche and every tranche paid ahead of it (`payment_priority` at or
+   * below its own). Deferred interest is not in `N`. Negative when the notes
+   * exceed the collateral, and zero when there is no collateral. Pari-passu
+   * classes rank by `payment_priority`, so each is enhanced only by those
+   * ranked after it; an equity class's value is the collateral left above
+   * the whole structure.
+   */
+  credit_enhancement: number;
+  /**
+   * Id of the tranche (`Tranche::id`).
+   */
+  tranche_id: string;
+  [k: string]: unknown;
+}
+/**
+ * Cash paid to one tranche outside the waterfall.
+ */
+export interface NonWaterfallPayment {
+  /**
+   * Manager incentive fee withheld from the cash before it reached an
+   * equity class; zero otherwise. Already counted in the period's
+   * `fees_paid`, and not part of what the tranche received.
+   */
+  incentive_fee: Money;
+  /**
+   * Part booked to the tranche's interest flows.
+   */
+  interest: Money;
+  /**
+   * Date the tranche received the cash. A recovery settling after the last
+   * period carries its own later date here.
+   */
+  payment_date: DateWire;
+  /**
+   * Part booked to the tranche's principal flows, net of `incentive_fee`.
+   */
+  principal: Money;
+  /**
+   * Where the cash came from.
+   */
+  source: NonWaterfallSource;
+  /**
+   * Id of the tranche paid (`Tranche::id`), equity classes included.
+   */
+  tranche_id: string;
+  [k: string]: unknown;
+}
+/**
+ * How one period's waterfall ran: who was paid, how much, and what was left.
+ *
+ * The serializable projection of [`WaterfallDistribution`]: its two
+ * recipient-keyed maps cannot be JSON (a `RecipientType::Tranche` is not a
+ * string key) and hold nothing `payment_records` does not, and its payment
+ * date and coverage tests are already on [`PeriodDiagnostics`].
+ */
+export interface PeriodWaterfall {
+  /**
+   * Coverage-test diversions that moved cash, in execution order.
+   */
+  diverted_amounts: DiversionRecord[];
+  /**
+   * Total cash failing coverage tests diverted this period.
+   */
+  diverted_cash: Money;
+  /**
+   * Whether any coverage-test tier failed this period, even with no cash
+   * left to divert.
+   */
+  had_diversions: boolean;
+  /**
+   * Every recipient payment, in execution order.
+   */
+  payment_records: PaymentRecord[];
+  /**
+   * Principal proceeds spent on fee or interest tiers.
+   */
+  principal_used_for_interest: Money;
+  /**
+   * Recovery cash included in `total_available`.
+   */
+  recovery_proceeds: Money;
+  /**
+   * Interest proceeds left undistributed, carried to the next period.
+   */
+  remaining_interest: Money;
+  /**
+   * Principal proceeds left undistributed, carried to the next period.
+   */
+  remaining_principal: Money;
+  /**
+   * Cash each tier allocated, as `(tier id, amount)` in execution order.
+   */
+  tier_allocations: [string, Money][];
+  /**
+   * Cash entering the waterfall (interest plus principal proceeds).
+   */
+  total_available: Money;
+  [k: string]: unknown;
+}
+/**
+ * One recipient's payment as the waterfall executor made it.
+ */
+export interface PaymentRecord {
+  /**
+   * Whether a failing coverage test diverted this payment here.
+   */
+  diverted: boolean;
+  /**
+   * Whether this payment is capital: it retires the tranche's balance and
+   * books to its principal flows rather than its interest flows.
+   */
+  is_principal: boolean;
+  /**
+   * Cash actually paid, in the deal currency.
+   */
+  paid_amount: Money;
+  /**
+   * `WaterfallTier::priority` of that tier (lower runs first).
+   */
+  priority: number;
+  /**
+   * Who was paid. An equity class is paid as `RecipientType::Equity`, every
+   * other class as `RecipientType::Tranche` with its id.
+   */
+  recipient: RecipientType;
+  /**
+   * `Recipient::id` within the tier.
+   */
+  recipient_id: string;
+  /**
+   * Amount the recipient's calculation asked for, in the deal currency.
+   */
+  requested_amount: Money;
+  /**
+   * `requested_amount` less `paid_amount`.
+   */
+  shortfall: Money;
+  /**
+   * `WaterfallTier::id` of the tier that made the payment.
+   */
+  tier_id: string;
 }
 /**
  * Result containing tranche-specific cashflows and metadata.
@@ -19924,23 +20229,6 @@ export interface MetricCoordinate {
   value?: number | null;
 }
 /**
- * The display unit of one scalar field of a result struct.
- */
-export interface MetricFieldUnit {
-  /**
-   * Wire name of the field.
-   */
-  field: string;
-  /**
-   * Unit text as the field documents it, such as `USD per bp` or `years`.
-   */
-  label: string;
-  /**
-   * Canonical Rust field the unit is documented on.
-   */
-  source: string;
-}
-/**
  * Canonical per-key metric interpretation for host presentation.
  */
 export interface MetricMetadata {
@@ -20047,7 +20335,75 @@ export interface OasResult {
   [k: string]: unknown;
 }
 /**
- * Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.
+ * Balance held by one obligor, industry or rating, as a row of a [`PoolReport`]
+ * concentration table.
+ */
+export interface PoolConcentrationEntry {
+  /**
+   * Number of asset rows grouped, zero-balance rows included.
+   */
+  asset_count: number;
+  /**
+   * Current balance of the row's assets, defaulted assets included, in the
+   * pool's base currency.
+   */
+  balance: Money;
+  /**
+   * `balance` in percent points of [`PoolReport::total_balance`] (`20.0` =
+   * 20%), the convention of `ConcentrationLimit::max_pct` and
+   * `PoolStats::defaulted_balance_pct`, so a share compares to a limit
+   * directly. The rows of one table sum to `100.0`; `0.0` when the pool
+   * balance is not positive.
+   */
+  balance_pct: number;
+  /**
+   * Obligor id, industry or rating wire form (`"BB+"`) this row groups, or
+   * `null` for the assets that carry no value on the dimension. A null key
+   * cannot collide with a real name.
+   */
+  key?: string | null;
+}
+/**
+ * Collateral-pool statistics, WARF and concentration by obligor, industry and rating.
+ */
+export interface PoolReport {
+  /**
+   * Balance per `PoolAsset::industry`.
+   */
+  by_industry: PoolConcentrationEntry[];
+  /**
+   * Balance per `PoolAsset::obligor_id`.
+   */
+  by_obligor: PoolConcentrationEntry[];
+  /**
+   * Balance per `PoolAsset::rating` wire form. An asset with no rating is in
+   * the null-key row, not in an explicit `"NR"` row, although WARF weights
+   * both with the `NR` factor.
+   */
+  by_rating: PoolConcentrationEntry[];
+  /**
+   * [`calculate_pool_stats`] of the same rows. Its fields mix units: `wac` is
+   * a decimal, `weighted_avg_spread_bp` basis points and
+   * `defaulted_balance_pct` percent points.
+   */
+  stats: PoolStats;
+  /**
+   * Current balance of every asset row, defaulted assets included, in the
+   * pool's base currency: the denominator of each `balance_pct`.
+   */
+  total_balance: Money;
+  /**
+   * Moody's weighted-average rating factor, the number `CloWarfCalculator`
+   * and `PeriodDiagnostics::warf` report: weighted by balance over the
+   * performing rows only (defaulted and non-positive-balance rows are out of
+   * both numerator and denominator). An unrated asset takes the Moody's table
+   * factor for `NR`. `None` when no performing balance remains; the
+   * `clo_warf` metric, which must return a number, reports `0.0` there.
+   */
+  warf?: number | null;
+}
+/**
+ * AssetPool-level performance statistics
  */
 export interface PoolStats {
   /**
@@ -20057,15 +20413,18 @@ export interface PoolStats {
    */
   defaulted_balance_pct: number;
   /**
-   * Diversity score (Moody's methodology)
+   * Diversity score (Moody's methodology) of the assets that name an obligor;
+   * `None` when none does. See [`AssetPool::diversity_score`].
    */
-  diversity_score: number;
+  diversity_score?: number | null;
   /**
-   * Number of industries
+   * Number of distinct `PoolAsset::industry` values. Assets naming no industry
+   * are not counted.
    */
   num_industries: number;
   /**
-   * Number of obligors
+   * Number of distinct `PoolAsset::obligor_id` values. Assets naming no obligor
+   * are not counted.
    */
   num_obligors: number;
   /**
@@ -20075,22 +20434,46 @@ export interface PoolStats {
   undrawn_commitment?: number;
   /**
    * Weighted-average coupon (annual decimal) of the performing fixed-rate
-   * collateral; see [`AssetPool::wac`].
+   * collateral; `None` when there is none. See [`AssetPool::wac`].
    */
-  wac: number;
+  wac?: number | null;
   /**
-   * Weighted average maturity (WAM) in years.
+   * Weighted average maturity (WAM) in years; `None` when the pool balance is
+   * zero.
    *
    * For weighted average life, which weights principal cashflows rather
    * than maturities, use the `wal` metric.
    */
-  weighted_avg_maturity: number;
+  weighted_avg_maturity?: number | null;
   /**
    * Weighted-average spread in basis points of the performing collateral
-   * that carries an explicit `spread_bp`; see
+   * that carries an explicit `spread_bp`; `None` when there is none. See
    * [`AssetPool::weighted_avg_spread_bp`].
    */
-  weighted_avg_spread_bp: number;
+  weighted_avg_spread_bp?: number | null;
+}
+/**
+ * The display units of the collateral-pool report fields.
+ */
+export interface PoolReportFieldUnits {
+  /**
+   * Unit of the numeric fields of each `by_obligor`, `by_industry` and
+   * `by_rating` row, in the order `PoolConcentrationEntry` declares them.
+   */
+  concentration: MetricFieldUnit[];
+  /**
+   * Unit of every `PoolReport::stats` field, in the order `PoolStats`
+   * declares them.
+   */
+  stats: MetricFieldUnit[];
+  /**
+   * Unit of `PoolReport::total_balance`.
+   */
+  total_balance: MetricFieldUnit;
+  /**
+   * Unit of `PoolReport::warf`.
+   */
+  warf: MetricFieldUnit;
 }
 /**
  * Market conventions of one interest-rate index.
@@ -20178,7 +20561,7 @@ export interface ScenarioCell {
    */
   wal: number;
   /**
-   * Total principal writedown in currency units.
+   * Total principal writedown, in units of [`ScenarioTable::currency`].
    */
   writedown: number;
 }
@@ -20214,9 +20597,48 @@ export interface ScenarioTable {
    */
   cells: ScenarioCell[];
   /**
+   * Currency of the tranche, which each cell's `writedown` is denominated in.
+   */
+  currency: Currency;
+  /**
    * Identifier of the tranche evaluated.
    */
   tranche_id: string;
+}
+/**
+ * The display units of a scenario table's axes and measures.
+ */
+export interface ScenarioTableFieldUnits {
+  /**
+   * Unit of each swept `ScenarioCell` input, in the order the struct declares them.
+   */
+  axes: MetricFieldUnit[];
+  /**
+   * Unit of each measure `ScenarioCell` reports, in the order the struct declares them.
+   */
+  measures: MetricFieldUnit[];
+}
+/**
+ * The display units of a simulation's coverage, diversion, enhancement and excess-spread series.
+ */
+export interface SimulationFieldUnits {
+  /**
+   * Unit of each numeric `CoverageTestDiagnostic` field, in the order the
+   * struct declares them.
+   */
+  coverage_tests: MetricFieldUnit[];
+  /**
+   * Unit of `TrancheCreditEnhancement::credit_enhancement`.
+   */
+  credit_enhancement: MetricFieldUnit;
+  /**
+   * Unit of `PeriodWaterfall::diverted_cash` and of each diversion's amount.
+   */
+  diverted_cash: MetricFieldUnit;
+  /**
+   * Unit of `PeriodDiagnostics::excess_spread`.
+   */
+  excess_spread: MetricFieldUnit;
 }
 /**
  * Tranche cashflows and deal accounting from one deterministic simulation.
@@ -20233,6 +20655,27 @@ export interface SimulationRun {
     [k: string]: TrancheCashflows;
   };
   [k: string]: unknown;
+}
+/**
+ * One deal family the standard structured-credit constructor accepts, with its registry profile and an example of its inputs.
+ */
+export interface StandardDealFamily {
+  /**
+   * The `deal_type` argument of [`StructuredCredit::new_standard`].
+   */
+  deal_type: DealType;
+  /**
+   * Complete [`StandardDealParams`] that `new_standard` accepts for this family,
+   * with its `id`, tranche ids and `pool.deal_type` naming the family. Its schema
+   * is `standard_deal_params`, not repeated here.
+   */
+  example: {
+    [k: string]: unknown;
+  };
+  /**
+   * Registry profile that family's deal takes its assumptions from.
+   */
+  profile_id: string;
 }
 /**
  * Inputs for the standard structured-credit registry constructor.

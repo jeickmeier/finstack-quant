@@ -32,25 +32,26 @@ pub use utils::{validate_tiers, ValidationError};
 
 pub use types::MarketConditions;
 pub use types::{
-    calculate_pool_stats, AdvanceRate, AdvancingPolicy, AfcSpec, AllocationMode, AssetPool,
-    AssetType, BalloonSpec, BorrowingBaseReport, BorrowingBaseRules, CallAssumption,
-    CallExercisePolicy, CallScope, CardPortfolioSpec, CccBucketRule, CollateralInstrument,
-    ConcentrationLimit, ConcentrationScope, ControlledAccumulationSpec, CoveragePlacement,
-    CoverageRules, CoverageTestAction, CoverageTestSpec, CoverageTestType, CoverageTrigger,
-    CreditModelConfig, DealFees, DealType, DefaultedValuation, DelinquencyModel,
-    DiscountObligationRule, EarlyAmortizationSpec, EligibilityRule, EquityHistory,
-    ExcessSpreadSpec, FundingSource, HedgeSwap, IncentiveFeeSpec, InstrumentCollateral,
-    InstrumentExerciseOverride, LiquidationSpec, LiveCollateral, LossAllocationPolicy,
-    LossRecognition, ManagementFeeType, Metadata, ModificationSpec, PaymentCalculation,
-    PaymentRecord, PaymentType, PenaltyStep, PoolAsset, PoolStats, PrepaymentPenalty,
-    PutExercisePolicy, Recipient, RecipientType, ReinvestmentAssumptions, ReinvestmentCriteria,
-    ReinvestmentPeriod, RepLine, ReserveAccountSpec, ReserveInterestDestination, ReserveTarget,
-    RoundingConvention, ShiftMode, ShiftingInterestSpec, ShiftingInterestStep,
-    SpecialServicingSpec, StandardDealParams, StepDownSpec, StepDownTrigger, StructuredCredit,
-    StructuredCreditBuilder, SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche,
-    TrancheAccrualPeriod, TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance,
-    TrancheStructure, TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution,
-    WaterfallRules, WaterfallTier,
+    calculate_pool_stats, pool_report, standard_deal_families, AdvanceRate, AdvancingPolicy,
+    AfcSpec, AllocationMode, AssetPool, AssetType, BalloonSpec, BorrowingBaseReport,
+    BorrowingBaseRules, CallAssumption, CallExercisePolicy, CallScope, CardPortfolioSpec,
+    CccBucketRule, CollateralInstrument, ConcentrationLimit, ConcentrationScope,
+    ControlledAccumulationSpec, CoveragePlacement, CoverageRules, CoverageTestAction,
+    CoverageTestSpec, CoverageTestType, CoverageTrigger, CreditModelConfig, DealFees, DealType,
+    DefaultedValuation, DelinquencyModel, DiscountObligationRule, DiversionRecord,
+    EarlyAmortizationSpec, EligibilityRule, EquityHistory, ExcessSpreadSpec, FundingSource,
+    HedgeSwap, IncentiveFeeSpec, InstrumentCollateral, InstrumentExerciseOverride, LiquidationSpec,
+    LiveCollateral, LossAllocationPolicy, LossRecognition, ManagementFeeType, Metadata,
+    ModificationSpec, PaymentCalculation, PaymentRecord, PaymentType, PenaltyStep, PoolAsset,
+    PoolConcentrationEntry, PoolReport, PoolStats, PrepaymentPenalty, PutExercisePolicy, Recipient,
+    RecipientType, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, RepLine,
+    ReserveAccountSpec, ReserveInterestDestination, ReserveTarget, RoundingConvention, ShiftMode,
+    ShiftingInterestSpec, ShiftingInterestStep, SpecialServicingSpec, StandardDealFamily,
+    StandardDealParams, StepDownSpec, StepDownTrigger, StructuredCredit, StructuredCreditBuilder,
+    SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche, TrancheAccrualPeriod,
+    TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance, TrancheStructure,
+    TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
+    WaterfallTier,
 };
 
 pub use pricing::execute_waterfall;
@@ -58,7 +59,9 @@ pub use pricing::execute_waterfall;
 pub use pricing::coverage_tests::{TestContext, TestResult};
 pub use pricing::waterfall::WaterfallContext;
 pub use pricing::{
-    CoverageTestDiagnostic, PeriodDiagnostics, SimulationDiagnostics, SimulationRun,
+    CoverageTestBreach, CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource,
+    PeriodDiagnostics, PeriodWaterfall, SimulationDiagnostics, SimulationRun,
+    TrancheCreditEnhancement,
 };
 
 pub use metrics::{

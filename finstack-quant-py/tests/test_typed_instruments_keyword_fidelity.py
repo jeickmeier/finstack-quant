@@ -382,6 +382,7 @@ def test_result_wrapper_from_json_accepts_keyword_argument() -> None:
 
     scenario_payload = json.dumps({
         "tranche_id": "A",
+        "currency": "USD",
         "cells": [{"cpr": 0.06, "cdr": 0.02, "severity": 0.6, "price": 98.2, "wal": 4.1, "writedown": 0.0}],
     })
     assert ScenarioTable.from_json(json=scenario_payload).tranche_id == "A"

@@ -236,7 +236,69 @@ test("switching instrument loads its model and market, and gallery links retain 
   expect(errors).toEqual([]);
 });
 
-test("structured-credit scenario prices use the completed native request", async ({
+test("a standard deal family builds, prices and lists its native tranches", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=pricing-workbench&theme=light&density=compact&focus=1&instrument=structured_credit",
+  );
+  const state = page.locator(".finstack-workbench__state");
+  await expect(state).toHaveText("Priced");
+  await page.getByText("Start from a standard deal", { exact: true }).click();
+  await page.getByRole("radio", { name: "RMBS", exact: true }).click();
+  await page.getByRole("button", { name: "Build deal" }).click();
+  await expect(state).toHaveText("Priced");
+  const results = page.getByRole("region", { name: "Results", exact: true });
+  await results.getByRole("tab", { name: "Request" }).click();
+  await results.getByText("Priced instrument", { exact: true }).click();
+  await expect(
+    results.getByRole("region", { name: "Priced instrument JSON" }),
+  ).toContainText('"deal_type":"rmbs"');
+  await results.getByRole("tab", { name: "Scenarios" }).click();
+  await expect(
+    results.getByRole("region", {
+      name: `${scenarios.trancheId} tranche analytics`,
+    }),
+  ).toBeVisible();
+  // The built deal reaches its native pool report.
+  await results.locator("summary", { hasText: /^Pool report$/ }).click();
+  const pool = results.getByRole("region", { name: "Pool report" });
+  await expect(pool).toContainText("WARF");
+  await expect(pool.getByRole("table", { name: "By rating" })).toBeVisible();
+  // ... and its native waterfall, one row per simulated period with detail on expand.
+  await results.locator("summary", { hasText: /^Waterfall report$/ }).click();
+  const waterfall = results.getByRole("region", { name: "Waterfall report" });
+  await waterfall.getByRole("button", { expanded: false }).first().click();
+  await expect(
+    waterfall.getByRole("table", { name: "Payment records" }),
+  ).toBeVisible();
+  // ... and its coverage tests, as far as this family's waterfall carries any.
+  await results.locator("summary", { hasText: /^Coverage tests$/ }).click();
+  await expect(
+    results
+      .getByRole("region", { name: "Coverage tests" })
+      .or(results.getByText("No coverage test was evaluated.")),
+  ).toBeVisible();
+  // ... and its credit enhancement and excess spread.
+  await results
+    .locator("summary", { hasText: /^Credit enhancement and excess spread$/ })
+    .click();
+  await expect(
+    results
+      .getByRole("region", { name: "Credit enhancement and excess spread" })
+      .getByRole("table", { name: "By payment date" }),
+  ).toBeVisible();
+  // ... and its equity tranche: this family has none, and Rust says so.
+  await results.locator("summary", { hasText: /^Equity tranche$/ }).click();
+  await expect(
+    results.getByRole("region", { name: "Equity tranche" }).getByRole("alert"),
+  ).toContainText("deal has no equity tranche");
+  expect(errors).toEqual([]);
+});
+
+test("structured-credit scenarios use the completed native request", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -247,9 +309,9 @@ test("structured-credit scenario prices use the completed native request", async
   const results = page.getByRole("region", { name: "Results", exact: true });
   await expect(page.locator(".finstack-workbench__state")).toHaveText("Priced");
   await results.getByRole("tab", { name: "Scenarios" }).click();
-  await results.getByText("Scenario prices", { exact: true }).click();
+  await results.locator("summary", { hasText: /^Scenarios$/ }).click();
   const scenario = results.getByRole("region", {
-    name: "CLONOTES-A scenario prices",
+    name: "CLONOTES-A scenario measures",
   });
   // The grid shows the live native prices; the committed fixture holds the same
   // native table and `mise run ui-fixtures --check` keeps it fresh.
@@ -257,6 +319,14 @@ test("structured-credit scenario prices use the completed native request", async
     String(scenarios.cases[0]!.table.cells[0]!.price),
   );
   await expect(scenario).toContainText("trancheScenarioTable");
+  // WAL and writedown read the same returned cells, each with its native unit.
+  await scenario.getByRole("radio", { name: "WAL", exact: true }).click();
+  await expect(scenario).toContainText("WAL (years). Severity:");
+  await expect(scenario.getByRole("grid")).toContainText(
+    String(scenarios.cases[0]!.table.cells[0]!.wal),
+  );
+  await scenario.getByRole("radio", { name: "Writedown", exact: true }).click();
+  await expect(scenario).toContainText("Writedown (USD). Severity:");
   // The native ScenarioGrid editor is seeded from the host grid.
   await expect(
     results.getByRole("button", { name: "Run scenarios" }),

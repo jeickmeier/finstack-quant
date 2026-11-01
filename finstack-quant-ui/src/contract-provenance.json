@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "5590246edc27a463671f87aa6ae1e8d170af11df0fa7669f4835963c6cd2a1b3",
+          "sha256": "a964ba14993e4641251c27a329be6f48477187266804c5926deb0d9cc3523346",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "b8230fbb7bff0c79e51a2b07673e0dec7f8b13b2904ce7f097db888480ae3b29",
+          "sha256": "2f344763420769d16e51e18ed1cdd021ac75841e8c6c5fc490b3135d7b5a2f7e",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -334,7 +334,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
-          "sha256": "c164dbd24e936875f977b39803df41cd42dd824e2cf54ad6e3ca081868ca4ce9",
+          "sha256": "ed75fbbed7c8f5ea47238d31b8b0da97d4157064773e083577201a4779a1e7ad",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -1692,8 +1692,8 @@
     },
     {
       "id": "scenario-heatmap",
-      "route": "returned-prices",
-      "convention": "Rust clean settlement price, percent of current tranche balance.",
+      "route": "returned-measures",
+      "convention": "Returned ScenarioCell measures only, in the units scenarioTableFieldUnits states: Rust clean settlement price in percent of current tranche balance, WAL in years, writedown in the table's currency.",
       "api": {
         "name": "valuations.instruments.trancheScenarioTable",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -1734,7 +1734,7 @@
     {
       "id": "tranche-analytics",
       "route": "returned-metrics",
-      "convention": "Returned TrancheMetrics fields in the units each Rust field documents; break-even CDR, discount margin and OAS as returned decimals; prices percent of current tranche balance; no price default.",
+      "convention": "Returned TrancheMetrics fields in the units each Rust field documents; break-even CDR, discount margin and OAS as returned decimals; prices percent of current tranche balance; no price default; cash flows by date only from TrancheCashflows::to_table, with its dates joined and summed in Rust.",
       "api": {
         "name": "valuations.instruments.trancheMetrics",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -1775,6 +1775,141 @@
         "returns": "TrancheMetrics",
         "declaration": "/**\n   * Per-tranche valuation, yield, spread and risk metrics computed from one\n   * tranche's own cashflows — the one per-note analytics entry point.\n   *\n   * `marketPricePct`, when provided, is the quoted clean price (% of CURRENT balance)\n   * the yield, z-spread and CS01 are solved against; otherwise the deal quote,\n   * or the tranche's own model price (zero z-spread). `metrics` lists registry\n   * metric ids (`\"dv01\"`, `\"default01\"`, …) valued on this note and returned\n   * in `metrics`, so tranche sensitivities sum to the deal's. Returns a typed\n   * `TrancheMetrics` object — a plain object with the same snake_case fields\n   * Python exposes through its typed `TrancheMetrics` wrapper. Pass it to\n   * `JSON.stringify` if a wire string is needed.\n   * @returns Typed `TrancheMetrics` object (PV, clean/dirty price, accrued, WAL, yield, z-spread, CS01, effective duration and convexity, requested registry metrics).\n   * @param deal - Borrowed typed StructuredCredit handle; load persisted envelopes once with StructuredCredit.fromJson before calling. The handle is not consumed.\n   * @param trancheId - Stable tranche identifier used to select the required domain object.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param marketPricePct - Optional clean settlement quote as a percentage of CURRENT balance; omit to use the deal quote, or its model clean price when no quote is supplied.\n   * @param metrics - Optional registry metric ids to value on this note; omit or pass an empty array for none.\n   * @throws Error - Throws a JavaScript exception if the market JSON is malformed; a metric id is unknown; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.\n   */\n  trancheMetrics(\n    deal: StructuredCredit,\n    trancheId: string,\n    marketJson: JsonInput,\n    asOf: string,\n    marketPricePct?: number | null,\n    metrics?: string[] | null\n  ): TrancheMetrics;",
         "sha256": "bc91ceb63532e92bfd4404b4bd0635320a59dc87948d1204aeaffa7d38ca3e92"
+      }
+    },
+    {
+      "id": "pool-report",
+      "route": "returned-report",
+      "convention": "Returned PoolReport fields in the units poolReportFieldUnits states: statistics, Moody's WARF and concentration tables by obligor, industry and rating, in Rust's row order with balance_pct in percent points of total_balance. A null key is shown as missing, never dropped, and a null statistic as missing, never zero; nothing is summed, sorted or grouped here.",
+      "api": {
+        "name": "valuations.instruments.poolReport",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "poolReport",
+        "inputs": [
+          {
+            "name": "pool",
+            "type": "generated.valuations.AssetPool | string",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.valuations.PoolReport",
+        "declaration": "/**\n   * Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).\n   * @param pool - `AssetPool` plain object or JSON string, in any of its three representations.\n   * @param asOf - ISO-8601 date the remaining maturities are measured from. It also stands in for the closing date when a pool is normalized: it ages representative lines and counts the delayed draws already funded on instrument collateral.\n   * @returns `PoolReport` plain object: `total_balance` (the denominator of every share), `stats` (`PoolStats` of the same rows), `warf` (Moody's rating factor weighted by balance over the performing rows, unrated assets at the `NR` factor) and `by_obligor`, `by_industry`, `by_rating`, each a list of `PoolConcentrationEntry` with `balance_pct` in percent points. An empty pool reports zero balances and empty tables. `poolReportFieldUnits` states every unit.\n   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, the pool cannot be normalized, an asset is not in the pool's base currency, or a rating has no Moody's factor.\n   */\n  poolReport(\n    pool: generated.valuations.AssetPool | string,\n    asOf: string\n  ): generated.valuations.PoolReport;",
+        "sha256": "a75937f578b29d96fb235b458e2c83b704b5cb84d9293dad7ffb105462e85884"
+      }
+    },
+    {
+      "id": "waterfall-report",
+      "route": "returned-report",
+      "convention": "Returned SimulationDiagnostics.periods in payment order, in the deal currency each Money states: the period's PeriodWaterfall, and on expand its tier allocations and payment records in execution order, diversions and non-waterfall payments with their own dates. The is_principal, diverted and had_diversions flags are Rust's. Nothing is summed, joined by date, sorted or classified here.",
+      "api": {
+        "name": "StructuredCredit#runSimulation",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StructuredCredit",
+        "member": "runSimulation",
+        "inputs": [
+          {
+            "name": "marketJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.valuations.SimulationRun",
+        "declaration": "/**\n   * Run the deterministic simulation and return the deal-level accounting.\n   *\n   * Mirrors Rust `StructuredCredit::run_simulation`.\n   * @param marketJson - Canonical market-context JSON (string or plain object) supplying discount and forward curves.\n   * @param asOf - Requested ISO-8601 valuation date; lifecycle policy resolves the effective date.\n   * @returns `SimulationRun` with `tranches` keyed by tranche identifier and complete `diagnostics`.\n   * @throws Error - Throws with kind `not_found` if a curve is missing, `validation` if the deal or dates are invalid, and `computation` if simulation fails.\n   */\n  runSimulation(marketJson: JsonInput, asOf: string): generated.valuations.SimulationRun;",
+        "sha256": "0985a0aa86be8b5e7e185a6432167e8eac5d9823dcec7cab08c22904b616a28f"
+      }
+    },
+    {
+      "id": "coverage-test-chart",
+      "route": "returned-report",
+      "convention": "Returned SimulationDiagnostics.first_breaches in Rust's order and, for the selected test, periods[].coverage_tests' ratio, trigger_level, cushion and passing on the dates Rust recorded them, in the units simulationFieldUnits states. The first breach date, cushion and pass or fail are Rust's. A test recorded on fewer dates than the deal has periods states the counts returned, and a null ratio or cushion is shown as no claim outstanding with no dot. waterfall.diverted_cash and diverted_amounts are shown for the deal, not attributed to a test. Nothing is computed, joined by date, sorted or classified here.",
+      "api": {
+        "name": "StructuredCredit#runSimulation",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StructuredCredit",
+        "member": "runSimulation",
+        "inputs": [
+          {
+            "name": "marketJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.valuations.SimulationRun",
+        "declaration": "/**\n   * Run the deterministic simulation and return the deal-level accounting.\n   *\n   * Mirrors Rust `StructuredCredit::run_simulation`.\n   * @param marketJson - Canonical market-context JSON (string or plain object) supplying discount and forward curves.\n   * @param asOf - Requested ISO-8601 valuation date; lifecycle policy resolves the effective date.\n   * @returns `SimulationRun` with `tranches` keyed by tranche identifier and complete `diagnostics`.\n   * @throws Error - Throws with kind `not_found` if a curve is missing, `validation` if the deal or dates are invalid, and `computation` if simulation fails.\n   */\n  runSimulation(marketJson: JsonInput, asOf: string): generated.valuations.SimulationRun;",
+        "sha256": "0985a0aa86be8b5e7e185a6432167e8eac5d9823dcec7cab08c22904b616a28f"
+      }
+    },
+    {
+      "id": "credit-enhancement-chart",
+      "route": "returned-report",
+      "convention": "Returned periods[].credit_enhancement by tranche, a decimal share of the collateral beneath it at period end, and periods[].excess_spread, realized that period and annualized as a decimal of the opening pool balance (pool interest less debt coupons due, waterfall fees and net charge-offs), in the units simulationFieldUnits states. One period is listed, not charted. Nothing is computed, grouped, joined by date, sorted or classified here.",
+      "api": {
+        "name": "StructuredCredit#runSimulation",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StructuredCredit",
+        "member": "runSimulation",
+        "inputs": [
+          {
+            "name": "marketJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.valuations.SimulationRun",
+        "declaration": "/**\n   * Run the deterministic simulation and return the deal-level accounting.\n   *\n   * Mirrors Rust `StructuredCredit::run_simulation`.\n   * @param marketJson - Canonical market-context JSON (string or plain object) supplying discount and forward curves.\n   * @param asOf - Requested ISO-8601 valuation date; lifecycle policy resolves the effective date.\n   * @returns `SimulationRun` with `tranches` keyed by tranche identifier and complete `diagnostics`.\n   * @throws Error - Throws with kind `not_found` if a curve is missing, `validation` if the deal or dates are invalid, and `computation` if simulation fails.\n   */\n  runSimulation(marketJson: JsonInput, asOf: string): generated.valuations.SimulationRun;",
+        "sha256": "0985a0aa86be8b5e7e185a6432167e8eac5d9823dcec7cab08c22904b616a28f"
+      }
+    },
+    {
+      "id": "equity-tranche-card",
+      "route": "returned-report",
+      "convention": "Returned EquityMetrics in the units equityMetricsFieldUnits states: invested in the deal currency; irr an annual XIRR decimal on ACT/365F, or null when no rate solves, stated rather than drawn as zero; moic total distributions over invested; nav_pct distributions discounted on the deal's discount curve as a percent of current balance; cash_on_cash each distribution as an unannualized decimal share of invested. Rust chooses the equity tranche and returns null for moic and cash_on_cash when nothing is invested, stated rather than drawn as zero; a returned zero is drawn as zero. A blank purchase price is omitted, so Rust's par default applies. Nothing is computed, rescaled or classified here.",
+      "api": {
+        "name": "StructuredCredit#equityMetrics",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StructuredCredit",
+        "member": "equityMetrics",
+        "inputs": [
+          {
+            "name": "marketJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "purchasePricePct",
+            "type": "number | null",
+            "optional": true
+          }
+        ],
+        "returns": "generated.valuations.EquityMetrics",
+        "declaration": "/**\n   * Equity-tranche return metrics (mirrors Rust `calculate_equity_metrics`).\n   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.\n   * @param asOf - ISO-8601 valuation date.\n   * @param purchasePricePct - Optional equity purchase price in percent of its current balance (`60` = 60%); omit to invest at par. Must be finite and non-negative.\n   * @returns `EquityMetrics` plain object: `invested`; `irr`, an annual XIRR (ACT/365F) decimal or `null` when no rate solves; `moic`, a multiple of invested; `nav_pct`, the distributions discounted on the deal's discount curve as a percent of current balance; and `cash_on_cash`, each distribution as an unannualized decimal share of invested. `equityMetricsFieldUnits` states the units.\n   * @throws Error - Throws with kind `not_found` if a curve is missing or the simulation records no equity tranche, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.\n   */\n  equityMetrics(\n    marketJson: JsonInput,\n    asOf: string,\n    purchasePricePct?: number | null\n  ): generated.valuations.EquityMetrics;",
+        "sha256": "1edf29e4f1e744b912ab8eb0e9bfed9aa9aa3a8c8ea060b2604b6773c09e6977"
       }
     },
     {
@@ -2507,7 +2642,7 @@
   ],
   "scenarioAuthority": {
     "source": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/scenario.rs",
-    "sha256": "6d1e2e6ef80f6979abba09e6c918668e0eb2bbfc1b3847bdafdc76e50a3c3c39"
+    "sha256": "b0109c1eb652aecbceb2c94ee7dd4220d4fc7705edf87c41c594d18d54e957ce"
   },
   "deferred": {
     "machine-readable-units": "Generic values stay raw; do not infer units from names or decimal refs.",

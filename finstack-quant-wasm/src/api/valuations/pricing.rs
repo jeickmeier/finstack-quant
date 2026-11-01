@@ -474,6 +474,72 @@ pub fn tranche_metric_field_units(currency: JsValue) -> Result<JsValue, JsValue>
     to_js_value(&finstack_quant_valuations::pricer::tranche_metric_field_units(currency))
 }
 
+/// Units of the `ScenarioCell` fields, the one place a host reads them from.
+///
+/// Rates are decimals, the price is a clean percent of the tranche's current balance and
+/// the writedown is in currency units. Values are never rescaled.
+/// @param currency - ISO-4217 code of the result's `ScenarioTable.currency`, in any ASCII case; it names the unit of `writedown`.
+/// @returns `ScenarioTableFieldUnits`: `axes`, one `MetricFieldUnit` per swept input (`cpr`, `cdr`, `severity`), and `measures`, one per reported measure (`price`, `wal`, `writedown`), each in struct order.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = scenarioTableFieldUnits)]
+pub fn scenario_table_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::scenario_table_field_units(currency))
+}
+
+/// Units of a structured-credit simulation's charted series, the one place a host reads them from.
+///
+/// Coverage ratios, triggers and cushions are in times covered, credit enhancement
+/// is a decimal share of the collateral and excess spread an annual decimal of the opening pool
+/// balance. Values are never rescaled.
+/// @param currency - ISO-4217 code of the simulation's deal currency, in any ASCII case; it names the unit of `diverted_cash`.
+/// @returns `SimulationFieldUnits`: `coverage_tests`, one `MetricFieldUnit` per numeric coverage-test field (`ratio`, `trigger_level`, `cushion`) in struct order, and one each for `diverted_cash`, `credit_enhancement` and `excess_spread`.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = simulationFieldUnits)]
+pub fn simulation_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::simulation_field_units(
+        currency,
+    ))
+}
+
+/// Deal families `StructuredCredit.newStandard` accepts, the one place a host reads them from.
+///
+/// @returns `StandardDealFamily[]` in `abs`, `clo`, `cmbs`, `rmbs` order: `deal_type`, the `newStandard` argument; `profile_id`, the registry profile supplying the family's frequency and credit assumptions; and `example`, complete `StandardDealParams` that `newStandard` accepts for the family, with its id, tranche ids and `pool.deal_type` naming the family.
+/// @throws Error - Throws a `validation` error if an example cannot be constructed, which its fixed inputs do not trigger.
+#[wasm_bindgen(js_name = standardDealFamilies)]
+pub fn standard_deal_families() -> Result<JsValue, JsValue> {
+    to_js_value(&finstack_quant_valuations::instruments::fixed_income::structured_credit::standard_deal_families().map_err(crate::utils::to_js_err)?)
+}
+
+/// Units of the `EquityMetrics` fields, the one place a host reads them from.
+///
+/// The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV a percent of the
+/// equity's current balance and cash-on-cash a decimal share of the invested amount. Values are never rescaled.
+/// @param currency - ISO-4217 code of the result's `currency`, in any ASCII case; it names the unit of `invested`.
+/// @returns `EquityMetricsFieldUnits`: one `MetricFieldUnit` each for `invested`, `irr`, `moic`, `nav_pct` and `cash_on_cash`, and `purchase_price` for the `purchasePricePct` argument of `equityMetrics`: percent of current balance, omitted means par.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = equityMetricsFieldUnits)]
+pub fn equity_metrics_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::equity_metrics_field_units(currency))
+}
+
+/// Units of the `PoolReport` fields, the one place a host reads them from.
+///
+/// `PoolStats` mixes a decimal coupon, a basis-point spread and a percent-point
+/// defaulted share. Values are never rescaled.
+/// @param currency - ISO-4217 code of the pool's base currency, in any ASCII case; it names the unit of `total_balance`, `undrawn_commitment` and each row's `balance`.
+/// @returns `PoolReportFieldUnits`: `total_balance` and `warf`, each one `MetricFieldUnit`; `stats`, one per `PoolStats` field in struct order; and `concentration`, one per numeric `PoolConcentrationEntry` field in struct order.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = poolReportFieldUnits)]
+pub fn pool_report_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::pool_report_field_units(
+        currency,
+    ))
+}
+
 /// List every pricing model key registered in the standard pricer registry.
 ///
 /// The list is registry-derived rather than enum-derived, so it reflects real

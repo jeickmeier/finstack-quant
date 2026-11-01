@@ -728,9 +728,9 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::fixed_income::convertible::ConvertibleGreeks;
     use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
-        BorrowingBaseReport, EquityMetrics, OasConfig, OasResult, PoolStats, ScenarioGrid,
-        ScenarioTable, SimulationDiagnostics, SimulationRun, StandardDealParams, TrancheCashflows,
-        TrancheMetrics,
+        BorrowingBaseReport, EquityMetrics, OasConfig, OasResult, PoolReport, PoolStats,
+        ScenarioGrid, ScenarioTable, SimulationDiagnostics, SimulationRun, StandardDealFamily,
+        StandardDealParams, TrancheCashflows, TrancheMetrics,
     };
     use crate::instruments::json_loader::InstrumentJson;
     use crate::instruments::MarketDependencies;
@@ -741,7 +741,10 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::market::listed::ListedProductCoverage;
     use crate::metrics::risk::var_calculator::VarResult;
     use crate::metrics::risk::MarketHistory;
-    use crate::pricer::{MetricFieldUnit, MetricMetadata, TrancheSolveFieldUnits};
+    use crate::pricer::{
+        EquityMetricsFieldUnits, MetricFieldUnit, MetricMetadata, PoolReportFieldUnits,
+        ScenarioTableFieldUnits, SimulationFieldUnits, TrancheSolveFieldUnits,
+    };
     use crate::results::ValuationResult;
     use finstack_quant_core::contract::{Diagnostic, ValidationReport};
     use finstack_quant_core::currency::Currency;
@@ -1064,6 +1067,36 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_kind(SchemaKind::Output)
         .with_examples(examples::tranche_solve_field_units),
         finstack_quant_core::schema_artifact!(
+            ScenarioTableFieldUnits,
+            "results",
+            "scenario_table_field_units",
+            Component,
+            "The display units of a scenario table's axes and measures."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::scenario_table_field_units),
+        finstack_quant_core::schema_artifact!(
+            EquityMetricsFieldUnits,
+            "results",
+            "equity_metrics_field_units",
+            Component,
+            "The display units of an equity tranche's invested amount, IRR, MOIC, NAV and cash-on-cash."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::equity_metrics_field_units),
+        finstack_quant_core::schema_artifact!(
+            SimulationFieldUnits,
+            "results",
+            "simulation_field_units",
+            Component,
+            "The display units of a simulation's coverage, diversion, enhancement and excess-spread series."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::simulation_field_units),
+        finstack_quant_core::schema_artifact!(
             MetricMetadata,
             "results",
             "metric_metadata",
@@ -1094,6 +1127,26 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_kind(SchemaKind::Output)
         .with_examples(examples::pool_stats),
         finstack_quant_core::schema_artifact!(
+            PoolReport,
+            "results",
+            "pool_report",
+            Component,
+            "Collateral-pool statistics, WARF and concentration by obligor, industry and rating."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::pool_report),
+        finstack_quant_core::schema_artifact!(
+            PoolReportFieldUnits,
+            "results",
+            "pool_report_field_units",
+            Component,
+            "The display units of the collateral-pool report fields."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::pool_report_field_units),
+        finstack_quant_core::schema_artifact!(
             TrancheCashflows,
             "results",
             "tranche_cashflows",
@@ -1112,6 +1165,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         )
         .with_packager(package_valuations_schema)
         .with_examples(examples::standard_deal_params),
+        finstack_quant_core::schema_artifact!(
+            StandardDealFamily,
+            "results",
+            "standard_deal_family",
+            Component,
+            "One deal family the standard structured-credit constructor accepts, with its registry profile and an example of its inputs."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::standard_deal_family),
         finstack_quant_core::schema_artifact!(
             SimulationRun,
             "results",
