@@ -403,6 +403,17 @@ const displays = [
       "Returned SimulationDiagnostics.first_breaches in Rust's order and, for the selected test, periods[].coverage_tests' ratio, trigger_level, cushion and passing on the dates Rust recorded them, in the units simulationFieldUnits states. The first breach date, cushion and pass or fail are Rust's. A trigger with a first_breaches entry and no coverage_tests row is reported as having no ratio by date. waterfall.diverted_cash and diverted_amounts are shown for the deal, not attributed to a test. Nothing is computed, joined by date, sorted or classified here.",
   },
   {
+    id: "credit-enhancement-chart",
+    api: [
+      "StructuredCredit#runSimulation",
+      "StructuredCredit",
+      "runSimulation",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned periods[].credit_enhancement by tranche, a decimal share of the collateral beneath it at period end, and periods[].excess_spread, realized that period and annualized as a decimal of the opening pool balance (pool interest less debt coupons due, waterfall fees and net charge-offs), in the units simulationFieldUnits states. One period is listed, not charted. Nothing is computed, grouped, joined by date, sorted or classified here.",
+  },
+  {
     id: "performance-report",
     api: ["analytics.Performance#summary", "Performance", "summary"],
     route: "returned-analytics",
