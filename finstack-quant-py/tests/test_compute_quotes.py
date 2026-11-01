@@ -78,6 +78,7 @@ def test_what_does_not_apply_is_none_and_round_trips() -> None:
     [
         (Bond.example(), {"discount_margin": 0.01}, "requires a floating-rate bond"),
         (_callable(), {"z_spread": 0.01}, "requires an explicit quoted clean price"),
+        (_callable(), {"asw_market": 0.01}, "ASW market pricing for option-bearing bond"),
         (Bond.example(), {"yield": 0.05}, "unknown variant"),
         (Bond.example(), {"ytm": 0.05, "ytw": 0.05}, "invalid BondQuoteInput"),
         (Bond.example(), {"ytm": math.nan}, "invalid BondQuoteInput"),

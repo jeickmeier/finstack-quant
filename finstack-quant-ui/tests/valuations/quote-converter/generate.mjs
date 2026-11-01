@@ -123,6 +123,8 @@ const errors = {
   discountMarginOnFixed: nativeError(bullet, { discount_margin: 0.01 }),
   // Z-spread is not a quote on a bond with exercise rights: use its OAS.
   zSpreadOnCallable: nativeError(callable, { z_spread: 0.01 }),
+  // Nor is an asset-swap spread: the worst exit depends on the price.
+  aswMarketOnCallable: nativeError(callable, { asw_market: 0.01 }),
   // A call on the quote date below the price has no spread that matches same-day cash.
   quoteDateCall: nativeError(
     withSpec(callable, {

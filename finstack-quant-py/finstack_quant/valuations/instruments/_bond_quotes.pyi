@@ -396,18 +396,13 @@ def compute_quotes(
         price is not positive, ``as_of`` is not a date, or the market is malformed. A
         quote kind the bond does not have raises it too: ``discount_margin`` on a bond
         with no floating coupons, ``asw_market`` or ``japanese_simple_yield`` on a
-        floating coupon, and ``z_spread`` on a bond with exercise rights. So does a
+        floating coupon, and ``z_spread`` or ``asw_market`` on a bond with exercise
+        rights, whose workout path depends on the price. So does a
         metric of the set that cannot be solved, which fails the whole set:
         ``z_spread`` on a bond with a call or put on the quote date below the price,
         or ``oas`` on a bond with exercise rights and no HW1F parameters.
     KeyError
         If a curve the bond needs to normalize the quote is missing.
-
-    Notes
-    -----
-    ``asw_market`` prices the swap to maturity while the metric runs it to the worst
-    exit, so on a bond whose worst exit is early the set's ``asw_market`` is not the
-    input, and feeding it back does not recover the price.
 
     Examples
     --------

@@ -1020,11 +1020,9 @@ name at that clean price, with the unit `metricMetadata` declares for
 A null field shows as "No value", never zero: it does not apply to the bond or has no
 finite value. A quote that cannot be solved shows the native error as returned: a kind
 the bond does not have (`discount_margin` with no floating coupons, `asw_market` or
-`japanese_simple_yield` on a floating coupon, `z_spread` with exercise rights), or one
+`japanese_simple_yield` on a floating coupon, `z_spread` or `asw_market` with exercise rights), or one
 metric of the set failing, which fails the whole set. A bond with exercise rights needs
-HW1F parameters for its `oas`. `asw_market` does not recover the price it came from on
-a bond whose worst exit is early, because the metric runs the swap to the workout and
-its inverse to maturity. Nothing is converted or compared in JavaScript. The native
+HW1F parameters for its `oas`. Nothing is converted or compared in JavaScript. The native
 fixture is `tests/valuations/quote-converter/cases.json`.
 
 ## Option calculator
