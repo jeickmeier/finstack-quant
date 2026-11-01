@@ -919,3 +919,29 @@ test('commodity spot money currency is checked at expiry and in Monte Carlo', ()
     );
   }
 });
+
+test('bondWorkoutLadder matches Python, a null yield included', () => {
+  const { market, as_of: asOf, cases } = golden.bond_workout_ladder;
+  for (const { bond: bondJson, ladder } of cases) {
+    const bond = instruments.Bond.fromJson(bondJson);
+    try {
+      same(plain(instruments.bondWorkoutLadder(bond, market, asOf)), ladder, 'workout ladder');
+    } finally {
+      bond.free();
+    }
+  }
+  const [premium, quoteDateCall] = cases.map((entry) => entry.ladder.rows);
+  assert.deepEqual(
+    premium.map((row) => [row.date, row.kind, row.is_worst]),
+    [
+      ['2027-01-15', 'call', true],
+      ['2029-01-15', 'call', false],
+      ['2031-01-15', 'call', false],
+      ['2034-01-16', 'maturity', false],
+    ]
+  );
+  assert.deepEqual(
+    [quoteDateCall[0].date, quoteDateCall[0].yield_rate, quoteDateCall[0].is_worst],
+    ['2025-01-17', null, true]
+  );
+});

@@ -3755,6 +3755,10 @@ export type BasketAssetType = "equity" | "bond" | "etf" | "cash" | "commodity" |
  */
 export type FxConversionPolicy = "cashflow_date" | "period_end" | "period_average";
 /**
+ * How the holder leaves the bond on a [`BondWorkoutRow`]'s date.
+ */
+export type WorkoutExitKind = "call" | "put" | "maturity";
+/**
  * Classifies captured cashflows by economic meaning.
  *
  * These tags are diagnostic metadata only. They do not change pricing logic by
@@ -17626,6 +17630,88 @@ export interface BasketPricingConfig {
    * FX policy hint for conversions when constituent currency != basket currency.
    */
   fx_policy: FxConversionPolicy;
+}
+/**
+ * Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked.
+ */
+export interface BondWorkoutLadder {
+  /**
+   * Valuation date.
+   */
+  as_of: DateWire;
+  /**
+   * Clean price every row is solved at, as percent of the original notional:
+   * the quoted clean price, or for a bond with no exercise rights and no quote
+   * the model price at the quote date.
+   */
+  clean_price_pct: number;
+  /**
+   * `clean_price_pct` plus accrued interest at the quote date, in the bond's
+   * currency. Exits are alternatives for one price, so the rows share it.
+   */
+  dirty_price: Money;
+  /**
+   * Identifier of the bond.
+   */
+  instrument_id: string;
+  /**
+   * Settlement date of the quote; every yield is timed from it.
+   */
+  quote_date: DateWire;
+  /**
+   * One row per candidate exit, in date order. Adjacent call windows that share
+   * a boundary date each keep a row; a put and a call on one date each keep
+   * theirs. A bond with no exercise rights has one maturity row.
+   */
+  rows: BondWorkoutRow[];
+}
+/**
+ * One admissible exit of a bond: a row of a [`BondWorkoutLadder`].
+ */
+export interface BondWorkoutRow {
+  /**
+   * Exit date. A maturity row carries the business-day-adjusted final payment
+   * date when that is later than the contractual maturity.
+   */
+  date: DateWire;
+  /**
+   * `yield_rate` less the swap par rate from the quote date to `date`, as a
+   * decimal, the convention of the `i_spread` metric. `None` when `yield_rate`
+   * is `None`.
+   */
+  i_spread?: number | null;
+  /**
+   * Whether this is the worst exit, the one the `ytw` metric selects. At most
+   * one row is marked; none is when no exit has a yield and each pays at least
+   * the price at once.
+   */
+  is_worst: boolean;
+  /**
+   * Whether the exit is a call, a put or maturity.
+   */
+  kind: WorkoutExitKind;
+  /**
+   * Whether the redemption is a make-whole price off a reference curve.
+   */
+  make_whole: boolean;
+  /**
+   * Clean cash the exit redeems, in the bond's currency; accrued interest is
+   * paid on top.
+   */
+  redemption_amount: Money;
+  /**
+   * Clean redemption as percent of the principal outstanding at the exit
+   * (`103.0` = 103%). A make-whole call shows its make-whole price, which can
+   * exceed the contractual strike.
+   */
+  redemption_price_pct: number;
+  /**
+   * Street yield to this exit as a decimal, compounded at the coupon
+   * frequency, timed from the quote date. `None` when the path has no finite
+   * yield: an exit on the quote date, or same-day cash at or above the price. A
+   * worst row can be `None`, where the `ytw` metric is negative infinity.
+   */
+  yield_rate?: number | null;
 }
 /**
  * Asset-backed facility borrowing base, availability and advance-rate test.

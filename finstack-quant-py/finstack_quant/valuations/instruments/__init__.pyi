@@ -31,6 +31,11 @@ from finstack_quant.valuations.instruments._instruments import (
     TermLoan as TermLoan,
     TermLoanBuilder as TermLoanBuilder,
 )
+from finstack_quant.valuations.instruments._bond_workout import (
+    BondWorkoutLadder as BondWorkoutLadder,
+    BondWorkoutRow as BondWorkoutRow,
+    bond_workout_ladder as bond_workout_ladder,
+)
 from finstack_quant.valuations.instruments._merton_mc import (
     BarrierCrossing as BarrierCrossing,
     MertonMcCalibrationSpec as MertonMcCalibrationSpec,
@@ -198,6 +203,8 @@ __all__ = [
     "BarrierCrossing",
     "Bond",
     "BondBuilder",
+    "BondWorkoutLadder",
+    "BondWorkoutRow",
     "CallAssumption",
     "CallPutSchedule",
     "CapFloor",
@@ -263,6 +270,7 @@ __all__ = [
     "VarResult",
     "Waterfall",
     "bond_from_cashflows_json",
+    "bond_workout_ladder",
     "calculate_pool_stats",
     "calculate_var",
     "instrument_cashflows",

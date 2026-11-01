@@ -725,6 +725,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
     use crate::instruments::fixed_income::asset_backed_facility::FacilityProjection;
     use crate::instruments::fixed_income::bond::pricing::merton_mc::MertonMcResult;
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions::BondWorkoutLadder;
     use crate::instruments::fixed_income::convertible::ConvertibleGreeks;
     use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
@@ -1126,6 +1127,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::pool_stats),
+        finstack_quant_core::schema_artifact!(
+            BondWorkoutLadder,
+            "results",
+            "bond_workout_ladder",
+            Component,
+            "Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::bond_workout_ladder),
         finstack_quant_core::schema_artifact!(
             PoolReport,
             "results",

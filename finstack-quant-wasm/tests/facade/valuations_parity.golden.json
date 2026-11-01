@@ -1709,7 +1709,7 @@
           "date": "2024-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "758333.333333333",
+            "amount": "758333.3333333330",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1729,7 +1729,7 @@
           "date": "2024-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "725642.485857187",
+            "amount": "725642.4858571870",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1749,7 +1749,7 @@
           "date": "2024-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "701587.845991617",
+            "amount": "701587.8459916170",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1769,7 +1769,7 @@
           "date": "2025-01-02",
           "reset_date": null,
           "amount": {
-            "amount": "670548.90416569",
+            "amount": "670548.9041656900",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1789,7 +1789,7 @@
           "date": "2025-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "626545.923146556",
+            "amount": "626545.92314655640",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1809,7 +1809,7 @@
           "date": "2025-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "602127.256661638",
+            "amount": "602127.25666163830",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1829,7 +1829,7 @@
           "date": "2025-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "577999.322376615",
+            "amount": "577999.32237661530",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1869,7 +1869,7 @@
           "date": "2026-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "508041.058103195",
+            "amount": "508041.05810319490",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1949,7 +1949,7 @@
           "date": "2027-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "403519.7671349516",
+            "amount": "403519.76713495170",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -2009,7 +2009,7 @@
           "date": "2028-01-03",
           "reset_date": null,
           "amount": {
-            "amount": "340712.143243985",
+            "amount": "340712.1432439850",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -2218,49 +2218,49 @@
         [
           "2024-04-01",
           {
-            "amount": "758333.333333333",
+            "amount": "758333.3333333330",
             "currency": "USD"
           }
         ],
         [
           "2024-07-01",
           {
-            "amount": "725642.485857187",
+            "amount": "725642.4858571870",
             "currency": "USD"
           }
         ],
         [
           "2024-10-01",
           {
-            "amount": "701587.845991617",
+            "amount": "701587.8459916170",
             "currency": "USD"
           }
         ],
         [
           "2025-01-02",
           {
-            "amount": "670548.90416569",
+            "amount": "670548.9041656900",
             "currency": "USD"
           }
         ],
         [
           "2025-04-01",
           {
-            "amount": "626545.923146556",
+            "amount": "626545.92314655640",
             "currency": "USD"
           }
         ],
         [
           "2025-07-01",
           {
-            "amount": "602127.256661638",
+            "amount": "602127.25666163830",
             "currency": "USD"
           }
         ],
         [
           "2025-10-01",
           {
-            "amount": "577999.322376615",
+            "amount": "577999.32237661530",
             "currency": "USD"
           }
         ],
@@ -2274,7 +2274,7 @@
         [
           "2026-04-01",
           {
-            "amount": "508041.058103195",
+            "amount": "508041.05810319490",
             "currency": "USD"
           }
         ],
@@ -2302,7 +2302,7 @@
         [
           "2027-04-01",
           {
-            "amount": "403519.7671349516",
+            "amount": "403519.76713495170",
             "currency": "USD"
           }
         ],
@@ -2323,7 +2323,7 @@
         [
           "2028-01-03",
           {
-            "amount": "340712.143243985",
+            "amount": "340712.1432439850",
             "currency": "USD"
           }
         ]
@@ -2457,7 +2457,7 @@
         "currency": "USD"
       },
       "total_interest": {
-        "amount": "8598939.29668482780",
+        "amount": "8598939.29668482880",
         "currency": "USD"
       },
       "total_principal": {
@@ -2503,10 +2503,10 @@
         2334977.4500475316, 2255361.2438797224, 2177815.765887149, 27005140.74494716
       ],
       "interest": [
-        758333.333333333, 725642.485857187, 701587.845991617, 670548.90416569, 626545.923146556,
-        602127.256661638, 577999.322376615, 548204.7161074615, 508041.058103195, 486008.5448622527,
-        464232.4574216178, 437953.6146922244, 403519.7671349516, 383591.8410551944,
-        363890.0825313093, 340712.143243985
+        758333.333333333, 725642.485857187, 701587.845991617, 670548.90416569, 626545.9231465564,
+        602127.2566616383, 577999.3223766153, 548204.7161074615, 508041.058103195,
+        486008.5448622527, 464232.4574216178, 437953.6146922244, 403519.76713495166,
+        383591.8410551944, 363890.0825313093, 340712.143243985
       ],
       "principal": [
         2586528.591519251, 2506596.504789011, 2429134.577681208, 2354066.474286073,
@@ -7210,6 +7210,159 @@
           "maturity": "2034-01-01",
           "discount_curve_id": "USD-OIS",
           "calendar_id": "nyse"
+        }
+      }
+    ]
+  },
+  "bond_workout_ladder": {
+    "market": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2025-01-15\",\"day_count\":\"act_365f\",\"knot_points\":[[0.0,1.0],[1.0,0.9607894391523232]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":1e-6,\"rate_calibration\":null,\"fx_policy\":null}],\"fx\":null,\"surfaces\":[],\"prices\":{},\"series\":[],\"inflation_indices\":[],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+    "as_of": "2025-01-15",
+    "cases": [
+      {
+        "bond": "{\"schema\": \"finstack_quant.instrument/1\", \"instrument\": {\"type\": \"bond\", \"spec\": {\"id\": \"CALLABLE-USD-10Y\", \"notional\": {\"amount\": \"1000000\", \"currency\": \"USD\"}, \"issue_date\": \"2024-01-15\", \"maturity\": \"2034-01-15\", \"cashflow_spec\": {\"fixed\": {\"coupon_type\": \"cash\", \"rate\": \"0.05\", \"frequency\": {\"count\": 6, \"unit\": \"months\"}, \"day_count\": \"30_360\", \"business_day_convention\": \"following\", \"calendar_id\": \"weekends_only\", \"stub\": \"short_front\", \"end_of_month\": false, \"payment_lag_days\": 0}}, \"discount_curve_id\": \"USD-OIS\", \"credit_curve_id\": null, \"call_put\": {\"calls\": [{\"start\": \"2027-01-15\", \"end\": \"2027-01-15\", \"price_pct_of_par\": 103.0}, {\"start\": \"2029-01-15\", \"end\": \"2029-01-15\", \"price_pct_of_par\": 101.0}, {\"start\": \"2031-01-15\", \"end\": \"2031-01-15\", \"price_pct_of_par\": 100.0}], \"puts\": []}, \"attributes\": {}, \"settlement_days\": 2, \"ex_coupon_days\": 0, \"instrument_pricing_overrides\": {\"market_quotes\": {\"quoted_clean_price_pct\": 108.0}}}}}",
+        "ladder": {
+          "instrument_id": "CALLABLE-USD-10Y",
+          "as_of": "2025-01-15",
+          "quote_date": "2025-01-17",
+          "clean_price_pct": 108.0,
+          "dirty_price": {
+            "amount": "1080277.777777778",
+            "currency": "USD"
+          },
+          "rows": [
+            {
+              "date": "2027-01-15",
+              "kind": "call",
+              "redemption_price_pct": 103.0,
+              "redemption_amount": {
+                "amount": "1030000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.023486319414279404,
+              "i_spread": -0.016913469650888645,
+              "is_worst": true
+            },
+            {
+              "date": "2029-01-15",
+              "kind": "call",
+              "redemption_price_pct": 101.0,
+              "redemption_amount": {
+                "amount": "1010000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.030924198064671723,
+              "i_spread": -0.009501964695850653,
+              "is_worst": false
+            },
+            {
+              "date": "2031-01-15",
+              "kind": "call",
+              "redemption_price_pct": 100.0,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.035083108793001666,
+              "i_spread": -0.005334805736063292,
+              "is_worst": false
+            },
+            {
+              "date": "2034-01-16",
+              "kind": "maturity",
+              "redemption_price_pct": 100.0,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.03934025265069428,
+              "i_spread": -0.0010831960195526943,
+              "is_worst": false
+            }
+          ]
+        }
+      },
+      {
+        "bond": "{\"schema\": \"finstack_quant.instrument/1\", \"instrument\": {\"type\": \"bond\", \"spec\": {\"id\": \"CALLABLE-USD-10Y\", \"notional\": {\"amount\": \"1000000\", \"currency\": \"USD\"}, \"issue_date\": \"2024-01-15\", \"maturity\": \"2034-01-15\", \"cashflow_spec\": {\"fixed\": {\"coupon_type\": \"cash\", \"rate\": \"0.05\", \"frequency\": {\"count\": 6, \"unit\": \"months\"}, \"day_count\": \"30_360\", \"business_day_convention\": \"following\", \"calendar_id\": \"weekends_only\", \"stub\": \"short_front\", \"end_of_month\": false, \"payment_lag_days\": 0}}, \"discount_curve_id\": \"USD-OIS\", \"credit_curve_id\": null, \"call_put\": {\"calls\": [{\"start\": \"2025-01-17\", \"end\": \"2025-01-17\", \"price_pct_of_par\": 103.0}, {\"start\": \"2027-01-15\", \"end\": \"2027-01-15\", \"price_pct_of_par\": 103.0}, {\"start\": \"2029-01-15\", \"end\": \"2029-01-15\", \"price_pct_of_par\": 101.0}, {\"start\": \"2031-01-15\", \"end\": \"2031-01-15\", \"price_pct_of_par\": 100.0}], \"puts\": []}, \"attributes\": {}, \"settlement_days\": 2, \"ex_coupon_days\": 0, \"instrument_pricing_overrides\": {\"market_quotes\": {\"quoted_clean_price_pct\": 108.0}}}}}",
+        "ladder": {
+          "instrument_id": "CALLABLE-USD-10Y",
+          "as_of": "2025-01-15",
+          "quote_date": "2025-01-17",
+          "clean_price_pct": 108.0,
+          "dirty_price": {
+            "amount": "1080277.777777778",
+            "currency": "USD"
+          },
+          "rows": [
+            {
+              "date": "2025-01-17",
+              "kind": "call",
+              "redemption_price_pct": 103.0,
+              "redemption_amount": {
+                "amount": "1030000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": null,
+              "i_spread": null,
+              "is_worst": true
+            },
+            {
+              "date": "2027-01-15",
+              "kind": "call",
+              "redemption_price_pct": 103.0,
+              "redemption_amount": {
+                "amount": "1030000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.023486319414279404,
+              "i_spread": -0.016913469650888645,
+              "is_worst": false
+            },
+            {
+              "date": "2029-01-15",
+              "kind": "call",
+              "redemption_price_pct": 101.0,
+              "redemption_amount": {
+                "amount": "1010000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.030924198064671723,
+              "i_spread": -0.009501964695850653,
+              "is_worst": false
+            },
+            {
+              "date": "2031-01-15",
+              "kind": "call",
+              "redemption_price_pct": 100.0,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.035083108793001666,
+              "i_spread": -0.005334805736063292,
+              "is_worst": false
+            },
+            {
+              "date": "2034-01-16",
+              "kind": "maturity",
+              "redemption_price_pct": 100.0,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.03934025265069428,
+              "i_spread": -0.0010831960195526943,
+              "is_worst": false
+            }
+          ]
         }
       }
     ]

@@ -3,6 +3,7 @@
 //! Exposes the [`PyValuationResult`] envelope for pricing output,
 //! JSON-based instrument loading and the standard pricer pipeline.
 
+mod bond_workout;
 pub(crate) mod composite;
 pub(crate) mod convert;
 pub(crate) mod instruments;
@@ -396,6 +397,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     m.add_function(wrap_pyfunction!(bond_from_cashflows_json, &m)?)?;
     instruments::register(py, &m)?;
     merton_mc::register(py, &m)?;
+    bond_workout::register(&m)?;
     typed_legs::register(py, &m)?;
     typed_rates::register(py, &m)?;
     typed_credit::register(py, &m)?;
@@ -416,6 +418,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "bond_from_cashflows_json",
     ];
     exports.extend_from_slice(merton_mc::EXPORTS);
+    exports.extend_from_slice(bond_workout::EXPORTS);
     exports.extend_from_slice(typed_structured_credit::tranche_analytics::EXPORTS);
     exports.extend_from_slice(instruments::EXPORTS);
     exports.extend_from_slice(typed_legs::EXPORTS);

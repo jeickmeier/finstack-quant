@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Bonds: yield and spread to every exit
+
+`bond_workout_ladder(bond, market, as_of)` answers which call date is the worst workout and what the yield to each is. It returns one row per admissible call, put and maturity exit: date, kind, redemption price and amount, whether the redemption is make-whole, Street yield, I-spread and whether the row is the worst. The ladder and the `ytw` metric run one walk (`solve_workout_exits`), so the worst row holds that metric's yield and the `i_spread` metric's spread. It needs a quoted clean price on a bond with exercise rights and lowers a return floor into calls, as `ytw` does. Yield and spread are null on a path with no finite yield: an exit on the quote date, or same-day cash at or above the price. A worst row can be null, where `ytw` is negative infinity. Z-spread is not reported per exit: no per-exit convention exists.
+
+Bound in Python (`bond_workout_ladder`, `BondWorkoutLadder`, `BondWorkoutRow`) and WASM (`valuations.instruments.bondWorkoutLadder`). No existing value moves.
+
 ### Structured credit: a custom waterfall pays a debt class only what a note is owed
 
 Per tranche and date, `interest_flows` plus `principal_flows` now equals `cashflows` with no exception. A note is owed interest at its rate and the return of its balance. A fixed or percentage amount is a fee formula with no contractual basis as either: it cannot be an extra coupon, and treating it as principal would silently retire the notional of what is usually an interest-only strip or a misrouted fee. So these waterfalls are now refused rather than reclassified.

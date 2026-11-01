@@ -12,6 +12,7 @@ mod annuity;
 mod compute;
 mod spread_price;
 mod types;
+mod workout_ladder;
 mod yield_price;
 
 pub use annuity::{
@@ -20,6 +21,7 @@ pub use annuity::{
 pub use compute::compute_quotes;
 pub use spread_price::{price_from_dm, price_from_oas, price_from_z_spread};
 pub use types::{BondQuoteSet, YieldCompounding};
+pub use workout_ladder::{bond_workout_ladder, BondWorkoutLadder, BondWorkoutRow, WorkoutExitKind};
 pub use yield_price::{
     df_from_yield, price_from_ytm, price_from_ytm_compounded_params, price_from_ytw,
 };
@@ -31,6 +33,7 @@ pub(crate) use compute::{clear_price_driving_overrides, settlement_dirty_from_qu
 pub(crate) use spread_price::{
     quoted_workout_path, solve_kernel_spread, BondZSpreadPricingKernel, WorkoutPath,
 };
+pub(crate) use workout_ladder::workout_dirty_target;
 pub(crate) use yield_price::{
     act365l_flow_times, bond_flow_times, clean_price_from_japanese_simple_yield,
     enumerate_exit_paths, exercise_redemption_amount, flow_times, japanese_simple_yield,
@@ -43,6 +46,8 @@ pub(crate) use yield_price::{
 /// redemption price expressed as a percentage of par (e.g. `103.0` for 103%).
 #[derive(Debug, Clone)]
 pub(crate) struct ExitCandidate {
+    /// Whether the exit is an issuer call, a holder put or contractual maturity.
+    pub(crate) kind: WorkoutExitKind,
     /// The exact admissible exercise date, clipped to
     /// `[as_of, bond.maturity]`.
     pub(crate) date: finstack_quant_core::dates::Date,
