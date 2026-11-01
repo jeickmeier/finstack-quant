@@ -3406,9 +3406,10 @@ export type ShiftMode = "shift_of_subordinate" | "senior_share";
  * - cumulative loss is a fraction of the *original* pool balance;
  * - the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;
  * - credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,
- *   where the senior note is the *single* most-senior tranche by payment
- *   priority — for pari-passu senior classes (e.g. A-1/A-2) only the
- *   lowest-priority one is taken as the reference.
+ *   where the senior note is the tranche with the lowest `payment_priority`.
+ *   `TrancheStructure` gives every tranche a distinct priority, so for
+ *   same-seniority senior classes (e.g. A-1/A-2) this is the first one in
+ *   input order: A-1 is subtracted and A-2, ranked behind it, is not.
  *
  * `MaxDelinquency` reads the delinquent share of the pool, which is zero
  * unless the deal carries a `credit_model.delinquency` model.
@@ -18897,17 +18898,21 @@ export interface CoverageTestBreach {
  */
 export interface CoverageTestDiagnostic {
   /**
-   * `ratio − trigger_level`; negative while the test fails.
+   * `ratio − trigger_level`; negative while the test fails. `None` when `ratio`
+   * is, for the same reason.
    */
-  cushion: number;
+  cushion?: number | null;
   /**
    * Whether the test passed in this period.
    */
   passing: boolean;
   /**
    * Ratio the executor computed (OC: collateral ÷ notes; IC: interest ÷ due).
+   * `None` when the test has no claim outstanding: the notes it covers are
+   * retired (OC) or owe no interest (IC), so the denominator is zero and no
+   * ratio exists. Such a test passes.
    */
-  ratio: number;
+  ratio?: number | null;
   /**
    * `CoverageTestSpec::id` of the test.
    */
@@ -19357,9 +19362,10 @@ export interface ThreeFactorPathData {
 export interface EquityMetrics {
   /**
    * Each distribution as a decimal fraction of `invested`, by payment date and
-   * not annualized; the fractions sum to `moic`.
+   * not annualized; the fractions sum to `moic`. The share is `None` when
+   * nothing is invested.
    */
-  cash_on_cash: [string, number][];
+  cash_on_cash: [string, number | null][];
   /**
    * ISO-4217 code of the currency the amounts are denominated in.
    */
@@ -19376,9 +19382,10 @@ export interface EquityMetrics {
   irr?: number | null;
   /**
    * Multiple on invested capital: total distributions ÷ `invested`, interest
-   * and principal together.
+   * and principal together. `None` when nothing is invested; a class that
+   * receives nothing on a positive investment has a true `0.0`.
    */
-  moic: number;
+  moic?: number | null;
   /**
    * Present value at the valuation date of the distributions on the deal's
    * discount curve, as a percent of the equity's current balance (`62.5` =
@@ -19414,6 +19421,11 @@ export interface EquityMetricsFieldUnits {
    * Unit of `EquityMetrics::nav_pct`.
    */
   nav_pct: MetricFieldUnit;
+  /**
+   * Unit of the `purchase_price_pct` argument of `calculate_equity_metrics`,
+   * and what omitting it means.
+   */
+  purchase_price: MetricFieldUnit;
 }
 /**
  * The display unit of one scalar field of a result struct.
@@ -19620,21 +19632,24 @@ export interface PeriodDiagnostics {
   spread_account: Money;
   /**
    * Weighted-average coupon (annual decimal) of the performing fixed-rate
-   * collateral at period end: the same population as `AssetPool::wac`.
+   * collateral at period end: the same population as `AssetPool::wac`. `None`
+   * when no performing fixed-rate balance remains.
    */
-  wac: number;
+  wac?: number | null;
   /**
-   * Balance-weighted Moody's rating factor of the collateral.
+   * Balance-weighted Moody's rating factor of the performing collateral. `None`
+   * when no performing balance remains.
    */
-  warf: number;
+  warf?: number | null;
   /**
    * How this period's waterfall ran.
    */
   waterfall: PeriodWaterfall;
   /**
-   * Balance-weighted spread of the floating-rate collateral (basis points).
+   * Balance-weighted spread of the performing floating-rate collateral (basis
+   * points). `None` when no performing floating-rate balance remains.
    */
-  weighted_avg_spread_bp: number;
+  weighted_avg_spread_bp?: number | null;
   [k: string]: unknown;
 }
 /**
@@ -20382,9 +20397,10 @@ export interface PoolReport {
    * and `PeriodDiagnostics::warf` report: weighted by balance over the
    * performing rows only (defaulted and non-positive-balance rows are out of
    * both numerator and denominator). An unrated asset takes the Moody's table
-   * factor for `NR`. `0.0` when no performing balance remains.
+   * factor for `NR`. `None` when no performing balance remains; the
+   * `clo_warf` metric, which must return a number, reports `0.0` there.
    */
-  warf: number;
+  warf?: number | null;
 }
 /**
  * AssetPool-level performance statistics
@@ -20397,15 +20413,18 @@ export interface PoolStats {
    */
   defaulted_balance_pct: number;
   /**
-   * Diversity score (Moody's methodology)
+   * Diversity score (Moody's methodology) of the assets that name an obligor;
+   * `None` when none does. See [`AssetPool::diversity_score`].
    */
-  diversity_score: number;
+  diversity_score?: number | null;
   /**
-   * Number of industries
+   * Number of distinct `PoolAsset::industry` values. Assets naming no industry
+   * are not counted.
    */
   num_industries: number;
   /**
-   * Number of obligors
+   * Number of distinct `PoolAsset::obligor_id` values. Assets naming no obligor
+   * are not counted.
    */
   num_obligors: number;
   /**
@@ -20415,22 +20434,23 @@ export interface PoolStats {
   undrawn_commitment?: number;
   /**
    * Weighted-average coupon (annual decimal) of the performing fixed-rate
-   * collateral; see [`AssetPool::wac`].
+   * collateral; `None` when there is none. See [`AssetPool::wac`].
    */
-  wac: number;
+  wac?: number | null;
   /**
-   * Weighted average maturity (WAM) in years.
+   * Weighted average maturity (WAM) in years; `None` when the pool balance is
+   * zero.
    *
    * For weighted average life, which weights principal cashflows rather
    * than maturities, use the `wal` metric.
    */
-  weighted_avg_maturity: number;
+  weighted_avg_maturity?: number | null;
   /**
    * Weighted-average spread in basis points of the performing collateral
-   * that carries an explicit `spread_bp`; see
+   * that carries an explicit `spread_bp`; `None` when there is none. See
    * [`AssetPool::weighted_avg_spread_bp`].
    */
-  weighted_avg_spread_bp: number;
+  weighted_avg_spread_bp?: number | null;
 }
 /**
  * The display units of the collateral-pool report fields.

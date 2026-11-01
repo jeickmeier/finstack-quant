@@ -36,11 +36,12 @@ it("shows the returned statistics with the units Rust states", () => {
   expect(term("WARF").textContent).toContain(units.warf.label);
   for (const unit of units.stats) {
     const tile = term(labelFor(unit.field));
-    expect(
-      within(tile).getByTitle(
-        String(report.stats[unit.field as keyof typeof report.stats]),
-      ),
-    ).toBeTruthy();
+    const value = report.stats[unit.field as keyof typeof report.stats];
+    if (value === null) {
+      expect(tile.textContent).toBe(`${labelFor(unit.field)}Missing`);
+      continue;
+    }
+    expect(within(tile).getByTitle(String(value))).toBeTruthy();
     expect(tile.textContent).toContain(unit.label);
   }
 });
@@ -80,24 +81,31 @@ it("shows a null key as missing rather than dropping its balance", () => {
   expect(rows("By obligor")).toEqual([["Missing", "100,000,000", "100", "1"]]);
 });
 
-it("renders an empty pool with zero balances and empty tables", () => {
+it("renders an empty pool with zero balances, empty tables and missing averages", () => {
   const { report, units } = byName("empty");
   render(<PoolReport report={report} units={units} />);
   expect(screen.getAllByText("No assets in the pool")).toHaveLength(3);
-  expect(
-    screen.getByText("Total balance", { selector: "dt" }).parentElement!
-      .textContent,
-  ).toContain("0USD");
+  const term = (name: string) =>
+    screen.getByText(name, { selector: "dt" }).parentElement!;
+  expect(term("Total balance").textContent).toContain("0USD");
+  for (const field of [
+    "warf",
+    "wac",
+    "weighted_avg_spread_bp",
+    "weighted_avg_maturity",
+    "diversity_score",
+  ])
+    expect(term(labelFor(field)).textContent).toBe(`${labelFor(field)}Missing`);
+  // Counts stay counts, in the units that say what they count.
+  expect(term(labelFor("num_obligors")).textContent).toContain(
+    "0named obligors",
+  );
 });
 
-it("hides a stat Rust omits and shows a native error as returned", () => {
-  const { report, units } = byName("golden");
-  const { undrawn_commitment: _omitted, ...stats } = report.stats;
+it("shows a native error as returned", () => {
   const { rerender } = render(
-    <PoolReport report={{ ...report, stats }} units={units} />,
+    <PoolReport report={null} units={null} loading />,
   );
-  expect(screen.queryByText("Undrawn commitment")).toBeNull();
-  rerender(<PoolReport report={null} units={null} loading />);
   expect(screen.getByRole("status").textContent).toBe("Calculating…");
   rerender(<PoolReport report={null} units={null} error="native failure" />);
   expect(screen.getByRole("alert").textContent).toBe("native failure");

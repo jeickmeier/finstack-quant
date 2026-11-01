@@ -705,7 +705,10 @@ recoveries, reinvested par and fees paid, the reserve, spread and funding
 account balances, the delinquent balance, the realized excess spread, and
 every coverage test as the executor evaluated it (`CoverageTestDiagnostic {
 test_id, ratio, trigger_level, cushion, passing }`; a single source, not a
-recomputation).
+recomputation). `ratio` and `cushion` are `None` when the test has no claim
+outstanding: the notes it covers are retired or owe no interest, and it passes.
+`wac`, `weighted_avg_spread_bp` and `warf` are `None` where their population is
+empty.
 
 `PeriodDiagnostics::waterfall` (`PeriodWaterfall`) says who was paid: the tier
 allocations, each recipient's `PaymentRecord` (requested, paid, shortfall,
@@ -750,8 +753,8 @@ is total distributions over `invested`. `nav_pct` is those distributions discoun
 from `as_of` on `deal.discount_curve_id`, as a percent of current balance, and does
 not move with the price. `cash_on_cash` is each distribution as an unannualized
 decimal share of `invested`. A class that receives nothing has `irr: None` and a true
-zero MOIC and NAV. With nothing invested `irr` is `None`, and `moic` and each
-`cash_on_cash` entry are zero rather than an undefined ratio. A deal with no equity
+zero MOIC and NAV. With nothing invested `irr`, `moic` and each `cash_on_cash` share
+are `None`, as each divides by `invested`. A deal with no equity
 class is a validation error. `equity_metrics_field_units(currency)` (in `pricer`)
 states these units for a host.
 

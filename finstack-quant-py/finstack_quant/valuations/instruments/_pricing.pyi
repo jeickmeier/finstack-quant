@@ -435,7 +435,7 @@ def scenario_table_field_units(currency: str | Currency) -> dict[str, Any]:
     """
     Units of the :class:`ScenarioTable` cell fields, the one place a host reads them from.
 
-    Rates are decimals, the price is percent of the tranche's current balance
+    Rates are decimals, the price is a clean percent of the tranche's current balance
     and the writedown is in currency units. Values are never rescaled.
 
     Parameters
@@ -519,7 +519,9 @@ def equity_metrics_field_units(currency: str | Currency) -> dict[str, Any]:
     -------
     dict[str, Any]
         One record of ``field``, ``label`` and ``source`` each for ``invested``,
-        ``irr``, ``moic``, ``nav_pct`` and ``cash_on_cash``.
+        ``irr``, ``moic``, ``nav_pct`` and ``cash_on_cash``, and ``purchase_price``
+        for the ``purchase_price_pct`` argument of ``equity_metrics``: percent of
+        current balance, omitted means par.
 
     Raises
     ------

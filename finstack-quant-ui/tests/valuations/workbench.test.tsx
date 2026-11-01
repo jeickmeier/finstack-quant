@@ -973,7 +973,7 @@ it(
       () =>
         expect(
           document.querySelector('[aria-label="Coverage tests"]') ??
-            screen.queryByText(/returned no coverage tests/),
+            screen.queryByText("No coverage test was evaluated."),
         ).toBeTruthy(),
       { timeout: budget(10000) },
     );

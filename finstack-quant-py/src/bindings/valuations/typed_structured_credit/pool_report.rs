@@ -128,7 +128,7 @@ impl PyPoolReport {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "PoolReport(total_balance={}, warf={}, obligors={}, industries={}, ratings={})",
+            "PoolReport(total_balance={}, warf={:?}, obligors={}, industries={}, ratings={})",
             self.inner.total_balance,
             self.inner.warf,
             self.inner.by_obligor.len(),
@@ -146,7 +146,7 @@ crate::bindings::macros::py_getters!(PyPoolReport |s| {
     stats -> PyPoolStats = PyPoolStats { inner: s.inner.stats.clone() };
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_report", "PoolReport.warf")]
-    warf -> f64 = s.inner.warf;
+    warf -> Option<f64> = s.inner.warf;
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_report", "PoolReport.by_obligor")]
     by_obligor -> Vec<PyPoolConcentrationEntry> = entries(&s.inner.by_obligor);

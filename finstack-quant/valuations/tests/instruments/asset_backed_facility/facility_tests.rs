@@ -239,7 +239,7 @@ fn borrowing_base_deficiency_forces_repayment_before_the_residual() {
     );
     assert_eq!(test.test_id, "BB_FACILITY");
     assert!(!test.passing);
-    assert!((test.ratio - 72.0 / 90.0).abs() < 1e-9);
+    assert!((test.ratio.expect("a drawn facility") - 72.0 / 90.0).abs() < 1e-9);
 
     // A facility inside its borrowing base pays the residual from day one and
     // repays nothing while revolving.

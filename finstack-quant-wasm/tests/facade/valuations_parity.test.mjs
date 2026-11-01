@@ -482,19 +482,17 @@ test('structured-credit deal analytics match Python', () => {
     'performing balance'
   );
   close(instruments.assetPoolWac(pool), analytics.wac, TIGHT, 'wac');
-  close(
-    instruments.assetPoolWeightedAvgSpreadBp(pool),
-    analytics.weighted_avg_spread_bp,
-    TIGHT,
-    'was'
-  );
+  // The example pool is all fixed-rate: Rust's None, undefined here and null in the golden.
+  assert.equal(analytics.weighted_avg_spread_bp, null);
+  assert.equal(instruments.assetPoolWeightedAvgSpreadBp(pool), undefined);
   close(
     instruments.assetPoolWeightedAvgMaturity(pool, sc.as_of),
     analytics.weighted_avg_maturity,
     TIGHT,
     'wam'
   );
-  close(instruments.assetPoolDiversityScore(pool), analytics.diversity_score, TIGHT, 'diversity');
+  assert.equal(analytics.diversity_score, null);
+  assert.equal(instruments.assetPoolDiversityScore(pool), undefined);
   same(
     plain(instruments.assetPoolAssetsByObligor(pool, 'NOBODY')),
     analytics.assets_by_obligor,

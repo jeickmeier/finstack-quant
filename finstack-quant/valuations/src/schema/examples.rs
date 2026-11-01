@@ -291,11 +291,11 @@ pub(super) fn equity_metrics() -> Result<Vec<Value>> {
         currency: Currency::USD,
         invested: 40_000_000.0,
         irr: Some(0.142),
-        moic: 1.85,
+        moic: Some(1.85),
         nav_pct: 62.5,
         cash_on_cash: vec![
-            (date(2025, time::Month::April, 15)?, 0.045),
-            (date(2025, time::Month::July, 15)?, 0.047),
+            (date(2025, time::Month::April, 15)?, Some(0.045)),
+            (date(2025, time::Month::July, 15)?, Some(0.047)),
         ],
     })
 }

@@ -72,7 +72,7 @@ const presentation = {
   }),
 };
 const priceSentence = (severity: number) =>
-  `Price (% of current balance). Par reference: 100. Severity: ${severity}.`;
+  `Price (clean, % of current balance). Par reference: 100. Severity: ${severity}.`;
 // The native scenario tables are regenerated and compared by
 // `mise run ui-fixtures --check` (tests/valuations/scenario-table/generate.mjs).
 it("records its sources and keeps current-face prices across the factor-adjusted tranche", () => {
@@ -193,7 +193,7 @@ it("selects exact supplied severity and preserves complete native JSON without o
     "CPR (annual decimal)",
     "CDR (annual decimal)",
     "Severity (decimal)",
-    "Price (% of current balance)",
+    "Price (clean, % of current balance)",
     "WAL (years)",
     "Writedown (USD)",
   ]);
@@ -227,10 +227,10 @@ it("switches the coloured measure with its native values and unit, reading the s
 });
 it("colours WAL and writedown low to high and prices about par, without a host extent", () => {
   const table = tables[0]!;
-  const colours = (measure: string, severity: number) => {
+  const colours = (measure: string, severity: number, of = table) => {
     const definition = composeFigure(
       {
-        ...scenarioPreset({ table, units, measure, severity }),
+        ...scenarioPreset({ table: of, units, measure, severity }),
         ariaLabel: "Native scenarios",
       },
       presentation,
@@ -243,7 +243,7 @@ it("colours WAL and writedown low to high and prices about par, without a host e
     try {
       const scene = runtime.render(definition, { width: 1000, height: 650 });
       expect(scene.points.map((point) => point.datum)).toEqual(
-        scenarioCells(table, severity),
+        scenarioCells(of, severity),
       );
       const stops = scene.colors.domain as number[];
       // A sequential ramp spreads its stops across the extent.
@@ -264,14 +264,19 @@ it("colours WAL and writedown low to high and prices about par, without a host e
   );
   const reach = Math.max(...table.cells.map((c) => Math.abs(c.price - 100)));
   expect(colours("price", 0.2)).toEqual([100 - reach, 100, 100 + reach]);
-  // A measure flat across the table still has a valid scale.
+  // Prices all within a point of par still centre on a domain a point wide.
+  const nearPar = {
+    ...table,
+    cells: table.cells.map((cell) => ({ ...cell, price: 100.25 })),
+  };
+  expect(colours("price", 0.2, nearPar)).toEqual([99, 100, 101]);
+  // A measure flat across the table still has a valid scale, one wide from its value.
   const flat = {
     ...table,
-    cells: table.cells.map((cell) => ({ ...cell, writedown: 0 })),
+    cells: table.cells.map((cell) => ({ ...cell, writedown: 0, wal: 3 })),
   };
-  expect(() =>
-    scenarioPreset({ table: flat, units, measure: "writedown", severity: 0.2 }),
-  ).not.toThrow();
+  expect(colours("writedown", 0.2, flat)).toEqual([0, 1]);
+  expect(colours("wal", 0.2, flat)).toEqual([3, 4]);
 });
 it("runs the independent panel with no worker and handles an empty result", () => {
   const { rerender } = render(

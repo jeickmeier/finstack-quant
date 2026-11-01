@@ -44,18 +44,21 @@
           "type": "number"
         },
         "diversity_score": {
-          "description": "Diversity score (Moody's methodology)",
+          "description": "Diversity score (Moody's methodology) of the assets that name an obligor;\n`None` when none does. See [`AssetPool::diversity_score`].",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "num_industries": {
-          "description": "Number of industries",
+          "description": "Number of distinct `PoolAsset::industry` values. Assets naming no industry\nare not counted.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
         "num_obligors": {
-          "description": "Number of obligors",
+          "description": "Number of distinct `PoolAsset::obligor_id` values. Assets naming no obligor\nare not counted.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -67,26 +70,31 @@
           "type": "number"
         },
         "wac": {
-          "description": "Weighted-average coupon (annual decimal) of the performing fixed-rate\ncollateral; see [`AssetPool::wac`].",
+          "description": "Weighted-average coupon (annual decimal) of the performing fixed-rate\ncollateral; `None` when there is none. See [`AssetPool::wac`].",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "weighted_avg_maturity": {
-          "description": "Weighted average maturity (WAM) in years.\n\nFor weighted average life, which weights principal cashflows rather\nthan maturities, use the `wal` metric.",
+          "description": "Weighted average maturity (WAM) in years; `None` when the pool balance is\nzero.\n\nFor weighted average life, which weights principal cashflows rather\nthan maturities, use the `wal` metric.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "weighted_avg_spread_bp": {
-          "description": "Weighted-average spread in basis points of the performing collateral\nthat carries an explicit `spread_bp`; see\n[`AssetPool::weighted_avg_spread_bp`].",
+          "description": "Weighted-average spread in basis points of the performing collateral\nthat carries an explicit `spread_bp`; `None` when there is none. See\n[`AssetPool::weighted_avg_spread_bp`].",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
-        "wac",
-        "weighted_avg_spread_bp",
-        "weighted_avg_maturity",
-        "diversity_score",
         "num_obligors",
         "num_industries",
         "defaulted_balance_pct"
@@ -135,13 +143,13 @@
       ],
       "stats": {
         "defaulted_balance_pct": 0.0,
-        "diversity_score": 0.0,
+        "diversity_score": null,
         "num_industries": 0,
         "num_obligors": 0,
         "undrawn_commitment": 0.0,
         "wac": 0.07,
         "weighted_avg_maturity": 10.0082191781,
-        "weighted_avg_spread_bp": 0.0
+        "weighted_avg_spread_bp": null
       },
       "total_balance": {
         "amount": "100000000",
@@ -181,15 +189,17 @@
       "description": "Current balance of every asset row, defaulted assets included, in the\npool's base currency: the denominator of each `balance_pct`."
     },
     "warf": {
-      "description": "Moody's weighted-average rating factor, the number `CloWarfCalculator`\nand `PeriodDiagnostics::warf` report: weighted by balance over the\nperforming rows only (defaulted and non-positive-balance rows are out of\nboth numerator and denominator). An unrated asset takes the Moody's table\nfactor for `NR`. `0.0` when no performing balance remains.",
+      "description": "Moody's weighted-average rating factor, the number `CloWarfCalculator`\nand `PeriodDiagnostics::warf` report: weighted by balance over the\nperforming rows only (defaulted and non-positive-balance rows are out of\nboth numerator and denominator). An unrated asset takes the Moody's table\nfactor for `NR`. `None` when no performing balance remains; the\n`clo_warf` metric, which must return a number, reports `0.0` there.",
       "format": "double",
-      "type": "number"
+      "type": [
+        "number",
+        "null"
+      ]
     }
   },
   "required": [
     "total_balance",
     "stats",
-    "warf",
     "by_obligor",
     "by_industry",
     "by_rating"

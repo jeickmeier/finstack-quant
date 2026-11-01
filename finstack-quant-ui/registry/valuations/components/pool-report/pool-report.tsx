@@ -69,6 +69,22 @@ function Tile({ field, children }: { field: string; children: ReactNode }) {
     </div>
   );
 }
+/** A returned number with its unit; Rust's null, an empty population, is missing and never zero. */
+function Measure({
+  value,
+  unit,
+}: {
+  value: number | null | undefined;
+  unit: MetricFieldUnit;
+}) {
+  return value == null ? (
+    <span className="finstack-na" title={unit.source}>
+      Missing
+    </span>
+  ) : (
+    <MeasureValue value={value} unit={unit} />
+  );
+}
 export interface PoolReportProps {
   /** Native valuations.instruments.poolReport result; null while none is available. */
   report: NativeReport | null;
@@ -82,7 +98,8 @@ export interface PoolReportProps {
 /**
  * A collateral pool's statistics, WARF and concentration by obligor, industry and
  * rating, as Rust returned them and in Rust's row order. A row with a null key
- * holds the assets missing that attribute. Nothing is summed, sorted or grouped.
+ * holds the assets missing that attribute, and a null statistic is shown as missing.
+ * Nothing is summed, sorted or grouped.
  */
 export function PoolReport({
   report,
@@ -103,12 +120,6 @@ export function PoolReport({
         {loading ? "Calculating…" : "No pool report returned"}
       </p>
     );
-  const stats = units.stats
-    .map((unit) => ({
-      unit,
-      value: report.stats[unit.field as keyof typeof report.stats],
-    }))
-    .filter((stat) => stat.value !== undefined);
   return (
     <section
       aria-label="Pool report"
@@ -126,11 +137,14 @@ export function PoolReport({
           </span>
         </Tile>
         <Tile field={units.warf.field}>
-          <MeasureValue value={report.warf} unit={units.warf} />
+          <Measure value={report.warf} unit={units.warf} />
         </Tile>
-        {stats.map(({ unit, value }) => (
+        {units.stats.map((unit) => (
           <Tile key={unit.field} field={unit.field}>
-            <MeasureValue value={value} unit={unit} />
+            <Measure
+              value={report.stats[unit.field as keyof typeof report.stats]}
+              unit={unit}
+            />
           </Tile>
         ))}
       </dl>

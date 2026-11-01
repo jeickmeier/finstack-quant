@@ -466,7 +466,7 @@ fn test_was_golden_calculation() {
         .with_rating(CreditRating::B),
     );
 
-    let was = pool.weighted_avg_spread_bp();
+    let was = pool.weighted_avg_spread_bp().expect("spread balance");
 
     // Expected WAS = (50×400 + 30×450 + 20×500) / 100 = 435 bp
     let expected_was =

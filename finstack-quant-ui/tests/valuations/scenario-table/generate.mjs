@@ -327,6 +327,8 @@ await emit(
 // excess spread instead of diverting, so it has a first breach and no coverage_tests
 // row. The same deal cut to its first payment date has one period; the example cut to
 // one year has no tests; the no-asset deal settles in one period with no waterfall run.
+// The small senior note retires early, so its OC and IC tests then have no claim
+// outstanding and Rust reports no ratio or cushion, while they still pass.
 const chartMoney = (amount) => ({ amount: String(amount), currency: "USD" });
 const chartTranche = (base, id, seniority, attach, detach, amount, rate) => ({
   ...structuredClone(base),
@@ -369,11 +371,24 @@ const untested = structuredClone(instrument);
 untested.instrument.spec.maturity = "2025-01-01";
 const onePeriod = structuredClone(covered);
 onePeriod.instrument.spec.maturity = "2024-04-01";
+const retiredSenior = structuredClone(covered);
+{
+  const { tranches } = retiredSenior.instrument.spec.tranches;
+  const base = tranches[0];
+  tranches[0] = chartTranche(base, "SENIOR", "senior", 95, 100, 5000000, 0.05);
+  tranches[1] = chartTranche(base, "MEZZ", "mezzanine", 15, 95, 80000000, 0.08);
+  retiredSenior.instrument.spec.coverage_triggers = [
+    { id: "OC_SENIOR", kind: "oc", tranche_id: "SENIOR", trigger_level: 1.1 },
+    { id: "IC_SENIOR", kind: "ic", tranche_id: "SENIOR", trigger_level: 1.05 },
+    { id: "OC_MEZZ", kind: "oc", tranche_id: "MEZZ", trigger_level: 1.01 },
+  ];
+}
 const chartCases = [
   { name: "covered", input: covered },
   { name: "untested", input: untested },
   { name: "settlement", input: settlement },
   { name: "one-period", input: onePeriod },
+  { name: "retired-senior", input: retiredSenior },
 ].map(({ name, input }) => {
   const instrumentJson = native.validateInstrumentJson(JSON.stringify(input));
   const deal = native.StructuredCredit.fromJson(instrumentJson);

@@ -210,16 +210,16 @@ fn cure_on(run: &SimulationRun, test_id: &str, trigger: f64, stack: &[&str], dat
         .iter()
         .find(|test| test.test_id == test_id)
         .expect("test diagnostic");
+    let ratio = test.ratio.expect("a failing test has a ratio");
     assert!(
         !test.passing,
-        "{test_id} must fail on {date}, ratio {}",
-        test.ratio
+        "{test_id} must fail on {date}, ratio {ratio}"
     );
     let denominator: f64 = stack
         .iter()
         .map(|id| opening_balance(&run.tranches, id, date))
         .sum();
-    (denominator * (1.0 - test.ratio / trigger)).max(0.0)
+    (denominator * (1.0 - ratio / trigger)).max(0.0)
 }
 
 fn first_failure(run: &SimulationRun, test_id: &str) -> Date {

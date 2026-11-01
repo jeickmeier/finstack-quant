@@ -52,7 +52,7 @@ impl PyPoolStats {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "PoolStats(wac={}, weighted_avg_spread_bp={}, weighted_avg_maturity={}, diversity_score={})",
+            "PoolStats(wac={:?}, weighted_avg_spread_bp={:?}, weighted_avg_maturity={:?}, diversity_score={:?})",
             self.inner.wac,
             self.inner.weighted_avg_spread_bp,
             self.inner.weighted_avg_maturity,
@@ -63,16 +63,16 @@ impl PyPoolStats {
 
 crate::bindings::macros::py_getters!(PyPoolStats |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_stats", "PoolStats.wac")]
-    wac -> f64 = s.inner.wac;
+    wac -> Option<f64> = s.inner.wac;
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_stats", "PoolStats.weighted_avg_spread_bp")]
-    weighted_avg_spread_bp -> f64 = s.inner.weighted_avg_spread_bp;
+    weighted_avg_spread_bp -> Option<f64> = s.inner.weighted_avg_spread_bp;
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_stats", "PoolStats.weighted_avg_maturity")]
-    weighted_avg_maturity -> f64 = s.inner.weighted_avg_maturity;
+    weighted_avg_maturity -> Option<f64> = s.inner.weighted_avg_maturity;
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_stats", "PoolStats.diversity_score")]
-    diversity_score -> f64 = s.inner.diversity_score;
+    diversity_score -> Option<f64> = s.inner.diversity_score;
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_stats", "PoolStats.num_obligors")]
     num_obligors -> usize = s.inner.num_obligors;

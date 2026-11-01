@@ -290,7 +290,7 @@ fn test_pool_weighted_avg_coupon_single_asset() {
     let wac = pool.wac();
 
     // Assert
-    assert_eq!(wac, 0.06);
+    assert_eq!(wac, Some(0.06));
 }
 
 #[test]
@@ -316,7 +316,7 @@ fn test_pool_weighted_avg_coupon_multiple_assets() {
     let wac = pool.wac();
 
     // Assert: (10M * 6% + 20M * 9%) / 30M = (0.6M + 1.8M) / 30M = 8%
-    assert!((wac - 0.08).abs() < 0.0001);
+    assert!((wac.expect("fixed-rate balance") - 0.08).abs() < 0.0001);
 }
 
 #[test]
@@ -328,7 +328,7 @@ fn test_pool_weighted_avg_coupon_empty_pool() {
     let wac = pool.wac();
 
     // Assert
-    assert_eq!(wac, 0.0);
+    assert_eq!(wac, None);
 }
 
 #[test]
@@ -356,7 +356,7 @@ fn test_pool_weighted_avg_spread_floating_rate_assets() {
     let was = pool.weighted_avg_spread_bp();
 
     // Assert: (10M * 400 + 20M * 500) / 30M = (4,000M + 10,000M) / 30M = 466.67bps
-    assert!((was - 466.666667).abs() < 0.01);
+    assert!((was.expect("spread balance") - 466.666667).abs() < 0.01);
 }
 
 #[test]
@@ -388,7 +388,7 @@ fn test_pool_weighted_avg_spread_mixed_assets() {
     let was = pool.weighted_avg_spread_bp();
 
     // Assert: only the floating-rate loan contributes → 450bps
-    assert!((was - 450.0).abs() < 0.01);
+    assert!((was.expect("spread balance") - 450.0).abs() < 0.01);
 }
 
 #[test]
@@ -416,7 +416,7 @@ fn test_pool_weighted_avg_spread_excludes_defaulted() {
 
     // Defaulted assets are excluded from numerator AND denominator.
     let was = pool.weighted_avg_spread_bp();
-    assert!((was - 400.0).abs() < 0.01);
+    assert!((was.expect("spread balance") - 400.0).abs() < 0.01);
 }
 
 #[test]
@@ -439,7 +439,10 @@ fn test_pool_weighted_avg_maturity() {
     ));
 
     // Act
-    let wam = pool.weighted_avg_maturity(test_date()).expect("wam");
+    let wam = pool
+        .weighted_avg_maturity(test_date())
+        .expect("wam")
+        .expect("balance");
 
     // Assert: (10M * 3 + 10M * 7) / 20M = 5 years
     assert!((wam - 5.0).abs() < 0.1);
@@ -473,11 +476,14 @@ fn test_pool_weighted_avg_maturity_counts_every_row() {
     assert_eq!((first - test_date()).whole_days(), 1095);
     assert_eq!((second - test_date()).whole_days(), 2556);
     let expected = (1095.0 / 365.0 + 2556.0 / 365.0) / 2.0;
-    let wam = pool.weighted_avg_maturity(test_date()).expect("wam");
+    let wam = pool
+        .weighted_avg_maturity(test_date())
+        .expect("wam")
+        .expect("balance");
     assert!((wam - expected).abs() < 1e-12, "{wam} vs {expected}");
     assert!((wam - 1.5).abs() > 1.0, "the ICMA row must not be dropped");
     let stats = calculate_pool_stats(&pool, test_date()).expect("stats");
-    assert!((stats.weighted_avg_maturity - expected).abs() < 1e-12);
+    assert!((stats.weighted_avg_maturity.expect("balance") - expected).abs() < 1e-12);
 }
 
 /// A row in a currency other than the pool's base currency makes the pool
@@ -530,7 +536,7 @@ fn test_pool_diversity_score_single_obligor() {
     let diversity = pool.diversity_score();
 
     // Assert: Same obligor = score of 1
-    assert!((diversity - 1.0).abs() < 0.01);
+    assert!((diversity.expect("named obligors") - 1.0).abs() < 0.01);
 }
 
 #[test]
@@ -564,7 +570,7 @@ fn test_pool_diversity_score_multiple_obligors() {
     let diversity = pool.diversity_score();
 
     // Assert: Two equal obligors = score of 2
-    assert!((diversity - 2.0).abs() < 0.01);
+    assert!((diversity.expect("named obligors") - 2.0).abs() < 0.01);
 }
 
 #[test]
@@ -590,9 +596,12 @@ fn test_pool_diversity_score_is_independent_of_asset_order() {
         forward.assets.push(asset(i));
         reverse.assets.push(asset(39 - i));
     }
-    let score = forward.diversity_score();
+    let score = forward.diversity_score().expect("named obligors");
     assert!(score > 1.0 && score < 40.0);
-    assert_eq!(score.to_bits(), reverse.diversity_score().to_bits());
+    assert_eq!(
+        score.to_bits(),
+        reverse.diversity_score().expect("named obligors").to_bits()
+    );
 }
 
 #[test]
@@ -604,7 +613,7 @@ fn test_pool_diversity_score_empty_pool() {
     let diversity = pool.diversity_score();
 
     // Assert
-    assert_eq!(diversity, 0.0);
+    assert_eq!(diversity, None);
 }
 
 // AssetPool Filtering and Grouping Tests
@@ -733,9 +742,10 @@ fn test_calculate_pool_stats_comprehensive() {
     // Assert
     // Indenture WAC: only the performing fixed-rate B1 (7%) is in the
     // population; the floating L1 is reported through the spread instead.
-    assert!((stats.wac - 0.07).abs() < 1e-15, "{}", stats.wac);
-    assert!(stats.weighted_avg_spread_bp > 0.0);
-    assert!(stats.weighted_avg_maturity > 0.0);
+    let wac = stats.wac.expect("fixed-rate balance");
+    assert!((wac - 0.07).abs() < 1e-15, "{wac}");
+    assert!(stats.weighted_avg_spread_bp.expect("spread balance") > 0.0);
+    assert!(stats.weighted_avg_maturity.expect("balance") > 0.0);
     assert_eq!(stats.num_obligors, 2);
     assert_eq!(stats.num_industries, 2);
     assert_eq!(stats.defaulted_balance_pct, 0.0); // No defaults
@@ -797,8 +807,8 @@ fn test_pool_zero_balance_asset() {
     let was = pool.weighted_avg_spread_bp();
 
     // Assert: Should handle gracefully
-    assert_eq!(wac, 0.0);
-    assert_eq!(was, 0.0);
+    assert_eq!(wac, None);
+    assert_eq!(was, None);
 }
 
 #[test]
@@ -898,10 +908,11 @@ fn test_pool_wac_excludes_floating_and_defaulted_collateral() {
     pool.assets.push(defaulted);
 
     // Rounding only: two products, one sum and one division.
-    assert!((pool.wac() - 0.08).abs() < 1e-15, "{}", pool.wac());
+    let wac = pool.wac().expect("fixed-rate balance");
+    assert!((wac - 0.08).abs() < 1e-15, "{wac}");
     let stats = calculate_pool_stats(&pool, test_date()).expect("stats");
-    assert_eq!(stats.wac.to_bits(), pool.wac().to_bits());
-    assert_eq!(stats.weighted_avg_spread_bp, 400.0);
+    assert_eq!(stats.wac, Some(wac));
+    assert_eq!(stats.weighted_avg_spread_bp, Some(400.0));
     // 5M of 65M carried as defaulted, in percent points.
     assert!((stats.defaulted_balance_pct - 5.0 / 65.0 * 100.0).abs() < 1e-12);
 }
@@ -1070,7 +1081,8 @@ mod pool_report_tests {
         // BB 400 @ 1350, B 300 @ 2720, unrated 100 @ NR 3650; the defaulted row
         // at 200 is out, over a performing balance of 800.
         let expected = (400.0 * 1350.0 + 300.0 * 2720.0 + 100.0 * 3650.0) / 800.0;
-        assert!((report.warf - expected).abs() < 1e-9, "{}", report.warf);
+        let warf = report.warf.expect("performing balance");
+        assert!((warf - expected).abs() < 1e-9, "{warf}");
     }
 
     #[test]
@@ -1085,12 +1097,40 @@ mod pool_report_tests {
         assert_eq!(report.stats.defaulted_balance_pct, 20.0);
     }
 
+    /// A floating-only pool has no WAC and an all-fixed pool no spread: each is
+    /// missing, not zero, and the other average is still reported.
+    #[test]
+    fn an_empty_population_reports_a_missing_average_not_zero() {
+        let mut floating = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+        let mut loan = PoolAsset::fixed_rate_bond(
+            "L",
+            Money::new(100.0, Currency::USD).expect("money"),
+            0.08,
+            maturity_date(),
+            finstack_quant_core::dates::DayCount::Thirty360,
+        );
+        loan.forward_curve_id = Some("USD-SOFR".into());
+        loan.spread_bp = Some(350.0);
+        floating.assets.push(loan);
+        let report = pool_report(&floating, test_date()).expect("report");
+        assert_eq!(report.stats.wac, None);
+        assert_eq!(report.stats.weighted_avg_spread_bp, Some(350.0));
+        // No asset names an obligor or an industry: nothing to measure diversity on.
+        assert_eq!(report.stats.diversity_score, None);
+        assert_eq!(report.stats.num_obligors, 0);
+        assert_eq!(report.stats.num_industries, 0);
+    }
+
     #[test]
     fn empty_pool_reports_zeros_and_empty_tables() {
         let pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
         let report = pool_report(&pool, test_date()).expect("report");
         assert_eq!(report.total_balance.amount(), 0.0);
-        assert_eq!(report.warf, 0.0);
+        assert_eq!(report.warf, None);
+        assert_eq!(report.stats.wac, None);
+        assert_eq!(report.stats.weighted_avg_spread_bp, None);
+        assert_eq!(report.stats.weighted_avg_maturity, None);
+        assert_eq!(report.stats.diversity_score, None);
         assert!(report.by_obligor.is_empty());
         assert!(report.by_industry.is_empty());
         assert!(report.by_rating.is_empty());
@@ -1113,7 +1153,7 @@ mod pool_report_tests {
             assert_eq!(keys(table), [None]);
             assert_eq!(shares(table), [100.0]);
         }
-        assert_eq!(report.warf, 3650.0);
+        assert_eq!(report.warf, Some(3650.0));
     }
 
     #[test]

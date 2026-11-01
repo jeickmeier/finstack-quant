@@ -23,6 +23,8 @@ function Tile({ field, children }: { field: string; children: ReactNode }) {
     </div>
   );
 }
+/** What Rust's null MOIC and cash-on-cash share mean, per EquityMetrics. */
+const nothingInvested = "Nothing invested";
 function columns(
   unit: EquityMetricsFieldUnits["cash_on_cash"],
 ): ColumnDef<{}, Distribution, any>[] {
@@ -40,7 +42,8 @@ function columns(
           {labelFor(unit.field)} ({unit.label})
         </span>
       ),
-      accessorFn: ([, share]) => formatRaw(share),
+      accessorFn: ([, share]) =>
+        share == null ? nothingInvested : formatRaw(share),
       meta: { className: "text-right finstack-numeric" },
     },
   ];
@@ -62,8 +65,8 @@ export interface EquityTrancheCardProps {
 /**
  * The deal's equity tranche as Rust measured it: invested amount, IRR, MOIC, NAV and
  * each distribution's cash-on-cash. Rust chooses the tranche, and a deal without one
- * shows Rust's error. A missing IRR is stated and never drawn as zero; a zero Rust
- * returned is drawn as zero. Nothing is computed, rescaled or classified.
+ * shows Rust's error. A missing IRR, MOIC or share is stated and never drawn as zero;
+ * a zero Rust returned is drawn as zero. Nothing is computed, rescaled or classified.
  */
 export function EquityTrancheCard({
   metrics,
@@ -90,12 +93,11 @@ export function EquityTrancheCard({
         <div className="w-56">
           <DecimalInput
             label="Purchase price"
-            help="Blank invests at Rust's default, par"
+            help={units?.purchase_price.label}
             value={purchasePrice}
             onValueChange={onPurchasePriceChange ?? (() => {})}
             readOnly={!onPurchasePriceChange}
             allowNegative={false}
-            suffix="% of current balance"
           />
         </div>
       </div>
@@ -127,7 +129,13 @@ export function EquityTrancheCard({
               )}
             </Tile>
             <Tile field={units.moic.field}>
-              <MeasureValue value={metrics.moic} unit={units.moic} />
+              {metrics.moic === null || metrics.moic === undefined ? (
+                <span className="finstack-na" title={units.moic.source}>
+                  {nothingInvested}
+                </span>
+              ) : (
+                <MeasureValue value={metrics.moic} unit={units.moic} />
+              )}
             </Tile>
             <Tile field={units.nav_pct.field}>
               <MeasureValue value={metrics.nav_pct} unit={units.nav_pct} />

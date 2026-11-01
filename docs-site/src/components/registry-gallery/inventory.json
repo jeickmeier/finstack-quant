@@ -249,31 +249,31 @@
     {
       "name": "pool-report",
       "type": "registry:component",
-      "docs": "Present a native valuations.instruments.poolReport result: total balance, WARF and PoolStats tiles, then concentration tables by obligor, industry and rating in Rust's row order. Every unit comes from native poolReportFieldUnits for the report's currency. A null key means the attribute is missing on those assets and shows as such. Nothing is summed, sorted, grouped or rescaled. No worker is required.",
+      "docs": "Present a native valuations.instruments.poolReport result: total balance, WARF and PoolStats tiles, then concentration tables by obligor, industry and rating in Rust's row order. Every unit comes from native poolReportFieldUnits for the report's currency. A null key means the attribute is missing on those assets and shows as such, and a null statistic, an average over an empty population, shows as missing and never as zero. Nothing is summed, sorted, grouped or rescaled. No worker is required.",
       "worker": "none"
     },
     {
       "name": "waterfall-report",
       "type": "registry:component",
-      "docs": "Present a native StructuredCredit.runSimulation result: one row per SimulationDiagnostics.periods entry in Rust's order with PeriodWaterfall's total available, recovery proceeds, diverted cash, carried interest and principal, whether a coverage test failed, and how many payments went outside the waterfall. Expanding a period shows the principal used for interest, its tier allocations and payment records in execution order, its diversions and its non-waterfall payments with their own dates. A settlement-only deal has one row, holding its settlement in non-waterfall payments. The caption names the deal currency Rust states on each amount, and each amount shows every digit. Nothing is summed, joined by date, sorted or classified. No worker is required.",
+      "docs": "Present a native StructuredCredit.runSimulation result: one row per SimulationDiagnostics.periods entry in Rust's order with PeriodWaterfall's total available, recovery proceeds, diverted cash, carried interest and principal, whether a coverage test failed, and how many payments went outside the waterfall. Expanding a period shows the principal used for interest, its tier allocations and payment records in execution order, its diversions and its non-waterfall payments with their own dates. A settlement-only deal has one row, whose release is in that row's non-waterfall payments, and a note says so. The non-waterfall column is a count; the caption names the deal currency Rust states on each amount, and each amount shows every digit. Nothing is summed, joined by date, sorted or classified. No worker is required.",
       "worker": "none"
     },
     {
       "name": "coverage-test-chart",
       "type": "registry:component",
-      "docs": "Present a native StructuredCredit.runSimulation result: SimulationDiagnostics.first_breaches in Rust's order, one test selected at a time, its ratio, trigger_level, cushion and passing flag on the dates Rust recorded it, and its first breach date, which a later cure does not clear. Dots are not connected because a tranche trigger can be absent between dates. A trigger with an entry in first_breaches and no coverage_tests row says so instead of drawing. Below, waterfall.diverted_cash by date and the diverted_amounts records with Rust's reason; a diversion belongs to a waterfall tier, so it is not attributed to the selected test. Units come from native simulationFieldUnits. A deal with no coverage tests, or with one period, renders a stated condition rather than a chart. Nothing is computed, joined by date, sorted or classified. No worker is required.",
+      "docs": "Present a native StructuredCredit.runSimulation result: SimulationDiagnostics.first_breaches in Rust's order, one test selected at a time, its ratio, trigger_level, cushion and passing flag on the dates Rust recorded it, and its first breach date, which a later cure does not clear. Dots are not connected because a tranche trigger can be absent between dates. A test recorded on fewer dates than the deal has periods states the counts, and one with no coverage_tests row is listed without a chart. A null ratio or cushion is Rust's no claim outstanding: the table and tooltip say so and no dot is drawn. Below, waterfall.diverted_cash by date and the diverted_amounts records with Rust's reason; a diversion belongs to a waterfall tier, so it is not attributed to the selected test. Units come from native simulationFieldUnits. No test evaluated, or one period, renders a stated condition rather than a chart. Nothing is computed, joined by date, sorted or classified. No worker is required.",
       "worker": "none"
     },
     {
       "name": "credit-enhancement-chart",
       "type": "registry:component",
-      "docs": "Present a native StructuredCredit.runSimulation result: PeriodDiagnostics.credit_enhancement, each tranche's decimal share of the collateral beneath it at period end, one line per tranche, and PeriodDiagnostics.excess_spread, realized that period and annualized as a decimal of the opening pool balance (pool interest less debt coupons due, service-provider and manager fees paid through the waterfall and net charge-offs; not the static abs_excess_spread metric). A table below holds the same values with every digit. Units come from native simulationFieldUnits. A deal with one period, such as a settlement, is listed instead of charted, and a settlement's excess spread is the zero Rust records. Nothing is computed, grouped, joined by date, sorted or classified. No worker is required.",
+      "docs": "Present a native StructuredCredit.runSimulation result: PeriodDiagnostics.credit_enhancement, each tranche's decimal share of the collateral beneath it at period end, one line per tranche, and PeriodDiagnostics.excess_spread, realized that period and annualized as a decimal of the opening pool balance (pool interest less debt coupons due, service-provider and manager fees paid through the waterfall and net charge-offs; not the static abs_excess_spread metric). A table below holds the same values with every digit. Units come from native simulationFieldUnits. A deal with one period is listed instead of charted. Nothing is computed, grouped, joined by date, sorted or classified. No worker is required.",
       "worker": "none"
     },
     {
       "name": "equity-tranche-card",
       "type": "registry:component",
-      "docs": "Present a native StructuredCredit.equityMetrics result beside a purchase price input. Rust measures the deal's first equity-seniority tranche: invested is its current balance times the price, par when the price is blank; irr is the annual XIRR (ACT/365F, decimal) of -invested on the valuation date against every later distribution, interest and principal; moic is total distributions over invested; nav_pct is those distributions discounted to the valuation date on the deal's discount curve, as a percent of current balance, and does not move with the price; cash_on_cash is each distribution as an unannualized decimal share of invested. Units come from native equityMetricsFieldUnits. A deal with no equity tranche shows Rust's error as returned. A null irr is stated as no rate solving and never drawn as zero: Rust returns it when nothing is invested or the tranche receives no distribution, while one that receives little still has an IRR near -1. A returned zero is drawn as zero, including the zero moic and cash-on-cash shares Rust returns when nothing is invested. Nothing is computed, rescaled or classified. No worker is required.",
+      "docs": "Present a native StructuredCredit.equityMetrics result beside a purchase price input. Rust measures the deal's first equity-seniority tranche: invested is its current balance times the price, par when the price is blank; irr is the annual XIRR (ACT/365F, decimal) of -invested on the valuation date against every later distribution, interest and principal; moic is total distributions over invested; nav_pct is those distributions discounted to the valuation date on the deal's discount curve, as a percent of current balance, and does not move with the price; cash_on_cash is each distribution as an unannualized decimal share of invested. Units come from native equityMetricsFieldUnits. A deal with no equity tranche shows Rust's error as returned. A null irr is stated as no rate solving and never drawn as zero: Rust returns it when nothing is invested or the tranche receives no distribution, while one that receives little still has an IRR near -1. A null moic or cash-on-cash share is stated as nothing invested, and a returned zero is drawn as zero. Nothing is computed, rescaled or classified. No worker is required.",
       "worker": "none"
     },
     {
@@ -1508,7 +1508,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
-      "sha256": "bd886ce39eedefdc5f86352a338f35eb4c704bdcb8d2c54faacdfe4d1a1560f1"
+      "sha256": "c07365a93cb4634ffe67678fc3365848b072acc4fe83d9e15fdfd540a2c9f628"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
@@ -1516,19 +1516,19 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/pool-report.json",
-      "sha256": "0ec5d9f9a9e4cb6193fddc8ffdd32759d8e8b5e45de786c61d5426fc1c3b3cbe"
+      "sha256": "e25bb7832f6f54005486131223e7f1960aa6583b7df035b53bf9c633f24b4e96"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/waterfall-report.json",
-      "sha256": "73e22d6edc150640ccf8aa5117f74377e657207cb3b222aff54d1d5a33d99fac"
+      "sha256": "89bc60c0979ee4a6e2d3caad0767e3e8ca93a8828df8dc8df8b88cf3dd35530a"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/deal-charts.json",
-      "sha256": "f36a17a0dac69daa52a28615376fd5de5fa0b14f044afa51c0f13343bc555a27"
+      "sha256": "fe6933a1628c505ef6f61be050c2df0595778f5d71e0f349058da382121cbf7e"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/equity-tranche.json",
-      "sha256": "eca7da39a6b2aa4a2b3731415941687635b439747732e33a1c376a367db19167"
+      "sha256": "2ca9cd3bd326590f747061ff8ec92f7d3bd4e842648e2a9db4e0452e6f3ef786"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",

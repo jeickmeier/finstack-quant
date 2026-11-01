@@ -476,7 +476,7 @@ pub fn tranche_metric_field_units(currency: JsValue) -> Result<JsValue, JsValue>
 
 /// Units of the `ScenarioCell` fields, the one place a host reads them from.
 ///
-/// Rates are decimals, the price is percent of the tranche's current balance and
+/// Rates are decimals, the price is a clean percent of the tranche's current balance and
 /// the writedown is in currency units. Values are never rescaled.
 /// @param currency - ISO-4217 code of the result's `ScenarioTable.currency`, in any ASCII case; it names the unit of `writedown`.
 /// @returns `ScenarioTableFieldUnits`: `axes`, one `MetricFieldUnit` per swept input (`cpr`, `cdr`, `severity`), and `measures`, one per reported measure (`price`, `wal`, `writedown`), each in struct order.
@@ -508,7 +508,7 @@ pub fn simulation_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
 /// The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV a percent of the
 /// equity's current balance and cash-on-cash a decimal share of the invested amount. Values are never rescaled.
 /// @param currency - ISO-4217 code of the result's `currency`, in any ASCII case; it names the unit of `invested`.
-/// @returns `EquityMetricsFieldUnits`: one `MetricFieldUnit` each for `invested`, `irr`, `moic`, `nav_pct` and `cash_on_cash`.
+/// @returns `EquityMetricsFieldUnits`: one `MetricFieldUnit` each for `invested`, `irr`, `moic`, `nav_pct` and `cash_on_cash`, and `purchase_price` for the `purchasePricePct` argument of `equityMetrics`: percent of current balance, omitted means par.
 /// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
 #[wasm_bindgen(js_name = equityMetricsFieldUnits)]
 pub fn equity_metrics_field_units(currency: JsValue) -> Result<JsValue, JsValue> {

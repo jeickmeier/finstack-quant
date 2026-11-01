@@ -12,8 +12,8 @@ class EquityMetrics:
     (:meth:`StructuredCredit.equity_metrics`'s return value): the XIRR of the
     invested amount against every projected equity distribution, the
     multiple on invested capital, the NAV and the cash-on-cash series. With
-    nothing invested (a zero price or balance) ``irr`` is ``None``, and ``moic``
-    and each cash-on-cash share are ``0.0`` rather than an undefined ratio.
+    nothing invested (a zero price or balance) ``irr``, ``moic`` and each
+    cash-on-cash share are ``None``: each divides by ``invested``.
     ``equity_metrics_field_units`` states the units.
 
     Examples
@@ -202,14 +202,15 @@ class EquityMetrics:
         ...
 
     @property
-    def moic(self) -> float:
+    def moic(self) -> float | None:
         """
         Multiple on invested capital: total distributions over ``invested``, interest and principal.
 
         Returns
         -------
-        float
-            The multiple; ``0.0`` when nothing is invested.
+        float | None
+            The multiple; ``None`` when nothing is invested. A class that receives
+            nothing on a positive investment has a true ``0.0``.
 
         Notes
         -----
@@ -234,14 +235,14 @@ class EquityMetrics:
         ...
 
     @property
-    def cash_on_cash(self) -> list[tuple[datetime.date, float]]:
+    def cash_on_cash(self) -> list[tuple[datetime.date, float | None]]:
         """
         Each distribution as a decimal share of ``invested``, not annualized.
 
         Returns
         -------
-        list[tuple[datetime.date, float]]
-            ``(date, share)`` pairs; each share is ``0.0`` when nothing is invested.
+        list[tuple[datetime.date, float | None]]
+            ``(date, share)`` pairs; each share is ``None`` when nothing is invested.
 
         Raises
         ------

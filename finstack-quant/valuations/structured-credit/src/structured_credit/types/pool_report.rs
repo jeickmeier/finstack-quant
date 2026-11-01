@@ -55,8 +55,9 @@ pub struct PoolReport {
     /// and `PeriodDiagnostics::warf` report: weighted by balance over the
     /// performing rows only (defaulted and non-positive-balance rows are out of
     /// both numerator and denominator). An unrated asset takes the Moody's table
-    /// factor for `NR`. `0.0` when no performing balance remains.
-    pub warf: f64,
+    /// factor for `NR`. `None` when no performing balance remains; the
+    /// `clo_warf` metric, which must return a number, reports `0.0` there.
+    pub warf: Option<f64>,
     /// Balance per `PoolAsset::obligor_id`.
     pub by_obligor: Vec<PoolConcentrationEntry>,
     /// Balance per `PoolAsset::industry`.
@@ -89,7 +90,8 @@ pub struct PoolReport {
 ///
 /// # Returns
 ///
-/// The [`PoolReport`]. An empty pool reports zero balances and empty tables.
+/// The [`PoolReport`]. An empty pool reports zero balances, empty tables and
+/// `None` for each average.
 ///
 /// # Errors
 ///

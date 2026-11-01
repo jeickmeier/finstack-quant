@@ -343,7 +343,7 @@ class PoolReport:
         ...
 
     @property
-    def warf(self) -> float:
+    def warf(self) -> float | None:
         """
         Moody's weighted-average rating factor of the performing collateral.
 
@@ -353,9 +353,9 @@ class PoolReport:
 
         Returns
         -------
-        float
-            The rating factor, as the ``clo_warf`` metric reports it; ``0.0``
-            when no performing balance remains.
+        float | None
+            The rating factor, as the ``clo_warf`` metric reports it; ``None``
+            when no performing balance remains, where that metric reports ``0.0``.
 
         Notes
         -----

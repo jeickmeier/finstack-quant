@@ -505,7 +505,9 @@ fn p6_clo_standard_rules_carry_performing_collateral_at_par() {
         };
         deal.coverage_rules = Some(CoverageRules::clo_standard());
         let run = deal.run_simulation(&market(close), close).expect("run");
-        run.diagnostics.periods[0].coverage_tests[0].ratio
+        run.diagnostics.periods[0].coverage_tests[0]
+            .ratio
+            .expect("notes outstanding")
     };
     let b = ratio_for(CreditRating::B);
     let b_minus = ratio_for(CreditRating::BMinus);
@@ -1095,7 +1097,9 @@ fn rating_haircuts_key_by_rating_bucket() {
             ..CoverageRules::default()
         });
         let run = deal.run_simulation(&market(close), close).expect("run");
-        run.diagnostics.periods[0].coverage_tests[0].ratio
+        run.diagnostics.periods[0].coverage_tests[0]
+            .ratio
+            .expect("notes outstanding")
     };
     let b_minus = ratio_for(CreditRating::BMinus, vec![(CreditRating::B, 0.10)]);
     let b_minus_nr_only = ratio_for(CreditRating::BMinus, vec![(CreditRating::NR, 0.15)]);

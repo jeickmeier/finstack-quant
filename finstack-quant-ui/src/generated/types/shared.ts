@@ -12948,9 +12948,10 @@ export type ReserveTarget =
  * - cumulative loss is a fraction of the *original* pool balance;
  * - the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;
  * - credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,
- *   where the senior note is the *single* most-senior tranche by payment
- *   priority — for pari-passu senior classes (e.g. A-1/A-2) only the
- *   lowest-priority one is taken as the reference.
+ *   where the senior note is the tranche with the lowest `payment_priority`.
+ *   `TrancheStructure` gives every tranche a distinct priority, so for
+ *   same-seniority senior classes (e.g. A-1/A-2) this is the first one in
+ *   input order: A-1 is subtracted and A-2, ranked behind it, is not.
  *
  * `MaxDelinquency` reads the delinquent share of the pool, which is zero
  * unless the deal carries a `credit_model.delinquency` model.

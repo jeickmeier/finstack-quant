@@ -12375,7 +12375,7 @@
           "measures": [
             {
               "field": "price",
-              "label": "% of current balance",
+              "label": "clean, % of current balance",
               "source": "valuations::ScenarioCell::price"
             },
             {
@@ -12662,7 +12662,7 @@
           "measures": [
             {
               "field": "price",
-              "label": "% of current balance",
+              "label": "clean, % of current balance",
               "source": "valuations::ScenarioCell::price"
             },
             {
@@ -19870,7 +19870,7 @@
             "currency": "USD"
           },
           "stats": {
-            "wac": 0,
+            "wac": null,
             "weighted_avg_spread_bp": 350,
             "weighted_avg_maturity": 3.475068493150685,
             "diversity_score": 1.9230769230769231,
@@ -19955,7 +19955,7 @@
           "stats": [
             {
               "field": "wac",
-              "label": "decimal",
+              "label": "annual decimal, fixed-rate only",
               "source": "valuations::PoolStats::wac"
             },
             {
@@ -19975,12 +19975,12 @@
             },
             {
               "field": "num_obligors",
-              "label": "obligors",
+              "label": "named obligors",
               "source": "valuations::PoolStats::num_obligors"
             },
             {
               "field": "num_industries",
-              "label": "industries",
+              "label": "named industries",
               "source": "valuations::PoolStats::num_industries"
             },
             {
@@ -20169,9 +20169,9 @@
           },
           "stats": {
             "wac": 0.07,
-            "weighted_avg_spread_bp": 0,
+            "weighted_avg_spread_bp": null,
             "weighted_avg_maturity": 10.008219178082191,
-            "diversity_score": 0,
+            "diversity_score": null,
             "num_obligors": 0,
             "num_industries": 0,
             "defaulted_balance_pct": 0,
@@ -20226,7 +20226,7 @@
           "stats": [
             {
               "field": "wac",
-              "label": "decimal",
+              "label": "annual decimal, fixed-rate only",
               "source": "valuations::PoolStats::wac"
             },
             {
@@ -20246,12 +20246,12 @@
             },
             {
               "field": "num_obligors",
-              "label": "obligors",
+              "label": "named obligors",
               "source": "valuations::PoolStats::num_obligors"
             },
             {
               "field": "num_industries",
-              "label": "industries",
+              "label": "named industries",
               "source": "valuations::PoolStats::num_industries"
             },
             {
@@ -20500,16 +20500,16 @@
             "currency": "USD"
           },
           "stats": {
-            "wac": 0,
-            "weighted_avg_spread_bp": 0,
-            "weighted_avg_maturity": 0,
-            "diversity_score": 0,
+            "wac": null,
+            "weighted_avg_spread_bp": null,
+            "weighted_avg_maturity": null,
+            "diversity_score": null,
             "num_obligors": 0,
             "num_industries": 0,
             "defaulted_balance_pct": 0,
             "undrawn_commitment": 0
           },
-          "warf": 0,
+          "warf": null,
           "by_obligor": [],
           "by_industry": [],
           "by_rating": []
@@ -20528,7 +20528,7 @@
           "stats": [
             {
               "field": "wac",
-              "label": "decimal",
+              "label": "annual decimal, fixed-rate only",
               "source": "valuations::PoolStats::wac"
             },
             {
@@ -20548,12 +20548,12 @@
             },
             {
               "field": "num_obligors",
-              "label": "obligors",
+              "label": "named obligors",
               "source": "valuations::PoolStats::num_obligors"
             },
             {
               "field": "num_industries",
-              "label": "industries",
+              "label": "named industries",
               "source": "valuations::PoolStats::num_industries"
             },
             {
@@ -21126,7 +21126,7 @@
                 },
                 "pool_factor": 0.9409770161099289,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3649.9999999999995,
                 "interest_collections": {
                   "amount": "1764987.263780753",
@@ -21334,7 +21334,7 @@
                 },
                 "pool_factor": 0.885437744847146,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3649.9999999999995,
                 "interest_collections": {
                   "amount": "1660812.448944442",
@@ -21542,7 +21542,7 @@
                 },
                 "pool_factor": 0.833176567097372,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1579959.818817459",
@@ -21750,7 +21750,7 @@
                 },
                 "pool_factor": 0.784,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3649.9999999999995,
                 "interest_collections": {
                   "amount": "1486705.875884437",
@@ -22289,9 +22289,9 @@
                   "currency": "USD"
                 },
                 "pool_factor": 0,
-                "wac": 0,
-                "weighted_avg_spread_bp": 0,
-                "warf": 0,
+                "wac": null,
+                "weighted_avg_spread_bp": null,
+                "warf": null,
                 "interest_collections": {
                   "amount": "0",
                   "currency": "USD"
@@ -24173,7 +24173,7 @@
                 },
                 "pool_factor": 0.977180736448736,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1755864.115116567",
@@ -24427,7 +24427,7 @@
                 },
                 "pool_factor": 0.954882191686493,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1715796.589113514",
@@ -24681,7 +24681,7 @@
                 },
                 "pool_factor": 0.9330924832939901,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1695068.027013712",
@@ -24998,7 +24998,7 @@
                 },
                 "pool_factor": 0.9118,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1656387.822967965",
@@ -25284,7 +25284,7 @@
                 },
                 "pool_factor": 0.890993395493957,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650.0000000000005,
                 "interest_collections": {
                   "amount": "1583403.52763402",
@@ -25570,7 +25570,7 @@
                 },
                 "pool_factor": 0.870661582379744,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1564463.329953703",
@@ -25856,7 +25856,7 @@
                 },
                 "pool_factor": 0.85079372626746,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650.0000000000005,
                 "interest_collections": {
                   "amount": "1545563.027031103",
@@ -26142,7 +26142,7 @@
                 },
                 "pool_factor": 0.83137924,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1510294.416982191",
@@ -26428,7 +26428,7 @@
                 },
                 "pool_factor": 0.81240777801139,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1443747.336496699",
@@ -26714,7 +26714,7 @@
                 },
                 "pool_factor": 0.7938692308138511,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650.0000000000005,
                 "interest_collections": {
                   "amount": "1426477.664251786",
@@ -26973,7 +26973,7 @@
                 },
                 "pool_factor": 0.7757537196106701,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1409244.36804696",
@@ -27232,7 +27232,7 @@
                 },
                 "pool_factor": 0.758051591032,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1377086.449404361",
@@ -28151,7 +28151,7 @@
                 },
                 "pool_factor": 0.9409770161099289,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3649.9999999999995,
                 "interest_collections": {
                   "amount": "1764987.263780753",
@@ -28332,7 +28332,7 @@
                 },
                 "pool_factor": 0.885437744847146,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3649.9999999999995,
                 "interest_collections": {
                   "amount": "1660812.448944442",
@@ -28513,7 +28513,7 @@
                 },
                 "pool_factor": 0.833176567097372,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1579959.818817459",
@@ -28694,7 +28694,7 @@
                 },
                 "pool_factor": 0.784,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3649.9999999999995,
                 "interest_collections": {
                   "amount": "1486705.875884437",
@@ -29201,9 +29201,9 @@
                   "currency": "USD"
                 },
                 "pool_factor": 0,
-                "wac": 0,
-                "weighted_avg_spread_bp": 0,
-                "warf": 0,
+                "wac": null,
+                "weighted_avg_spread_bp": null,
+                "warf": null,
                 "interest_collections": {
                   "amount": "0",
                   "currency": "USD"
@@ -29870,7 +29870,7 @@
                 },
                 "pool_factor": 0.977180736448736,
                 "wac": 0.07,
-                "weighted_avg_spread_bp": 0,
+                "weighted_avg_spread_bp": null,
                 "warf": 3650,
                 "interest_collections": {
                   "amount": "1755864.115116567",
@@ -30165,6 +30165,4639 @@
             ]
           }
         }
+      },
+      {
+        "name": "retired-senior",
+        "instrument": {
+          "schema": "finstack_quant.instrument/1",
+          "instrument": {
+            "type": "structured_credit",
+            "spec": {
+              "id": "CLO-EXAMPLE",
+              "deal_type": "clo",
+              "pool": {
+                "id": "POOL-1",
+                "deal_type": "clo",
+                "currency": "USD",
+                "assets": [
+                  {
+                    "id": "COLLATERAL-1",
+                    "asset_type": {
+                      "type": "high_yield_bond"
+                    },
+                    "balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "rate": 0.07,
+                    "spread_bp": null,
+                    "forward_curve_id": null,
+                    "maturity": "2034-01-01",
+                    "rating": null,
+                    "industry": null,
+                    "obligor_id": null,
+                    "defaulted": false,
+                    "recovery_amount": null,
+                    "default_date": null,
+                    "purchase_price": null,
+                    "acquisition_date": null,
+                    "origination_date": null,
+                    "day_count": "act_360",
+                    "smm_override": null,
+                    "mdr_override": null,
+                    "recovery_rate": null,
+                    "contractual_payment": null
+                  }
+                ],
+                "cumulative_defaults": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_recoveries": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_prepayments": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_scheduled_amortization": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reinvestment_period": null,
+                "collection_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "rep_lines": null
+              },
+              "tranches": {
+                "tranches": [
+                  {
+                    "id": "SENIOR",
+                    "attach_pct": 95,
+                    "detach_pct": 100,
+                    "seniority": "senior",
+                    "rating": null,
+                    "original_balance": {
+                      "amount": "5000000",
+                      "currency": "USD"
+                    },
+                    "current_balance": {
+                      "amount": "5000000",
+                      "currency": "USD"
+                    },
+                    "coupon": {
+                      "fixed": {
+                        "rate": 0.05
+                      }
+                    },
+                    "oc_trigger": null,
+                    "ic_trigger": null,
+                    "frequency": {
+                      "count": 3,
+                      "unit": "months"
+                    },
+                    "day_count": "act_360",
+                    "deferred_interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "pik_enabled": false,
+                    "maturity": "2034-01-01",
+                    "attributes": {}
+                  },
+                  {
+                    "id": "MEZZ",
+                    "attach_pct": 15,
+                    "detach_pct": 95,
+                    "seniority": "mezzanine",
+                    "rating": null,
+                    "original_balance": {
+                      "amount": "80000000",
+                      "currency": "USD"
+                    },
+                    "current_balance": {
+                      "amount": "80000000",
+                      "currency": "USD"
+                    },
+                    "coupon": {
+                      "fixed": {
+                        "rate": 0.08
+                      }
+                    },
+                    "oc_trigger": null,
+                    "ic_trigger": null,
+                    "frequency": {
+                      "count": 3,
+                      "unit": "months"
+                    },
+                    "day_count": "act_360",
+                    "deferred_interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "pik_enabled": false,
+                    "maturity": "2034-01-01",
+                    "attributes": {}
+                  },
+                  {
+                    "id": "EQUITY",
+                    "attach_pct": 0,
+                    "detach_pct": 15,
+                    "seniority": "equity",
+                    "rating": null,
+                    "original_balance": {
+                      "amount": "15000000",
+                      "currency": "USD"
+                    },
+                    "current_balance": {
+                      "amount": "15000000",
+                      "currency": "USD"
+                    },
+                    "coupon": {
+                      "fixed": {
+                        "rate": 0
+                      }
+                    },
+                    "oc_trigger": {
+                      "trigger_level": 0.95,
+                      "cure_level": null,
+                      "breach_date": null,
+                      "consequence": "trap_excess_spread"
+                    },
+                    "ic_trigger": null,
+                    "frequency": {
+                      "count": 3,
+                      "unit": "months"
+                    },
+                    "day_count": "act_360",
+                    "deferred_interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "pik_enabled": false,
+                    "maturity": "2034-01-01",
+                    "attributes": {}
+                  }
+                ]
+              },
+              "closing_date": "2024-01-01",
+              "first_payment_date": "2024-04-01",
+              "maturity": "2027-01-01",
+              "frequency": {
+                "count": 3,
+                "unit": "months"
+              },
+              "calendar_id": "nyse",
+              "discount_curve_id": "USD-OIS",
+              "attributes": {},
+              "prepayment_spec": {
+                "curve": "constant",
+                "cpr": 0.03
+              },
+              "default_spec": {
+                "curve": "constant",
+                "cdr": 0.06
+              },
+              "recovery_spec": {
+                "rate": 0.5,
+                "recovery_lag": 0
+              },
+              "market_conditions": {
+                "refi_rate": 0.04
+              },
+              "deal_metadata": {
+                "manager_id": null,
+                "servicer_id": null,
+                "master_servicer_id": null,
+                "special_servicer_id": null,
+                "trustee_id": null
+              },
+              "hedge_swaps": [],
+              "coverage_triggers": [
+                {
+                  "id": "OC_SENIOR",
+                  "tranche_id": "SENIOR",
+                  "kind": "oc",
+                  "trigger_level": 1.1,
+                  "action": "pay_down_senior"
+                },
+                {
+                  "id": "IC_SENIOR",
+                  "tranche_id": "SENIOR",
+                  "kind": "ic",
+                  "trigger_level": 1.05,
+                  "action": "pay_down_senior"
+                },
+                {
+                  "id": "OC_MEZZ",
+                  "tranche_id": "MEZZ",
+                  "kind": "oc",
+                  "trigger_level": 1.01,
+                  "action": "pay_down_senior"
+                }
+              ]
+            }
+          }
+        },
+        "run": {
+          "tranches": {
+            "EQUITY": {
+              "tranche_id": "EQUITY",
+              "cashflows": [
+                [
+                  "2024-04-01",
+                  {
+                    "amount": "74891.8928943445",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-07-01",
+                  {
+                    "amount": "53965.1453121641",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-10-01",
+                  {
+                    "amount": "33884.23762908273",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-01-02",
+                  {
+                    "amount": "13682.07025715949",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-04-01",
+                  {
+                    "amount": "474.077019801",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "detailed_flows": [
+                {
+                  "date": "2024-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "74891.8928943445",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-07-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "53965.1453121641",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-10-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "33884.23762908273",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-01-02",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "13682.07025715949",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "474.077019801",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2027-01-04",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "-15000000",
+                    "currency": "USD"
+                  },
+                  "kind": "defaulted_notional",
+                  "accrual_factor": 0
+                }
+              ],
+              "accrual_periods": [],
+              "interest_flows": [
+                [
+                  "2024-04-01",
+                  {
+                    "amount": "74891.8928943445",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-07-01",
+                  {
+                    "amount": "53965.1453121641",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-10-01",
+                  {
+                    "amount": "33884.23762908273",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-01-02",
+                  {
+                    "amount": "13682.07025715949",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-04-01",
+                  {
+                    "amount": "474.077019801",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "principal_flows": [],
+              "pik_flows": [],
+              "deferred_flows": [],
+              "writedown_flows": [
+                [
+                  "2027-01-04",
+                  {
+                    "amount": "15000000",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "final_balance": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_interest": {
+                "amount": "176897.42311255182",
+                "currency": "USD"
+              },
+              "total_principal": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_pik": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_deferred": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_writedown": {
+                "amount": "15000000",
+                "currency": "USD"
+              }
+            },
+            "MEZZ": {
+              "tranche_id": "MEZZ",
+              "cashflows": [
+                [
+                  "2024-04-01",
+                  {
+                    "amount": "1617777.777777778",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-07-01",
+                  {
+                    "amount": "1617777.777777778",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-10-01",
+                  {
+                    "amount": "1635555.555555556",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-01-02",
+                  {
+                    "amount": "2489083.024844593",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-04-01",
+                  {
+                    "amount": "2963791.480305333",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-07-01",
+                  {
+                    "amount": "2913815.105061362",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-10-01",
+                  {
+                    "amount": "2864123.588359214",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-01-02",
+                  {
+                    "amount": "2798766.397353052",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-04-01",
+                  {
+                    "amount": "2702817.335169058",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-07-01",
+                  {
+                    "amount": "2656816.612794950",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-10-01",
+                  {
+                    "amount": "2611507.887865931",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2027-01-04",
+                  {
+                    "amount": "2551915.201106512",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "detailed_flows": [
+                {
+                  "date": "2024-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1617777.777777778",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-07-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1617777.777777778",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-10-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1635555.555555556",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-01-02",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1635555.555555556",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-01-02",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "853527.469289037",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1582929.450614219",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1380862.029691114",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-07-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1564463.329953703",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-07-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1349351.775107659",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-10-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1545563.027031103",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-10-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1318560.561328111",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2026-01-02",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1510294.416982191",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2026-01-02",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1288471.980370861",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2026-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1443747.336496699",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2026-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1259069.998672359",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2026-07-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1426477.664251786",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2026-07-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1230338.948543164",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2026-10-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1409244.368046960",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2026-10-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1202263.519818971",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2027-01-04",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1377086.449404361",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2027-01-04",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1174828.751702151",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2027-01-04",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "-68942724.9654766",
+                    "currency": "USD"
+                  },
+                  "kind": "defaulted_notional",
+                  "accrual_factor": 0
+                }
+              ],
+              "accrual_periods": [
+                {
+                  "start": "2024-01-01",
+                  "end": "2024-04-01",
+                  "payment_date": "2024-04-01",
+                  "opening_balance": {
+                    "amount": "80000000",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2024-04-01",
+                  "end": "2024-07-01",
+                  "payment_date": "2024-07-01",
+                  "opening_balance": {
+                    "amount": "80000000",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2024-07-01",
+                  "end": "2024-10-01",
+                  "payment_date": "2024-10-01",
+                  "opening_balance": {
+                    "amount": "80000000",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2024-10-01",
+                  "end": "2025-01-01",
+                  "payment_date": "2025-01-02",
+                  "opening_balance": {
+                    "amount": "80000000",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-04-01",
+                  "payment_date": "2025-04-01",
+                  "opening_balance": {
+                    "amount": "79146472.530710963",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2025-04-01",
+                  "end": "2025-07-01",
+                  "payment_date": "2025-07-01",
+                  "opening_balance": {
+                    "amount": "77765610.501019849",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2025-07-01",
+                  "end": "2025-10-01",
+                  "payment_date": "2025-10-01",
+                  "opening_balance": {
+                    "amount": "76416258.725912190",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2025-10-01",
+                  "end": "2026-01-01",
+                  "payment_date": "2026-01-02",
+                  "opening_balance": {
+                    "amount": "75097698.164584079",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2026-01-01",
+                  "end": "2026-04-01",
+                  "payment_date": "2026-04-01",
+                  "opening_balance": {
+                    "amount": "73809226.184213218",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2026-04-01",
+                  "end": "2026-07-01",
+                  "payment_date": "2026-07-01",
+                  "opening_balance": {
+                    "amount": "72550156.185540859",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2026-07-01",
+                  "end": "2026-10-01",
+                  "payment_date": "2026-10-01",
+                  "opening_balance": {
+                    "amount": "71319817.236997695",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2026-10-01",
+                  "end": "2027-01-01",
+                  "payment_date": "2027-01-04",
+                  "opening_balance": {
+                    "amount": "70117553.717178724",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.08,
+                  "day_count": "act_360"
+                }
+              ],
+              "interest_flows": [
+                [
+                  "2024-04-01",
+                  {
+                    "amount": "1617777.777777778",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-07-01",
+                  {
+                    "amount": "1617777.777777778",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-10-01",
+                  {
+                    "amount": "1635555.555555556",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-01-02",
+                  {
+                    "amount": "1635555.555555556",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-04-01",
+                  {
+                    "amount": "1582929.450614219",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-07-01",
+                  {
+                    "amount": "1564463.329953703",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-10-01",
+                  {
+                    "amount": "1545563.027031103",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-01-02",
+                  {
+                    "amount": "1510294.416982191",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-04-01",
+                  {
+                    "amount": "1443747.336496699",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-07-01",
+                  {
+                    "amount": "1426477.664251786",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-10-01",
+                  {
+                    "amount": "1409244.368046960",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2027-01-04",
+                  {
+                    "amount": "1377086.449404361",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "principal_flows": [
+                [
+                  "2025-01-02",
+                  {
+                    "amount": "853527.469289037",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-04-01",
+                  {
+                    "amount": "1380862.029691114",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-07-01",
+                  {
+                    "amount": "1349351.775107659",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-10-01",
+                  {
+                    "amount": "1318560.561328111",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-01-02",
+                  {
+                    "amount": "1288471.980370861",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-04-01",
+                  {
+                    "amount": "1259069.998672359",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-07-01",
+                  {
+                    "amount": "1230338.948543164",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-10-01",
+                  {
+                    "amount": "1202263.519818971",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2027-01-04",
+                  {
+                    "amount": "1174828.751702151",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "pik_flows": [],
+              "deferred_flows": [
+                [
+                  "2025-07-01",
+                  {
+                    "amount": "8130.12684469787",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-10-01",
+                  {
+                    "amount": "24855.05598779884",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-01-02",
+                  {
+                    "amount": "49891.3570371049",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-04-01",
+                  {
+                    "amount": "82328.5442246699",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-07-01",
+                  {
+                    "amount": "122976.260613821",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-10-01",
+                  {
+                    "amount": "171825.9338565918",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2027-01-04",
+                  {
+                    "amount": "228253.9160034398",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "writedown_flows": [
+                [
+                  "2027-01-04",
+                  {
+                    "amount": "68942724.9654766",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "final_balance": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_interest": {
+                "amount": "18366472.709447690",
+                "currency": "USD"
+              },
+              "total_principal": {
+                "amount": "11057275.034523427",
+                "currency": "USD"
+              },
+              "total_pik": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_deferred": {
+                "amount": "688261.19456812411",
+                "currency": "USD"
+              },
+              "total_writedown": {
+                "amount": "68942724.9654766",
+                "currency": "USD"
+              }
+            },
+            "SENIOR": {
+              "tranche_id": "SENIOR",
+              "cashflows": [
+                [
+                  "2024-04-01",
+                  {
+                    "amount": "1577629.6601618325",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-07-01",
+                  {
+                    "amount": "1523930.5854221879",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-10-01",
+                  {
+                    "amount": "1471735.45178049928",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-01-02",
+                  {
+                    "amount": "566730.84408781951",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "detailed_flows": [
+                {
+                  "date": "2024-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "63194.4444444445",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1514435.215717388",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-07-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "44053.6660235719",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-07-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1479876.919398616",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-10-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "25628.23382907328",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-10-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1446107.217951426",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-01-02",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "7150.19715524951",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-01-02",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "559580.64693257",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                }
+              ],
+              "accrual_periods": [
+                {
+                  "start": "2024-01-01",
+                  "end": "2024-04-01",
+                  "payment_date": "2024-04-01",
+                  "opening_balance": {
+                    "amount": "5000000",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2024-04-01",
+                  "end": "2024-07-01",
+                  "payment_date": "2024-07-01",
+                  "opening_balance": {
+                    "amount": "3485564.784282612",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2024-07-01",
+                  "end": "2024-10-01",
+                  "payment_date": "2024-10-01",
+                  "opening_balance": {
+                    "amount": "2005687.864883996",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2024-10-01",
+                  "end": "2025-01-01",
+                  "payment_date": "2025-01-02",
+                  "opening_balance": {
+                    "amount": "559580.646932570",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-04-01",
+                  "payment_date": "2025-04-01",
+                  "opening_balance": {
+                    "amount": "0.000000000",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2025-04-01",
+                  "end": "2025-07-01",
+                  "payment_date": "2025-07-01",
+                  "opening_balance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2025-07-01",
+                  "end": "2025-10-01",
+                  "payment_date": "2025-10-01",
+                  "opening_balance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2025-10-01",
+                  "end": "2026-01-01",
+                  "payment_date": "2026-01-02",
+                  "opening_balance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2026-01-01",
+                  "end": "2026-04-01",
+                  "payment_date": "2026-04-01",
+                  "opening_balance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2026-04-01",
+                  "end": "2026-07-01",
+                  "payment_date": "2026-07-01",
+                  "opening_balance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2026-07-01",
+                  "end": "2026-10-01",
+                  "payment_date": "2026-10-01",
+                  "opening_balance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2026-10-01",
+                  "end": "2027-01-01",
+                  "payment_date": "2027-01-04",
+                  "opening_balance": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.05,
+                  "day_count": "act_360"
+                }
+              ],
+              "interest_flows": [
+                [
+                  "2024-04-01",
+                  {
+                    "amount": "63194.4444444445",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-07-01",
+                  {
+                    "amount": "44053.6660235719",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-10-01",
+                  {
+                    "amount": "25628.23382907328",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-01-02",
+                  {
+                    "amount": "7150.19715524951",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "principal_flows": [
+                [
+                  "2024-04-01",
+                  {
+                    "amount": "1514435.215717388",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-07-01",
+                  {
+                    "amount": "1479876.919398616",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-10-01",
+                  {
+                    "amount": "1446107.217951426",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-01-02",
+                  {
+                    "amount": "559580.64693257",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "pik_flows": [],
+              "deferred_flows": [],
+              "writedown_flows": [],
+              "final_balance": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_interest": {
+                "amount": "140026.54145233919",
+                "currency": "USD"
+              },
+              "total_principal": {
+                "amount": "5000000.000000000",
+                "currency": "USD"
+              },
+              "total_pik": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_deferred": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_writedown": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            }
+          },
+          "diagnostics": {
+            "periods": [
+              {
+                "payment_date": "2024-04-01",
+                "pool_balance": {
+                  "amount": "97718073.6448736",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.977180736448736,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650,
+                "interest_collections": {
+                  "amount": "1755864.115116567",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "746944.076308317",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1534982.278818142",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "767491.139409071",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.027703969860589057,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": 19.8465017721182,
+                    "trigger_level": 1.1,
+                    "cushion": 18.746501772118197,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": 27.785102480965428,
+                    "trigger_level": 1.05,
+                    "cushion": 26.735102480965427,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.1674412807128351,
+                    "trigger_level": 1.01,
+                    "cushion": 0.15744128071283514,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "3270299.330833955",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "63194.4444444445",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1617777.777777778",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1514435.215717388",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "equity",
+                      {
+                        "amount": "74891.8928943445",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "63194.4444444445",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "63194.4444444445",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.0000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1617777.777777778",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1617777.777777778",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "5000000",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1514435.215717388",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "3485564.784282612",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "equity",
+                      "recipient_id": "equity_distribution",
+                      "priority": 6,
+                      "recipient": "equity",
+                      "requested_amount": {
+                        "amount": "74891.8928943445",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "74891.8928943445",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.0000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0.0000000000",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0.0000000000",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "767491.139409071",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 0.9643303981108978
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.1456486843192866
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.007854137016640514
+                  }
+                ]
+              },
+              {
+                "payment_date": "2024-07-01",
+                "pool_balance": {
+                  "amount": "95488219.1686493",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.954882191686493,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650,
+                "interest_collections": {
+                  "amount": "1715796.589113514",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "729899.362572981",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1499955.11365127",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "749977.556825635",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.02849063169390403,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": 27.819909279926232,
+                    "trigger_level": 1.1,
+                    "cushion": 26.71990927992623,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": 38.94787299189671,
+                    "trigger_level": 1.05,
+                    "cushion": 37.89787299189671,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.1614953595702762,
+                    "trigger_level": 1.01,
+                    "cushion": 0.15149535957027616,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "3195673.508512130",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "44053.6660235719",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1617777.777777778",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1479876.919398616",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "equity",
+                      {
+                        "amount": "53965.1453121641",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "44053.6660235719",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "44053.6660235719",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.0000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1617777.777777778",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1617777.777777778",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "3485564.784282612",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1479876.919398616",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "2005687.864883996",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "equity",
+                      "recipient_id": "equity_distribution",
+                      "priority": 6,
+                      "recipient": "equity",
+                      "requested_amount": {
+                        "amount": "53965.1453121641",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "53965.1453121641",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.0000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0.0000000000",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0.0000000000",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "749977.556825635",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 0.9789954417168302
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.14119575609586713
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.01589168495806343
+                  }
+                ]
+              },
+              {
+                "payment_date": "2024-10-01",
+                "pool_balance": {
+                  "amount": "93309248.329399",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.9330924832939901,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650,
+                "interest_collections": {
+                  "amount": "1695068.027013712",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "713243.596652529",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1465727.242597795",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "732863.621298897",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.029280235394705294,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": 47.24332096052784,
+                    "trigger_level": 1.1,
+                    "cushion": 46.14332096052784,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": 66.14064934473895,
+                    "trigger_level": 1.05,
+                    "cushion": 65.09064934473895,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.155472967966238,
+                    "trigger_level": 1.01,
+                    "cushion": 0.1454729679662381,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "3141175.244965138",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "25628.23382907328",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1635555.555555556",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1446107.217951426",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "equity",
+                      {
+                        "amount": "33884.23762908273",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "25628.23382907328",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "25628.23382907328",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.00000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1635555.555555556",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1635555.555555556",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "2005687.864883996",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1446107.217951426",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "559580.646932570",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "equity",
+                      "recipient_id": "equity_distribution",
+                      "priority": 6,
+                      "recipient": "equity",
+                      "requested_amount": {
+                        "amount": "33884.23762908273",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "33884.23762908273",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.00000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "-0.00000000001",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0.00000000000",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "732863.621298897",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 0.9940029455069969
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.1366388424591926
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.024116926862270672
+                  }
+                ]
+              },
+              {
+                "payment_date": "2025-01-02",
+                "pool_balance": {
+                  "amount": "91180000",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.9118,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650,
+                "interest_collections": {
+                  "amount": "1656387.822967965",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "696967.903044263",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1432280.426354688",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "716140.213177344",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.030113119781669515,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": 165.468746325995,
+                    "trigger_level": 1.1,
+                    "cushion": 164.368746325995,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": 229.16531749234574,
+                    "trigger_level": 1.05,
+                    "cushion": 228.11531749234572,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.1493742565769827,
+                    "trigger_level": 1.01,
+                    "cushion": 0.13937425657698266,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "3069495.939189572",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "7150.19715524951",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1635555.555555556",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1413108.116221607",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "equity",
+                      {
+                        "amount": "13682.07025715949",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "7150.19715524951",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "7150.19715524951",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.00000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1635555.555555556",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1635555.555555556",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "559580.64693257",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "559580.64693257",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.00000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "MEZZ_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "80000000",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "853527.469289037",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "79146472.530710963",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "equity",
+                      "recipient_id": "equity_distribution",
+                      "priority": 6,
+                      "recipient": "equity",
+                      "requested_amount": {
+                        "amount": "13682.07025715949",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "13682.07025715949",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.00000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0.00000000000",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0.00000000000",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "716140.213177344",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 1
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.13197551512710062
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.03253424578538019
+                  }
+                ]
+              },
+              {
+                "payment_date": "2025-04-01",
+                "pool_balance": {
+                  "amount": "89099339.5493957",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.890993395493957,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650.0000000000005,
+                "interest_collections": {
+                  "amount": "1583403.52763402",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "681063.608777923",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1399596.841826382",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "699798.420913191",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.030678848163781098,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.1,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.05,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.1431994210983698,
+                    "trigger_level": 1.01,
+                    "cushion": 0.1331994210983698,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "2964265.557325134",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1582929.450614219",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1380862.029691114",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "equity",
+                      {
+                        "amount": "474.077019801",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1582929.450614219",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1582929.450614219",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "MEZZ_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "79146472.530711",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1380862.029691114",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "77765610.501019886",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "equity",
+                      "recipient_id": "equity_distribution",
+                      "priority": 6,
+                      "recipient": "equity",
+                      "requested_amount": {
+                        "amount": "474.077019801",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "474.077019801",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0.000000000",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "699798.420913191",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 1
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.12720328911184073
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.041148127137256886
+                  }
+                ]
+              },
+              {
+                "payment_date": "2025-07-01",
+                "pool_balance": {
+                  "amount": "87066158.2379744",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.870661582379744,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650,
+                "interest_collections": {
+                  "amount": "1564463.329953703",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "665522.238794045",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1367659.072627229",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "683829.536313614",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.031064637141320132,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.1,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.05,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.136948703205031,
+                    "trigger_level": 1.01,
+                    "cushion": 0.12694870320503093,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "2913815.105061362",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1564463.329953703",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1349351.775107659",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "equity",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1572593.456798401",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1564463.329953703",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "8130.126844698",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "MEZZ_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "77765610.5010199",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1349351.775107659",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "76416258.725912241",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "683829.536313614",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 1
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.12231962139587343
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.04996316107169688
+                  }
+                ]
+              },
+              {
+                "payment_date": "2025-10-01",
+                "pool_balance": {
+                  "amount": "85079372.626746",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.85079372626746,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650.0000000000005,
+                "interest_collections": {
+                  "amount": "1545563.027031103",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "650335.511427776",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1336450.09980067",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "668225.049900335",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.03146802353085523,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.1,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.05,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.1306223914725262,
+                    "trigger_level": 1.01,
+                    "cushion": 0.12062239147252618,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "2864123.588359214",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1545563.027031103",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1318560.561328111",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1570418.083018902",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1545563.027031103",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "24855.055987799",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "MEZZ_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "76416258.7259122",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1318560.561328111",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "75097698.164584089",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0.000000000",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "668225.049900335",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 1
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.11732190957675236
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.05898404493241995
+                  }
+                ]
+              },
+              {
+                "payment_date": "2026-01-02",
+                "pool_balance": {
+                  "amount": "83137924",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.83137924,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650,
+                "interest_collections": {
+                  "amount": "1510294.416982191",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "635495.333995759",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1305953.292750204",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "652976.646375102",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.03187672529739667,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.1,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.05,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.1242208222593189,
+                    "trigger_level": 1.01,
+                    "cushion": 0.11422082225931884,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "2798766.397353052",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1510294.416982191",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1288471.980370861",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1560185.774019296",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1510294.416982191",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "49891.357037105",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "MEZZ_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "75097698.1645841",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1288471.980370861",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "73809226.184213239",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0.000000000",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "652976.646375102",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 1
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.11220749048035862
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.06821558575618536
+                  }
+                ]
+              },
+              {
+                "payment_date": "2026-04-01",
+                "pool_balance": {
+                  "amount": "81240777.801139",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.81240777801139,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650,
+                "interest_collections": {
+                  "amount": "1443747.336496699",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "620993.798483711",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1276152.400377296",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "638076.200188648",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.03226029013552049,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.1,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.05,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.1177443805454357,
+                    "trigger_level": 1.01,
+                    "cushion": 0.10774438054543567,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "2702817.335169058",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1443747.336496699",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1259069.998672359",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1526075.880721369",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1443747.336496699",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "82328.544224670",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "MEZZ_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "73809226.1842132",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1259069.998672359",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "72550156.185540841",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0.000000000",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "638076.200188648",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 1
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.10697363874175389
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.07766270283435667
+                  }
+                ]
+              },
+              {
+                "payment_date": "2026-07-01",
+                "pool_balance": {
+                  "amount": "79386923.0813851",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.7938692308138511,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650.0000000000005,
+                "interest_collections": {
+                  "amount": "1426477.664251786",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "606823.17733241",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1247031.542421507",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "623515.771210754",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.03270099108236713,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.1,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.05,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.1111935007246088,
+                    "trigger_level": 1.01,
+                    "cushion": 0.10119350072460875,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "2656816.612794950",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1426477.664251786",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1230338.948543164",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1549453.924865607",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1426477.664251786",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "122976.260613821",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "MEZZ_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "72550156.1855409",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1230338.948543164",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "71319817.236997736",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0.000000000",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "623515.771210754",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 1
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.10161756535288886
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.0873304303342906
+                  }
+                ]
+              },
+              {
+                "payment_date": "2026-10-01",
+                "pool_balance": {
+                  "amount": "77575371.961067",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.7757537196106701,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650,
+                "interest_collections": {
+                  "amount": "1409244.36804696",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "592975.919319846",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1218575.200998251",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "609287.600499125",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.033160991669481596,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.1,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.05,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.1045686673467732,
+                    "trigger_level": 1.01,
+                    "cushion": 0.09456866734677316,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "2611507.887865931",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1409244.36804696",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1202263.519818971",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1581070.301903552",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1409244.36804696",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "171825.933856592",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "MEZZ_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "71319817.2369977",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1202263.519818971",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "70117553.717178729",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0.00000000",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "609287.600499125",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 1
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.09613641617640155
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.09722391998193615
+                  }
+                ]
+              },
+              {
+                "payment_date": "2027-01-04",
+                "pool_balance": {
+                  "amount": "75805159.1032",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.758051591032,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": null,
+                "warf": 3650,
+                "interest_collections": {
+                  "amount": "1377086.449404361",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "579444.645537333",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "1190768.212329636",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "595384.106164818",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": -0.03360922786880315,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.1,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "IC_SENIOR",
+                    "ratio": null,
+                    "trigger_level": 1.05,
+                    "cushion": null,
+                    "passing": true
+                  },
+                  {
+                    "test_id": "OC_MEZZ",
+                    "ratio": 1.0978704158077628,
+                    "trigger_level": 1.01,
+                    "cushion": 0.08787041580776278,
+                    "passing": true
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "2551915.201106512",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "SENIOR_interest",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "SENIOR_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_interest",
+                      {
+                        "amount": "1377086.449404361",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "MEZZ_coverage",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "1174828.751702151",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "SENIOR_interest",
+                      "recipient_id": "SENIOR_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "MEZZ_interest",
+                      "recipient_id": "MEZZ_interest",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "1605340.365407801",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1377086.449404361",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "228253.916003440",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "SENIOR_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "SENIOR"
+                      },
+                      "requested_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "MEZZ_principal",
+                      "priority": 5,
+                      "recipient": {
+                        "tranche": "MEZZ"
+                      },
+                      "requested_amount": {
+                        "amount": "70117553.7171787",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1174828.751702151",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "68942724.965476549",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    }
+                  ],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0.000000000",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "595384.106164818",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "SENIOR",
+                    "credit_enhancement": 1
+                  },
+                  {
+                    "tranche_id": "MEZZ",
+                    "credit_enhancement": 0.09052727042470839
+                  },
+                  {
+                    "tranche_id": "EQUITY",
+                    "credit_enhancement": -0.10734844380707927
+                  }
+                ]
+              }
+            ],
+            "reserve_balance_path": [
+              [
+                "2024-04-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2024-07-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2024-10-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2025-01-02",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2025-04-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2025-07-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2025-10-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2026-01-02",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2026-04-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2026-07-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2026-10-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2027-01-04",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "reserve_interest_paid": [],
+            "draws_from_reserve": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "draws_from_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "unfunded_draws": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reserve_replenished": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "early_amortization_date": null,
+            "tranche_draws": [],
+            "first_breaches": [
+              {
+                "test_id": "IC_SENIOR",
+                "first_breach": null
+              },
+              {
+                "test_id": "OC_EQUITY_trigger",
+                "first_breach": "2025-10-01"
+              },
+              {
+                "test_id": "OC_MEZZ",
+                "first_breach": null
+              },
+              {
+                "test_id": "OC_SENIOR",
+                "first_breach": null
+              }
+            ]
+          }
+        }
       }
     ]
   },
@@ -30198,6 +34831,11 @@
         "field": "cash_on_cash",
         "label": "decimal share of invested",
         "source": "valuations::EquityMetrics::cash_on_cash"
+      },
+      "purchase_price": {
+        "field": "purchase_price_pct",
+        "label": "% of current balance; omitted means par",
+        "source": "valuations::calculate_equity_metrics::purchase_price_pct"
       }
     },
     "cases": [
@@ -31189,49 +35827,49 @@
             "currency": "USD",
             "invested": 0,
             "irr": null,
-            "moic": 0,
+            "moic": null,
             "nav_pct": 143.3056753377453,
             "cash_on_cash": [
-              ["2024-04-01", 0],
-              ["2024-07-01", 0],
-              ["2024-10-01", 0],
-              ["2025-01-02", 0],
-              ["2025-04-01", 0],
-              ["2025-07-01", 0],
-              ["2025-10-01", 0],
-              ["2026-01-02", 0],
-              ["2026-04-01", 0],
-              ["2026-07-01", 0],
-              ["2026-10-01", 0],
-              ["2027-01-04", 0],
-              ["2027-04-01", 0],
-              ["2027-07-01", 0],
-              ["2027-10-01", 0],
-              ["2028-01-03", 0],
-              ["2028-04-03", 0],
-              ["2028-07-03", 0],
-              ["2028-10-02", 0],
-              ["2029-01-02", 0],
-              ["2029-04-02", 0],
-              ["2029-07-02", 0],
-              ["2029-10-01", 0],
-              ["2030-01-02", 0],
-              ["2030-04-01", 0],
-              ["2030-07-01", 0],
-              ["2030-10-01", 0],
-              ["2031-01-02", 0],
-              ["2031-04-01", 0],
-              ["2031-07-01", 0],
-              ["2031-10-01", 0],
-              ["2032-01-02", 0],
-              ["2032-04-01", 0],
-              ["2032-07-01", 0],
-              ["2032-10-01", 0],
-              ["2033-01-03", 0],
-              ["2033-04-01", 0],
-              ["2033-07-01", 0],
-              ["2033-10-03", 0],
-              ["2034-01-03", 0]
+              ["2024-04-01", null],
+              ["2024-07-01", null],
+              ["2024-10-01", null],
+              ["2025-01-02", null],
+              ["2025-04-01", null],
+              ["2025-07-01", null],
+              ["2025-10-01", null],
+              ["2026-01-02", null],
+              ["2026-04-01", null],
+              ["2026-07-01", null],
+              ["2026-10-01", null],
+              ["2027-01-04", null],
+              ["2027-04-01", null],
+              ["2027-07-01", null],
+              ["2027-10-01", null],
+              ["2028-01-03", null],
+              ["2028-04-03", null],
+              ["2028-07-03", null],
+              ["2028-10-02", null],
+              ["2029-01-02", null],
+              ["2029-04-02", null],
+              ["2029-07-02", null],
+              ["2029-10-01", null],
+              ["2030-01-02", null],
+              ["2030-04-01", null],
+              ["2030-07-01", null],
+              ["2030-10-01", null],
+              ["2031-01-02", null],
+              ["2031-04-01", null],
+              ["2031-07-01", null],
+              ["2031-10-01", null],
+              ["2032-01-02", null],
+              ["2032-04-01", null],
+              ["2032-07-01", null],
+              ["2032-10-01", null],
+              ["2033-01-03", null],
+              ["2033-04-01", null],
+              ["2033-07-01", null],
+              ["2033-10-03", null],
+              ["2034-01-03", null]
             ]
           }
         }
@@ -31688,49 +36326,49 @@
             "currency": "USD",
             "invested": 0,
             "irr": null,
-            "moic": 0,
+            "moic": null,
             "nav_pct": 0,
             "cash_on_cash": [
-              ["2024-04-01", 0],
-              ["2024-07-01", 0],
-              ["2024-10-01", 0],
-              ["2025-01-02", 0],
-              ["2025-04-01", 0],
-              ["2025-07-01", 0],
-              ["2025-10-01", 0],
-              ["2026-01-02", 0],
-              ["2026-04-01", 0],
-              ["2026-07-01", 0],
-              ["2026-10-01", 0],
-              ["2027-01-04", 0],
-              ["2027-04-01", 0],
-              ["2027-07-01", 0],
-              ["2027-10-01", 0],
-              ["2028-01-03", 0],
-              ["2028-04-03", 0],
-              ["2028-07-03", 0],
-              ["2028-10-02", 0],
-              ["2029-01-02", 0],
-              ["2029-04-02", 0],
-              ["2029-07-02", 0],
-              ["2029-10-01", 0],
-              ["2030-01-02", 0],
-              ["2030-04-01", 0],
-              ["2030-07-01", 0],
-              ["2030-10-01", 0],
-              ["2031-01-02", 0],
-              ["2031-04-01", 0],
-              ["2031-07-01", 0],
-              ["2031-10-01", 0],
-              ["2032-01-02", 0],
-              ["2032-04-01", 0],
-              ["2032-07-01", 0],
-              ["2032-10-01", 0],
-              ["2033-01-03", 0],
-              ["2033-04-01", 0],
-              ["2033-07-01", 0],
-              ["2033-10-03", 0],
-              ["2034-01-03", 0]
+              ["2024-04-01", null],
+              ["2024-07-01", null],
+              ["2024-10-01", null],
+              ["2025-01-02", null],
+              ["2025-04-01", null],
+              ["2025-07-01", null],
+              ["2025-10-01", null],
+              ["2026-01-02", null],
+              ["2026-04-01", null],
+              ["2026-07-01", null],
+              ["2026-10-01", null],
+              ["2027-01-04", null],
+              ["2027-04-01", null],
+              ["2027-07-01", null],
+              ["2027-10-01", null],
+              ["2028-01-03", null],
+              ["2028-04-03", null],
+              ["2028-07-03", null],
+              ["2028-10-02", null],
+              ["2029-01-02", null],
+              ["2029-04-02", null],
+              ["2029-07-02", null],
+              ["2029-10-01", null],
+              ["2030-01-02", null],
+              ["2030-04-01", null],
+              ["2030-07-01", null],
+              ["2030-10-01", null],
+              ["2031-01-02", null],
+              ["2031-04-01", null],
+              ["2031-07-01", null],
+              ["2031-10-01", null],
+              ["2032-01-02", null],
+              ["2032-04-01", null],
+              ["2032-07-01", null],
+              ["2032-10-01", null],
+              ["2033-01-03", null],
+              ["2033-04-01", null],
+              ["2033-07-01", null],
+              ["2033-10-03", null],
+              ["2034-01-03", null]
             ]
           }
         }

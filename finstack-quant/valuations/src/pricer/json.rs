@@ -661,7 +661,7 @@ pub fn scenario_table_field_units(currency: Currency) -> ScenarioTableFieldUnits
         .map(unit)
         .collect(),
         measures: [
-            ("price", "% of current balance"),
+            ("price", "clean, % of current balance"),
             ("wal", "years"),
             ("writedown", currency.as_str()),
         ]
@@ -715,12 +715,12 @@ pub fn pool_report_field_units(currency: Currency) -> PoolReportFieldUnits {
         total_balance: unit("PoolReport", "total_balance", currency.clone()),
         warf: unit("PoolReport", "warf", "Moody's rating factor".to_string()),
         stats: [
-            ("wac", "decimal"),
+            ("wac", "annual decimal, fixed-rate only"),
             ("weighted_avg_spread_bp", "bp"),
             ("weighted_avg_maturity", "years"),
             ("diversity_score", "score"),
-            ("num_obligors", "obligors"),
-            ("num_industries", "industries"),
+            ("num_obligors", "named obligors"),
+            ("num_industries", "named industries"),
             ("defaulted_balance_pct", POOL_SHARE),
             ("undrawn_commitment", currency.as_str()),
         ]
@@ -809,6 +809,9 @@ pub struct EquityMetricsFieldUnits {
     pub nav_pct: MetricFieldUnit,
     /// Unit of each `EquityMetrics::cash_on_cash` value.
     pub cash_on_cash: MetricFieldUnit,
+    /// Unit of the `purchase_price_pct` argument of `calculate_equity_metrics`,
+    /// and what omitting it means.
+    pub purchase_price: MetricFieldUnit,
 }
 
 /// Units of the `EquityMetrics` fields, the one place a host reads them from.
@@ -824,8 +827,8 @@ pub struct EquityMetricsFieldUnits {
 ///
 /// # Returns
 ///
-/// One record per numeric field. `tranche_id` and `currency` have no unit and are
-/// not listed.
+/// One record per numeric field, then the purchase price argument the amounts
+/// depend on. `tranche_id` and `currency` have no unit and are not listed.
 pub fn equity_metrics_field_units(currency: Currency) -> EquityMetricsFieldUnits {
     let unit = |field: &str, label: String| MetricFieldUnit {
         field: field.to_string(),
@@ -838,6 +841,11 @@ pub fn equity_metrics_field_units(currency: Currency) -> EquityMetricsFieldUnits
         moic: unit("moic", "multiple of invested".to_string()),
         nav_pct: unit("nav_pct", "% of current balance".to_string()),
         cash_on_cash: unit("cash_on_cash", "decimal share of invested".to_string()),
+        purchase_price: MetricFieldUnit {
+            field: "purchase_price_pct".to_string(),
+            label: "% of current balance; omitted means par".to_string(),
+            source: "valuations::calculate_equity_metrics::purchase_price_pct".to_string(),
+        },
     }
 }
 
@@ -1336,7 +1344,7 @@ mod tests {
         assert_eq!(units.total_balance.label, "EUR");
         assert_eq!(units.warf.source, "valuations::PoolReport::warf");
         assert_eq!(names(&units.stats)[0], "wac");
-        assert_eq!(units.stats[0].label, "decimal");
+        assert_eq!(units.stats[0].label, "annual decimal, fixed-rate only");
         assert_eq!(units.stats[1].label, "bp");
         assert_eq!(units.stats[6].label, "% of current pool balance");
         assert_eq!(units.stats[7].label, "EUR");
@@ -1454,7 +1462,7 @@ mod tests {
         let mut listed = order;
         listed.sort_unstable();
         assert_eq!(listed, declared);
-        assert_eq!(units.measures[0].label, "% of current balance");
+        assert_eq!(units.measures[0].label, "clean, % of current balance");
         assert_eq!(units.measures[2].label, "EUR");
         assert_eq!(units.measures[1].source, "valuations::ScenarioCell::wal");
     }
@@ -1467,7 +1475,7 @@ mod tests {
             currency: Currency::EUR,
             invested: 0.0,
             irr: Some(0.0),
-            moic: 0.0,
+            moic: Some(0.0),
             nav_pct: 0.0,
             cash_on_cash: Vec::new(),
         };
@@ -1486,6 +1494,8 @@ mod tests {
             .as_object()
             .expect("object")
             .iter()
+            // The argument the result depends on, not a field of it.
+            .filter(|(name, _)| name.as_str() != "purchase_price")
             .map(|(name, unit)| {
                 assert_eq!(unit["field"], name.as_str());
                 assert_eq!(unit["source"], format!("valuations::EquityMetrics::{name}"));
@@ -1495,6 +1505,10 @@ mod tests {
         listed.sort_unstable();
         assert_eq!(listed, declared);
         assert_eq!(units["invested"]["label"], "EUR");
+        assert_eq!(
+            units["purchase_price"]["label"],
+            "% of current balance; omitted means par"
+        );
     }
 
     #[test]
@@ -1502,9 +1516,9 @@ mod tests {
         use finstack_quant_valuations_structured_credit::structured_credit::CoverageTestDiagnostic;
         let diagnostic = CoverageTestDiagnostic {
             test_id: "OC_A".to_string(),
-            ratio: 0.0,
+            ratio: Some(0.0),
             trigger_level: 0.0,
-            cushion: 0.0,
+            cushion: Some(0.0),
             passing: true,
         };
         let value = serde_json::to_value(&diagnostic).expect("serialize");
