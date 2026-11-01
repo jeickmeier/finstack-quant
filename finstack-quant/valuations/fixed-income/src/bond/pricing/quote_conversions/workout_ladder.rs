@@ -59,9 +59,11 @@ pub struct BondWorkoutRow {
     /// yield: an exit on the quote date, or same-day cash at or above the price. A
     /// worst row can be `None`, where the `ytw` metric is negative infinity.
     pub yield_rate: Option<f64>,
-    /// `yield_rate` less the swap par rate from the quote date to `date`, as a
-    /// decimal, the convention of the `i_spread` metric. `None` when `yield_rate`
-    /// is `None`.
+    /// `yield_rate` less the swap par rate from the quote date, as a decimal, the
+    /// convention of the `i_spread` metric. The par rate runs to `date` when the
+    /// bond has an exit other than maturity, and to contractual maturity when it
+    /// has none, which differs from `date` if the final payment rolls. `None` when
+    /// `yield_rate` is `None`.
     pub i_spread: Option<f64>,
     /// Whether this is the worst exit, the one the `ytw` metric selects. At most
     /// one row is marked; none is when no exit has a yield and each pays at least
@@ -140,7 +142,7 @@ pub(crate) fn workout_dirty_target(
     }
 }
 
-/// Price, yield and I-spread to every call, put and maturity exit of a bond.
+/// Yield and I-spread to every call, put and maturity exit of a bond at one price.
 ///
 /// Answers which call date is the worst workout and what the yield to each is.
 /// Exits are the ones the `ytw` metric walks, a return floor lowered into calls
@@ -225,13 +227,25 @@ pub fn bond_workout_ladder(
     )?;
 
     let disc = market.get_discount(&bond.discount_curve_id)?;
+    // The `i_spread` metric times its par rate to the workout path's last date when
+    // a path exists, and to contractual maturity when none does. A rolled final
+    // payment separates the two, so a row with no path follows the metric, not `date`.
+    let has_workout_path = effective_bond
+        .call_put
+        .as_ref()
+        .is_some_and(|schedule| schedule.has_options());
     let mut rows = Vec::with_capacity(exits.len());
     for (index, exit) in exits.iter().enumerate() {
         let date = exit.path.exit.date;
         let yield_rate = exit.yield_rate.is_finite().then_some(exit.yield_rate);
         let i_spread = match yield_rate {
             Some(rate) if date > quote_date => {
-                Some(rate - i_spread_par_rate(bond, disc.as_ref(), quote_date, date)?)
+                let horizon = if has_workout_path {
+                    date
+                } else {
+                    bond.maturity
+                };
+                Some(rate - i_spread_par_rate(bond, disc.as_ref(), quote_date, horizon)?)
             }
             _ => None,
         };

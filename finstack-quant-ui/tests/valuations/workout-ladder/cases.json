@@ -113,7 +113,8 @@
           }
         ]
       },
-      "ytw": 0.015079736312720887
+      "ytw": 0.015079736312720887,
+      "iSpread": -0.015434971506143667
     },
     "discount": {
       "request": {
@@ -185,7 +186,8 @@
           }
         ]
       },
-      "ytw": 0.0562032718434587
+      "ytw": 0.0562032718434587,
+      "iSpread": 0.025835206728515622
     },
     "putable": {
       "request": {
@@ -231,7 +233,8 @@
           }
         ]
       },
-      "ytw": 0.009984148296144949
+      "ytw": 0.009984148296144949,
+      "iSpread": -0.020452658525617742
     },
     "makeWhole": {
       "request": {
@@ -277,7 +280,8 @@
           }
         ]
       },
-      "ytw": 0.03867405040278965
+      "ytw": 0.03867405040278965,
+      "iSpread": 0.008305985287846575
     },
     "bullet": {
       "request": {
@@ -305,12 +309,13 @@
             },
             "make_whole": false,
             "yield_rate": 0.03036862933426007,
-            "i_spread": 5.642193169931586e-7,
+            "i_spread": 5.864772130576013e-7,
             "is_worst": true
           }
         ]
       },
-      "ytw": 0.03036862933426007
+      "ytw": 0.03036862933426007,
+      "iSpread": 5.864772130576013e-7
     },
     "quoteDateCall": {
       "request": {
@@ -356,7 +361,10 @@
           }
         ]
       },
-      "ytw": null
+      "ytw": null,
+      "iSpread": {
+        "error": "Validation error: Metric 'i_spread' calculation failed: Invalid date range: start must be before end [instrument=US912828XG33, type=Bond, model=Tree]"
+      }
     }
   }
 }

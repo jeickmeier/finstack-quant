@@ -182,6 +182,44 @@ fn a_bond_with_no_exercise_rights_has_one_maturity_row() {
 }
 
 #[test]
+fn a_rolled_bullet_row_holds_the_metrics_yield_and_spread() {
+    // 2034-01-15 is a Sunday, so the final payment rolls past contractual maturity.
+    let mut plain = Bond::fixed(
+        "LADDER-ROLLED",
+        Money::new(1_000_000.0, Currency::USD).expect("money"),
+        Rate::from_decimal(0.06).expect("rate"),
+        date!(2025 - 01 - 15),
+        date!(2034 - 01 - 15),
+        finstack_quant_core::dates::StubKind::ShortFront,
+        "USD-OIS",
+    )
+    .expect("bond");
+    plain.settlement_convention = None;
+    let at_price = quoted(plain.clone(), 97.5);
+    // A floor whose window has passed lowers to no exit, so the metric has no
+    // workout path even though the bond carries a right.
+    let expired_floor = at_price
+        .clone()
+        .with_return_floor(
+            ReturnFloorSpec::moic(1.20).window(ProtectionWindow::Between {
+                start: date!(2024 - 01 - 15),
+                end: date!(2024 - 01 - 16),
+            }),
+        );
+    for bond in [plain, at_price, expired_floor] {
+        let ladder = bond_workout_ladder(&bond, &market(), AS_OF).expect("ladder");
+        let row = worst(&ladder);
+        assert!(row.date > bond.maturity, "maturity must roll: {row:?}");
+        assert_eq!(row.yield_rate, Some(measure(&bond, MetricId::Ytw, "ytw")));
+        assert_eq!(
+            row.i_spread,
+            Some(measure(&bond, MetricId::ISpread, "i_spread")),
+            "row {row:?}"
+        );
+    }
+}
+
+#[test]
 fn exercise_rights_without_a_quote_fail_as_the_metric_does() {
     let mut bond = callable(100.0);
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default();

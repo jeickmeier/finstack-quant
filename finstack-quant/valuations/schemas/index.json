@@ -956,7 +956,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/bond_workout_ladder.schema.json",
-      "bytes": 6754,
+      "bytes": 6921,
       "kind": "output",
       "path": "schemas/results/1/bond_workout_ladder.schema.json",
       "summary": "Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked.",

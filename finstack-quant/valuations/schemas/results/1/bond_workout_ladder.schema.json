@@ -9,7 +9,7 @@
           "description": "Exit date. A maturity row carries the business-day-adjusted final payment\ndate when that is later than the contractual maturity."
         },
         "i_spread": {
-          "description": "`yield_rate` less the swap par rate from the quote date to `date`, as a\ndecimal, the convention of the `i_spread` metric. `None` when `yield_rate`\nis `None`.",
+          "description": "`yield_rate` less the swap par rate from the quote date, as a decimal, the\nconvention of the `i_spread` metric. The par rate runs to `date` when the\nbond has an exit other than maturity, and to contractual maturity when it\nhas none, which differs from `date` if the final payment rolls. `None` when\n`yield_rate` is `None`.",
           "format": "double",
           "type": [
             "number",
