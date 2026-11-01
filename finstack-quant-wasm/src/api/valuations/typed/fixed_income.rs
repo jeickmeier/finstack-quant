@@ -1350,6 +1350,37 @@ pub fn bond_workout_ladder(
     )
 }
 
+/// Every price, yield and spread quote of a bond, solved from any one of them (mirrors Rust `compute_quotes`).
+///
+/// The quote is normalized to a clean price and every other field is the metric of the same name at that price, in one call. The bond's default pricing model runs (tree when it has exercise rights) on the bond family's registries; any quote the bond carries is replaced.
+/// @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights needs HW1F parameters on the bond or in the market, because its `oas` is part of the set.
+/// @param market_json - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index curve.
+/// @param as_of - ISO-8601 valuation date; the quote date and accrued interest follow the bond's settlement convention.
+/// @param quote_input - One `BondQuoteInput`, a plain object or JSON string with exactly one key: `clean_price_pct` (percent of par), `dirty_price_currency` (currency, the whole notional), `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_market`, `i_spread` or `japanese_simple_yield` (decimals, `0.01` = 100bp).
+/// @returns `BondQuoteSet` plain object: `clean_price_currency`, `clean_price_pct`, `dirty_price_currency`, and `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_par`, `asw_market`, `i_spread`, `japanese_simple_yield` and `moosmuller_ytm` as decimals, each `null` when it does not apply to the bond or has no finite value.
+/// @throws Error - Throws with kind `validation` if `quoteInput` has an unknown or second key or a non-finite value, a dirty price is not positive, the market JSON or `asOf` is malformed, the quote kind does not apply to the bond (`discount_margin` with no floating coupons, `asw_market` or `japanese_simple_yield` on a floating coupon, `z_spread` with exercise rights), or a metric of the set cannot be solved, which fails the whole set (`z_spread` with a call or put on the quote date below the price, `oas` with exercise rights and no HW1F parameters); and with kind `not_found` if a curve the bond needs to normalize the quote is missing.
+#[wasm_bindgen(js_name = computeQuotes)]
+pub fn compute_quotes(
+    bond: &JsBond,
+    market_json: JsValue,
+    as_of: JsValue,
+    quote_input: JsValue,
+) -> Result<JsValue, JsValue> {
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
+    let quote_input = crate::utils::input::from_js_json(&quote_input, "quoteInput")?;
+    to_js_value(
+        &finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::compute_quotes(
+            &bond.inner,
+            &market,
+            as_of,
+            quote_input,
+            finstack_quant_calibration::recalibration::pricing_options(),
+        )
+        .map_err(to_js_err)?,
+    )
+}
+
 #[wasm_bindgen(js_class = Bond)]
 impl JsBond {
     /// Price the bond with the Merton structural Monte Carlo engine.

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Bonds: the whole quote set from any one quote
+
+`compute_quotes` is now bound in Python (`compute_quotes`, `BondQuoteSet`) and WASM (`valuations.instruments.computeQuotes`), with JSON Schemas for `BondQuoteSet` and `BondQuoteInput`. Each yield and spread equals the metric of the same name at that clean price. A field is null when it does not apply to the bond or its metric has no finite value, never infinity or NaN; no finite value moves. A quote kind the bond does not have is an error: `discount_margin` with no floating coupons, `asw_market` or `japanese_simple_yield` on a floating coupon, `z_spread` with exercise rights. One failed metric fails the whole set. `asw_market` prices the swap to maturity while the metric runs it to the worst exit, so on a bond whose worst exit is early it does not recover the price it came from. `BondQuoteInput` adds `deny_unknown_fields`; it already rejected an unknown or second key.
+
 ### Bonds: yield and spread to every exit
 
 `bond_workout_ladder(bond, market, as_of)` answers which call date is the worst workout and what the yield to each is. It returns one row per admissible call, put and maturity exit: date, kind, redemption price and amount, whether the redemption is make-whole, Street yield, I-spread and whether the row is the worst. The ladder and the `ytw` metric run one walk (`solve_workout_exits`), so the worst row holds that metric's yield and the `i_spread` metric's spread. As that metric does, the spread's par rate runs to the exit date when the bond has an exit other than maturity, and to contractual maturity when it has none. It needs a quoted clean price on a bond with exercise rights and lowers a return floor into calls, as `ytw` does. Yield and spread are null on a path with no finite yield: an exit on the quote date, or same-day cash at or above the price. A worst row can be null, where `ytw` is negative infinity. Z-spread is not reported per exit: no per-exit convention exists.

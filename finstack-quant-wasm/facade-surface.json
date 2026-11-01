@@ -4565,6 +4565,7 @@
       "cdsIndexParamsItraxxEurope",
       "cdsTrancheParamsEquityTranche",
       "cdsTrancheParamsMezzanineTranche",
+      "computeQuotes",
       "coverageRulesCloStandard",
       "coverageRulesValidate",
       "equityMetricsFieldUnits",
@@ -6032,6 +6033,9 @@
     "kind": "function"
   },
   "valuations.instruments.bondWorkoutLadder": {
+    "kind": "function"
+  },
+  "valuations.instruments.computeQuotes": {
     "kind": "function"
   },
   "valuations.instruments.trancheCashflowsTable": {

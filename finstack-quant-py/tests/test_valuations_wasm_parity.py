@@ -27,7 +27,7 @@ import pytest
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
-from finstack_quant.core.market_data import DiscountCurve, HazardCurve, MarketContext, VolSurface
+from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, HazardCurve, MarketContext, VolSurface
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Bps, Rate
 from finstack_quant.models.credit import MertonModel
@@ -120,6 +120,43 @@ def _bond_workout_ladder_case() -> dict[str, Any]:
             {"bond": bond, "ladder": ins.bond_workout_ladder(ins.Bond.from_json(bond), market, as_of).to_dict()}
             for bond in (callable_json, quote_date_call_json)
         ],
+    }
+
+
+def _compute_quotes_case() -> dict[str, Any]:
+    """Quote sets of a bullet, a callable from each of two kinds, and an FRN, with a rejected kind."""
+    as_of = datetime.date(2024, 1, 15)
+    market = (
+        MarketContext()
+        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+        .insert(DiscountCurve.flat("USD-TREASURY", as_of, 0.04))
+        .insert(ForwardCurve.flat("USD-SOFR-3M", 0.25, datetime.date(2024, 1, 2), 0.03))
+    )
+    callable_spec = json.loads(ins.Bond.example_callable().to_json())
+    callable_spec["instrument"]["spec"]["instrument_pricing_overrides"] = {
+        "model_config": {"hw1f_mean_reversion": 0.03, "hw1f_sigma": 0.01}
+    }
+    bullet_json = ins.Bond.example().to_json()
+    callable_json = json.dumps(callable_spec)
+    frn_json = ins.Bond.example_floating().to_json()
+    return {
+        "market": market.to_json(),
+        "as_of": as_of.isoformat(),
+        "cases": [
+            {
+                "bond": bond,
+                "quote_input": quote_input,
+                "quotes": ins.compute_quotes(ins.Bond.from_json(bond), market, as_of, quote_input).to_dict(),
+            }
+            for bond, quote_input in (
+                (bullet_json, {"clean_price_pct": 98.5}),
+                (bullet_json, {"ytm": 0.05}),
+                (callable_json, {"clean_price_pct": 108.0}),
+                (callable_json, {"oas": 0.01}),
+                (frn_json, {"discount_margin": 0.01}),
+            )
+        ],
+        "rejected": {"bond": bullet_json, "quote_input": {"discount_margin": 0.01}},
     }
 
 
@@ -312,6 +349,7 @@ def build_cases() -> dict[str, Any]:
     }
 
     cases["bond_workout_ladder"] = _bond_workout_ladder_case()
+    cases["compute_quotes"] = _compute_quotes_case()
 
     # -- Merton Monte Carlo ------------------------------------------------
     merton = MertonModel(100.0, 0.25, 60.0, 0.04)

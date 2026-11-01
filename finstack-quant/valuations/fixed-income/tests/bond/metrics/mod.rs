@@ -29,6 +29,7 @@ mod moosmuller_ytm;
 mod oas;
 mod prices;
 mod quote_engine;
+mod quote_set;
 mod spreads;
 mod theta;
 mod wal;

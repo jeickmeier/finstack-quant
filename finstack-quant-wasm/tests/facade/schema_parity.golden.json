@@ -2600,6 +2600,13 @@
             "bytes": 843
           },
           {
+            "path": "schemas/common/1/bond_quote_input.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/bond_quote_input.schema.json",
+            "type_name": "BondQuoteInput",
+            "kind": "input",
+            "bytes": 3919
+          },
+          {
             "path": "schemas/common/1/business_day_convention.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
             "type_name": "BusinessDayConvention",
@@ -3333,6 +3340,13 @@
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
             "bytes": 10963
+          },
+          {
+            "path": "schemas/results/1/bond_quote_set.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/bond_quote_set.schema.json",
+            "type_name": "BondQuoteSet",
+            "kind": "output",
+            "bytes": 3894
           },
           {
             "path": "schemas/results/1/bond_workout_ladder.schema.json",
@@ -4718,6 +4732,14 @@
           },
           {
             "domain": "valuations",
+            "path": "schemas/common/1/bond_quote_input.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/bond_quote_input.schema.json",
+            "type_name": "BondQuoteInput",
+            "kind": "input",
+            "bytes": 3919
+          },
+          {
+            "domain": "valuations",
             "path": "schemas/common/1/business_day_convention.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
             "type_name": "BusinessDayConvention",
@@ -5555,6 +5577,14 @@
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
             "bytes": 10963
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/bond_quote_set.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/bond_quote_set.schema.json",
+            "type_name": "BondQuoteSet",
+            "kind": "output",
+            "bytes": 3894
           },
           {
             "domain": "valuations",

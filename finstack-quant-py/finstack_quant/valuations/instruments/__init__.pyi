@@ -31,6 +31,10 @@ from finstack_quant.valuations.instruments._instruments import (
     TermLoan as TermLoan,
     TermLoanBuilder as TermLoanBuilder,
 )
+from finstack_quant.valuations.instruments._bond_quotes import (
+    BondQuoteSet as BondQuoteSet,
+    compute_quotes as compute_quotes,
+)
 from finstack_quant.valuations.instruments._bond_workout import (
     BondWorkoutLadder as BondWorkoutLadder,
     BondWorkoutRow as BondWorkoutRow,
@@ -203,6 +207,7 @@ __all__ = [
     "BarrierCrossing",
     "Bond",
     "BondBuilder",
+    "BondQuoteSet",
     "BondWorkoutLadder",
     "BondWorkoutRow",
     "CallAssumption",
@@ -273,6 +278,7 @@ __all__ = [
     "bond_workout_ladder",
     "calculate_pool_stats",
     "calculate_var",
+    "compute_quotes",
     "instrument_cashflows",
     "instrument_envelope_from_spec",
     "list_models",

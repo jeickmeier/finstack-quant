@@ -55,16 +55,36 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 /// # Returns
 ///
 /// A `BondQuoteSet` containing all computed price, yield, and spread metrics.
+/// Each yield and spread is the value of the metric of the same name on the bond
+/// at this clean price. A field is `None` when it does not apply to the bond or
+/// its metric has no finite value. An effectively zero notional returns zero
+/// prices and no quotes.
 ///
 /// # Errors
 ///
 /// Returns `Err` when the input quote cannot be normalized, required market
 /// data or cashflows are unavailable for that normalization, or the selected
 /// model cannot produce the base value, or an applicable metric fails. Metric
-/// errors identify the metric and instrument. Discount margin is omitted for
-/// non-floating bonds. Asset-swap quotes require a fixed coupon or a custom
-/// cashflow schedule with an explicit floating specification; otherwise they
-/// are left unset.
+/// errors identify the metric and instrument, and one failure fails the whole
+/// set: a bond with a call or put on the quote date below the price fails its
+/// `z_spread`, and a bond with exercise rights and no HW1F parameters fails its
+/// `oas`. Discount margin is omitted for non-floating bonds. Asset-swap quotes
+/// require a fixed coupon or a custom cashflow schedule with an explicit floating
+/// specification; otherwise they are left unset.
+///
+/// A quote kind that does not apply to the bond is an error rather than an empty
+/// set:
+///
+/// | `quote_input` | Fails on |
+/// | --- | --- |
+/// | `DiscountMargin` | a bond with no floating coupons |
+/// | `AswMarket`, `JapaneseSimpleYield` | a bond with a floating coupon; `AswMarket` also on custom cashflows |
+/// | `ZSpread` | a bond with exercise rights, whose workout path depends on the price |
+/// | any | a non-finite value, or a non-positive `DirtyPriceCurrency` |
+///
+/// `AswMarket` prices the asset swap to maturity while the `asw_market` metric
+/// runs it to the worst exit, so on a bond whose worst exit is early, the set's
+/// `asw_market` is not the input and feeding it back does not recover the price.
 ///
 /// # Examples
 ///
@@ -258,17 +278,19 @@ pub fn compute_quotes(
             })?;
     }
 
-    // Read back the metrics we care about.
-    let ytm = ctx.computed.get(&MetricId::Ytm).copied();
-    let ytw = ctx.computed.get(&MetricId::Ytw).copied();
-    let z_spread = ctx.computed.get(&MetricId::ZSpread).copied();
-    let discount_margin = ctx.computed.get(&MetricId::DiscountMargin).copied();
-    let oas = ctx.computed.get(&MetricId::Oas).copied();
-    let asw_par = ctx.computed.get(&MetricId::ASWPar).copied();
-    let asw_market = ctx.computed.get(&MetricId::ASWMarket).copied();
-    let i_spread = ctx.computed.get(&MetricId::ISpread).copied();
-    let japanese_simple_yield = ctx.computed.get(&MetricId::JapaneseSimpleYield).copied();
-    let moosmuller_ytm = ctx.computed.get(&MetricId::MoosmullerYtm).copied();
+    // Read back the metrics we care about. A metric with no finite value, such
+    // as `ytw` on a workout at the quote date, is `None`: JSON has no infinity.
+    let finite = |id: &MetricId| ctx.computed.get(id).copied().filter(|v| v.is_finite());
+    let ytm = finite(&MetricId::Ytm);
+    let ytw = finite(&MetricId::Ytw);
+    let z_spread = finite(&MetricId::ZSpread);
+    let discount_margin = finite(&MetricId::DiscountMargin);
+    let oas = finite(&MetricId::Oas);
+    let asw_par = finite(&MetricId::ASWPar);
+    let asw_market = finite(&MetricId::ASWMarket);
+    let i_spread = finite(&MetricId::ISpread);
+    let japanese_simple_yield = finite(&MetricId::JapaneseSimpleYield);
+    let moosmuller_ytm = finite(&MetricId::MoosmullerYtm);
 
     Ok(BondQuoteSet {
         clean_price_currency,
