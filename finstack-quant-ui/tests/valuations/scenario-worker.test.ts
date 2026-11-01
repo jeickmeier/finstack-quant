@@ -27,6 +27,17 @@ const marketJson = readFileSync(
   resolve(import.meta.dirname, "../../..", fixture.marketSource),
   "utf8",
 );
+/** JSON has no non-finite number, so check the raw result before any round trip hides one. */
+function expectFinite(value: unknown, path = "result"): void {
+  if (typeof value === "number") {
+    expect(Number.isFinite(value), `${path} is ${value}`).toBe(true);
+  } else if (Array.isArray(value)) {
+    value.forEach((item, index) => expectFinite(item, `${path}[${index}]`));
+  } else if (value !== null && typeof value === "object") {
+    for (const [key, item] of Object.entries(value))
+      expectFinite(item, `${path}.${key}`);
+  }
+}
 let worker: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   worker = await startWorker();
@@ -166,11 +177,9 @@ it(
         deal.free();
       }
       // JSON has no negative zero, which Rust's sum over no rows returns.
-      expect(c.report).toEqual(
-        JSON.parse(
-          JSON.stringify(unwrap(await worker.proxy.poolReport(request))),
-        ),
-      );
+      const report = unwrap(await worker.proxy.poolReport(request));
+      expectFinite(report);
+      expect(c.report).toEqual(JSON.parse(JSON.stringify(report)));
       expect(
         unwrap(
           await worker.proxy.poolReportFieldUnits(
@@ -198,6 +207,7 @@ it(
       } finally {
         deal.free();
       }
+      expectFinite(run);
       expect(c.run).toEqual(JSON.parse(JSON.stringify(run)));
     }
     const failed = await worker.proxy.runSimulation({
@@ -224,6 +234,7 @@ it(
           asOf: dealCharts.asOf,
         }),
       );
+      expectFinite(run);
       expect(c.run).toEqual(JSON.parse(JSON.stringify(run)));
     }
     const failed = await worker.proxy.simulationFieldUnits("NOT-A-CODE");
@@ -257,9 +268,9 @@ it(
           message: c.result.error.message,
         });
       } else {
-        expect(c.result.value).toEqual(
-          JSON.parse(JSON.stringify(unwrap(returned))),
-        );
+        const metrics = unwrap(returned);
+        expectFinite(metrics);
+        expect(c.result.value).toEqual(JSON.parse(JSON.stringify(metrics)));
       }
     }
     const failed = await worker.proxy.equityMetricsFieldUnits("NOT-A-CODE");

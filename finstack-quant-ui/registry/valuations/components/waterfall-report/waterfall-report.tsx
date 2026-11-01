@@ -33,11 +33,15 @@ const amounts = [
   "remaining_interest",
   "remaining_principal",
 ] as const;
-const headers = [
+const headers: { id: string; label?: string; className?: string }[] = [
   { id: "payment_date" },
   ...amounts.map((id) => ({ id, className: "text-right" })),
   { id: "had_diversions" },
-  { id: "non_waterfall_payments", className: "text-right" },
+  {
+    id: "non_waterfall_payments",
+    label: `${labelFor("non_waterfall_payments")} (count)`,
+    className: "text-right",
+  },
 ];
 const numeric = { className: "text-right finstack-numeric" };
 const yesNo = (flag: boolean) => (flag ? "Yes" : "No");
@@ -201,7 +205,8 @@ export interface WaterfallReportProps {
  * One row per simulated period, as Rust returned them and in payment order, with
  * the period's tier allocations, payment records, diversions and non-waterfall
  * payments on expand. A deal with no payment period left has one row, its
- * settlement. Nothing is summed, joined by date, sorted or classified.
+ * settlement, whose release is in that row's detail. Nothing is summed, joined by
+ * date, sorted or classified.
  */
 export function WaterfallReport({
   run,
@@ -238,17 +243,18 @@ export function WaterfallReport({
       <Table>
         {/* Every amount of a period is in the deal currency, per PeriodWaterfall and NonWaterfallPayment. */}
         <TableCaption>
-          By payment period ({periods[0]!.waterfall.total_available.currency})
+          By payment period, amounts in{" "}
+          {periods[0]!.waterfall.total_available.currency}
         </TableCaption>
         <TableHeader>
           <TableRow>
-            {headers.map(({ id, className }) => (
+            {headers.map(({ id, label, className }) => (
               <TableHead
                 key={id}
                 scope="col"
                 className={`h-[var(--row-height)] whitespace-normal py-0 text-xs font-medium tracking-wide text-muted-foreground ${className ?? ""}`}
               >
-                {labelFor(id)}
+                {label ?? labelFor(id)}
               </TableHead>
             ))}
           </TableRow>
@@ -263,6 +269,13 @@ export function WaterfallReport({
           ))}
         </TableBody>
       </Table>
+      {periods.some((period) => period.non_waterfall_payments[0]) && (
+        <p className="mt-2 mb-0 text-sm text-muted-foreground">
+          The amounts above are the waterfall's. Cash paid outside it, such as a
+          settlement's release, is listed when a period with a non-waterfall
+          count is expanded.
+        </p>
+      )}
     </section>
   );
 }

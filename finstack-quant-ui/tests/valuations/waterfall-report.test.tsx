@@ -29,7 +29,15 @@ const bodyRows = (caption: string) =>
 it("shows one row per returned period in Rust's order", () => {
   const run = runOf("diverting");
   render(<WaterfallReport run={run} />);
-  const body = screen.getByRole("table", { name: "By payment period (USD)" });
+  const body = screen.getByRole("table", {
+    name: "By payment period, amounts in USD",
+  });
+  expect(
+    within(body)
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent)
+      .at(-1),
+  ).toBe("Non waterfall payments (count)");
   expect(within(body).getAllByRole("row").slice(1).map(cells)).toEqual(
     periodsOf(run).map(
       ({ payment_date, waterfall, non_waterfall_payments }) => [
@@ -118,13 +126,37 @@ it("renders a settlement-only deal as its one period, not as empty", () => {
     settlement!.non_waterfall_payments.map((payment) => [
       payment.payment_date,
       payment.tranche_id,
-      expect.any(String),
+      "Reserve account release",
       digits(payment.interest),
       digits(payment.principal),
       digits(payment.incentive_fee),
     ]),
   );
   expect(screen.getAllByText("None this period")).toHaveLength(3);
+});
+
+it("tells the reader a settlement's release is in the detail, and only when one is", () => {
+  const note =
+    /Cash paid outside it, such as a settlement's release, is listed/;
+  render(<WaterfallReport run={runOf("settlement")} />);
+  expect(screen.getByText(note)).toBeTruthy();
+  cleanup();
+  const run = runOf("diverting");
+  render(
+    <WaterfallReport
+      run={{
+        ...run,
+        diagnostics: {
+          ...run.diagnostics,
+          periods: periodsOf(run).map((period) => ({
+            ...period,
+            non_waterfall_payments: [],
+          })),
+        },
+      }}
+    />,
+  );
+  expect(screen.queryByText(note)).toBeNull();
 });
 
 it("says so when a run holds no period at all", () => {

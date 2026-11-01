@@ -758,6 +758,46 @@ it("offers scenarios only while structured credit is selected", async () => {
   expect(screen.queryByRole("tab", { name: "Scenarios" })).toBeNull();
 });
 it(
+  "passes a seeded tranche Rust does not know through, so Rust's error shows",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench
+          defaultRequest={{
+            instrumentJson: JSON.stringify(scenarioCases.cases[0]!.instrument),
+            marketJson: JSON.stringify(pricingMarket),
+            asOf: scenarioCases.asOf,
+            model: "discounting",
+            metrics: [],
+          }}
+          scenario={{
+            trancheId: "NO-SUCH-TRANCHE",
+            gridJson: JSON.stringify(scenarioCases.grid),
+          }}
+        />
+      </FinstackQueryProvider>,
+    );
+    await waitFor(() => expect(prices()).toHaveLength(1), {
+      timeout: budget(10000),
+    });
+    await userEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
+    await waitFor(
+      () =>
+        expect(
+          screen
+            .getAllByRole("alert")
+            .some((alert) => /NO-SUCH-TRANCHE/.test(alert.textContent!)),
+        ).toBe(true),
+      { timeout: budget(10000) },
+    );
+    expect(
+      call.mock.calls.find(([method]) => method === "trancheMetrics")![1]
+        .trancheId,
+    ).toBe("NO-SUCH-TRANCHE");
+  },
+  budget(15000),
+);
+it(
   "loads scenarios only on demand from the completed structured-credit context",
   async () => {
     const request = {
@@ -940,7 +980,7 @@ it(
       call.mock.calls.find(([method]) => method === "poolReport")![1],
     ).toEqual({
       instrumentJson: family.instrumentJson,
-      asOf: expect.any(String),
+      asOf: scenarioCases.asOf,
     });
     // ... and the waterfall report, on the completed request's market and date.
     expect(call.mock.calls.some(([method]) => method === "runSimulation")).toBe(
@@ -971,9 +1011,9 @@ it(
     );
     await waitFor(
       () =>
+        // The family's registry deal configures no coverage test.
         expect(
-          document.querySelector('[aria-label="Coverage tests"]') ??
-            screen.queryByText("No coverage test was evaluated."),
+          screen.queryByText("No coverage test was evaluated."),
         ).toBeTruthy(),
       { timeout: budget(10000) },
     );
