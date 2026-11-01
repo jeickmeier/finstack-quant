@@ -122,8 +122,8 @@ class BondQuoteSet:
         Returns
         -------
         pandas.DataFrame
-            Thirteen ``float64`` columns in field order; a field that is ``None`` is
-            ``NaN``.
+            Thirteen columns in field order. A field that is ``None`` holds ``None``, so
+            its column has ``object`` dtype; the others are ``float64``.
 
         Raises
         ------
