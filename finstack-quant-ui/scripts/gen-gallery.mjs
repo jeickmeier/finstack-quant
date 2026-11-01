@@ -38,6 +38,7 @@ const sources = {
   equityTranche: "tests/valuations/scenario-table/equity-tranche.json",
   cashflows: "tests/valuations/cashflows/cases.json",
   loanYield: "tests/valuations/loan-yield/cases.json",
+  workoutLadder: "tests/valuations/workout-ladder/cases.json",
   marketScenario: "tests/scenarios/application/cases.json",
   horizonReturn: "tests/scenarios/horizon/cases.json",
   scenarioTemplates: "tests/scenarios/templates/cases.json",

@@ -60,6 +60,13 @@ export const importHarnesses = {
       name: "use-market-validator",
       modules: modules.length,
     })),
+  "use-bond-workout-ladder": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-bond-workout-ladder/use-bond-workout-ladder"),
+    ]).then((modules) => ({
+      name: "use-bond-workout-ladder",
+      modules: modules.length,
+    })),
   "use-metric-values": () =>
     Promise.all([
       import("@/hooks/valuations/use-metric-values/use-metric-values"),

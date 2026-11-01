@@ -175,6 +175,12 @@
       "worker": "none"
     },
     {
+      "name": "yield-workout-ladder",
+      "type": "registry:component",
+      "docs": "Answers which call date is the worst workout and what the yield to each is. Present a native valuations.instruments.bondWorkoutLadder result (useBondWorkoutLadder): the one price every exit is solved at, then one row per exit in Rust's date order with its redemption, yield, I-spread and the mark on the row is_worst names, the exit the ytw metric selects. Pass metricMetadata of workoutLadderMetrics for the yield and spread units. A null yield shows as no yield, never zero. A bond with exercise rights needs quoted_clean_price_pct; the native error is shown as returned. Nothing is compared, sorted or derived. Accepts ladder, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "metric-picker",
       "type": "registry:ui",
       "docs": "Controlled metric-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
@@ -634,6 +640,10 @@
     },
     {
       "name": "use-market-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-bond-workout-ladder",
       "type": "registry:hook"
     },
     {
@@ -1512,7 +1522,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
-      "sha256": "0fa06a4979f734bb9a6ba39a63b806c6b306d01f864ef6b2092fa79045f370e0"
+      "sha256": "7a99d56e01adf878a52ba9c1caf99c6d3a1a9bce255da975ee5759c06e18c868"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/pool-report.json",
@@ -1524,7 +1534,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/deal-charts.json",
-      "sha256": "fe6933a1628c505ef6f61be050c2df0595778f5d71e0f349058da382121cbf7e"
+      "sha256": "a7afa2bde83f84a7e36d233af08c3b665fa2b2876f280a8c41a6a4dbfa171633"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/equity-tranche.json",
@@ -1537,6 +1547,10 @@
     {
       "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
       "sha256": "a4e8b76537de7b44526868f1d8cd0deb7a5bb77f3b72197ae66c20927fe07c1d"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/workout-ladder/cases.json",
+      "sha256": "e64993cb998a70d0d19dc30079f84f12976c3e19f3bfc9a437cafcb202dbe4d5"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",

@@ -174,9 +174,9 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twenty-four native fixture generators under
+`mise run ui-fixtures` runs the twenty-five native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
-horizon return, scenario templates, attribution, cashflows → details; loan yields;
+horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
 scenario-table; statements → covenants; analytics; models credit, risk, options and liability management;
 margin), then
@@ -991,6 +991,21 @@ one, otherwise to the model price, which differs by model. Unit and group are wh
 not shown. The revolver's own card is a later item; on a revolver this card shows
 the five ids Rust lists. The native fixture is
 `tests/valuations/loan-yield/cases.json`.
+
+## Yield workout ladder
+
+`YieldWorkoutLadder` (`@finstack/yield-workout-ladder`) answers which call date is
+the worst workout and what the yield to each is. It draws one
+`valuations.instruments.bondWorkoutLadder` result, fetched with
+`useBondWorkoutLadder` (`@finstack/use-bond-workout-ladder`): the one price every
+exit is solved at, then one row per call, put and maturity exit in Rust's date order
+with its redemption, yield and I-spread. The mark sits on the row Rust's `is_worst`
+names, the exit the `ytw` metric selects; no yield is compared in JavaScript. Yield
+and spread units are what `metricMetadata` declares for `workoutLadderMetrics`. A
+null yield, an exit with no finite yield, shows as "No yield". A bond with exercise
+rights needs `quoted_clean_price_pct`, or the native error shows as returned.
+Z-spread is not reported per exit, because no per-exit convention exists. The native
+fixture is `tests/valuations/workout-ladder/cases.json`.
 
 ## Option calculator
 

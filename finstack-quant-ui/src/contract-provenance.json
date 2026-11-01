@@ -2199,6 +2199,37 @@
       }
     },
     {
+      "id": "yield-workout-ladder",
+      "route": "returned-report",
+      "convention": "Returned BondWorkoutLadder of one bond: one row per call, put and maturity exit in Rust's date order, every yield solved at the one price shown. The worst row is the one is_worst marks, the exit the ytw metric selects; no yield is compared here. Yield and I-spread units are what metricMetadata declares for ytw and i_spread, and a null yield is shown as no yield, never zero. Z-spread is not reported per exit.",
+      "api": {
+        "name": "valuations.instruments.bondWorkoutLadder",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "bondWorkoutLadder",
+        "inputs": [
+          {
+            "name": "bond",
+            "type": "Bond",
+            "optional": false
+          },
+          {
+            "name": "marketJson",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.valuations.BondWorkoutLadder",
+        "declaration": "/**\n   * Yield and I-spread to every call, put and maturity exit of a bond at one market price, with the worst marked (mirrors Rust `bond_workout_ladder`).\n   * @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights must carry `quoted_clean_price_pct`; one with none falls back to its model price.\n   * @param marketJson - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index and make-whole reference curves.\n   * @param asOf - ISO-8601 valuation date; the quote date and coupon entitlement follow the bond's settlement convention.\n   * @returns `BondWorkoutLadder` plain object: `clean_price_pct` and `dirty_price`, the one price every exit is solved at, and `rows` in date order, each with `date`, `kind` (`call`, `put` or `maturity`), `redemption_price_pct` in percent of the principal redeemed, `redemption_amount`, `make_whole`, `yield_rate` and `i_spread` as decimals or `null` when the path has no finite yield (an exit on the quote date, or same-day cash at or above the price; a worst row can be `null`, where the `ytw` metric is negative infinity), and `is_worst`.\n   * @throws Error - Throws with kind `not_found` if a bond with exercise rights has no quoted clean price or a curve is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if a yield cannot be solved.\n   */\n  bondWorkoutLadder(\n    bond: Bond,\n    marketJson: string,\n    asOf: string\n  ): generated.valuations.BondWorkoutLadder;",
+        "sha256": "9f7f3d727f48105d3b7d742f05b16a88408cd125fe1ef905e2fbf09a89df0c77"
+      }
+    },
+    {
       "id": "loan-yield-card",
       "route": "returned-model",
       "convention": "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model.",

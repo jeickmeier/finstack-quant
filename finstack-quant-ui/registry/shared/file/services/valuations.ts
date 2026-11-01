@@ -26,6 +26,8 @@ export type ValuationsNative = {
       | "scenarioTableFieldUnits"
       | "simulationFieldUnits"
       | "equityMetricsFieldUnits"
+      | "Bond"
+      | "bondWorkoutLadder"
       | "poolReport"
       | "poolReportFieldUnits"
       | "standardDealFamilies"
@@ -156,6 +158,20 @@ export function createValuationsService(
           ),
         ),
       );
+    },
+    bondWorkoutLadder(request) {
+      return context.result(() => {
+        const bond = instruments.Bond.fromJson(request.instrumentJson);
+        try {
+          return instruments.bondWorkoutLadder(
+            bond,
+            request.marketJson,
+            request.asOf,
+          );
+        } finally {
+          bond.free();
+        }
+      });
     },
     poolReport(request) {
       return context.result(() =>

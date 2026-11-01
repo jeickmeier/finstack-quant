@@ -8,6 +8,8 @@
 
 Bound in Python (`bond_workout_ladder`, `BondWorkoutLadder`, `BondWorkoutRow`) and WASM (`valuations.instruments.bondWorkoutLadder`). No existing value moves.
 
+The `yield-workout-ladder` registry component and `useBondWorkoutLadder` hook draw it, with the row Rust marks as the worst workout.
+
 ### Structured credit: a custom waterfall pays a debt class only what a note is owed
 
 Per tranche and date, `interest_flows` plus `principal_flows` now equals `cashflows` with no exception. A note is owed interest at its rate and the return of its balance. A fixed or percentage amount is a fee formula with no contractual basis as either: it cannot be an extra coupon, and treating it as principal would silently retire the notional of what is usually an interest-only strip or a misrouted fee. So these waterfalls are now refused rather than reclassified.

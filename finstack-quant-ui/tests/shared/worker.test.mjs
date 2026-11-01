@@ -95,6 +95,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "trancheMetricFieldUnits",
     "trancheSolveFieldUnits",
     "scenarioTableFieldUnits",
+    "bondWorkoutLadder",
     "poolReport",
     "poolReportFieldUnits",
     "runSimulation",
