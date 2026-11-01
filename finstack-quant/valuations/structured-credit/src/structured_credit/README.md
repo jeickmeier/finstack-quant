@@ -720,9 +720,12 @@ maps cannot be JSON. Cash that reaches a tranche outside the waterfall is on
 `NonWaterfallSource`): reserve interest routed to a tranche on the period that
 earned it, and the redemption and terminal releases on the deal's last period.
 Per tranche and date the two sum to the tranche's `cashflows`, and to its
-`interest_flows` plus `principal_flows` except for residual cash a custom
-waterfall pays a debt class beyond its interest claim, which the engine books to
-`cashflows` alone. A recovery settling after the last period carries its own
+`interest_flows` plus `principal_flows` except for a fixed or percentage amount a
+custom waterfall pays a debt class beyond its interest claim, which the engine
+books to `cashflows` alone. Residual cash a custom waterfall pays a debt class is
+a turbo: principal, capped at the balance the class has left, with the excess
+passing to the next recipient or tier, and it does not repay deferred interest
+first. A recovery settling after the last period carries its own
 later `payment_date`; a deal with no payment period left that still settles cash
 has one record holding that settlement. Monte Carlo and OAS paths build the same
 record and discard it with the path.

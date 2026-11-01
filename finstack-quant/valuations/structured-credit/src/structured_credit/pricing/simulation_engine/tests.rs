@@ -3301,56 +3301,131 @@ mod cases {
         );
     }
 
-    /// Residual cash a custom waterfall pays a debt class beyond its interest
-    /// claim reaches `cashflows` but neither flow vector (`record_tranche_flows`
-    /// caps interest at the claim). The records report the cash the class got.
-    #[test]
-    fn residual_to_a_debt_class_reconciles_to_cashflows_only() {
+    /// `CLASS_A` interest and sequential principal, then remaining cash to
+    /// `CLASS_B`, optionally followed by a residual-holder tier.
+    fn residual_to_class_b_deal(equity_tier: bool) -> StructuredCredit {
         use crate::structured_credit::types::{
             PaymentCalculation, PaymentType, Recipient, Waterfall, WaterfallTier,
         };
         let mut deal = clo_with_mezz(Vec::new());
-        deal.waterfall = Some(
-            Waterfall::builder(Currency::USD)
-                .add_tier(
-                    WaterfallTier::new("interest", 1, PaymentType::Interest)
-                        .add_recipient(Recipient::tranche_interest("a_interest", "CLASS_A")),
-                )
-                .add_tier(
-                    WaterfallTier::new("principal", 2, PaymentType::Principal)
-                        .add_recipient(Recipient::tranche_principal("a", "CLASS_A", None))
-                        .add_recipient(Recipient::tranche_principal("b", "CLASS_B", None)),
-                )
-                .add_tier(
-                    WaterfallTier::new("residual", 3, PaymentType::Residual).add_recipient(
-                        Recipient::new(
-                            "b_residual",
-                            RecipientType::Tranche("CLASS_B".to_string()),
-                            PaymentCalculation::ResidualCash,
-                        ),
+        let mut waterfall = Waterfall::builder(Currency::USD)
+            .add_tier(
+                WaterfallTier::new("interest", 1, PaymentType::Interest)
+                    .add_recipient(Recipient::tranche_interest("a_interest", "CLASS_A")),
+            )
+            .add_tier(
+                WaterfallTier::new("principal", 2, PaymentType::Principal)
+                    .add_recipient(Recipient::tranche_principal("a", "CLASS_A", None))
+                    .add_recipient(Recipient::tranche_principal("b", "CLASS_B", None)),
+            )
+            .add_tier(
+                WaterfallTier::new("residual", 3, PaymentType::Residual).add_recipient(
+                    Recipient::new(
+                        "b_residual",
+                        RecipientType::Tranche("CLASS_B".to_string()),
+                        PaymentCalculation::ResidualCash,
                     ),
-                )
-                .build()
-                .expect("waterfall"),
-        );
-        let market = MarketContext::new().insert(cleanup_discount_curve());
-        let run = deal
-            .run_simulation(&market, deal.closing_date)
-            .expect("simulation");
+                ),
+            );
+        if equity_tier {
+            waterfall = waterfall.add_tier(
+                WaterfallTier::new("equity", 4, PaymentType::Residual).add_recipient(
+                    Recipient::new(
+                        "equity",
+                        RecipientType::Equity,
+                        PaymentCalculation::ResidualCash,
+                    ),
+                ),
+            );
+        }
+        deal.waterfall = Some(waterfall.build().expect("waterfall"));
+        deal
+    }
+
+    /// Residual cash paid to a debt class is a turbo: it reconciles as principal
+    /// on every date, retires the balance and never exceeds it.
+    #[test]
+    fn residual_to_a_debt_class_pays_down_principal() {
+        let deal = residual_to_class_b_deal(false);
+        let run = run_reconciled(&deal);
         let first = &run.diagnostics.periods[0];
         let date = first.payment_date;
         let flows = &run.tranches["CLASS_B"];
-        let paid: f64 = first
+        let [record] = first
             .waterfall
             .payment_records
             .iter()
             .filter(|record| record.recipient == RecipientType::Tranche("CLASS_B".to_string()))
-            .map(|record| record.paid_amount.amount())
-            .sum();
+            .filter(|record| record.paid_amount.amount() > 0.0)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("one payment to CLASS_B");
+        };
+        assert!(record.is_principal);
+        let paid = record.paid_amount.amount();
         assert!(paid > 0.0);
         assert!((paid - sum_on(&flows.cashflows, date)).abs() <= RECONCILE_TOLERANCE);
+        assert!((paid - sum_on(&flows.principal_flows, date)).abs() <= RECONCILE_TOLERANCE);
         assert_eq!(sum_on(&flows.interest_flows, date), 0.0);
-        assert_eq!(sum_on(&flows.principal_flows, date), 0.0);
+        // The cap reads the running balance, so payments spread over several
+        // periods stop at the original balance only if each one retired it.
+        assert!(flows.principal_flows.len() > 1);
+        assert_eq!(flows.total_interest.amount(), 0.0);
+        assert!((flows.total_principal.amount() - 2_000_000.0).abs() <= RECONCILE_TOLERANCE);
+        let cash: f64 = flows.cashflows.iter().map(|(_, m)| m.amount()).sum();
+        assert!((cash - 2_000_000.0).abs() <= RECONCILE_TOLERANCE);
+    }
+
+    /// Cash paid in `period` to `recipient`, one entry per payment made.
+    fn paid_to(period: &PeriodDiagnostics, recipient: &RecipientType) -> Vec<f64> {
+        period
+            .waterfall
+            .payment_records
+            .iter()
+            .filter(|record| record.recipient == *recipient)
+            .map(|record| record.paid_amount.amount())
+            .filter(|paid| *paid > 0.0)
+            .collect()
+    }
+
+    /// The turbo stops at the balance: within the period that retires the class,
+    /// the cash above it reaches the next tier.
+    #[test]
+    fn residual_above_a_debt_balance_passes_to_the_next_tier() {
+        let deal = residual_to_class_b_deal(true);
+        let run = run_reconciled(&deal);
+        let class_b = RecipientType::Tranche("CLASS_B".to_string());
+        assert!(
+            run.diagnostics.periods.iter().any(|period| {
+                !paid_to(period, &class_b).is_empty()
+                    && !paid_to(period, &RecipientType::Equity).is_empty()
+            }),
+            "no period pays both the class and the tier after it"
+        );
+        let total = run.tranches["CLASS_B"].total_principal.amount();
+        assert!((total - 2_000_000.0).abs() <= RECONCILE_TOLERANCE);
+    }
+
+    /// A class also paying down through an earlier principal tier takes only
+    /// what is left of its balance from the residual tier, so it is never overpaid.
+    #[test]
+    fn residual_to_a_debt_class_nets_principal_paid_earlier_in_the_period() {
+        let mut deal = residual_to_class_b_deal(false);
+        // `CLASS_B` first, so it takes principal before the residual tier runs.
+        deal.waterfall.as_mut().expect("waterfall").tiers[1]
+            .recipients
+            .reverse();
+        let run = run_reconciled(&deal);
+        let class_b = RecipientType::Tranche("CLASS_B".to_string());
+        let payments: Vec<Vec<f64>> = run
+            .diagnostics
+            .periods
+            .iter()
+            .map(|period| paid_to(period, &class_b))
+            .collect();
+        assert!(payments.iter().any(|paid| paid.len() == 2));
+        let total: f64 = payments.iter().flatten().sum();
+        assert!((total - 2_000_000.0).abs() <= RECONCILE_TOLERANCE);
     }
 
     // ── First coverage breach and credit enhancement ─────────────────────
