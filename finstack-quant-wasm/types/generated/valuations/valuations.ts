@@ -19586,10 +19586,7 @@ export interface PeriodDiagnostics {
    * a tranche, and, on the deal's last period, its redemption and terminal
    * releases. Together with `waterfall.payment_records` this is every
    * tranche's cash: per tranche and date, the two sum to the tranche's
-   * `cashflows`, and to its `interest_flows` plus `principal_flows`. The one
-   * exception to the second sum is a fixed or percentage amount a custom
-   * waterfall pays a debt class beyond its interest claim, which the engine
-   * books to `cashflows` alone.
+   * `cashflows`, and to its `interest_flows` plus `principal_flows`.
    */
   non_waterfall_payments: NonWaterfallPayment[];
   /**

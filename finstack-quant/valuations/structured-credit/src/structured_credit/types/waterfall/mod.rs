@@ -76,14 +76,16 @@ pub enum RoundingConvention {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "snake_case")]
 pub enum PaymentCalculation {
-    /// Fixed amount
+    /// Fixed amount. A fee formula: validation rejects it for a tranche recipient,
+    /// since a note is owed only its coupon and the return of its balance.
     FixedAmount {
         /// Amount.
         amount: Money,
         /// Rounding convention.
         rounding: Option<RoundingConvention>,
     },
-    /// Percentage of collateral balance
+    /// Percentage of collateral balance. A fee formula: validation rejects it for
+    /// a tranche recipient.
     PercentageOfCollateral {
         /// Rate.
         rate: f64,
@@ -96,7 +98,8 @@ pub enum PaymentCalculation {
     },
     /// Percentage of the specially serviced collateral balance (CMBS special
     /// servicing fee): the balances of pool assets carrying a
-    /// `special_servicing` spec.
+    /// `special_servicing` spec. A fee formula: validation rejects it for a
+    /// tranche recipient.
     PercentageOfSpecialServiced {
         /// Rate.
         rate: f64,
@@ -136,6 +139,7 @@ pub enum PaymentCalculation {
     ///
     /// The current reserve balance is passed dynamically via `WaterfallContext`
     /// at execution time, not stored here, because the balance changes each period.
+    /// Validation rejects it for a tranche recipient.
     ReserveReplenishment {
         /// Target reserve balance the account should be replenished to.
         target_balance: Money,
@@ -161,7 +165,9 @@ pub enum PaymentCalculation {
     /// into the period (`amount`, set by the engine each period from the
     /// interest its available-funds cap withheld in earlier periods), paid
     /// from the cash reaching this recipient and recorded as interest on the
-    /// tranche outside its capped claim.
+    /// tranche outside its capped claim. A custom waterfall names the recipient
+    /// `net_wac_carryover_<tranche_id>` and the tranche must accrue carryover
+    /// under `waterfall_rules.afc`.
     NetWacCarryover {
         /// Tranche id.
         tranche_id: String,
@@ -177,7 +183,8 @@ pub enum PaymentCalculation {
     /// the manager shares only in the excess. Nothing is paid while the
     /// hurdle is unreachable, or when no equity history is supplied. The
     /// standard template places one recipient in the principal tier ahead of
-    /// `equity_principal` and one ahead of the residual.
+    /// `equity_principal` and one ahead of the residual. Validation rejects it
+    /// for a tranche recipient.
     IncentiveFee {
         /// Equity IRR hurdle as an annual decimal.
         hurdle_irr: f64,

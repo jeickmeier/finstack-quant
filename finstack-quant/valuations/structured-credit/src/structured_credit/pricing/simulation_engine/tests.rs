@@ -3428,6 +3428,131 @@ mod cases {
         assert!((total - 2_000_000.0).abs() <= RECONCILE_TOLERANCE);
     }
 
+    /// `CLASS_A` coupon and sequential principal, plus one extra recipient for
+    /// `CLASS_B` in a tier funded after them.
+    fn deal_paying_class_b(
+        recipient_id: &str,
+        calculation: crate::structured_credit::types::PaymentCalculation,
+    ) -> StructuredCredit {
+        use crate::structured_credit::types::{PaymentType, Recipient, WaterfallTier};
+        let mut deal = residual_to_class_b_deal(false);
+        let waterfall = deal.waterfall.as_mut().expect("waterfall");
+        waterfall.tiers[2] = WaterfallTier::new("residual", 3, PaymentType::Residual)
+            .add_recipient(Recipient::new(
+                recipient_id,
+                RecipientType::Tranche("CLASS_B".to_string()),
+                calculation,
+            ));
+        deal
+    }
+
+    /// A fixed amount used to reach `cashflows` alone: lifetime cash 3,000,000
+    /// on a 2,000,000 note. The engine now refuses to price it, whichever path
+    /// built the deal.
+    #[test]
+    fn simulation_rejects_a_fixed_amount_paid_to_a_debt_class() {
+        use crate::structured_credit::types::PaymentCalculation;
+        let deal = deal_paying_class_b(
+            "b_extra",
+            PaymentCalculation::FixedAmount {
+                amount: Money::from((50_000_i64, Currency::USD)),
+                rounding: None,
+            },
+        );
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let message = deal
+            .run_simulation(&market, deal.closing_date)
+            .expect_err("rejected")
+            .to_string();
+        assert!(message.contains("fixed_amount"), "{message}");
+        assert!(message.contains("CLASS_B"), "{message}");
+    }
+
+    /// A coupon rounded up pays cents above the claim the engine computes
+    /// unrounded. That cash is still interest, so no gap opens.
+    #[test]
+    fn coupon_rounded_above_its_claim_is_booked_as_interest() {
+        use crate::structured_credit::types::{
+            PaymentCalculation, PaymentType, Recipient, RoundingConvention, WaterfallTier,
+        };
+        let mut deal = residual_to_class_b_deal(true);
+        let waterfall = deal.waterfall.as_mut().expect("waterfall");
+        waterfall.tiers[0] = WaterfallTier::new("interest", 1, PaymentType::Interest)
+            .add_recipient(Recipient::new(
+                "a_interest",
+                RecipientType::Tranche("CLASS_A".to_string()),
+                PaymentCalculation::TrancheInterest {
+                    tranche_id: "CLASS_A".to_string(),
+                    rounding: Some(RoundingConvention::Ceiling),
+                },
+            ));
+        let run = run_reconciled(&deal);
+        assert!(run.tranches["CLASS_A"].total_interest.amount() > 0.0);
+    }
+
+    /// Carryover the engine cannot settle against a balance is rejected: the
+    /// tranche must accrue it and the recipient must carry the engine's id.
+    #[test]
+    fn simulation_rejects_carryover_with_no_balance_behind_it() {
+        use crate::structured_credit::types::PaymentCalculation;
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        for recipient_id in ["b_extra", "net_wac_carryover_CLASS_B"] {
+            let deal = deal_paying_class_b(
+                recipient_id,
+                PaymentCalculation::NetWacCarryover {
+                    tranche_id: "CLASS_B".to_string(),
+                    amount: Money::from((10_000_i64, Currency::USD)),
+                },
+            );
+            let message = deal
+                .run_simulation(&market, deal.closing_date)
+                .expect_err("rejected")
+                .to_string();
+            assert!(message.contains("net_wac_carryover_CLASS_B"), "{message}");
+        }
+    }
+
+    /// The carryover the validation admits: a capped class accruing it, repaid
+    /// under the engine's recipient id, reconciles as interest.
+    #[test]
+    fn carryover_a_custom_waterfall_repays_reconciles_as_interest() {
+        use crate::structured_credit::types::{
+            AfcSpec, PaymentCalculation, PaymentType, Recipient, WaterfallRules, WaterfallTier,
+        };
+        let mut deal = deal_paying_class_b(
+            "net_wac_carryover_CLASS_B",
+            PaymentCalculation::NetWacCarryover {
+                tranche_id: "CLASS_B".to_string(),
+                amount: Money::from((0_i64, Currency::USD)),
+            },
+        );
+        let waterfall = deal.waterfall.as_mut().expect("waterfall");
+        waterfall.tiers[0] = WaterfallTier::new("interest", 1, PaymentType::Interest)
+            .add_recipient(Recipient::tranche_interest("a_interest", "CLASS_A"))
+            .add_recipient(Recipient::tranche_interest("b_interest", "CLASS_B"));
+        deal.waterfall_rules = Some(WaterfallRules {
+            afc: Some(AfcSpec {
+                capped_tranches: vec!["CLASS_B".to_string()],
+                net_wac_fee_bp: Some(100.0),
+                carryover: true,
+            }),
+            ..WaterfallRules::default()
+        });
+        let run = run_reconciled(&deal);
+        let class_b = RecipientType::Tranche("CLASS_B".to_string());
+        let repaid = run
+            .diagnostics
+            .periods
+            .iter()
+            .flat_map(|period| &period.waterfall.payment_records)
+            .filter(|record| {
+                record.recipient == class_b && record.recipient_id == "net_wac_carryover_CLASS_B"
+            })
+            .map(|record| record.paid_amount.amount())
+            .sum::<f64>();
+        assert!(repaid > 0.0);
+    }
+
     // ── First coverage breach and credit enhancement ─────────────────────
 
     fn breach<'a>(run: &'a SimulationRun, test_id: &str) -> &'a CoverageTestBreach {

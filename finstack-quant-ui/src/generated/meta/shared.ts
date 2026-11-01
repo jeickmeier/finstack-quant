@@ -23878,7 +23878,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/0",
-    "description": "Fixed amount"
+    "description": "Fixed amount. A fee formula: validation rejects it for a tranche recipient,\nsince a note is owed only its coupon and the return of its balance."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/0/properties/fixed_amount",
@@ -23909,7 +23909,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/1",
-    "description": "Percentage of collateral balance"
+    "description": "Percentage of collateral balance. A fee formula: validation rejects it for\na tranche recipient."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral",
@@ -23959,7 +23959,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/2",
-    "description": "Percentage of the specially serviced collateral balance (CMBS special\nservicing fee): the balances of pool assets carrying a\n`special_servicing` spec."
+    "description": "Percentage of the specially serviced collateral balance (CMBS special\nservicing fee): the balances of pool assets carrying a\n`special_servicing` spec. A fee formula: validation rejects it for a\ntranche recipient."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced",
@@ -24088,7 +24088,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/6",
-    "description": "Reserve account replenishment (up to target balance).\n\nThe current reserve balance is passed dynamically via `WaterfallContext`\nat execution time, not stored here, because the balance changes each period."
+    "description": "Reserve account replenishment (up to target balance).\n\nThe current reserve balance is passed dynamically via `WaterfallContext`\nat execution time, not stored here, because the balance changes each period.\nValidation rejects it for a tranche recipient."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/6/properties/reserve_replenishment",
@@ -24139,7 +24139,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/8",
-    "description": "Net-WAC carryover repayment: the tranche's carryover balance brought\ninto the period (`amount`, set by the engine each period from the\ninterest its available-funds cap withheld in earlier periods), paid\nfrom the cash reaching this recipient and recorded as interest on the\ntranche outside its capped claim."
+    "description": "Net-WAC carryover repayment: the tranche's carryover balance brought\ninto the period (`amount`, set by the engine each period from the\ninterest its available-funds cap withheld in earlier periods), paid\nfrom the cash reaching this recipient and recorded as interest on the\ntranche outside its capped claim. A custom waterfall names the recipient\n`net_wac_carryover_<tranche_id>` and the tranche must accrue carryover\nunder `waterfall_rules.afc`."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/8/properties/net_wac_carryover",
@@ -24160,7 +24160,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/9",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/9",
-    "description": "Manager incentive fee: `share` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual."
+    "description": "Manager incentive fee: `share` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual. Validation rejects it\nfor a tranche recipient."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/9/properties/incentive_fee",
