@@ -254,6 +254,48 @@ fn equity_irr_reproduces_xirr_of_the_equity_flows() {
     assert!((at_discount.moic - metrics.moic / 0.8).abs() < 1e-9);
 }
 
+/// An equity class that receives nothing has no IRR and a true zero MOIC and NAV.
+#[test]
+fn equity_metrics_of_a_class_that_receives_nothing_have_no_irr() {
+    let mut deal = clo(0.0);
+    for tranche in &mut deal.tranches.tranches {
+        if tranche.seniority != TrancheSeniority::Equity {
+            tranche.coupon = RateSpec::Fixed { rate: 0.9 };
+        }
+    }
+    let metrics =
+        calculate_equity_metrics(&deal, &market(), close(), None).expect("equity metrics");
+    assert_eq!(metrics.invested, 25_000_000.0);
+    assert_eq!(metrics.irr, None);
+    assert_eq!(metrics.moic, 0.0);
+    assert_eq!(metrics.nav_pct, 0.0);
+    assert!(metrics.cash_on_cash.is_empty());
+}
+
+/// Nothing invested leaves no IRR and zero ratios, and the NAV does not depend on the price.
+#[test]
+fn equity_metrics_at_a_zero_price_have_no_irr_and_keep_the_nav() {
+    let deal = clo(0.02);
+    let at_par = calculate_equity_metrics(&deal, &market(), close(), None).expect("par");
+    let free = calculate_equity_metrics(&deal, &market(), close(), Some(0.0)).expect("free");
+    assert_eq!(free.invested, 0.0);
+    assert_eq!(free.irr, None);
+    assert_eq!(free.moic, 0.0);
+    assert_eq!(free.nav_pct, at_par.nav_pct);
+    assert_eq!(free.cash_on_cash.len(), at_par.cash_on_cash.len());
+    assert!(free.cash_on_cash.iter().all(|(_, share)| *share == 0.0));
+}
+
+/// A deal without an equity class and an invalid price are errors, not zeros.
+#[test]
+fn equity_metrics_reject_no_equity_class_and_a_negative_price() {
+    let no_equity = StructuredCredit::example().expect("example");
+    let error = calculate_equity_metrics(&no_equity, &market(), close(), None)
+        .expect_err("no equity tranche");
+    assert!(error.to_string().contains("deal has no equity tranche"));
+    assert!(calculate_equity_metrics(&clo(0.02), &market(), close(), Some(-1.0)).is_err());
+}
+
 /// Diagnostics with populated periods survive a JSON round-trip.
 #[test]
 fn diagnostics_round_trip_through_json() {

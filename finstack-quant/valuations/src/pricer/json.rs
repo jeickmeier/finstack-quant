@@ -794,6 +794,53 @@ pub fn simulation_field_units(currency: Currency) -> SimulationFieldUnits {
     }
 }
 
+/// Units of an `EquityMetrics`, which do not all appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct EquityMetricsFieldUnits {
+    /// Unit of `EquityMetrics::invested`.
+    pub invested: MetricFieldUnit,
+    /// Unit of `EquityMetrics::irr`.
+    pub irr: MetricFieldUnit,
+    /// Unit of `EquityMetrics::moic`.
+    pub moic: MetricFieldUnit,
+    /// Unit of `EquityMetrics::nav_pct`.
+    pub nav_pct: MetricFieldUnit,
+    /// Unit of each `EquityMetrics::cash_on_cash` value.
+    pub cash_on_cash: MetricFieldUnit,
+}
+
+/// Units of the `EquityMetrics` fields, the one place a host reads them from.
+///
+/// The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV
+/// a percent of the equity's current balance and cash-on-cash a decimal share of the
+/// invested amount. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `EquityMetrics::currency` of the result being labelled; it
+///   names the unit of `invested`.
+///
+/// # Returns
+///
+/// One record per numeric field. `tranche_id` and `currency` have no unit and are
+/// not listed.
+pub fn equity_metrics_field_units(currency: Currency) -> EquityMetricsFieldUnits {
+    let unit = |field: &str, label: String| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::EquityMetrics::{field}"),
+    };
+    EquityMetricsFieldUnits {
+        invested: unit("invested", currency.to_string()),
+        irr: unit("irr", "annual decimal, ACT/365F".to_string()),
+        moic: unit("moic", "multiple of invested".to_string()),
+        nav_pct: unit("nav_pct", "% of current balance".to_string()),
+        cash_on_cash: unit("cash_on_cash", "decimal share of invested".to_string()),
+    }
+}
+
 /// List every pricing model key that has a pricer in the standard registry.
 ///
 /// The list is **registry-derived**, not enum-derived: it reports real dispatch
@@ -1410,6 +1457,44 @@ mod tests {
         assert_eq!(units.measures[0].label, "% of current balance");
         assert_eq!(units.measures[2].label, "EUR");
         assert_eq!(units.measures[1].source, "valuations::ScenarioCell::wal");
+    }
+
+    #[test]
+    fn equity_units_name_every_numeric_field_of_the_result() {
+        use finstack_quant_valuations_structured_credit::structured_credit::EquityMetrics;
+        let metrics = EquityMetrics {
+            tranche_id: "E".to_string(),
+            currency: Currency::EUR,
+            invested: 0.0,
+            irr: Some(0.0),
+            moic: 0.0,
+            nav_pct: 0.0,
+            cash_on_cash: Vec::new(),
+        };
+        let mut declared: Vec<String> = serde_json::to_value(&metrics)
+            .expect("serialize")
+            .as_object()
+            .expect("object")
+            .iter()
+            .filter(|(_, field)| field.is_number() || field.is_array())
+            .map(|(name, _)| name.clone())
+            .collect();
+        declared.sort_unstable();
+        let units = serde_json::to_value(equity_metrics_field_units(Currency::EUR))
+            .expect("serialize units");
+        let mut listed: Vec<String> = units
+            .as_object()
+            .expect("object")
+            .iter()
+            .map(|(name, unit)| {
+                assert_eq!(unit["field"], name.as_str());
+                assert_eq!(unit["source"], format!("valuations::EquityMetrics::{name}"));
+                name.clone()
+            })
+            .collect();
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units["invested"]["label"], "EUR");
     }
 
     #[test]

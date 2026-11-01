@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from finstack_quant.valuations.instruments import (
+    equity_metrics_field_units,
     pool_report_field_units,
     scenario_table_field_units,
     simulation_field_units,
@@ -28,6 +29,7 @@ SOLVE_FIXTURE = Path(__file__).parent / "fixtures" / "tranche_solve_field_units.
 POOL_REPORT_FIXTURE = Path(__file__).parent / "fixtures" / "pool_report_field_units.json"
 SCENARIO_FIXTURE = Path(__file__).parent / "fixtures" / "scenario_table_field_units.json"
 SIMULATION_FIXTURE = Path(__file__).parent / "fixtures" / "simulation_field_units.json"
+EQUITY_FIXTURE = Path(__file__).parent / "fixtures" / "equity_metrics_field_units.json"
 
 
 def test_units_match_the_records_pinned_for_both_hosts() -> None:
@@ -68,3 +70,10 @@ def test_simulation_units_match_the_records_pinned_for_both_hosts() -> None:
     if os.environ.get("UPDATE_TRANCHE_UNITS_PARITY"):
         SIMULATION_FIXTURE.write_text(json.dumps(actual, indent=2) + "\n")
     assert actual == json.loads(SIMULATION_FIXTURE.read_text())
+
+
+def test_equity_units_match_the_records_pinned_for_both_hosts() -> None:
+    actual = equity_metrics_field_units("EUR")
+    if os.environ.get("UPDATE_TRANCHE_UNITS_PARITY"):
+        EQUITY_FIXTURE.write_text(json.dumps(actual, indent=2) + "\n")
+    assert actual == json.loads(EQUITY_FIXTURE.read_text())

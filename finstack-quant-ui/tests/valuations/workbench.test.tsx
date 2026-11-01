@@ -172,6 +172,20 @@ beforeEach(() => {
           deal.free();
         }
       }
+      case "equityMetrics": {
+        const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+        try {
+          return deal.equityMetrics(
+            request.marketJson,
+            request.asOf,
+            request.purchasePricePct,
+          );
+        } finally {
+          deal.free();
+        }
+      }
+      case "equityMetricsFieldUnits":
+        return native.equityMetricsFieldUnits(request);
       case "scenarioTableFieldUnits":
         return native.scenarioTableFieldUnits(request);
       case "simulationFieldUnits":
@@ -984,6 +998,25 @@ it(
     expect(
       call.mock.calls.filter(([method]) => method === "runSimulation"),
     ).toHaveLength(1);
+    // ... and the equity tranche: the call is always made and Rust answers for the deal.
+    fireEvent.click(
+      screen.getByText("Equity tranche", { selector: "summary" }),
+    );
+    await waitFor(
+      () =>
+        expect(
+          screen
+            .getByRole("region", { name: "Equity tranche" })
+            .querySelector('[role="alert"]')?.textContent,
+        ).toMatch(/deal has no equity tranche/),
+      { timeout: budget(10000) },
+    );
+    const equity = call.mock.calls.find(
+      ([method]) => method === "equityMetrics",
+    )![1];
+    // A blank price is not a price: JS leaves the default to Rust.
+    expect(equity.purchasePricePct).toBeNull();
+    expect(equity.instrumentJson).toBe(family.instrumentJson);
     // The grid and the price extent come from Rust's example and the returned prices.
     fireEvent.click(screen.getByText("Scenarios", { selector: "summary" }));
     await waitFor(

@@ -18,6 +18,7 @@ import type {
   ScenarioTable,
   ScenarioTableFieldUnits,
   SimulationFieldUnits,
+  EquityMetricsFieldUnits,
   PoolReportFieldUnits,
   StructuredCredit,
   ScenarioResults,
@@ -131,6 +132,13 @@ export interface DealSimulationRequest {
   readonly instrumentJson: string;
   readonly marketJson: string;
   readonly asOf: string;
+}
+/** Native residual-class IRR, MOIC, NAV and cash-on-cash of one deterministic projection. */
+export type EquityMetrics = ReturnType<StructuredCredit["equityMetrics"]>;
+/** One structured-credit deal's equity metrics at a purchase price. */
+export interface EquityMetricsRequest extends DealSimulationRequest {
+  /** Percent of the equity's current balance; null leaves the price to Rust's default. */
+  readonly purchasePricePct: number | null;
 }
 /** One tranche of a structured-credit deal, priced on a complete market at a valuation date. */
 export interface TrancheRequest {
@@ -1152,6 +1160,10 @@ export interface ValuationsApi {
   runSimulation(
     request: DealSimulationRequest,
   ): Promise<Envelope<SimulationRun>>;
+  /** StructuredCredit.equityMetrics: the deal's equity tranche, or the native failure when it has none. */
+  equityMetrics(
+    request: EquityMetricsRequest,
+  ): Promise<Envelope<EquityMetrics>>;
   /** valuations.instruments.poolReport over the deal's pool: statistics, WARF and concentration. */
   poolReport(request: PoolReportRequest): Promise<Envelope<PoolReport>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
@@ -1188,6 +1200,10 @@ export interface ValuationsApi {
   simulationFieldUnits(
     currency: string,
   ): Promise<Envelope<SimulationFieldUnits>>;
+  /** valuations.instruments.equityMetricsFieldUnits: units of an equity tranche's metrics. */
+  equityMetricsFieldUnits(
+    currency: string,
+  ): Promise<Envelope<EquityMetricsFieldUnits>>;
   /** valuations.instruments.poolReportFieldUnits: units of a pool report's fields. */
   poolReportFieldUnits(
     currency: string,

@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Structured credit: units of an equity tranche's metrics
+
+#### Added
+
+- `equity_metrics_field_units(currency)` (`EquityMetricsFieldUnits`; WASM `equityMetricsFieldUnits`) states the unit of each `EquityMetrics` number.
+
+#### Changed
+
+- `EquityMetrics` now documents its decimal, percent and multiple conventions and what a zero investment returns; its values are unchanged.
+
+#### Fixed
+
+- WASM `StructuredCredit.equityMetrics` documented an omitted `purchasePricePct` as investing at model NAV. It invests at par, as Rust and Python state.
+
 ### Structured credit: units of a simulation's charted series
 
 #### Added

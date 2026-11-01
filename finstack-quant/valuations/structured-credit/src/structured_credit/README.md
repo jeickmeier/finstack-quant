@@ -742,6 +742,19 @@ annual decimal of the opening pool balance. `AbsExcessSpread` is a different,
 static card-trust metric in percent. `simulation_field_units(currency)` states
 the units of these charted series for a host.
 
+`calculate_equity_metrics(deal, market, as_of, purchase_price_pct)` reports the
+deal's first equity-seniority class. `invested` is its current balance times the
+price, par when omitted. `irr` is the annual XIRR (ACT/365F, decimal) of `-invested`
+on `as_of` against every later distribution, interest and principal alike. `moic`
+is total distributions over `invested`. `nav_pct` is those distributions discounted
+from `as_of` on `deal.discount_curve_id`, as a percent of current balance, and does
+not move with the price. `cash_on_cash` is each distribution as an unannualized
+decimal share of `invested`. A class that receives nothing has `irr: None` and a true
+zero MOIC and NAV. With nothing invested `irr` is `None`, and `moic` and each
+`cash_on_cash` entry are zero rather than an undefined ratio. A deal with no equity
+class is a validation error. `equity_metrics_field_units(currency)` (in `pricer`)
+states these units for a host.
+
 `SimulationDiagnostics::to_table()` owns the nineteen-column period export used
 by Python `to_dataframe()`. It retains period order and duplicate dates, joins
 the first reserve-interest entry matching each payment date, and uses zero for

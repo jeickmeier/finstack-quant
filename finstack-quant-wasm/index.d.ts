@@ -199,6 +199,7 @@ import type {
   PoolReportFieldUnits,
   ScenarioTableFieldUnits,
   SimulationFieldUnits,
+  EquityMetricsFieldUnits,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
@@ -439,6 +440,7 @@ export type {
   PoolReportFieldUnits,
   ScenarioTableFieldUnits,
   SimulationFieldUnits,
+  EquityMetricsFieldUnits,
   TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
@@ -22014,9 +22016,9 @@ export interface StructuredCredit extends WasmOwned {
    * Equity-tranche return metrics (mirrors Rust `calculate_equity_metrics`).
    * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
    * @param asOf - ISO-8601 valuation date.
-   * @param purchasePricePct - Optional equity purchase price in percent of its balance (`60` = 60%); omit to invest at the model net asset value.
-   * @returns `EquityMetrics` plain object with IRR, MOIC, NAV in percent of balance and cash-on-cash yields.
-   * @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
+   * @param purchasePricePct - Optional equity purchase price in percent of its current balance (`60` = 60%); omit to invest at par. Must be finite and non-negative.
+   * @returns `EquityMetrics` plain object: `invested`; `irr`, an annual XIRR (ACT/365F) decimal or `null` when no rate solves; `moic`, a multiple of invested; `nav_pct`, the distributions discounted on the deal's discount curve as a percent of current balance; and `cash_on_cash`, each distribution as an unannualized decimal share of invested. `equityMetricsFieldUnits` states the units.
+   * @throws Error - Throws with kind `not_found` if a curve is missing or the simulation records no equity tranche, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
    */
   equityMetrics(
     marketJson: JsonInput,
@@ -23231,6 +23233,15 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
    */
   simulationFieldUnits(currency: string): SimulationFieldUnits;
+  /**
+   * Units of the `EquityMetrics` fields, the one place a host reads them from.
+   *
+   * The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV a percent of the equity's current balance and cash-on-cash a decimal share of the invested amount. Values are never rescaled.
+   * @param currency - ISO-4217 code of the result's `currency`, in any ASCII case; it names the unit of `invested`.
+   * @returns `EquityMetricsFieldUnits`: one `MetricFieldUnit` each for `invested`, `irr`, `moic`, `nav_pct` and `cash_on_cash`.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  equityMetricsFieldUnits(currency: string): EquityMetricsFieldUnits;
   /**
    * Units of the `PoolReport` fields, the one place a host reads them from.
    * @param currency - ISO-4217 code of the pool's base currency, in any ASCII case; it names the unit of `total_balance`, `undrawn_commitment` and each row's `balance`.

@@ -1010,12 +1010,21 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics.schema.json",
-      "bytes": 2285,
+      "bytes": 2544,
       "kind": "output",
       "path": "schemas/results/1/equity_metrics.schema.json",
       "summary": "Equity-tranche return metrics: IRR, MOIC, NAV and cash-on-cash.",
       "title": "EquityMetrics",
       "type_name": "EquityMetrics"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics_field_units.schema.json",
+      "bytes": 2576,
+      "kind": "output",
+      "path": "schemas/results/1/equity_metrics_field_units.schema.json",
+      "summary": "The display units of an equity tranche's invested amount, IRR, MOIC, NAV and cash-on-cash.",
+      "title": "EquityMetricsFieldUnits",
+      "type_name": "EquityMetricsFieldUnits"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",

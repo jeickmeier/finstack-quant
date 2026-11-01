@@ -414,6 +414,17 @@ const displays = [
       "Returned periods[].credit_enhancement by tranche, a decimal share of the collateral beneath it at period end, and periods[].excess_spread, realized that period and annualized as a decimal of the opening pool balance (pool interest less debt coupons due, waterfall fees and net charge-offs), in the units simulationFieldUnits states. One period is listed, not charted. Nothing is computed, grouped, joined by date, sorted or classified here.",
   },
   {
+    id: "equity-tranche-card",
+    api: [
+      "StructuredCredit#equityMetrics",
+      "StructuredCredit",
+      "equityMetrics",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned EquityMetrics in the units equityMetricsFieldUnits states: invested in the deal currency; irr an annual XIRR decimal on ACT/365F, or null when no rate solves, stated rather than drawn as zero; moic total distributions over invested; nav_pct distributions discounted on the deal's discount curve as a percent of current balance; cash_on_cash each distribution as an unannualized decimal share of invested. Rust chooses the equity tranche and returns zero for moic and cash_on_cash when nothing is invested; a returned zero is drawn as zero. A blank purchase price is omitted, so Rust's par default applies. Nothing is computed, rescaled or classified here.",
+  },
+  {
     id: "performance-report",
     api: ["analytics.Performance#summary", "Performance", "summary"],
     route: "returned-analytics",

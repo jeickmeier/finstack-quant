@@ -4566,6 +4566,7 @@
       "cdsTrancheParamsMezzanineTranche",
       "coverageRulesCloStandard",
       "coverageRulesValidate",
+      "equityMetricsFieldUnits",
       "instrumentCashflows",
       "instrumentCashflowsWithMarket",
       "instrumentEnvelopeFromSpec",
@@ -4847,6 +4848,9 @@
     "kind": "function"
   },
   "valuations.instruments.simulationFieldUnits": {
+    "kind": "function"
+  },
+  "valuations.instruments.equityMetricsFieldUnits": {
     "kind": "function"
   },
   "valuations.instruments.trancheMetricFieldUnits": {

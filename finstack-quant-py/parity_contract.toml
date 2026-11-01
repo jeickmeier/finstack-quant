@@ -1017,6 +1017,7 @@ public = [
     "bond_from_cashflows_json",
     "calculate_pool_stats",
     "calculate_var",
+    "equity_metrics_field_units",
     "instrument_cashflows",
     "instrument_envelope_from_spec",
     "list_models",

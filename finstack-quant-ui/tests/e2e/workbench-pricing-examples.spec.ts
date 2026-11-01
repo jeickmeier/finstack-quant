@@ -290,6 +290,11 @@ test("a standard deal family builds, prices and lists its native tranches", asyn
       .getByRole("region", { name: "Credit enhancement and excess spread" })
       .getByRole("table", { name: "By payment date" }),
   ).toBeVisible();
+  // ... and its equity tranche: this family has none, and Rust says so.
+  await results.locator("summary", { hasText: /^Equity tranche$/ }).click();
+  await expect(
+    results.getByRole("region", { name: "Equity tranche" }).getByRole("alert"),
+  ).toContainText("deal has no equity tranche");
   expect(errors).toEqual([]);
 });
 

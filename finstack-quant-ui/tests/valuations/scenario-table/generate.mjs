@@ -398,3 +398,90 @@ await emit(
     cases: chartCases,
   }),
 );
+// Equity tranche card on the UI market: a three-class deal to the pool's maturity whose
+// equity class is paid, at Rust's par default and at a discount. Then the two ways there
+// is no IRR, a class that receives nothing because the notes' coupons absorb all cash,
+// and nothing invested, at a zero price and at a zero balance; a class that receives
+// little, which still has one; and the deals Rust refuses, one with no equity tranche
+// (the example), one with no assets and no reserve, and a negative price.
+const equityDeal = structuredClone(instrument);
+{
+  const spec = equityDeal.instrument.spec;
+  const base = spec.tranches.tranches[0];
+  spec.prepayment_spec = { curve: "constant", cpr: 0.1 };
+  spec.default_spec = { curve: "constant", cdr: 0.01 };
+  spec.recovery_spec = { rate: 0.5, recovery_lag: 0 };
+  spec.tranches.tranches = [
+    chartTranche(base, "SENIOR", "senior", 30, 100, 70000000, 0.05),
+    chartTranche(base, "MEZZ", "mezzanine", 15, 30, 15000000, 0.08),
+    chartTranche(base, "EQUITY", "equity", 0, 15, 15000000, 0),
+  ];
+}
+const edited = (edit) => {
+  const deal = structuredClone(equityDeal);
+  edit(deal.instrument.spec);
+  return deal;
+};
+const equityCases = [
+  { name: "paying", input: equityDeal, purchasePricePct: null },
+  { name: "discounted", input: equityDeal, purchasePricePct: 60 },
+  { name: "negative-price", input: equityDeal, purchasePricePct: -1 },
+  { name: "zero-price", input: equityDeal, purchasePricePct: 0 },
+  {
+    name: "starved",
+    input: edited((spec) => {
+      spec.tranches.tranches[0].coupon = { fixed: { rate: 0.6 } };
+      spec.tranches.tranches[1].coupon = { fixed: { rate: 0.6 } };
+    }),
+    purchasePricePct: null,
+  },
+  {
+    name: "zero-balance",
+    input: edited((spec) => {
+      spec.tranches.tranches[2].current_balance = chartMoney(0);
+    }),
+    purchasePricePct: null,
+  },
+  {
+    name: "wiped-out",
+    input: edited((spec) => {
+      spec.default_spec = { curve: "constant", cdr: 0.9 };
+      spec.recovery_spec = { rate: 0, recovery_lag: 0 };
+    }),
+    purchasePricePct: null,
+  },
+  { name: "no-equity", input: instrument, purchasePricePct: null },
+  {
+    name: "no-assets",
+    input: edited((spec) => {
+      spec.pool.assets = [];
+    }),
+    purchasePricePct: null,
+  },
+].map(({ name, input, purchasePricePct }) => {
+  const instrumentJson = native.validateInstrumentJson(JSON.stringify(input));
+  const deal = native.StructuredCredit.fromJson(instrumentJson);
+  try {
+    return {
+      name,
+      instrument: JSON.parse(instrumentJson),
+      purchasePricePct,
+      result: failure(() =>
+        deal.equityMetrics(marketJson, asOf, purchasePricePct),
+      ),
+    };
+  } finally {
+    deal.free();
+  }
+});
+await emit(
+  new URL("./equity-tranche.json", import.meta.url),
+  JSON.stringify({
+    instrumentSource,
+    marketSource,
+    marketSha256: createHash("sha256").update(marketJson).digest("hex"),
+    asOf,
+    units: native.equityMetricsFieldUnits("USD"),
+    cases: equityCases,
+  }),
+);

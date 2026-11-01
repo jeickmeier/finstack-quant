@@ -18,6 +18,7 @@ import standardDeals from "./scenario-table/standard-deals.json";
 import poolReports from "./scenario-table/pool-report.json";
 import waterfallReports from "./scenario-table/waterfall-report.json";
 import dealCharts from "./scenario-table/deal-charts.json";
+import equityTranche from "./scenario-table/equity-tranche.json";
 import { budget } from "../shared/budget";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -226,6 +227,42 @@ it(
       expect(c.run).toEqual(JSON.parse(JSON.stringify(run)));
     }
     const failed = await worker.proxy.simulationFieldUnits("NOT-A-CODE");
+    expect(failed.ok).toBe(false);
+  },
+  budget(30000),
+);
+it(
+  "returns the native equity metrics, their failures and their units",
+  async () => {
+    expect(equityTranche.units).toEqual(
+      unwrap(await worker.proxy.equityMetricsFieldUnits("USD")),
+    );
+    expect(equityTranche.units).toEqual(native.equityMetricsFieldUnits("USD"));
+    for (const c of equityTranche.cases) {
+      const returned = await worker.proxy.equityMetrics({
+        instrumentJson: JSON.stringify(c.instrument),
+        marketJson,
+        asOf: equityTranche.asOf,
+        purchasePricePct: c.purchasePricePct,
+      });
+      if (c.result.error) {
+        expect(returned.ok).toBe(false);
+        expect(
+          returned.ok === false && {
+            kind: returned.error.kind,
+            message: returned.error.message,
+          },
+        ).toEqual({
+          kind: c.result.error.kind,
+          message: c.result.error.message,
+        });
+      } else {
+        expect(c.result.value).toEqual(
+          JSON.parse(JSON.stringify(unwrap(returned))),
+        );
+      }
+    }
+    const failed = await worker.proxy.equityMetricsFieldUnits("NOT-A-CODE");
     expect(failed.ok).toBe(false);
   },
   budget(30000),

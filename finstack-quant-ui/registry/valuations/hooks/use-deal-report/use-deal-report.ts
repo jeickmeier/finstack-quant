@@ -6,10 +6,13 @@ import {
 } from "@/hooks/shared/use-finstack/query";
 import type {
   DealSimulationRequest,
+  EquityMetricsRequest,
   PoolReportRequest,
 } from "@/workers/finstack-contract";
 export type {
   DealSimulationRequest,
+  EquityMetrics,
+  EquityMetricsRequest,
   PoolReport,
   PoolReportRequest,
   SimulationRun,
@@ -41,6 +44,36 @@ export function useSimulationFieldUnits(currency: string | null) {
       ready: currency !== null,
       missing: "Simulation units require a currency and ready worker",
       queryFn: (ready) => ready.call("simulationFieldUnits", currency!),
+    }),
+  );
+}
+/** Native equity metrics of the deal at a purchase price, or a structured failure, as for a deal with no equity tranche. Null disables the call. */
+export function useEquityMetrics(request: EquityMetricsRequest | null) {
+  return useWorkerQuery((worker) => {
+    const { snapshot, key } = requestSnapshot(request);
+    return workerQueryOptions({
+      client: worker.client,
+      queryKey: ["finstack", worker.session, "equityMetrics", key] as const,
+      ready: snapshot !== null,
+      missing: "Equity metrics require an explicit request and ready worker",
+      queryFn: (ready) => ready.call("equityMetrics", snapshot!),
+    });
+  });
+}
+/** Native units of an equity tranche's metrics for their currency. Null disables the call. */
+export function useEquityMetricsFieldUnits(currency: string | null) {
+  return useWorkerQuery((worker) =>
+    workerQueryOptions({
+      client: worker.client,
+      queryKey: [
+        "finstack",
+        worker.session,
+        "equityMetricsFieldUnits",
+        currency,
+      ] as const,
+      ready: currency !== null,
+      missing: "Equity metric units require a currency and ready worker",
+      queryFn: (ready) => ready.call("equityMetricsFieldUnits", currency!),
     }),
   );
 }
