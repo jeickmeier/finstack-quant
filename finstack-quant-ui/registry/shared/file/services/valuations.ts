@@ -25,6 +25,7 @@ export type ValuationsNative = {
       | "trancheSolveFieldUnits"
       | "scenarioTableFieldUnits"
       | "simulationFieldUnits"
+      | "equityMetricsFieldUnits"
       | "poolReport"
       | "poolReportFieldUnits"
     >;
@@ -167,6 +168,17 @@ export function createValuationsService(
         ),
       );
     },
+    equityMetrics(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          deal.equityMetrics(
+            request.marketJson,
+            request.asOf,
+            request.purchasePricePct,
+          ),
+        ),
+      );
+    },
     trancheMetrics(request) {
       return context.result(() =>
         withDeal(request.instrumentJson, (deal) =>
@@ -233,6 +245,8 @@ export function createValuationsService(
       context.result(() => instruments.scenarioTableFieldUnits(currency)),
     simulationFieldUnits: (currency) =>
       context.result(() => instruments.simulationFieldUnits(currency)),
+    equityMetricsFieldUnits: (currency) =>
+      context.result(() => instruments.equityMetricsFieldUnits(currency)),
     poolReportFieldUnits: (currency) =>
       context.result(() => instruments.poolReportFieldUnits(currency)),
     trancheSolveFieldUnits: () =>

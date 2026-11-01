@@ -128,6 +128,7 @@
     "statements_analytics.varianceBridge",
     "valuations.instruments.StructuredCredit",
     "valuations.instruments.calendarYearLadderByCurrency",
+    "valuations.instruments.equityMetricsFieldUnits",
     "valuations.instruments.instrumentCashflowsWithMarket",
     "valuations.instruments.listModelsGrouped",
     "valuations.instruments.metricMetadata",

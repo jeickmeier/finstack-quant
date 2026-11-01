@@ -1882,6 +1882,37 @@
       }
     },
     {
+      "id": "equity-tranche-card",
+      "route": "returned-report",
+      "convention": "Returned EquityMetrics in the units equityMetricsFieldUnits states: invested in the deal currency; irr an annual XIRR decimal on ACT/365F, or null when no rate solves, stated rather than drawn as zero; moic total distributions over invested; nav_pct distributions discounted on the deal's discount curve as a percent of current balance; cash_on_cash each distribution as an unannualized decimal share of invested. Rust chooses the equity tranche and returns zero for moic and cash_on_cash when nothing is invested; a returned zero is drawn as zero. A blank purchase price is omitted, so Rust's par default applies. Nothing is computed, rescaled or classified here.",
+      "api": {
+        "name": "StructuredCredit#equityMetrics",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StructuredCredit",
+        "member": "equityMetrics",
+        "inputs": [
+          {
+            "name": "marketJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "purchasePricePct",
+            "type": "number | null",
+            "optional": true
+          }
+        ],
+        "returns": "generated.valuations.EquityMetrics",
+        "declaration": "/**\n   * Equity-tranche return metrics (mirrors Rust `calculate_equity_metrics`).\n   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.\n   * @param asOf - ISO-8601 valuation date.\n   * @param purchasePricePct - Optional equity purchase price in percent of its current balance (`60` = 60%); omit to invest at par. Must be finite and non-negative.\n   * @returns `EquityMetrics` plain object: `invested`; `irr`, an annual XIRR (ACT/365F) decimal or `null` when no rate solves; `moic`, a multiple of invested; `nav_pct`, the distributions discounted on the deal's discount curve as a percent of current balance; and `cash_on_cash`, each distribution as an unannualized decimal share of invested. `equityMetricsFieldUnits` states the units.\n   * @throws Error - Throws with kind `not_found` if a curve is missing or the simulation records no equity tranche, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.\n   */\n  equityMetrics(\n    marketJson: JsonInput,\n    asOf: string,\n    purchasePricePct?: number | null\n  ): generated.valuations.EquityMetrics;",
+        "sha256": "1edf29e4f1e744b912ab8eb0e9bfed9aa9aa3a8c8ea060b2604b6773c09e6977"
+      }
+    },
+    {
       "id": "performance-report",
       "route": "returned-analytics",
       "deferred": "machine-readable-units",

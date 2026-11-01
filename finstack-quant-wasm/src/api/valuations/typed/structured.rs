@@ -803,9 +803,9 @@ impl JsStructuredCredit {
     /// Equity-tranche return metrics (mirrors Rust `calculate_equity_metrics`).
     /// @param market_json - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
     /// @param as_of - ISO-8601 valuation date.
-    /// @param purchase_price_pct - Optional equity purchase price in percent of its balance (`60` = 60%); omit to invest at the model net asset value.
-    /// @returns `EquityMetrics` plain object with IRR, MOIC, NAV in percent of balance and cash-on-cash yields.
-    /// @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
+    /// @param purchase_price_pct - Optional equity purchase price in percent of its current balance (`60` = 60%); omit to invest at par. Must be finite and non-negative.
+    /// @returns `EquityMetrics` plain object: `invested`; `irr`, an annual XIRR (ACT/365F) decimal or `null` when no rate solves; `moic`, a multiple of invested; `nav_pct`, the distributions discounted on the deal's discount curve as a percent of current balance; and `cash_on_cash`, each distribution as an unannualized decimal share of invested. `equityMetricsFieldUnits` states the units.
+    /// @throws Error - Throws with kind `not_found` if a curve is missing or the simulation records no equity tranche, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
     #[wasm_bindgen(js_name = equityMetrics)]
     pub fn equity_metrics(
         &self,

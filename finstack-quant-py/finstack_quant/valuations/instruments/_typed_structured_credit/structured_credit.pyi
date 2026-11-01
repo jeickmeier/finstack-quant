@@ -422,8 +422,8 @@ class StructuredCredit:
         Raises
         ------
         ValueError
-            If the deal has no residual class, fails pricing validation, or
-            ``as_of`` is invalid.
+            If the deal has no residual class, fails pricing validation, ``as_of``
+            is invalid, or ``purchase_price_pct`` is negative or not finite.
         """
         ...
 

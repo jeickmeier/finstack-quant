@@ -503,6 +503,19 @@ pub fn simulation_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
     ))
 }
 
+/// Units of the `EquityMetrics` fields, the one place a host reads them from.
+///
+/// The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV a percent of the
+/// equity's current balance and cash-on-cash a decimal share of the invested amount. Values are never rescaled.
+/// @param currency - ISO-4217 code of the result's `currency`, in any ASCII case; it names the unit of `invested`.
+/// @returns `EquityMetricsFieldUnits`: one `MetricFieldUnit` each for `invested`, `irr`, `moic`, `nav_pct` and `cash_on_cash`.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = equityMetricsFieldUnits)]
+pub fn equity_metrics_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::equity_metrics_field_units(currency))
+}
+
 /// Units of the `PoolReport` fields, the one place a host reads them from.
 ///
 /// `PoolStats` mixes a decimal coupon, a basis-point spread and a percent-point

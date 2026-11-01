@@ -254,6 +254,11 @@ pub(super) fn scenario_table_field_units() -> Result<Vec<Value>> {
     example(&crate::pricer::scenario_table_field_units(Currency::USD))
 }
 
+/// The units of a USD equity tranche's metrics.
+pub(super) fn equity_metrics_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::equity_metrics_field_units(Currency::USD))
+}
+
 /// The units of a USD simulation's charted series.
 pub(super) fn simulation_field_units() -> Result<Vec<Value>> {
     example(&crate::pricer::simulation_field_units(Currency::USD))

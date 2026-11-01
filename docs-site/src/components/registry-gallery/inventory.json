@@ -271,6 +271,12 @@
       "worker": "none"
     },
     {
+      "name": "equity-tranche-card",
+      "type": "registry:component",
+      "docs": "Present a native StructuredCredit.equityMetrics result beside a purchase price input. Rust measures the deal's first equity-seniority tranche: invested is its current balance times the price, par when the price is blank; irr is the annual XIRR (ACT/365F, decimal) of -invested on the valuation date against every later distribution, interest and principal; moic is total distributions over invested; nav_pct is those distributions discounted to the valuation date on the deal's discount curve, as a percent of current balance, and does not move with the price; cash_on_cash is each distribution as an unannualized decimal share of invested. Units come from native equityMetricsFieldUnits. A deal with no equity tranche shows Rust's error as returned. A null irr is stated as no rate solving and never drawn as zero: Rust returns it when nothing is invested or the tranche receives no distribution, while one that receives little still has an IRR near -1. A returned zero is drawn as zero, including the zero moic and cash-on-cash shares Rust returns when nothing is invested. Nothing is computed, rescaled or classified. No worker is required.",
+      "worker": "none"
+    },
+    {
       "name": "tranche-analytics",
       "type": "registry:component",
       "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. With onOasConfigChange, an OAS configuration disclosure edits the generated OasConfig contract, starting from its Rust example (OasConfig::default()), and hands complete JSON to the host on apply. With schedule, the native TrancheCashflows totals and the TrancheCashflows::to_table projection (one row per date; Rust joins and sums the per-kind flows) show as returned. Nothing is computed, rescaled or defaulted. No worker is required.",
@@ -279,7 +285,7 @@
     {
       "name": "pricing-workbench",
       "type": "registry:block",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, an equity tranche card over native equityMetrics, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "worker": "host"
     },
     {
@@ -1519,6 +1525,10 @@
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/deal-charts.json",
       "sha256": "f36a17a0dac69daa52a28615376fd5de5fa0b14f044afa51c0f13343bc555a27"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/scenario-table/equity-tranche.json",
+      "sha256": "eca7da39a6b2aa4a2b3731415941687635b439747732e33a1c376a367db19167"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",

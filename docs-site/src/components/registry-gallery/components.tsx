@@ -60,6 +60,7 @@ import { Example as Example75 } from "./examples/pool-report";
 import { Example as Example76 } from "./examples/waterfall-report";
 import { Example as Example77 } from "./examples/coverage-test-chart";
 import { Example as Example78 } from "./examples/credit-enhancement-chart";
+import { Example as Example79 } from "./examples/equity-tranche-card";
 import { Example as Example71 } from "./examples/option-calculator";
 import { Example as Example53 } from "./examples/csa-editor";
 import { Example as Example54 } from "./examples/margin-call-table";
@@ -139,6 +140,7 @@ const examples = {
   "waterfall-report": Example76,
   "coverage-test-chart": Example77,
   "credit-enhancement-chart": Example78,
+  "equity-tranche-card": Example79,
   "pool-report": Example75,
   "option-calculator": Example71,
   "csa-editor": Example53,

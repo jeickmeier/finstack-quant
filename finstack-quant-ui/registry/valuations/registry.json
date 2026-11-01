@@ -666,6 +666,41 @@
       }
     },
     {
+      "name": "equity-tranche-card",
+      "type": "registry:component",
+      "title": "Equity tranche card",
+      "description": "Displays a structured-credit deal's equity tranche: invested amount, IRR, MOIC, NAV and cash-on-cash, from Rust's equity metrics.",
+      "docs": "Present a native StructuredCredit.equityMetrics result beside a purchase price input. Rust measures the deal's first equity-seniority tranche: invested is its current balance times the price, par when the price is blank; irr is the annual XIRR (ACT/365F, decimal) of -invested on the valuation date against every later distribution, interest and principal; moic is total distributions over invested; nav_pct is those distributions discounted to the valuation date on the deal's discount curve, as a percent of current balance, and does not move with the price; cash_on_cash is each distribution as an unannualized decimal share of invested. Units come from native equityMetricsFieldUnits. A deal with no equity tranche shows Rust's error as returned. A null irr is stated as no rate solving and never drawn as zero: Rust returns it when nothing is invested or the tranche receives no distribution, while one that receives little still has an IRR near -1. A returned zero is drawn as zero, including the zero moic and cash-on-cash shares Rust returns when nothing is invested. Nothing is computed, rescaled or classified. No worker is required.",
+      "files": [
+        {
+          "path": "components/equity-tranche-card/equity-tranche-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/equity-tranche-card/equity-tranche-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/measure-value",
+        "@finstack/decimal-input"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8",
+        "finstack-quant-wasm@0.11.0"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "tranche-analytics",
       "type": "registry:component",
       "title": "Tranche analytics",
@@ -717,7 +752,7 @@
       "type": "registry:block",
       "title": "Pricing workbench",
       "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows, tranche analytics and scenarios.",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, an equity tranche card over native equityMetrics, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "files": [
         {
           "path": "blocks/pricing-workbench/pricing-workbench.tsx",
@@ -785,6 +820,11 @@
           "target": "components/finstack/valuations/blocks/pricing-workbench/enhancement-panel.tsx"
         },
         {
+          "path": "blocks/pricing-workbench/equity-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/equity-panel.tsx"
+        },
+        {
           "path": "blocks/pricing-workbench/tranche-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/tranche-panel.tsx"
@@ -839,6 +879,7 @@
         "@finstack/waterfall-report",
         "@finstack/coverage-test-chart",
         "@finstack/credit-enhancement-chart",
+        "@finstack/equity-tranche-card",
         "button",
         "label",
         "popover",

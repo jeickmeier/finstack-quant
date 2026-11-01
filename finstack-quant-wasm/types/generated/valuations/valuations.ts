@@ -19356,7 +19356,8 @@ export interface ThreeFactorPathData {
  */
 export interface EquityMetrics {
   /**
-   * Each distribution as a fraction of `invested`, by payment date.
+   * Each distribution as a decimal fraction of `invested`, by payment date and
+   * not annualized; the fractions sum to `moic`.
    */
   cash_on_cash: [string, number][];
   /**
@@ -19369,22 +19370,67 @@ export interface EquityMetrics {
   invested: number;
   /**
    * Annualized IRR of `−invested` on the valuation date against every
-   * projected distribution (XIRR); `None` when no rate solves.
+   * projected distribution (XIRR, ACT/365F), as a decimal; `None` when no rate
+   * solves, as when nothing is invested or no distribution is projected.
    */
   irr?: number | null;
   /**
-   * Multiple on invested capital: total distributions ÷ `invested`.
+   * Multiple on invested capital: total distributions ÷ `invested`, interest
+   * and principal together.
    */
   moic: number;
   /**
-   * Present value of the distributions on the deal's discount curve, as a
-   * percent of the equity's current balance.
+   * Present value at the valuation date of the distributions on the deal's
+   * discount curve, as a percent of the equity's current balance (`62.5` =
+   * 62.5%). It does not depend on the purchase price.
    */
   nav_pct: number;
   /**
    * Identifier of the equity tranche.
    */
   tranche_id: string;
+}
+/**
+ * The display units of an equity tranche's invested amount, IRR, MOIC, NAV and cash-on-cash.
+ */
+export interface EquityMetricsFieldUnits {
+  /**
+   * Unit of each `EquityMetrics::cash_on_cash` value.
+   */
+  cash_on_cash: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::invested`.
+   */
+  invested: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::irr`.
+   */
+  irr: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::moic`.
+   */
+  moic: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::nav_pct`.
+   */
+  nav_pct: MetricFieldUnit;
+}
+/**
+ * The display unit of one scalar field of a result struct.
+ */
+export interface MetricFieldUnit {
+  /**
+   * Wire name of the field.
+   */
+  field: string;
+  /**
+   * Unit text as the field documents it, such as `USD per bp` or `years`.
+   */
+  label: string;
+  /**
+   * Canonical Rust field the unit is documented on.
+   */
+  source: string;
 }
 /**
  * Projected cashflows of an asset-backed facility and its residual.
@@ -20166,23 +20212,6 @@ export interface MetricCoordinate {
    * decimal strike; `None` when the label carries no number.
    */
   value?: number | null;
-}
-/**
- * The display unit of one scalar field of a result struct.
- */
-export interface MetricFieldUnit {
-  /**
-   * Wire name of the field.
-   */
-  field: string;
-  /**
-   * Unit text as the field documents it, such as `USD per bp` or `years`.
-   */
-  label: string;
-  /**
-   * Canonical Rust field the unit is documented on.
-   */
-  source: string;
 }
 /**
  * Canonical per-key metric interpretation for host presentation.

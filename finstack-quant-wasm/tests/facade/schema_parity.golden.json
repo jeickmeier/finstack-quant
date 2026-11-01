@@ -3381,7 +3381,14 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics.schema.json",
             "type_name": "EquityMetrics",
             "kind": "output",
-            "bytes": 2285
+            "bytes": 2544
+          },
+          {
+            "path": "schemas/results/1/equity_metrics_field_units.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics_field_units.schema.json",
+            "type_name": "EquityMetricsFieldUnits",
+            "kind": "output",
+            "bytes": 2576
           },
           {
             "path": "schemas/results/1/facility_projection.schema.json",
@@ -5589,7 +5596,15 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics.schema.json",
             "type_name": "EquityMetrics",
             "kind": "output",
-            "bytes": 2285
+            "bytes": 2544
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/equity_metrics_field_units.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics_field_units.schema.json",
+            "type_name": "EquityMetricsFieldUnits",
+            "kind": "output",
+            "bytes": 2576
           },
           {
             "domain": "valuations",

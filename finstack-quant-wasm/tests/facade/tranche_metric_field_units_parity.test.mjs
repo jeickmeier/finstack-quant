@@ -83,3 +83,19 @@ test('simulationFieldUnits matches the records pinned for both hosts', () => {
     SIMULATION_PINNED
   );
 });
+
+const EQUITY_PINNED = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/fixtures/equity_metrics_field_units.json',
+      import.meta.url
+    )
+  )
+);
+
+test('equityMetricsFieldUnits matches the records pinned for both hosts', () => {
+  assert.deepEqual(
+    plain(facade.valuations.instruments.equityMetricsFieldUnits('EUR')),
+    EQUITY_PINNED
+  );
+});

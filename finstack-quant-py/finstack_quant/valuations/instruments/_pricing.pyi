@@ -501,6 +501,39 @@ def simulation_field_units(currency: str | Currency) -> dict[str, Any]:
     """
     ...
 
+def equity_metrics_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of the :class:`EquityMetrics` fields, the one place a host reads them from.
+
+    The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV
+    a percent of the equity's current balance and cash-on-cash a decimal share of the
+    invested amount. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        Currency of the result being labelled, an ISO-4217 code in any ASCII case or
+        a ``Currency``. It names the unit of ``invested``.
+
+    Returns
+    -------
+    dict[str, Any]
+        One record of ``field``, ``label`` and ``source`` each for ``invested``,
+        ``irr``, ``moic``, ``nav_pct`` and ``cash_on_cash``.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import equity_metrics_field_units
+    >>> equity_metrics_field_units("USD")["invested"]["label"]
+    'USD'
+    """
+    ...
+
 def pool_report_field_units(currency: str | Currency) -> dict[str, Any]:
     """
     Units of the :class:`PoolReport` fields, the one place a host reads them from.
