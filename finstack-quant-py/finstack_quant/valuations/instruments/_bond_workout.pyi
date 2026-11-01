@@ -226,9 +226,12 @@ class BondWorkoutRow:
     @property
     def i_spread(self) -> float | None:
         """
-        :attr:`yield_rate` less the swap par rate from the quote date to :attr:`date`.
+        :attr:`yield_rate` less the swap par rate from the quote date.
 
-        This is the convention of the ``i_spread`` metric.
+        This is the convention of the ``i_spread`` metric. The par rate runs to
+        :attr:`date` when the bond has an exit other than maturity, and to contractual
+        maturity when it has none, which differs from :attr:`date` if the final
+        payment rolls.
 
         Returns
         -------

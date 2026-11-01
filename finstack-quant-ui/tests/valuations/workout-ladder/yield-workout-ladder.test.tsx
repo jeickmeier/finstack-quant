@@ -95,12 +95,17 @@ it.each(Object.entries(cases))(
   budget(30000),
 );
 it.each(Object.entries(cases))(
-  "the row Rust marks in %s holds the ytw metric's yield",
+  "the row Rust marks in %s holds the ytw and i_spread metrics",
   (_name, entry) => {
     const marked = ladderOf(entry).rows.filter((row) => row.is_worst);
     expect(marked).toHaveLength(1);
     // A null metric is negative infinity through JSON: no finite yield either way.
     expect(marked[0].yield_rate ?? null).toBe(entry.ytw);
+    // The rolled bullet is the case whose par rate runs to contractual maturity, not
+    // the row's date. Where the metric rejects a quote-date workout the row has none.
+    expect(marked[0].i_spread ?? null).toBe(
+      typeof entry.iSpread === "number" ? entry.iSpread : null,
+    );
   },
 );
 it(
@@ -114,6 +119,19 @@ it(
   },
   budget(30000),
 );
+it("only a workout on the quote date has no i_spread metric", () => {
+  expect(
+    Object.entries(cases).flatMap(([name, entry]) =>
+      typeof entry.iSpread === "number" ? [] : [name],
+    ),
+  ).toEqual(["quoteDateCall"]);
+});
+it("the bullet case rolls, so its spread pins the contractual-maturity horizon", () => {
+  const bond = JSON.parse(cases.bullet.request.instrumentJson);
+  expect(cases.bullet.ladder.rows[0].date).not.toBe(
+    bond.instrument.spec.maturity,
+  );
+});
 it("marks only the row Rust marks, whatever the yields", () => {
   const native = ladderOf(cases.premium);
   // The lowest yield moved off the marked row: the mark must not follow it.

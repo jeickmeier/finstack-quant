@@ -1550,7 +1550,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/workout-ladder/cases.json",
-      "sha256": "e64993cb998a70d0d19dc30079f84f12976c3e19f3bfc9a437cafcb202dbe4d5"
+      "sha256": "dfcfa85972586a4906e5a46aa411ca77086bd0bc6a4e634e73d2cf0194e0a43f"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",

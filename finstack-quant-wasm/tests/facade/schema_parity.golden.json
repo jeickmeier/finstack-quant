@@ -3339,7 +3339,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/bond_workout_ladder.schema.json",
             "type_name": "BondWorkoutLadder",
             "kind": "output",
-            "bytes": 6754
+            "bytes": 6921
           },
           {
             "path": "schemas/results/1/borrowing_base_report.schema.json",
@@ -5562,7 +5562,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/bond_workout_ladder.schema.json",
             "type_name": "BondWorkoutLadder",
             "kind": "output",
-            "bytes": 6754
+            "bytes": 6921
           },
           {
             "domain": "valuations",

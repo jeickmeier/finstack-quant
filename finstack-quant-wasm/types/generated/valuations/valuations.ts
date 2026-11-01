@@ -17675,9 +17675,11 @@ export interface BondWorkoutRow {
    */
   date: DateWire;
   /**
-   * `yield_rate` less the swap par rate from the quote date to `date`, as a
-   * decimal, the convention of the `i_spread` metric. `None` when `yield_rate`
-   * is `None`.
+   * `yield_rate` less the swap par rate from the quote date, as a decimal, the
+   * convention of the `i_spread` metric. The par rate runs to `date` when the
+   * bond has an exit other than maturity, and to contractual maturity when it
+   * has none, which differs from `date` if the final payment rolls. `None` when
+   * `yield_rate` is `None`.
    */
   i_spread?: number | null;
   /**

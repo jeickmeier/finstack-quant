@@ -41,18 +41,28 @@ const stepDown = {
   ],
   puts: [],
 };
-/** The native ladder and the ytw metric of one bond, the value its worst row must hold. */
+/** The native ladder and the ytw and i_spread metrics of one bond, the values its worst row must hold. */
 function ladderCase(spec) {
   const instrumentJson = JSON.stringify(withSpec(spec));
   const bond = native.Bond.fromJson(instrumentJson);
+  const metric = (id) =>
+    native.priceInstrument(instrumentJson, marketJson, asOf, "default", [id])
+      .measures[id];
+  // The metric rejects a workout on the quote date, which has no par horizon.
+  const iSpread = () => {
+    try {
+      return metric("i_spread");
+    } catch (error) {
+      return { error: error.message };
+    }
+  };
   try {
     return {
       request: { instrumentJson, marketJson, asOf },
       ladder: native.bondWorkoutLadder(bond, marketJson, asOf),
       // JSON has no infinity: a null here is the metric's negative infinity.
-      ytw: native.priceInstrument(instrumentJson, marketJson, asOf, "default", [
-        "ytw",
-      ]).measures.ytw,
+      ytw: metric("ytw"),
+      iSpread: iSpread(),
     };
   } finally {
     bond.free();
