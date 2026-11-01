@@ -920,7 +920,7 @@ public = [
 # disable_stochastic and the effective_* policy getters; AssetPool carries the
 # collateral analytics (total/performing balance, wac, weighted_avg_spread_bp,
 # weighted_avg_maturity, diversity_score, assets_by_obligor/industry) and
-# calculate_pool_stats returns PoolStats. Rust-only: value_tranche*,
+# calculate_pool_stats returns PoolStats, pool_report returns PoolReport. Rust-only: value_tranche*,
 # AssetPool::add_bond. TrancheAccrualPeriod,
 # CoverageTestSpec, CoverageTrigger, DelinquencyModel, CardPortfolioSpec and the
 # CMBS PoolAsset sub-specs stay dict/JSON sub-fields. WASM stays JSON-first;
@@ -985,6 +985,8 @@ public = [
     "PikMode",
     "PikSchedule",
     "PoolAsset",
+    "PoolConcentrationEntry",
+    "PoolReport",
     "PoolStats",
     "PremiumLegSpec",
     "PrepaymentPenalty",
@@ -1015,6 +1017,7 @@ public = [
     "bond_from_cashflows_json",
     "calculate_pool_stats",
     "calculate_var",
+    "equity_metrics_field_units",
     "instrument_cashflows",
     "instrument_envelope_from_spec",
     "list_models",
@@ -1023,9 +1026,14 @@ public = [
     "list_standard_metrics_grouped",
     "metric_metadata",
     "metrics_for_instrument",
+    "pool_report",
+    "pool_report_field_units",
     "pretty_instrument_json",
     "price_driver_fields",
     "price_instrument",
+    "scenario_table_field_units",
+    "simulation_field_units",
+    "standard_deal_families",
     "tranche_breakeven_cdr",
     "tranche_discount_margin",
     "tranche_metric_field_units",
@@ -2179,7 +2187,7 @@ types = { CompositeExposureReport = "CompositeExposureReport", CompositeHistoryR
 
 [parity.modules."finstack_quant.valuations.instruments"]
 js = "valuations.instruments"
-types = { AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", InstrumentCashflowEnvelope = "InstrumentCashflowEnvelope", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcCalibrationSpec = "MertonMcCalibrationSpec", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PoolStats = "PoolStats", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SimulationRun = "SimulationRun", StandardDealParams = "StandardDealParams", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", VarResult = "VarResult", Waterfall = "Waterfall" }
+types = { AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", InstrumentCashflowEnvelope = "InstrumentCashflowEnvelope", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcCalibrationSpec = "MertonMcCalibrationSpec", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PoolConcentrationEntry = "PoolConcentrationEntry", PoolReport = "PoolReport", PoolStats = "PoolStats", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SimulationRun = "SimulationRun", StandardDealParams = "StandardDealParams", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", VarResult = "VarResult", Waterfall = "Waterfall" }
 
 [parity.modules."finstack_quant.valuations.market"]
 js = "valuations.market"
@@ -2225,6 +2233,7 @@ validateCapitalStructureSpecJson = "JSON wire validation through Rust CapitalStr
 valuationResultToJson = "twin of Python ValuationResult.to_json (WASM results are plain objects)"
 
 [parity.js."valuations.instruments".wasm_only]
+trancheCashflowsTable = "twin of Python TrancheCashflows.to_dataframe (WASM cashflows are a plain object, so Rust TrancheCashflows::to_table is a function taking it)"
 FxBarrierOption = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"
 FxDigitalOption = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"
 FxSpot = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"

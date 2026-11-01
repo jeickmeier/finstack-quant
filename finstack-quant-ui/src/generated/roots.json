@@ -15,6 +15,11 @@
     "schema": "schemas/scenario_grid.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
+    "source": "finstack-quant/valuations/schemas/common/1/standard_deal_params.schema.json",
+    "schema": "schemas/standard_deal_params.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
     "source": "finstack-quant/covenants/schemas/covenants/1/covenant_engine.schema.json",
     "schema": "schemas/covenant_engine.json"

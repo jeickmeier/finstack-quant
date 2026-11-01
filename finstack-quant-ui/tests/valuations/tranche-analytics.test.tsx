@@ -13,7 +13,12 @@ import type { OasResult, TrancheMetrics } from "finstack-quant-wasm";
 import fixture from "./scenario-table/tranche-analytics.json";
 import { budget } from "../shared/budget";
 import oasConfigSchema from "../../src/generated/schemas/oas_config.json";
-import { TrancheAnalytics } from "@/components/finstack/valuations/components/tranche-analytics/tranche-analytics";
+import {
+  TrancheAnalytics,
+  type TrancheScheduleValue,
+} from "@/components/finstack/valuations/components/tranche-analytics/tranche-analytics";
+import { formatRawMoney, groupDecimal } from "@/lib/finstack/format/format";
+import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { TranchePanel } from "@/components/finstack/valuations/blocks/pricing-workbench/tranche-panel";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
 
@@ -45,6 +50,17 @@ beforeEach(() => {
     try {
       const head = [deal, arg.trancheId, arg.marketJson, arg.asOf] as const;
       switch (method) {
+        case "trancheSchedule": {
+          const cashflows = deal.trancheCashflows(
+            arg.trancheId,
+            arg.marketJson,
+            arg.asOf,
+          );
+          return {
+            cashflows,
+            table: native.trancheCashflowsTable(cashflows),
+          };
+        }
         case "trancheMetrics":
           return native.trancheMetrics(
             ...head,
@@ -144,6 +160,79 @@ it("shows native TrancheMetrics fields in Rust order with their documented units
   expect(within(oas).queryByRole("button")).toBeNull();
 });
 
+it("shows one tranche's native cash flows by date and totals exactly as returned", () => {
+  const schedule = fixed.results.schedule!
+    .value as unknown as TrancheScheduleValue;
+  render(
+    <TrancheAnalytics
+      trancheId={fixed.trancheId}
+      price=""
+      metrics={{}}
+      metricUnits={{}}
+      solveUnits={{}}
+      breakevenCdr={{}}
+      discountMargin={{}}
+      oas={{}}
+      schedule={{ value: schedule }}
+    />,
+  );
+  const tile = within(
+    screen.getByRole("region", { name: "Cash flows by date" }),
+  );
+  const table = tile.getByRole("table", {
+    name: `${fixed.trancheId} cash flows by date, in USD`,
+  });
+  const rows = within(table).getAllByRole("row");
+  // A header row, then Rust's one row per date, in its order.
+  expect(rows).toHaveLength(schedule.table.row_count + 1);
+  const headers = within(rows[0]!)
+    .getAllByRole("columnheader")
+    .map((cell) => cell.textContent);
+  expect(headers).toEqual(schedule.table.columns.map((c) => labelFor(c.name)));
+  // Every row, every column, in Rust's order.
+  const shown = (value: string | number) =>
+    typeof value === "number" ? groupDecimal(String(value)) : value;
+  const columns = schedule.table.columns.map(
+    (column) => column.data.values as (string | number)[],
+  );
+  rows.slice(1).forEach((row, index) => {
+    expect(
+      [...row.querySelectorAll("th,td")].map((cell) => cell.textContent),
+    ).toEqual(columns.map((column) => shown(column[index]!)));
+  });
+  for (const field of [
+    "total_interest",
+    "total_principal",
+    "total_pik",
+    "total_deferred",
+    "total_writedown",
+    "final_balance",
+  ] as const)
+    expect(tile.getByText(labelFor(field)).nextSibling!.textContent).toBe(
+      formatRawMoney(schedule.cashflows[field]),
+    );
+});
+it("shows the schedule's own native error without hiding the other tiles", () => {
+  render(
+    <TrancheAnalytics
+      trancheId="A"
+      price=""
+      metrics={{ error: "metrics failed" }}
+      metricUnits={{}}
+      solveUnits={{}}
+      breakevenCdr={{}}
+      discountMargin={{}}
+      oas={{}}
+      schedule={{ error: "schedule failed" }}
+    />,
+  );
+  expect(
+    within(
+      screen.getByRole("region", { name: "Cash flows by date" }),
+    ).getByRole("alert").textContent,
+  ).toBe("schedule failed");
+  expect(screen.getByText("metrics failed")).toBeTruthy();
+});
 it("shows each tile's own native error without hiding the others", () => {
   render(
     <TrancheAnalytics

@@ -446,6 +446,15 @@ fn price_driver_fields() -> Vec<&'static str> {
     finstack_quant_valuations::instruments::pricing_overrides::MarketQuoteOverrides::price_driver_fields()
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "standard_deal_families")]
+#[pyfunction]
+#[pyo3(text_signature = "()")]
+fn standard_deal_families(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    let families = finstack_quant_valuations::instruments::fixed_income::structured_credit::standard_deal_families()
+        .map_err(core_to_py)?;
+    serde_to_py(py, &families)
+}
+
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "tranche_solve_field_units")]
 #[pyfunction]
 #[pyo3(text_signature = "()")]
@@ -467,6 +476,62 @@ fn tranche_metric_field_units<'py>(
     serde_to_py(
         py,
         &finstack_quant_valuations::pricer::tranche_metric_field_units(currency),
+    )
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "scenario_table_field_units")]
+#[pyfunction]
+#[pyo3(text_signature = "(currency)")]
+fn scenario_table_field_units<'py>(
+    py: Python<'py>,
+    currency: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let currency = crate::bindings::core::currency::extract_currency(currency)?;
+    serde_to_py(
+        py,
+        &finstack_quant_valuations::pricer::scenario_table_field_units(currency),
+    )
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "simulation_field_units")]
+#[pyfunction]
+#[pyo3(text_signature = "(currency)")]
+fn simulation_field_units<'py>(
+    py: Python<'py>,
+    currency: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let currency = crate::bindings::core::currency::extract_currency(currency)?;
+    serde_to_py(
+        py,
+        &finstack_quant_valuations::pricer::simulation_field_units(currency),
+    )
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "equity_metrics_field_units")]
+#[pyfunction]
+#[pyo3(text_signature = "(currency)")]
+fn equity_metrics_field_units<'py>(
+    py: Python<'py>,
+    currency: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let currency = crate::bindings::core::currency::extract_currency(currency)?;
+    serde_to_py(
+        py,
+        &finstack_quant_valuations::pricer::equity_metrics_field_units(currency),
+    )
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "pool_report_field_units")]
+#[pyfunction]
+#[pyo3(text_signature = "(currency)")]
+fn pool_report_field_units<'py>(
+    py: Python<'py>,
+    currency: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let currency = crate::bindings::core::currency::extract_currency(currency)?;
+    serde_to_py(
+        py,
+        &finstack_quant_valuations::pricer::pool_report_field_units(currency),
     )
 }
 
@@ -670,6 +735,11 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics_grouped, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(metric_metadata, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(price_driver_fields, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(pool_report_field_units, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(standard_deal_families, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(scenario_table_field_units, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(simulation_field_units, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(equity_metrics_field_units, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(tranche_metric_field_units, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(tranche_solve_field_units, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(metrics_for_instrument, m)?)?;
@@ -693,6 +763,11 @@ pub(crate) const EXPORTS: &[&str] = &[
     "metrics_for_instrument",
     "price_driver_fields",
     "price_instrument",
+    "pool_report_field_units",
+    "standard_deal_families",
+    "scenario_table_field_units",
+    "simulation_field_units",
+    "equity_metrics_field_units",
     "tranche_metric_field_units",
     "tranche_solve_field_units",
 ];

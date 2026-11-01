@@ -1,0 +1,32 @@
+{
+  "invested": {
+    "field": "invested",
+    "label": "EUR",
+    "source": "valuations::EquityMetrics::invested"
+  },
+  "irr": {
+    "field": "irr",
+    "label": "annual decimal, ACT/365F",
+    "source": "valuations::EquityMetrics::irr"
+  },
+  "moic": {
+    "field": "moic",
+    "label": "multiple of invested",
+    "source": "valuations::EquityMetrics::moic"
+  },
+  "nav_pct": {
+    "field": "nav_pct",
+    "label": "% of current balance",
+    "source": "valuations::EquityMetrics::nav_pct"
+  },
+  "cash_on_cash": {
+    "field": "cash_on_cash",
+    "label": "decimal share of invested",
+    "source": "valuations::EquityMetrics::cash_on_cash"
+  },
+  "purchase_price": {
+    "field": "purchase_price_pct",
+    "label": "% of current balance; omitted means par",
+    "source": "valuations::calculate_equity_metrics::purchase_price_pct"
+  }
+}

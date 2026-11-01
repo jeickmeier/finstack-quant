@@ -213,6 +213,7 @@ mod tests {
         for (field, cell) in cases {
             let table = ScenarioTable {
                 tranche_id: "A".to_string(),
+                currency: finstack_quant_core::currency::Currency::USD,
                 cells: vec![cell],
             };
             let err = ensure_scenario_table_finite(&table)

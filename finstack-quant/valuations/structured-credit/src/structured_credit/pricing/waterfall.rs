@@ -677,6 +677,7 @@ fn allocate_sequential(
             paid_amount: paid,
             shortfall,
             diverted,
+            is_principal: is_principal_payment(&recipient.calculation, tier.payment_type),
         });
 
         tier_total = tier_total.checked_add(paid)?;
@@ -826,6 +827,7 @@ fn allocate_pro_rata(
             paid_amount: paid,
             shortfall,
             diverted,
+            is_principal: is_principal_payment(&recipient.calculation, tier.payment_type),
         });
 
         tier_total = tier_total.checked_add(paid)?;

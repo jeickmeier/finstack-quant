@@ -244,6 +244,29 @@ test("liability-management-card exercise economics", async ({ page }) => {
     "liability-management-card-exercise.png",
   );
 });
+test("waterfall-report period detail", async ({ page }) => {
+  const item = await open(page, "waterfall-report", "light", "comfortable");
+  const report = item.getByRole("region", { name: "Waterfall report" });
+  await report.getByRole("button", { expanded: false }).first().click();
+  await expect(
+    report.getByRole("table", { name: "Payment records" }),
+  ).toBeVisible();
+  await expect(report).toHaveScreenshot("waterfall-report-period-detail.png");
+});
+test("coverage-test-chart a trigger with no ratio by date", async ({
+  page,
+}) => {
+  const item = await open(page, "coverage-test-chart", "light", "comfortable");
+  const report = item.getByRole("region", { name: "Coverage tests" });
+  await report.getByRole("combobox", { name: "Test" }).click();
+  await page.getByRole("option", { name: "OC_EQUITY_trigger" }).click();
+  await expect(
+    report.getByText(/^Recorded on 0 of \d+ dates\.$/),
+  ).toBeVisible();
+  await expect(
+    report.getByText("First breach 2026-07-01", { exact: false }),
+  ).toBeVisible();
+});
 test("merton-calculator model parameters", async ({ page }) => {
   const item = await open(page, "merton-calculator", "light", "comfortable");
   // The four item baselines stop inside the term structure, above this table.

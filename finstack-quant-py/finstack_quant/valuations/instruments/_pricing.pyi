@@ -431,6 +431,173 @@ def tranche_solve_field_units() -> dict[str, Any]:
     """
     ...
 
+def scenario_table_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of the :class:`ScenarioTable` cell fields, the one place a host reads them from.
+
+    Rates are decimals, the price is a clean percent of the tranche's current balance
+    and the writedown is in currency units. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        ``ScenarioTable.currency`` of the table being labelled, an ISO-4217 code
+        in any ASCII case or a ``Currency``. It names the unit of ``writedown``.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``axes``, one record of ``field``, ``label`` and ``source`` per swept
+        input (``cpr``, ``cdr``, ``severity``); and ``measures``, one such record
+        per reported measure (``price``, ``wal``, ``writedown``), each in struct
+        order.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import scenario_table_field_units
+    >>> units = scenario_table_field_units("USD")
+    >>> {row["field"]: row["label"] for row in units["measures"]}["wal"]
+    'years'
+    """
+    ...
+
+def simulation_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of a structured-credit simulation's charted series, the one place a host reads them from.
+
+    Coverage ratios, triggers and cushions are in times covered, credit enhancement
+    is a decimal share of the collateral and excess spread an annual decimal of the opening pool
+    balance. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        Deal currency of the simulation being labelled, an ISO-4217 code in any
+        ASCII case or a ``Currency``. It names the unit of ``diverted_cash``.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``coverage_tests``, one record of ``field``, ``label`` and ``source`` per
+        numeric coverage-test field (``ratio``, ``trigger_level``, ``cushion``) in
+        struct order; and one such record each for ``diverted_cash``,
+        ``credit_enhancement`` and ``excess_spread``.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import simulation_field_units
+    >>> simulation_field_units("USD")["diverted_cash"]["label"]
+    'USD'
+    """
+    ...
+
+def equity_metrics_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of the :class:`EquityMetrics` fields, the one place a host reads them from.
+
+    The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV
+    a percent of the equity's current balance and cash-on-cash a decimal share of the
+    invested amount. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        Currency of the result being labelled, an ISO-4217 code in any ASCII case or
+        a ``Currency``. It names the unit of ``invested``.
+
+    Returns
+    -------
+    dict[str, Any]
+        One record of ``field``, ``label`` and ``source`` each for ``invested``,
+        ``irr``, ``moic``, ``nav_pct`` and ``cash_on_cash``, and ``purchase_price``
+        for the ``purchase_price_pct`` argument of ``equity_metrics``: percent of
+        current balance, omitted means par.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import equity_metrics_field_units
+    >>> equity_metrics_field_units("USD")["invested"]["label"]
+    'USD'
+    """
+    ...
+
+def standard_deal_families() -> list[dict[str, Any]]:
+    """
+    Deal families :meth:`StructuredCredit.new_standard` accepts, the one place a host reads them from.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        One record per family in ``abs``, ``clo``, ``cmbs``, ``rmbs`` order:
+        ``deal_type``, the ``new_standard`` argument; ``profile_id``, the registry
+        profile supplying the family's frequency and credit assumptions; and
+        ``example``, complete ``StandardDealParams`` that ``new_standard`` accepts for
+        the family, with its id, tranche ids and ``pool.deal_type`` naming the family.
+
+    Raises
+    ------
+    ValueError
+        If an example cannot be constructed, which its fixed inputs do not trigger.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import standard_deal_families
+    >>> [(family["deal_type"], family["profile_id"]) for family in standard_deal_families()][0]
+    ('abs', 'abs_auto_standard')
+    """
+    ...
+
+def pool_report_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of the :class:`PoolReport` fields, the one place a host reads them from.
+
+    ``PoolStats`` mixes a decimal coupon, a basis-point spread and a
+    percent-point defaulted share. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        Base currency of the pool being labelled, an ISO-4217 code in any ASCII
+        case or a ``Currency``. It names the unit of ``total_balance``,
+        ``undrawn_commitment`` and each row's ``balance``.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``total_balance`` and ``warf``, each one record of ``field``, ``label``
+        and ``source``; ``stats``, one such record per ``PoolStats`` field in
+        struct order; and ``concentration``, one per numeric
+        ``PoolConcentrationEntry`` field in struct order.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import pool_report_field_units
+    >>> units = pool_report_field_units("USD")
+    >>> {row["field"]: row["label"] for row in units["stats"]}["weighted_avg_spread_bp"]
+    'bp'
+    """
+    ...
+
 class MetricPricingOverrides:
     """
     Metric-time pricing overrides merged into an instrument before pricing.

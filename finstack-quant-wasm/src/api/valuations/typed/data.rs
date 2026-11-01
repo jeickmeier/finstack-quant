@@ -18,7 +18,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::Cds
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AmortizationEvent;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CoverageRules, CoverageTestSpec, PenaltyStep, PoolAsset, PrepaymentPenalty, Tranche,
-    TrancheStructure, Waterfall,
+    TrancheCashflows, TrancheStructure, Waterfall,
 };
 use finstack_quant_valuations::instruments::{MertonMcConfig, PikSchedule};
 use wasm_bindgen::prelude::*;
@@ -346,20 +346,20 @@ pub fn asset_pool_performing_balance(pool: JsValue) -> Result<JsValue, JsValue> 
 
 /// Weighted-average coupon of the performing fixed-rate collateral (mirrors Rust `AssetPool::wac`).
 /// @param pool - `AssetPool` plain object or JSON string.
-/// @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `0` when no performing fixed-rate collateral exists.
+/// @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `undefined` when no performing fixed-rate collateral exists.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
 #[wasm_bindgen(js_name = assetPoolWac)]
-pub fn asset_pool_wac(pool: JsValue) -> Result<f64, JsValue> {
+pub fn asset_pool_wac(pool: JsValue) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     Ok(pool.wac())
 }
 
 /// Weighted-average spread of the performing collateral that carries an explicit spread (mirrors Rust `AssetPool::weighted_avg_spread_bp`).
 /// @param pool - `AssetPool` plain object or JSON string.
-/// @returns Balance-weighted spread in basis points; `0` when no performing asset carries a spread.
+/// @returns Balance-weighted spread in basis points; `undefined` when no performing asset carries a spread.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
 #[wasm_bindgen(js_name = assetPoolWeightedAvgSpreadBp)]
-pub fn asset_pool_weighted_avg_spread_bp(pool: JsValue) -> Result<f64, JsValue> {
+pub fn asset_pool_weighted_avg_spread_bp(pool: JsValue) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     Ok(pool.weighted_avg_spread_bp())
 }
@@ -367,10 +367,13 @@ pub fn asset_pool_weighted_avg_spread_bp(pool: JsValue) -> Result<f64, JsValue> 
 /// Balance-weighted average remaining maturity (mirrors Rust `AssetPool::weighted_avg_maturity`).
 /// @param pool - `AssetPool` plain object or JSON string.
 /// @param as_of - ISO-8601 date the remaining maturities are measured from.
-/// @returns Weighted average maturity in years (ACT/365F from `asOf`); `0` for an empty pool.
+/// @returns Weighted average maturity in years (ACT/365F from `asOf`); `undefined` when the pool balance is zero.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
 #[wasm_bindgen(js_name = assetPoolWeightedAvgMaturity)]
-pub fn asset_pool_weighted_avg_maturity(pool: JsValue, as_of: JsValue) -> Result<f64, JsValue> {
+pub fn asset_pool_weighted_avg_maturity(
+    pool: JsValue,
+    as_of: JsValue,
+) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     pool.weighted_avg_maturity(js_date(&as_of, "asOf")?)
         .map_err(to_js_err)
@@ -378,10 +381,10 @@ pub fn asset_pool_weighted_avg_maturity(pool: JsValue, as_of: JsValue) -> Result
 
 /// Moody's diversity score of the pool (mirrors Rust `AssetPool::diversity_score`).
 /// @param pool - `AssetPool` plain object or JSON string.
-/// @returns Diversity score from the obligor and industry concentrations; `0` when the pool balance cannot be computed.
+/// @returns Diversity score over the assets that name an obligor; `undefined` when none does or the pool balance cannot be summed.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
 #[wasm_bindgen(js_name = assetPoolDiversityScore)]
-pub fn asset_pool_diversity_score(pool: JsValue) -> Result<f64, JsValue> {
+pub fn asset_pool_diversity_score(pool: JsValue) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     Ok(pool.diversity_score())
 }
@@ -409,6 +412,37 @@ pub fn asset_pool_assets_by_obligor(
 pub fn asset_pool_assets_by_industry(pool: JsValue, industry: JsValue) -> Result<JsValue, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(&pool.assets_by_industry(&js_string(&industry, "industry")?))
+}
+
+/// One row per payment date of a tranche's flows (mirrors Rust `TrancheCashflows::to_table`).
+///
+/// Python reaches the same table through `TrancheCashflows.to_dataframe`.
+/// @param cashflows - `TrancheCashflows` plain object or JSON string, as `StructuredCredit.trancheCashflows` returns it.
+/// @returns `TableEnvelope` with a `date` column in ascending order and float `cashflow`, `interest`, `principal`, `pik`, `deferred` and `writedown` columns in the flows' one currency, which the table does not state (read `total_interest.currency`). Flows on one date are summed per kind; a kind with no flow on a date is zero; the columns remain when there are no rows.
+/// @throws Error - Throws with kind `validation` if `cashflows` does not match the `TrancheCashflows` schema or mixes currencies.
+#[wasm_bindgen(js_name = trancheCashflowsTable)]
+pub fn tranche_cashflows_table(cashflows: JsValue) -> Result<JsValue, JsValue> {
+    let cashflows: TrancheCashflows = from_js_json(&cashflows, "cashflows")?;
+    to_js_value(&cashflows.to_table().map_err(to_js_err)?)
+}
+
+/// Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).
+///
+/// Each concentration table covers every asset row, defaulted assets included in balances and denominator, so its shares sum to 100%. Assets with no value on a dimension form one row with a null key. Rows are ordered by balance descending, then key ascending with the null key first. Representative lines and instrument collateral are normalized to asset rows first and land in the null-key rows.
+/// @param pool - `AssetPool` plain object or JSON string, in any of its three representations.
+/// @param as_of - ISO-8601 date the remaining maturities are measured from. It also stands in for the closing date when a pool is normalized: it ages representative lines and counts the delayed draws already funded on instrument collateral.
+/// @returns `PoolReport` plain object: `total_balance` (the denominator of every share), `stats` (`PoolStats` of the same rows), `warf` (Moody's rating factor weighted by balance over the performing rows, unrated assets at the `NR` factor) and `by_obligor`, `by_industry`, `by_rating`, each a list of `PoolConcentrationEntry` with `balance_pct` in percent points. An empty pool reports zero balances and empty tables. `poolReportFieldUnits` states every unit.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, the pool cannot be normalized, an asset is not in the pool's base currency, or a rating has no Moody's factor.
+#[wasm_bindgen(js_name = poolReport)]
+pub fn pool_report(pool: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
+    to_js_value(
+        &finstack_quant_valuations::instruments::fixed_income::structured_credit::pool_report(
+            &pool,
+            js_date(&as_of, "asOf")?,
+        )
+        .map_err(to_js_err)?,
+    )
 }
 
 /// Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).

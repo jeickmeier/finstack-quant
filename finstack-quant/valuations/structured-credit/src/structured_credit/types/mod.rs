@@ -20,6 +20,7 @@ pub(crate) mod enums;
 pub(crate) mod hedges;
 pub(crate) mod npl;
 pub(crate) mod pool;
+mod pool_report;
 /// SoA layout for pool assets.
 pub(crate) mod pool_state;
 pub(crate) mod results;
@@ -28,7 +29,7 @@ pub(crate) mod tranches;
 pub(crate) mod waterfall;
 
 mod constructors;
-pub use constructors::StandardDealParams;
+pub use constructors::{standard_deal_families, StandardDealFamily, StandardDealParams};
 mod instrument;
 mod pricing_methods;
 mod resolved;
@@ -59,21 +60,22 @@ pub use pool::{
     calculate_pool_stats, PoolAsset, PoolStats, ReinvestmentAssumptions, ReinvestmentCriteria,
     ReinvestmentPeriod, RepLine,
 };
+pub use pool_report::{pool_report, PoolConcentrationEntry, PoolReport};
 pub(crate) use pool_state::PoolState;
 
 pub use tranches::{CoverageTrigger, Tranche, TrancheBuilder, TrancheStructure};
 
 pub use setup::{DealFees, IncentiveFeeSpec};
 
-pub(crate) use waterfall::DiversionRecord;
 pub use waterfall::{
     AfcSpec, AllocationMode, CccBucketRule, ControlledAccumulationSpec, CoveragePlacement,
     CoverageRules, CoverageTestAction, CoverageTestSpec, CoverageTestType, DefaultedValuation,
-    DiscountObligationRule, EarlyAmortizationSpec, EquityHistory, ExcessSpreadSpec, FundingSource,
-    ManagementFeeType, PaymentCalculation, PaymentRecord, PaymentType, Recipient, RecipientType,
-    ReserveAccountSpec, ReserveTarget, RoundingConvention, ShiftMode, ShiftingInterestSpec,
-    ShiftingInterestStep, StepDownSpec, StepDownTrigger, TargetOcSpec, TemplateFees, Waterfall,
-    WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier,
+    DiscountObligationRule, DiversionRecord, EarlyAmortizationSpec, EquityHistory,
+    ExcessSpreadSpec, FundingSource, ManagementFeeType, PaymentCalculation, PaymentRecord,
+    PaymentType, Recipient, RecipientType, ReserveAccountSpec, ReserveTarget, RoundingConvention,
+    ShiftMode, ShiftingInterestSpec, ShiftingInterestStep, StepDownSpec, StepDownTrigger,
+    TargetOcSpec, TemplateFees, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
+    WaterfallTier,
 };
 
 pub(crate) use results::DealAccruals;

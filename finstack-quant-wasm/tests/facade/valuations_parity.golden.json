@@ -2477,6 +2477,47 @@
         "currency": "USD"
       }
     },
+    "tranche_cashflows_table": {
+      "date": [
+        "2024-04-01",
+        "2024-07-01",
+        "2024-10-01",
+        "2025-01-02",
+        "2025-04-01",
+        "2025-07-01",
+        "2025-10-01",
+        "2026-01-02",
+        "2026-04-01",
+        "2026-07-01",
+        "2026-10-01",
+        "2027-01-04",
+        "2027-04-01",
+        "2027-07-01",
+        "2027-10-01",
+        "2028-01-03"
+      ],
+      "cashflow": [
+        3344861.924852584, 3232238.990646198, 3130722.423672825, 3024615.378451763,
+        3109381.8851590184, 3008235.5690733003, 2909751.1173538133, 2807897.8501749686,
+        2697902.376598185, 2608196.0764093376, 2520837.540591506, 2431002.9589397633,
+        2334977.4500475316, 2255361.2438797224, 2177815.765887149, 27005140.74494716
+      ],
+      "interest": [
+        758333.333333333, 725642.485857187, 701587.845991617, 670548.90416569, 626545.923146556,
+        602127.256661638, 577999.322376615, 548204.7161074615, 508041.058103195, 486008.5448622527,
+        464232.4574216178, 437953.6146922244, 403519.7671349516, 383591.8410551944,
+        363890.0825313093, 340712.143243985
+      ],
+      "principal": [
+        2586528.591519251, 2506596.504789011, 2429134.577681208, 2354066.474286073,
+        2482835.962012462, 2406108.312411662, 2331751.794977198, 2259693.134067507,
+        2189861.31849499, 2122187.531547085, 2056605.083169888, 1993049.344247539, 1931457.68291258,
+        1871769.402824528, 1813925.68335584, 26664428.60170318
+      ],
+      "pik": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+      "deferred": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+      "writedown": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    },
     "equity_metrics": {
       "tranche_id": "E",
       "currency": "USD",
@@ -2513,7 +2554,7 @@
           },
           "pool_factor": 0.9690967704774951,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.000000000001,
           "interest_collections": {
             "amount": "2017128.3014637180",
@@ -2568,6 +2609,174 @@
               "cushion": 0.4616287230593541,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "4603656.8929829690",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "758333.333333333",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "2586528.5915192510",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "727961.634797052",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "758333.333333333",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "758333.333333333",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "60000000",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "2586528.5915192510",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "57413471.4084807490",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "727961.634797052",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "727961.634797052",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.40755688020514313
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09799027226754423
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.005198597044988744
+            }
           ]
         },
         {
@@ -2578,7 +2787,7 @@
           },
           "pool_factor": 0.939148550549911,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.000000000002,
           "interest_collections": {
             "amount": "1954792.5225872450",
@@ -2633,6 +2842,174 @@
               "cushion": 0.48633348801408616,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "4461389.0273762560",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "725642.485857187",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "2506596.5047890110",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "698316.703396725",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "725642.485857187",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "725642.485857187",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "57413471.4084808",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "2506596.5047890110",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "54906874.9036917890",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "698316.703396725",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "698316.703396725",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.41535473944413315
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09591645694416295
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.010562970555827118
+            }
           ]
         },
         {
@@ -2643,7 +3020,7 @@
           },
           "pool_factor": 0.9101258273365401,
           "wac": 0.08000000000000002,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.000000000001,
           "interest_collections": {
             "amount": "1915200.5175224470",
@@ -2698,6 +3075,174 @@
               "cushion": 0.5124955757035035,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "4344335.0952036550",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "701587.845991617",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "2429134.5776812080",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "676946.004864163",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "701587.845991617",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "701587.845991617",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "54906874.9036917",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "2429134.5776812080",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "52477740.3260104920",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "676946.004864163",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "676946.004864163",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.42340126222343016
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09377651036033643
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.016098406927361506
+            }
           ]
         },
         {
@@ -2708,7 +3253,7 @@
           },
           "pool_factor": 0.881999999999999,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
             "amount": "1856014.6363478310",
@@ -2763,6 +3308,174 @@
               "cushion": 0.5402337724079056,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "4210081.1106339040",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "670548.90416569",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "2354066.4742860730",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "648799.065515474",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "670548.90416569",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "670548.90416569",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.00000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "52477740.3260105",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "2354066.4742860730",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "50123673.8517244270",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "648799.065515474",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "648799.065515474",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.00000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.43170437809836143
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09156832367659234
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.02181036113066403
+            }
           ]
         },
         {
@@ -2773,7 +3486,7 @@
           },
           "pool_factor": 0.85474335156115,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3649.9999999999995,
           "interest_collections": {
             "amount": "1759556.5337383490",
@@ -2828,6 +3541,174 @@
               "cushion": 0.5696799685392377,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "4242392.49575081140",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "626545.923146556",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "525000",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "2482835.96201246240",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "608010.610591793",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "626545.923146556",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "626545.923146556",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "525000",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "525000",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "50123673.8517245",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "2482835.96201246240",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "47640837.88971203760",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "608010.610591793",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "608010.610591793",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "201517.74429248540",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.4426299098706276
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09164736118854229
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.025346821705486113
+            }
           ]
         },
         {
@@ -2838,7 +3719,7 @@
           },
           "pool_factor": 0.828329021585021,
           "wac": 0.08000000000000002,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.000000000002,
           "interest_collections": {
             "amount": "1724127.0049219480",
@@ -2893,6 +3774,174 @@
               "cushion": 0.6043691186486932,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "4130235.31733361030",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "602127.256661638",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "2406108.31241166230",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "591166.414926977",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "602127.256661638",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "602127.256661638",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "47640837.889712",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "2406108.31241166230",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "45234729.57730033770",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "591166.414926977",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "591166.414926977",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "195290.19518775730",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.4539038425728107
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09172891910345644
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.028996055386328278
+            }
           ]
         },
         {
@@ -2903,7 +3952,7 @@
           },
           "pool_factor": 0.8027309797108271,
           "wac": 0.07999999999999999,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0000000000005,
           "interest_collections": {
             "amount": "1689206.8564547960",
@@ -2958,6 +4007,174 @@
               "cushion": 0.6416195840417855,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "4020958.65143199430",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "577999.322376615",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "2331751.79497719830",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "574540.867411514",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "577999.322376615",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "577999.322376615",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "45234729.5773003",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "2331751.79497719830",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "42902977.78232310170",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "574540.867411514",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "574540.867411514",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "189255.09746237530",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.46553728625524887
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09181307779369062
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.03276165836016212
+            }
           ]
         },
         {
@@ -2968,7 +4185,7 @@
           },
           "pool_factor": 0.777923999999999,
           "wac": 0.08000000000000002,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
             "amount": "1637004.9092587850",
@@ -3023,6 +4240,174 @@
               "cushion": 0.681705406989686,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "3896698.04332629150",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "548204.716107462",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "2259693.13406750650",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "552133.526484656",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "548204.716107462",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "548204.716107462",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "42902977.78232314",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "2259693.13406750650",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "40643284.64825563350",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "552133.526484656",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "552133.526484656",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "183406.50374719150",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.47754170525326783
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09189992019457266
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.036647341491659075
+            }
           ]
         },
         {
@@ -3033,7 +4418,7 @@
           },
           "pool_factor": 0.7538836360769341,
           "wac": 0.07999999999999999,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
             "amount": "1551928.8627572220",
@@ -3088,6 +4473,174 @@
               "cushion": 0.7249409730883949,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "3741790.18125221190",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "508041.058103195",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "525000",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "2189861.31849498990",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "518887.804654027",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "508041.058103195",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "508041.058103195",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "525000",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "525000",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "40643284.64825563",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "2189861.31849498990",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "38453423.32976064010",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "518887.804654027",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "518887.804654027",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "177738.65046597190",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.48992892948486205
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09198953188612587
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.04065693398011953
+            }
           ]
         },
         {
@@ -3098,7 +4651,7 @@
           },
           "pool_factor": 0.730586197037988,
           "wac": 0.07999999999999999,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
             "amount": "1520680.0183411570",
@@ -3153,6 +4706,174 @@
               "cushion": 0.7716887242246189,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "3642867.54988824170",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "486008.544862253",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "2122187.53154708470",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "503838.140145571",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "486008.544862253",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "486008.544862253",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "38453423.32976064",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "2122187.53154708470",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "36331235.79821355530",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "503838.140145571",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "503838.140145571",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "172245.95215560170",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5027111661086521
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09208200117741128
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.04479438713300233
+            }
           ]
         },
         {
@@ -3163,7 +4884,7 @@
           },
           "pool_factor": 0.708008724104949,
           "wac": 0.08000000000000002,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0000000000005,
           "interest_collections": {
             "amount": "1489880.4473931290",
@@ -3218,6 +4939,174 @@
               "cushion": 0.8223687115959104,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "3546485.53056301690",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "464232.457421618",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "2056605.08316988790",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "488981.323304844",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "464232.457421618",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "464232.457421618",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "36331235.79821356",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "2056605.08316988790",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "34274630.71504367210",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "488981.323304844",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "488981.323304844",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "166922.99596181490",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5159010115535936
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09217741919354991
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.049063778259797984
+            }
           ]
         },
         {
@@ -3228,7 +5117,7 @@
           },
           "pool_factor": 0.686128967999998,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3649.9999999999995,
           "interest_collections": {
             "amount": "1443838.3299662480",
@@ -3283,6 +5172,174 @@
               "cushion": 0.8774705221248718,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "3436887.67421378680",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "437953.6146922246",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "1993049.34424753880",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "469218.048607356",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "437953.6146922246",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "437953.6146922246",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.0000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "34274630.71504366",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "1993049.34424753880",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "32281581.37079612120",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "469218.048607356",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "469218.048607356",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000004",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "161764.53630502280",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5295114639322993
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.0922758799655241
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.05346931469006766
+            }
           ]
         },
         {
@@ -3293,7 +5350,7 @@
           },
           "pool_factor": 0.664925367019855,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3649.999999999999,
           "interest_collections": {
             "amount": "1368801.2569518690",
@@ -3348,6 +5405,174 @@
               "cushion": 0.9375682959109628,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "3300258.93986444950",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "403519.7671349516",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "525000",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "1931457.68291258010",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "440281.4898169178",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "403519.7671349516",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "403519.7671349516",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.0000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "525000",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "525000",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "32281581.37079613",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "1931457.68291258010",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "30350123.68788354990",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "440281.4898169178",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "440281.4898169178",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.0000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "156765.48971098710",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5435559358502068
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09237748052284106
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.058015337919614225
+            }
           ]
         },
         {
@@ -3358,7 +5583,7 @@
           },
           "pool_factor": 0.644377025787505,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
             "amount": "1341239.7761768990",
@@ -3413,6 +5638,174 @@
               "cushion": 1.0033398115520973,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "3213009.17900142660",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "383591.8410551948",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "1871769.40282452760",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "426814.6017883712",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "383591.8410551948",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "383591.8410551948",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.0000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "530833.333333333",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "30350123.68788355",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "1871769.40282452760",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "28478354.28505902240",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "426814.6017883712",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "426814.6017883712",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.0000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "151920.92980124060",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5580482676232118
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09248232098915149
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.06270632788886858
+            }
           ]
         },
         {
@@ -3423,7 +5816,7 @@
           },
           "pool_factor": 0.6244636946605651,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3649.9999999999995,
           "interest_collections": {
             "amount": "1314074.5546007390",
@@ -3478,6 +5871,174 @@
               "cushion": 1.0755909856474155,
               "passing": true
             }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "3128000.23795657860",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "363890.0825313096",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "1813925.68335583970",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "equity",
+                {
+                  "amount": "413517.8054027623",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "363890.0825313096",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "363890.0825313096",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.0000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "28478354.28505902",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "1813925.68335583970",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "26664428.60170318030",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              },
+              {
+                "tier_id": "equity",
+                "recipient_id": "equity_distribution",
+                "priority": 5,
+                "recipient": "equity",
+                "requested_amount": {
+                  "amount": "413517.8054027623",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "413517.8054027623",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.0000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "0.0000000000",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "-0.0000000001",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "147226.08243832060",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5730027409167966
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09259050468091931
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.06754690739770638
+            }
           ]
         },
         {
@@ -3488,7 +6049,7 @@
           },
           "pool_factor": 0.605165749775998,
           "wac": 0.07999999999999999,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3649.999999999999,
           "interest_collections": {
             "amount": "1273465.4070302290",
@@ -3542,6 +6103,199 @@
               "trigger_level": 1.2,
               "cushion": 1.1552876672960315,
               "passing": true
+            }
+          ],
+          "waterfall": {
+            "total_available": {
+              "amount": "2888658.6076355270",
+              "currency": "USD"
+            },
+            "tier_allocations": [
+              [
+                "A_interest",
+                {
+                  "amount": "340712.143243985",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "A_coverage",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "B_interest",
+                {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "principal",
+                {
+                  "amount": "1615193.2006052980",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "payment_records": [
+              {
+                "tier_id": "A_interest",
+                "recipient_id": "A_interest",
+                "priority": 1,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "340712.143243985",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "340712.143243985",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "B_interest",
+                "recipient_id": "B_interest",
+                "priority": 3,
+                "recipient": {
+                  "tranche": "B"
+                },
+                "requested_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "536666.666666667",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "0.000000000",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": false
+              },
+              {
+                "tier_id": "principal",
+                "recipient_id": "A_principal",
+                "priority": 4,
+                "recipient": {
+                  "tranche": "A"
+                },
+                "requested_amount": {
+                  "amount": "26664428.60170318",
+                  "currency": "USD"
+                },
+                "paid_amount": {
+                  "amount": "1615193.2006052980",
+                  "currency": "USD"
+                },
+                "shortfall": {
+                  "amount": "25049235.4010978820",
+                  "currency": "USD"
+                },
+                "diverted": false,
+                "is_principal": true
+              }
+            ],
+            "diverted_amounts": [],
+            "diverted_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "had_diversions": false,
+            "remaining_interest": {
+              "amount": "396086.5971195770",
+              "currency": "USD"
+            },
+            "remaining_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_used_for_interest": {
+              "amount": "0.000000000",
+              "currency": "USD"
+            },
+            "recovery_proceeds": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "non_waterfall_payments": [
+            {
+              "payment_date": "2028-01-03",
+              "tranche_id": "A",
+              "source": "redemption",
+              "interest": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "principal": {
+                "amount": "25049235.40109788",
+                "currency": "USD"
+              },
+              "incentive_fee": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            {
+              "payment_date": "2028-01-03",
+              "tranche_id": "B",
+              "source": "redemption",
+              "interest": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "principal": {
+                "amount": "30000000",
+                "currency": "USD"
+              },
+              "incentive_fee": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            {
+              "payment_date": "2028-01-03",
+              "tranche_id": "E",
+              "source": "redemption",
+              "interest": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "principal": {
+                "amount": "5928892.08672744",
+                "currency": "USD"
+              },
+              "incentive_fee": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            }
+          ],
+          "credit_enhancement": [
+            {
+              "tranche_id": "A",
+              "credit_enhancement": 0.5860764524368762
+            },
+            {
+              "tranche_id": "B",
+              "credit_enhancement": 0.09034449782601967
+            },
+            {
+              "tranche_id": "E",
+              "credit_enhancement": -0.07489948704426586
             }
           ]
         }
@@ -3678,7 +6432,13 @@
         "currency": "USD"
       },
       "early_amortization_date": null,
-      "tranche_draws": []
+      "tranche_draws": [],
+      "first_breaches": [
+        {
+          "test_id": "OC_A",
+          "first_breach": null
+        }
+      ]
     },
     "create_waterfall": {
       "tiers": [
@@ -3845,22 +6605,614 @@
         "currency": "USD"
       },
       "wac": 0.08,
-      "weighted_avg_spread_bp": 0.0,
+      "weighted_avg_spread_bp": null,
       "weighted_avg_maturity": 8.005479452054795,
-      "diversity_score": 0.0,
+      "diversity_score": null,
       "assets_by_obligor": [],
       "assets_by_industry": [],
       "pool_stats": {
         "wac": 0.08,
-        "weighted_avg_spread_bp": 0.0,
+        "weighted_avg_spread_bp": null,
         "weighted_avg_maturity": 8.005479452054795,
-        "diversity_score": 0.0,
+        "diversity_score": null,
         "num_obligors": 0,
         "num_industries": 0,
         "defaulted_balance_pct": -0.0,
         "undrawn_commitment": -0.0
       }
-    }
+    },
+    "pool_report": {
+      "pool": "{\"id\": \"P\", \"deal_type\": \"clo\", \"currency\": \"USD\", \"assets\": [{\"id\": \"A\", \"asset_type\": {\"type\": \"high_yield_bond\"}, \"balance\": {\"amount\": \"300\", \"currency\": \"USD\"}, \"rate\": 0.08, \"spread_bp\": null, \"forward_curve_id\": null, \"maturity\": \"2032-01-01\", \"rating\": \"BB\", \"industry\": \"Tech\", \"obligor_id\": \"X\", \"defaulted\": false, \"recovery_amount\": null, \"default_date\": null, \"purchase_price\": null, \"acquisition_date\": null, \"origination_date\": null, \"day_count\": \"act_360\", \"smm_override\": null, \"mdr_override\": null, \"recovery_rate\": null, \"contractual_payment\": null}, {\"id\": \"B\", \"asset_type\": {\"type\": \"high_yield_bond\"}, \"balance\": {\"amount\": \"300\", \"currency\": \"USD\"}, \"rate\": 0.08, \"spread_bp\": null, \"forward_curve_id\": null, \"maturity\": \"2032-01-01\", \"rating\": \"B\", \"industry\": \"Tech\", \"obligor_id\": \"Y\", \"defaulted\": false, \"recovery_amount\": null, \"default_date\": null, \"purchase_price\": null, \"acquisition_date\": null, \"origination_date\": null, \"day_count\": \"act_360\", \"smm_override\": null, \"mdr_override\": null, \"recovery_rate\": null, \"contractual_payment\": null}, {\"id\": \"C\", \"asset_type\": {\"type\": \"high_yield_bond\"}, \"balance\": {\"amount\": \"100\", \"currency\": \"USD\"}, \"rate\": 0.08, \"spread_bp\": null, \"forward_curve_id\": null, \"maturity\": \"2032-01-01\", \"rating\": \"BB+\", \"industry\": \"Retail\", \"obligor_id\": \"X\", \"defaulted\": false, \"recovery_amount\": null, \"default_date\": null, \"purchase_price\": null, \"acquisition_date\": null, \"origination_date\": null, \"day_count\": \"act_360\", \"smm_override\": null, \"mdr_override\": null, \"recovery_rate\": null, \"contractual_payment\": null}, {\"id\": \"D\", \"asset_type\": {\"type\": \"high_yield_bond\"}, \"balance\": {\"amount\": \"200\", \"currency\": \"USD\"}, \"rate\": 0.08, \"spread_bp\": null, \"forward_curve_id\": null, \"maturity\": \"2032-01-01\", \"rating\": \"CCC\", \"industry\": \"Retail\", \"obligor_id\": \"Z\", \"defaulted\": true, \"recovery_amount\": null, \"default_date\": null, \"purchase_price\": null, \"acquisition_date\": null, \"origination_date\": null, \"day_count\": \"act_360\", \"smm_override\": null, \"mdr_override\": null, \"recovery_rate\": null, \"contractual_payment\": null}, {\"id\": \"E\", \"asset_type\": {\"type\": \"high_yield_bond\"}, \"balance\": {\"amount\": \"100\", \"currency\": \"USD\"}, \"rate\": 0.08, \"spread_bp\": null, \"forward_curve_id\": null, \"maturity\": \"2032-01-01\", \"rating\": null, \"industry\": null, \"obligor_id\": null, \"defaulted\": false, \"recovery_amount\": null, \"default_date\": null, \"purchase_price\": null, \"acquisition_date\": null, \"origination_date\": null, \"day_count\": \"act_360\", \"smm_override\": null, \"mdr_override\": null, \"recovery_rate\": null, \"contractual_payment\": null}], \"cumulative_defaults\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"cumulative_recoveries\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"cumulative_prepayments\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"cumulative_scheduled_amortization\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"reinvestment_period\": null, \"collection_account\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"reserve_account\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"excess_spread_account\": {\"amount\": \"0\", \"currency\": \"USD\"}, \"rep_lines\": null}",
+      "report": {
+        "total_balance": {
+          "amount": "1000",
+          "currency": "USD"
+        },
+        "stats": {
+          "wac": 0.08,
+          "weighted_avg_spread_bp": null,
+          "weighted_avg_maturity": 8.005479452054796,
+          "diversity_score": 2.793103448275862,
+          "num_obligors": 3,
+          "num_industries": 2,
+          "defaulted_balance_pct": 20.0,
+          "undrawn_commitment": -0.0
+        },
+        "warf": 2100.0,
+        "by_obligor": [
+          {
+            "key": "X",
+            "balance": {
+              "amount": "400",
+              "currency": "USD"
+            },
+            "balance_pct": 40.0,
+            "asset_count": 2
+          },
+          {
+            "key": "Y",
+            "balance": {
+              "amount": "300",
+              "currency": "USD"
+            },
+            "balance_pct": 30.0,
+            "asset_count": 1
+          },
+          {
+            "key": "Z",
+            "balance": {
+              "amount": "200",
+              "currency": "USD"
+            },
+            "balance_pct": 20.0,
+            "asset_count": 1
+          },
+          {
+            "key": null,
+            "balance": {
+              "amount": "100",
+              "currency": "USD"
+            },
+            "balance_pct": 10.0,
+            "asset_count": 1
+          }
+        ],
+        "by_industry": [
+          {
+            "key": "Tech",
+            "balance": {
+              "amount": "600",
+              "currency": "USD"
+            },
+            "balance_pct": 60.0,
+            "asset_count": 2
+          },
+          {
+            "key": "Retail",
+            "balance": {
+              "amount": "300",
+              "currency": "USD"
+            },
+            "balance_pct": 30.0,
+            "asset_count": 2
+          },
+          {
+            "key": null,
+            "balance": {
+              "amount": "100",
+              "currency": "USD"
+            },
+            "balance_pct": 10.0,
+            "asset_count": 1
+          }
+        ],
+        "by_rating": [
+          {
+            "key": "B",
+            "balance": {
+              "amount": "300",
+              "currency": "USD"
+            },
+            "balance_pct": 30.0,
+            "asset_count": 1
+          },
+          {
+            "key": "BB",
+            "balance": {
+              "amount": "300",
+              "currency": "USD"
+            },
+            "balance_pct": 30.0,
+            "asset_count": 1
+          },
+          {
+            "key": "CCC",
+            "balance": {
+              "amount": "200",
+              "currency": "USD"
+            },
+            "balance_pct": 20.0,
+            "asset_count": 1
+          },
+          {
+            "key": null,
+            "balance": {
+              "amount": "100",
+              "currency": "USD"
+            },
+            "balance_pct": 10.0,
+            "asset_count": 1
+          },
+          {
+            "key": "BB+",
+            "balance": {
+              "amount": "100",
+              "currency": "USD"
+            },
+            "balance_pct": 10.0,
+            "asset_count": 1
+          }
+        ]
+      }
+    },
+    "standard_deal_families": [
+      {
+        "deal_type": "abs",
+        "profile_id": "abs_auto_standard",
+        "example": {
+          "id": "ABS-EXAMPLE",
+          "pool": {
+            "id": "ABS-POOL",
+            "deal_type": "abs",
+            "currency": "USD",
+            "assets": [
+              {
+                "id": "COLLATERAL-1",
+                "asset_type": {
+                  "type": "high_yield_bond"
+                },
+                "balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "rate": 0.07,
+                "spread_bp": null,
+                "forward_curve_id": null,
+                "maturity": "2034-01-01",
+                "rating": null,
+                "industry": null,
+                "obligor_id": null,
+                "defaulted": false,
+                "recovery_amount": null,
+                "default_date": null,
+                "purchase_price": null,
+                "acquisition_date": null,
+                "origination_date": null,
+                "day_count": "act_360",
+                "smm_override": null,
+                "mdr_override": null,
+                "recovery_rate": null,
+                "contractual_payment": null
+              }
+            ],
+            "cumulative_defaults": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_recoveries": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_prepayments": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_scheduled_amortization": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reinvestment_period": null,
+            "collection_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reserve_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "excess_spread_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "rep_lines": null
+          },
+          "tranches": {
+            "tranches": [
+              {
+                "id": "ABSNOTES-A",
+                "attach_pct": 0.0,
+                "detach_pct": 100.0,
+                "seniority": "senior",
+                "rating": null,
+                "original_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "current_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "coupon": {
+                  "fixed": {
+                    "rate": 0.06
+                  }
+                },
+                "oc_trigger": null,
+                "ic_trigger": null,
+                "frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "day_count": "act_360",
+                "deferred_interest": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "pik_enabled": false,
+                "maturity": "2034-01-01",
+                "attributes": {}
+              }
+            ]
+          },
+          "closing_date": "2024-01-01",
+          "maturity": "2034-01-01",
+          "discount_curve_id": "USD-OIS",
+          "calendar_id": "nyse"
+        }
+      },
+      {
+        "deal_type": "clo",
+        "profile_id": "clo_standard",
+        "example": {
+          "id": "CLO-EXAMPLE",
+          "pool": {
+            "id": "CLO-POOL",
+            "deal_type": "clo",
+            "currency": "USD",
+            "assets": [
+              {
+                "id": "COLLATERAL-1",
+                "asset_type": {
+                  "type": "high_yield_bond"
+                },
+                "balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "rate": 0.07,
+                "spread_bp": null,
+                "forward_curve_id": null,
+                "maturity": "2034-01-01",
+                "rating": null,
+                "industry": null,
+                "obligor_id": null,
+                "defaulted": false,
+                "recovery_amount": null,
+                "default_date": null,
+                "purchase_price": null,
+                "acquisition_date": null,
+                "origination_date": null,
+                "day_count": "act_360",
+                "smm_override": null,
+                "mdr_override": null,
+                "recovery_rate": null,
+                "contractual_payment": null
+              }
+            ],
+            "cumulative_defaults": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_recoveries": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_prepayments": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_scheduled_amortization": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reinvestment_period": null,
+            "collection_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reserve_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "excess_spread_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "rep_lines": null
+          },
+          "tranches": {
+            "tranches": [
+              {
+                "id": "CLONOTES-A",
+                "attach_pct": 0.0,
+                "detach_pct": 100.0,
+                "seniority": "senior",
+                "rating": null,
+                "original_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "current_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "coupon": {
+                  "fixed": {
+                    "rate": 0.06
+                  }
+                },
+                "oc_trigger": null,
+                "ic_trigger": null,
+                "frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "day_count": "act_360",
+                "deferred_interest": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "pik_enabled": false,
+                "maturity": "2034-01-01",
+                "attributes": {}
+              }
+            ]
+          },
+          "closing_date": "2024-01-01",
+          "maturity": "2034-01-01",
+          "discount_curve_id": "USD-OIS",
+          "calendar_id": "nyse"
+        }
+      },
+      {
+        "deal_type": "cmbs",
+        "profile_id": "cmbs_standard",
+        "example": {
+          "id": "CMBS-EXAMPLE",
+          "pool": {
+            "id": "CMBS-POOL",
+            "deal_type": "cmbs",
+            "currency": "USD",
+            "assets": [
+              {
+                "id": "COLLATERAL-1",
+                "asset_type": {
+                  "type": "high_yield_bond"
+                },
+                "balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "rate": 0.07,
+                "spread_bp": null,
+                "forward_curve_id": null,
+                "maturity": "2034-01-01",
+                "rating": null,
+                "industry": null,
+                "obligor_id": null,
+                "defaulted": false,
+                "recovery_amount": null,
+                "default_date": null,
+                "purchase_price": null,
+                "acquisition_date": null,
+                "origination_date": null,
+                "day_count": "30_360",
+                "smm_override": null,
+                "mdr_override": null,
+                "recovery_rate": null,
+                "contractual_payment": null
+              }
+            ],
+            "cumulative_defaults": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_recoveries": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_prepayments": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_scheduled_amortization": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reinvestment_period": null,
+            "collection_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reserve_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "excess_spread_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "rep_lines": null
+          },
+          "tranches": {
+            "tranches": [
+              {
+                "id": "CMBSNOTES-A",
+                "attach_pct": 0.0,
+                "detach_pct": 100.0,
+                "seniority": "senior",
+                "rating": null,
+                "original_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "current_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "coupon": {
+                  "fixed": {
+                    "rate": 0.06
+                  }
+                },
+                "oc_trigger": null,
+                "ic_trigger": null,
+                "frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "day_count": "act_360",
+                "deferred_interest": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "pik_enabled": false,
+                "maturity": "2034-01-01",
+                "attributes": {}
+              }
+            ]
+          },
+          "closing_date": "2024-01-01",
+          "maturity": "2034-01-01",
+          "discount_curve_id": "USD-OIS",
+          "calendar_id": "nyse"
+        }
+      },
+      {
+        "deal_type": "rmbs",
+        "profile_id": "rmbs_standard",
+        "example": {
+          "id": "RMBS-EXAMPLE",
+          "pool": {
+            "id": "RMBS-POOL",
+            "deal_type": "rmbs",
+            "currency": "USD",
+            "assets": [
+              {
+                "id": "COLLATERAL-1",
+                "asset_type": {
+                  "type": "high_yield_bond"
+                },
+                "balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "rate": 0.07,
+                "spread_bp": null,
+                "forward_curve_id": null,
+                "maturity": "2034-01-01",
+                "rating": null,
+                "industry": null,
+                "obligor_id": null,
+                "defaulted": false,
+                "recovery_amount": null,
+                "default_date": null,
+                "purchase_price": null,
+                "acquisition_date": null,
+                "origination_date": null,
+                "day_count": "30_360",
+                "smm_override": null,
+                "mdr_override": null,
+                "recovery_rate": null,
+                "contractual_payment": null
+              }
+            ],
+            "cumulative_defaults": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_recoveries": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_prepayments": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_scheduled_amortization": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reinvestment_period": null,
+            "collection_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reserve_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "excess_spread_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "rep_lines": null
+          },
+          "tranches": {
+            "tranches": [
+              {
+                "id": "RMBSNOTES-A",
+                "attach_pct": 0.0,
+                "detach_pct": 100.0,
+                "seniority": "senior",
+                "rating": null,
+                "original_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "current_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "coupon": {
+                  "fixed": {
+                    "rate": 0.06
+                  }
+                },
+                "oc_trigger": null,
+                "ic_trigger": null,
+                "frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "day_count": "act_360",
+                "deferred_interest": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "pik_enabled": false,
+                "maturity": "2034-01-01",
+                "attributes": {}
+              }
+            ]
+          },
+          "closing_date": "2024-01-01",
+          "maturity": "2034-01-01",
+          "discount_curve_id": "USD-OIS",
+          "calendar_id": "nyse"
+        }
+      }
+    ]
   },
   "merton": {
     "model": {
@@ -4478,6 +7830,7 @@
     },
     "scenario_table": {
       "tranche_id": "A",
+      "currency": "USD",
       "cells": [
         {
           "cpr": 0.1,

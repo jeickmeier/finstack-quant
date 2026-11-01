@@ -619,6 +619,236 @@ pub fn tranche_solve_field_units() -> TrancheSolveFieldUnits {
     }
 }
 
+/// Units of a `ScenarioTable`'s cells, which do not appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioTableFieldUnits {
+    /// Unit of each swept `ScenarioCell` input, in the order the struct declares them.
+    pub axes: Vec<MetricFieldUnit>,
+    /// Unit of each measure `ScenarioCell` reports, in the order the struct declares them.
+    pub measures: Vec<MetricFieldUnit>,
+}
+
+/// Units of the `ScenarioCell` fields, the one place a host reads them from.
+///
+/// Rates are decimals, the price is percent of the tranche's current balance and
+/// the writedown is in currency units. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `ScenarioTable::currency` of the table being labelled; it
+///   names the unit of `writedown`.
+///
+/// # Returns
+///
+/// One record per numeric cell field, split into the swept axes and the reported
+/// measures so a host can offer the measures without naming them.
+pub fn scenario_table_field_units(currency: Currency) -> ScenarioTableFieldUnits {
+    let unit = |&(field, label): &(&str, &str)| MetricFieldUnit {
+        field: field.to_string(),
+        label: label.to_string(),
+        source: format!("valuations::ScenarioCell::{field}"),
+    };
+    let currency = currency.to_string();
+    ScenarioTableFieldUnits {
+        axes: [
+            ("cpr", "annual decimal"),
+            ("cdr", "annual decimal"),
+            ("severity", "decimal"),
+        ]
+        .iter()
+        .map(unit)
+        .collect(),
+        measures: [
+            ("price", "clean, % of current balance"),
+            ("wal", "years"),
+            ("writedown", currency.as_str()),
+        ]
+        .iter()
+        .map(unit)
+        .collect(),
+    }
+}
+
+/// Units of a `PoolReport`, which do not all appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PoolReportFieldUnits {
+    /// Unit of `PoolReport::total_balance`.
+    pub total_balance: MetricFieldUnit,
+    /// Unit of `PoolReport::warf`.
+    pub warf: MetricFieldUnit,
+    /// Unit of every `PoolReport::stats` field, in the order `PoolStats`
+    /// declares them.
+    pub stats: Vec<MetricFieldUnit>,
+    /// Unit of the numeric fields of each `by_obligor`, `by_industry` and
+    /// `by_rating` row, in the order `PoolConcentrationEntry` declares them.
+    pub concentration: Vec<MetricFieldUnit>,
+}
+
+/// Units of the `PoolReport` fields, the one place a host reads them from.
+///
+/// `PoolStats` mixes a decimal coupon, a basis-point spread and a percent-point
+/// defaulted share. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `AssetPool::currency` of the report being labelled; it
+///   names the unit of `total_balance`, `undrawn_commitment` and each row's
+///   `balance`.
+///
+/// # Returns
+///
+/// One record per numeric field, grouped by the struct holding it. Each row's
+/// string `key` has no unit and is not listed.
+pub fn pool_report_field_units(currency: Currency) -> PoolReportFieldUnits {
+    const POOL_SHARE: &str = "% of current pool balance";
+    let unit = |owner: &str, field: &str, label: String| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::{owner}::{field}"),
+    };
+    let currency = currency.to_string();
+    PoolReportFieldUnits {
+        total_balance: unit("PoolReport", "total_balance", currency.clone()),
+        warf: unit("PoolReport", "warf", "Moody's rating factor".to_string()),
+        stats: [
+            ("wac", "annual decimal, fixed-rate only"),
+            ("weighted_avg_spread_bp", "bp"),
+            ("weighted_avg_maturity", "years"),
+            ("diversity_score", "score"),
+            ("num_obligors", "named obligors"),
+            ("num_industries", "named industries"),
+            ("defaulted_balance_pct", POOL_SHARE),
+            ("undrawn_commitment", currency.as_str()),
+        ]
+        .into_iter()
+        .map(|(field, label)| unit("PoolStats", field, label.to_string()))
+        .collect(),
+        concentration: [
+            ("balance", currency.as_str()),
+            ("balance_pct", POOL_SHARE),
+            ("asset_count", "assets"),
+        ]
+        .into_iter()
+        .map(|(field, label)| unit("PoolConcentrationEntry", field, label.to_string()))
+        .collect(),
+    }
+}
+
+/// Units of the charted `SimulationDiagnostics` series, which do not appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct SimulationFieldUnits {
+    /// Unit of each numeric `CoverageTestDiagnostic` field, in the order the
+    /// struct declares them.
+    pub coverage_tests: Vec<MetricFieldUnit>,
+    /// Unit of `PeriodWaterfall::diverted_cash` and of each diversion's amount.
+    pub diverted_cash: MetricFieldUnit,
+    /// Unit of `TrancheCreditEnhancement::credit_enhancement`.
+    pub credit_enhancement: MetricFieldUnit,
+    /// Unit of `PeriodDiagnostics::excess_spread`.
+    pub excess_spread: MetricFieldUnit,
+}
+
+/// Units of the coverage, diversion, enhancement and excess-spread series of a
+/// structured-credit simulation, the one place a host reads them from.
+///
+/// Coverage ratios, triggers and cushions are in times covered, credit enhancement
+/// is a decimal share of the collateral and excess spread an annual decimal of the opening pool
+/// balance. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The deal currency of the simulation being labelled, as its
+///   `Money` amounts state it; it names the unit of `diverted_cash`.
+///
+/// # Returns
+///
+/// One record per charted field, grouped by the struct holding it.
+pub fn simulation_field_units(currency: Currency) -> SimulationFieldUnits {
+    let unit = |owner: &str, field: &str, label: String| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::{owner}::{field}"),
+    };
+    SimulationFieldUnits {
+        coverage_tests: ["ratio", "trigger_level", "cushion"]
+            .into_iter()
+            .map(|field| unit("CoverageTestDiagnostic", field, "times covered".to_string()))
+            .collect(),
+        diverted_cash: unit("PeriodWaterfall", "diverted_cash", currency.to_string()),
+        credit_enhancement: unit(
+            "TrancheCreditEnhancement",
+            "credit_enhancement",
+            "decimal share of collateral".to_string(),
+        ),
+        excess_spread: unit(
+            "PeriodDiagnostics",
+            "excess_spread",
+            "annual decimal of opening pool balance".to_string(),
+        ),
+    }
+}
+
+/// Units of an `EquityMetrics`, which do not all appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct EquityMetricsFieldUnits {
+    /// Unit of `EquityMetrics::invested`.
+    pub invested: MetricFieldUnit,
+    /// Unit of `EquityMetrics::irr`.
+    pub irr: MetricFieldUnit,
+    /// Unit of `EquityMetrics::moic`.
+    pub moic: MetricFieldUnit,
+    /// Unit of `EquityMetrics::nav_pct`.
+    pub nav_pct: MetricFieldUnit,
+    /// Unit of each `EquityMetrics::cash_on_cash` value.
+    pub cash_on_cash: MetricFieldUnit,
+    /// Unit of the `purchase_price_pct` argument of `calculate_equity_metrics`,
+    /// and what omitting it means.
+    pub purchase_price: MetricFieldUnit,
+}
+
+/// Units of the `EquityMetrics` fields, the one place a host reads them from.
+///
+/// The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV
+/// a percent of the equity's current balance and cash-on-cash a decimal share of the
+/// invested amount. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `EquityMetrics::currency` of the result being labelled; it
+///   names the unit of `invested`.
+///
+/// # Returns
+///
+/// One record per numeric field, then the purchase price argument the amounts
+/// depend on. `tranche_id` and `currency` have no unit and are not listed.
+pub fn equity_metrics_field_units(currency: Currency) -> EquityMetricsFieldUnits {
+    let unit = |field: &str, label: String| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::EquityMetrics::{field}"),
+    };
+    EquityMetricsFieldUnits {
+        invested: unit("invested", currency.to_string()),
+        irr: unit("irr", "annual decimal, ACT/365F".to_string()),
+        moic: unit("moic", "multiple of invested".to_string()),
+        nav_pct: unit("nav_pct", "% of current balance".to_string()),
+        cash_on_cash: unit("cash_on_cash", "decimal share of invested".to_string()),
+        purchase_price: MetricFieldUnit {
+            field: "purchase_price_pct".to_string(),
+            label: "% of current balance; omitted means par".to_string(),
+            source: "valuations::calculate_equity_metrics::purchase_price_pct".to_string(),
+        },
+    }
+}
+
 /// List every pricing model key that has a pricer in the standard registry.
 ///
 /// The list is **registry-derived**, not enum-derived: it reports real dispatch
@@ -1070,6 +1300,57 @@ mod tests {
     }
 
     #[test]
+    fn pool_report_field_units_list_every_numeric_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::{
+            pool_report, AssetPool, DealType, PoolAsset,
+        };
+        let as_of = time::macros::date!(2025 - 01 - 01);
+        let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::EUR);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A",
+            finstack_quant_core::money::Money::new(100.0, Currency::EUR).expect("money"),
+            0.05,
+            time::macros::date!(2030 - 01 - 01),
+            finstack_quant_core::dates::DayCount::Thirty360,
+        ));
+        let report =
+            serde_json::to_value(pool_report(&pool, as_of).expect("report")).expect("serialize");
+        let wire_fields = |value: &Value, skip: &[&str]| -> Vec<String> {
+            value
+                .as_object()
+                .expect("object")
+                .keys()
+                .filter(|key| !skip.contains(&key.as_str()))
+                .cloned()
+                .collect()
+        };
+        let names = |rows: &[MetricFieldUnit]| -> Vec<String> {
+            rows.iter().map(|row| row.field.clone()).collect()
+        };
+        let sorted = |mut fields: Vec<String>| {
+            fields.sort();
+            fields
+        };
+
+        let units = pool_report_field_units(Currency::EUR);
+        assert_eq!(
+            sorted(names(&units.stats)),
+            sorted(wire_fields(&report["stats"], &[]))
+        );
+        assert_eq!(
+            sorted(names(&units.concentration)),
+            sorted(wire_fields(&report["by_obligor"][0], &["key"]))
+        );
+        assert_eq!(units.total_balance.label, "EUR");
+        assert_eq!(units.warf.source, "valuations::PoolReport::warf");
+        assert_eq!(names(&units.stats)[0], "wac");
+        assert_eq!(units.stats[0].label, "annual decimal, fixed-rate only");
+        assert_eq!(units.stats[1].label, "bp");
+        assert_eq!(units.stats[6].label, "% of current pool balance");
+        assert_eq!(units.stats[7].label, "EUR");
+    }
+
+    #[test]
     fn tranche_field_units_list_every_scalar_field_in_struct_order() {
         use finstack_quant_valuations_structured_credit::structured_credit::TrancheMetrics;
         let fields = [
@@ -1145,6 +1426,124 @@ mod tests {
         assert_eq!(
             units.discount_margin.source,
             "valuations::tranche_discount_margin"
+        );
+    }
+
+    #[test]
+    fn scenario_table_units_list_every_cell_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::ScenarioCell;
+        let cell = ScenarioCell {
+            cpr: 0.0,
+            cdr: 0.0,
+            severity: 0.0,
+            price: 0.0,
+            wal: 0.0,
+            writedown: 0.0,
+        };
+        let value = serde_json::to_value(&cell).expect("serialize");
+        let mut declared: Vec<&str> = value
+            .as_object()
+            .expect("object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        declared.sort_unstable();
+        let units = scenario_table_field_units(Currency::EUR);
+        let order: Vec<&str> = units
+            .axes
+            .iter()
+            .chain(&units.measures)
+            .map(|unit| unit.field.as_str())
+            .collect();
+        assert_eq!(
+            order,
+            ["cpr", "cdr", "severity", "price", "wal", "writedown"]
+        );
+        let mut listed = order;
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units.measures[0].label, "clean, % of current balance");
+        assert_eq!(units.measures[2].label, "EUR");
+        assert_eq!(units.measures[1].source, "valuations::ScenarioCell::wal");
+    }
+
+    #[test]
+    fn equity_units_name_every_numeric_field_of_the_result() {
+        use finstack_quant_valuations_structured_credit::structured_credit::EquityMetrics;
+        let metrics = EquityMetrics {
+            tranche_id: "E".to_string(),
+            currency: Currency::EUR,
+            invested: 0.0,
+            irr: Some(0.0),
+            moic: Some(0.0),
+            nav_pct: 0.0,
+            cash_on_cash: Vec::new(),
+        };
+        let mut declared: Vec<String> = serde_json::to_value(&metrics)
+            .expect("serialize")
+            .as_object()
+            .expect("object")
+            .iter()
+            .filter(|(_, field)| field.is_number() || field.is_array())
+            .map(|(name, _)| name.clone())
+            .collect();
+        declared.sort_unstable();
+        let units = serde_json::to_value(equity_metrics_field_units(Currency::EUR))
+            .expect("serialize units");
+        let mut listed: Vec<String> = units
+            .as_object()
+            .expect("object")
+            .iter()
+            // The argument the result depends on, not a field of it.
+            .filter(|(name, _)| name.as_str() != "purchase_price")
+            .map(|(name, unit)| {
+                assert_eq!(unit["field"], name.as_str());
+                assert_eq!(unit["source"], format!("valuations::EquityMetrics::{name}"));
+                name.clone()
+            })
+            .collect();
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units["invested"]["label"], "EUR");
+        assert_eq!(
+            units["purchase_price"]["label"],
+            "% of current balance; omitted means par"
+        );
+    }
+
+    #[test]
+    fn simulation_units_list_every_coverage_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::CoverageTestDiagnostic;
+        let diagnostic = CoverageTestDiagnostic {
+            test_id: "OC_A".to_string(),
+            ratio: Some(0.0),
+            trigger_level: 0.0,
+            cushion: Some(0.0),
+            passing: true,
+        };
+        let value = serde_json::to_value(&diagnostic).expect("serialize");
+        let mut declared: Vec<&str> = value
+            .as_object()
+            .expect("object")
+            .iter()
+            .filter(|(_, field)| field.is_number())
+            .map(|(name, _)| name.as_str())
+            .collect();
+        declared.sort_unstable();
+        let units = simulation_field_units(Currency::EUR);
+        let order: Vec<&str> = units
+            .coverage_tests
+            .iter()
+            .map(|unit| unit.field.as_str())
+            .collect();
+        assert_eq!(order, ["ratio", "trigger_level", "cushion"]);
+        let mut listed = order;
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units.diverted_cash.label, "EUR");
+        assert_eq!(
+            units.excess_spread.source,
+            "valuations::PeriodDiagnostics::excess_spread"
         );
     }
 

@@ -12,14 +12,17 @@ import {
   within,
 } from "@testing-library/react";
 import { createChartRuntime } from "@tanstack/charts";
-import type { ScenarioCell } from "finstack-quant-wasm";
+import type {
+  ScenarioCell,
+  ScenarioTable,
+  ScenarioTableFieldUnits,
+} from "finstack-quant-wasm";
 import {
   ScenarioHeatmap,
   ScenarioHeatmapPanel,
   scenarioCells,
   scenarioPreset,
   scenarioKey,
-  scenarioPriceLabel,
 } from "@/components/finstack/valuations/components/scenario-heatmap/scenario-heatmap";
 import { composeFigure } from "@/components/finstack/shared/chart/finstack-chart/figure";
 import tokens from "../../registry/theme/finstack-theme/tokens.json";
@@ -33,6 +36,43 @@ vi.mock(
   }),
 );
 afterEach(cleanup);
+const units = fixture.cases[0]!.units as ScenarioTableFieldUnits;
+const tables = fixture.cases.map((c) => c.table as ScenarioTable);
+const t = tokens.light;
+const presentation = {
+  theme: {
+    foreground: t.foreground,
+    background: t.background,
+    muted: t["muted-foreground"],
+    grid: t.border,
+    palette: [t["chart-1"]],
+  },
+  cellText: { light: t["cell-light"], dark: t["cell-dark"], size: 11 },
+  ramps: {
+    sequential: Array.from(
+      { length: 9 },
+      (_, i) => t[`sequential-${i + 1}` as keyof typeof t],
+    ),
+    diverging: [
+      t["diverging-negative"],
+      t["diverging-neutral"],
+      t["diverging-positive"],
+    ],
+  },
+  fontFamily: "sans-serif",
+  titleSize: 16,
+  bodySize: 14,
+  noteSize: 12,
+  spacing: 4,
+  measureText: (text: string, o: { fontSize: number }) => ({
+    x: 0,
+    y: 0,
+    width: text.length * o.fontSize * 0.6,
+    height: o.fontSize,
+  }),
+};
+const priceSentence = (severity: number) =>
+  `Price (clean, % of current balance). Par reference: 100. Severity: ${severity}.`;
 // The native scenario tables are regenerated and compared by
 // `mise run ui-fixtures --check` (tests/valuations/scenario-table/generate.mjs).
 it("records its sources and keeps current-face prices across the factor-adjusted tranche", () => {
@@ -57,52 +97,22 @@ it("records its sources and keeps current-face prices across the factor-adjusted
   );
 });
 it("retains original cells, coordinates, severity and par reference through the native heatmap", () => {
-  const t = tokens.light;
-  for (const c of fixture.cases)
+  for (const table of tables)
     for (const severity of fixture.grid.severities) {
-      const cells = scenarioCells(c.table, severity);
-      expect(cells.every((cell) => c.table.cells.includes(cell))).toBe(true);
+      const cells = scenarioCells(table, severity);
+      expect(cells.every((cell) => table.cells.includes(cell))).toBe(true);
       const figure = composeFigure(
         {
           ...scenarioPreset({
-            table: c.table,
+            table,
+            units,
+            measure: "price",
             severity,
             priceDomain: [80, 140],
           }),
           ariaLabel: "Native scenarios",
         },
-        {
-          theme: {
-            foreground: t.foreground,
-            background: t.background,
-            muted: t["muted-foreground"],
-            grid: t.border,
-            palette: [t["chart-1"]],
-          },
-          cellText: { light: t["cell-light"], dark: t["cell-dark"], size: 11 },
-          ramps: {
-            sequential: Array.from(
-              { length: 9 },
-              (_, i) => t[`sequential-${i + 1}` as keyof typeof t],
-            ),
-            diverging: [
-              t["diverging-negative"],
-              t["diverging-neutral"],
-              t["diverging-positive"],
-            ],
-          },
-          fontFamily: "sans-serif",
-          titleSize: 16,
-          bodySize: 14,
-          noteSize: 12,
-          spacing: 4,
-          measureText: (text, o) => ({
-            x: 0,
-            y: 0,
-            width: text.length * o.fontSize * 0.6,
-            height: o.fontSize,
-          }),
-        },
+        presentation,
       );
       const runtime = createChartRuntime<
         ScenarioCell,
@@ -126,26 +136,28 @@ it("retains original cells, coordinates, severity and par reference through the 
     }
 });
 it("selects exact supplied severity and preserves complete native JSON without overlay columns", () => {
-  const table = fixture.cases[1]!.table,
+  const table = tables[1]!,
     onSeverityChange = vi.fn();
   const { rerender } = render(
     <ScenarioHeatmap
       table={table}
+      units={units}
+      measure="price"
+      onMeasureChange={() => {}}
       severity={0.2}
       onSeverityChange={onSeverityChange}
       priceDomain={[80, 140]}
     />,
   );
-  expect(
-    screen.getByText(
-      `${scenarioPriceLabel}. Par reference: 100. Severity: 0.2.`,
-    ),
-  ).toBeTruthy();
+  expect(screen.getByText(priceSentence(0.2))).toBeTruthy();
   fireEvent.click(screen.getByRole("radio", { name: "0.6" }));
   expect(onSeverityChange).toHaveBeenLastCalledWith(0.6);
   rerender(
     <ScenarioHeatmap
       table={table}
+      units={units}
+      measure="price"
+      onMeasureChange={() => {}}
       severity={0.6}
       onSeverityChange={onSeverityChange}
       priceDomain={[80, 140]}
@@ -157,7 +169,7 @@ it("selects exact supplied severity and preserves complete native JSON without o
   );
   expect(rows).toEqual(
     scenarioCells(table, 0.6).map((c) =>
-      [c.cpr, c.cdr, c.severity, c.price].map(String),
+      [c.cpr, c.cdr, c.severity, c.price, c.wal, c.writedown].map(String),
     ),
   );
   fireEvent.click(
@@ -174,12 +186,23 @@ it("selects exact supplied severity and preserves complete native JSON without o
       })
       .querySelector("pre")!.textContent,
   ).toBe(serializeHost(table));
+  // Every column header carries the unit Rust states for that field.
   expect(
-    screen.queryByRole("columnheader", { name: /WAL|writedown/i }),
-  ).toBeNull();
+    screen.getAllByRole("columnheader").map((cell) => cell.textContent),
+  ).toEqual([
+    "CPR (annual decimal)",
+    "CDR (annual decimal)",
+    "Severity (decimal)",
+    "Price (clean, % of current balance)",
+    "WAL (years)",
+    "Writedown (USD)",
+  ]);
   rerender(
     <ScenarioHeatmap
       table={table}
+      units={units}
+      measure="price"
+      onMeasureChange={() => {}}
       severity={0.9}
       onSeverityChange={onSeverityChange}
       priceDomain={[80, 140]}
@@ -190,24 +213,91 @@ it("selects exact supplied severity and preserves complete native JSON without o
     scenarioKey("other", table.cells[0]!),
   );
 });
+it("switches the coloured measure with its native values and unit, reading the same cells", () => {
+  const table = tables[0]!;
+  render(<ScenarioHeatmapPanel table={table} units={units} />);
+  for (const [name, sentence] of [
+    ["WAL", "WAL (years). Severity: 0.2."],
+    ["Writedown", "Writedown (USD). Severity: 0.2."],
+    ["Price", priceSentence(0.2)],
+  ] as const) {
+    fireEvent.click(screen.getByRole("radio", { name }));
+    expect(screen.getByText(sentence)).toBeTruthy();
+  }
+});
+it("colours WAL and writedown low to high and prices about par, without a host extent", () => {
+  const table = tables[0]!;
+  const colours = (measure: string, severity: number, of = table) => {
+    const definition = composeFigure(
+      {
+        ...scenarioPreset({ table: of, units, measure, severity }),
+        ariaLabel: "Native scenarios",
+      },
+      presentation,
+    ).definition;
+    const runtime = createChartRuntime<
+      ScenarioCell,
+      string | number,
+      string | number
+    >();
+    try {
+      const scene = runtime.render(definition, { width: 1000, height: 650 });
+      expect(scene.points.map((point) => point.datum)).toEqual(
+        scenarioCells(of, severity),
+      );
+      const stops = scene.colors.domain as number[];
+      // A sequential ramp spreads its stops across the extent.
+      return measure === "price" ? stops : [stops[0], stops.at(-1)];
+    } finally {
+      runtime.destroy();
+    }
+  };
+  const extent = (values: number[]) => [
+    Math.min(...values),
+    Math.max(...values),
+  ];
+  expect(colours("wal", 0.2)).toEqual(
+    extent(table.cells.map((cell) => cell.wal)),
+  );
+  expect(colours("writedown", 0.2)).toEqual(
+    extent(table.cells.map((cell) => cell.writedown)),
+  );
+  const reach = Math.max(...table.cells.map((c) => Math.abs(c.price - 100)));
+  expect(colours("price", 0.2)).toEqual([100 - reach, 100, 100 + reach]);
+  // Prices all within a point of par still centre on a domain a point wide.
+  const nearPar = {
+    ...table,
+    cells: table.cells.map((cell) => ({ ...cell, price: 100.25 })),
+  };
+  expect(colours("price", 0.2, nearPar)).toEqual([99, 100, 101]);
+  // A measure flat across the table still has a valid scale, one wide from its value.
+  const flat = {
+    ...table,
+    cells: table.cells.map((cell) => ({ ...cell, writedown: 0, wal: 3 })),
+  };
+  expect(colours("writedown", 0.2, flat)).toEqual([0, 1]);
+  expect(colours("wal", 0.2, flat)).toEqual([3, 4]);
+});
 it("runs the independent panel with no worker and handles an empty result", () => {
   const { rerender } = render(
     <ScenarioHeatmapPanel
-      table={fixture.cases[0]!.table}
+      table={tables[0]!}
+      units={units}
       priceDomain={[80, 140]}
     />,
   );
   expect(screen.getByRole("radio", { name: "0.2" })).toBeTruthy();
   fireEvent.click(screen.getByRole("radio", { name: "0.6" }));
-  expect(
-    screen.getByText(
-      `${scenarioPriceLabel}. Par reference: 100. Severity: 0.6.`,
-    ),
-  ).toBeTruthy();
+  expect(screen.getByText(priceSentence(0.6))).toBeTruthy();
   rerender(
     <ScenarioHeatmapPanel
       key="empty"
-      table={{ tranche_id: "empty", cells: [] }}
+      table={{
+        tranche_id: "empty",
+        currency: "USD" as ScenarioTable["currency"],
+        cells: [],
+      }}
+      units={units}
       priceDomain={[80, 140]}
     />,
   );

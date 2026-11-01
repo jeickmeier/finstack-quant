@@ -3,9 +3,13 @@ import type { ExampleProps } from "./props";
 import { useState } from "react";
 import { ScenarioHeatmap } from "@/components/finstack/valuations/components/scenario-heatmap/scenario-heatmap";
 import { useLinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
-import type { ScenarioTable } from "finstack-quant-wasm";
+import type {
+  ScenarioTable,
+  ScenarioTableFieldUnits,
+} from "finstack-quant-wasm";
 import data from "../data.json";
 const scenario = data.scenarios.cases[0]!.table as ScenarioTable;
+const units = data.scenarios.cases[0]!.units as ScenarioTableFieldUnits;
 export function Example({
   width = 880,
   presentation,
@@ -16,11 +20,15 @@ export function Example({
   >;
 }) {
   const [severity, setSeverity] = useState(scenario.cells[0]!.severity);
+  const [measure, setMeasure] = useState(units.measures[0]!.field);
   const link = useLinkedSelection();
   return (
     <ScenarioHeatmap
       {...presentation}
       table={scenario}
+      units={units}
+      measure={measure}
+      onMeasureChange={setMeasure}
       severity={severity}
       onSeverityChange={setSeverity}
       priceDomain={[80, 140]}

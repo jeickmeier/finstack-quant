@@ -1,9 +1,8 @@
 //! AssetPool characteristic metrics for structured credit.
 
+use crate::structured_credit::types::pool::weighted_avg_rating_factor;
 use crate::structured_credit::StructuredCredit;
-use finstack_quant_core::types::CreditRating;
 use finstack_quant_core::Result;
-use finstack_quant_models::credit::moodys_warf_factor;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// CLO WARF calculator - Moody's methodology
@@ -15,27 +14,17 @@ impl finstack_quant_valuations_core::metrics::MetricCalculator for CloWarfCalcul
             .instrument_as::<crate::structured_credit::StructuredCredit>()?
             .resolved_for_pricing()?;
 
-        let mut weighted_sum = 0.0;
-        let mut total_balance = 0.0;
-
         // Performing par only: defaulted assets are carried at recovery in
-        // OC haircuts, not in the rating-factor average.
-        for asset in clo.pool.assets.iter().filter(|a| !a.defaulted) {
-            let balance = asset.balance.amount();
-            // Assets with no rating use the registry's `NR` (not rated)
-            // factor, so the unrated-collateral policy lives in one place
-            // (the embedded Moody's table) instead of a hardcoded constant.
-            let rating_factor = moodys_warf_factor(asset.rating.unwrap_or(CreditRating::NR))?;
-
-            weighted_sum += balance * rating_factor;
-            total_balance += balance;
-        }
-
-        if total_balance > 0.0 {
-            Ok(weighted_sum / total_balance)
-        } else {
-            Ok(0.0)
-        }
+        // OC haircuts, not in the rating-factor average. A metric is a number: no
+        // performing balance reports zero.
+        Ok(weighted_avg_rating_factor(
+            clo.pool
+                .assets
+                .iter()
+                .filter(|asset| !asset.defaulted)
+                .map(|asset| (asset.balance.amount(), asset.rating)),
+        )?
+        .unwrap_or(0.0))
     }
 }
 
@@ -55,7 +44,8 @@ impl finstack_quant_valuations_core::metrics::MetricCalculator for CloWasCalcula
             .instrument_as::<crate::structured_credit::StructuredCredit>()?
             .resolved_for_pricing()?;
 
-        Ok(clo.pool.weighted_avg_spread_bp())
+        // A metric is a number: no spread-bearing collateral reports zero.
+        Ok(clo.pool.weighted_avg_spread_bp().unwrap_or(0.0))
     }
 }
 
@@ -84,7 +74,11 @@ impl MetricCalculator for WamCalculator {
         let deal = context
             .instrument_as::<StructuredCredit>()?
             .resolved_for_pricing()?;
-        deal.pool.weighted_avg_maturity(context.as_of)
+        // A metric is a number: a zero-balance pool reports zero.
+        Ok(deal
+            .pool
+            .weighted_avg_maturity(context.as_of)?
+            .unwrap_or(0.0))
     }
 }
 

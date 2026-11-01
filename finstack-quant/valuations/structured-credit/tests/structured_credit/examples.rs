@@ -69,7 +69,7 @@ mod tests {
         pool.assets.push(bond1);
 
         // Calculate WAS - spread component only, over assets that carry one.
-        let was = pool.weighted_avg_spread_bp();
+        let was = pool.weighted_avg_spread_bp().expect("spread balance");
 
         // Expected WAS calculation (market convention):
         // Loan1: 10M × 425bps = 4,250M·bp
@@ -277,7 +277,7 @@ mod tests {
         // 3. Calculate pool metrics using market-standard methods
 
         // WAS - now correctly uses spread only
-        let was = pool.weighted_avg_spread_bp();
+        let was = pool.weighted_avg_spread_bp().expect("spread balance");
         // Expected: (15M×425 + 20M×450 + 15M×500) / 50M
         //         = (6,375 + 9,000 + 7,500) / 50
         //         = 22,875 / 50 = 457.5 bp

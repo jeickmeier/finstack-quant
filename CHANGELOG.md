@@ -2,6 +2,97 @@
 
 ## [Unreleased]
 
+### Structured credit: the standard deal families come from Rust
+
+#### Added
+
+- `standard_deal_families()` (`StandardDealFamily`; Python `standard_deal_families`, WASM `valuations.instruments.standardDealFamilies`) returns each family `new_standard` accepts with its registry profile id and an example `StandardDealParams` whose `id`, tranche ids and `pool.deal_type` name the family.
+
+#### Changed
+
+- Breaking: `StructuredCredit::new_standard` returns a validation error when `pool.deal_type` contradicts the family. It must equal the family, and the `abs` family also takes `auto` and `card` pools, which have no constructor of their own.
+
+### Structured credit: absent values are null, not zero or infinity
+
+Wire changes. Each field below is now nullable; every value that exists is unchanged. An engine's pass, fail and pricing logic does not move.
+
+#### Changed
+
+- `CoverageTestDiagnostic.ratio` and `.cushion` are `null` (Python `None`) when the test has no claim outstanding: the notes it covers are retired (OC) or owe no interest (IC). They were `Infinity` in JavaScript and `None` in Python. `passing` is still `true` there. Python `coverage_tests_dataframe` gives `NaN`.
+- `AssetPool::wac`, `weighted_avg_spread_bp`, `weighted_avg_maturity` and `diversity_score` (Python alike, WASM `assetPool*` `number | undefined`), `PoolStats` of the same names, `PoolReport.warf` and `PeriodDiagnostics.wac`, `weighted_avg_spread_bp` and `warf` are `null` when their population is empty, so a floating-only pool has no WAC rather than a WAC of zero. `SimulationDiagnostics::to_table` makes those three columns nullable (Python `to_dataframe`: pandas `Float64`, `<NA>`). The `clo_was`, `clo_warf` and `wam` metrics still return `0.0` there, and `clo_warf` is unchanged for any pool with performing balance; RMBS `enable_stochastic` still passes a WAC of `0.0` to the prepayment model.
+- `EquityMetrics.moic` and each `cash_on_cash` share are `null` when nothing is invested. A class that receives nothing on a positive investment keeps a real MOIC of `0.0`.
+- `pool_report_field_units`: `wac` is `annual decimal, fixed-rate only`, `num_obligors` and `num_industries` are `named obligors` and `named industries`, as an asset naming neither is not counted.
+- `scenario_table_field_units`: `price` is `clean, % of current balance`.
+
+#### Added
+
+- `EquityMetricsFieldUnits.purchase_price` states the unit of the `purchase_price_pct` argument and that omitting it means par.
+
+### Structured credit: units of an equity tranche's metrics
+
+#### Added
+
+- `equity_metrics_field_units(currency)` (`EquityMetricsFieldUnits`; WASM `equityMetricsFieldUnits`) states the unit of each `EquityMetrics` number.
+
+#### Changed
+
+- `EquityMetrics` now documents its decimal, percent and multiple conventions and what a zero investment returns.
+
+#### Fixed
+
+- WASM `StructuredCredit.equityMetrics` documented an omitted `purchasePricePct` as investing at model NAV. It invests at par, as Rust and Python state.
+
+### Structured credit: units of a simulation's charted series
+
+#### Added
+
+- `simulation_field_units(currency)` (`SimulationFieldUnits`; WASM `simulationFieldUnits`) states the unit of each `CoverageTestDiagnostic` number, `diverted_cash`, `credit_enhancement` and `excess_spread`.
+
+#### Changed
+
+- `PeriodDiagnostics.excess_spread` now documents its definition; its value is unchanged.
+
+### Structured credit: scenario table currency and units
+
+#### Added
+
+- `ScenarioTable.currency` names the currency of each cell's `writedown`, as `TrancheMetrics.currency` does for its result.
+- `scenario_table_field_units(currency)` (`ScenarioTableFieldUnits`; WASM `scenarioTableFieldUnits`) states the unit of every `ScenarioCell` field, split into swept `axes` and reported `measures`.
+
+#### Changed
+
+- `ScenarioTable` JSON now requires `currency`.
+
+### Structured credit: a tranche's cash flows by date in WASM
+
+#### Added
+
+- WASM `valuations.instruments.trancheCashflowsTable(cashflows)` returns Rust `TrancheCashflows::to_table` as a `TableEnvelope`: one row per payment date with cashflow, interest, principal, PIK, deferred and writedown columns. Python already reaches the same table through `TrancheCashflows.to_dataframe`.
+
+### Structured credit: one report for a collateral pool
+
+#### Added
+
+- `pool_report(pool, as_of)` returns a `PoolReport`: `calculate_pool_stats`, Moody's WARF of the performing collateral (the number `clo_warf` and `PeriodDiagnostics.warf` report) and concentration by obligor, industry and rating. Each `PoolConcentrationEntry` holds the key (`null` for assets with no value on the dimension), balance, `balance_pct` in percent points and asset count; tables cover defaulted assets, sum to 100% and are ordered by balance descending, then key ascending. Python `pool_report`, WASM `poolReport`.
+- `pool_report_field_units(currency)` (`PoolReportFieldUnits`) states the unit of every report field. Python `pool_report_field_units`, WASM `poolReportFieldUnits`.
+
+#### Changed
+
+- All structured-credit WARF numbers share one function, so `CloWarfCalculator` now skips non-positive-balance rows, as `PeriodDiagnostics.warf` already did. Pools with positive balances are unaffected.
+
+### Structured credit: who got paid each period
+
+#### Added
+
+- `PeriodDiagnostics.waterfall` (`PeriodWaterfall`): each period's tier allocations, `PaymentRecord`s, diversions and carried cash, on the `SimulationDiagnostics.periods` that `StructuredCredit::run_simulation` returns (Python `run_simulation`, WASM `runSimulation`). `PaymentRecord` gains `is_principal`.
+- `PeriodDiagnostics.non_waterfall_payments` (`NonWaterfallPayment`, `NonWaterfallSource`): cash paid to a tranche outside the waterfall (routed reserve interest, redemption, terminal releases). Per tranche and date, payment records plus these sum to the tranche's cash flows.
+- `PeriodDiagnostics.credit_enhancement` (`TrancheCreditEnhancement`): each tranche's end-of-period share of collateral beneath it, generalising the function the `MinCreditEnhancement` step-down trigger reads.
+- `SimulationDiagnostics.first_breaches` (`CoverageTestBreach`; Python `SimulationDiagnostics.first_breaches`): each coverage test's first failing payment date, including tranche triggers that never reach `coverage_tests`.
+
+#### Changed
+
+- A deal with no payment period left that still settles cash now reports one record in `SimulationDiagnostics.periods` holding that settlement.
+
 ### UI boundary: rules decided in Rust
 
 `check-worker-compose` (`ui-check`) now flags a worker service that decides from a native result; pure composition takes `// finstack-compose: <reason>`.

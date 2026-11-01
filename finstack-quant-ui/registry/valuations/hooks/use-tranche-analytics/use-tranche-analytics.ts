@@ -1,22 +1,70 @@
 "use client";
+import { useCallback } from "react";
 import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
+import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
 import {
   useWorkerQuery,
   workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type {
+  StandardDealRequest,
   TrancheMetricsRequest,
   TrancheOasRequest,
   TranchePriceRequest,
   TrancheRequest,
 } from "@/workers/finstack-contract";
 export type {
+  DealTranches,
+  StandardDealRequest,
+  StandardDealType,
   TrancheMetricsRequest,
   TrancheOasRequest,
   TranchePriceRequest,
   TrancheRequest,
 } from "@/workers/finstack-contract";
+/** The deal families Rust's standard constructor accepts, each with its registry profile id and example inputs. */
+export function useStandardDealFamilies() {
+  return useWorkerQuery((worker) =>
+    workerQueryOptions({
+      client: worker.client,
+      queryKey: ["finstack", worker.session, "standardDealFamilies"] as const,
+      ready: true,
+      missing: "Deal families require a ready worker",
+      queryFn: (ready) => ready.call("standardDealFamilies"),
+    }),
+  );
+}
+/** Build a deal on request: native canonical instrument JSON, or the native error thrown. */
+export function useNewStandardDeal() {
+  const worker = useFinstack();
+  return useCallback(
+    async (request: StandardDealRequest) => {
+      if (worker.error) throw worker.error;
+      if (worker.status !== "ready" || !worker.client)
+        throw new Error("Building a deal is waiting for the worker");
+      return worker.client.call("newStandardDeal", request);
+    },
+    [worker.client, worker.status, worker.error],
+  );
+}
+/** Native tranches of a deal's instrument JSON. Null disables the call. */
+export function useDealTranches(instrumentJson: string | null) {
+  return useWorkerQuery((worker) =>
+    workerQueryOptions({
+      client: worker.client,
+      queryKey: [
+        "finstack",
+        worker.session,
+        "dealTranches",
+        instrumentJson,
+      ] as const,
+      ready: instrumentJson !== null,
+      missing: "Deal tranches require instrument JSON and a ready worker",
+      queryFn: (ready) => ready.call("dealTranches", instrumentJson!),
+    }),
+  );
+}
 /** Snapshot the deal, tranche, market, date, optional price and metric ids. Null disables the call. */
 export function trancheMetricsOptions(
   client: FinstackClient | null,
@@ -113,6 +161,19 @@ export function useTrancheMetrics(request: TrancheMetricsRequest | null) {
   return useWorkerQuery((worker) =>
     trancheMetricsOptions(worker.client, worker.session, request),
   );
+}
+/** Native flows and date table of one tranche, or a structured failure. Null disables the call. */
+export function useTrancheSchedule(request: TrancheRequest | null) {
+  return useWorkerQuery((worker) => {
+    const { snapshot, key } = requestSnapshot(request);
+    return workerQueryOptions({
+      client: worker.client,
+      queryKey: ["finstack", worker.session, "trancheSchedule", key] as const,
+      ready: snapshot !== null,
+      missing: "Tranche schedule requires an explicit request and ready worker",
+      queryFn: (ready) => ready.call("trancheSchedule", snapshot!),
+    });
+  });
 }
 /** Native OasResult under the supplied OasConfig, else Rust's default; pass null until the user asks for the solve. */
 export function useTrancheOas(request: TrancheOasRequest | null) {

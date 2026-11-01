@@ -64,7 +64,7 @@ fn market() -> MarketContext {
 fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredit {
     let total = POOL_NOTIONAL;
     let per_asset = total / n_assets as f64;
-    let mut pool = AssetPool::new("CLO-POOL", DealType::Clo, Currency::USD);
+    let mut pool = AssetPool::new("CLO-POOL", DealType::Abs, Currency::USD);
     for i in 0..n_assets {
         pool.assets.push(PoolAsset::fixed_rate_bond(
             format!("L{i}"),

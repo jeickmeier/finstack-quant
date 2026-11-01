@@ -121,6 +121,11 @@ from finstack_quant.valuations.instruments._typed_structured_credit.tranche_cash
     TrancheCashflows as TrancheCashflows,
 )
 from finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics import EquityMetrics as EquityMetrics
+from finstack_quant.valuations.instruments._typed_structured_credit.pool_report import (
+    PoolConcentrationEntry as PoolConcentrationEntry,
+    PoolReport as PoolReport,
+    pool_report as pool_report,
+)
 from finstack_quant.valuations.instruments._typed_structured_credit.pool_stats import (
     PoolStats as PoolStats,
     calculate_pool_stats as calculate_pool_stats,
@@ -145,6 +150,11 @@ from finstack_quant.valuations.instruments._pricing import (
     metrics_for_instrument as metrics_for_instrument,
     price_driver_fields as price_driver_fields,
     price_instrument as price_instrument,
+    pool_report_field_units as pool_report_field_units,
+    standard_deal_families as standard_deal_families,
+    scenario_table_field_units as scenario_table_field_units,
+    simulation_field_units as simulation_field_units,
+    equity_metrics_field_units as equity_metrics_field_units,
     tranche_metric_field_units as tranche_metric_field_units,
     tranche_solve_field_units as tranche_solve_field_units,
 )
@@ -230,6 +240,8 @@ __all__ = [
     "PikMode",
     "PikSchedule",
     "PoolAsset",
+    "PoolConcentrationEntry",
+    "PoolReport",
     "PoolStats",
     "PremiumLegSpec",
     "ProtectionLegSpec",
@@ -261,6 +273,12 @@ __all__ = [
     "list_standard_metrics_grouped",
     "metric_metadata",
     "metrics_for_instrument",
+    "pool_report",
+    "pool_report_field_units",
+    "standard_deal_families",
+    "scenario_table_field_units",
+    "simulation_field_units",
+    "equity_metrics_field_units",
     "pretty_instrument_json",
     "price_driver_fields",
     "price_instrument",

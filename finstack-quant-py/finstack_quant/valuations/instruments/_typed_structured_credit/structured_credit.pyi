@@ -78,6 +78,8 @@ class StructuredCredit:
         params : StandardDealParams
             Collateral, liabilities, dates and market identifiers. A missing
             payment calendar is accepted here but must be supplied before simulation.
+            The pool's ``deal_type`` must be the family; ``abs`` also takes ``auto`` and
+            ``card`` pools.
 
         Returns
         -------
@@ -87,7 +89,8 @@ class StructuredCredit:
         Raises
         ------
         ValueError
-            If the family is unsupported or the deal fails pricing validation.
+            If the family is unsupported, the pool contradicts it or the deal fails
+            pricing validation.
 
         Examples
         --------
@@ -422,8 +425,8 @@ class StructuredCredit:
         Raises
         ------
         ValueError
-            If the deal has no residual class, fails pricing validation, or
-            ``as_of`` is invalid.
+            If the deal has no residual class, fails pricing validation, ``as_of``
+            is invalid, or ``purchase_price_pct`` is negative or not finite.
         """
         ...
 

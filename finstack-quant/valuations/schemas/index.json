@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1004925,
+      "bytes": 1005021,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -317,7 +317,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1012838,
+      "bytes": 1012934,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -515,7 +515,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1011815,
+      "bytes": 1011911,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -659,7 +659,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 396749,
+      "bytes": 396845,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -794,7 +794,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1102817,
+      "bytes": 1102913,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -974,7 +974,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1014446,
+      "bytes": 1014542,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",
@@ -1010,7 +1010,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics.schema.json",
-      "bytes": 2285,
+      "bytes": 2772,
       "kind": "output",
       "path": "schemas/results/1/equity_metrics.schema.json",
       "summary": "Equity-tranche return metrics: IRR, MOIC, NAV and cash-on-cash.",
@@ -1018,8 +1018,17 @@
       "type_name": "EquityMetrics"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics_field_units.schema.json",
+      "bytes": 3006,
+      "kind": "output",
+      "path": "schemas/results/1/equity_metrics_field_units.schema.json",
+      "summary": "The display units of an equity tranche's invested amount, IRR, MOIC, NAV and cash-on-cash.",
+      "title": "EquityMetricsFieldUnits",
+      "type_name": "EquityMetricsFieldUnits"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
-      "bytes": 39592,
+      "bytes": 56452,
       "kind": "output",
       "path": "schemas/results/1/facility_projection.schema.json",
       "summary": "Projected cashflows of an asset-backed facility and its residual.",
@@ -1090,8 +1099,26 @@
       "type_name": "OasResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/pool_report.schema.json",
+      "bytes": 7538,
+      "kind": "output",
+      "path": "schemas/results/1/pool_report.schema.json",
+      "summary": "Collateral-pool statistics, WARF and concentration by obligor, industry and rating.",
+      "title": "PoolReport",
+      "type_name": "PoolReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/pool_report_field_units.schema.json",
+      "bytes": 3980,
+      "kind": "output",
+      "path": "schemas/results/1/pool_report_field_units.schema.json",
+      "summary": "The display units of the collateral-pool report fields.",
+      "title": "PoolReportFieldUnits",
+      "type_name": "PoolReportFieldUnits"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
-      "bytes": 2491,
+      "bytes": 2872,
       "kind": "output",
       "path": "schemas/results/1/pool_stats.schema.json",
       "summary": "Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.",
@@ -1100,7 +1127,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
-      "bytes": 2537,
+      "bytes": 2805,
       "kind": "output",
       "path": "schemas/results/1/scenario_table.schema.json",
       "summary": "Structured-credit scenario grid results for one tranche.",
@@ -1108,8 +1135,17 @@
       "type_name": "ScenarioTable"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table_field_units.schema.json",
+      "bytes": 2448,
+      "kind": "output",
+      "path": "schemas/results/1/scenario_table_field_units.schema.json",
+      "summary": "The display units of a scenario table's axes and measures.",
+      "title": "ScenarioTableFieldUnits",
+      "type_name": "ScenarioTableFieldUnits"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
-      "bytes": 9967,
+      "bytes": 26793,
       "kind": "output",
       "path": "schemas/results/1/simulation_diagnostics.schema.json",
       "summary": "Deal-level accounting produced alongside the tranche cashflows.",
@@ -1117,13 +1153,31 @@
       "type_name": "SimulationDiagnostics"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/simulation_field_units.schema.json",
+      "bytes": 2970,
+      "kind": "output",
+      "path": "schemas/results/1/simulation_field_units.schema.json",
+      "summary": "The display units of a simulation's coverage, diversion, enhancement and excess-spread series.",
+      "title": "SimulationFieldUnits",
+      "type_name": "SimulationFieldUnits"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
-      "bytes": 36503,
+      "bytes": 53363,
       "kind": "output",
       "path": "schemas/results/1/simulation_run.schema.json",
       "summary": "Tranche cashflows and deal accounting from one deterministic simulation.",
       "title": "SimulationRun",
       "type_name": "SimulationRun"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/standard_deal_family.schema.json",
+      "bytes": 5325,
+      "kind": "output",
+      "path": "schemas/results/1/standard_deal_family.schema.json",
+      "summary": "One deal family the standard structured-credit constructor accepts, with its registry profile and an example of its inputs.",
+      "title": "StandardDealFamily",
+      "type_name": "StandardDealFamily"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/tranche_cashflows.schema.json",

@@ -605,6 +605,9 @@ mod currency_stamp_tests {
 }
 
 /// Equity analytics from the residual class's projected cashflows.
+///
+/// With nothing invested (a zero purchase price or a zero balance) `irr`, `moic` and
+/// every `cash_on_cash` share are `None`: each divides by `invested`, so none exists.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -616,16 +619,22 @@ pub struct EquityMetrics {
     /// Cash invested on the valuation date: current balance × purchase price.
     pub invested: f64,
     /// Annualized IRR of `−invested` on the valuation date against every
-    /// projected distribution (XIRR); `None` when no rate solves.
+    /// projected distribution (XIRR, ACT/365F), as a decimal; `None` when no rate
+    /// solves, as when nothing is invested or no distribution is projected.
     pub irr: Option<f64>,
-    /// Multiple on invested capital: total distributions ÷ `invested`.
-    pub moic: f64,
-    /// Present value of the distributions on the deal's discount curve, as a
-    /// percent of the equity's current balance.
+    /// Multiple on invested capital: total distributions ÷ `invested`, interest
+    /// and principal together. `None` when nothing is invested; a class that
+    /// receives nothing on a positive investment has a true `0.0`.
+    pub moic: Option<f64>,
+    /// Present value at the valuation date of the distributions on the deal's
+    /// discount curve, as a percent of the equity's current balance (`62.5` =
+    /// 62.5%). It does not depend on the purchase price.
     pub nav_pct: f64,
-    /// Each distribution as a fraction of `invested`, by payment date.
-    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<(String, f64)>"))]
-    pub cash_on_cash: Vec<(Date, f64)>,
+    /// Each distribution as a decimal fraction of `invested`, by payment date and
+    /// not annualized; the fractions sum to `moic`. The share is `None` when
+    /// nothing is invested.
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<(String, Option<f64>)>"))]
+    pub cash_on_cash: Vec<(Date, Option<f64>)>,
 }
 
 /// Equity analytics for the deal's residual class.
@@ -643,12 +652,17 @@ pub struct EquityMetrics {
 /// # Returns
 ///
 /// IRR, MOIC, NAV and the cash-on-cash series; distributions include reserve
-/// interest routed directly to the equity class.
+/// interest routed directly to the equity class. An equity class that receives
+/// nothing has no IRR and a true zero MOIC and NAV; one that receives little still
+/// has an IRR, near −100%.
 ///
 /// # Errors
 ///
-/// Returns an error when the deal fails validation, has no equity tranche,
-/// or the projection or discount curve is unavailable.
+/// Returns an error when the deal fails validation, has no equity tranche (the
+/// first tranche of `TrancheSeniority::Equity` is the class measured), the
+/// purchase price is not a finite non-negative percent, the simulation records
+/// no such tranche, as for a pool with no assets and no reserve, or the
+/// projection or discount curve is unavailable.
 pub fn calculate_equity_metrics(
     deal: &StructuredCredit,
     market: &MarketContext,
@@ -688,7 +702,7 @@ pub fn calculate_equity_metrics(
         flows.push((*date, cash));
         total += cash;
         pv += cash * curve.df_between_dates(as_of, *date)?;
-        cash_on_cash.push((*date, if invested > 0.0 { cash / invested } else { 0.0 }));
+        cash_on_cash.push((*date, (invested > 0.0).then(|| cash / invested)));
     }
     let irr = if invested > 0.0 {
         finstack_quant_core::cashflow::xirr(
@@ -706,11 +720,7 @@ pub fn calculate_equity_metrics(
         currency: equity.current_balance.currency(),
         invested,
         irr,
-        moic: if invested > 0.0 {
-            total / invested
-        } else {
-            0.0
-        },
+        moic: (invested > 0.0).then(|| total / invested),
         nav_pct: if current_balance > 0.0 {
             pv / current_balance * 100.0
         } else {

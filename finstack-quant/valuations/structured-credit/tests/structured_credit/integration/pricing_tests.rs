@@ -285,7 +285,10 @@ fn test_structured_credit_full_metric_suite() {
         finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
         finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
             id: "TEST_CLO".into(),
-            pool: create_simple_pool(),
+            pool: AssetPool {
+                deal_type: DealType::Clo,
+                ..create_simple_pool()
+            },
             tranches: create_simple_tranches(),
             closing_date: Date::from_calendar_date(2024, Month::January, 1).unwrap(),
             maturity: maturity_date(),
@@ -596,7 +599,10 @@ fn test_structured_credit_empty_metrics_request() {
         finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
         finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
             id: "TEST_CLO".into(),
-            pool: create_simple_pool(),
+            pool: AssetPool {
+                deal_type: DealType::Clo,
+                ..create_simple_pool()
+            },
             tranches: create_simple_tranches(),
             closing_date: Date::from_calendar_date(2024, Month::January, 1).unwrap(),
             maturity: maturity_date(),

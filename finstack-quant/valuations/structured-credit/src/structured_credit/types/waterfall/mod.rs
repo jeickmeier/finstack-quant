@@ -621,41 +621,46 @@ impl WaterfallDistribution {
 }
 
 /// Record of a diverted payment from one tier to another recipient.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DiversionRecord {
-    /// Source tier where cash originated.
+    /// `WaterfallTier::id` of the coverage-test tier that diverted the cash.
     pub source_tier: String,
-    /// Recipient identifier that received the diverted cash.
+    /// `Recipient::id` that received the cash, or `principal_account` when a
+    /// `Reinvest` test retained it as principal proceeds.
     pub target_tranche: String,
-    /// Diverted amount.
+    /// Cash diverted, in the deal currency.
     pub amount: Money,
-    /// Human-readable reason for diversion.
+    /// Failing coverage tests that caused the diversion, for display.
     pub reason: String,
 }
 
-/// Record of individual payment
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// One recipient's payment as the waterfall executor made it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PaymentRecord {
-    /// Tier id
+    /// `WaterfallTier::id` of the tier that made the payment.
     pub tier_id: String,
-    /// Recipient id within tier
+    /// `Recipient::id` within the tier.
     pub recipient_id: String,
-    /// Priority
+    /// `WaterfallTier::priority` of that tier (lower runs first).
     pub priority: usize,
-    /// Recipient
+    /// Who was paid. An equity class is paid as `RecipientType::Equity`, every
+    /// other class as `RecipientType::Tranche` with its id.
     pub recipient: RecipientType,
-    /// Requested amount
+    /// Amount the recipient's calculation asked for, in the deal currency.
     pub requested_amount: Money,
-    /// Paid amount
+    /// Cash actually paid, in the deal currency.
     pub paid_amount: Money,
-    /// Shortfall
+    /// `requested_amount` less `paid_amount`.
     pub shortfall: Money,
-    /// Diverted
+    /// Whether a failing coverage test diverted this payment here.
     pub diverted: bool,
+    /// Whether this payment is capital: it retires the tranche's balance and
+    /// books to its principal flows rather than its interest flows.
+    pub is_principal: bool,
 }
 
 /// Main waterfall engine with tier-based distribution
