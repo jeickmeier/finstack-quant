@@ -966,6 +966,24 @@ it(
     expect(
       call.mock.calls.filter(([method]) => method === "runSimulation"),
     ).toHaveLength(1);
+    // ... and the enhancement chart, from that same simulation.
+    fireEvent.click(
+      screen.getByText("Credit enhancement and excess spread", {
+        selector: "summary",
+      }),
+    );
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector(
+            '[aria-label="Credit enhancement and excess spread"]',
+          ),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    expect(
+      call.mock.calls.filter(([method]) => method === "runSimulation"),
+    ).toHaveLength(1);
     // The grid and the price extent come from Rust's example and the returned prices.
     fireEvent.click(screen.getByText("Scenarios", { selector: "summary" }));
     await waitFor(

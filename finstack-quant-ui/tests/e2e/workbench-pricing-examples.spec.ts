@@ -281,6 +281,15 @@ test("a standard deal family builds, prices and lists its native tranches", asyn
       .getByRole("region", { name: "Coverage tests" })
       .or(results.getByText(/returned no coverage tests/)),
   ).toBeVisible();
+  // ... and its credit enhancement and excess spread.
+  await results
+    .locator("summary", { hasText: /^Credit enhancement and excess spread$/ })
+    .click();
+  await expect(
+    results
+      .getByRole("region", { name: "Credit enhancement and excess spread" })
+      .getByRole("table", { name: "By payment date" }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 
