@@ -945,3 +945,45 @@ test('bondWorkoutLadder matches Python, a null yield included', () => {
     ['2025-01-17', null, true]
   );
 });
+
+test('computeQuotes matches Python, a null field included, and rejects a kind the bond lacks', () => {
+  const { market, as_of: asOf, cases, rejected } = golden.compute_quotes;
+  for (const { bond: bondJson, quote_input: quoteInput, quotes } of cases) {
+    const bond = instruments.Bond.fromJson(bondJson);
+    try {
+      same(plain(instruments.computeQuotes(bond, market, asOf, quoteInput)), quotes, 'quote set');
+      // The same quote as JSON text.
+      same(
+        plain(instruments.computeQuotes(bond, market, asOf, JSON.stringify(quoteInput))),
+        quotes,
+        'quote set from text'
+      );
+    } finally {
+      bond.free();
+    }
+  }
+  const [bullet, , , , frn] = cases.map((entry) => entry.quotes);
+  assert.equal(bullet.discount_margin, null);
+  assert.equal(bullet.clean_price_pct, 98.5);
+  assert.equal(frn.asw_market, null);
+  assert.equal(frn.japanese_simple_yield, null);
+
+  const bond = instruments.Bond.fromJson(rejected.bond);
+  try {
+    assert.throws(
+      () => instruments.computeQuotes(bond, market, asOf, rejected.quote_input),
+      (error) =>
+        error.name === 'FinstackError' &&
+        error.kind === 'validation' &&
+        error.message.includes('requires a floating-rate bond')
+    );
+    for (const strict of [{ yield: 0.05 }, { ytm: 0.05, ytw: 0.05 }]) {
+      assert.throws(
+        () => instruments.computeQuotes(bond, market, asOf, strict),
+        (error) => error.kind === 'validation'
+      );
+    }
+  } finally {
+    bond.free();
+  }
+});

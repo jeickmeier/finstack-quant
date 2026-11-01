@@ -10,6 +10,15 @@
       "type_name": "Attributes"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/common/1/bond_quote_input.schema.json",
+      "bytes": 3919,
+      "kind": "input",
+      "path": "schemas/common/1/bond_quote_input.schema.json",
+      "summary": "The one market quote a bond's quote set is solved from: a price, a yield or a spread.",
+      "title": "BondQuoteInput",
+      "type_name": "BondQuoteInput"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
       "bytes": 1989,
       "kind": "component",
@@ -953,6 +962,15 @@
       "summary": "Year-on-year inflation swap.",
       "title": "yoy_inflation_swap",
       "type_name": "SingleInstrumentEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/bond_quote_set.schema.json",
+      "bytes": 3894,
+      "kind": "output",
+      "path": "schemas/results/1/bond_quote_set.schema.json",
+      "summary": "Every price, yield and spread quote of a bond, solved from any one of them.",
+      "title": "BondQuoteSet",
+      "type_name": "BondQuoteSet"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/bond_workout_ladder.schema.json",

@@ -331,6 +331,44 @@ pub(super) fn bond_workout_ladder() -> Result<Vec<Value>> {
     )?)
 }
 
+/// The quote set of the example bond at 98.5 clean on a sloping curve.
+pub(super) fn bond_quote_set() -> Result<Vec<Value>> {
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions;
+    use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::{BondQuoteInput, PricingOptions};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+    let bond = Bond::example()?;
+    let as_of = bond.issue_date;
+    let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (10.0, 0.70)])
+        .build()?;
+    let market = MarketContext::new().insert(curve);
+    example(&quote_conversions::compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::CleanPricePct(98.5),
+        PricingOptions::default(),
+    )?)
+}
+
+/// A quote of each form: a price, a yield and a spread.
+pub(super) fn bond_quote_input() -> Result<Vec<Value>> {
+    use crate::instruments::BondQuoteInput;
+
+    [
+        BondQuoteInput::CleanPricePct(98.5),
+        BondQuoteInput::Ytm(0.055),
+        BondQuoteInput::ZSpread(0.012),
+    ]
+    .iter()
+    .map(|input| Ok(example(input)?.remove(0)))
+    .collect()
+}
+
 /// Report on the canonical example CLO pool at its closing date.
 pub(super) fn pool_report() -> Result<Vec<Value>> {
     let deal = structured_credit::StructuredCredit::example()?;

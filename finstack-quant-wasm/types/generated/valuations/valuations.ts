@@ -260,9 +260,7 @@ export type BarrierCrossing = "discrete" | "brownian_bridge";
  */
 export type CalibrationParameter = "debt_barrier" | "asset_vol";
 /**
- * Quote input for the bond quote engine.
- *
- * All spreads are expressed in **decimal** (`0.01 = 100bp`).
+ * The one market quote a bond's quote set is solved from: a price, a yield or a spread.
  */
 export type BondQuoteInput =
   | {
@@ -17630,6 +17628,70 @@ export interface BasketPricingConfig {
    * FX policy hint for conversions when constituent currency != basket currency.
    */
   fx_policy: FxConversionPolicy;
+}
+/**
+ * Every price, yield and spread quote of a bond, solved from any one of them.
+ */
+export interface BondQuoteSet {
+  /**
+   * Asset swap market spread (decimal). `None` under the same rule as
+   * `asw_par`, including on a plain floating-rate note, which the `asw_market`
+   * metric alone would still value.
+   */
+  asw_market?: number | null;
+  /**
+   * Asset swap par spread (decimal). `None` unless the bond has a fixed coupon
+   * and no custom cashflows, or custom cashflows with a floating specification.
+   */
+  asw_par?: number | null;
+  /**
+   * Clean price in the bond's currency, for its whole notional.
+   */
+  clean_price_currency: number;
+  /**
+   * Clean price as percentage of par (`99.5` = 99.5%, the quote convention).
+   */
+  clean_price_pct: number;
+  /**
+   * Dirty price at the quote date in the bond's currency, for its whole
+   * notional: clean price plus accrued interest to the quote date.
+   */
+  dirty_price_currency: number;
+  /**
+   * Discount margin (decimal). `None` unless the bond has floating coupons.
+   */
+  discount_margin?: number | null;
+  /**
+   * I-spread (decimal): the yield less the swap par rate. On a bond with
+   * exercise rights the yield and horizon are the worst exit's.
+   */
+  i_spread?: number | null;
+  /**
+   * Japanese simple yield (単利, decimal). `None` unless the coupon is fixed.
+   */
+  japanese_simple_yield?: number | null;
+  /**
+   * Moosmüller yield to maturity (decimal): simple interest to the next
+   * coupon, then periodic compounding.
+   */
+  moosmuller_ytm?: number | null;
+  /**
+   * Option-adjusted spread (decimal), from the bond's tree model.
+   */
+  oas?: number | null;
+  /**
+   * Street yield to maturity (decimal), compounded at the coupon frequency.
+   */
+  ytm?: number | null;
+  /**
+   * Yield to worst across every call, put and maturity exit (decimal).
+   */
+  ytw?: number | null;
+  /**
+   * Z-spread over the discount curve (decimal). On a bond with exercise
+   * rights it discounts the worst exit's flows.
+   */
+  z_spread?: number | null;
 }
 /**
  * Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked.

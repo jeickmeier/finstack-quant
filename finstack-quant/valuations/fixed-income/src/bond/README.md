@@ -140,6 +140,10 @@ risk-free benchmark PV, not a corporate market value. Choose one credit basis:
 - **Straight bond:** calibrate `ZSpread` from a clean market quote with
   `pricing::quote_conversions::compute_quotes`, or set `quoted_z_spread` as the
   price driver. The Z-spread shifts the risk-free discount curve.
+- **Whole quote set:** `pricing::quote_conversions::compute_quotes` solves every
+  price, yield and spread from any one of them. Each equals the metric of the
+  same name at that clean price, and a quote kind that does not apply to the bond
+  is an error.
 - **Worst workout:** `pricing::quote_conversions::bond_workout_ladder` returns
   the yield and I-spread to every call, put and maturity exit, with the row the
   `ytw` metric selects marked.
