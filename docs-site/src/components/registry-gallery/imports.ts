@@ -67,6 +67,13 @@ export const importHarnesses = {
       name: "use-bond-workout-ladder",
       modules: modules.length,
     })),
+  "use-compute-quotes": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-compute-quotes/use-compute-quotes"),
+    ]).then((modules) => ({
+      name: "use-compute-quotes",
+      modules: modules.length,
+    })),
   "use-metric-values": () =>
     Promise.all([
       import("@/hooks/valuations/use-metric-values/use-metric-values"),

@@ -181,6 +181,12 @@
       "worker": "none"
     },
     {
+      "name": "quote-converter",
+      "type": "registry:component",
+      "docs": "Answers what a bond's other quotes are given any one of them. Offers the quote kinds of the BondQuoteInput schema and presents a native valuations.instruments.computeQuotes result (useComputeQuotes) in Rust's field order. Pass metricMetadata of quoteSetMetrics for the units. A null field shows as no value, never zero. A quote that cannot be solved, a kind the bond does not have or one metric of the set failing, shows the native error as returned. Nothing is converted or compared. Accepts defaultInput, onSubmit, quotes, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "metric-picker",
       "type": "registry:ui",
       "docs": "Controlled metric-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
@@ -644,6 +650,10 @@
     },
     {
       "name": "use-bond-workout-ladder",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-compute-quotes",
       "type": "registry:hook"
     },
     {
@@ -1551,6 +1561,10 @@
     {
       "path": "finstack-quant-ui/tests/valuations/workout-ladder/cases.json",
       "sha256": "dfcfa85972586a4906e5a46aa411ca77086bd0bc6a4e634e73d2cf0194e0a43f"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/quote-converter/cases.json",
+      "sha256": "032713eeac54d9d1799fc4393a9c88a41265ca061af2b7958280a876883a61a6"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",

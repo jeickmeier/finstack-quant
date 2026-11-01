@@ -94,6 +94,69 @@
       }
     },
     {
+      "name": "quote-converter",
+      "type": "registry:component",
+      "title": "Quote converter",
+      "description": "Enter any one quote of a bond and see the whole price, yield and spread set Rust returns for it.",
+      "docs": "Answers what a bond's other quotes are given any one of them. Offers the quote kinds of the BondQuoteInput schema and presents a native valuations.instruments.computeQuotes result (useComputeQuotes) in Rust's field order. Pass metricMetadata of quoteSetMetrics for the units. A null field shows as no value, never zero. A quote that cannot be solved, a kind the bond does not have or one metric of the set failing, shows the native error as returned. Nothing is converted or compared. Accepts defaultInput, onSubmit, quotes, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/quote-converter/quote-converter.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/quote-converter/quote-converter.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/primitive-contracts",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "button"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-compute-quotes",
+      "type": "registry:hook",
+      "title": "useComputeQuotes",
+      "description": "Solves a bond's whole quote set from any one quote through the WASM worker.",
+      "docs": "valuations.instruments.Bond.fromJson then computeQuotes for the supplied instrument, market, date and quote, the handle freed afterwards. Null means no request. Requires FinstackQueryProvider. A quote that cannot be solved, or a missing curve, is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-compute-quotes/use-compute-quotes.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-compute-quotes/use-compute-quotes.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-metric-values",
       "type": "registry:hook",
       "title": "useMetricValues",

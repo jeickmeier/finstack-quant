@@ -130,6 +130,7 @@
     "valuations.instruments.StructuredCredit",
     "valuations.instruments.bondWorkoutLadder",
     "valuations.instruments.calendarYearLadderByCurrency",
+    "valuations.instruments.computeQuotes",
     "valuations.instruments.equityMetricsFieldUnits",
     "valuations.instruments.instrumentCashflowsWithMarket",
     "valuations.instruments.listModelsGrouped",

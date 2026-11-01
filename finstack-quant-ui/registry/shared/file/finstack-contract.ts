@@ -131,6 +131,21 @@ export interface BondWorkoutLadderRequest {
   /** ISO-8601 valuation date. */
   readonly asOf: string;
 }
+/** Every price, yield and spread quote of a bond, from any one of them. */
+export type BondQuoteSet = ReturnType<
+  typeof valuations.instruments.computeQuotes
+>;
+/** One bond on a complete market at a valuation date, with the one quote to solve from. */
+export interface ComputeQuotesRequest {
+  readonly instrumentJson: string;
+  readonly marketJson: string;
+  /** ISO-8601 valuation date. */
+  readonly asOf: string;
+  /** One BondQuoteInput: a single key naming the quote kind. */
+  readonly quoteInput: Parameters<
+    typeof valuations.instruments.computeQuotes
+  >[3];
+}
 /** One deal's collateral pool at a date. */
 export interface PoolReportRequest {
   readonly instrumentJson: string;
@@ -1182,6 +1197,8 @@ export interface ValuationsApi {
   bondWorkoutLadder(
     request: BondWorkoutLadderRequest,
   ): Promise<Envelope<BondWorkoutLadder>>;
+  /** valuations.instruments.Bond.fromJson + computeQuotes: the whole quote set from any one quote. */
+  computeQuotes(request: ComputeQuotesRequest): Promise<Envelope<BondQuoteSet>>;
   /** valuations.instruments.poolReport over the deal's pool: statistics, WARF and concentration. */
   poolReport(request: PoolReportRequest): Promise<Envelope<PoolReport>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
