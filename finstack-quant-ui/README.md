@@ -174,9 +174,9 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twenty-five native fixture generators under
+`mise run ui-fixtures` runs the twenty-six native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
-horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders;
+horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
 scenario-table; statements → covenants; analytics; models credit, risk, options and liability management;
 margin), then
@@ -1006,6 +1006,26 @@ null yield, an exit with no finite yield, shows as "No yield". A bond with exerc
 rights needs `quoted_clean_price_pct`, or the native error shows as returned.
 Z-spread is not reported per exit, because no per-exit convention exists. The native
 fixture is `tests/valuations/workout-ladder/cases.json`.
+
+## Quote converter
+
+`QuoteConverter` (`@finstack/quote-converter`) answers what a bond's other quotes are
+given any one of them. The user picks a kind and enters a value; it draws one
+`valuations.instruments.computeQuotes` result, fetched with `useComputeQuotes`
+(`@finstack/use-compute-quotes`), in Rust's field order. The kinds are the branches
+of the `BondQuoteInput` schema, carried in `primitive-contracts.json` as the day-count
+and business-day selects carry theirs. Each yield and spread is the metric of the same
+name at that clean price, with the unit `metricMetadata` declares for
+`quoteSetMetrics`; `clean_price_pct` has no metric id and its label states its unit.
+A null field shows as "No value", never zero: it does not apply to the bond or has no
+finite value. A quote that cannot be solved shows the native error as returned: a kind
+the bond does not have (`discount_margin` with no floating coupons, `asw_market` or
+`japanese_simple_yield` on a floating coupon, `z_spread` with exercise rights), or one
+metric of the set failing, which fails the whole set. A bond with exercise rights needs
+HW1F parameters for its `oas`. `asw_market` does not recover the price it came from on
+a bond whose worst exit is early, because the metric runs the swap to the workout and
+its inverse to maturity. Nothing is converted or compared in JavaScript. The native
+fixture is `tests/valuations/quote-converter/cases.json`.
 
 ## Option calculator
 

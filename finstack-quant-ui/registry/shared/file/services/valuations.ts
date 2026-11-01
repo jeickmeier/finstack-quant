@@ -28,6 +28,7 @@ export type ValuationsNative = {
       | "equityMetricsFieldUnits"
       | "Bond"
       | "bondWorkoutLadder"
+      | "computeQuotes"
       | "poolReport"
       | "poolReportFieldUnits"
       | "standardDealFamilies"
@@ -167,6 +168,21 @@ export function createValuationsService(
             bond,
             request.marketJson,
             request.asOf,
+          );
+        } finally {
+          bond.free();
+        }
+      });
+    },
+    computeQuotes(request) {
+      return context.result(() => {
+        const bond = instruments.Bond.fromJson(request.instrumentJson);
+        try {
+          return instruments.computeQuotes(
+            bond,
+            request.marketJson,
+            request.asOf,
+            request.quoteInput,
           );
         } finally {
           bond.free();

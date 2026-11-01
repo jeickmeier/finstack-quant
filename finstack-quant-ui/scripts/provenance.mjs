@@ -519,6 +519,17 @@ const displays = [
       "Returned BondWorkoutLadder of one bond: one row per call, put and maturity exit in Rust's date order, every yield solved at the one price shown. The worst row is the one is_worst marks, the exit the ytw metric selects; no yield is compared here. Yield and I-spread units are what metricMetadata declares for ytw and i_spread, and a null yield is shown as no yield, never zero. Z-spread is not reported per exit.",
   },
   {
+    id: "quote-converter",
+    api: [
+      "valuations.instruments.computeQuotes",
+      "ValuationInstrumentsNamespace",
+      "computeQuotes",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned BondQuoteSet of one bond from the one quote entered: every price, yield and spread in Rust's field order, each the metric of the same name at that clean price. Quote kinds are the branches of the BondQuoteInput schema. Units are what metricMetadata declares for clean_price, dirty_price and each yield and spread id; clean_price_pct has no metric id and its label states its unit. A null field is shown as no value, never zero, and a quote that cannot be solved shows the native error. Nothing is converted or compared here.",
+  },
+  {
     id: "loan-yield-card",
     api: [
       "valuations.instruments.priceInstrumentWithMarket",

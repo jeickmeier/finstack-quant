@@ -2230,6 +2230,42 @@
       }
     },
     {
+      "id": "quote-converter",
+      "route": "returned-report",
+      "convention": "Returned BondQuoteSet of one bond from the one quote entered: every price, yield and spread in Rust's field order, each the metric of the same name at that clean price. Quote kinds are the branches of the BondQuoteInput schema. Units are what metricMetadata declares for clean_price, dirty_price and each yield and spread id; clean_price_pct has no metric id and its label states its unit. A null field is shown as no value, never zero, and a quote that cannot be solved shows the native error. Nothing is converted or compared here.",
+      "api": {
+        "name": "valuations.instruments.computeQuotes",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "computeQuotes",
+        "inputs": [
+          {
+            "name": "bond",
+            "type": "Bond",
+            "optional": false
+          },
+          {
+            "name": "marketJson",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "quoteInput",
+            "type": "generated.valuations.BondQuoteInput | string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.valuations.BondQuoteSet",
+        "declaration": "/**\n   * Every price, yield and spread quote of a bond, solved from any one of them (mirrors Rust `compute_quotes`).\n   * @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights needs HW1F parameters on the bond or in the market, because its `oas` is part of the set.\n   * @param marketJson - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index curve.\n   * @param asOf - ISO-8601 valuation date; the quote date and accrued interest follow the bond's settlement convention.\n   * @param quoteInput - One `BondQuoteInput`, a plain object or JSON string with exactly one key: `clean_price_pct` (percent of par), `dirty_price_currency` (currency, the whole notional), `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_market`, `i_spread` or `japanese_simple_yield` (decimals, `0.01` = 100bp).\n   * @returns `BondQuoteSet` plain object: `clean_price_currency`, `clean_price_pct`, `dirty_price_currency`, and `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_par`, `asw_market`, `i_spread`, `japanese_simple_yield` and `moosmuller_ytm` as decimals, each `null` when it does not apply to the bond or has no finite value.\n   * @throws Error - Throws with kind `validation` if `quoteInput` has an unknown or second key or a non-finite value, a dirty price is not positive, the market JSON or `asOf` is malformed, the quote kind does not apply to the bond (`discount_margin` with no floating coupons, `asw_market` or `japanese_simple_yield` on a floating coupon, `z_spread` with exercise rights), or a metric of the set cannot be solved, which fails the whole set (`z_spread` with a call or put on the quote date below the price, `oas` with exercise rights and no HW1F parameters); and with kind `not_found` if a curve the bond needs to normalize the quote is missing.\n   */\n  computeQuotes(\n    bond: Bond,\n    marketJson: string,\n    asOf: string,\n    quoteInput: generated.valuations.BondQuoteInput | string\n  ): generated.valuations.BondQuoteSet;",
+        "sha256": "6caf5afb4f1ec73e762a66d1e28206ab87c22cd758bf5ce64210372738b7995d"
+      }
+    },
+    {
       "id": "loan-yield-card",
       "route": "returned-model",
       "convention": "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model.",
