@@ -964,8 +964,9 @@ mod cases {
 
         let (diagnostics_wac, _, _) = state::pool_composition(&state).expect("composition");
         // Rounding only: two products and one division on exact inputs.
-        assert!((pool.wac() - 0.08).abs() < 1e-15, "{}", pool.wac());
-        assert_eq!(pool.wac().to_bits(), diagnostics_wac.to_bits());
+        let wac = pool.wac().expect("fixed-rate balance");
+        assert!((wac - 0.08).abs() < 1e-15, "{wac}");
+        assert_eq!(Some(wac), diagnostics_wac);
     }
 
     #[test]
@@ -3665,5 +3666,44 @@ mod cases {
         let state = state_of(&deal);
         assert_eq!(step_down_metrics(&state).credit_enhancement, 0.30);
         assert_eq!(formula_before_sharing(&state), 0.60);
+    }
+
+    /// A retired note leaves its OC and IC tests with no claim: the record states
+    /// no ratio or cushion, and the test still passes.
+    #[test]
+    fn a_retired_note_has_no_ratio_or_cushion() {
+        use crate::structured_credit::types::CoverageTestSpec;
+        let mut deal = clo_with_mezz(vec![
+            CoverageTestSpec::oc("CLASS_A", 1.2),
+            CoverageTestSpec::ic("CLASS_A", 1.1),
+            CoverageTestSpec::oc("CLASS_B", 1.1),
+        ]);
+        deal.tranches.tranches[0].current_balance = Money::from((0_i64, Currency::USD));
+        let run = run_reconciled(&deal);
+        let tests = &run.diagnostics.periods[0].coverage_tests;
+        let retired: Vec<_> = tests
+            .iter()
+            .filter(|test| test.test_id.contains("CLASS_A"))
+            .collect();
+        assert_eq!(retired.len(), 2);
+        for test in retired {
+            assert_eq!(test.ratio, None, "{}", test.test_id);
+            assert_eq!(test.cushion, None, "{}", test.test_id);
+            assert!(test.passing, "{}", test.test_id);
+        }
+        let live = tests
+            .iter()
+            .find(|test| test.test_id.contains("CLASS_B"))
+            .expect("CLASS_B test");
+        assert_eq!(
+            live.cushion.expect("claim outstanding"),
+            live.ratio.expect("claim outstanding") - live.trigger_level
+        );
+        let json = serde_json::to_value(&run.diagnostics.periods[0].coverage_tests).expect("json");
+        assert!(json
+            .as_array()
+            .expect("rows")
+            .iter()
+            .any(|row| row["ratio"].is_null()));
     }
 }

@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "5590246edc27a463671f87aa6ae1e8d170af11df0fa7669f4835963c6cd2a1b3",
+          "sha256": "a964ba14993e4641251c27a329be6f48477187266804c5926deb0d9cc3523346",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "b8230fbb7bff0c79e51a2b07673e0dec7f8b13b2904ce7f097db888480ae3b29",
+          "sha256": "2f344763420769d16e51e18ed1cdd021ac75841e8c6c5fc490b3135d7b5a2f7e",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -334,7 +334,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
-          "sha256": "c164dbd24e936875f977b39803df41cd42dd824e2cf54ad6e3ca081868ca4ce9",
+          "sha256": "ed75fbbed7c8f5ea47238d31b8b0da97d4157064773e083577201a4779a1e7ad",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -1780,7 +1780,7 @@
     {
       "id": "pool-report",
       "route": "returned-report",
-      "convention": "Returned PoolReport fields in the units poolReportFieldUnits states: statistics, Moody's WARF and concentration tables by obligor, industry and rating, in Rust's row order with balance_pct in percent points of total_balance. A null key is shown as missing, never dropped; nothing is summed, sorted or grouped here.",
+      "convention": "Returned PoolReport fields in the units poolReportFieldUnits states: statistics, Moody's WARF and concentration tables by obligor, industry and rating, in Rust's row order with balance_pct in percent points of total_balance. A null key is shown as missing, never dropped, and a null statistic as missing, never zero; nothing is summed, sorted or grouped here.",
       "api": {
         "name": "valuations.instruments.poolReport",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -1832,7 +1832,7 @@
     {
       "id": "coverage-test-chart",
       "route": "returned-report",
-      "convention": "Returned SimulationDiagnostics.first_breaches in Rust's order and, for the selected test, periods[].coverage_tests' ratio, trigger_level, cushion and passing on the dates Rust recorded them, in the units simulationFieldUnits states. The first breach date, cushion and pass or fail are Rust's. A trigger with a first_breaches entry and no coverage_tests row is reported as having no ratio by date. waterfall.diverted_cash and diverted_amounts are shown for the deal, not attributed to a test. Nothing is computed, joined by date, sorted or classified here.",
+      "convention": "Returned SimulationDiagnostics.first_breaches in Rust's order and, for the selected test, periods[].coverage_tests' ratio, trigger_level, cushion and passing on the dates Rust recorded them, in the units simulationFieldUnits states. The first breach date, cushion and pass or fail are Rust's. A test recorded on fewer dates than the deal has periods states the counts returned, and a null ratio or cushion is shown as no claim outstanding with no dot. waterfall.diverted_cash and diverted_amounts are shown for the deal, not attributed to a test. Nothing is computed, joined by date, sorted or classified here.",
       "api": {
         "name": "StructuredCredit#runSimulation",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -1884,7 +1884,7 @@
     {
       "id": "equity-tranche-card",
       "route": "returned-report",
-      "convention": "Returned EquityMetrics in the units equityMetricsFieldUnits states: invested in the deal currency; irr an annual XIRR decimal on ACT/365F, or null when no rate solves, stated rather than drawn as zero; moic total distributions over invested; nav_pct distributions discounted on the deal's discount curve as a percent of current balance; cash_on_cash each distribution as an unannualized decimal share of invested. Rust chooses the equity tranche and returns zero for moic and cash_on_cash when nothing is invested; a returned zero is drawn as zero. A blank purchase price is omitted, so Rust's par default applies. Nothing is computed, rescaled or classified here.",
+      "convention": "Returned EquityMetrics in the units equityMetricsFieldUnits states: invested in the deal currency; irr an annual XIRR decimal on ACT/365F, or null when no rate solves, stated rather than drawn as zero; moic total distributions over invested; nav_pct distributions discounted on the deal's discount curve as a percent of current balance; cash_on_cash each distribution as an unannualized decimal share of invested. Rust chooses the equity tranche and returns null for moic and cash_on_cash when nothing is invested, stated rather than drawn as zero; a returned zero is drawn as zero. A blank purchase price is omitted, so Rust's par default applies. Nothing is computed, rescaled or classified here.",
       "api": {
         "name": "StructuredCredit#equityMetrics",
         "source": "finstack-quant-wasm/index.d.ts",

@@ -131,15 +131,12 @@ fn period_diagnostics_carry_the_executor_coverage_ratios_and_pool_path() {
     assert!((first.pool_factor - 1.0).abs() < 1e-12);
     assert_eq!(first.coverage_tests.len(), 1);
     let oc = &first.coverage_tests[0];
-    assert!(
-        (oc.ratio - 100.0 / 60.0).abs() < 1e-9,
-        "OC ratio {}",
-        oc.ratio
-    );
+    let ratio = oc.ratio.expect("notes outstanding");
+    assert!((ratio - 100.0 / 60.0).abs() < 1e-9, "OC ratio {ratio}");
     assert_eq!(oc.trigger_level, 1.20);
-    assert!((oc.cushion - (100.0 / 60.0 - 1.20)).abs() < 1e-9);
+    assert!((oc.cushion.expect("notes outstanding") - (100.0 / 60.0 - 1.20)).abs() < 1e-9);
     assert!(oc.passing);
-    assert!((first.wac - 0.08).abs() < 1e-12);
+    assert!((first.wac.expect("fixed-rate balance") - 0.08).abs() < 1e-12);
     assert_eq!(first.defaults.amount(), 0.0);
     assert!(first.interest_collections.amount() > 0.0);
 
@@ -193,7 +190,7 @@ fn period_warf_is_the_pool_report_warf() {
     assert_eq!(first.warf, report.warf);
     assert_eq!(
         report.warf,
-        (4.0 * 1350.0 + 3.0 * 2720.0 + 3.0 * 3650.0) / 10.0
+        Some((4.0 * 1350.0 + 3.0 * 2720.0 + 3.0 * 3650.0) / 10.0)
     );
 }
 
@@ -241,7 +238,8 @@ fn equity_irr_reproduces_xirr_of_the_equity_flows() {
         .iter()
         .map(|(_, amount)| amount.amount())
         .sum();
-    assert!((metrics.moic - total / 25_000_000.0).abs() < 1e-12);
+    let moic = metrics.moic.expect("invested");
+    assert!((moic - total / 25_000_000.0).abs() < 1e-12);
     assert_eq!(metrics.cash_on_cash.len(), equity.cashflows.len());
     assert!(metrics.nav_pct > 0.0);
 
@@ -251,7 +249,7 @@ fn equity_irr_reproduces_xirr_of_the_equity_flows() {
         at_discount.irr.expect("irr") > irr,
         "a cheaper entry raises the IRR"
     );
-    assert!((at_discount.moic - metrics.moic / 0.8).abs() < 1e-9);
+    assert!((at_discount.moic.expect("invested") - moic / 0.8).abs() < 1e-9);
 }
 
 /// An equity class that receives nothing has no IRR and a true zero MOIC and NAV.
@@ -267,12 +265,13 @@ fn equity_metrics_of_a_class_that_receives_nothing_have_no_irr() {
         calculate_equity_metrics(&deal, &market(), close(), None).expect("equity metrics");
     assert_eq!(metrics.invested, 25_000_000.0);
     assert_eq!(metrics.irr, None);
-    assert_eq!(metrics.moic, 0.0);
+    // Invested and paid nothing: a real multiple of zero, not a missing one.
+    assert_eq!(metrics.moic, Some(0.0));
     assert_eq!(metrics.nav_pct, 0.0);
     assert!(metrics.cash_on_cash.is_empty());
 }
 
-/// Nothing invested leaves no IRR and zero ratios, and the NAV does not depend on the price.
+/// Nothing invested leaves no IRR, MOIC or shares, and the NAV does not depend on the price.
 #[test]
 fn equity_metrics_at_a_zero_price_have_no_irr_and_keep_the_nav() {
     let deal = clo(0.02);
@@ -280,10 +279,10 @@ fn equity_metrics_at_a_zero_price_have_no_irr_and_keep_the_nav() {
     let free = calculate_equity_metrics(&deal, &market(), close(), Some(0.0)).expect("free");
     assert_eq!(free.invested, 0.0);
     assert_eq!(free.irr, None);
-    assert_eq!(free.moic, 0.0);
+    assert_eq!(free.moic, None);
     assert_eq!(free.nav_pct, at_par.nav_pct);
     assert_eq!(free.cash_on_cash.len(), at_par.cash_on_cash.len());
-    assert!(free.cash_on_cash.iter().all(|(_, share)| *share == 0.0));
+    assert!(free.cash_on_cash.iter().all(|(_, share)| share.is_none()));
 }
 
 /// A deal without an equity class and an invalid price are errors, not zeros.
@@ -326,9 +325,9 @@ fn table_period(payment_date: Date, balance: f64) -> PeriodDiagnostics {
         payment_date,
         pool_balance: usd(balance),
         pool_factor: 0.8,
-        wac: 0.06,
-        weighted_avg_spread_bp: 125.0,
-        warf: 250.0,
+        wac: Some(0.06),
+        weighted_avg_spread_bp: None,
+        warf: Some(250.0),
         interest_collections: usd(2.0),
         principal_collections: usd(3.0),
         defaults: usd(4.0),
@@ -416,9 +415,6 @@ fn diagnostics_table_preserves_period_order_and_first_matching_interest() {
     );
     for (name, expected) in [
         ("pool_factor", 0.8),
-        ("wac", 0.06),
-        ("weighted_avg_spread_bp", 125.0),
-        ("warf", 250.0),
         ("interest_collections", 2.0),
         ("principal_collections", 3.0),
         ("defaults", 4.0),
@@ -435,6 +431,17 @@ fn diagnostics_table_preserves_period_order_and_first_matching_interest() {
         assert_eq!(
             table.column(name).expect("column").data,
             TableColumnData::Float64(vec![expected; 4])
+        );
+    }
+    // Averages are nullable: the period's floating population is empty.
+    for (name, expected) in [
+        ("wac", Some(0.06)),
+        ("weighted_avg_spread_bp", None),
+        ("warf", Some(250.0)),
+    ] {
+        assert_eq!(
+            table.column(name).expect("column").data,
+            TableColumnData::NullableFloat64(vec![expected; 4])
         );
     }
 }
@@ -477,7 +484,13 @@ fn empty_diagnostics_table_retains_column_order_and_dtypes() {
         ]
     );
     assert_eq!(table.columns[0].data, TableColumnData::String(Vec::new()));
-    assert!(table.columns[1..]
-        .iter()
-        .all(|column| column.data == TableColumnData::Float64(Vec::new())));
+    for column in &table.columns[1..] {
+        let expected = if ["wac", "weighted_avg_spread_bp", "warf"].contains(&column.name.as_str())
+        {
+            TableColumnData::NullableFloat64(Vec::new())
+        } else {
+            TableColumnData::Float64(Vec::new())
+        };
+        assert_eq!(column.data, expected, "{}", column.name);
+    }
 }

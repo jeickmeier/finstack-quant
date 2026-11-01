@@ -15,14 +15,16 @@ impl finstack_quant_valuations_core::metrics::MetricCalculator for CloWarfCalcul
             .resolved_for_pricing()?;
 
         // Performing par only: defaulted assets are carried at recovery in
-        // OC haircuts, not in the rating-factor average.
-        weighted_avg_rating_factor(
+        // OC haircuts, not in the rating-factor average. A metric is a number: no
+        // performing balance reports zero.
+        Ok(weighted_avg_rating_factor(
             clo.pool
                 .assets
                 .iter()
                 .filter(|asset| !asset.defaulted)
                 .map(|asset| (asset.balance.amount(), asset.rating)),
-        )
+        )?
+        .unwrap_or(0.0))
     }
 }
 
@@ -42,7 +44,8 @@ impl finstack_quant_valuations_core::metrics::MetricCalculator for CloWasCalcula
             .instrument_as::<crate::structured_credit::StructuredCredit>()?
             .resolved_for_pricing()?;
 
-        Ok(clo.pool.weighted_avg_spread_bp())
+        // A metric is a number: no spread-bearing collateral reports zero.
+        Ok(clo.pool.weighted_avg_spread_bp().unwrap_or(0.0))
     }
 }
 
@@ -71,7 +74,11 @@ impl MetricCalculator for WamCalculator {
         let deal = context
             .instrument_as::<StructuredCredit>()?
             .resolved_for_pricing()?;
-        deal.pool.weighted_avg_maturity(context.as_of)
+        // A metric is a number: a zero-balance pool reports zero.
+        Ok(deal
+            .pool
+            .weighted_avg_maturity(context.as_of)?
+            .unwrap_or(0.0))
     }
 }
 

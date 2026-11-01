@@ -772,6 +772,62 @@ def _diversified_pool() -> AssetPool:
     ])
 
 
+def test_absent_values_are_none_not_zero_or_infinity() -> None:
+    """A retired note has no ratio; nothing invested has no MOIC; an empty pool has no averages."""
+    from finstack_quant.valuations.instruments import (
+        AssetPool,
+        EquityMetrics,
+        SimulationDiagnostics,
+        calculate_pool_stats,
+        pool_report,
+    )
+
+    empty = AssetPool("P", "clo", USD)
+    assert [
+        empty.wac(),
+        empty.weighted_avg_spread_bp(),
+        empty.weighted_avg_maturity(CLOSE),
+        empty.diversity_score(),
+    ] == [
+        None,
+        None,
+        None,
+        None,
+    ]
+    stats = calculate_pool_stats(empty, CLOSE)
+    assert [stats.wac, stats.weighted_avg_spread_bp, stats.weighted_avg_maturity, stats.diversity_score] == [
+        None,
+        None,
+        None,
+        None,
+    ]
+    assert pool_report(empty, CLOSE).warf is None
+
+    metrics = EquityMetrics.from_json(
+        '{"tranche_id": "E", "currency": "USD", "invested": 0.0, "irr": null,'
+        ' "moic": null, "nav_pct": 90.0, "cash_on_cash": [["2025-01-15", null]]}'
+    )
+    assert metrics.moic is None
+    assert metrics.cash_on_cash[0][1] is None
+    assert metrics.to_dataframe()["cash_on_cash"].isna().all()
+
+    diagnostics = SimulationDiagnostics.from_json(
+        json.dumps({
+            "periods": [],
+            "reserve_balance_path": [],
+            "reserve_interest_paid": [],
+            "draws_from_reserve": {"amount": "0", "currency": "USD"},
+            "draws_from_principal": {"amount": "0", "currency": "USD"},
+            "unfunded_draws": {"amount": "0", "currency": "USD"},
+            "reserve_replenished": {"amount": "0", "currency": "USD"},
+            "early_amortization_date": None,
+            "tranche_draws": [],
+            "first_breaches": [],
+        })
+    )
+    assert diagnostics.coverage_tests_dataframe().empty
+
+
 def test_asset_pool_exposes_the_rust_collateral_analytics() -> None:
     """VALB-005: pool balances, WAC/WAS/WAM, diversity and lookups come from Rust."""
     from finstack_quant.valuations.instruments import PoolStats, calculate_pool_stats
@@ -781,7 +837,8 @@ def test_asset_pool_exposes_the_rust_collateral_analytics() -> None:
     assert pool.performing_balance().amount == pytest.approx(80_000_000.0)
     # Defaulted collateral is excluded from the coupon average.
     assert pool.wac() == pytest.approx(0.07)
-    assert pool.weighted_avg_spread_bp() == 0.0
+    # All fixed-rate: no spread-bearing collateral, so no average, not zero.
+    assert pool.weighted_avg_spread_bp() is None
     assert pool.weighted_avg_maturity(CLOSE) == pytest.approx(8.0, abs=0.02)
     assert pool.diversity_score() > 0.0
     assert [a.id for a in pool.assets_by_obligor("OB-2")] == ["L2", "L3"]

@@ -2554,7 +2554,7 @@
           },
           "pool_factor": 0.9690967704774951,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.000000000001,
           "interest_collections": {
             "amount": "2017128.3014637180",
@@ -2787,7 +2787,7 @@
           },
           "pool_factor": 0.939148550549911,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.000000000002,
           "interest_collections": {
             "amount": "1954792.5225872450",
@@ -3020,7 +3020,7 @@
           },
           "pool_factor": 0.9101258273365401,
           "wac": 0.08000000000000002,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.000000000001,
           "interest_collections": {
             "amount": "1915200.5175224470",
@@ -3253,7 +3253,7 @@
           },
           "pool_factor": 0.881999999999999,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
             "amount": "1856014.6363478310",
@@ -3486,7 +3486,7 @@
           },
           "pool_factor": 0.85474335156115,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3649.9999999999995,
           "interest_collections": {
             "amount": "1759556.5337383490",
@@ -3719,7 +3719,7 @@
           },
           "pool_factor": 0.828329021585021,
           "wac": 0.08000000000000002,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.000000000002,
           "interest_collections": {
             "amount": "1724127.0049219480",
@@ -3952,7 +3952,7 @@
           },
           "pool_factor": 0.8027309797108271,
           "wac": 0.07999999999999999,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0000000000005,
           "interest_collections": {
             "amount": "1689206.8564547960",
@@ -4185,7 +4185,7 @@
           },
           "pool_factor": 0.777923999999999,
           "wac": 0.08000000000000002,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
             "amount": "1637004.9092587850",
@@ -4418,7 +4418,7 @@
           },
           "pool_factor": 0.7538836360769341,
           "wac": 0.07999999999999999,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
             "amount": "1551928.8627572220",
@@ -4651,7 +4651,7 @@
           },
           "pool_factor": 0.730586197037988,
           "wac": 0.07999999999999999,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
             "amount": "1520680.0183411570",
@@ -4884,7 +4884,7 @@
           },
           "pool_factor": 0.708008724104949,
           "wac": 0.08000000000000002,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0000000000005,
           "interest_collections": {
             "amount": "1489880.4473931290",
@@ -5117,7 +5117,7 @@
           },
           "pool_factor": 0.686128967999998,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3649.9999999999995,
           "interest_collections": {
             "amount": "1443838.3299662480",
@@ -5350,7 +5350,7 @@
           },
           "pool_factor": 0.664925367019855,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3649.999999999999,
           "interest_collections": {
             "amount": "1368801.2569518690",
@@ -5583,7 +5583,7 @@
           },
           "pool_factor": 0.644377025787505,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
             "amount": "1341239.7761768990",
@@ -5816,7 +5816,7 @@
           },
           "pool_factor": 0.6244636946605651,
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3649.9999999999995,
           "interest_collections": {
             "amount": "1314074.5546007390",
@@ -6049,7 +6049,7 @@
           },
           "pool_factor": 0.605165749775998,
           "wac": 0.07999999999999999,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "warf": 3649.999999999999,
           "interest_collections": {
             "amount": "1273465.4070302290",
@@ -6605,16 +6605,16 @@
         "currency": "USD"
       },
       "wac": 0.08,
-      "weighted_avg_spread_bp": 0.0,
+      "weighted_avg_spread_bp": null,
       "weighted_avg_maturity": 8.005479452054795,
-      "diversity_score": 0.0,
+      "diversity_score": null,
       "assets_by_obligor": [],
       "assets_by_industry": [],
       "pool_stats": {
         "wac": 0.08,
-        "weighted_avg_spread_bp": 0.0,
+        "weighted_avg_spread_bp": null,
         "weighted_avg_maturity": 8.005479452054795,
-        "diversity_score": 0.0,
+        "diversity_score": null,
         "num_obligors": 0,
         "num_industries": 0,
         "defaulted_balance_pct": -0.0,
@@ -6630,7 +6630,7 @@
         },
         "stats": {
           "wac": 0.08,
-          "weighted_avg_spread_bp": 0.0,
+          "weighted_avg_spread_bp": null,
           "weighted_avg_maturity": 8.005479452054796,
           "diversity_score": 2.793103448275862,
           "num_obligors": 3,

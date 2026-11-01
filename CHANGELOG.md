@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Structured credit: absent values are null, not zero or infinity
+
+Wire changes. Each field below is now nullable; every value that exists is unchanged. An engine's pass, fail and pricing logic does not move.
+
+#### Changed
+
+- `CoverageTestDiagnostic.ratio` and `.cushion` are `null` (Python `None`) when the test has no claim outstanding: the notes it covers are retired (OC) or owe no interest (IC). They were `Infinity` in JavaScript and `None` in Python. `passing` is still `true` there. Python `coverage_tests_dataframe` gives `NaN`.
+- `AssetPool::wac`, `weighted_avg_spread_bp`, `weighted_avg_maturity` and `diversity_score` (Python alike, WASM `assetPool*` `number | undefined`), `PoolStats` of the same names, `PoolReport.warf` and `PeriodDiagnostics.wac`, `weighted_avg_spread_bp` and `warf` are `null` when their population is empty, so a floating-only pool has no WAC rather than a WAC of zero. `SimulationDiagnostics::to_table` makes those three columns nullable (Python `to_dataframe`: pandas `Float64`, `<NA>`). The `clo_was`, `clo_warf` and `wam` metrics still return `0.0` there, and `clo_warf` is unchanged for any pool with performing balance; RMBS `enable_stochastic` still passes a WAC of `0.0` to the prepayment model.
+- `EquityMetrics.moic` and each `cash_on_cash` share are `null` when nothing is invested. A class that receives nothing on a positive investment keeps a real MOIC of `0.0`.
+- `pool_report_field_units`: `wac` is `annual decimal, fixed-rate only`, `num_obligors` and `num_industries` are `named obligors` and `named industries`, as an asset naming neither is not counted.
+- `scenario_table_field_units`: `price` is `clean, % of current balance`.
+
+#### Added
+
+- `EquityMetricsFieldUnits.purchase_price` states the unit of the `purchase_price_pct` argument and that omitting it means par.
+
 ### Structured credit: units of an equity tranche's metrics
 
 #### Added
@@ -10,7 +26,7 @@
 
 #### Changed
 
-- `EquityMetrics` now documents its decimal, percent and multiple conventions and what a zero investment returns; its values are unchanged.
+- `EquityMetrics` now documents its decimal, percent and multiple conventions and what a zero investment returns.
 
 #### Fixed
 

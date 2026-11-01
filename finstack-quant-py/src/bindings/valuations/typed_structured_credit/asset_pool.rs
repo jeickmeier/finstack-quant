@@ -321,19 +321,19 @@ impl PyAssetPool {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.wac")]
     #[pyo3(text_signature = "($self)")]
-    fn wac(&self) -> f64 {
+    fn wac(&self) -> Option<f64> {
         self.inner.wac()
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.weighted_avg_spread_bp")]
     #[pyo3(text_signature = "($self)")]
-    fn weighted_avg_spread_bp(&self) -> f64 {
+    fn weighted_avg_spread_bp(&self) -> Option<f64> {
         self.inner.weighted_avg_spread_bp()
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.weighted_avg_maturity")]
     #[pyo3(text_signature = "($self, as_of)")]
-    fn weighted_avg_maturity(&self, as_of: &Bound<'_, PyAny>) -> PyResult<f64> {
+    fn weighted_avg_maturity(&self, as_of: &Bound<'_, PyAny>) -> PyResult<Option<f64>> {
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         self.inner
             .weighted_avg_maturity(as_of)
@@ -342,7 +342,7 @@ impl PyAssetPool {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.diversity_score")]
     #[pyo3(text_signature = "($self)")]
-    fn diversity_score(&self) -> f64 {
+    fn diversity_score(&self) -> Option<f64> {
         self.inner.diversity_score()
     }
 

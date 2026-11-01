@@ -346,20 +346,20 @@ pub fn asset_pool_performing_balance(pool: JsValue) -> Result<JsValue, JsValue> 
 
 /// Weighted-average coupon of the performing fixed-rate collateral (mirrors Rust `AssetPool::wac`).
 /// @param pool - `AssetPool` plain object or JSON string.
-/// @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `0` when no performing fixed-rate collateral exists.
+/// @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `undefined` when no performing fixed-rate collateral exists.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
 #[wasm_bindgen(js_name = assetPoolWac)]
-pub fn asset_pool_wac(pool: JsValue) -> Result<f64, JsValue> {
+pub fn asset_pool_wac(pool: JsValue) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     Ok(pool.wac())
 }
 
 /// Weighted-average spread of the performing collateral that carries an explicit spread (mirrors Rust `AssetPool::weighted_avg_spread_bp`).
 /// @param pool - `AssetPool` plain object or JSON string.
-/// @returns Balance-weighted spread in basis points; `0` when no performing asset carries a spread.
+/// @returns Balance-weighted spread in basis points; `undefined` when no performing asset carries a spread.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
 #[wasm_bindgen(js_name = assetPoolWeightedAvgSpreadBp)]
-pub fn asset_pool_weighted_avg_spread_bp(pool: JsValue) -> Result<f64, JsValue> {
+pub fn asset_pool_weighted_avg_spread_bp(pool: JsValue) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     Ok(pool.weighted_avg_spread_bp())
 }
@@ -367,10 +367,13 @@ pub fn asset_pool_weighted_avg_spread_bp(pool: JsValue) -> Result<f64, JsValue> 
 /// Balance-weighted average remaining maturity (mirrors Rust `AssetPool::weighted_avg_maturity`).
 /// @param pool - `AssetPool` plain object or JSON string.
 /// @param as_of - ISO-8601 date the remaining maturities are measured from.
-/// @returns Weighted average maturity in years (ACT/365F from `asOf`); `0` for an empty pool.
+/// @returns Weighted average maturity in years (ACT/365F from `asOf`); `undefined` when the pool balance is zero.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
 #[wasm_bindgen(js_name = assetPoolWeightedAvgMaturity)]
-pub fn asset_pool_weighted_avg_maturity(pool: JsValue, as_of: JsValue) -> Result<f64, JsValue> {
+pub fn asset_pool_weighted_avg_maturity(
+    pool: JsValue,
+    as_of: JsValue,
+) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     pool.weighted_avg_maturity(js_date(&as_of, "asOf")?)
         .map_err(to_js_err)
@@ -378,10 +381,10 @@ pub fn asset_pool_weighted_avg_maturity(pool: JsValue, as_of: JsValue) -> Result
 
 /// Moody's diversity score of the pool (mirrors Rust `AssetPool::diversity_score`).
 /// @param pool - `AssetPool` plain object or JSON string.
-/// @returns Diversity score from the obligor and industry concentrations; `0` when the pool balance cannot be computed.
+/// @returns Diversity score over the assets that name an obligor; `undefined` when none does or the pool balance cannot be summed.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
 #[wasm_bindgen(js_name = assetPoolDiversityScore)]
-pub fn asset_pool_diversity_score(pool: JsValue) -> Result<f64, JsValue> {
+pub fn asset_pool_diversity_score(pool: JsValue) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     Ok(pool.diversity_score())
 }

@@ -23,5 +23,10 @@
     "field": "cash_on_cash",
     "label": "decimal share of invested",
     "source": "valuations::EquityMetrics::cash_on_cash"
+  },
+  "purchase_price": {
+    "field": "purchase_price_pct",
+    "label": "% of current balance; omitted means par",
+    "source": "valuations::calculate_equity_metrics::purchase_price_pct"
   }
 }

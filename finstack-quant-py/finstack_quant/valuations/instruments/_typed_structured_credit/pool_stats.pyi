@@ -137,14 +137,15 @@ class PoolStats:
         ...
 
     @property
-    def wac(self) -> float:
+    def wac(self) -> float | None:
         """
         Weighted-average coupon of the performing fixed-rate collateral.
 
         Returns
         -------
-        float
-            Annual decimal (``0.07`` = 7%).
+        float | None
+            Annual decimal (``0.07`` = 7%); ``None`` when no performing
+            fixed-rate collateral exists.
 
         Notes
         -----
@@ -153,14 +154,14 @@ class PoolStats:
         ...
 
     @property
-    def weighted_avg_spread_bp(self) -> float:
+    def weighted_avg_spread_bp(self) -> float | None:
         """
         Weighted-average spread of the performing collateral that carries a spread.
 
         Returns
         -------
-        float
-            Spread in basis points.
+        float | None
+            Spread in basis points; ``None`` when no performing asset carries a spread.
 
         Notes
         -----
@@ -169,14 +170,15 @@ class PoolStats:
         ...
 
     @property
-    def weighted_avg_maturity(self) -> float:
+    def weighted_avg_maturity(self) -> float | None:
         """
         Balance-weighted average remaining maturity.
 
         Returns
         -------
-        float
-            Maturity in years from the statistics date.
+        float | None
+            Maturity in years from the statistics date; ``None`` when the pool
+            balance is zero.
 
         Notes
         -----
@@ -185,14 +187,14 @@ class PoolStats:
         ...
 
     @property
-    def diversity_score(self) -> float:
+    def diversity_score(self) -> float | None:
         """
-        Moody's diversity score of the pool.
+        Moody's diversity score of the assets that name an obligor.
 
         Returns
         -------
-        float
-            The diversity score.
+        float | None
+            The diversity score; ``None`` when no asset names an obligor.
 
         Notes
         -----
@@ -203,7 +205,7 @@ class PoolStats:
     @property
     def num_obligors(self) -> int:
         """
-        Number of distinct obligors.
+        Number of distinct named obligors; an asset naming none is not counted.
 
         Returns
         -------
@@ -219,7 +221,7 @@ class PoolStats:
     @property
     def num_industries(self) -> int:
         """
-        Number of distinct industries.
+        Number of distinct named industries; an asset naming none is not counted.
 
         Returns
         -------

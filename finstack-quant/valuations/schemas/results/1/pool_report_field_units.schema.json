@@ -51,7 +51,7 @@
       "stats": [
         {
           "field": "wac",
-          "label": "decimal",
+          "label": "annual decimal, fixed-rate only",
           "source": "valuations::PoolStats::wac"
         },
         {
@@ -71,12 +71,12 @@
         },
         {
           "field": "num_obligors",
-          "label": "obligors",
+          "label": "named obligors",
           "source": "valuations::PoolStats::num_obligors"
         },
         {
           "field": "num_industries",
-          "label": "industries",
+          "label": "named industries",
           "source": "valuations::PoolStats::num_industries"
         },
         {

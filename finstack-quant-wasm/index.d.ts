@@ -23238,7 +23238,7 @@ export interface ValuationInstrumentsNamespace {
    *
    * The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV a percent of the equity's current balance and cash-on-cash a decimal share of the invested amount. Values are never rescaled.
    * @param currency - ISO-4217 code of the result's `currency`, in any ASCII case; it names the unit of `invested`.
-   * @returns `EquityMetricsFieldUnits`: one `MetricFieldUnit` each for `invested`, `irr`, `moic`, `nav_pct` and `cash_on_cash`.
+   * @returns `EquityMetricsFieldUnits`: one `MetricFieldUnit` each for `invested`, `irr`, `moic`, `nav_pct` and `cash_on_cash`, and `purchase_price` for the `purchasePricePct` argument of `equityMetrics`: percent of current balance, omitted means par.
    * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
    */
   equityMetricsFieldUnits(currency: string): EquityMetricsFieldUnits;
@@ -23609,32 +23609,32 @@ export interface ValuationInstrumentsNamespace {
   /**
    * Weighted-average coupon of the performing fixed-rate collateral (mirrors Rust `AssetPool::wac`).
    * @param pool - `AssetPool` plain object or JSON string.
-   * @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `0` when no performing fixed-rate collateral exists.
+   * @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `undefined` when no performing fixed-rate collateral exists.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
    */
-  assetPoolWac(pool: generated.valuations.AssetPool | string): number;
+  assetPoolWac(pool: generated.valuations.AssetPool | string): number | undefined;
   /**
    * Weighted-average spread of the performing collateral that carries an explicit spread (mirrors Rust `AssetPool::weighted_avg_spread_bp`).
    * @param pool - `AssetPool` plain object or JSON string.
-   * @returns Balance-weighted spread in basis points; `0` when no performing asset carries a spread.
+   * @returns Balance-weighted spread in basis points; `undefined` when no performing asset carries a spread.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
    */
-  assetPoolWeightedAvgSpreadBp(pool: generated.valuations.AssetPool | string): number;
+  assetPoolWeightedAvgSpreadBp(pool: generated.valuations.AssetPool | string): number | undefined;
   /**
    * Balance-weighted average remaining maturity (mirrors Rust `AssetPool::weighted_avg_maturity`).
    * @param pool - `AssetPool` plain object or JSON string.
    * @param asOf - ISO-8601 date the remaining maturities are measured from.
-   * @returns Weighted average maturity in years (ACT/365F from `asOf`); `0` for an empty pool.
+   * @returns Weighted average maturity in years (ACT/365F from `asOf`); `undefined` when the pool balance is zero.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
    */
-  assetPoolWeightedAvgMaturity(pool: generated.valuations.AssetPool | string, asOf: string): number;
+  assetPoolWeightedAvgMaturity(pool: generated.valuations.AssetPool | string, asOf: string): number | undefined;
   /**
    * Moody's diversity score of the pool (mirrors Rust `AssetPool::diversity_score`).
    * @param pool - `AssetPool` plain object or JSON string.
-   * @returns Diversity score from the obligor and industry concentrations; `0` when the pool balance cannot be computed.
+   * @returns Diversity score over the assets that name an obligor; `undefined` when none does or the pool balance cannot be summed.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
    */
-  assetPoolDiversityScore(pool: generated.valuations.AssetPool | string): number;
+  assetPoolDiversityScore(pool: generated.valuations.AssetPool | string): number | undefined;
   /**
    * Loan-level assets of one obligor (mirrors Rust `AssetPool::assets_by_obligor`).
    * @param pool - `AssetPool` plain object or JSON string.

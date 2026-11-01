@@ -572,11 +572,14 @@ pub(super) fn simulate_period(
                 .get(test_id.as_str())
                 .copied()
                 .unwrap_or(f64::NAN);
+            // The executor's infinite ratio is its zero denominator: no claim
+            // is outstanding for the test, so no ratio exists to report.
+            let ratio = ratio.is_finite().then_some(*ratio);
             super::state::CoverageTestDiagnostic {
                 test_id: test_id.clone(),
-                ratio: *ratio,
+                ratio,
                 trigger_level,
-                cushion: ratio - trigger_level,
+                cushion: ratio.map(|ratio| ratio - trigger_level),
                 passing: *passing,
             }
         })

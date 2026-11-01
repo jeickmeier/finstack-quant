@@ -28,18 +28,24 @@
       "description": "One coverage test as the waterfall executor evaluated it in a period.",
       "properties": {
         "cushion": {
-          "description": "`ratio − trigger_level`; negative while the test fails.",
+          "description": "`ratio − trigger_level`; negative while the test fails. `None` when `ratio`\nis, for the same reason.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "passing": {
           "description": "Whether the test passed in this period.",
           "type": "boolean"
         },
         "ratio": {
-          "description": "Ratio the executor computed (OC: collateral ÷ notes; IC: interest ÷ due).",
+          "description": "Ratio the executor computed (OC: collateral ÷ notes; IC: interest ÷ due).\n`None` when the test has no claim outstanding: the notes it covers are\nretired (OC) or owe no interest (IC), so the denominator is zero and no\nratio exists. Such a test passes.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "test_id": {
           "description": "`CoverageTestSpec::id` of the test.",
@@ -53,9 +59,7 @@
       },
       "required": [
         "test_id",
-        "ratio",
         "trigger_level",
-        "cushion",
         "passing"
       ],
       "type": "object"
@@ -325,32 +329,38 @@
           "description": "Excess-spread account balance at period end."
         },
         "wac": {
-          "description": "Weighted-average coupon (annual decimal) of the performing fixed-rate\ncollateral at period end: the same population as `AssetPool::wac`.",
+          "description": "Weighted-average coupon (annual decimal) of the performing fixed-rate\ncollateral at period end: the same population as `AssetPool::wac`. `None`\nwhen no performing fixed-rate balance remains.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "warf": {
-          "description": "Balance-weighted Moody's rating factor of the collateral.",
+          "description": "Balance-weighted Moody's rating factor of the performing collateral. `None`\nwhen no performing balance remains.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "waterfall": {
           "$ref": "#/$defs/PeriodWaterfall",
           "description": "How this period's waterfall ran."
         },
         "weighted_avg_spread_bp": {
-          "description": "Balance-weighted spread of the floating-rate collateral (basis points).",
+          "description": "Balance-weighted spread of the performing floating-rate collateral (basis\npoints). `None` when no performing floating-rate balance remains.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
         "payment_date",
         "pool_balance",
         "pool_factor",
-        "wac",
-        "weighted_avg_spread_bp",
-        "warf",
         "interest_collections",
         "principal_collections",
         "defaults",

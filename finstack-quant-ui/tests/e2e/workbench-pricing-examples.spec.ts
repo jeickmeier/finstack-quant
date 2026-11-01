@@ -279,7 +279,7 @@ test("a standard deal family builds, prices and lists its native tranches", asyn
   await expect(
     results
       .getByRole("region", { name: "Coverage tests" })
-      .or(results.getByText(/returned no coverage tests/)),
+      .or(results.getByText("No coverage test was evaluated.")),
   ).toBeVisible();
   // ... and its credit enhancement and excess spread.
   await results

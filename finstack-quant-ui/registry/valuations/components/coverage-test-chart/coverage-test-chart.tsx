@@ -36,6 +36,10 @@ const axisLabel = (unit: MetricFieldUnit) =>
   `${labelFor(unit.field)} (${unit.label})`;
 const yesNo = (flag: boolean) => (flag ? "Yes" : "No");
 const numeric = { className: "text-right finstack-numeric" };
+/** What Rust's null ratio and cushion mean, per CoverageTestDiagnostic. */
+const noClaim = "No claim outstanding";
+const orNoClaim = (value: number | null | undefined) =>
+  value == null ? noClaim : formatRaw(value);
 /** The date scale all of a deal's panels share: Rust's first and last payment dates, so a test's missing dates stay visible. */
 const dateScale = (periods: readonly Period[]) => ({
   scale: scaleUtc,
@@ -74,14 +78,18 @@ function testChart(
             length: 14,
           })
         : ruleY([0], { id: "zero-cushion", stroke: "var(--foreground)" }),
-      dot(rows, {
-        ...channels,
-        y: (row: TestRow) => row[field],
-        id: field,
-        r: 4,
-        // Rust's flag. Rows are not connected: a test can be absent between them.
-        color: (row: TestRow) => (row.passing ? "Passed" : "Failed"),
-      }),
+      // A null is Rust's "no claim outstanding": a date with nothing to plot.
+      dot(
+        rows.filter((row) => row[field] != null),
+        {
+          ...channels,
+          y: (row: TestRow) => row[field] as number,
+          id: field,
+          r: 4,
+          // Rust's flag. Rows are not connected: a test can be absent between them.
+          color: (row: TestRow) => (row.passing ? "Passed" : "Failed"),
+        },
+      ),
     ],
     scales: {
       x: dateScale(periods),
@@ -99,12 +107,12 @@ function testChart(
           rows: row
             ? [
                 { label: labelFor("payment_date"), value: row.payment_date },
-                { label: labelFor("ratio"), value: formatRaw(row.ratio) },
+                { label: labelFor("ratio"), value: orNoClaim(row.ratio) },
                 {
                   label: labelFor("trigger_level"),
                   value: formatRaw(row.trigger_level),
                 },
-                { label: labelFor("cushion"), value: formatRaw(row.cushion) },
+                { label: labelFor("cushion"), value: orNoClaim(row.cushion) },
               ]
             : [],
         };
@@ -172,7 +180,7 @@ function testColumns(
     ...units.map((unit): ColumnDef<{}, TestRow, any> => ({
       id: unit.field,
       header: () => <span title={unit.source}>{axisLabel(unit)}</span>,
-      accessorFn: (row) => formatRaw(row[unit.field as "ratio"]),
+      accessorFn: (row) => orNoClaim(row[unit.field as "ratio"]),
       meta: numeric,
     })),
     {
@@ -237,6 +245,7 @@ function TestDetail({
     [allRows, breach.test_id],
   );
   const [ratio, , cushion] = units.coverage_tests;
+  const unclaimed = rows.filter((row) => row.ratio == null).length;
   const charts = useMemo(
     () =>
       periods[1] && rows[0]
@@ -266,7 +275,18 @@ function TestDetail({
           ? `First breach ${breach.first_breach}. A later cure does not clear it.`
           : "This test never failed in this simulation."}
       </p>
-      {rows[0] ? (
+      {rows.length < periods.length && (
+        <p role="status" className="m-0 text-sm text-muted-foreground">
+          Recorded on {rows.length} of {periods.length} dates.
+        </p>
+      )}
+      {unclaimed > 0 && (
+        <p role="status" className="m-0 text-sm text-muted-foreground">
+          {noClaim} on {unclaimed} of the {rows.length} recorded dates, so no
+          dot is drawn on them.
+        </p>
+      )}
+      {rows[0] && (
         <>
           {charts && (
             <>
@@ -291,13 +311,6 @@ function TestDetail({
             density={density}
           />
         </>
-      ) : (
-        <p role="status" className="m-0 text-sm text-muted-foreground">
-          The waterfall returned no ratio, trigger or cushion for{" "}
-          {breach.test_id} on any date, so its first breach is all this
-          simulation reports. A tranche trigger is on the period record only
-          while it is in breach and diverting cash.
-        </p>
       )}
     </div>
   );
@@ -369,8 +382,7 @@ export function CoverageTestChart({
   if (!breaches[0])
     return (
       <p role="status" className="text-sm text-muted-foreground">
-        The simulation returned no coverage tests. A deal with none, or a
-        settlement with no waterfall run, has nothing to chart.
+        No coverage test was evaluated.
       </p>
     );
   if (!periods[0])

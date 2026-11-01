@@ -54,9 +54,11 @@ it("captures the behaviours the card must keep apart", () => {
   expect(starved.invested).toBeGreaterThan(0);
   expect([starved.irr, starved.moic, starved.nav_pct]).toEqual([null, 0, 0]);
   expect(starved.cash_on_cash).toEqual([]);
-  // No IRR because nothing is invested: zero ratios, with a NAV at a zero price.
+  // No IRR because nothing is invested: no MOIC or shares, with a NAV at a zero price.
   const free = metricsOf("zero-price");
-  expect([free.invested, free.irr, free.moic]).toEqual([0, null, 0]);
+  expect([free.invested, free.irr, free.moic]).toEqual([0, null, null]);
+  expect(free.cash_on_cash.length).toBeGreaterThan(0);
+  expect(free.cash_on_cash.every(([, share]) => share === null)).toBe(true);
   expect(free.nav_pct).toBe(paying.nav_pct);
   const written = metricsOf("zero-balance");
   expect([
@@ -64,7 +66,7 @@ it("captures the behaviours the card must keep apart", () => {
     written.irr,
     written.moic,
     written.nav_pct,
-  ]).toEqual([0, null, 0, 0]);
+  ]).toEqual([0, null, null, 0]);
   // A class that receives little still has an IRR, near -100%.
   const wiped = metricsOf("wiped-out");
   expect(wiped.irr).toBeLessThan(-0.99);
@@ -109,16 +111,16 @@ it("states a missing IRR and draws the zeros Rust returned as zero", () => {
   );
 });
 
-it("draws nothing invested as Rust returned it, without calling its NAV zero", () => {
+it("states an undefined MOIC and shares when nothing is invested, without calling its NAV zero", () => {
   const metrics = metricsOf("zero-price");
   card(metrics);
   expect(tile("Invested")).toBe(`0${units.invested.label}`);
   expect(tile("IRR")).toBe("No rate solves");
-  expect(tile("MOIC")).toBe(`0${units.moic.label}`);
+  expect(tile("MOIC")).toBe("Nothing invested");
   expect(tile("NAV pct")).toBe(
     `${formatRaw(metrics.nav_pct)}${units.nav_pct.label}`,
   );
-  expect(rows().slice(1)[0]![1]).toBe("0");
+  expect(rows().slice(1)[0]![1]).toBe("Nothing invested");
 });
 
 it("draws a near-total loss's IRR rather than treating it as missing", () => {

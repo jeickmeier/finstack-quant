@@ -797,15 +797,15 @@ class AssetPool:
         """
         ...
 
-    def wac(self) -> float:
+    def wac(self) -> float | None:
         """
         Weighted-average coupon of the performing fixed-rate collateral.
 
         Returns
         -------
-        float
+        float | None
             Balance-weighted coupon as an annual decimal (``0.07`` = 7%);
-            ``0.0`` when no performing fixed-rate collateral exists.
+            ``None`` when no performing fixed-rate collateral exists.
 
         Notes
         -----
@@ -813,14 +813,14 @@ class AssetPool:
         """
         ...
 
-    def weighted_avg_spread_bp(self) -> float:
+    def weighted_avg_spread_bp(self) -> float | None:
         """
         Weighted-average spread of the performing collateral that carries an explicit spread.
 
         Returns
         -------
-        float
-            Balance-weighted spread in basis points; ``0.0`` when no
+        float | None
+            Balance-weighted spread in basis points; ``None`` when no
             performing asset carries a spread.
 
         Notes
@@ -829,7 +829,7 @@ class AssetPool:
         """
         ...
 
-    def weighted_avg_maturity(self, as_of: datetime.date | str) -> float:
+    def weighted_avg_maturity(self, as_of: datetime.date | str) -> float | None:
         """
         Balance-weighted average remaining maturity of the pool.
 
@@ -841,9 +841,9 @@ class AssetPool:
 
         Returns
         -------
-        float
+        float | None
             Weighted average maturity in years (ACT/365F from ``as_of``);
-            ``0.0`` for an empty pool.
+            ``None`` when the pool balance is zero.
 
         Raises
         ------
@@ -852,15 +852,15 @@ class AssetPool:
         """
         ...
 
-    def diversity_score(self) -> float:
+    def diversity_score(self) -> float | None:
         """
         Moody's diversity score of the pool.
 
         Returns
         -------
-        float
-            Diversity score from the obligor and industry concentrations;
-            ``0.0`` when the pool balance cannot be computed.
+        float | None
+            Diversity score over the assets that name an obligor; ``None`` when
+            none does or the pool balance cannot be summed.
 
         Notes
         -----

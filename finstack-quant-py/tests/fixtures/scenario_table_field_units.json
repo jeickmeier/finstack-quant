@@ -19,7 +19,7 @@
   "measures": [
     {
       "field": "price",
-      "label": "% of current balance",
+      "label": "clean, % of current balance",
       "source": "valuations::ScenarioCell::price"
     },
     {

@@ -25,7 +25,7 @@
   ],
   "properties": {
     "cash_on_cash": {
-      "description": "Each distribution as a decimal fraction of `invested`, by payment date and\nnot annualized; the fractions sum to `moic`.",
+      "description": "Each distribution as a decimal fraction of `invested`, by payment date and\nnot annualized; the fractions sum to `moic`. The share is `None` when\nnothing is invested.",
       "items": {
         "maxItems": 2,
         "minItems": 2,
@@ -35,7 +35,10 @@
           },
           {
             "format": "double",
-            "type": "number"
+            "type": [
+              "number",
+              "null"
+            ]
           }
         ],
         "type": "array"
@@ -60,9 +63,12 @@
       ]
     },
     "moic": {
-      "description": "Multiple on invested capital: total distributions ÷ `invested`, interest\nand principal together.",
+      "description": "Multiple on invested capital: total distributions ÷ `invested`, interest\nand principal together. `None` when nothing is invested; a class that\nreceives nothing on a positive investment has a true `0.0`.",
       "format": "double",
-      "type": "number"
+      "type": [
+        "number",
+        "null"
+      ]
     },
     "nav_pct": {
       "description": "Present value at the valuation date of the distributions on the deal's\ndiscount curve, as a percent of the equity's current balance (`62.5` =\n62.5%). It does not depend on the purchase price.",
@@ -78,7 +84,6 @@
     "tranche_id",
     "currency",
     "invested",
-    "moic",
     "nav_pct",
     "cash_on_cash"
   ],

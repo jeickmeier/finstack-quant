@@ -55,6 +55,11 @@
         "field": "nav_pct",
         "label": "% of current balance",
         "source": "valuations::EquityMetrics::nav_pct"
+      },
+      "purchase_price": {
+        "field": "purchase_price_pct",
+        "label": "% of current balance; omitted means par",
+        "source": "valuations::calculate_equity_metrics::purchase_price_pct"
       }
     }
   ],
@@ -78,6 +83,10 @@
     "nav_pct": {
       "$ref": "#/$defs/MetricFieldUnit",
       "description": "Unit of `EquityMetrics::nav_pct`."
+    },
+    "purchase_price": {
+      "$ref": "#/$defs/MetricFieldUnit",
+      "description": "Unit of the `purchase_price_pct` argument of `calculate_equity_metrics`,\nand what omitting it means."
     }
   },
   "required": [
@@ -85,7 +94,8 @@
     "irr",
     "moic",
     "nav_pct",
-    "cash_on_cash"
+    "cash_on_cash",
+    "purchase_price"
   ],
   "title": "EquityMetricsFieldUnits",
   "type": "object"

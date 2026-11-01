@@ -141,11 +141,15 @@ pub struct CoverageTestDiagnostic {
     /// `CoverageTestSpec::id` of the test.
     pub test_id: String,
     /// Ratio the executor computed (OC: collateral ÷ notes; IC: interest ÷ due).
-    pub ratio: f64,
+    /// `None` when the test has no claim outstanding: the notes it covers are
+    /// retired (OC) or owe no interest (IC), so the denominator is zero and no
+    /// ratio exists. Such a test passes.
+    pub ratio: Option<f64>,
     /// Trigger level the ratio was tested against.
     pub trigger_level: f64,
-    /// `ratio − trigger_level`; negative while the test fails.
-    pub cushion: f64,
+    /// `ratio − trigger_level`; negative while the test fails. `None` when `ratio`
+    /// is, for the same reason.
+    pub cushion: Option<f64>,
     /// Whether the test passed in this period.
     pub passing: bool,
 }
@@ -321,12 +325,15 @@ pub struct PeriodDiagnostics {
     /// (`AssetPool::original_balance_or_reconstructed`).
     pub pool_factor: f64,
     /// Weighted-average coupon (annual decimal) of the performing fixed-rate
-    /// collateral at period end: the same population as `AssetPool::wac`.
-    pub wac: f64,
-    /// Balance-weighted spread of the floating-rate collateral (basis points).
-    pub weighted_avg_spread_bp: f64,
-    /// Balance-weighted Moody's rating factor of the collateral.
-    pub warf: f64,
+    /// collateral at period end: the same population as `AssetPool::wac`. `None`
+    /// when no performing fixed-rate balance remains.
+    pub wac: Option<f64>,
+    /// Balance-weighted spread of the performing floating-rate collateral (basis
+    /// points). `None` when no performing floating-rate balance remains.
+    pub weighted_avg_spread_bp: Option<f64>,
+    /// Balance-weighted Moody's rating factor of the performing collateral. `None`
+    /// when no performing balance remains.
+    pub warf: Option<f64>,
     /// Interest collected from the pool (including servicer advances).
     pub interest_collections: Money,
     /// Scheduled and prepaid principal collected from the pool.
@@ -500,8 +507,10 @@ impl SimulationDiagnostics {
     /// `principal_collections`, `defaults`, `recoveries`, `reinvested_par`,
     /// `fees_paid`, `reserve_balance`, `reserve_interest`, `spread_account`,
     /// `funding_account`, `delinquent_balance`, `servicer_advances_outstanding`
-    /// and `excess_spread`. Dates are ISO 8601 strings; all other columns are
-    /// Float64, including on an empty table.
+    /// and `excess_spread`. Dates are ISO 8601 strings; `wac`,
+    /// `weighted_avg_spread_bp` and `warf` are nullable Float64, null where their
+    /// population is empty; all other columns are Float64, including on an empty
+    /// table.
     ///
     /// Rows retain `periods` order and duplicate payment dates. Reserve interest
     /// is the first entry in `reserve_interest_paid` with the same date, or zero
@@ -519,74 +528,56 @@ impl SimulationDiagnostics {
     ) -> finstack_quant_core::Result<finstack_quant_core::table::TableEnvelope> {
         use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
 
-        let rows: Vec<[f64; 18]> = self
-            .periods
-            .iter()
-            .map(|period| {
-                let reserve_interest = self
-                    .reserve_interest_paid
-                    .iter()
-                    .find(|(date, _)| *date == period.payment_date)
-                    .map_or(0.0, |(_, amount)| amount.amount());
-                [
-                    period.pool_balance.amount(),
-                    period.pool_factor,
-                    period.wac,
-                    period.weighted_avg_spread_bp,
-                    period.warf,
-                    period.interest_collections.amount(),
-                    period.principal_collections.amount(),
-                    period.defaults.amount(),
-                    period.recoveries.amount(),
-                    period.reinvested_par.amount(),
-                    period.fees_paid.amount(),
-                    period.reserve_balance.amount(),
-                    reserve_interest,
-                    period.spread_account.amount(),
-                    period.funding_account.amount(),
-                    period.delinquent_balance.amount(),
-                    period.servicer_advances_outstanding.amount(),
-                    period.excess_spread,
-                ]
-            })
-            .collect();
-        let mut columns = vec![TableColumn::new(
-            "date",
-            TableColumnData::String(
-                self.periods
-                    .iter()
-                    .map(|period| period.payment_date.to_string())
-                    .collect(),
-            ),
-        )];
-        for (index, name) in [
-            "pool_balance",
-            "pool_factor",
-            "wac",
-            "weighted_avg_spread_bp",
-            "warf",
-            "interest_collections",
-            "principal_collections",
-            "defaults",
-            "recoveries",
-            "reinvested_par",
-            "fees_paid",
-            "reserve_balance",
-            "reserve_interest",
-            "spread_account",
-            "funding_account",
-            "delinquent_balance",
-            "servicer_advances_outstanding",
-            "excess_spread",
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            columns.push(TableColumn::new(
+        let float = |name: &str, read: &dyn Fn(&PeriodDiagnostics) -> f64| {
+            TableColumn::new(
                 name,
-                TableColumnData::Float64(rows.iter().map(|row| row[index]).collect()),
-            ));
-        }
+                TableColumnData::Float64(self.periods.iter().map(read).collect()),
+            )
+        };
+        let nullable = |name: &str, read: fn(&PeriodDiagnostics) -> Option<f64>| {
+            TableColumn::new(
+                name,
+                TableColumnData::NullableFloat64(self.periods.iter().map(read).collect()),
+            )
+        };
+        let columns = vec![
+            TableColumn::new(
+                "date",
+                TableColumnData::String(
+                    self.periods
+                        .iter()
+                        .map(|period| period.payment_date.to_string())
+                        .collect(),
+                ),
+            ),
+            float("pool_balance", &|p| p.pool_balance.amount()),
+            float("pool_factor", &|p| p.pool_factor),
+            nullable("wac", |p| p.wac),
+            nullable("weighted_avg_spread_bp", |p| p.weighted_avg_spread_bp),
+            nullable("warf", |p| p.warf),
+            float("interest_collections", &|p| p.interest_collections.amount()),
+            float("principal_collections", &|p| {
+                p.principal_collections.amount()
+            }),
+            float("defaults", &|p| p.defaults.amount()),
+            float("recoveries", &|p| p.recoveries.amount()),
+            float("reinvested_par", &|p| p.reinvested_par.amount()),
+            float("fees_paid", &|p| p.fees_paid.amount()),
+            float("reserve_balance", &|p| p.reserve_balance.amount()),
+            float("reserve_interest", &|p| {
+                self.reserve_interest_paid
+                    .iter()
+                    .find(|(date, _)| *date == p.payment_date)
+                    .map_or(0.0, |(_, amount)| amount.amount())
+            }),
+            float("spread_account", &|p| p.spread_account.amount()),
+            float("funding_account", &|p| p.funding_account.amount()),
+            float("delinquent_balance", &|p| p.delinquent_balance.amount()),
+            float("servicer_advances_outstanding", &|p| {
+                p.servicer_advances_outstanding.amount()
+            }),
+            float("excess_spread", &|p| p.excess_spread),
+        ];
         TableEnvelope::new(columns, Default::default())
     }
 }
@@ -1061,8 +1052,11 @@ impl<'a> SimulationState<'a> {
 }
 
 /// Balance-weighted composition of the performing pool: fixed-rate coupon,
-/// floating spread (bp) and Moody's rating factor.
-pub(super) fn pool_composition(state: &SimulationState) -> Result<(f64, f64, f64)> {
+/// floating spread (bp) and Moody's rating factor, each `None` when its
+/// population is empty.
+pub(super) fn pool_composition(
+    state: &SimulationState,
+) -> Result<(Option<f64>, Option<f64>, Option<f64>)> {
     let mut fixed_balance = 0.0_f64;
     let mut coupon = 0.0_f64;
     let mut floating_balance = 0.0_f64;
@@ -1085,7 +1079,7 @@ pub(super) fn pool_composition(state: &SimulationState) -> Result<(f64, f64, f64
             }
         }
     }
-    let weighted = |sum: f64, total: f64| if total > 0.0 { sum / total } else { 0.0 };
+    let weighted = |sum: f64, total: f64| (total > 0.0).then(|| sum / total);
     Ok((
         weighted(coupon, fixed_balance),
         weighted(spread, floating_balance),
