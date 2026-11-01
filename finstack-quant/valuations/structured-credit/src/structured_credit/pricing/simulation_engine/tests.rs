@@ -3546,4 +3546,124 @@ mod cases {
         assert_eq!(value, (10_500_000.0 - 7_000_000.0) / 10_500_000.0);
         assert_eq!(step_down_metrics(&state).credit_enhancement, value);
     }
+
+    /// Two `Senior` classes and a mezzanine under a `MinCreditEnhancement`
+    /// trigger of `level`. `TrancheStructure::new` ranks A1 ahead of A2.
+    fn same_seniority_deal(level: f64) -> StructuredCredit {
+        let mut deal = clo_with_mezz(Vec::new());
+        let maturity = deal.maturity;
+        let mk = |id: &str, seniority, attach: f64, detach: f64, bal: f64, rate: f64| {
+            Tranche::new(
+                id,
+                attach,
+                detach,
+                seniority,
+                Money::new(bal, Currency::USD).expect("valid money fixture"),
+                RateSpec::Fixed { rate },
+                maturity,
+            )
+            .expect("tranche")
+        };
+        deal.tranches = TrancheStructure::new(vec![
+            mk(
+                "A1",
+                TrancheSeniority::Senior,
+                60.0,
+                100.0,
+                4_000_000.0,
+                0.05,
+            ),
+            mk(
+                "A2",
+                TrancheSeniority::Senior,
+                30.0,
+                60.0,
+                3_000_000.0,
+                0.05,
+            ),
+            mk(
+                "B",
+                TrancheSeniority::Mezzanine,
+                10.0,
+                30.0,
+                2_000_000.0,
+                0.08,
+            ),
+            mk("EQ", TrancheSeniority::Equity, 0.0, 10.0, 1_000_000.0, 0.0),
+        ])
+        .expect("structure");
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+        deal.waterfall_rules = Some(crate::structured_credit::WaterfallRules {
+            step_down: Some(crate::structured_credit::StepDownSpec {
+                step_down_date: deal.closing_date,
+                triggers: vec![
+                    crate::structured_credit::StepDownTrigger::MinCreditEnhancement(level),
+                ],
+            }),
+            ..Default::default()
+        });
+        deal
+    }
+
+    fn state_of(deal: &StructuredCredit) -> SimulationState<'_> {
+        SimulationState::new(
+            &deal.pool,
+            &deal.tranches,
+            deal.closing_date,
+            deal.closing_date,
+            0,
+        )
+        .expect("state")
+    }
+
+    /// The trigger's formula at `e9a972feb5^`, before it shared
+    /// `tranche_credit_enhancement`: only the first tranche holding the lowest
+    /// `payment_priority` is subtracted.
+    fn formula_before_sharing(state: &SimulationState<'_>) -> f64 {
+        let pool = state.pool_outstanding.amount() + state.principal_funding_account.amount();
+        let senior = state
+            .tranches
+            .tranches
+            .iter()
+            .min_by_key(|t| t.payment_priority)
+            .and_then(|t| state.tranche_balances.get(t.id.as_str()))
+            .map_or(0.0, |m| m.amount());
+        (pool - senior) / pool
+    }
+
+    /// `TrancheStructure::new` and deserialization give same-seniority classes
+    /// distinct priorities, so the trigger subtracts A1 alone: the sharing of
+    /// `tranche_credit_enhancement` moved no value for any deal built that way.
+    #[test]
+    fn same_seniority_classes_stay_ranked_so_the_trigger_value_is_the_first_class_alone() {
+        let deal = same_seniority_deal(0.45);
+        assert_eq!(
+            deal.tranches
+                .tranches
+                .iter()
+                .map(|t| t.payment_priority)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3, 4]
+        );
+        let state = state_of(&deal);
+        assert_eq!(step_down_metrics(&state).credit_enhancement, 0.60);
+        assert_eq!(formula_before_sharing(&state), 0.60);
+        // The step-down is in effect because the trigger reads 0.60 and not 0.30:
+        // on the first payment date principal reaches the classes behind A1.
+        let run = run_reconciled(&deal);
+        let first_date = run.diagnostics.periods[0].payment_date;
+        assert!(sum_on(&run.tranches["A1"].principal_flows, first_date) > 0.0);
+        assert!(sum_on(&run.tranches["A2"].principal_flows, first_date) > 0.0);
+    }
+
+    /// Priorities tied by writing the public field (no constructor, wire form or
+    /// binding does) are the one place the two formulas differ.
+    #[test]
+    fn tied_priorities_written_by_hand_subtract_every_tied_class() {
+        let mut deal = same_seniority_deal(0.45);
+        deal.tranches.tranches[1].payment_priority = 1;
+        let state = state_of(&deal);
+        assert_eq!(step_down_metrics(&state).credit_enhancement, 0.30);
+        assert_eq!(formula_before_sharing(&state), 0.60);
+    }
 }
