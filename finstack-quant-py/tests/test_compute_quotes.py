@@ -69,7 +69,8 @@ def test_what_does_not_apply_is_none_and_round_trips() -> None:
     frame = quotes.to_dataframe()
     assert len(frame) == 1
     assert frame["ytm"].iloc[0] == quotes.ytm
-    assert math.isnan(frame["discount_margin"].astype(float).iloc[0])
+    assert frame["ytm"].dtype == "float64"
+    assert frame["discount_margin"].iloc[0] is None
 
 
 @pytest.mark.parametrize(
