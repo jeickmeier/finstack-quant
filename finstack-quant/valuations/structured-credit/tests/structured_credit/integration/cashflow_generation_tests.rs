@@ -200,7 +200,10 @@ fn test_abs_generates_cashflows() {
         finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
         finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
             id: "TEST_ABS".into(),
-            pool: create_test_pool(),
+            pool: AssetPool {
+                deal_type: DealType::Abs,
+                ..create_test_pool()
+            },
             tranches: create_test_tranches(),
             closing_date: closing_date(),
             maturity: maturity_date(),
@@ -229,7 +232,10 @@ fn test_rmbs_generates_cashflows() {
         finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
         finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
             id: "TEST_RMBS".into(),
-            pool: create_test_pool(),
+            pool: AssetPool {
+                deal_type: DealType::Rmbs,
+                ..create_test_pool()
+            },
             tranches: create_test_tranches(),
             closing_date: closing_date(),
             maturity: maturity_date(),
@@ -258,7 +264,10 @@ fn test_cmbs_generates_cashflows() {
         finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs,
         finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
             id: "TEST_CMBS".into(),
-            pool: create_test_pool(),
+            pool: AssetPool {
+                deal_type: DealType::Cmbs,
+                ..create_test_pool()
+            },
             tranches: create_test_tranches(),
             closing_date: closing_date(),
             maturity: maturity_date(),

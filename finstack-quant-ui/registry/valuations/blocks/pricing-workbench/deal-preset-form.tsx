@@ -9,6 +9,7 @@ import sharedMetadata from "@/lib/finstack/generated/meta/shared";
 import localMetadata from "@/lib/finstack/generated/meta/standard_deal_params";
 import {
   useNewStandardDeal,
+  useStandardDealFamilies,
   type StandardDealType,
 } from "@/hooks/valuations/use-tranche-analytics/use-tranche-analytics";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
@@ -24,43 +25,58 @@ const standardDealParamsModule = {
   codec: createWireCodec(schema),
   example: source.examples[0],
 };
-/** The families StructuredCredit.newStandard accepts; the native call selects each one's registry assumptions. */
-const families: readonly StandardDealType[] = ["abs", "clo", "cmbs", "rmbs"];
 /**
  * Builds a deal from a registry family and the StandardDealParams Rust does not
- * default. The form starts from the schema's Rust example; payment frequency and
- * the prepayment, default and recovery assumptions come from the family's registry
- * profile, so the built deal's JSON is the first place they appear.
+ * default. The families, each one's registry profile and its example inputs come from
+ * the native call; payment frequency and the prepayment, default and recovery
+ * assumptions come from the profile, so the built deal's JSON is the first place they
+ * appear.
  */
 export default function DealPresetForm({
   onDeal,
 }: {
   onDeal(json: string): void;
 }) {
-  const [family, setFamily] = useState<StandardDealType>("clo");
+  const families = useStandardDealFamilies();
+  const [chosen, setChosen] = useState<StandardDealType>();
   const [error, setError] = useState<string | null>(null);
   const build = useNewStandardDeal();
+  if (families.error)
+    return (
+      <p role="alert" className="mt-2 text-sm text-error">
+        {families.error.message}
+      </p>
+    );
+  if (!families.data)
+    return (
+      <p role="status" className="mt-2 text-sm text-muted-foreground">
+        Loading the deal families…
+      </p>
+    );
+  const selected =
+    families.data.find((family) => family.deal_type === chosen) ??
+    families.data[0]!;
   return (
     <div className="mt-2 flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">
-        The family selects Rust&apos;s registry assumptions. The collateral,
-        tranches, dates and curve below start from Rust&apos;s example CLO
-        inputs; edit them for the deal you mean.
+        The family selects Rust&apos;s registry profile{" "}
+        <span className="font-mono">{selected.profile_id}</span>. The
+        collateral, tranches, dates and curve below start from Rust&apos;s
+        example for this family; edit them for the deal you mean.
       </p>
       <EnumField
         label="Deal family"
-        value={family}
-        onValueChange={(value) => setFamily(value as StandardDealType)}
-        options={families.map((value) => ({
-          value,
-          label: labelFor(value),
+        value={selected.deal_type}
+        onValueChange={(value) => setChosen(value as StandardDealType)}
+        options={families.data.map(({ deal_type }) => ({
+          value: deal_type,
+          label: labelFor(deal_type),
         }))}
       />
       <SchemaForm
+        key={selected.deal_type}
         module={standardDealParamsModule}
-        defaultValues={
-          standardDealParamsModule.example as Record<string, unknown>
-        }
+        defaultValues={selected.example as Record<string, unknown>}
         layout="full"
         submitLabel="Build deal"
         submitVariant="outline"
@@ -68,7 +84,7 @@ export default function DealPresetForm({
         onSubmit={async (paramsJson) => {
           setError(null);
           try {
-            onDeal(await build({ dealType: family, paramsJson }));
+            onDeal(await build({ dealType: selected.deal_type, paramsJson }));
           } catch (failure) {
             setError(
               failure instanceof Error ? failure.message : String(failure),

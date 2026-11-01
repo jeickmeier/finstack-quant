@@ -188,33 +188,29 @@ if (!checking)
       ),
     })),
   );
-// Deal entry: every family StructuredCredit.newStandard accepts, from the schema's
-// Rust example params, with the tranches a selector lists and the proof it simulates
-// on the UI market.
-const paramsSource =
-  "finstack-quant/valuations/schemas/common/1/standard_deal_params.schema.json";
-const params = JSON.parse(
-  await readFile(
-    new URL(`../../../../${paramsSource}`, import.meta.url),
-    "utf8",
-  ),
-).examples[0];
+// Deal entry: every family Rust lists, built from Rust's example of it, with the
+// tranches a selector lists and the proof it simulates on the UI market; then a pool
+// whose deal type contradicts the family, which Rust refuses.
+const standardFamilies = native.standardDealFamilies();
 const dealGrid = {
   cprs: [0, 0.1],
   cdrs: [0, 0.05],
   severities: [0.4],
   recovery_lag: null,
 };
-const dealCases = ["abs", "clo", "cmbs", "rmbs"].map((family) => {
+const dealCases = standardFamilies.map((entry) => {
+  const params = entry.example;
   const deal = native.StructuredCredit.newStandard(
-    family,
+    entry.deal_type,
     JSON.stringify(params),
   );
   try {
     const instrumentJson = deal.toJson();
     const tranches = deal.tranches;
     return {
-      family,
+      family: entry.deal_type,
+      profileId: entry.profile_id,
+      params,
       instrumentJson,
       tranches,
       table: native.trancheScenarioTable(
@@ -232,11 +228,9 @@ const dealCases = ["abs", "clo", "cmbs", "rmbs"].map((family) => {
 await emit(
   new URL("./standard-deals.json", import.meta.url),
   JSON.stringify({
-    paramsSource,
-    params,
     marketSource,
     marketSha256: createHash("sha256").update(marketJson).digest("hex"),
-    asOf: params.closing_date,
+    asOf: standardFamilies[0].example.closing_date,
     grid: dealGrid,
     cases: dealCases,
   }),

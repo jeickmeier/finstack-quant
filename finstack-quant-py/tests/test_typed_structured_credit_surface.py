@@ -772,6 +772,24 @@ def _diversified_pool() -> AssetPool:
     ])
 
 
+def test_standard_deal_families_build_what_they_list() -> None:
+    from finstack_quant.valuations.instruments import standard_deal_families
+
+    families = standard_deal_families()
+    assert [(family["deal_type"], family["profile_id"]) for family in families] == [
+        ("abs", "abs_auto_standard"),
+        ("clo", "clo_standard"),
+        ("cmbs", "cmbs_standard"),
+        ("rmbs", "rmbs_standard"),
+    ]
+    for family in families:
+        params = StandardDealParams.from_json(json.dumps(family["example"]))
+        assert StructuredCredit.new_standard(family["deal_type"], params).id == f"{family['deal_type'].upper()}-EXAMPLE"
+    clo = StandardDealParams.from_json(json.dumps(families[1]["example"]))
+    with pytest.raises(ValueError, match="contradicts the abs family"):
+        StructuredCredit.new_standard("abs", clo)
+
+
 def test_absent_values_are_none_not_zero_or_infinity() -> None:
     """A retired note has no ratio; nothing invested has no MOIC; an empty pool has no averages."""
     from finstack_quant.valuations.instruments import (

@@ -537,7 +537,10 @@ fn test_recovery_rate_golden_industry_standards() {
             finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
             finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
                 id: "TEST-CLO".into(),
-                pool: pool.clone(),
+                pool: AssetPool {
+                    deal_type: DealType::Clo,
+                    ..pool.clone()
+                },
                 tranches: tranches.clone(),
                 closing_date: closing,
                 maturity,
@@ -556,7 +559,10 @@ fn test_recovery_rate_golden_industry_standards() {
             finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
             finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
                 id: "TEST-RMBS".into(),
-                pool: pool.clone(),
+                pool: AssetPool {
+                    deal_type: DealType::Rmbs,
+                    ..pool.clone()
+                },
                 tranches: tranches.clone(),
                 closing_date: closing,
                 maturity,
@@ -594,7 +600,10 @@ fn test_recovery_rate_golden_industry_standards() {
             finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs,
             finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
                 id: "TEST-CMBS".into(),
-                pool: pool.clone(),
+                pool: AssetPool {
+                    deal_type: DealType::Cmbs,
+                    ..pool.clone()
+                },
                 tranches,
                 closing_date: closing,
                 maturity,

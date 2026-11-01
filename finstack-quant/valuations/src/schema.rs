@@ -729,8 +729,8 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
         BorrowingBaseReport, EquityMetrics, OasConfig, OasResult, PoolReport, PoolStats,
-        ScenarioGrid, ScenarioTable, SimulationDiagnostics, SimulationRun, StandardDealParams,
-        TrancheCashflows, TrancheMetrics,
+        ScenarioGrid, ScenarioTable, SimulationDiagnostics, SimulationRun, StandardDealFamily,
+        StandardDealParams, TrancheCashflows, TrancheMetrics,
     };
     use crate::instruments::json_loader::InstrumentJson;
     use crate::instruments::MarketDependencies;
@@ -1165,6 +1165,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         )
         .with_packager(package_valuations_schema)
         .with_examples(examples::standard_deal_params),
+        finstack_quant_core::schema_artifact!(
+            StandardDealFamily,
+            "results",
+            "standard_deal_family",
+            Component,
+            "One deal family the standard structured-credit constructor accepts, with its registry profile and an example of its inputs."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::standard_deal_family),
         finstack_quant_core::schema_artifact!(
             SimulationRun,
             "results",

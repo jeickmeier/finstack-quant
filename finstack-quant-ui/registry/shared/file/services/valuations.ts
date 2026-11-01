@@ -28,6 +28,7 @@ export type ValuationsNative = {
       | "equityMetricsFieldUnits"
       | "poolReport"
       | "poolReportFieldUnits"
+      | "standardDealFamilies"
     >;
   };
 };
@@ -108,6 +109,8 @@ export function createValuationsService(
         );
       });
     },
+    standardDealFamilies: () =>
+      context.result(() => instruments.standardDealFamilies()),
     newStandardDeal(request) {
       return context.result(() => {
         const deal = instruments.StructuredCredit.newStandard(

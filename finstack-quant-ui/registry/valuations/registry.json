@@ -1171,7 +1171,7 @@
       "type": "registry:hook",
       "title": "useTrancheAnalytics",
       "description": "Fetches native structured-credit tranche metrics, OAS, discount margin and break-even CDR through the WASM worker.",
-      "docs": "Deal entry through StructuredCredit.newStandard (useNewStandardDeal), the deal's tranches getter (useDealTranches), its trancheCashflows with Rust's date table (useTrancheSchedule), and four query option builders and hooks over valuations.instruments.trancheMetrics, trancheOas, trancheDiscountMargin and trancheBreakevenCdr, each keyed by its complete immutable request and the worker session; null disables a call. An omitted metrics price or metric list is left to Rust; OAS and discount margin require an explicit clean price, and OAS uses Rust's default OasConfig. Native errors are returned unchanged.",
+      "docs": "Deal entry through the families, registry profile ids and example inputs of standardDealFamilies (useStandardDealFamilies) and StructuredCredit.newStandard (useNewStandardDeal), the deal's tranches getter (useDealTranches), its trancheCashflows with Rust's date table (useTrancheSchedule), and four query option builders and hooks over valuations.instruments.trancheMetrics, trancheOas, trancheDiscountMargin and trancheBreakevenCdr, each keyed by its complete immutable request and the worker session; null disables a call. An omitted metrics price or metric list is left to Rust; OAS and discount margin require an explicit clean price, and OAS uses Rust's default OasConfig. Native errors are returned unchanged.",
       "files": [
         {
           "path": "hooks/use-tranche-analytics/use-tranche-analytics.ts",

@@ -20657,6 +20657,27 @@ export interface SimulationRun {
   [k: string]: unknown;
 }
 /**
+ * One deal family the standard structured-credit constructor accepts, with its registry profile and an example of its inputs.
+ */
+export interface StandardDealFamily {
+  /**
+   * The `deal_type` argument of [`StructuredCredit::new_standard`].
+   */
+  deal_type: DealType;
+  /**
+   * Complete [`StandardDealParams`] that `new_standard` accepts for this family,
+   * with its `id`, tranche ids and `pool.deal_type` naming the family. Its schema
+   * is `standard_deal_params`, not repeated here.
+   */
+  example: {
+    [k: string]: unknown;
+  };
+  /**
+   * Registry profile that family's deal takes its assumptions from.
+   */
+  profile_id: string;
+}
+/**
  * Inputs for the standard structured-credit registry constructor.
  */
 export interface StandardDealParams {

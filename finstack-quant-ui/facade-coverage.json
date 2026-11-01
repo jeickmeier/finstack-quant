@@ -139,6 +139,7 @@
     "valuations.instruments.priceInstrumentWithMarket",
     "valuations.instruments.scenarioTableFieldUnits",
     "valuations.instruments.simulationFieldUnits",
+    "valuations.instruments.standardDealFamilies",
     "valuations.instruments.trancheBreakevenCdr",
     "valuations.instruments.trancheCashflowsTable",
     "valuations.instruments.trancheDiscountMargin",

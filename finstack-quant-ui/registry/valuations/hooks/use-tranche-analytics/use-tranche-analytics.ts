@@ -23,6 +23,18 @@ export type {
   TranchePriceRequest,
   TrancheRequest,
 } from "@/workers/finstack-contract";
+/** The deal families Rust's standard constructor accepts, each with its registry profile id and example inputs. */
+export function useStandardDealFamilies() {
+  return useWorkerQuery((worker) =>
+    workerQueryOptions({
+      client: worker.client,
+      queryKey: ["finstack", worker.session, "standardDealFamilies"] as const,
+      ready: true,
+      missing: "Deal families require a ready worker",
+      queryFn: (ready) => ready.call("standardDealFamilies"),
+    }),
+  );
+}
 /** Build a deal on request: native canonical instrument JSON, or the native error thrown. */
 export function useNewStandardDeal() {
   const worker = useFinstack();

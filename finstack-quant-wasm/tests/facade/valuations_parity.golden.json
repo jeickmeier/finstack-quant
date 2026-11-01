@@ -6754,7 +6754,465 @@
           }
         ]
       }
-    }
+    },
+    "standard_deal_families": [
+      {
+        "deal_type": "abs",
+        "profile_id": "abs_auto_standard",
+        "example": {
+          "id": "ABS-EXAMPLE",
+          "pool": {
+            "id": "ABS-POOL",
+            "deal_type": "abs",
+            "currency": "USD",
+            "assets": [
+              {
+                "id": "COLLATERAL-1",
+                "asset_type": {
+                  "type": "high_yield_bond"
+                },
+                "balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "rate": 0.07,
+                "spread_bp": null,
+                "forward_curve_id": null,
+                "maturity": "2034-01-01",
+                "rating": null,
+                "industry": null,
+                "obligor_id": null,
+                "defaulted": false,
+                "recovery_amount": null,
+                "default_date": null,
+                "purchase_price": null,
+                "acquisition_date": null,
+                "origination_date": null,
+                "day_count": "act_360",
+                "smm_override": null,
+                "mdr_override": null,
+                "recovery_rate": null,
+                "contractual_payment": null
+              }
+            ],
+            "cumulative_defaults": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_recoveries": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_prepayments": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_scheduled_amortization": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reinvestment_period": null,
+            "collection_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reserve_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "excess_spread_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "rep_lines": null
+          },
+          "tranches": {
+            "tranches": [
+              {
+                "id": "ABSNOTES-A",
+                "attach_pct": 0.0,
+                "detach_pct": 100.0,
+                "seniority": "senior",
+                "rating": null,
+                "original_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "current_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "coupon": {
+                  "fixed": {
+                    "rate": 0.06
+                  }
+                },
+                "oc_trigger": null,
+                "ic_trigger": null,
+                "frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "day_count": "act_360",
+                "deferred_interest": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "pik_enabled": false,
+                "maturity": "2034-01-01",
+                "attributes": {}
+              }
+            ]
+          },
+          "closing_date": "2024-01-01",
+          "maturity": "2034-01-01",
+          "discount_curve_id": "USD-OIS",
+          "calendar_id": "nyse"
+        }
+      },
+      {
+        "deal_type": "clo",
+        "profile_id": "clo_standard",
+        "example": {
+          "id": "CLO-EXAMPLE",
+          "pool": {
+            "id": "CLO-POOL",
+            "deal_type": "clo",
+            "currency": "USD",
+            "assets": [
+              {
+                "id": "COLLATERAL-1",
+                "asset_type": {
+                  "type": "high_yield_bond"
+                },
+                "balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "rate": 0.07,
+                "spread_bp": null,
+                "forward_curve_id": null,
+                "maturity": "2034-01-01",
+                "rating": null,
+                "industry": null,
+                "obligor_id": null,
+                "defaulted": false,
+                "recovery_amount": null,
+                "default_date": null,
+                "purchase_price": null,
+                "acquisition_date": null,
+                "origination_date": null,
+                "day_count": "act_360",
+                "smm_override": null,
+                "mdr_override": null,
+                "recovery_rate": null,
+                "contractual_payment": null
+              }
+            ],
+            "cumulative_defaults": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_recoveries": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_prepayments": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_scheduled_amortization": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reinvestment_period": null,
+            "collection_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reserve_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "excess_spread_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "rep_lines": null
+          },
+          "tranches": {
+            "tranches": [
+              {
+                "id": "CLONOTES-A",
+                "attach_pct": 0.0,
+                "detach_pct": 100.0,
+                "seniority": "senior",
+                "rating": null,
+                "original_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "current_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "coupon": {
+                  "fixed": {
+                    "rate": 0.06
+                  }
+                },
+                "oc_trigger": null,
+                "ic_trigger": null,
+                "frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "day_count": "act_360",
+                "deferred_interest": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "pik_enabled": false,
+                "maturity": "2034-01-01",
+                "attributes": {}
+              }
+            ]
+          },
+          "closing_date": "2024-01-01",
+          "maturity": "2034-01-01",
+          "discount_curve_id": "USD-OIS",
+          "calendar_id": "nyse"
+        }
+      },
+      {
+        "deal_type": "cmbs",
+        "profile_id": "cmbs_standard",
+        "example": {
+          "id": "CMBS-EXAMPLE",
+          "pool": {
+            "id": "CMBS-POOL",
+            "deal_type": "cmbs",
+            "currency": "USD",
+            "assets": [
+              {
+                "id": "COLLATERAL-1",
+                "asset_type": {
+                  "type": "high_yield_bond"
+                },
+                "balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "rate": 0.07,
+                "spread_bp": null,
+                "forward_curve_id": null,
+                "maturity": "2034-01-01",
+                "rating": null,
+                "industry": null,
+                "obligor_id": null,
+                "defaulted": false,
+                "recovery_amount": null,
+                "default_date": null,
+                "purchase_price": null,
+                "acquisition_date": null,
+                "origination_date": null,
+                "day_count": "30_360",
+                "smm_override": null,
+                "mdr_override": null,
+                "recovery_rate": null,
+                "contractual_payment": null
+              }
+            ],
+            "cumulative_defaults": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_recoveries": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_prepayments": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_scheduled_amortization": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reinvestment_period": null,
+            "collection_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reserve_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "excess_spread_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "rep_lines": null
+          },
+          "tranches": {
+            "tranches": [
+              {
+                "id": "CMBSNOTES-A",
+                "attach_pct": 0.0,
+                "detach_pct": 100.0,
+                "seniority": "senior",
+                "rating": null,
+                "original_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "current_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "coupon": {
+                  "fixed": {
+                    "rate": 0.06
+                  }
+                },
+                "oc_trigger": null,
+                "ic_trigger": null,
+                "frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "day_count": "act_360",
+                "deferred_interest": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "pik_enabled": false,
+                "maturity": "2034-01-01",
+                "attributes": {}
+              }
+            ]
+          },
+          "closing_date": "2024-01-01",
+          "maturity": "2034-01-01",
+          "discount_curve_id": "USD-OIS",
+          "calendar_id": "nyse"
+        }
+      },
+      {
+        "deal_type": "rmbs",
+        "profile_id": "rmbs_standard",
+        "example": {
+          "id": "RMBS-EXAMPLE",
+          "pool": {
+            "id": "RMBS-POOL",
+            "deal_type": "rmbs",
+            "currency": "USD",
+            "assets": [
+              {
+                "id": "COLLATERAL-1",
+                "asset_type": {
+                  "type": "high_yield_bond"
+                },
+                "balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "rate": 0.07,
+                "spread_bp": null,
+                "forward_curve_id": null,
+                "maturity": "2034-01-01",
+                "rating": null,
+                "industry": null,
+                "obligor_id": null,
+                "defaulted": false,
+                "recovery_amount": null,
+                "default_date": null,
+                "purchase_price": null,
+                "acquisition_date": null,
+                "origination_date": null,
+                "day_count": "30_360",
+                "smm_override": null,
+                "mdr_override": null,
+                "recovery_rate": null,
+                "contractual_payment": null
+              }
+            ],
+            "cumulative_defaults": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_recoveries": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_prepayments": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "cumulative_scheduled_amortization": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reinvestment_period": null,
+            "collection_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reserve_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "excess_spread_account": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "rep_lines": null
+          },
+          "tranches": {
+            "tranches": [
+              {
+                "id": "RMBSNOTES-A",
+                "attach_pct": 0.0,
+                "detach_pct": 100.0,
+                "seniority": "senior",
+                "rating": null,
+                "original_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "current_balance": {
+                  "amount": "100000000",
+                  "currency": "USD"
+                },
+                "coupon": {
+                  "fixed": {
+                    "rate": 0.06
+                  }
+                },
+                "oc_trigger": null,
+                "ic_trigger": null,
+                "frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "day_count": "act_360",
+                "deferred_interest": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "pik_enabled": false,
+                "maturity": "2034-01-01",
+                "attributes": {}
+              }
+            ]
+          },
+          "closing_date": "2024-01-01",
+          "maturity": "2034-01-01",
+          "discount_curve_id": "USD-OIS",
+          "calendar_id": "nyse"
+        }
+      }
+    ]
   },
   "merton": {
     "model": {

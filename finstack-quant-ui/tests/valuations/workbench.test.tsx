@@ -119,6 +119,8 @@ beforeEach(() => {
         return native.dryRun(request);
       case "calibrate":
         return native.calibrate(request);
+      case "standardDealFamilies":
+        return native.standardDealFamilies();
       case "newStandardDeal": {
         const deal = native.StructuredCredit.newStandard(
           request.dealType,
@@ -923,6 +925,7 @@ it(
     fireEvent(details, new Event("toggle"));
     const entry = within(details);
     fireEvent.click(await entry.findByRole("radio", { name: "RMBS" }));
+    expect(entry.getByText(family.profileId)).toBeTruthy();
     const build = entry.getByRole("button", {
       name: "Build deal",
     }) as HTMLButtonElement;
@@ -941,7 +944,7 @@ it(
       ([method]) => method === "newStandardDeal",
     )![1];
     expect(built.dealType).toBe("rmbs");
-    expect(JSON.parse(built.paramsJson)).toEqual(standardDeals.params);
+    expect(JSON.parse(built.paramsJson)).toEqual(family.params);
     // The built deal reprices through the workbench's normal path.
     await waitFor(
       () => expect(prices().at(-1)!.instrumentJson).toBe(family.instrumentJson),

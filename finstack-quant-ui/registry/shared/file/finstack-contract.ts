@@ -19,6 +19,7 @@ import type {
   ScenarioTableFieldUnits,
   SimulationFieldUnits,
   EquityMetricsFieldUnits,
+  StandardDealFamily,
   PoolReportFieldUnits,
   StructuredCredit,
   ScenarioResults,
@@ -108,8 +109,8 @@ export interface ScenarioRequest {
   /** Complete native ScenarioGrid JSON; no model inputs are inferred. */
   readonly gridJson: string;
 }
-/** One of the deal families StructuredCredit.newStandard accepts. */
-export type StandardDealType = "abs" | "clo" | "cmbs" | "rmbs";
+/** One of the deal families StructuredCredit.newStandard accepts; standardDealFamilies lists them. */
+export type StandardDealType = StandardDealFamily["deal_type"];
 /** A registry deal family and its complete native StandardDealParams JSON. */
 export interface StandardDealRequest {
   readonly dealType: StandardDealType;
@@ -1150,6 +1151,8 @@ export interface ValuationsApi {
   validate(instrumentJson: string): Promise<Envelope<string>>;
   /** valuations.instruments.validateInstrumentJson + instrumentCashflowsWithMarket over the cached market handle; the native envelope object. */
   cashflows(request: CashflowRequest): Promise<Envelope<CashflowEnvelope>>;
+  /** valuations.instruments.standardDealFamilies: the families newStandard accepts, each with its registry profile id and example inputs. */
+  standardDealFamilies(): Promise<Envelope<StandardDealFamily[]>>;
   /** valuations.instruments.StructuredCredit.newStandard + toJson: the canonical instrument JSON of a deal under its family's registry assumptions. */
   newStandardDeal(request: StandardDealRequest): Promise<Envelope<string>>;
   /** valuations.instruments.StructuredCredit.fromJson + its tranches getter. */

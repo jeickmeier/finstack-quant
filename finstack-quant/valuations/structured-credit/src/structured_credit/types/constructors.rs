@@ -69,6 +69,94 @@ pub(super) struct InstrumentParams<'a> {
     pub discount_curve_id: &'a str,
 }
 
+/// The deal families [`StructuredCredit::new_standard`] accepts, each with the
+/// registry profile that supplies its frequency and credit assumptions.
+const STANDARD_FAMILIES: [(DealType, &str); 4] = [
+    (DealType::Abs, "abs_auto_standard"),
+    (DealType::Clo, "clo_standard"),
+    (DealType::Cmbs, "cmbs_standard"),
+    (DealType::Rmbs, "rmbs_standard"),
+];
+
+/// One deal family [`StructuredCredit::new_standard`] accepts; an entry of
+/// [`standard_deal_families`].
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct StandardDealFamily {
+    /// The `deal_type` argument of [`StructuredCredit::new_standard`].
+    pub deal_type: DealType,
+    /// Registry profile that family's deal takes its assumptions from.
+    pub profile_id: String,
+    /// Complete [`StandardDealParams`] that `new_standard` accepts for this family,
+    /// with its `id`, tranche ids and `pool.deal_type` naming the family. Its schema
+    /// is `standard_deal_params`, not repeated here.
+    #[cfg_attr(feature = "json-schema", schemars(with = "serde_json::Value"))]
+    pub example: StandardDealParams,
+}
+
+/// List the deal families [`StructuredCredit::new_standard`] accepts, the one
+/// place a host reads them from, with a coherent example of each family's inputs.
+///
+/// # Returns
+///
+/// One [`StandardDealFamily`] per family, in `abs`, `clo`, `cmbs`, `rmbs` order.
+/// Each example is a USD 100m fixed-rate collateral row and one senior note, in
+/// the family's schedule day count, closing 2024-01-01 and maturing 2034-01-01 on
+/// the `USD-OIS` curve and the `nyse` calendar.
+///
+/// # Errors
+///
+/// Returns an error if an example's tranche cannot be constructed, which the
+/// fixed inputs do not trigger.
+pub fn standard_deal_families() -> finstack_quant_core::Result<Vec<StandardDealFamily>> {
+    STANDARD_FAMILIES
+        .into_iter()
+        .map(|(deal_type, profile_id)| {
+            Ok(StandardDealFamily {
+                deal_type,
+                profile_id: profile_id.to_string(),
+                example: standard_family_example(deal_type)?,
+            })
+        })
+        .collect()
+}
+
+/// The inputs a host starts from for `deal_type`; see [`standard_deal_families`].
+fn standard_family_example(deal_type: DealType) -> finstack_quant_core::Result<StandardDealParams> {
+    use finstack_quant_core::currency::Currency;
+    let closing_date = time::macros::date!(2024 - 01 - 01);
+    let maturity = time::macros::date!(2034 - 01 - 01);
+    let family = deal_type.to_string().to_uppercase();
+    let balance = Money::from((100_000_000_i64, Currency::USD));
+    let mut pool = AssetPool::new(format!("{family}-POOL"), deal_type, Currency::USD);
+    pool.assets.push(PoolAsset::fixed_rate_bond(
+        "COLLATERAL-1",
+        balance,
+        0.07,
+        maturity,
+        deal_type.schedule_day_count(),
+    ));
+    let tranche = Tranche::new(
+        format!("{family}NOTES-A"),
+        0.0,
+        100.0,
+        TrancheSeniority::Senior,
+        balance,
+        RateSpec::Fixed { rate: 0.06 },
+        maturity,
+    )?;
+    Ok(StandardDealParams {
+        id: format!("{family}-EXAMPLE").into(),
+        pool,
+        tranches: TrancheStructure::new(vec![tranche])?,
+        closing_date,
+        maturity,
+        discount_curve_id: "USD-OIS".into(),
+        calendar_id: Some("nyse".into()),
+    })
+}
+
 impl StructuredCredit {
     /// Create a canonical, priceable example CLO structured-credit deal.
     ///
@@ -192,14 +280,17 @@ impl StructuredCredit {
     ///
     /// * `deal_type` - Deal family selecting the registry constructor profile;
     ///   one of [`DealType::Abs`], [`DealType::Clo`], [`DealType::Cmbs`] or
-    ///   [`DealType::Rmbs`].
+    ///   [`DealType::Rmbs`], as [`standard_deal_families`] lists them.
     /// * `params` - Deal identifier, collateral pool, tranches, closing and
     ///   maturity dates, discount curve and optional payment calendar.
+    ///   `params.pool.deal_type` must be `deal_type`; the `abs` family also takes
+    ///   auto and card pools, which have no constructor of their own.
     ///
     /// # Errors
     ///
     /// Returns a validation error if `deal_type` has no standard constructor
-    /// (CBO, auto, card), if the first registry payment period exceeds the
+    /// (CBO, auto, card), if `params.pool.deal_type` contradicts it, if the first
+    /// registry payment period exceeds the
     /// supported calendar range, or if the deal fails pricing validation.
     pub fn new_standard(
         deal_type: DealType,
@@ -214,17 +305,24 @@ impl StructuredCredit {
             discount_curve_id,
             calendar_id,
         } = params;
-        let profile_id = match deal_type {
-            DealType::Abs => "abs_auto_standard",
-            DealType::Clo => "clo_standard",
-            DealType::Cmbs => "cmbs_standard",
-            DealType::Rmbs => "rmbs_standard",
-            other => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                "deal type {other:?} has no standard constructor; use the StructuredCredit builder"
-            )))
-            }
+        let Some((_, profile_id)) = STANDARD_FAMILIES
+            .into_iter()
+            .find(|(family, _)| *family == deal_type)
+        else {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "deal type {deal_type:?} has no standard constructor; use the StructuredCredit builder"
+            )));
         };
+        // Auto and card pools are ABS, the family they are built under.
+        let coherent = pool.deal_type == deal_type
+            || (deal_type == DealType::Abs
+                && matches!(pool.deal_type, DealType::Auto | DealType::Card));
+        if !coherent {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "pool {} has deal type {}, which contradicts the {deal_type} family",
+                pool.id, pool.deal_type
+            )));
+        }
         let mut deal = Self::new_with_deal_config(
             id,
             deal_type,

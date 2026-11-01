@@ -110,13 +110,35 @@ it(
 it(
   "builds each standard deal family and lists its native tranches through the real worker",
   async () => {
-    const paramsJson = JSON.stringify(standardDeals.params);
+    const families = unwrap(await worker.proxy.standardDealFamilies());
+    expect(families).toEqual(native.standardDealFamilies());
+    expect(
+      families.map(({ deal_type, profile_id, example }) => [
+        deal_type,
+        profile_id,
+        example,
+      ]),
+    ).toEqual(
+      standardDeals.cases.map((c) => [c.family, c.profileId, c.params]),
+    );
+    expect(standardDeals.cases.map((c) => c.profileId)).toEqual([
+      "abs_auto_standard",
+      "clo_standard",
+      "cmbs_standard",
+      "rmbs_standard",
+    ]);
     for (const c of standardDeals.cases) {
       const built = unwrap(
         await worker.proxy.newStandardDeal({
           dealType: c.family as StandardDealType,
-          paramsJson,
+          paramsJson: JSON.stringify(c.params),
         }),
+      );
+      // Rust's example names its family.
+      expect(c.params.pool.deal_type).toBe(c.family);
+      expect(c.params.id).toBe(`${c.family.toUpperCase()}-EXAMPLE`);
+      expect(c.tranches.tranches[0]!.id).toBe(
+        `${c.family.toUpperCase()}NOTES-A`,
       );
       expect(built).toBe(c.instrumentJson);
       expect(unwrap(await worker.proxy.dealTranches(built))).toEqual(
@@ -135,6 +157,21 @@ it(
         ),
       ).toEqual(c.table);
     }
+    // A pool whose deal type contradicts the family is Rust's validation error.
+    const contradiction = await worker.proxy.newStandardDeal({
+      dealType: "abs",
+      paramsJson: JSON.stringify(
+        standardDeals.cases.find((c) => c.family === "clo")!.params,
+      ),
+    });
+    expect(contradiction).toMatchObject({
+      ok: false,
+      error: {
+        kind: "validation",
+        message: expect.stringContaining("contradicts the abs family"),
+      },
+    });
+    const paramsJson = JSON.stringify(standardDeals.cases[0]!.params);
     let error;
     try {
       native.StructuredCredit.newStandard("cbo", paramsJson);
