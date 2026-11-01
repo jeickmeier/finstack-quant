@@ -508,6 +508,17 @@ const displays = [
       "Returned native values of one stored object per supplied point: DiscountCurve.df and zeroRate (default continuous compounding) and forward (continuously compounded, year fractions only), ForwardCurve.rate (simple, on the curve day count), HazardCurve.sp and hazardRate, and models.volatility.getSurfaceVol (expiry in years, strike in the surface's units, inside the grid). Curve dates pass through as ISO text for Rust to convert with the curve day count; no date, unit or tenor conversion happens here. A point Rust rejects keeps its native error in its cell.",
   },
   {
+    id: "yield-workout-ladder",
+    api: [
+      "valuations.instruments.bondWorkoutLadder",
+      "ValuationInstrumentsNamespace",
+      "bondWorkoutLadder",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned BondWorkoutLadder of one bond: one row per call, put and maturity exit in Rust's date order, every yield solved at the one price shown. The worst row is the one is_worst marks, the exit the ytw metric selects; no yield is compared here. Yield and I-spread units are what metricMetadata declares for ytw and i_spread, and a null yield is shown as no yield, never zero. Z-spread is not reported per exit.",
+  },
+  {
     id: "loan-yield-card",
     api: [
       "valuations.instruments.priceInstrumentWithMarket",

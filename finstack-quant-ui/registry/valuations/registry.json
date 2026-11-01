@@ -35,6 +35,65 @@
       }
     },
     {
+      "name": "yield-workout-ladder",
+      "type": "registry:component",
+      "title": "Yield workout ladder",
+      "description": "Shows the yield and I-spread to every call, put and maturity exit of a bond, with the row Rust marks as the worst workout.",
+      "docs": "Answers which call date is the worst workout and what the yield to each is. Present a native valuations.instruments.bondWorkoutLadder result (useBondWorkoutLadder): the one price every exit is solved at, then one row per exit in Rust's date order with its redemption, yield, I-spread and the mark on the row is_worst names, the exit the ytw metric selects. Pass metricMetadata of workoutLadderMetrics for the yield and spread units. A null yield shows as no yield, never zero. A bond with exercise rights needs quoted_clean_price_pct; the native error is shown as returned. Nothing is compared, sorted or derived. Accepts ladder, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/yield-workout-ladder/yield-workout-ladder.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/yield-workout-ladder/yield-workout-ladder.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-bond-workout-ladder",
+      "type": "registry:hook",
+      "title": "useBondWorkoutLadder",
+      "description": "Solves the yield and I-spread to every exit of a bond through the WASM worker.",
+      "docs": "valuations.instruments.Bond.fromJson then bondWorkoutLadder for the supplied instrument, market and date, the handle freed afterwards. Null means no request. Requires FinstackQueryProvider. A bond with exercise rights and no quoted clean price, or a missing curve, is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-bond-workout-ladder/use-bond-workout-ladder.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-bond-workout-ladder/use-bond-workout-ladder.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-metric-values",
       "type": "registry:hook",
       "title": "useMetricValues",

@@ -14205,7 +14205,7 @@
                     "date": "2026-04-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "954727.782972105",
+                      "amount": "954727.7829721054",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14245,7 +14245,7 @@
                     "date": "2026-10-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "870135.115520062",
+                      "amount": "870135.1155200622",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14305,7 +14305,7 @@
                     "date": "2027-07-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "725734.532192149",
+                      "amount": "725734.5321921494",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14405,7 +14405,7 @@
                     "date": "2028-10-02",
                     "reset_date": null,
                     "amount": {
-                      "amount": "555007.086425631",
+                      "amount": "555007.0864256313",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14465,7 +14465,7 @@
                     "date": "2029-07-02",
                     "reset_date": null,
                     "amount": {
-                      "amount": "467763.170394098",
+                      "amount": "467763.1703940983",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14505,7 +14505,7 @@
                     "date": "2030-01-02",
                     "reset_date": null,
                     "amount": {
-                      "amount": "424724.0422615428",
+                      "amount": "424724.0422615429",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14565,7 +14565,7 @@
                     "date": "2030-10-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "362603.5679768247",
+                      "amount": "362603.5679768252",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14585,7 +14585,7 @@
                     "date": "2031-01-02",
                     "reset_date": null,
                     "amount": {
-                      "amount": "343075.9935688807",
+                      "amount": "343075.9935688810",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14605,7 +14605,7 @@
                     "date": "2031-04-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "318831.4207890124",
+                      "amount": "318831.4207890125",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14625,7 +14625,7 @@
                     "date": "2031-07-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "306418.4991077246",
+                      "amount": "306418.4991077249",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14645,7 +14645,7 @@
                     "date": "2031-10-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "294654.2657871228",
+                      "amount": "294654.2657871230",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14745,7 +14745,7 @@
                     "date": "2033-01-03",
                     "reset_date": null,
                     "amount": {
-                      "amount": "232067.9947938259",
+                      "amount": "232067.9947938261",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14765,7 +14765,7 @@
                     "date": "2033-04-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "217003.1374880076",
+                      "amount": "217003.1374880077",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -14825,7 +14825,7 @@
                     "date": "2034-01-03",
                     "reset_date": null,
                     "amount": {
-                      "amount": "194881.3936786355",
+                      "amount": "194881.39367863895",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -15394,7 +15394,7 @@
                   [
                     "2026-04-01",
                     {
-                      "amount": "954727.782972105",
+                      "amount": "954727.7829721054",
                       "currency": "USD"
                     }
                   ],
@@ -15408,7 +15408,7 @@
                   [
                     "2026-10-01",
                     {
-                      "amount": "870135.115520062",
+                      "amount": "870135.1155200622",
                       "currency": "USD"
                     }
                   ],
@@ -15429,7 +15429,7 @@
                   [
                     "2027-07-01",
                     {
-                      "amount": "725734.532192149",
+                      "amount": "725734.5321921494",
                       "currency": "USD"
                     }
                   ],
@@ -15464,7 +15464,7 @@
                   [
                     "2028-10-02",
                     {
-                      "amount": "555007.086425631",
+                      "amount": "555007.0864256313",
                       "currency": "USD"
                     }
                   ],
@@ -15485,7 +15485,7 @@
                   [
                     "2029-07-02",
                     {
-                      "amount": "467763.170394098",
+                      "amount": "467763.1703940983",
                       "currency": "USD"
                     }
                   ],
@@ -15499,7 +15499,7 @@
                   [
                     "2030-01-02",
                     {
-                      "amount": "424724.0422615428",
+                      "amount": "424724.0422615429",
                       "currency": "USD"
                     }
                   ],
@@ -15520,35 +15520,35 @@
                   [
                     "2030-10-01",
                     {
-                      "amount": "362603.5679768247",
+                      "amount": "362603.5679768252",
                       "currency": "USD"
                     }
                   ],
                   [
                     "2031-01-02",
                     {
-                      "amount": "343075.9935688807",
+                      "amount": "343075.9935688810",
                       "currency": "USD"
                     }
                   ],
                   [
                     "2031-04-01",
                     {
-                      "amount": "318831.4207890124",
+                      "amount": "318831.4207890125",
                       "currency": "USD"
                     }
                   ],
                   [
                     "2031-07-01",
                     {
-                      "amount": "306418.4991077246",
+                      "amount": "306418.4991077249",
                       "currency": "USD"
                     }
                   ],
                   [
                     "2031-10-01",
                     {
-                      "amount": "294654.2657871228",
+                      "amount": "294654.2657871230",
                       "currency": "USD"
                     }
                   ],
@@ -15583,14 +15583,14 @@
                   [
                     "2033-01-03",
                     {
-                      "amount": "232067.9947938259",
+                      "amount": "232067.9947938261",
                       "currency": "USD"
                     }
                   ],
                   [
                     "2033-04-01",
                     {
-                      "amount": "217003.1374880076",
+                      "amount": "217003.1374880077",
                       "currency": "USD"
                     }
                   ],
@@ -15611,7 +15611,7 @@
                   [
                     "2034-01-03",
                     {
-                      "amount": "194881.3936786355",
+                      "amount": "194881.39367863895",
                       "currency": "USD"
                     }
                   ]
@@ -15942,7 +15942,7 @@
                   "currency": "USD"
                 },
                 "total_interest": {
-                  "amount": "25095323.95488888694",
+                  "amount": "25095323.95488889379",
                   "currency": "USD"
                 },
                 "total_principal": {
@@ -16052,18 +16052,18 @@
                         1516666.666666667, 1434789.355571149, 1372664.958982674,
                         1299371.024086719, 1203655.2221048174,
                         1148252.8284355546, 1095442.8603082222,
-                        1033876.492757576, 954727.782972105, 911415.2184336458,
-                        870135.115520062, 821867.0833603537, 759568.6706920575,
-                        725734.532192149, 693493.8436061427, 655651.706392932,
-                        615651.3408151258, 580160.8741788155, 555007.086425631,
-                        525338.850850474, 488428.6669508867, 467763.170394098,
-                        448081.1925234818, 424724.0422615428, 392562.9234018939,
-                        377911.3265291441, 362603.5679768247, 343075.9935688807,
-                        318831.4207890124, 306418.4991077246, 294654.2657871228,
+                        1033876.492757576, 954727.7829721054, 911415.2184336458,
+                        870135.1155200622, 821867.0833603537, 759568.6706920575,
+                        725734.5321921494, 693493.8436061427, 655651.706392932,
+                        615651.3408151258, 580160.8741788155, 555007.0864256313,
+                        525338.850850474, 488428.6669508867, 467763.1703940983,
+                        448081.1925234818, 424724.042261543, 392562.9234018939,
+                        377911.3265291441, 362603.5679768252, 343075.993568881,
+                        318831.4207890125, 306418.499107725, 294654.265787123,
                         280464.8893610337, 264258.1735934647, 251923.8771635415,
-                        243008.4731375529, 232067.9947938259, 217003.1374880076,
+                        243008.4731375529, 232067.9947938261, 217003.1374880077,
                         209926.12156460405, 203263.3104647354,
-                        194881.3936786355, 0, 0, 0, 0
+                        194881.3936786389, 0, 0, 0, 0
                       ]
                     }
                   },
@@ -17422,7 +17422,7 @@
                     "date": "2026-05-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "198875",
+                      "amount": "198875.0000000000",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -17582,7 +17582,7 @@
                     "date": "2027-01-04",
                     "reset_date": null,
                     "amount": {
-                      "amount": "201327.4346732375",
+                      "amount": "201327.4346732380",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -17602,7 +17602,7 @@
                     "date": "2027-02-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "197388.0246836506",
+                      "amount": "197388.02468365060",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -17622,7 +17622,7 @@
                     "date": "2027-03-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "178822.6083912249",
+                      "amount": "178822.60839122490",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -17642,7 +17642,7 @@
                     "date": "2027-04-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "198434.3258136898",
+                      "amount": "198434.32581368980",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -17682,7 +17682,7 @@
                     "date": "2027-06-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "199580.4852237208",
+                      "amount": "199580.48522372080",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -17702,7 +17702,7 @@
                     "date": "2027-07-01",
                     "reset_date": null,
                     "amount": {
-                      "amount": "193666.8293790368",
+                      "amount": "193666.82937903680",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -18012,7 +18012,7 @@
                     "date": "2030-01-02",
                     "reset_date": null,
                     "amount": {
-                      "amount": "1617570.96421766189",
+                      "amount": "1617570.96421766224",
                       "currency": "USD"
                     },
                     "kind": "fixed",
@@ -18650,7 +18650,7 @@
                   [
                     "2026-05-01",
                     {
-                      "amount": "198875",
+                      "amount": "198875.0000000000",
                       "currency": "USD"
                     }
                   ],
@@ -18706,28 +18706,28 @@
                   [
                     "2027-01-04",
                     {
-                      "amount": "201327.4346732375",
+                      "amount": "201327.4346732380",
                       "currency": "USD"
                     }
                   ],
                   [
                     "2027-02-01",
                     {
-                      "amount": "197388.0246836506",
+                      "amount": "197388.02468365060",
                       "currency": "USD"
                     }
                   ],
                   [
                     "2027-03-01",
                     {
-                      "amount": "178822.6083912249",
+                      "amount": "178822.60839122490",
                       "currency": "USD"
                     }
                   ],
                   [
                     "2027-04-01",
                     {
-                      "amount": "198434.3258136898",
+                      "amount": "198434.32581368980",
                       "currency": "USD"
                     }
                   ],
@@ -18741,14 +18741,14 @@
                   [
                     "2027-06-01",
                     {
-                      "amount": "199580.4852237208",
+                      "amount": "199580.48522372080",
                       "currency": "USD"
                     }
                   ],
                   [
                     "2027-07-01",
                     {
-                      "amount": "193666.8293790368",
+                      "amount": "193666.82937903680",
                       "currency": "USD"
                     }
                   ],
@@ -18958,7 +18958,7 @@
                   [
                     "2030-01-02",
                     {
-                      "amount": "1617570.96421766189",
+                      "amount": "1617570.96421766224",
                       "currency": "USD"
                     }
                   ],
@@ -19374,7 +19374,7 @@
                   "currency": "USD"
                 },
                 "total_interest": {
-                  "amount": "9102051.42388664340",
+                  "amount": "9102051.42388664425",
                   "currency": "USD"
                 },
                 "total_principal": {
@@ -19497,7 +19497,7 @@
                       "values": [
                         198875, 203719.4034587083, 193552.8200750937,
                         199373.4305622196, 198792.7579780789, 192806.8272671317,
-                        199946.9866814325, 194177.5581480513, 201327.4346732375,
+                        199946.9866814325, 194177.5581480513, 201327.434673238,
                         197388.0246836506, 178822.6083912249, 198434.3258136898,
                         192617.64768412567, 199580.4852237208,
                         193666.8293790368, 195046.6406510179, 191968.2755170549,
@@ -19514,7 +19514,7 @@
                         133618.91516655489, 132793.53821333463,
                         130594.83882923896, 114642.93591258566,
                         138757.5737229256, 122921.4601908446,
-                        1617570.9642176619, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                        1617570.9642176626, 0, 0, 0, 0, 0, 0, 0, 0, 0
                       ]
                     }
                   },
@@ -23576,7 +23576,7 @@
                   "date": "2024-07-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "865581.44380135",
+                    "amount": "865581.443801350",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -23636,7 +23636,7 @@
                   "date": "2025-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "792606.710144446",
+                    "amount": "792606.7101444463",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -23676,7 +23676,7 @@
                   "date": "2025-10-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "765017.253324241",
+                    "amount": "765017.2533242413",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -23696,7 +23696,7 @@
                   "date": "2026-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "743186.430818712",
+                    "amount": "743186.4308187125",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -23958,7 +23958,7 @@
                 [
                   "2024-07-01",
                   {
-                    "amount": "865581.44380135",
+                    "amount": "865581.443801350",
                     "currency": "USD"
                   }
                 ],
@@ -23979,7 +23979,7 @@
                 [
                   "2025-04-01",
                   {
-                    "amount": "792606.710144446",
+                    "amount": "792606.7101444463",
                     "currency": "USD"
                   }
                 ],
@@ -23993,14 +23993,14 @@
                 [
                   "2025-10-01",
                   {
-                    "amount": "765017.253324241",
+                    "amount": "765017.2533242413",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-01-02",
                   {
-                    "amount": "743186.430818712",
+                    "amount": "743186.4308187125",
                     "currency": "USD"
                   }
                 ],
@@ -24142,7 +24142,7 @@
                 "currency": "USD"
               },
               "total_interest": {
-                "amount": "9260112.57641468085",
+                "amount": "9260112.57641468195",
                 "currency": "USD"
               },
               "total_principal": {
@@ -40127,6 +40127,368 @@
             }
           }
         ]
+      }
+    }
+  },
+  "workoutLadder": {
+    "description": "Native bondWorkoutLadder results of callable, putable, make-whole and plain bonds, each with its ytw metric, and the native error of a callable bond with no quote.",
+    "sources": [
+      {
+        "path": "finstack-quant/valuations/tests/instruments/json_examples/bond.json",
+        "sha256": "3004830e4297c3a7840a60c2e85005359b8f823b11153af44902f001e10d00f7"
+      },
+      {
+        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
+        "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c"
+      }
+    ],
+    "metadata": [
+      {
+        "key": "ytw",
+        "metric": "ytw",
+        "components": [],
+        "coordinates": [],
+        "unit": "decimal",
+        "group": "Pricing",
+        "bucketed": false
+      },
+      {
+        "key": "i_spread",
+        "metric": "i_spread",
+        "components": [],
+        "coordinates": [],
+        "unit": "decimal",
+        "group": "Pricing",
+        "bucketed": false
+      }
+    ],
+    "unquoted": {
+      "request": {
+        "instrumentJson": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":{\"calls\":[{\"start\":\"2026-01-15\",\"end\":\"2026-01-15\",\"price_pct_of_par\":102},{\"start\":\"2028-01-15\",\"end\":\"2028-01-15\",\"price_pct_of_par\":101},{\"start\":\"2030-01-15\",\"end\":\"2030-01-15\",\"price_pct_of_par\":100}],\"puts\":[]},\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"settlement_days\":1},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
+        "marketJson": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-TREASURY\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-IG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"EUR-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"JPY-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-1M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.08333333333333333,\"knot_points\":[[0,0.035],[40,0.035]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-6M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.5,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-LIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"EUR-EURIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.03],[40,0.03]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"hazard\",\"id\":\"CDX.NA.IG.HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"CORP-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"USD-CREDIT-BBB\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"ACME-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"price\",\"id\":\"WTI-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"CL-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-SPOT-AVG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"RBOB-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":90,\"knot_points\":[[0,90],[40,90]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"IRON-ORE-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":110,\"knot_points\":[[0,110],[40,110]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"VIX\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_level\":20,\"knot_points\":[[0,20],[40,22]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"inflation\",\"id\":\"US-CPI\",\"base_date\":\"2023-10-01\",\"base_cpi\":300,\"day_count\":\"act_365f\",\"indexation_lag_months\":3,\"knot_points\":[[0,300],[4,330],[40,500]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_zero\"}],\"fx\":{\"config\":{\"cache_capacity\":256,\"enable_triangulation\":true,\"pivot_currency\":\"USD\"},\"pinned_quotes\":[],\"provider_quotes\":[],\"quotes\":[[\"EUR\",\"USD\",1.1],[\"JPY\",\"USD\",0.007142857142857143]],\"provider_pinned_quotes\":[]},\"surfaces\":[{\"id\":\"SPX-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SPX\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SX5E-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[500,5000,10000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"NKY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[3500,35000,70000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"EURUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.11000000000000001,1.1,2.2],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15]},{\"id\":\"JPYUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.0007000000000000001,0.007,0.014],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]},{\"id\":\"WTI-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"CL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"RBOB-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[9,90,180],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"NG-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.4,4,8],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"USD-CAPFLOOR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWPNVOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-CMS10Y-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-10Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-2Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-INFL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"CDSOPT-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.001,0.01,0.02],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4]},{\"id\":\"SOFR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.005000000000000001,0.05,0.1],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"USD-SOFR-HW-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.004,0.04,0.08],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"EQUITY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"US-CPI-FLOOR-VOL\",\"expiries\":[0.01,40],\"strikes\":[0.5,1.5],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0,0,0,0]}],\"prices\":{\"SPX-SPOT\":{\"unitless\":4500},\"SPX\":{\"unitless\":4500},\"SPX-DIV\":{\"unitless\":0.02},\"SPX-DIVYIELD\":{\"unitless\":0.02},\"AAPL-SPOT\":{\"unitless\":180},\"AAPL-DIV\":{\"unitless\":0.01},\"UST10Y-PRICE\":{\"unitless\":98},\"UST_10Y_PRICE\":{\"unitless\":100},\"US91282CJL54\":{\"unitless\":98},\"TECH\":{\"unitless\":50},\"SX5E-SPOT\":{\"unitless\":5000},\"SX5E-CLOSE\":{\"unitless\":5300},\"SX5E-DIV\":{\"unitless\":0.02},\"EURUSD-SPOT\":{\"unitless\":1.1},\"EURUSD\":{\"unitless\":1.1},\"NKY-SPOT\":{\"unitless\":35000},\"NKY-DIV\":{\"unitless\":0.01},\"JPYUSD-SPOT\":{\"unitless\":0.007142857142857143},\"US-CORP-INDEX\":{\"unitless\":100},\"US-CORP-DURATION\":{\"unitless\":5},\"US-CORP-YIELD\":{\"unitless\":0.05},\"TESX-ACCRUED-DISTRIBUTIONS\":{\"unitless\":80},\"TESX-ACCRUED-FUNDING\":{\"unitless\":30},\"TESX-SPREAD-BPS\":{\"unitless\":15},\"SOFR-RATE\":{\"unitless\":0.05},\"EQUITY-SPOT\":{\"unitless\":4500},\"EQUITY-DIVYIELD\":{\"unitless\":0.02}},\"series\":[],\"inflation_indices\":[{\"id\":\"US-CPI\",\"currency\":\"USD\",\"observations\":[[\"2023-09-01\",299],[\"2023-10-01\",300],[\"2023-11-01\",301],[\"2023-12-01\",302]],\"interpolation\":\"linear\",\"lag\":{\"months\":3},\"seasonality\":null}],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+        "asOf": "2024-07-15"
+      },
+      "error": {
+        "name": "FinstackError",
+        "kind": "not_found",
+        "message": "Requested item not found: bond.instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
+      }
+    },
+    "cases": {
+      "premium": {
+        "request": {
+          "instrumentJson": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":{\"calls\":[{\"start\":\"2026-01-15\",\"end\":\"2026-01-15\",\"price_pct_of_par\":102},{\"start\":\"2028-01-15\",\"end\":\"2028-01-15\",\"price_pct_of_par\":101},{\"start\":\"2030-01-15\",\"end\":\"2030-01-15\",\"price_pct_of_par\":100}],\"puts\":[]},\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"settlement_days\":1,\"instrument_pricing_overrides\":{\"market_quotes\":{\"quoted_clean_price_pct\":106}}},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
+          "marketJson": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-TREASURY\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-IG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"EUR-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"JPY-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-1M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.08333333333333333,\"knot_points\":[[0,0.035],[40,0.035]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-6M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.5,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-LIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"EUR-EURIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.03],[40,0.03]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"hazard\",\"id\":\"CDX.NA.IG.HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"CORP-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"USD-CREDIT-BBB\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"ACME-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"price\",\"id\":\"WTI-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"CL-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-SPOT-AVG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"RBOB-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":90,\"knot_points\":[[0,90],[40,90]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"IRON-ORE-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":110,\"knot_points\":[[0,110],[40,110]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"VIX\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_level\":20,\"knot_points\":[[0,20],[40,22]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"inflation\",\"id\":\"US-CPI\",\"base_date\":\"2023-10-01\",\"base_cpi\":300,\"day_count\":\"act_365f\",\"indexation_lag_months\":3,\"knot_points\":[[0,300],[4,330],[40,500]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_zero\"}],\"fx\":{\"config\":{\"cache_capacity\":256,\"enable_triangulation\":true,\"pivot_currency\":\"USD\"},\"pinned_quotes\":[],\"provider_quotes\":[],\"quotes\":[[\"EUR\",\"USD\",1.1],[\"JPY\",\"USD\",0.007142857142857143]],\"provider_pinned_quotes\":[]},\"surfaces\":[{\"id\":\"SPX-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SPX\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SX5E-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[500,5000,10000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"NKY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[3500,35000,70000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"EURUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.11000000000000001,1.1,2.2],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15]},{\"id\":\"JPYUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.0007000000000000001,0.007,0.014],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]},{\"id\":\"WTI-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"CL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"RBOB-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[9,90,180],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"NG-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.4,4,8],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"USD-CAPFLOOR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWPNVOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-CMS10Y-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-10Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-2Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-INFL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"CDSOPT-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.001,0.01,0.02],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4]},{\"id\":\"SOFR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.005000000000000001,0.05,0.1],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"USD-SOFR-HW-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.004,0.04,0.08],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"EQUITY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"US-CPI-FLOOR-VOL\",\"expiries\":[0.01,40],\"strikes\":[0.5,1.5],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0,0,0,0]}],\"prices\":{\"SPX-SPOT\":{\"unitless\":4500},\"SPX\":{\"unitless\":4500},\"SPX-DIV\":{\"unitless\":0.02},\"SPX-DIVYIELD\":{\"unitless\":0.02},\"AAPL-SPOT\":{\"unitless\":180},\"AAPL-DIV\":{\"unitless\":0.01},\"UST10Y-PRICE\":{\"unitless\":98},\"UST_10Y_PRICE\":{\"unitless\":100},\"US91282CJL54\":{\"unitless\":98},\"TECH\":{\"unitless\":50},\"SX5E-SPOT\":{\"unitless\":5000},\"SX5E-CLOSE\":{\"unitless\":5300},\"SX5E-DIV\":{\"unitless\":0.02},\"EURUSD-SPOT\":{\"unitless\":1.1},\"EURUSD\":{\"unitless\":1.1},\"NKY-SPOT\":{\"unitless\":35000},\"NKY-DIV\":{\"unitless\":0.01},\"JPYUSD-SPOT\":{\"unitless\":0.007142857142857143},\"US-CORP-INDEX\":{\"unitless\":100},\"US-CORP-DURATION\":{\"unitless\":5},\"US-CORP-YIELD\":{\"unitless\":0.05},\"TESX-ACCRUED-DISTRIBUTIONS\":{\"unitless\":80},\"TESX-ACCRUED-FUNDING\":{\"unitless\":30},\"TESX-SPREAD-BPS\":{\"unitless\":15},\"SOFR-RATE\":{\"unitless\":0.05},\"EQUITY-SPOT\":{\"unitless\":4500},\"EQUITY-DIVYIELD\":{\"unitless\":0.02}},\"series\":[],\"inflation_indices\":[{\"id\":\"US-CPI\",\"currency\":\"USD\",\"observations\":[[\"2023-09-01\",299],[\"2023-10-01\",300],[\"2023-11-01\",301],[\"2023-12-01\",302]],\"interpolation\":\"linear\",\"lag\":{\"months\":3},\"seasonality\":null}],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+          "asOf": "2024-07-15"
+        },
+        "ladder": {
+          "instrument_id": "US912828XG33",
+          "as_of": "2024-07-15",
+          "quote_date": "2024-07-16",
+          "clean_price_pct": 106,
+          "dirty_price": {
+            "amount": "1060115.489130435",
+            "currency": "USD"
+          },
+          "rows": [
+            {
+              "date": "2026-01-15",
+              "kind": "call",
+              "redemption_price_pct": 102,
+              "redemption_amount": {
+                "amount": "1020000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.015079736312720887,
+              "i_spread": -0.015434971506143667,
+              "is_worst": true
+            },
+            {
+              "date": "2028-01-15",
+              "kind": "call",
+              "redemption_price_pct": 101,
+              "redemption_amount": {
+                "amount": "1010000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.027145394765111512,
+              "i_spread": -0.003258073201643428,
+              "is_worst": false
+            },
+            {
+              "date": "2030-01-15",
+              "kind": "call",
+              "redemption_price_pct": 100,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.030557802958688242,
+              "i_spread": 0.00016984424455165903,
+              "is_worst": false
+            },
+            {
+              "date": "2034-01-17",
+              "kind": "maturity",
+              "redemption_price_pct": 100,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.034999945164670254,
+              "i_spread": 0.004631880049727179,
+              "is_worst": false
+            }
+          ]
+        },
+        "ytw": 0.015079736312720887
+      },
+      "discount": {
+        "request": {
+          "instrumentJson": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":{\"calls\":[{\"start\":\"2026-01-15\",\"end\":\"2026-01-15\",\"price_pct_of_par\":102},{\"start\":\"2028-01-15\",\"end\":\"2028-01-15\",\"price_pct_of_par\":101},{\"start\":\"2030-01-15\",\"end\":\"2030-01-15\",\"price_pct_of_par\":100}],\"puts\":[]},\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"settlement_days\":1,\"instrument_pricing_overrides\":{\"market_quotes\":{\"quoted_clean_price_pct\":90}}},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
+          "marketJson": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-TREASURY\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-IG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"EUR-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"JPY-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-1M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.08333333333333333,\"knot_points\":[[0,0.035],[40,0.035]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-6M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.5,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-LIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"EUR-EURIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.03],[40,0.03]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"hazard\",\"id\":\"CDX.NA.IG.HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"CORP-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"USD-CREDIT-BBB\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"ACME-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"price\",\"id\":\"WTI-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"CL-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-SPOT-AVG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"RBOB-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":90,\"knot_points\":[[0,90],[40,90]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"IRON-ORE-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":110,\"knot_points\":[[0,110],[40,110]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"VIX\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_level\":20,\"knot_points\":[[0,20],[40,22]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"inflation\",\"id\":\"US-CPI\",\"base_date\":\"2023-10-01\",\"base_cpi\":300,\"day_count\":\"act_365f\",\"indexation_lag_months\":3,\"knot_points\":[[0,300],[4,330],[40,500]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_zero\"}],\"fx\":{\"config\":{\"cache_capacity\":256,\"enable_triangulation\":true,\"pivot_currency\":\"USD\"},\"pinned_quotes\":[],\"provider_quotes\":[],\"quotes\":[[\"EUR\",\"USD\",1.1],[\"JPY\",\"USD\",0.007142857142857143]],\"provider_pinned_quotes\":[]},\"surfaces\":[{\"id\":\"SPX-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SPX\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SX5E-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[500,5000,10000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"NKY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[3500,35000,70000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"EURUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.11000000000000001,1.1,2.2],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15]},{\"id\":\"JPYUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.0007000000000000001,0.007,0.014],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]},{\"id\":\"WTI-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"CL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"RBOB-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[9,90,180],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"NG-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.4,4,8],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"USD-CAPFLOOR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWPNVOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-CMS10Y-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-10Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-2Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-INFL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"CDSOPT-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.001,0.01,0.02],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4]},{\"id\":\"SOFR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.005000000000000001,0.05,0.1],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"USD-SOFR-HW-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.004,0.04,0.08],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"EQUITY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"US-CPI-FLOOR-VOL\",\"expiries\":[0.01,40],\"strikes\":[0.5,1.5],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0,0,0,0]}],\"prices\":{\"SPX-SPOT\":{\"unitless\":4500},\"SPX\":{\"unitless\":4500},\"SPX-DIV\":{\"unitless\":0.02},\"SPX-DIVYIELD\":{\"unitless\":0.02},\"AAPL-SPOT\":{\"unitless\":180},\"AAPL-DIV\":{\"unitless\":0.01},\"UST10Y-PRICE\":{\"unitless\":98},\"UST_10Y_PRICE\":{\"unitless\":100},\"US91282CJL54\":{\"unitless\":98},\"TECH\":{\"unitless\":50},\"SX5E-SPOT\":{\"unitless\":5000},\"SX5E-CLOSE\":{\"unitless\":5300},\"SX5E-DIV\":{\"unitless\":0.02},\"EURUSD-SPOT\":{\"unitless\":1.1},\"EURUSD\":{\"unitless\":1.1},\"NKY-SPOT\":{\"unitless\":35000},\"NKY-DIV\":{\"unitless\":0.01},\"JPYUSD-SPOT\":{\"unitless\":0.007142857142857143},\"US-CORP-INDEX\":{\"unitless\":100},\"US-CORP-DURATION\":{\"unitless\":5},\"US-CORP-YIELD\":{\"unitless\":0.05},\"TESX-ACCRUED-DISTRIBUTIONS\":{\"unitless\":80},\"TESX-ACCRUED-FUNDING\":{\"unitless\":30},\"TESX-SPREAD-BPS\":{\"unitless\":15},\"SOFR-RATE\":{\"unitless\":0.05},\"EQUITY-SPOT\":{\"unitless\":4500},\"EQUITY-DIVYIELD\":{\"unitless\":0.02}},\"series\":[],\"inflation_indices\":[{\"id\":\"US-CPI\",\"currency\":\"USD\",\"observations\":[[\"2023-09-01\",299],[\"2023-10-01\",300],[\"2023-11-01\",301],[\"2023-12-01\",302]],\"interpolation\":\"linear\",\"lag\":{\"months\":3},\"seasonality\":null}],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+          "asOf": "2024-07-15"
+        },
+        "ladder": {
+          "instrument_id": "US912828XG33",
+          "as_of": "2024-07-15",
+          "quote_date": "2024-07-16",
+          "clean_price_pct": 90,
+          "dirty_price": {
+            "amount": "900115.489130435",
+            "currency": "USD"
+          },
+          "rows": [
+            {
+              "date": "2026-01-15",
+              "kind": "call",
+              "redemption_price_pct": 102,
+              "redemption_amount": {
+                "amount": "1020000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.13070982086776173,
+              "i_spread": 0.10019511304889717,
+              "is_worst": false
+            },
+            {
+              "date": "2028-01-15",
+              "kind": "call",
+              "redemption_price_pct": 101,
+              "redemption_amount": {
+                "amount": "1010000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.07827886208073906,
+              "i_spread": 0.047875394113984115,
+              "is_worst": false
+            },
+            {
+              "date": "2030-01-15",
+              "kind": "call",
+              "redemption_price_pct": 100,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.06438294380873168,
+              "i_spread": 0.033994985094595094,
+              "is_worst": false
+            },
+            {
+              "date": "2034-01-17",
+              "kind": "maturity",
+              "redemption_price_pct": 100,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.0562032718434587,
+              "i_spread": 0.025835206728515622,
+              "is_worst": true
+            }
+          ]
+        },
+        "ytw": 0.0562032718434587
+      },
+      "putable": {
+        "request": {
+          "instrumentJson": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":{\"calls\":[],\"puts\":[{\"start\":\"2027-01-15\",\"end\":\"2027-01-15\",\"price_pct_of_par\":100}]},\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"settlement_days\":1,\"instrument_pricing_overrides\":{\"market_quotes\":{\"quoted_clean_price_pct\":108}}},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
+          "marketJson": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-TREASURY\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-IG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"EUR-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"JPY-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-1M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.08333333333333333,\"knot_points\":[[0,0.035],[40,0.035]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-6M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.5,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-LIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"EUR-EURIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.03],[40,0.03]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"hazard\",\"id\":\"CDX.NA.IG.HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"CORP-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"USD-CREDIT-BBB\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"ACME-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"price\",\"id\":\"WTI-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"CL-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-SPOT-AVG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"RBOB-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":90,\"knot_points\":[[0,90],[40,90]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"IRON-ORE-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":110,\"knot_points\":[[0,110],[40,110]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"VIX\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_level\":20,\"knot_points\":[[0,20],[40,22]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"inflation\",\"id\":\"US-CPI\",\"base_date\":\"2023-10-01\",\"base_cpi\":300,\"day_count\":\"act_365f\",\"indexation_lag_months\":3,\"knot_points\":[[0,300],[4,330],[40,500]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_zero\"}],\"fx\":{\"config\":{\"cache_capacity\":256,\"enable_triangulation\":true,\"pivot_currency\":\"USD\"},\"pinned_quotes\":[],\"provider_quotes\":[],\"quotes\":[[\"EUR\",\"USD\",1.1],[\"JPY\",\"USD\",0.007142857142857143]],\"provider_pinned_quotes\":[]},\"surfaces\":[{\"id\":\"SPX-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SPX\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SX5E-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[500,5000,10000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"NKY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[3500,35000,70000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"EURUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.11000000000000001,1.1,2.2],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15]},{\"id\":\"JPYUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.0007000000000000001,0.007,0.014],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]},{\"id\":\"WTI-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"CL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"RBOB-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[9,90,180],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"NG-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.4,4,8],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"USD-CAPFLOOR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWPNVOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-CMS10Y-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-10Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-2Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-INFL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"CDSOPT-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.001,0.01,0.02],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4]},{\"id\":\"SOFR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.005000000000000001,0.05,0.1],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"USD-SOFR-HW-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.004,0.04,0.08],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"EQUITY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"US-CPI-FLOOR-VOL\",\"expiries\":[0.01,40],\"strikes\":[0.5,1.5],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0,0,0,0]}],\"prices\":{\"SPX-SPOT\":{\"unitless\":4500},\"SPX\":{\"unitless\":4500},\"SPX-DIV\":{\"unitless\":0.02},\"SPX-DIVYIELD\":{\"unitless\":0.02},\"AAPL-SPOT\":{\"unitless\":180},\"AAPL-DIV\":{\"unitless\":0.01},\"UST10Y-PRICE\":{\"unitless\":98},\"UST_10Y_PRICE\":{\"unitless\":100},\"US91282CJL54\":{\"unitless\":98},\"TECH\":{\"unitless\":50},\"SX5E-SPOT\":{\"unitless\":5000},\"SX5E-CLOSE\":{\"unitless\":5300},\"SX5E-DIV\":{\"unitless\":0.02},\"EURUSD-SPOT\":{\"unitless\":1.1},\"EURUSD\":{\"unitless\":1.1},\"NKY-SPOT\":{\"unitless\":35000},\"NKY-DIV\":{\"unitless\":0.01},\"JPYUSD-SPOT\":{\"unitless\":0.007142857142857143},\"US-CORP-INDEX\":{\"unitless\":100},\"US-CORP-DURATION\":{\"unitless\":5},\"US-CORP-YIELD\":{\"unitless\":0.05},\"TESX-ACCRUED-DISTRIBUTIONS\":{\"unitless\":80},\"TESX-ACCRUED-FUNDING\":{\"unitless\":30},\"TESX-SPREAD-BPS\":{\"unitless\":15},\"SOFR-RATE\":{\"unitless\":0.05},\"EQUITY-SPOT\":{\"unitless\":4500},\"EQUITY-DIVYIELD\":{\"unitless\":0.02}},\"series\":[],\"inflation_indices\":[{\"id\":\"US-CPI\",\"currency\":\"USD\",\"observations\":[[\"2023-09-01\",299],[\"2023-10-01\",300],[\"2023-11-01\",301],[\"2023-12-01\",302]],\"interpolation\":\"linear\",\"lag\":{\"months\":3},\"seasonality\":null}],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+          "asOf": "2024-07-15"
+        },
+        "ladder": {
+          "instrument_id": "US912828XG33",
+          "as_of": "2024-07-15",
+          "quote_date": "2024-07-16",
+          "clean_price_pct": 108,
+          "dirty_price": {
+            "amount": "1080115.489130435",
+            "currency": "USD"
+          },
+          "rows": [
+            {
+              "date": "2027-01-15",
+              "kind": "put",
+              "redemption_price_pct": 100,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.009984148296144949,
+              "i_spread": -0.020452658525617742,
+              "is_worst": true
+            },
+            {
+              "date": "2034-01-17",
+              "kind": "maturity",
+              "redemption_price_pct": 100,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.032617973947759546,
+              "i_spread": 0.0022499088328164704,
+              "is_worst": false
+            }
+          ]
+        },
+        "ytw": 0.009984148296144949
+      },
+      "makeWhole": {
+        "request": {
+          "instrumentJson": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":{\"calls\":[{\"start\":\"2027-01-15\",\"end\":\"2027-01-15\",\"price_pct_of_par\":100,\"make_whole\":{\"reference_curve_id\":\"USD-TREASURY\",\"spread_bp\":25}}],\"puts\":[]},\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"settlement_days\":1,\"instrument_pricing_overrides\":{\"market_quotes\":{\"quoted_clean_price_pct\":103}}},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
+          "marketJson": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-TREASURY\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-IG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"EUR-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"JPY-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-1M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.08333333333333333,\"knot_points\":[[0,0.035],[40,0.035]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-6M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.5,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-LIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"EUR-EURIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.03],[40,0.03]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"hazard\",\"id\":\"CDX.NA.IG.HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"CORP-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"USD-CREDIT-BBB\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"ACME-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"price\",\"id\":\"WTI-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"CL-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-SPOT-AVG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"RBOB-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":90,\"knot_points\":[[0,90],[40,90]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"IRON-ORE-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":110,\"knot_points\":[[0,110],[40,110]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"VIX\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_level\":20,\"knot_points\":[[0,20],[40,22]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"inflation\",\"id\":\"US-CPI\",\"base_date\":\"2023-10-01\",\"base_cpi\":300,\"day_count\":\"act_365f\",\"indexation_lag_months\":3,\"knot_points\":[[0,300],[4,330],[40,500]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_zero\"}],\"fx\":{\"config\":{\"cache_capacity\":256,\"enable_triangulation\":true,\"pivot_currency\":\"USD\"},\"pinned_quotes\":[],\"provider_quotes\":[],\"quotes\":[[\"EUR\",\"USD\",1.1],[\"JPY\",\"USD\",0.007142857142857143]],\"provider_pinned_quotes\":[]},\"surfaces\":[{\"id\":\"SPX-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SPX\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SX5E-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[500,5000,10000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"NKY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[3500,35000,70000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"EURUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.11000000000000001,1.1,2.2],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15]},{\"id\":\"JPYUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.0007000000000000001,0.007,0.014],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]},{\"id\":\"WTI-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"CL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"RBOB-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[9,90,180],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"NG-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.4,4,8],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"USD-CAPFLOOR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWPNVOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-CMS10Y-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-10Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-2Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-INFL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"CDSOPT-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.001,0.01,0.02],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4]},{\"id\":\"SOFR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.005000000000000001,0.05,0.1],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"USD-SOFR-HW-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.004,0.04,0.08],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"EQUITY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"US-CPI-FLOOR-VOL\",\"expiries\":[0.01,40],\"strikes\":[0.5,1.5],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0,0,0,0]}],\"prices\":{\"SPX-SPOT\":{\"unitless\":4500},\"SPX\":{\"unitless\":4500},\"SPX-DIV\":{\"unitless\":0.02},\"SPX-DIVYIELD\":{\"unitless\":0.02},\"AAPL-SPOT\":{\"unitless\":180},\"AAPL-DIV\":{\"unitless\":0.01},\"UST10Y-PRICE\":{\"unitless\":98},\"UST_10Y_PRICE\":{\"unitless\":100},\"US91282CJL54\":{\"unitless\":98},\"TECH\":{\"unitless\":50},\"SX5E-SPOT\":{\"unitless\":5000},\"SX5E-CLOSE\":{\"unitless\":5300},\"SX5E-DIV\":{\"unitless\":0.02},\"EURUSD-SPOT\":{\"unitless\":1.1},\"EURUSD\":{\"unitless\":1.1},\"NKY-SPOT\":{\"unitless\":35000},\"NKY-DIV\":{\"unitless\":0.01},\"JPYUSD-SPOT\":{\"unitless\":0.007142857142857143},\"US-CORP-INDEX\":{\"unitless\":100},\"US-CORP-DURATION\":{\"unitless\":5},\"US-CORP-YIELD\":{\"unitless\":0.05},\"TESX-ACCRUED-DISTRIBUTIONS\":{\"unitless\":80},\"TESX-ACCRUED-FUNDING\":{\"unitless\":30},\"TESX-SPREAD-BPS\":{\"unitless\":15},\"SOFR-RATE\":{\"unitless\":0.05},\"EQUITY-SPOT\":{\"unitless\":4500},\"EQUITY-DIVYIELD\":{\"unitless\":0.02}},\"series\":[],\"inflation_indices\":[{\"id\":\"US-CPI\",\"currency\":\"USD\",\"observations\":[[\"2023-09-01\",299],[\"2023-10-01\",300],[\"2023-11-01\",301],[\"2023-12-01\",302]],\"interpolation\":\"linear\",\"lag\":{\"months\":3},\"seasonality\":null}],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+          "asOf": "2024-07-15"
+        },
+        "ladder": {
+          "instrument_id": "US912828XG33",
+          "as_of": "2024-07-15",
+          "quote_date": "2024-07-16",
+          "clean_price_pct": 103,
+          "dirty_price": {
+            "amount": "1030115.489130435",
+            "currency": "USD"
+          },
+          "rows": [
+            {
+              "date": "2027-01-15",
+              "kind": "call",
+              "redemption_price_pct": 105.95513835866797,
+              "redemption_amount": {
+                "amount": "1059551.38358668",
+                "currency": "USD"
+              },
+              "make_whole": true,
+              "yield_rate": 0.052167143116953835,
+              "i_spread": 0.021730336295191145,
+              "is_worst": false
+            },
+            {
+              "date": "2034-01-17",
+              "kind": "maturity",
+              "redemption_price_pct": 100,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.03867405040278965,
+              "i_spread": 0.008305985287846575,
+              "is_worst": true
+            }
+          ]
+        },
+        "ytw": 0.03867405040278965
+      },
+      "bullet": {
+        "request": {
+          "instrumentJson": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":null,\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"settlement_days\":1},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
+          "marketJson": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-TREASURY\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-IG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"EUR-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"JPY-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-1M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.08333333333333333,\"knot_points\":[[0,0.035],[40,0.035]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-6M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.5,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-LIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"EUR-EURIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.03],[40,0.03]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"hazard\",\"id\":\"CDX.NA.IG.HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"CORP-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"USD-CREDIT-BBB\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"ACME-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"price\",\"id\":\"WTI-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"CL-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-SPOT-AVG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"RBOB-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":90,\"knot_points\":[[0,90],[40,90]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"IRON-ORE-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":110,\"knot_points\":[[0,110],[40,110]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"VIX\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_level\":20,\"knot_points\":[[0,20],[40,22]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"inflation\",\"id\":\"US-CPI\",\"base_date\":\"2023-10-01\",\"base_cpi\":300,\"day_count\":\"act_365f\",\"indexation_lag_months\":3,\"knot_points\":[[0,300],[4,330],[40,500]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_zero\"}],\"fx\":{\"config\":{\"cache_capacity\":256,\"enable_triangulation\":true,\"pivot_currency\":\"USD\"},\"pinned_quotes\":[],\"provider_quotes\":[],\"quotes\":[[\"EUR\",\"USD\",1.1],[\"JPY\",\"USD\",0.007142857142857143]],\"provider_pinned_quotes\":[]},\"surfaces\":[{\"id\":\"SPX-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SPX\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SX5E-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[500,5000,10000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"NKY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[3500,35000,70000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"EURUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.11000000000000001,1.1,2.2],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15]},{\"id\":\"JPYUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.0007000000000000001,0.007,0.014],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]},{\"id\":\"WTI-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"CL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"RBOB-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[9,90,180],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"NG-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.4,4,8],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"USD-CAPFLOOR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWPNVOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-CMS10Y-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-10Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-2Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-INFL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"CDSOPT-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.001,0.01,0.02],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4]},{\"id\":\"SOFR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.005000000000000001,0.05,0.1],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"USD-SOFR-HW-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.004,0.04,0.08],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"EQUITY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"US-CPI-FLOOR-VOL\",\"expiries\":[0.01,40],\"strikes\":[0.5,1.5],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0,0,0,0]}],\"prices\":{\"SPX-SPOT\":{\"unitless\":4500},\"SPX\":{\"unitless\":4500},\"SPX-DIV\":{\"unitless\":0.02},\"SPX-DIVYIELD\":{\"unitless\":0.02},\"AAPL-SPOT\":{\"unitless\":180},\"AAPL-DIV\":{\"unitless\":0.01},\"UST10Y-PRICE\":{\"unitless\":98},\"UST_10Y_PRICE\":{\"unitless\":100},\"US91282CJL54\":{\"unitless\":98},\"TECH\":{\"unitless\":50},\"SX5E-SPOT\":{\"unitless\":5000},\"SX5E-CLOSE\":{\"unitless\":5300},\"SX5E-DIV\":{\"unitless\":0.02},\"EURUSD-SPOT\":{\"unitless\":1.1},\"EURUSD\":{\"unitless\":1.1},\"NKY-SPOT\":{\"unitless\":35000},\"NKY-DIV\":{\"unitless\":0.01},\"JPYUSD-SPOT\":{\"unitless\":0.007142857142857143},\"US-CORP-INDEX\":{\"unitless\":100},\"US-CORP-DURATION\":{\"unitless\":5},\"US-CORP-YIELD\":{\"unitless\":0.05},\"TESX-ACCRUED-DISTRIBUTIONS\":{\"unitless\":80},\"TESX-ACCRUED-FUNDING\":{\"unitless\":30},\"TESX-SPREAD-BPS\":{\"unitless\":15},\"SOFR-RATE\":{\"unitless\":0.05},\"EQUITY-SPOT\":{\"unitless\":4500},\"EQUITY-DIVYIELD\":{\"unitless\":0.02}},\"series\":[],\"inflation_indices\":[{\"id\":\"US-CPI\",\"currency\":\"USD\",\"observations\":[[\"2023-09-01\",299],[\"2023-10-01\",300],[\"2023-11-01\",301],[\"2023-12-01\",302]],\"interpolation\":\"linear\",\"lag\":{\"months\":3},\"seasonality\":null}],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+          "asOf": "2024-07-15"
+        },
+        "ladder": {
+          "instrument_id": "US912828XG33",
+          "as_of": "2024-07-15",
+          "quote_date": "2024-07-16",
+          "clean_price_pct": 109.92951854841088,
+          "dirty_price": {
+            "amount": "1099410.674614544",
+            "currency": "USD"
+          },
+          "rows": [
+            {
+              "date": "2034-01-17",
+              "kind": "maturity",
+              "redemption_price_pct": 100,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.03036862933426007,
+              "i_spread": 5.642193169931586e-7,
+              "is_worst": true
+            }
+          ]
+        },
+        "ytw": 0.03036862933426007
+      },
+      "quoteDateCall": {
+        "request": {
+          "instrumentJson": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":{\"calls\":[{\"start\":\"2024-07-16\",\"end\":\"2024-07-16\",\"price_pct_of_par\":99}],\"puts\":[]},\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"settlement_days\":1,\"instrument_pricing_overrides\":{\"market_quotes\":{\"quoted_clean_price_pct\":100}}},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
+          "marketJson": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-TREASURY\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-IG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"EUR-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"JPY-OIS\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[1,0.97],[40,0.3]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-1M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.08333333333333333,\"knot_points\":[[0,0.035],[40,0.035]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-6M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.5,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-LIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.04],[40,0.04]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"EUR-EURIBOR-3M\",\"base\":\"2023-12-28\",\"reset_lag\":2,\"day_count\":\"act_365f\",\"tenor\":0.25,\"knot_points\":[[0,0.03],[40,0.03]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"hazard\",\"id\":\"CDX.NA.IG.HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"CORP-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"USD-CREDIT-BBB\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"hazard\",\"id\":\"ACME-HAZARD\",\"base\":\"2023-12-28\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null},{\"type\":\"price\",\"id\":\"WTI-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"CL-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":80,\"knot_points\":[[0,80],[40,80]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-SPOT-AVG\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"NG-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":4,\"knot_points\":[[0,4],[40,4]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"RBOB-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":90,\"knot_points\":[[0,90],[40,90]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"IRON-ORE-FORWARD\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_price\":110,\"knot_points\":[[0,110],[40,110]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"price\",\"id\":\"VIX\",\"base\":\"2023-12-28\",\"day_count\":\"act_365f\",\"spot_level\":20,\"knot_points\":[[0,20],[40,22]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_forward\"},{\"type\":\"inflation\",\"id\":\"US-CPI\",\"base_date\":\"2023-10-01\",\"base_cpi\":300,\"day_count\":\"act_365f\",\"indexation_lag_months\":3,\"knot_points\":[[0,300],[4,330],[40,500]],\"interp_style\":\"linear\",\"extrapolation\":\"flat_zero\"}],\"fx\":{\"config\":{\"cache_capacity\":256,\"enable_triangulation\":true,\"pivot_currency\":\"USD\"},\"pinned_quotes\":[],\"provider_quotes\":[],\"quotes\":[[\"EUR\",\"USD\",1.1],[\"JPY\",\"USD\",0.007142857142857143]],\"provider_pinned_quotes\":[]},\"surfaces\":[{\"id\":\"SPX-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SPX\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"SX5E-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[500,5000,10000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"NKY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[3500,35000,70000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"EURUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.11000000000000001,1.1,2.2],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15,0.15]},{\"id\":\"JPYUSD-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.0007000000000000001,0.007,0.014],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]},{\"id\":\"WTI-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"CL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[8,80,160],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"RBOB-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[9,90,180],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"NG-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.4,4,8],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3]},{\"id\":\"USD-CAPFLOOR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWPNVOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-CMS10Y-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-10Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-SWAPTION-VOL-2Y\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"USD-INFL-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.003,0.03,0.06],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"CDSOPT-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.001,0.01,0.02],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4]},{\"id\":\"SOFR-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.005000000000000001,0.05,0.1],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"USD-SOFR-HW-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[0.004,0.04,0.08],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01]},{\"id\":\"EQUITY-VOL\",\"expiries\":[0.01,1,40],\"strikes\":[450,4500,9000],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]},{\"id\":\"US-CPI-FLOOR-VOL\",\"expiries\":[0.01,40],\"strikes\":[0.5,1.5],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0,0,0,0]}],\"prices\":{\"SPX-SPOT\":{\"unitless\":4500},\"SPX\":{\"unitless\":4500},\"SPX-DIV\":{\"unitless\":0.02},\"SPX-DIVYIELD\":{\"unitless\":0.02},\"AAPL-SPOT\":{\"unitless\":180},\"AAPL-DIV\":{\"unitless\":0.01},\"UST10Y-PRICE\":{\"unitless\":98},\"UST_10Y_PRICE\":{\"unitless\":100},\"US91282CJL54\":{\"unitless\":98},\"TECH\":{\"unitless\":50},\"SX5E-SPOT\":{\"unitless\":5000},\"SX5E-CLOSE\":{\"unitless\":5300},\"SX5E-DIV\":{\"unitless\":0.02},\"EURUSD-SPOT\":{\"unitless\":1.1},\"EURUSD\":{\"unitless\":1.1},\"NKY-SPOT\":{\"unitless\":35000},\"NKY-DIV\":{\"unitless\":0.01},\"JPYUSD-SPOT\":{\"unitless\":0.007142857142857143},\"US-CORP-INDEX\":{\"unitless\":100},\"US-CORP-DURATION\":{\"unitless\":5},\"US-CORP-YIELD\":{\"unitless\":0.05},\"TESX-ACCRUED-DISTRIBUTIONS\":{\"unitless\":80},\"TESX-ACCRUED-FUNDING\":{\"unitless\":30},\"TESX-SPREAD-BPS\":{\"unitless\":15},\"SOFR-RATE\":{\"unitless\":0.05},\"EQUITY-SPOT\":{\"unitless\":4500},\"EQUITY-DIVYIELD\":{\"unitless\":0.02}},\"series\":[],\"inflation_indices\":[{\"id\":\"US-CPI\",\"currency\":\"USD\",\"observations\":[[\"2023-09-01\",299],[\"2023-10-01\",300],[\"2023-11-01\",301],[\"2023-12-01\",302]],\"interpolation\":\"linear\",\"lag\":{\"months\":3},\"seasonality\":null}],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+          "asOf": "2024-07-15"
+        },
+        "ladder": {
+          "instrument_id": "US912828XG33",
+          "as_of": "2024-07-15",
+          "quote_date": "2024-07-16",
+          "clean_price_pct": 100,
+          "dirty_price": {
+            "amount": "1000115.489130435",
+            "currency": "USD"
+          },
+          "rows": [
+            {
+              "date": "2024-07-16",
+              "kind": "call",
+              "redemption_price_pct": 99,
+              "redemption_amount": {
+                "amount": "990000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": null,
+              "i_spread": null,
+              "is_worst": true
+            },
+            {
+              "date": "2034-01-17",
+              "kind": "maturity",
+              "redemption_price_pct": 100,
+              "redemption_amount": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "make_whole": false,
+              "yield_rate": 0.042476779387507206,
+              "i_spread": 0.01210871427256413,
+              "is_worst": false
+            }
+          ]
+        },
+        "ytw": null
       }
     }
   },

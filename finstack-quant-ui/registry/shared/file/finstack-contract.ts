@@ -120,6 +120,17 @@ export interface StandardDealRequest {
 export type DealTranches = StructuredCredit["tranches"];
 /** Native report of a deal's collateral pool. */
 export type PoolReport = ReturnType<typeof valuations.instruments.poolReport>;
+/** Yield and I-spread to every exit of a bond, worst marked by Rust. */
+export type BondWorkoutLadder = ReturnType<
+  typeof valuations.instruments.bondWorkoutLadder
+>;
+/** One bond on a complete market at a valuation date. */
+export interface BondWorkoutLadderRequest {
+  readonly instrumentJson: string;
+  readonly marketJson: string;
+  /** ISO-8601 valuation date. */
+  readonly asOf: string;
+}
 /** One deal's collateral pool at a date. */
 export interface PoolReportRequest {
   readonly instrumentJson: string;
@@ -1167,6 +1178,10 @@ export interface ValuationsApi {
   equityMetrics(
     request: EquityMetricsRequest,
   ): Promise<Envelope<EquityMetrics>>;
+  /** valuations.instruments.Bond.fromJson + bondWorkoutLadder: yield and I-spread to every exit. */
+  bondWorkoutLadder(
+    request: BondWorkoutLadderRequest,
+  ): Promise<Envelope<BondWorkoutLadder>>;
   /** valuations.instruments.poolReport over the deal's pool: statistics, WARF and concentration. */
   poolReport(request: PoolReportRequest): Promise<Envelope<PoolReport>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
