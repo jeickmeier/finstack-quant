@@ -267,9 +267,8 @@ fn each_quote_kind_of_a_callable_returns_the_price() {
     for clean in [108.0, 92.0] {
         let bond = callable();
         let set = quotes(&bond, BondQuoteInput::CleanPricePct(clean)).expect("set");
-        // Z-spread is rejected on a bond with exercise rights, and asw_market does
-        // not close at a premium: the metric runs the swap to the workout and its
-        // inverse to maturity. Both have their own tests.
+        // Z-spread and asw_market are rejected on a bond with exercise rights, in
+        // their own tests.
         for (input, tolerance) in [
             (
                 BondQuoteInput::DirtyPriceCurrency(set.dirty_price_currency),
@@ -324,30 +323,50 @@ fn each_quote_kind_of_an_frn_returns_the_price() {
     }
 }
 
-/// A known gap, not a tolerance: the `asw_market` metric runs the swap to the worst
-/// exit and `price_from_asw_market` to maturity, so they agree only when the worst
-/// exit is maturity. It does not close at a premium, and it does at a discount.
+/// The `asw_market` metric runs the swap to the worst exit, which depends on the
+/// price this quote is meant to solve, so the quote is refused at every price: here
+/// at the spreads of a premium and a discount, where the worst exit differs. The
+/// output field is unchanged.
 #[test]
-fn asw_market_does_not_close_when_the_worst_exit_is_early() {
+fn asw_market_input_is_rejected_on_a_bond_with_exercise_rights() {
     let bond = callable();
-    let premium = quotes(&bond, BondQuoteInput::CleanPricePct(108.0)).expect("set");
-    let back = quotes(
-        &bond,
-        BondQuoteInput::AswMarket(premium.asw_market.expect("asw_market")),
-    )
-    .expect("set");
+    for clean in [108.0, 92.0] {
+        let set = quotes(&bond, BondQuoteInput::CleanPricePct(clean)).expect("set");
+        assert_field_is_metric(&bond, &set, set.asw_market, MetricId::ASWMarket);
+        let message = quotes(
+            &bond,
+            BondQuoteInput::AswMarket(set.asw_market.expect("asw_market")),
+        )
+        .expect_err("rejected")
+        .to_string();
+        assert!(
+            message.contains("ASW market pricing for option-bearing bond"),
+            "{message}"
+        );
+    }
+}
+
+/// Every route through the shared quote path refuses it, not only the quote set.
+#[test]
+fn quoted_asw_market_on_a_bond_with_exercise_rights_does_not_price() {
+    let mut bond = callable();
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .quoted_asw_market = Some(0.01);
+    let message = bond
+        .value(&market(), AS_OF)
+        .expect_err("rejected")
+        .to_string();
     assert!(
-        (back.clean_price_pct - 108.0).abs() > 1.0,
-        "this gap has closed, so move asw_market into the round-trip list: {}",
-        back.clean_price_pct
+        message.contains("ASW market pricing for option-bearing bond"),
+        "{message}"
     );
-    let discount = quotes(&bond, BondQuoteInput::CleanPricePct(92.0)).expect("set");
-    assert_closes(
-        &bond,
-        BondQuoteInput::AswMarket(discount.asw_market.expect("asw_market")),
-        92.0,
-        1e-12,
-    );
+    let mut plain = bullet();
+    plain
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_asw_market = Some(0.01);
+    assert!(plain.value(&market(), AS_OF).is_ok());
 }
 
 /// A quote kind that does not apply to the bond is the native error, not a `None`.
@@ -373,6 +392,11 @@ fn a_quote_kind_the_bond_does_not_have_is_an_error() {
             callable(),
             BondQuoteInput::ZSpread(0.01),
             "requires an explicit quoted clean price",
+        ),
+        (
+            callable(),
+            BondQuoteInput::AswMarket(0.01),
+            "ASW market pricing for option-bearing bond",
         ),
     ];
     for (bond, input, expected) in cases {

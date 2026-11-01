@@ -79,12 +79,8 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 /// | --- | --- |
 /// | `DiscountMargin` | a bond with no floating coupons |
 /// | `AswMarket`, `JapaneseSimpleYield` | a bond with a floating coupon; `AswMarket` also on custom cashflows |
-/// | `ZSpread` | a bond with exercise rights, whose workout path depends on the price |
+/// | `ZSpread`, `AswMarket` | a bond with exercise rights, whose workout path depends on the price |
 /// | any | a non-finite value, or a non-positive `DirtyPriceCurrency` |
-///
-/// `AswMarket` prices the asset swap to maturity while the `asw_market` metric
-/// runs it to the worst exit, so on a bond whose worst exit is early, the set's
-/// `asw_market` is not the input and feeding it back does not recover the price.
 ///
 /// # Examples
 ///

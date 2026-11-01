@@ -2,9 +2,13 @@
 
 ## [Unreleased]
 
+### Bonds: an asset-swap quote no longer prices a bond with exercise rights
+
+**Behaviour change.** A bond with exercise rights and `quoted_asw_market`, or `BondQuoteInput::AswMarket` on one, is now an error at every spread, as a Z-spread quote already is. It used to return a price: the inverse runs the swap to maturity, while the `asw_market` metric runs it to the worst exit, which depends on the price, so the returned `asw_market` could differ from the quote (a callable at 108 came back at 119.1566). This reaches every route through the quote path: `value`, `price_instrument`, the price metrics, OAS from a quote and `compute_quotes`. The `asw_market` metric and output field on such a bond are unchanged, and so is the quote on a plain fixed-coupon bond. Quote a clean price, or use OAS.
+
 ### Bonds: the whole quote set from any one quote
 
-`compute_quotes` is now bound in Python (`compute_quotes`, `BondQuoteSet`) and WASM (`valuations.instruments.computeQuotes`), with JSON Schemas for `BondQuoteSet` and `BondQuoteInput`. Each yield and spread equals the metric of the same name at that clean price. A field is null when it does not apply to the bond or its metric has no finite value, never infinity or NaN; no finite value moves. A quote kind the bond does not have is an error: `discount_margin` with no floating coupons, `asw_market` or `japanese_simple_yield` on a floating coupon, `z_spread` with exercise rights. One failed metric fails the whole set. `asw_market` prices the swap to maturity while the metric runs it to the worst exit, so on a bond whose worst exit is early it does not recover the price it came from. `BondQuoteInput` adds `deny_unknown_fields`; it already rejected an unknown or second key.
+`compute_quotes` is now bound in Python (`compute_quotes`, `BondQuoteSet`) and WASM (`valuations.instruments.computeQuotes`), with JSON Schemas for `BondQuoteSet` and `BondQuoteInput`. Each yield and spread equals the metric of the same name at that clean price. A field is null when it does not apply to the bond or its metric has no finite value, never infinity or NaN; no finite value moves. A quote kind the bond does not have is an error: `discount_margin` with no floating coupons, `asw_market` or `japanese_simple_yield` on a floating coupon, `z_spread` or `asw_market` with exercise rights. One failed metric fails the whole set. `BondQuoteInput` adds `deny_unknown_fields`; it already rejected an unknown or second key.
 
 The `quote-converter` registry component and `useComputeQuotes` hook draw it: enter any one quote, read the whole set Rust returns.
 
