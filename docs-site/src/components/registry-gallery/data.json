@@ -20588,6 +20588,1839 @@
       }
     ]
   },
+  "waterfallReport": {
+    "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
+    "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
+    "marketSha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
+    "asOf": "2024-01-01",
+    "cases": [
+      {
+        "name": "diverting",
+        "instrument": {
+          "schema": "finstack_quant.instrument/1",
+          "instrument": {
+            "type": "structured_credit",
+            "spec": {
+              "id": "CLO-EXAMPLE",
+              "deal_type": "clo",
+              "pool": {
+                "id": "POOL-1",
+                "deal_type": "clo",
+                "currency": "USD",
+                "assets": [
+                  {
+                    "id": "COLLATERAL-1",
+                    "asset_type": {
+                      "type": "high_yield_bond"
+                    },
+                    "balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "rate": 0.07,
+                    "spread_bp": null,
+                    "forward_curve_id": null,
+                    "maturity": "2034-01-01",
+                    "rating": null,
+                    "industry": null,
+                    "obligor_id": null,
+                    "defaulted": false,
+                    "recovery_amount": null,
+                    "default_date": null,
+                    "purchase_price": null,
+                    "acquisition_date": null,
+                    "origination_date": null,
+                    "day_count": "act_360",
+                    "smm_override": null,
+                    "mdr_override": null,
+                    "recovery_rate": null,
+                    "contractual_payment": null
+                  }
+                ],
+                "cumulative_defaults": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_recoveries": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_prepayments": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_scheduled_amortization": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reinvestment_period": null,
+                "collection_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "rep_lines": null
+              },
+              "tranches": {
+                "tranches": [
+                  {
+                    "id": "CLONOTES-A",
+                    "attach_pct": 0,
+                    "detach_pct": 100,
+                    "seniority": "senior",
+                    "rating": null,
+                    "original_balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "current_balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "coupon": {
+                      "fixed": {
+                        "rate": 0.06
+                      }
+                    },
+                    "oc_trigger": null,
+                    "ic_trigger": null,
+                    "frequency": {
+                      "count": 3,
+                      "unit": "months"
+                    },
+                    "day_count": "act_360",
+                    "deferred_interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "pik_enabled": false,
+                    "maturity": "2034-01-01",
+                    "attributes": {}
+                  }
+                ]
+              },
+              "closing_date": "2024-01-01",
+              "first_payment_date": "2024-04-01",
+              "maturity": "2025-01-01",
+              "frequency": {
+                "count": 3,
+                "unit": "months"
+              },
+              "calendar_id": "nyse",
+              "discount_curve_id": "USD-OIS",
+              "attributes": {},
+              "prepayment_spec": {
+                "curve": "constant",
+                "cpr": 0.2
+              },
+              "default_spec": {
+                "curve": "constant",
+                "cdr": 0.02
+              },
+              "recovery_spec": {
+                "rate": 0.6,
+                "recovery_lag": 12
+              },
+              "market_conditions": {
+                "refi_rate": 0.04
+              },
+              "deal_metadata": {
+                "manager_id": null,
+                "servicer_id": null,
+                "master_servicer_id": null,
+                "special_servicer_id": null,
+                "trustee_id": null
+              },
+              "hedge_swaps": [],
+              "coverage_triggers": [
+                {
+                  "id": "OC_CLONOTES-A",
+                  "tranche_id": "CLONOTES-A",
+                  "kind": "oc",
+                  "trigger_level": 2,
+                  "action": "pay_down_senior"
+                }
+              ]
+            }
+          }
+        },
+        "run": {
+          "tranches": {
+            "CLONOTES-A": {
+              "tranche_id": "CLONOTES-A",
+              "cashflows": [
+                [
+                  "2024-04-01",
+                  {
+                    "amount": "7163491.292056633",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-07-01",
+                  {
+                    "amount": "6740680.660928912",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-10-01",
+                  {
+                    "amount": "6359999.051162289",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-01-02",
+                  {
+                    "amount": "5984612.929624669",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-04-01",
+                  {
+                    "amount": "302276.6164387214",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-07-01",
+                  {
+                    "amount": "284435.3485763136",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-10-01",
+                  {
+                    "amount": "267647.1255795272",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-01-02",
+                  {
+                    "amount": "251849.793598223",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "detailed_flows": [
+                {
+                  "date": "2024-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1516666.666666663",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "5646824.62538997",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-07-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1431023.159848252",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-07-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "5309657.50108066",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-10-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1365333.940727449",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-10-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "4994665.11043484",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-01-02",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1288749.075700779",
+                    "currency": "USD"
+                  },
+                  "kind": "fixed",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-01-02",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "4695863.85392389",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-04-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "302276.6164387214",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-07-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "284435.3485763136",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2025-10-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "267647.1255795272",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2026-01-02",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "251849.793598223",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2026-01-02",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "-78246780.0249779",
+                    "currency": "USD"
+                  },
+                  "kind": "defaulted_notional",
+                  "accrual_factor": 0
+                }
+              ],
+              "accrual_periods": [
+                {
+                  "start": "2024-01-01",
+                  "end": "2024-04-01",
+                  "payment_date": "2024-04-01",
+                  "opening_balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.06,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2024-04-01",
+                  "end": "2024-07-01",
+                  "payment_date": "2024-07-01",
+                  "opening_balance": {
+                    "amount": "94353175.37461003",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.06,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2024-07-01",
+                  "end": "2024-10-01",
+                  "payment_date": "2024-10-01",
+                  "opening_balance": {
+                    "amount": "89043517.87352937",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.06,
+                  "day_count": "act_360"
+                },
+                {
+                  "start": "2024-10-01",
+                  "end": "2025-01-01",
+                  "payment_date": "2025-01-02",
+                  "opening_balance": {
+                    "amount": "84048852.76309453",
+                    "currency": "USD"
+                  },
+                  "coupon_rate": 0.06,
+                  "day_count": "act_360"
+                }
+              ],
+              "interest_flows": [
+                [
+                  "2024-04-01",
+                  {
+                    "amount": "1516666.666666663",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-07-01",
+                  {
+                    "amount": "1431023.159848252",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-10-01",
+                  {
+                    "amount": "1365333.940727449",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-01-02",
+                  {
+                    "amount": "1288749.075700779",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "principal_flows": [
+                [
+                  "2024-04-01",
+                  {
+                    "amount": "5646824.62538997",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-07-01",
+                  {
+                    "amount": "5309657.50108066",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2024-10-01",
+                  {
+                    "amount": "4994665.11043484",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-01-02",
+                  {
+                    "amount": "4695863.85392389",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-04-01",
+                  {
+                    "amount": "302276.6164387214",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-07-01",
+                  {
+                    "amount": "284435.3485763136",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2025-10-01",
+                  {
+                    "amount": "267647.1255795272",
+                    "currency": "USD"
+                  }
+                ],
+                [
+                  "2026-01-02",
+                  {
+                    "amount": "251849.793598223",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "pik_flows": [],
+              "deferred_flows": [],
+              "writedown_flows": [
+                [
+                  "2026-01-02",
+                  {
+                    "amount": "78246780.0249779",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "final_balance": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_interest": {
+                "amount": "5601772.842943143",
+                "currency": "USD"
+              },
+              "total_principal": {
+                "amount": "21753219.9750221452",
+                "currency": "USD"
+              },
+              "total_pik": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_deferred": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_writedown": {
+                "amount": "78246780.0249779",
+                "currency": "USD"
+              }
+            }
+          },
+          "diagnostics": {
+            "periods": [
+              {
+                "payment_date": "2024-04-01",
+                "pool_balance": {
+                  "amount": "94097701.6109929",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.9409770161099289,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": 0,
+                "warf": 3649.9999999999995,
+                "interest_collections": {
+                  "amount": "1764987.263780753",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "5398504.02827588",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "503794.360731202",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": 0.0018721141128642132,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_CLONOTES-A",
+                    "ratio": 0.997984822557075,
+                    "trigger_level": 2,
+                    "cushion": -1.002015177442925,
+                    "passing": false
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "7163491.292056633",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "CLONOTES-A_interest",
+                      {
+                        "amount": "1516666.666666667",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "CLONOTES-A_coverage",
+                      {
+                        "amount": "248320.597114086",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "5398504.02827588",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "equity",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "CLONOTES-A_interest",
+                      "recipient_id": "CLONOTES-A_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "1516666.666666667",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1516666.666666667",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "CLONOTES-A_coverage",
+                      "recipient_id": "CLONOTES-A_principal",
+                      "priority": 2,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "100000000",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "248320.597114086",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "99751679.402885914",
+                        "currency": "USD"
+                      },
+                      "diverted": true,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "CLONOTES-A_principal",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "99751679.4028859",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "5398504.02827588",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "94353175.37461002",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    }
+                  ],
+                  "diverted_amounts": [
+                    {
+                      "source_tier": "CLONOTES-A_coverage",
+                      "target_tranche": "CLONOTES-A_principal",
+                      "amount": {
+                        "amount": "248320.597114086",
+                        "currency": "USD"
+                      },
+                      "reason": "coverage test failed: OC_CLONOTES-A"
+                    }
+                  ],
+                  "diverted_cash": {
+                    "amount": "248320.597114086",
+                    "currency": "USD"
+                  },
+                  "had_diversions": true,
+                  "remaining_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0.000000000",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "CLONOTES-A",
+                    "credit_enhancement": -0.0027149840989027676
+                  }
+                ]
+              },
+              {
+                "payment_date": "2024-07-01",
+                "pool_balance": {
+                  "amount": "88543774.4847146",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.885437744847146,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": 0,
+                "warf": 3649.9999999999995,
+                "interest_collections": {
+                  "amount": "1660812.448944442",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "5079868.21198447",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "474058.914293856",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": 0.001707405077530826,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_CLONOTES-A",
+                    "ratio": 0.9984863178973162,
+                    "trigger_level": 2,
+                    "cushion": -1.0015136821026838,
+                    "passing": false
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "6740680.660928912",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "CLONOTES-A_interest",
+                      {
+                        "amount": "1431023.159848252",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "CLONOTES-A_coverage",
+                      {
+                        "amount": "229789.28909619",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "5079868.21198447",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "equity",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "CLONOTES-A_interest",
+                      "recipient_id": "CLONOTES-A_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "1431023.159848252",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1431023.159848252",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "CLONOTES-A_coverage",
+                      "recipient_id": "CLONOTES-A_principal",
+                      "priority": 2,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "94353175.37461",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "229789.28909619",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "94123386.08551381",
+                        "currency": "USD"
+                      },
+                      "diverted": true,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "CLONOTES-A_principal",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "94123386.0855139",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "5079868.21198447",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "89043517.87352943",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    }
+                  ],
+                  "diverted_amounts": [
+                    {
+                      "source_tier": "CLONOTES-A_coverage",
+                      "target_tranche": "CLONOTES-A_principal",
+                      "amount": {
+                        "amount": "229789.28909619",
+                        "currency": "USD"
+                      },
+                      "reason": "coverage test failed: OC_CLONOTES-A"
+                    }
+                  ],
+                  "diverted_cash": {
+                    "amount": "229789.28909619",
+                    "currency": "USD"
+                  },
+                  "had_diversions": true,
+                  "remaining_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0.000000000",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "CLONOTES-A",
+                    "credit_enhancement": -0.005644026265235038
+                  }
+                ]
+              },
+              {
+                "payment_date": "2024-10-01",
+                "pool_balance": {
+                  "amount": "83317656.7097372",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.833176567097372,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": 0,
+                "warf": 3650,
+                "interest_collections": {
+                  "amount": "1579959.818817459",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "4780039.23234483",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "446078.5426325454",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": 0.0016350990794158724,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_CLONOTES-A",
+                    "ratio": 0.9989728298809725,
+                    "trigger_level": 2,
+                    "cushion": -1.0010271701190274,
+                    "passing": false
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "6359999.051162289",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "CLONOTES-A_interest",
+                      {
+                        "amount": "1365333.94072745",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "CLONOTES-A_coverage",
+                      {
+                        "amount": "214625.878090009",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "4780039.23234483",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "equity",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "CLONOTES-A_interest",
+                      "recipient_id": "CLONOTES-A_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "1365333.94072745",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1365333.94072745",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.00000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "CLONOTES-A_coverage",
+                      "recipient_id": "CLONOTES-A_principal",
+                      "priority": 2,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "89043517.8735294",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "214625.878090009",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "88828891.995439391",
+                        "currency": "USD"
+                      },
+                      "diverted": true,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "CLONOTES-A_principal",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "88828891.9954394",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "4780039.23234483",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "84048852.76309457",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    }
+                  ],
+                  "diverted_amounts": [
+                    {
+                      "source_tier": "CLONOTES-A_coverage",
+                      "target_tranche": "CLONOTES-A_principal",
+                      "amount": {
+                        "amount": "214625.878090009",
+                        "currency": "USD"
+                      },
+                      "reason": "coverage test failed: OC_CLONOTES-A"
+                    }
+                  ],
+                  "diverted_cash": {
+                    "amount": "214625.878090009",
+                    "currency": "USD"
+                  },
+                  "had_diversions": true,
+                  "remaining_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0.00000000",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "CLONOTES-A",
+                    "credit_enhancement": -0.008776003577545159
+                  }
+                ]
+              },
+              {
+                "payment_date": "2025-01-02",
+                "pool_balance": {
+                  "amount": "78400000",
+                  "currency": "USD"
+                },
+                "pool_factor": 0.784,
+                "wac": 0.07,
+                "weighted_avg_spread_bp": 0,
+                "warf": 3649.9999999999995,
+                "interest_collections": {
+                  "amount": "1486705.875884437",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "4497907.053740232",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "419749.6559970384",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": 0.0014430044709275152,
+                "coverage_tests": [
+                  {
+                    "test_id": "OC_CLONOTES-A",
+                    "ratio": 0.9994677283069215,
+                    "trigger_level": 2,
+                    "cushion": -1.0005322716930785,
+                    "passing": false
+                  }
+                ],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "5984612.929624669",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [
+                    [
+                      "CLONOTES-A_interest",
+                      {
+                        "amount": "1288749.075700783",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "CLONOTES-A_coverage",
+                      {
+                        "amount": "197956.800183654",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "principal",
+                      {
+                        "amount": "4497907.053740232",
+                        "currency": "USD"
+                      }
+                    ],
+                    [
+                      "equity",
+                      {
+                        "amount": "0",
+                        "currency": "USD"
+                      }
+                    ]
+                  ],
+                  "payment_records": [
+                    {
+                      "tier_id": "CLONOTES-A_interest",
+                      "recipient_id": "CLONOTES-A_interest",
+                      "priority": 1,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "1288749.075700783",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "1288749.075700783",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "0.000000000",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": false
+                    },
+                    {
+                      "tier_id": "CLONOTES-A_coverage",
+                      "recipient_id": "CLONOTES-A_principal",
+                      "priority": 2,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "84048852.7630945",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "197956.800183654",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "83850895.962910846",
+                        "currency": "USD"
+                      },
+                      "diverted": true,
+                      "is_principal": true
+                    },
+                    {
+                      "tier_id": "principal",
+                      "recipient_id": "CLONOTES-A_principal",
+                      "priority": 3,
+                      "recipient": {
+                        "tranche": "CLONOTES-A"
+                      },
+                      "requested_amount": {
+                        "amount": "83850895.9629109",
+                        "currency": "USD"
+                      },
+                      "paid_amount": {
+                        "amount": "4497907.053740232",
+                        "currency": "USD"
+                      },
+                      "shortfall": {
+                        "amount": "79352988.909170668",
+                        "currency": "USD"
+                      },
+                      "diverted": false,
+                      "is_principal": true
+                    }
+                  ],
+                  "diverted_amounts": [
+                    {
+                      "source_tier": "CLONOTES-A_coverage",
+                      "target_tranche": "CLONOTES-A_principal",
+                      "amount": {
+                        "amount": "197956.800183654",
+                        "currency": "USD"
+                      },
+                      "reason": "coverage test failed: OC_CLONOTES-A"
+                    }
+                  ],
+                  "diverted_cash": {
+                    "amount": "197956.800183654",
+                    "currency": "USD"
+                  },
+                  "had_diversions": true,
+                  "remaining_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0.000000000",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [
+                  {
+                    "payment_date": "2025-04-01",
+                    "tranche_id": "CLONOTES-A",
+                    "source": "recovery_release",
+                    "interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "principal": {
+                      "amount": "302276.6164387214",
+                      "currency": "USD"
+                    },
+                    "incentive_fee": {
+                      "amount": "0",
+                      "currency": "USD"
+                    }
+                  },
+                  {
+                    "payment_date": "2025-07-01",
+                    "tranche_id": "CLONOTES-A",
+                    "source": "recovery_release",
+                    "interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "principal": {
+                      "amount": "284435.3485763136",
+                      "currency": "USD"
+                    },
+                    "incentive_fee": {
+                      "amount": "0",
+                      "currency": "USD"
+                    }
+                  },
+                  {
+                    "payment_date": "2025-10-01",
+                    "tranche_id": "CLONOTES-A",
+                    "source": "recovery_release",
+                    "interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "principal": {
+                      "amount": "267647.1255795272",
+                      "currency": "USD"
+                    },
+                    "incentive_fee": {
+                      "amount": "0",
+                      "currency": "USD"
+                    }
+                  },
+                  {
+                    "payment_date": "2026-01-02",
+                    "tranche_id": "CLONOTES-A",
+                    "source": "recovery_release",
+                    "interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "principal": {
+                      "amount": "251849.793598223",
+                      "currency": "USD"
+                    },
+                    "incentive_fee": {
+                      "amount": "0",
+                      "currency": "USD"
+                    }
+                  }
+                ],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "CLONOTES-A",
+                    "credit_enhancement": -0.012155470780237787
+                  }
+                ]
+              }
+            ],
+            "reserve_balance_path": [
+              [
+                "2024-04-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2024-07-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2024-10-01",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ],
+              [
+                "2025-01-02",
+                {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              ]
+            ],
+            "reserve_interest_paid": [],
+            "draws_from_reserve": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "draws_from_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "unfunded_draws": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reserve_replenished": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "early_amortization_date": null,
+            "tranche_draws": [],
+            "first_breaches": [
+              {
+                "test_id": "OC_CLONOTES-A",
+                "first_breach": "2024-04-01"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "settlement",
+        "instrument": {
+          "schema": "finstack_quant.instrument/1",
+          "instrument": {
+            "type": "structured_credit",
+            "spec": {
+              "id": "CLO-EXAMPLE",
+              "deal_type": "clo",
+              "pool": {
+                "id": "POOL-1",
+                "deal_type": "clo",
+                "currency": "USD",
+                "assets": [],
+                "cumulative_defaults": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_recoveries": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_prepayments": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_scheduled_amortization": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reinvestment_period": null,
+                "collection_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_account": {
+                  "amount": "1000000",
+                  "currency": "USD"
+                },
+                "excess_spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "rep_lines": null
+              },
+              "tranches": {
+                "tranches": [
+                  {
+                    "id": "CLONOTES-A",
+                    "attach_pct": 0,
+                    "detach_pct": 100,
+                    "seniority": "senior",
+                    "rating": null,
+                    "original_balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "current_balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "coupon": {
+                      "fixed": {
+                        "rate": 0.06
+                      }
+                    },
+                    "oc_trigger": null,
+                    "ic_trigger": null,
+                    "frequency": {
+                      "count": 3,
+                      "unit": "months"
+                    },
+                    "day_count": "act_360",
+                    "deferred_interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "pik_enabled": false,
+                    "maturity": "2034-01-01",
+                    "attributes": {}
+                  }
+                ]
+              },
+              "closing_date": "2024-01-01",
+              "first_payment_date": "2024-04-01",
+              "maturity": "2034-01-01",
+              "frequency": {
+                "count": 3,
+                "unit": "months"
+              },
+              "calendar_id": "nyse",
+              "discount_curve_id": "USD-OIS",
+              "attributes": {},
+              "prepayment_spec": {
+                "curve": "constant",
+                "cpr": 0.2
+              },
+              "default_spec": {
+                "curve": "constant",
+                "cdr": 0.02
+              },
+              "recovery_spec": {
+                "rate": 0.6,
+                "recovery_lag": 12
+              },
+              "market_conditions": {
+                "refi_rate": 0.04
+              },
+              "deal_metadata": {
+                "manager_id": null,
+                "servicer_id": null,
+                "master_servicer_id": null,
+                "special_servicer_id": null,
+                "trustee_id": null
+              },
+              "hedge_swaps": []
+            }
+          }
+        },
+        "run": {
+          "tranches": {
+            "CLONOTES-A": {
+              "tranche_id": "CLONOTES-A",
+              "cashflows": [
+                [
+                  "2024-01-01",
+                  {
+                    "amount": "1000000",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "detailed_flows": [
+                {
+                  "date": "2024-01-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "1000000",
+                    "currency": "USD"
+                  },
+                  "kind": "amortization",
+                  "accrual_factor": 0
+                },
+                {
+                  "date": "2024-01-01",
+                  "reset_date": null,
+                  "amount": {
+                    "amount": "-99000000",
+                    "currency": "USD"
+                  },
+                  "kind": "defaulted_notional",
+                  "accrual_factor": 0
+                }
+              ],
+              "accrual_periods": [],
+              "interest_flows": [],
+              "principal_flows": [
+                [
+                  "2024-01-01",
+                  {
+                    "amount": "1000000",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "pik_flows": [],
+              "deferred_flows": [],
+              "writedown_flows": [
+                [
+                  "2024-01-01",
+                  {
+                    "amount": "99000000",
+                    "currency": "USD"
+                  }
+                ]
+              ],
+              "final_balance": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_interest": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_principal": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "total_pik": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_deferred": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "total_writedown": {
+                "amount": "99000000",
+                "currency": "USD"
+              }
+            }
+          },
+          "diagnostics": {
+            "periods": [
+              {
+                "payment_date": "2024-01-01",
+                "pool_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "pool_factor": 0,
+                "wac": 0,
+                "weighted_avg_spread_bp": 0,
+                "warf": 0,
+                "interest_collections": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "principal_collections": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "defaults": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "recoveries": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reinvested_par": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "fees_paid": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "reserve_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "funding_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "delinquent_balance": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "servicer_advances_outstanding": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "excess_spread": 0,
+                "coverage_tests": [],
+                "waterfall": {
+                  "total_available": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "tier_allocations": [],
+                  "payment_records": [],
+                  "diverted_amounts": [],
+                  "diverted_cash": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "had_diversions": false,
+                  "remaining_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "remaining_principal": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "principal_used_for_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "recovery_proceeds": {
+                    "amount": "0",
+                    "currency": "USD"
+                  }
+                },
+                "non_waterfall_payments": [
+                  {
+                    "payment_date": "2024-01-01",
+                    "tranche_id": "CLONOTES-A",
+                    "source": "reserve_account_release",
+                    "interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "principal": {
+                      "amount": "1000000",
+                      "currency": "USD"
+                    },
+                    "incentive_fee": {
+                      "amount": "0",
+                      "currency": "USD"
+                    }
+                  }
+                ],
+                "credit_enhancement": [
+                  {
+                    "tranche_id": "CLONOTES-A",
+                    "credit_enhancement": 0
+                  }
+                ]
+              }
+            ],
+            "reserve_balance_path": [],
+            "reserve_interest_paid": [],
+            "draws_from_reserve": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "draws_from_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "unfunded_draws": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "reserve_replenished": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "early_amortization_date": null,
+            "tranche_draws": [],
+            "first_breaches": []
+          }
+        }
+      }
+    ]
+  },
   "cashflows": {
     "description": "Native cashflow envelope objects and their native calendar-year ladders per row currency; no inferred row schema or financial reconciliation.",
     "sources": [

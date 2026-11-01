@@ -279,3 +279,45 @@ await emit(
   new URL("./pool-report.json", import.meta.url),
   JSON.stringify({ goldenSource, instrumentSource, cases: poolCases }),
 );
+// Waterfall report on the UI market: the example CLO cut to one year with an OC test
+// it fails, so cash diverts each period and recoveries settle after the last, and the
+// same deal with no assets and a funded reserve, whose one period is its settlement.
+const diverting = structuredClone(instrument);
+diverting.instrument.spec.maturity = "2025-01-01";
+diverting.instrument.spec.coverage_triggers = [
+  {
+    id: `OC_${trancheId}`,
+    kind: "oc",
+    tranche_id: trancheId,
+    trigger_level: 2,
+  },
+];
+const settlement = structuredClone(instrument);
+settlement.instrument.spec.pool.assets = [];
+settlement.instrument.spec.pool.reserve_account.amount = "1000000";
+const waterfallCases = [
+  { name: "diverting", input: diverting },
+  { name: "settlement", input: settlement },
+].map(({ name, input }) => {
+  const instrumentJson = native.validateInstrumentJson(JSON.stringify(input));
+  const deal = native.StructuredCredit.fromJson(instrumentJson);
+  try {
+    return {
+      name,
+      instrument: JSON.parse(instrumentJson),
+      run: deal.runSimulation(marketJson, asOf),
+    };
+  } finally {
+    deal.free();
+  }
+});
+await emit(
+  new URL("./waterfall-report.json", import.meta.url),
+  JSON.stringify({
+    instrumentSource,
+    marketSource,
+    marketSha256: createHash("sha256").update(marketJson).digest("hex"),
+    asOf,
+    cases: waterfallCases,
+  }),
+);

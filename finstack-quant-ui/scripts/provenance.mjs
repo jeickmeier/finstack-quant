@@ -381,6 +381,17 @@ const displays = [
       "Returned PoolReport fields in the units poolReportFieldUnits states: statistics, Moody's WARF and concentration tables by obligor, industry and rating, in Rust's row order with balance_pct in percent points of total_balance. A null key is shown as missing, never dropped; nothing is summed, sorted or grouped here.",
   },
   {
+    id: "waterfall-report",
+    api: [
+      "StructuredCredit#runSimulation",
+      "StructuredCredit",
+      "runSimulation",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned SimulationDiagnostics.periods in payment order, in the deal currency each Money states: the period's PeriodWaterfall, and on expand its tier allocations and payment records in execution order, diversions and non-waterfall payments with their own dates. The is_principal, diverted and had_diversions flags are Rust's. Nothing is summed, joined by date, sorted or classified here.",
+  },
+  {
     id: "performance-report",
     api: ["analytics.Performance#summary", "Performance", "summary"],
     route: "returned-analytics",

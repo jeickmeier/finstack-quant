@@ -123,6 +123,14 @@ export interface PoolReportRequest {
   /** ISO-8601 date the remaining maturities are measured from. */
   readonly asOf: string;
 }
+/** Native tranche flows and period-by-period deal accounting of one deterministic simulation. */
+export type SimulationRun = ReturnType<StructuredCredit["runSimulation"]>;
+/** One structured-credit deal simulated on a complete market at a valuation date. */
+export interface DealSimulationRequest {
+  readonly instrumentJson: string;
+  readonly marketJson: string;
+  readonly asOf: string;
+}
 /** One tranche of a structured-credit deal, priced on a complete market at a valuation date. */
 export interface TrancheRequest {
   readonly instrumentJson: string;
@@ -1139,6 +1147,10 @@ export interface ValuationsApi {
   dealTranches(instrumentJson: string): Promise<Envelope<DealTranches>>;
   /** valuations.instruments.StructuredCredit.fromJson + its trancheCashflows, handed to trancheCashflowsTable; dates are joined and summed in Rust. */
   trancheSchedule(request: TrancheRequest): Promise<Envelope<TrancheSchedule>>;
+  /** StructuredCredit.runSimulation: the deal's tranche flows and accounting by period. */
+  runSimulation(
+    request: DealSimulationRequest,
+  ): Promise<Envelope<SimulationRun>>;
   /** valuations.instruments.poolReport over the deal's pool: statistics, WARF and concentration. */
   poolReport(request: PoolReportRequest): Promise<Envelope<PoolReport>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
