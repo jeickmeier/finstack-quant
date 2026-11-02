@@ -84,7 +84,13 @@
         "theta_period_days",
         "theta_roll_down"
       ],
-      "Credit": ["bucketed_cs01", "cs01", "expected_loss"],
+      "Credit": [
+        "bucketed_cs01",
+        "cs01",
+        "expected_loss",
+        "jump_to_default",
+        "recovery01"
+      ],
       "Greeks": ["cross_gamma_rates_credit", "vega"],
       "Pricing": [
         "accrued",
@@ -36963,7 +36969,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
+        "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_swap.json",
@@ -39063,7 +39069,7 @@
             "theta_period_days",
             "theta_roll_down"
           ],
-          "Credit": ["bucketed_cs01", "cs01"],
+          "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
           "Instrument Specific": [
             "all_in_rate",
             "oid_eir_amortization",
@@ -39298,7 +39304,7 @@
             "theta_period_days",
             "theta_roll_down"
           ],
-          "Credit": ["bucketed_cs01", "cs01"],
+          "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
           "Instrument Specific": [
             "all_in_rate",
             "oid_eir_amortization",
@@ -39537,7 +39543,7 @@
             "theta_period_days",
             "theta_roll_down"
           ],
-          "Credit": ["bucketed_cs01", "cs01"],
+          "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
           "Instrument Specific": [
             "all_in_rate",
             "oid_eir_amortization",
@@ -39776,7 +39782,7 @@
             "theta_period_days",
             "theta_roll_down"
           ],
-          "Credit": ["bucketed_cs01", "cs01"],
+          "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
           "Instrument Specific": [
             "all_in_rate",
             "oid_eir_amortization",
@@ -40015,7 +40021,13 @@
             "theta_period_days",
             "theta_roll_down"
           ],
-          "Credit": ["bucketed_cs01", "cs01", "expected_loss"],
+          "Credit": [
+            "bucketed_cs01",
+            "cs01",
+            "expected_loss",
+            "jump_to_default",
+            "recovery01"
+          ],
           "Instrument Specific": [
             "accrued_interest",
             "all_in_rate",
@@ -40793,7 +40805,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
+        "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
       }
     ],
     "base": {
@@ -41941,7 +41953,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
+        "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
       }
     ],
     "base": {
@@ -43479,7 +43491,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
+        "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
       }
     ],
     "asOf": "2025-01-01",
@@ -43786,11 +43798,11 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
+        "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
       },
       {
         "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
-        "sha256": "acf5d008c47277d3b654aa6d172e68c45c285035789a8c6d6843a9795813cec6"
+        "sha256": "0965801897de2d912a19e63fe99d6c5762228de10c586fa51ef5ea3b2e524c22"
       }
     ],
     "cases": [
@@ -66622,7 +66634,7 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
+        "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/composite.json",

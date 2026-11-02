@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Bonds and loans: recovery01 and jump to default on a hazard curve
+
+`recovery01` and `jump_to_default` are now registered on `Bond`, `TermLoan` and `RevolvingCredit`, in currency, for the whole notional, from the holder's perspective.
+
+`recovery01` is the PV change per +1% (0.01 absolute) recovery move, by central difference of the full PV. It bumps the recovery each pricer reads: the hazard curve's on a bond or term loan, the facility's `recovery_rate` on a revolver. As for a CDS, a curve carrying its calibration recipe is re-bootstrapped to the same par spreads at the bumped recovery, and a hand-built curve keeps its hazard rates. The two differ greatly: at 250bp flat spreads and 40% recovery, a 5% five-year bond on 1mm has 8.03 recalibrated against 1,767.89 frozen, and a premium bond's recalibrated figure is negative. A quoted bond or loan is held at its calibrated spread, as CS01 is.
+
+`jump_to_default` is value on immediate default less current value, and it follows the fractional recovery of par each pricer uses, without accrued interest: `R` times outstanding principal on a bond, `R` times funded balance on a term loan, and `R × drawn + (R − 1) × (leq × undrawn + LC draw)` on a revolver. Notional must be positive on these instruments, so a short is a position with negative quantity.
+
+A bond, term loan or revolver not priced on a hazard curve gets a `Validation` error for either id, never a zero: no `credit_curve_id`, a bond under a model other than `hazard_rate` or `rates_credit`, a term loan under a model other than `tree`, or a revolver with stochastic draws, which takes survival from its simulated spread path. `metricsForInstrument` reads the type, so it lists both for every such instrument; nothing requests them by default. No existing value moves.
+
 ### Bonds: G-spread over a named government curve
 
 The new `g_spread` metric is the bond's yield minus the par yield of a named government discount curve, in decimals. It uses the same yield and horizon as `i_spread`, through one shared helper: the worst exit on a bond with exercise rights and a quoted clean price, maturity otherwise. Over the bond's own discount curve it equals `i_spread` bit for bit. This is a working convention, pending the desk's decision on the benchmark: it interpolates the named curve at the horizon and selects no on-the-run bond.

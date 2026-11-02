@@ -19,6 +19,8 @@
 //! - **Convexity**: Curvature of price/yield relationship
 //! - **DV01**: Dollar value of 1bp rate change
 //! - **CS01**: Credit spread sensitivity
+//! - **Recovery01**: PV change per +1% recovery on a hazard-priced bond
+//! - **Jump to Default**: Recovery of par less current value, on a hazard-priced bond
 //! - **Spread Duration**: Quote-reproducing Z-spread sensitivity normalized by
 //!   the Z-spread base PV into years
 //!
@@ -47,6 +49,8 @@ pub(crate) mod carry;
 pub(crate) mod convexity;
 /// CS01 calculators with z-spread fallback for bonds without credit curves
 pub(crate) mod cs01;
+/// Recovery01 and jump-to-default on hazard-priced bonds
+mod default_risk;
 /// Macaulay duration calculator
 pub(crate) mod duration_macaulay;
 /// Modified duration calculator
@@ -281,6 +285,9 @@ pub(crate) fn register_bond_metrics(
             // Always quote-reproducing Z-spread risk, even when CS01 uses a
             // hazard/par-CDS curve.
             (SpreadDuration, BondSpreadDurationCalculator),
+
+            (Recovery01, default_risk::BondRecovery01Calculator),
+            (JumpToDefault, default_risk::BondJumpToDefaultCalculator),
 
             (Moic, return_metrics::moic::MoicCalculator),
             (MoicToWorst, return_metrics::moic::MoicToWorstCalculator),

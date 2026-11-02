@@ -68,6 +68,8 @@ pub(crate) fn register_revolving_credit_metrics(
                 crate::revolving_credit::RevolvingCredit,
             >::hazard_when_credit_curve()),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (Recovery01, exposure::Recovery01Calculator),
+            (JumpToDefault, exposure::JumpToDefaultCalculator),
             // Quote metrics on the settlement schedule (LSTA convention: a
             // quote applies to the drawn balance plus accrued).
             (DiscountMargin, quotes::DiscountMarginCalculator),

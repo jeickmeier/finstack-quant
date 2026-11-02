@@ -11,6 +11,7 @@ pub mod dv01;
 pub mod fd_greeks;
 pub mod fx01;
 pub mod option_greeks;
+pub mod recovery01;
 pub(crate) mod rf_component_dv01;
 pub mod theta;
 pub(crate) mod vega;
