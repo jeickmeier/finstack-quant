@@ -23698,6 +23698,21 @@ export interface ValuationInstrumentsNamespace {
     asOf: string
   ): generated.valuations.BondWorkoutLadder;
   /**
+   * Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices (mirrors Rust `convertible_spot_ladder`).
+   * @param bond - Borrowed `ConvertibleBond` handle; it is not consumed. Its `metric_pricing_overrides.bump_config` sets the spot bump behind delta (default 1% of each row's share price).
+   * @param marketJson - Canonical market-context JSON holding the bond's discount curve, share price, volatility and any dividend yield, hazard curve and floating index.
+   * @param asOf - ISO-8601 valuation date and origin of the tree's ACT/365F clock.
+   * @param spots - Share prices in the bond's currency, each finite and positive, sorted ascending with duplicates dropped; omit for 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2 and 3 times the market's share price.
+   * @returns `ConvertibleSpotLadder` plain object: `instrument_id`, `as_of`, `currency`, `market_spot` and `rows` in ascending share price, each with `spot`, `is_market_spot`, `price`, `conversion_value` and `bond_floor` in `currency`, `parity` over notional, and `delta` per unit of share price, `hedge_ratio` as a decimal share of the conversion ratio, `regime` (`busted` below 0.40, `balanced` to 0.80, `equity_sensitive` above) and `conversion_premium` as a decimal, each `null` where undefined: a mandatory-variable bond has no hedge ratio or regime.
+   * @throws Error - Throws with kind `validation` if `spots` is empty or holds a value that is not finite and positive, or the bond or market JSON is invalid, and kind `not_found` if market data the bond needs is missing.
+   */
+  convertibleSpotLadder(
+    bond: ConvertibleBond,
+    marketJson: string,
+    asOf: string,
+    spots?: readonly number[] | null
+  ): generated.valuations.ConvertibleSpotLadder;
+  /**
    * Every price, yield and spread quote of a bond, solved from any one of them (mirrors Rust `compute_quotes`).
    * @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights needs HW1F parameters on the bond or in the market, because its `oas` is part of the set.
    * @param marketJson - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index curve.

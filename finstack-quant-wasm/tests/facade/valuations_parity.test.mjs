@@ -1043,3 +1043,37 @@ test('computeQuotes matches Python, a null field included, and rejects a kind th
     bond.free();
   }
 });
+
+test('convertibleSpotLadder matches Python, the default grid included', () => {
+  const {
+    market,
+    as_of: asOf,
+    bond: bondJson,
+    spots,
+    supplied,
+    default: grid,
+  } = golden.convertible_spot_ladder;
+  const bond = instruments.ConvertibleBond.fromJson(bondJson);
+  try {
+    same(
+      plain(instruments.convertibleSpotLadder(bond, market, asOf, spots)),
+      supplied,
+      'supplied spots'
+    );
+    same(plain(instruments.convertibleSpotLadder(bond, market, asOf)), grid, 'default grid');
+    assert.throws(
+      () => instruments.convertibleSpotLadder(bond, market, asOf, [0]),
+      (error) => error.kind === 'validation'
+    );
+  } finally {
+    bond.free();
+  }
+  assert.deepEqual(
+    supplied.rows.map((row) => [row.spot, row.parity, row.regime]),
+    [
+      [50, 0.5, 'busted'],
+      [100, 1, 'balanced'],
+      [300, 3, 'equity_sensitive'],
+    ]
+  );
+});

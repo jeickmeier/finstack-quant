@@ -3948,6 +3948,15 @@ export type SchemaVersion = number;
  */
 export type InstrumentSchema = "finstack_quant.instrument/1";
 /**
+ * Which of bond or stock drives a convertible's value at a share price.
+ *
+ * Classified by [`ConvertibleSpotRow::hedge_ratio`] on the market bands of 40 and
+ * 80 delta. Managers do not agree on the cutoffs: these are the bands Putnam and
+ * Lord Abbett publish, and MSCI uses thirds. See
+ * `docs/REFERENCES.md#convertible-delta-bands`.
+ */
+export type ConvertibleRegime = "busted" | "balanced" | "equity_sensitive";
+/**
  * Stage of persisted artifact loading that produced a diagnostic.
  */
 export type LoadPhase = "parse" | "version" | "structure" | "semantic" | "canonicalize" | "hash" | "build";
@@ -19032,6 +19041,84 @@ export interface ConvertibleGreeks {
    */
   vega: number;
   [k: string]: unknown;
+}
+/**
+ * Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices.
+ */
+export interface ConvertibleSpotLadder {
+  /**
+   * Valuation date.
+   */
+  as_of: DateWire;
+  /**
+   * Currency of the bond, which every money field is in.
+   */
+  currency: Currency;
+  /**
+   * Identifier of the bond.
+   */
+  instrument_id: string;
+  /**
+   * Share price the market holds.
+   */
+  market_spot: number;
+  /**
+   * One row per share price, in ascending order.
+   */
+  rows: ConvertibleSpotRow[];
+}
+/**
+ * A convertible at one share price: a row of a [`ConvertibleSpotLadder`].
+ */
+export interface ConvertibleSpotRow {
+  /**
+   * Value of the coupons and principal with no conversion or exercise rights, the
+   * `bond_floor` metric in currency. It does not depend on the share price, so every
+   * row holds the same number.
+   */
+  bond_floor: number;
+  /**
+   * [`price`](Self::price) over conversion value, less one, as a decimal; the
+   * `conversion_premium` metric. `null` when conversion value is not positive or the
+   * ratio is not finite.
+   */
+  conversion_premium?: number | null;
+  /**
+   * Immediate conversion value of the position in currency, the `conversion_value` metric.
+   */
+  conversion_value: number;
+  /**
+   * Change in [`price`](Self::price) per unit of share price, by central difference
+   * with the bond's spot bump, the `delta` metric's definition. `null` if not finite.
+   */
+  delta?: number | null;
+  /**
+   * [`delta`](Self::delta) as a share of the effective conversion ratio, the decimal
+   * the regime bands read. `null` on a mandatory-variable bond, whose share count
+   * moves with the stock, if the ratio is not positive, or if the delta is `null`.
+   */
+  hedge_ratio?: number | null;
+  /**
+   * Whether [`spot`](Self::spot) is the share price the market holds.
+   */
+  is_market_spot: boolean;
+  /**
+   * Conversion value over notional, the `parity` metric (`1.0` is par, not one dollar).
+   */
+  parity: number;
+  /**
+   * Tree value of the whole position in [`currency`](ConvertibleSpotLadder::currency),
+   * the PV of the bond priced on this share price.
+   */
+  price: number;
+  /**
+   * Regime of this row; `null` where [`hedge_ratio`](Self::hedge_ratio) is.
+   */
+  regime?: ConvertibleRegime | null;
+  /**
+   * Share price of this row, in the bond's currency.
+   */
+  spot: number;
 }
 /**
  * When one coverage test first failed over a simulation.

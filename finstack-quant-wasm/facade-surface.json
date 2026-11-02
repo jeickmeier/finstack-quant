@@ -4567,6 +4567,7 @@
       "cdsTrancheParamsEquityTranche",
       "cdsTrancheParamsMezzanineTranche",
       "computeQuotes",
+      "convertibleSpotLadder",
       "coverageRulesCloStandard",
       "coverageRulesValidate",
       "equityMetricsFieldUnits",
@@ -6037,6 +6038,9 @@
     "kind": "function"
   },
   "valuations.instruments.bondWorkoutLadder": {
+    "kind": "function"
+  },
+  "valuations.instruments.convertibleSpotLadder": {
     "kind": "function"
   },
   "valuations.instruments.computeQuotes": {

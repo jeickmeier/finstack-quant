@@ -1018,6 +1018,15 @@
       "type_name": "ConvertibleGreeks"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/convertible_spot_ladder.schema.json",
+      "bytes": 6472,
+      "kind": "output",
+      "path": "schemas/results/1/convertible_spot_ladder.schema.json",
+      "summary": "Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices.",
+      "title": "ConvertibleSpotLadder",
+      "type_name": "ConvertibleSpotLadder"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/currency_ladder.schema.json",
       "bytes": 2239,
       "kind": "output",

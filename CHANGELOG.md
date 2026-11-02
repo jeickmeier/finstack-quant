@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Convertibles: value across share prices
+
+`convertible_spot_ladder(bond, market, as_of, spots)` answers how a convertible moves with its stock. Each row reprices on the market with only the share price moved and gives price, delta, hedge ratio, regime, conversion value, parity, conversion premium and the bond floor, in ascending share price. Omit `spots` for 0.25 to 3 times the market's share price. Spots must be finite and positive; they are sorted and duplicates dropped. Price, delta, parity, conversion value, premium and floor are the definitions of the metrics of those names, so the market row equals them.
+
+Regime is new and defined once in Rust, from `hedge_ratio`, delta over the effective conversion ratio: `busted` below 0.40, `balanced` to 0.80, `equity_sensitive` above. The cutoffs are one market convention, the bands Putnam and Lord Abbett publish; MSCI uses thirds (`docs/REFERENCES.md#convertible-delta-bands`). A mandatory-variable bond delivers a moving share count, so its hedge ratio and regime are null.
+
+Bound in Python (`convertible_spot_ladder`, `ConvertibleSpotLadder`, `ConvertibleSpotRow`) and WASM (`valuations.instruments.convertibleSpotLadder`). `metricMetadata` now declares the units of `parity` (dimensionless), `conversion_premium` (decimal), `conversion_value` and `bond_floor` (currency), which were `unknown`. No value moves.
+
 ### UI: bond and loan analytics in the pricing workbench
 
 A priced bond now adds an Analytics result tab with `bond-credit-card`, `yield-workout-ladder` and `quote-converter`, each opening on its own over the completed request; a priced term loan adds one with `loan-yield-card`. No value moved.

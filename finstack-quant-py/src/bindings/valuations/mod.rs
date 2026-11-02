@@ -7,6 +7,7 @@ mod bond_quotes;
 mod bond_workout;
 pub(crate) mod composite;
 pub(crate) mod convert;
+mod convertible_spot_ladder;
 pub(crate) mod instruments;
 pub(crate) mod market;
 mod merton_mc;
@@ -404,6 +405,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_rates::register(py, &m)?;
     typed_credit::register(py, &m)?;
     typed_convertible::register(py, &m)?;
+    convertible_spot_ladder::register(&m)?;
     typed_equity::register(py, &m)?;
     typed_fx::register(py, &m)?;
     typed_structured_credit::register(py, &m)?;
@@ -428,6 +430,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(typed_rates::EXPORTS);
     exports.extend_from_slice(typed_credit::EXPORTS);
     exports.extend_from_slice(typed_convertible::EXPORTS);
+    exports.extend_from_slice(convertible_spot_ladder::EXPORTS);
     exports.extend_from_slice(typed_equity::EXPORTS);
     exports.extend_from_slice(typed_fx::EXPORTS);
     exports.extend_from_slice(typed_structured_credit::EXPORTS);

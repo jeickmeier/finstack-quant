@@ -88,6 +88,11 @@ from finstack_quant.valuations.instruments._typed_convertible import (
     ConvertibleBond as ConvertibleBond,
     ConvertibleBondBuilder as ConvertibleBondBuilder,
 )
+from finstack_quant.valuations.instruments._convertible_spot_ladder import (
+    ConvertibleSpotLadder as ConvertibleSpotLadder,
+    ConvertibleSpotRow as ConvertibleSpotRow,
+    convertible_spot_ladder as convertible_spot_ladder,
+)
 from finstack_quant.valuations.instruments._typed_fx import (
     FxForward as FxForward,
     FxForwardBuilder as FxForwardBuilder,
@@ -227,6 +232,8 @@ __all__ = [
     "ConversionSpec",
     "ConvertibleBond",
     "ConvertibleBondBuilder",
+    "ConvertibleSpotLadder",
+    "ConvertibleSpotRow",
     "CoverageRules",
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
@@ -281,6 +288,7 @@ __all__ = [
     "calculate_pool_stats",
     "calculate_var",
     "compute_quotes",
+    "convertible_spot_ladder",
     "instrument_cashflows",
     "instrument_envelope_from_spec",
     "list_models",

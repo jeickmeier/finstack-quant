@@ -221,6 +221,30 @@ def _default_risk_case() -> dict[str, Any]:
     }
 
 
+def _convertible_spot_ladder_case() -> dict[str, Any]:
+    """Convertible spot ladders: supplied spots through every regime, and the default grid."""
+    as_of = datetime.date(2025, 1, 15)
+    market = (
+        MarketContext()
+        .insert(DiscountCurve.flat("USD-IG", as_of, 0.04))
+        .insert(HazardCurve("USD-CREDIT-BBB", as_of, [(1.0, 0.025)], recovery_rate=0.0))
+        .insert_price("TECH", 100.0, "USD")
+        .insert_price("TECH-VOL", 0.30)
+    )
+    spec = json.loads(ins.ConvertibleBond.example().to_json())
+    spec["instrument"]["spec"]["conversion"]["ratio"] = 10_000.0
+    bond_json = json.dumps(spec)
+    bond = ins.ConvertibleBond.from_json(bond_json)
+    return {
+        "market": market.to_json(),
+        "as_of": as_of.isoformat(),
+        "bond": bond_json,
+        "spots": [50.0, 100.0, 300.0],
+        "supplied": ins.convertible_spot_ladder(bond, market, as_of, [50.0, 100.0, 300.0]).to_dict(),
+        "default": ins.convertible_spot_ladder(bond, market, as_of).to_dict(),
+    }
+
+
 def _money(value: Money) -> dict[str, Any]:
     return {"amount": value.amount, "currency": str(value.currency)}
 
@@ -410,6 +434,7 @@ def build_cases() -> dict[str, Any]:
     }
 
     cases["bond_workout_ladder"] = _bond_workout_ladder_case()
+    cases["convertible_spot_ladder"] = _convertible_spot_ladder_case()
     cases["compute_quotes"] = _compute_quotes_case()
     cases["g_spread"] = _g_spread_case()
     cases["default_risk"] = _default_risk_case()

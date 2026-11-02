@@ -728,7 +728,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
         BondQuoteSet, BondWorkoutLadder,
     };
-    use crate::instruments::fixed_income::convertible::ConvertibleGreeks;
+    use crate::instruments::fixed_income::convertible::{ConvertibleGreeks, ConvertibleSpotLadder};
     use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
         BorrowingBaseReport, EquityMetrics, OasConfig, OasResult, PoolReport, PoolStats,
@@ -1248,6 +1248,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::convertible_greeks),
+        finstack_quant_core::schema_artifact!(
+            ConvertibleSpotLadder,
+            "results",
+            "convertible_spot_ladder",
+            Component,
+            "Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::convertible_spot_ladder),
         finstack_quant_core::schema_artifact!(
             FacilityProjection,
             "results",

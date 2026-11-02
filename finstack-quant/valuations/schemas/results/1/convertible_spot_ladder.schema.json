@@ -1,0 +1,188 @@
+{
+  "$defs": {
+    "ConvertibleRegime": {
+      "description": "Which of bond or stock drives a convertible's value at a share price.\n\nClassified by [`ConvertibleSpotRow::hedge_ratio`] on the market bands of 40 and\n80 delta. Managers do not agree on the cutoffs: these are the bands Putnam and\nLord Abbett publish, and MSCI uses thirds. See\n`docs/REFERENCES.md#convertible-delta-bands`.",
+      "oneOf": [
+        {
+          "const": "busted",
+          "description": "Hedge ratio below 0.40: value follows the bond floor and the issuer's credit.",
+          "type": "string"
+        },
+        {
+          "const": "balanced",
+          "description": "Hedge ratio from 0.40 to 0.80 inclusive: value responds to both bond and stock.",
+          "type": "string"
+        },
+        {
+          "const": "equity_sensitive",
+          "description": "Hedge ratio above 0.80: value follows the shares.",
+          "type": "string"
+        }
+      ]
+    },
+    "ConvertibleSpotRow": {
+      "additionalProperties": false,
+      "description": "A convertible at one share price: a row of a [`ConvertibleSpotLadder`].",
+      "properties": {
+        "bond_floor": {
+          "description": "Value of the coupons and principal with no conversion or exercise rights, the\n`bond_floor` metric in currency. It does not depend on the share price, so every\nrow holds the same number.",
+          "format": "double",
+          "type": "number"
+        },
+        "conversion_premium": {
+          "description": "[`price`](Self::price) over conversion value, less one, as a decimal; the\n`conversion_premium` metric. `null` when conversion value is not positive or the\nratio is not finite.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "conversion_value": {
+          "description": "Immediate conversion value of the position in currency, the `conversion_value` metric.",
+          "format": "double",
+          "type": "number"
+        },
+        "delta": {
+          "description": "Change in [`price`](Self::price) per unit of share price, by central difference\nwith the bond's spot bump, the `delta` metric's definition. `null` if not finite.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "hedge_ratio": {
+          "description": "[`delta`](Self::delta) as a share of the effective conversion ratio, the decimal\nthe regime bands read. `null` on a mandatory-variable bond, whose share count\nmoves with the stock, if the ratio is not positive, or if the delta is `null`.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "is_market_spot": {
+          "description": "Whether [`spot`](Self::spot) is the share price the market holds.",
+          "type": "boolean"
+        },
+        "parity": {
+          "description": "Conversion value over notional, the `parity` metric (`1.0` is par, not one dollar).",
+          "format": "double",
+          "type": "number"
+        },
+        "price": {
+          "description": "Tree value of the whole position in [`currency`](ConvertibleSpotLadder::currency),\nthe PV of the bond priced on this share price.",
+          "format": "double",
+          "type": "number"
+        },
+        "regime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConvertibleRegime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Regime of this row; `null` where [`hedge_ratio`](Self::hedge_ratio) is."
+        },
+        "spot": {
+          "description": "Share price of this row, in the bond's currency.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "spot",
+        "is_market_spot",
+        "price",
+        "conversion_value",
+        "parity",
+        "bond_floor"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/convertible_spot_ladder.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices.",
+  "examples": [
+    {
+      "as_of": "2025-01-01",
+      "currency": "USD",
+      "instrument_id": "CB-EXAMPLE",
+      "market_spot": 100.0,
+      "rows": [
+        {
+          "bond_floor": 818730.75,
+          "conversion_premium": 0.74931228,
+          "conversion_value": 500000.0,
+          "delta": 3347.45,
+          "hedge_ratio": 0.334745,
+          "is_market_spot": false,
+          "parity": 0.5,
+          "price": 874656.14,
+          "regime": "busted",
+          "spot": 50.0
+        },
+        {
+          "bond_floor": 818730.75,
+          "conversion_premium": 0.15834878,
+          "conversion_value": 1000000.0,
+          "delta": 7368.0,
+          "hedge_ratio": 0.7368,
+          "is_market_spot": true,
+          "parity": 1.0,
+          "price": 1158348.78,
+          "regime": "balanced",
+          "spot": 100.0
+        },
+        {
+          "bond_floor": 818730.75,
+          "conversion_premium": 0.04786242,
+          "conversion_value": 1500000.0,
+          "delta": 8921.0,
+          "hedge_ratio": 0.8921,
+          "is_market_spot": false,
+          "parity": 1.5,
+          "price": 1571793.63,
+          "regime": "equity_sensitive",
+          "spot": 150.0
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "as_of": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Valuation date."
+    },
+    "currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Currency of the bond, which every money field is in."
+    },
+    "instrument_id": {
+      "description": "Identifier of the bond.",
+      "type": "string"
+    },
+    "market_spot": {
+      "description": "Share price the market holds.",
+      "format": "double",
+      "type": "number"
+    },
+    "rows": {
+      "description": "One row per share price, in ascending order.",
+      "items": {
+        "$ref": "#/$defs/ConvertibleSpotRow"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "instrument_id",
+    "as_of",
+    "currency",
+    "market_spot",
+    "rows"
+  ],
+  "title": "ConvertibleSpotLadder",
+  "type": "object"
+}
