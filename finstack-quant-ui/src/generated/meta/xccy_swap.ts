@@ -1227,6 +1227,21 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/government_curve_id",
+    "description": "Optional government discount curve identifier for the bond `g_spread` metric.\n\nThe metric subtracts this curve's par yield from the bond's yield. It\nenters no price, and `g_spread` is an error when it is unset."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/government_curve_id/anyOf/0",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/government_curve_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/hazard_mean_reversion",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/hazard_mean_reversion",
     "description": "Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit\nlattice, annualised.\n\n`None` and `0.0` both mean no reversion. Capped by\n[`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX),\nabove which the binomial lattice's conditional variance collapses far\nenough to distort option values. Requires `credit_curve_id`.\n\nNote that mean reversion narrows the feasible correlation range: it\nskews the per-node marginal transition probabilities away from ½, and\ntwo Bernoulli marginals admit only correlations inside their Fréchet\nbounds. At `KAPPA_MAX` on both factors over a five-year lattice the\nfeasible `|ρ|` can fall to around `0.12`. Calibration rejects an\nunattainable correlation and reports the lattice-wide maximum, which is\nalso available up front from\n[`RatesCreditTree::max_feasible_correlation`](finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree::max_feasible_correlation).",

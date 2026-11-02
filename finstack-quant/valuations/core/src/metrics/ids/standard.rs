@@ -15,6 +15,7 @@ impl MetricId {
         MetricId::MoosmullerYtm,
         MetricId::ZSpread,
         MetricId::ISpread,
+        MetricId::GSpread,
         MetricId::DiscountMargin,
         MetricId::Oas,
         MetricId::ASWPar,

@@ -13,7 +13,7 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use serde::{Deserialize, Serialize};
 
-use super::i_spread_par_rate;
+use super::curve_par_rate;
 use super::yield_price::solve_workout_exits;
 use crate::bond::pricing::settlement::{model_dirty_at_quote_date, QuoteDateContext};
 use crate::bond::Bond;
@@ -245,7 +245,7 @@ pub fn bond_workout_ladder(
                 } else {
                     bond.maturity
                 };
-                Some(rate - i_spread_par_rate(bond, disc.as_ref(), quote_date, horizon)?)
+                Some(rate - curve_par_rate(bond, disc.as_ref(), quote_date, horizon)?)
             }
             _ => None,
         };

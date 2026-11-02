@@ -27,7 +27,7 @@ pub use yield_price::{
 };
 
 pub(crate) use annuity::{
-    asw_leg_schedule, floating_leg_pv_and_annuity, i_spread_par_rate, settlement_asw_components,
+    asw_leg_schedule, curve_par_rate, floating_leg_pv_and_annuity, settlement_asw_components,
 };
 pub(crate) use compute::{clear_price_driving_overrides, settlement_dirty_from_quote_overrides};
 pub(crate) use spread_price::{

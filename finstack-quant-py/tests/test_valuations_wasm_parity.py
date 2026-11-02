@@ -160,6 +160,36 @@ def _compute_quotes_case() -> dict[str, Any]:
     }
 
 
+def _g_spread_case() -> dict[str, Any]:
+    """G-spread by metric id: over another curve, over the bond's discount curve, and with no curve named."""
+    as_of = datetime.date(2024, 1, 15)
+    plain = ins.Bond.example()
+    spec = json.loads(plain.to_json())
+    discount_curve_id = spec["instrument"]["spec"]["discount_curve_id"]
+    market = (
+        MarketContext()
+        .insert(DiscountCurve.flat(discount_curve_id, as_of, 0.04))
+        .insert(DiscountCurve.flat("USD-GOVT", as_of, 0.035))
+    )
+
+    def naming(curve_id: str) -> ins.Bond:
+        spec["instrument"]["spec"]["instrument_pricing_overrides"] = {"model_config": {"government_curve_id": curve_id}}
+        return ins.Bond.from_json(json.dumps(spec))
+
+    govt = naming("USD-GOVT")
+    own_curve = naming(discount_curve_id)
+    return {
+        "market": market.to_json(),
+        "as_of": as_of.isoformat(),
+        "bond": govt.to_json(),
+        "plain_bond": plain.to_json(),
+        "own_curve_bond": own_curve.to_json(),
+        "g_spread": govt.metric(market, as_of, "g_spread"),
+        "g_spread_over_own_curve": own_curve.metric(market, as_of, "g_spread"),
+        "i_spread": own_curve.metric(market, as_of, "i_spread"),
+    }
+
+
 def _money(value: Money) -> dict[str, Any]:
     return {"amount": value.amount, "currency": str(value.currency)}
 
@@ -350,6 +380,7 @@ def build_cases() -> dict[str, Any]:
 
     cases["bond_workout_ladder"] = _bond_workout_ladder_case()
     cases["compute_quotes"] = _compute_quotes_case()
+    cases["g_spread"] = _g_spread_case()
 
     # -- Merton Monte Carlo ------------------------------------------------
     merton = MertonModel(100.0, 0.25, 60.0, 0.04)
@@ -561,6 +592,15 @@ def test_valuation_result_methods_match_the_typed_wrapper() -> None:
     assert str(result.value.amount_decimal) == wire["value"]["amount"]
     assert list(result.metrics) == list(wire["measures"])
     assert result.get_metric("not_a_metric") is None
+
+
+def test_g_spread_with_no_government_curve_is_a_value_error() -> None:
+    case = _g_spread_case()
+    assert case["g_spread_over_own_curve"] == case["i_spread"]
+    bond = ins.Bond.from_json(case["plain_bond"])
+    market = MarketContext.from_json(case["market"])
+    with pytest.raises(ValueError, match="government_curve_id"):
+        bond.metric(market, case["as_of"], "g_spread")
 
 
 def test_unknown_tranche_is_a_lookup_miss() -> None:

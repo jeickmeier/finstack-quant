@@ -97,6 +97,7 @@
         "duration_mac",
         "duration_mod",
         "embedded_option_value",
+        "g_spread",
         "i_spread",
         "japanese_simple_yield",
         "moic",
@@ -36962,7 +36963,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
+        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_swap.json",
@@ -40792,7 +40793,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
+        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
       }
     ],
     "base": {
@@ -41940,7 +41941,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
+        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
       }
     ],
     "base": {
@@ -43478,7 +43479,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
+        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
       }
     ],
     "asOf": "2025-01-01",
@@ -43785,11 +43786,11 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
+        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
       },
       {
         "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
-        "sha256": "b3b41dfa2022f36d14f3aa0dd80904a33eb2485abf34113a7965e9a8bf851200"
+        "sha256": "acf5d008c47277d3b654aa6d172e68c45c285035789a8c6d6843a9795813cec6"
       }
     ],
     "cases": [
@@ -66621,7 +66622,7 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
+        "sha256": "9c9ef8a7050e45e32bf78bacc820d889a99f1b7bb9e0f7259a291d239e1536b8"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/composite.json",

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Bonds: G-spread over a named government curve
+
+The new `g_spread` metric is the bond's yield minus the par yield of a named government discount curve, in decimals. It uses the same yield and horizon as `i_spread`, through one shared helper: the worst exit on a bond with exercise rights and a quoted clean price, maturity otherwise. Over the bond's own discount curve it equals `i_spread` bit for bit. This is a working convention, pending the desk's decision on the benchmark: it interpolates the named curve at the horizon and selects no on-the-run bond.
+
+Name the curve in `instrument_pricing_overrides.model_config.government_curve_id`, where `asw_forward_curve_id` already lives. No curve named is a `Validation` error (Python `ValueError`, WASM `kind: "validation"`), never a fallback to the discount curve, and a named curve missing from the market is the usual not-found error. `metricsForInstrument` lists `g_spread` for every bond because it reads the type, so a bond with no curve gets that error only when it asks for the id. Nothing requests it by default: `compute_quotes` and every default metric set are unchanged.
+
+A named curve joins the bond's `market_dependencies` as a discount curve. No price or parallel DV01 moves, with the curve in the market or not, and `bucketed_dv01` gains zero rows for that curve.
+
 ### Bonds: an asset-swap quote no longer prices a bond with exercise rights
 
 **Behaviour change.** A bond with exercise rights and `quoted_asw_market`, or `BondQuoteInput::AswMarket` on one, is now an error at every spread, as a Z-spread quote already is. It used to return a price: the inverse runs the swap to maturity, while the `asw_market` metric runs it to the worst exit, which depends on the price, so the returned `asw_market` could differ from the quote (a callable at 108 came back at 119.1566). This reaches every route through the quote path: `value`, `price_instrument`, the price metrics, OAS from a quote and `compute_quotes`. The `asw_market` metric and output field on such a bond are unchanged, and so is the quote on a plain fixed-coupon bond. Quote a clean price, or use OAS.
