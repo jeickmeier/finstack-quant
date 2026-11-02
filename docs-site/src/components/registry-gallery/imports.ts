@@ -60,6 +60,13 @@ export const importHarnesses = {
       name: "use-market-validator",
       modules: modules.length,
     })),
+  "use-convertible-spot-ladder": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-convertible-spot-ladder/use-convertible-spot-ladder"),
+    ]).then((modules) => ({
+      name: "use-convertible-spot-ladder",
+      modules: modules.length,
+    })),
   "use-bond-workout-ladder": () =>
     Promise.all([
       import("@/hooks/valuations/use-bond-workout-ladder/use-bond-workout-ladder"),

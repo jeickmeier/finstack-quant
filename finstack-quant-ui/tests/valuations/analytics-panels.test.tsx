@@ -23,6 +23,7 @@ import { unwrap, type PriceRequest } from "@/workers/finstack-contract";
 import { startWorker } from "../shared/worker/harness.mjs";
 import { budget } from "../shared/budget";
 import bondCredit from "./bond-credit/cases.json";
+import convertible from "./convertible/cases.json";
 import loanYield from "./loan-yield/cases.json";
 import scenarioCases from "./scenario-table/cases.json";
 import pricingMarket from "./instruments/pricing-market.json";
@@ -81,6 +82,32 @@ const openAnalytics = async (request: PriceRequest) => {
   await userEvent.click(screen.getByRole("tab", { name: "Analytics" }));
 };
 const methods = () => called.mock.calls.map(([method]) => method);
+it(
+  "mounts the convertible card on the completed request, prices it as the tab opens",
+  async () => {
+    const { request, ladder } = convertible.cases.plain;
+    await openAnalytics({ ...request, model: "tree", metrics: [] });
+    const section = await screen.findByRole(
+      "region",
+      { name: "Convertible by share price" },
+      { timeout: budget(15000) },
+    );
+    await within(section).findByRole(
+      "rowheader",
+      { name: "100 (market)" },
+      { timeout: budget(15000) },
+    );
+    expect(ladder.rows.map((row) => row.spot)).toContain(100);
+    await screen.findByRole(
+      "region",
+      { name: "Convertible" },
+      { timeout: budget(15000) },
+    );
+    expect(methods()).toContain("convertibleSpotLadder");
+    expect(methods()).toContain("metricValues");
+  },
+  budget(60000),
+);
 it(
   "mounts the bond cards on their own, each with its own native error",
   async () => {

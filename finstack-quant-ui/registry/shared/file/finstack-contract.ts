@@ -131,6 +131,19 @@ export interface BondWorkoutLadderRequest {
   /** ISO-8601 valuation date. */
   readonly asOf: string;
 }
+/** A convertible's price, delta, parity, premium, regime and floor by share price. */
+export type ConvertibleSpotLadder = ReturnType<
+  typeof valuations.instruments.convertibleSpotLadder
+>;
+/** One convertible on a complete market at a valuation date. */
+export interface ConvertibleSpotLadderRequest {
+  readonly instrumentJson: string;
+  readonly marketJson: string;
+  /** ISO-8601 valuation date. */
+  readonly asOf: string;
+  /** Share prices; null or omitted is Rust's default ladder. */
+  readonly spots?: readonly number[] | null;
+}
 /** Every price, yield and spread quote of a bond, from any one of them. */
 export type BondQuoteSet = ReturnType<
   typeof valuations.instruments.computeQuotes
@@ -1193,6 +1206,10 @@ export interface ValuationsApi {
   equityMetrics(
     request: EquityMetricsRequest,
   ): Promise<Envelope<EquityMetrics>>;
+  /** valuations.instruments.ConvertibleBond.fromJson + convertibleSpotLadder: the bond at each share price. */
+  convertibleSpotLadder(
+    request: ConvertibleSpotLadderRequest,
+  ): Promise<Envelope<ConvertibleSpotLadder>>;
   /** valuations.instruments.Bond.fromJson + bondWorkoutLadder: yield and I-spread to every exit. */
   bondWorkoutLadder(
     request: BondWorkoutLadderRequest,

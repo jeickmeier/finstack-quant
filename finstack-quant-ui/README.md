@@ -1033,7 +1033,29 @@ error, and with no `theta_period` carry is one day; `theta_period_days` reports 
 Under `linear` the value is `-carry_total / cs01` for `z_spread` and `oas`, and
 `-carry_total / dv01` for `ytm`, in basis points. `metricMetadata` declares no unit for
 `breakeven`, because it follows the target, so the card says "not declared" and the
-form's target states it. The native fixture is `tests/valuations/bond-credit/cases.json`.
+form's target states it. The card's note states the conventions a reader would otherwise
+misread: z-spread compounds at the coupon frequency and OAS on `oas_quote_compounding`,
+continuous by default, and `asw_par` does not move with the quoted price while
+`asw_market` does. The native fixture is `tests/valuations/bond-credit/cases.json`.
+
+## Convertible card
+
+`ConvertibleCard` (`@finstack/convertible-card`) answers how a convertible moves with
+its stock. It draws one `valuations.instruments.convertibleSpotLadder` result, fetched
+with `useConvertibleSpotLadder` (`@finstack/use-convertible-spot-ladder`): a chart of
+price, conversion value and bond floor with a dot for each regime, a chart of parity
+and conversion premium, and one row per share price in Rust's ascending order, with
+the market row marked. Metric ids follow through `metric-values-table`, each on its own
+call so one id's error stays in its row. `onSpotsChange` shows a form for share prices;
+empty sends none, so the rows are Rust's default ladder, and Rust sorts, dedupes and
+rejects what is entered. No range rule lives here. Regime is Rust's, from the hedge
+ratio on the 40 and 80 delta bands, and is null with the hedge ratio on a
+mandatory-variable bond, which shows as "Undefined". Column units are what
+`metricMetadata` declares for `ladderMetrics`. The default ladder prices 8 rows on the
+200-step tree in milliseconds, so the workbench panel prices on opening the tab, unlike
+the bond cards. `oas` and `implied_vol` need a quoted clean price and `cs01` a hazard
+curve with a calibration recipe; the native fixture is
+`tests/valuations/convertible/cases.json`.
 
 ## Yield workout ladder
 

@@ -24,6 +24,7 @@ import {
 import { DealPresetPanel } from "./deal-preset-panel";
 import { StructuredCreditPanel } from "./structured-credit-panel";
 import { BondPanel } from "./bond-panel";
+import { ConvertiblePanel } from "./convertible-panel";
 import { LoanPanel } from "./loan-panel";
 import { CalibrationPanel } from "./calibration-panel";
 import {
@@ -55,7 +56,11 @@ const analyticsPanels: Readonly<
       density?: "compact" | "comfortable";
     }>
   >
-> = { bond: BondPanel, term_loan: LoanPanel };
+> = {
+  bond: BondPanel,
+  convertible_bond: ConvertiblePanel,
+  term_loan: LoanPanel,
+};
 export function PricingWorkbench({
   defaultRequest,
   density = "compact",

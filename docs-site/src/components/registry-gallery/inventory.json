@@ -193,6 +193,12 @@
       "worker": "none"
     },
     {
+      "name": "convertible-card",
+      "type": "registry:component",
+      "docs": "Answers how a convertible moves with its stock. Present a native valuations.instruments.convertibleSpotLadder result (useConvertibleSpotLadder) as a chart of price, conversion value and floor with each regime Rust returned, a chart of parity and premium, and a row per share price with delta, hedge ratio, regime, parity and premium, with metric ids through metric-values-table. The share prices are the ones entered through onSpotsChange or Rust's default ladder. Pass metricMetadata of ladderMetrics for the column units. A null hedge ratio, regime or premium shows as undefined. Nothing is classified, compared or derived. Accepts ladder, ladderMetadata, ladderLoading, ladderError, onSpotsChange, rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "quote-converter",
       "type": "registry:component",
       "docs": "Answers what a bond's other quotes are given any one of them. Offers the quote kinds of the BondQuoteInput schema and presents a native valuations.instruments.computeQuotes result (useComputeQuotes) in Rust's field order. Pass native bondQuoteSetFieldUnits (useBondQuoteSetFieldUnits) for the units. A null field shows as no value, never zero. A quote that cannot be solved, a kind the bond does not have or one metric of the set failing, shows the native error as returned. Nothing is converted or compared. Accepts defaultInput, onSubmit, quotes, units, loading, error, formatValue and density props; no worker or query provider required.",
@@ -658,6 +664,10 @@
     },
     {
       "name": "use-market-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-convertible-spot-ladder",
       "type": "registry:hook"
     },
     {
@@ -1573,6 +1583,10 @@
     {
       "path": "finstack-quant-ui/tests/valuations/bond-credit/cases.json",
       "sha256": "3762c12398f7d46330aee268809ace86c04643fc05f13e39baa1a1764eb1f6ed"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/convertible/cases.json",
+      "sha256": "b9dbee02f7dfb319aaaca401c183f2d0b88c5e877fc51a668b7406c5fdeffa0b"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/workout-ladder/cases.json",
