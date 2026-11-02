@@ -738,6 +738,48 @@ pub fn pool_report_field_units(currency: Currency) -> PoolReportFieldUnits {
     }
 }
 
+/// Units of the `BondQuoteSet` fields, in the order the struct declares them, the
+/// one place a host reads them from.
+///
+/// The set mixes currency prices, a percent-of-par price and decimal yields and
+/// spreads. Each field with a metric states that metric's [`MetricId::unit`], and
+/// `clean_price_pct`, which has none, states its quote convention. Values are never
+/// rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The currency of the bond whose set is being labelled; it names
+///   the unit of `clean_price_currency` and `dirty_price_currency`.
+///
+/// # Returns
+///
+/// One record per field of `BondQuoteSet`.
+pub fn bond_quote_set_field_units(currency: Currency) -> Vec<MetricFieldUnit> {
+    let currency = currency.to_string();
+    [
+        ("clean_price_currency", currency.as_str()),
+        ("clean_price_pct", "% of par"),
+        ("dirty_price_currency", currency.as_str()),
+        ("ytm", "decimal"),
+        ("ytw", "decimal"),
+        ("z_spread", "decimal"),
+        ("discount_margin", "decimal"),
+        ("oas", "decimal"),
+        ("asw_par", "decimal"),
+        ("asw_market", "decimal"),
+        ("i_spread", "decimal"),
+        ("japanese_simple_yield", "decimal"),
+        ("moosmuller_ytm", "decimal"),
+    ]
+    .into_iter()
+    .map(|(field, label)| MetricFieldUnit {
+        field: field.to_string(),
+        label: label.to_string(),
+        source: format!("valuations::BondQuoteSet::{field}"),
+    })
+    .collect()
+}
+
 /// Units of the charted `SimulationDiagnostics` series, which do not appear on the wire.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -1297,6 +1339,75 @@ mod tests {
         assert_eq!(at(""), (String::new(), None));
         // A word that f64::from_str reads as a number is still text.
         assert_eq!(at("inf"), ("inf".to_string(), None));
+    }
+
+    fn bond_quote_set(
+    ) -> crate::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteSet {
+        use crate::instruments::fixed_income::bond::pricing::quote_conversions::compute_quotes;
+        use crate::instruments::fixed_income::bond::Bond;
+        use crate::instruments::{BondQuoteInput, PricingOptions};
+        use finstack_quant_core::market_data::context::MarketContext;
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+        let bond = Bond::example().expect("bond");
+        let as_of = bond.issue_date;
+        let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (10.0, 0.70)])
+            .build()
+            .expect("curve");
+        compute_quotes(
+            &bond,
+            &MarketContext::new().insert(curve),
+            as_of,
+            BondQuoteInput::CleanPricePct(98.5),
+            PricingOptions::default(),
+        )
+        .expect("set")
+    }
+
+    #[test]
+    fn bond_quote_set_field_units_list_every_field_in_struct_order() {
+        // Text, not a Value: a struct writes its fields in the order it declares them.
+        let wire = serde_json::to_string(&bond_quote_set()).expect("serialize");
+        let keys: Value = serde_json::from_str(&wire).expect("parse");
+        let units = bond_quote_set_field_units(Currency::EUR);
+        assert_eq!(units.len(), keys.as_object().expect("object").len());
+        let positions: Vec<usize> = units
+            .iter()
+            .map(|unit| {
+                wire.find(&format!("\"{}\":", unit.field))
+                    .unwrap_or_else(|| panic!("{} is on the wire", unit.field))
+            })
+            .collect();
+        assert!(positions.is_sorted(), "struct order: {positions:?}");
+        assert_eq!(units[0].label, "EUR");
+        assert_eq!(units[1].label, "% of par");
+        assert_eq!(units[1].source, "valuations::BondQuoteSet::clean_price_pct");
+    }
+
+    #[test]
+    fn bond_quote_set_field_units_agree_with_metric_metadata() {
+        let units = bond_quote_set_field_units(Currency::EUR);
+        let mut checked = 0;
+        for unit in &units {
+            let metric = match unit.field.as_str() {
+                "clean_price_pct" => continue,
+                "clean_price_currency" => "clean_price",
+                "dirty_price_currency" => "dirty_price",
+                field => field,
+            };
+            let metadata = metric_metadata(&[metric.to_string()]).expect("metadata");
+            let declared = metadata[0].unit;
+            let expected = match declared {
+                crate::metrics::MetricUnit::Currency => "EUR",
+                other => other.as_str(),
+            };
+            assert_eq!(unit.label, expected, "{metric}: {declared:?}");
+            checked += 1;
+        }
+        // Every field but clean_price_pct has a metric.
+        assert_eq!(checked, units.len() - 1);
     }
 
     #[test]

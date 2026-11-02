@@ -1239,6 +1239,10 @@ export interface ValuationsApi {
   equityMetricsFieldUnits(
     currency: string,
   ): Promise<Envelope<EquityMetricsFieldUnits>>;
+  /** valuations.instruments.bondQuoteSetFieldUnits: units of a quote set's fields. */
+  bondQuoteSetFieldUnits(
+    currency: string,
+  ): Promise<Envelope<MetricFieldUnit[]>>;
   /** valuations.instruments.poolReportFieldUnits: units of a pool report's fields. */
   poolReportFieldUnits(
     currency: string,

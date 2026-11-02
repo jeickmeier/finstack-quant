@@ -22,6 +22,7 @@ export const instruments = {
   metricsForInstrument: wasm.metricsForInstrument,
   priceDriverFields: wasm.priceDriverFields,
   poolReportFieldUnits: wasm.poolReportFieldUnits,
+  bondQuoteSetFieldUnits: wasm.bondQuoteSetFieldUnits,
   scenarioTableFieldUnits: wasm.scenarioTableFieldUnits,
   simulationFieldUnits: wasm.simulationFieldUnits,
   equityMetricsFieldUnits: wasm.equityMetricsFieldUnits,

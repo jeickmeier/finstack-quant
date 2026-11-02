@@ -31,6 +31,7 @@ export type ValuationsNative = {
       | "computeQuotes"
       | "poolReport"
       | "poolReportFieldUnits"
+      | "bondQuoteSetFieldUnits"
       | "standardDealFamilies"
     >;
   };
@@ -282,6 +283,8 @@ export function createValuationsService(
       context.result(() => instruments.simulationFieldUnits(currency)),
     equityMetricsFieldUnits: (currency) =>
       context.result(() => instruments.equityMetricsFieldUnits(currency)),
+    bondQuoteSetFieldUnits: (currency) =>
+      context.result(() => instruments.bondQuoteSetFieldUnits(currency)),
     poolReportFieldUnits: (currency) =>
       context.result(() => instruments.poolReportFieldUnits(currency)),
     trancheSolveFieldUnits: () =>

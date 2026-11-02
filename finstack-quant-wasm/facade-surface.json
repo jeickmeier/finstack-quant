@@ -4556,6 +4556,7 @@
       "assetPoolWeightedAvgSpreadBp",
       "assetPoolWithReserve",
       "bondFromCashflowsJson",
+      "bondQuoteSetFieldUnits",
       "bondWorkoutLadder",
       "calculatePoolStats",
       "calculateVar",
@@ -4845,6 +4846,9 @@
     "kind": "function"
   },
   "valuations.instruments.poolReportFieldUnits": {
+    "kind": "function"
+  },
+  "valuations.instruments.bondQuoteSetFieldUnits": {
     "kind": "function"
   },
   "valuations.instruments.scenarioTableFieldUnits": {

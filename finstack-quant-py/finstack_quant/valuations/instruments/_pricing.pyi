@@ -562,6 +562,41 @@ def standard_deal_families() -> list[dict[str, Any]]:
     """
     ...
 
+def bond_quote_set_field_units(currency: str | Currency) -> list[dict[str, str]]:
+    """
+    Units of the :class:`BondQuoteSet` fields, in struct order, the one place a host reads them from.
+
+    The set mixes currency prices, a percent-of-par price and decimal yields and
+    spreads. Each field with a metric states that metric's unit, and
+    ``clean_price_pct``, which has none, states its quote convention. Values are never
+    rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        Currency of the bond whose set is being labelled, an ISO-4217 code in any ASCII
+        case or a ``Currency``. It names the unit of ``clean_price_currency`` and
+        ``dirty_price_currency``.
+
+    Returns
+    -------
+    list[dict[str, str]]
+        One record per field: ``field``, its wire name; ``label``, its unit text; and
+        ``source``, the Rust field the unit is documented on.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import bond_quote_set_field_units
+    >>> [(unit["field"], unit["label"]) for unit in bond_quote_set_field_units("USD")][:4]
+    [('clean_price_currency', 'USD'), ('clean_price_pct', '% of par'), ('dirty_price_currency', 'USD'), ('ytm', 'decimal')]
+    """
+    ...
+
 def pool_report_field_units(currency: str | Currency) -> dict[str, Any]:
     """
     Units of the :class:`PoolReport` fields, the one place a host reads them from.

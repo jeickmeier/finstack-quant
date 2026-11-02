@@ -6,7 +6,7 @@ import {
 
 import data from "./data.json";
 // The set is the supplied native fixture: the item installs without a worker.
-const { cases, metadata } = data.quoteConverter;
+const { cases, units } = data.quoteConverter;
 export function InstalledItem() {
   return (
     <>
@@ -17,7 +17,7 @@ export function InstalledItem() {
         }
         onSubmit={() => {}}
         quotes={cases.clean.quotes as QuoteConverterProps["quotes"]}
-        metadata={metadata as QuoteConverterProps["metadata"]}
+        units={units as QuoteConverterProps["units"]}
       />
     </>
   );

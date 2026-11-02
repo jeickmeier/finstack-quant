@@ -14,6 +14,7 @@ const read = async (path) =>
   JSON.parse(await readFile(new URL(path, repository), "utf8"));
 const [bullet, baseMarket] = await Promise.all(paths.map(read));
 const marketJson = JSON.stringify(baseMarket);
+const currency = bullet.instrument.spec.notional.currency;
 const asOf = "2024-07-15";
 const withSpec = (bond, spec) => ({
   ...bond,
@@ -147,20 +148,8 @@ await emit(
     description:
       "Native computeQuotes results of fixed, callable and floating bonds, each with what priceInstrument measures at its clean price, and the native errors of quotes that cannot be solved.",
     sources,
-    metadata: native.metricMetadata([
-      "clean_price",
-      "dirty_price",
-      "ytm",
-      "ytw",
-      "z_spread",
-      "discount_margin",
-      "oas",
-      "asw_par",
-      "asw_market",
-      "i_spread",
-      "japanese_simple_yield",
-      "moosmuller_ytm",
-    ]),
+    currency,
+    units: native.bondQuoteSetFieldUnits(currency),
     errors,
     cases,
   }),

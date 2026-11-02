@@ -128,6 +128,7 @@
     "statements_analytics.varianceBridge",
     "valuations.instruments.Bond",
     "valuations.instruments.StructuredCredit",
+    "valuations.instruments.bondQuoteSetFieldUnits",
     "valuations.instruments.bondWorkoutLadder",
     "valuations.instruments.calendarYearLadderByCurrency",
     "valuations.instruments.computeQuotes",

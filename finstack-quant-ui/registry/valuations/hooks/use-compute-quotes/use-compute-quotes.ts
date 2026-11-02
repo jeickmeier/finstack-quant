@@ -30,3 +30,20 @@ export function useComputeQuotes(request: ComputeQuotesRequest | null) {
     computeQuotesOptions(worker.client, worker.session, request),
   );
 }
+/** Native units of a quote set's fields for the bond's currency. Null disables the call. */
+export function useBondQuoteSetFieldUnits(currency: string | null) {
+  return useWorkerQuery((worker) =>
+    workerQueryOptions({
+      client: worker.client,
+      queryKey: [
+        "finstack",
+        worker.session,
+        "bondQuoteSetFieldUnits",
+        currency,
+      ] as const,
+      ready: currency !== null,
+      missing: "Quote set units require a currency and ready worker",
+      queryFn: (ready) => ready.call("bondQuoteSetFieldUnits", currency!),
+    }),
+  );
+}
