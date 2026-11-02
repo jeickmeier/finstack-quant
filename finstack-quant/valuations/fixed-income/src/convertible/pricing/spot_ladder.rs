@@ -146,9 +146,9 @@ pub struct ConvertibleSpotLadder {
 ///
 /// Returns a validation error when `spots` is empty or holds a value that is not
 /// finite and positive, when the market's share price is not positive and `spots`
-/// is `None`, or when the bond fails validation or a share price leaves the tree
-/// with no finite value. Market data the bond needs and the market lacks is a
-/// not-found error, a share price in another currency a currency mismatch.
+/// is `None`, or when the bond fails validation. Market data the bond needs and the
+/// market lacks is a not-found error, a share price in another currency a currency
+/// mismatch, and a share price or value too large for `Money` a conversion error.
 ///
 /// # References
 ///
@@ -447,6 +447,12 @@ mod tests {
                 .expect_err("rejected");
             assert!(matches!(error, Error::Validation(_)), "{spots:?}: {error}");
         }
+    }
+
+    /// A price too large for `Money` errors, so no row carries a non-finite number.
+    #[test]
+    fn share_price_with_no_representable_value_is_an_error() {
+        assert!(convertible_spot_ladder(&bond(), &market(), AS_OF, Some(&[1e300])).is_err());
     }
 
     #[test]
