@@ -82,6 +82,8 @@ const ids = [
   "oid_eir_rate",
   "oid_eir_amortization",
   "embedded_option_value",
+  "recovery01",
+  "jump_to_default",
 ];
 function metricValues(request) {
   return request.metrics.map((metric) => {
@@ -138,8 +140,14 @@ const cases = {
   modelTree: card("term_loan", callable, "tree"),
   // A fixed loan has no discount margin.
   fixed: card("term_loan", termLoan, "discounting"),
-  // Rust lists five of the card's ids for a revolver.
+  // Rust lists seven of the card's ids for a revolver.
   revolver: card("revolving_credit", revolver, "discounting"),
+  // A credit curve under the tree model prices on it, so the default-risk ids price.
+  hazard: card(
+    "term_loan",
+    withSpec(termLoan, { credit_curve_id: "ACME-HAZARD" }),
+    "tree",
+  ),
 };
 // What one failing id does to a request naming several: the whole call fails.
 let wholeRequestError = null;

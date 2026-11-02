@@ -57,6 +57,49 @@ fn b11_quote_set_propagates_applicable_metric_failure() {
     );
 }
 
+#[test]
+fn quote_set_reports_a_non_finite_metric_as_none() {
+    struct Fixed(f64);
+    impl MetricCalculator for Fixed {
+        fn calculate(&self, _: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+            Ok(self.0)
+        }
+    }
+    let bond = Bond::example().expect("bond");
+    let as_of = bond.issue_date;
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder(bond.discount_curve_id.as_str())
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (20.0, 0.5)])
+            .build()
+            .expect("curve"),
+    );
+    let mut metrics = crate::FIXED_INCOME.metrics().clone();
+    for (id, value) in [
+        (MetricId::Ytw, f64::NEG_INFINITY),
+        (MetricId::JapaneseSimpleYield, f64::INFINITY),
+        (MetricId::MoosmullerYtm, f64::NAN),
+    ] {
+        metrics.replace_metric(id, Arc::new(Fixed(value)), &[InstrumentType::Bond]);
+    }
+    let quotes = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::CleanPricePct(100.0),
+        PricingOptions::default().with_metric_registry(Arc::new(metrics)),
+    )
+    .expect("set");
+    assert_eq!(quotes.ytw, None);
+    assert_eq!(quotes.japanese_simple_yield, None);
+    assert_eq!(quotes.moosmuller_ytm, None);
+    assert!(quotes.ytm.is_some());
+    // JSON has no infinity: what crosses the wire reads back the same.
+    let wire = serde_json::to_string(&quotes).expect("to json");
+    let back: BondQuoteSet = serde_json::from_str(&wire).expect("from json");
+    assert_eq!(back, quotes);
+}
+
 struct LinearTreeOasPricer {
     call_dates: Arc<Mutex<Vec<Date>>>,
 }

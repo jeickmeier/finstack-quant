@@ -83,7 +83,13 @@
       "theta_period_days",
       "theta_roll_down"
     ],
-    "Credit": ["bucketed_cs01", "cs01", "expected_loss"],
+    "Credit": [
+      "bucketed_cs01",
+      "cs01",
+      "expected_loss",
+      "jump_to_default",
+      "recovery01"
+    ],
     "Greeks": ["cross_gamma_rates_credit", "vega"],
     "Pricing": [
       "accrued",
@@ -96,6 +102,7 @@
       "duration_mac",
       "duration_mod",
       "embedded_option_value",
+      "g_spread",
       "i_spread",
       "japanese_simple_yield",
       "moic",

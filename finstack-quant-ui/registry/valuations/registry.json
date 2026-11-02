@@ -2,16 +2,16 @@
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "items": [
     {
-      "name": "loan-yield-card",
+      "name": "metric-values-table",
       "type": "registry:component",
-      "title": "Loan yield card",
-      "description": "Yields, discount margin, all-in rate, OID and the call value of a loan by metric id, as Rust returned them, with each id's own native error.",
-      "docs": "Shows the metric ids a loan analyst reads together: ytm, ytw, ytc, yt2y, yt3y, yt4y, discount_margin, all_in_rate, oid_eir_rate, oid_eir_amortization and embedded_option_value. applicableLoanYieldMetrics keeps those Rust lists for the instrument type (metricsForInstrument); pass the result to useMetricValues, which prices each id on its own call because one failing id fails a whole native request, and useMetricMetadata for units and groups. An id Rust rejects (embedded_option_value without the tree model, discount_margin on a fixed loan or on a callable loan without a quote) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. Unit shows what metricMetadata declares and says not declared otherwise; values are never rescaled. Accepts rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "title": "Metric values table",
+      "description": "Metric ids as Rust returned them, each with its own native error, its declared unit and its group.",
+      "docs": "The table the metric-id cards share. Draws useMetricValues rows in the supplied order with labelFor labels; an id Rust rejects shows its native error in its own row and leaves the others, and a whole-request error replaces the table. Unit and group are what metricMetadata declares; a unit it leaves unknown says not declared, and values are never rescaled. applicableMetrics keeps the supplied ids Rust lists for an instrument type (metricsForInstrument). Accepts label, rows, metadata, loading, error, formatValue, density and note props; no worker or query provider required.",
       "files": [
         {
-          "path": "components/loan-yield-card/loan-yield-card.tsx",
+          "path": "components/metric-values-table/metric-values-table.tsx",
           "type": "registry:component",
-          "target": "components/finstack/valuations/components/loan-yield-card/loan-yield-card.tsx"
+          "target": "components/finstack/valuations/components/metric-values-table/metric-values-table.tsx"
         }
       ],
       "registryDependencies": [
@@ -31,6 +31,251 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "bond-credit-card",
+      "type": "registry:component",
+      "title": "Bond credit card",
+      "description": "Spreads, option value, durations, default risk, carry and breakeven of a bond by metric id, as Rust returned them, with each id's own native error.",
+      "docs": "Shows z_spread, i_spread, g_spread, oas, asw_par, asw_market, discount_margin, embedded_option_value, duration_mod, duration_mac, convexity, dv01, cs01, recovery01, jump_to_default, theta, theta_carry, theta_roll_down, carry_total, coupon_income, pull_to_par, roll_down, funding_cost, theta_period_days and breakeven. applicableMetrics keeps those Rust lists for the instrument type; pass the result to useMetricValues and useMetricMetadata. An id Rust rejects (g_spread with no government curve named, recovery01 and jump_to_default off a hazard curve, breakeven with no config, oas with no quote) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. With onOverridesChange it offers the schema's form for theta_period and breakeven_config over the supplied MetricPricingOverrides, keeping the fields it does not edit: pass the applied JSON as the request's metricPricingOverrides. Accepts rows, metadata, loading, error, formatValue, density, overrides and onOverridesChange props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/bond-credit-card/bond-credit-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/bond-credit-card/bond-credit-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/metric-values-table",
+        "@finstack/pricing-params-form",
+        "@finstack/schema-form"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "loan-yield-card",
+      "type": "registry:component",
+      "title": "Loan yield card",
+      "description": "Yields, discount margin, all-in rate, OID, the call value and default risk of a loan by metric id, as Rust returned them, with each id's own native error.",
+      "docs": "Shows the metric ids a loan analyst reads together: ytm, ytw, ytc, yt2y, yt3y, yt4y, discount_margin, all_in_rate, oid_eir_rate, oid_eir_amortization, embedded_option_value, recovery01 and jump_to_default. applicableMetrics from metric-values-table keeps those Rust lists for the instrument type (metricsForInstrument); pass the result to useMetricValues, which prices each id on its own call because one failing id fails a whole native request, and useMetricMetadata for units and groups. An id Rust rejects (embedded_option_value without the tree model, discount_margin on a fixed loan or on a callable loan without a quote, recovery01 and jump_to_default without a credit curve under the tree model) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. Unit shows what metricMetadata declares and says not declared otherwise; values are never rescaled. Accepts rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/loan-yield-card/loan-yield-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/loan-yield-card/loan-yield-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/metric-values-table"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "yield-workout-ladder",
+      "type": "registry:component",
+      "title": "Yield workout ladder",
+      "description": "Shows the yield and I-spread to every call, put and maturity exit of a bond, with the row Rust marks as the worst workout.",
+      "docs": "Answers which call date is the worst workout and what the yield to each is. Present a native valuations.instruments.bondWorkoutLadder result (useBondWorkoutLadder): the one price every exit is solved at, then one row per exit in Rust's date order with its redemption, yield, I-spread and the mark on the row is_worst names, the exit the ytw metric selects. Pass metricMetadata of workoutLadderMetrics for the yield and spread units. A null yield shows as no yield, never zero. A bond with exercise rights needs quoted_clean_price_pct; the native error is shown as returned. Nothing is compared, sorted or derived. Accepts ladder, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/yield-workout-ladder/yield-workout-ladder.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/yield-workout-ladder/yield-workout-ladder.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "convertible-card",
+      "type": "registry:component",
+      "title": "Convertible card",
+      "description": "Shows a convertible's price, parity, bond floor, conversion premium and regime by share price, and its metrics by id.",
+      "docs": "Answers how a convertible moves with its stock. Present a native valuations.instruments.convertibleSpotLadder result (useConvertibleSpotLadder) as a chart of price, conversion value and floor with each regime Rust returned, a chart of parity and premium, and a row per share price with delta, hedge ratio, regime, parity and premium, with metric ids through metric-values-table. The share prices are the ones entered through onSpotsChange or Rust's default ladder. Pass metricMetadata of ladderMetrics for the column units. A null hedge ratio, regime or premium shows as undefined. Nothing is classified, compared or derived. Accepts ladder, ladderMetadata, ladderLoading, ladderError, onSpotsChange, rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/convertible-card/convertible-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/convertible-card/convertible-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/metric-values-table",
+        "button",
+        "input"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-convertible-spot-ladder",
+      "type": "registry:hook",
+      "title": "useConvertibleSpotLadder",
+      "description": "Values a convertible at a ladder of share prices through the WASM worker.",
+      "docs": "valuations.instruments.ConvertibleBond.fromJson then convertibleSpotLadder for the supplied instrument, market, date and share prices, the handle freed afterwards. Null means no request; null spots is Rust's default ladder. Requires FinstackQueryProvider. A share price Rust rejects, or missing market data, is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-convertible-spot-ladder/use-convertible-spot-ladder.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-convertible-spot-ladder/use-convertible-spot-ladder.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-bond-workout-ladder",
+      "type": "registry:hook",
+      "title": "useBondWorkoutLadder",
+      "description": "Solves the yield and I-spread to every exit of a bond through the WASM worker.",
+      "docs": "valuations.instruments.Bond.fromJson then bondWorkoutLadder for the supplied instrument, market and date, the handle freed afterwards. Null means no request. Requires FinstackQueryProvider. A bond with exercise rights and no quoted clean price, or a missing curve, is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-bond-workout-ladder/use-bond-workout-ladder.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-bond-workout-ladder/use-bond-workout-ladder.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "quote-converter",
+      "type": "registry:component",
+      "title": "Quote converter",
+      "description": "Enter any one quote of a bond and see the whole price, yield and spread set Rust returns for it.",
+      "docs": "Answers what a bond's other quotes are given any one of them. Offers the quote kinds of the BondQuoteInput schema and presents a native valuations.instruments.computeQuotes result (useComputeQuotes) in Rust's field order. Pass native bondQuoteSetFieldUnits (useBondQuoteSetFieldUnits) for the units. A null field shows as no value, never zero. A quote that cannot be solved, a kind the bond does not have or one metric of the set failing, shows the native error as returned. Nothing is converted or compared. Accepts defaultInput, onSubmit, quotes, units, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/quote-converter/quote-converter.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/quote-converter/quote-converter.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/primitive-contracts",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "button"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-compute-quotes",
+      "type": "registry:hook",
+      "title": "useComputeQuotes",
+      "description": "Solves a bond's whole quote set from any one quote through the WASM worker.",
+      "docs": "valuations.instruments.Bond.fromJson then computeQuotes for the supplied instrument, market, date and quote, the handle freed afterwards. Null means no request. useBondQuoteSetFieldUnits calls bondQuoteSetFieldUnits for a currency; null disables it. Requires FinstackQueryProvider. A quote that cannot be solved, or a missing curve, is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-compute-quotes/use-compute-quotes.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-compute-quotes/use-compute-quotes.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -365,6 +610,11 @@
           "path": "components/pricing-params-form/pricing-params-form.tsx",
           "type": "registry:component",
           "target": "components/finstack/valuations/components/pricing-params-form/pricing-params-form.tsx"
+        },
+        {
+          "path": "components/pricing-params-form/metric-overrides.ts",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/pricing-params-form/metric-overrides.ts"
         }
       ],
       "registryDependencies": [
@@ -751,8 +1001,8 @@
       "name": "pricing-workbench",
       "type": "registry:block",
       "title": "Pricing workbench",
-      "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows, tranche analytics and scenarios.",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, an equity tranche card over native equityMetrics, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
+      "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows, bond and loan analytics, tranche analytics and scenarios.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, an equity tranche card over native equityMetrics, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. A priced bond adds an Analytics tab with bond-credit-card, yield-workout-ladder and quote-converter, each opening on its own over the completed request; a priced term loan adds one with loan-yield-card. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "files": [
         {
           "path": "blocks/pricing-workbench/pricing-workbench.tsx",
@@ -793,6 +1043,31 @@
           "path": "blocks/pricing-workbench/deal-preset-form.tsx",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/deal-preset-form.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/lazy-section.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/lazy-section.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/instrument-metrics.ts",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/instrument-metrics.ts"
+        },
+        {
+          "path": "blocks/pricing-workbench/bond-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/bond-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/convertible-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/convertible-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/loan-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/loan-panel.tsx"
         },
         {
           "path": "blocks/pricing-workbench/structured-credit-panel.tsx",
@@ -901,6 +1176,17 @@
         "@finstack/use-list-builtin-template-metadata",
         "@finstack/use-build-from-template",
         "@finstack/use-build-template-component",
+        "@finstack/bond-credit-card",
+        "@finstack/convertible-card",
+        "@finstack/loan-yield-card",
+        "@finstack/metric-values-table",
+        "@finstack/yield-workout-ladder",
+        "@finstack/quote-converter",
+        "@finstack/use-metric-values",
+        "@finstack/use-bond-workout-ladder",
+        "@finstack/use-convertible-spot-ladder",
+        "@finstack/use-compute-quotes",
+        "@finstack/primitive-contracts",
         "@finstack/use-compose-scenarios",
         "@finstack/use-apply-market-scenario",
         "@finstack/horizon-return-report",

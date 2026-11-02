@@ -1,7 +1,8 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useDealTranches } from "@/hooks/valuations/use-tranche-analytics/use-tranche-analytics";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
+import { LazySection } from "./lazy-section";
 import { ScenarioPanel } from "./scenario-panel";
 import { scenarioGridModule } from "./scenario-grid";
 import { PoolPanel } from "./pool-panel";
@@ -10,22 +11,6 @@ import { WaterfallPanel } from "./waterfall-panel";
 import { CoveragePanel } from "./coverage-panel";
 import { EnhancementPanel } from "./enhancement-panel";
 import { EquityPanel } from "./equity-panel";
-/** A disclosure whose content, and so its native calls, mounts when first opened. */
-function DealSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>{title}</summary>
-      {open && children}
-    </details>
-  );
-}
 /**
  * Shows the completed deal's pool and waterfall reports, coverage tests, enhancement and equity tranche, selects one of its native tranches and
  * shows that tranche's analytics and scenarios. The host's seeds are optional: with no seed the selection is the first
@@ -70,7 +55,7 @@ export function StructuredCreditPanel({
   const selected = { ...request, trancheId };
   return (
     <div className="flex flex-col gap-3">
-      <DealSection title="Pool report">
+      <LazySection title="Pool report">
         <PoolPanel
           request={{
             instrumentJson: request.instrumentJson,
@@ -78,19 +63,19 @@ export function StructuredCreditPanel({
           }}
           density={density}
         />
-      </DealSection>
-      <DealSection title="Waterfall report">
+      </LazySection>
+      <LazySection title="Waterfall report">
         <WaterfallPanel request={request} density={density} />
-      </DealSection>
-      <DealSection title="Coverage tests">
+      </LazySection>
+      <LazySection title="Coverage tests">
         <CoveragePanel request={request} density={density} />
-      </DealSection>
-      <DealSection title="Credit enhancement and excess spread">
+      </LazySection>
+      <LazySection title="Credit enhancement and excess spread">
         <EnhancementPanel request={request} density={density} />
-      </DealSection>
-      <DealSection title="Equity tranche">
+      </LazySection>
+      <LazySection title="Equity tranche">
         <EquityPanel request={request} density={density} />
-      </DealSection>
+      </LazySection>
       <div className="w-72">
         <EnumField
           label="Tranche"

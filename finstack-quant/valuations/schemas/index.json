@@ -10,6 +10,15 @@
       "type_name": "Attributes"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/common/1/bond_quote_input.schema.json",
+      "bytes": 3919,
+      "kind": "input",
+      "path": "schemas/common/1/bond_quote_input.schema.json",
+      "summary": "The one market quote a bond's quote set is solved from: a price, a yield or a spread.",
+      "title": "BondQuoteInput",
+      "type_name": "BondQuoteInput"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
       "bytes": 1989,
       "kind": "component",
@@ -119,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-      "bytes": 63148,
+      "bytes": 63588,
       "kind": "component",
       "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
       "summary": "Instrument-owned market quote and model configuration overrides.",
@@ -955,6 +964,24 @@
       "type_name": "SingleInstrumentEnvelope"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/bond_quote_set.schema.json",
+      "bytes": 3894,
+      "kind": "output",
+      "path": "schemas/results/1/bond_quote_set.schema.json",
+      "summary": "Every price, yield and spread quote of a bond, solved from any one of them.",
+      "title": "BondQuoteSet",
+      "type_name": "BondQuoteSet"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/bond_workout_ladder.schema.json",
+      "bytes": 6921,
+      "kind": "output",
+      "path": "schemas/results/1/bond_workout_ladder.schema.json",
+      "summary": "Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked.",
+      "title": "BondWorkoutLadder",
+      "type_name": "BondWorkoutLadder"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/borrowing_base_report.schema.json",
       "bytes": 1382,
       "kind": "output",
@@ -989,6 +1016,15 @@
       "summary": "Tree price and Greeks of a convertible bond.",
       "title": "ConvertibleGreeks",
       "type_name": "ConvertibleGreeks"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/convertible_spot_ladder.schema.json",
+      "bytes": 6472,
+      "kind": "output",
+      "path": "schemas/results/1/convertible_spot_ladder.schema.json",
+      "summary": "Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices.",
+      "title": "ConvertibleSpotLadder",
+      "type_name": "ConvertibleSpotLadder"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/currency_ladder.schema.json",

@@ -1,0 +1,127 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/results/1/bond_quote_set.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Every price, yield and spread quote of a bond, solved from any one of them.",
+  "examples": [
+    {
+      "asw_market": 0.0082390205739,
+      "asw_par": 0.00648458998161,
+      "clean_price_currency": 985000.0,
+      "clean_price_pct": 98.5,
+      "dirty_price_currency": 985116.758242,
+      "discount_margin": null,
+      "i_spread": 0.00833586693883,
+      "japanese_simple_yield": 0.0446692167841,
+      "moosmuller_ytm": 0.0443737390981,
+      "oas": 0.00816585226782,
+      "ytm": 0.0443512769572,
+      "ytw": 0.0443512769572,
+      "z_spread": 0.00832977967677
+    }
+  ],
+  "properties": {
+    "asw_market": {
+      "description": "Asset swap market spread (decimal). `None` under the same rule as\n`asw_par`, including on a plain floating-rate note, which the `asw_market`\nmetric alone would still value.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "asw_par": {
+      "description": "Asset swap par spread (decimal). `None` unless the bond has a fixed coupon\nand no custom cashflows, or custom cashflows with a floating specification.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "clean_price_currency": {
+      "description": "Clean price in the bond's currency, for its whole notional.",
+      "format": "double",
+      "type": "number"
+    },
+    "clean_price_pct": {
+      "description": "Clean price as percentage of par (`99.5` = 99.5%, the quote convention).",
+      "format": "double",
+      "type": "number"
+    },
+    "dirty_price_currency": {
+      "description": "Dirty price at the quote date in the bond's currency, for its whole\nnotional: clean price plus accrued interest to the quote date.",
+      "format": "double",
+      "type": "number"
+    },
+    "discount_margin": {
+      "description": "Discount margin (decimal). `None` unless the bond has floating coupons.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "i_spread": {
+      "description": "I-spread (decimal): the yield less the swap par rate. On a bond with\nexercise rights the yield and horizon are the worst exit's.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "japanese_simple_yield": {
+      "description": "Japanese simple yield (単利, decimal). `None` unless the coupon is fixed.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "moosmuller_ytm": {
+      "description": "Moosmüller yield to maturity (decimal): simple interest to the next\ncoupon, then periodic compounding.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "oas": {
+      "description": "Option-adjusted spread (decimal), from the bond's tree model.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "ytm": {
+      "description": "Street yield to maturity (decimal), compounded at the coupon frequency.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "ytw": {
+      "description": "Yield to worst across every call, put and maturity exit (decimal).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "z_spread": {
+      "description": "Z-spread over the discount curve (decimal). On a bond with exercise\nrights it discounts the worst exit's flows.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "clean_price_currency",
+    "clean_price_pct",
+    "dirty_price_currency"
+  ],
+  "title": "BondQuoteSet",
+  "type": "object"
+}

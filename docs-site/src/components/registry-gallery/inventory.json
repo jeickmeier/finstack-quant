@@ -169,9 +169,39 @@
       "worker": "none"
     },
     {
+      "name": "metric-values-table",
+      "type": "registry:component",
+      "docs": "The table the metric-id cards share. Draws useMetricValues rows in the supplied order with labelFor labels; an id Rust rejects shows its native error in its own row and leaves the others, and a whole-request error replaces the table. Unit and group are what metricMetadata declares; a unit it leaves unknown says not declared, and values are never rescaled. applicableMetrics keeps the supplied ids Rust lists for an instrument type (metricsForInstrument). Accepts label, rows, metadata, loading, error, formatValue, density and note props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "bond-credit-card",
+      "type": "registry:component",
+      "docs": "Shows z_spread, i_spread, g_spread, oas, asw_par, asw_market, discount_margin, embedded_option_value, duration_mod, duration_mac, convexity, dv01, cs01, recovery01, jump_to_default, theta, theta_carry, theta_roll_down, carry_total, coupon_income, pull_to_par, roll_down, funding_cost, theta_period_days and breakeven. applicableMetrics keeps those Rust lists for the instrument type; pass the result to useMetricValues and useMetricMetadata. An id Rust rejects (g_spread with no government curve named, recovery01 and jump_to_default off a hazard curve, breakeven with no config, oas with no quote) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. With onOverridesChange it offers the schema's form for theta_period and breakeven_config over the supplied MetricPricingOverrides, keeping the fields it does not edit: pass the applied JSON as the request's metricPricingOverrides. Accepts rows, metadata, loading, error, formatValue, density, overrides and onOverridesChange props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "loan-yield-card",
       "type": "registry:component",
-      "docs": "Shows the metric ids a loan analyst reads together: ytm, ytw, ytc, yt2y, yt3y, yt4y, discount_margin, all_in_rate, oid_eir_rate, oid_eir_amortization and embedded_option_value. applicableLoanYieldMetrics keeps those Rust lists for the instrument type (metricsForInstrument); pass the result to useMetricValues, which prices each id on its own call because one failing id fails a whole native request, and useMetricMetadata for units and groups. An id Rust rejects (embedded_option_value without the tree model, discount_margin on a fixed loan or on a callable loan without a quote) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. Unit shows what metricMetadata declares and says not declared otherwise; values are never rescaled. Accepts rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "docs": "Shows the metric ids a loan analyst reads together: ytm, ytw, ytc, yt2y, yt3y, yt4y, discount_margin, all_in_rate, oid_eir_rate, oid_eir_amortization, embedded_option_value, recovery01 and jump_to_default. applicableMetrics from metric-values-table keeps those Rust lists for the instrument type (metricsForInstrument); pass the result to useMetricValues, which prices each id on its own call because one failing id fails a whole native request, and useMetricMetadata for units and groups. An id Rust rejects (embedded_option_value without the tree model, discount_margin on a fixed loan or on a callable loan without a quote, recovery01 and jump_to_default without a credit curve under the tree model) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. Unit shows what metricMetadata declares and says not declared otherwise; values are never rescaled. Accepts rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "yield-workout-ladder",
+      "type": "registry:component",
+      "docs": "Answers which call date is the worst workout and what the yield to each is. Present a native valuations.instruments.bondWorkoutLadder result (useBondWorkoutLadder): the one price every exit is solved at, then one row per exit in Rust's date order with its redemption, yield, I-spread and the mark on the row is_worst names, the exit the ytw metric selects. Pass metricMetadata of workoutLadderMetrics for the yield and spread units. A null yield shows as no yield, never zero. A bond with exercise rights needs quoted_clean_price_pct; the native error is shown as returned. Nothing is compared, sorted or derived. Accepts ladder, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "convertible-card",
+      "type": "registry:component",
+      "docs": "Answers how a convertible moves with its stock. Present a native valuations.instruments.convertibleSpotLadder result (useConvertibleSpotLadder) as a chart of price, conversion value and floor with each regime Rust returned, a chart of parity and premium, and a row per share price with delta, hedge ratio, regime, parity and premium, with metric ids through metric-values-table. The share prices are the ones entered through onSpotsChange or Rust's default ladder. Pass metricMetadata of ladderMetrics for the column units. A null hedge ratio, regime or premium shows as undefined. Nothing is classified, compared or derived. Accepts ladder, ladderMetadata, ladderLoading, ladderError, onSpotsChange, rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "quote-converter",
+      "type": "registry:component",
+      "docs": "Answers what a bond's other quotes are given any one of them. Offers the quote kinds of the BondQuoteInput schema and presents a native valuations.instruments.computeQuotes result (useComputeQuotes) in Rust's field order. Pass native bondQuoteSetFieldUnits (useBondQuoteSetFieldUnits) for the units. A null field shows as no value, never zero. A quote that cannot be solved, a kind the bond does not have or one metric of the set failing, shows the native error as returned. Nothing is converted or compared. Accepts defaultInput, onSubmit, quotes, units, loading, error, formatValue and density props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -285,7 +315,7 @@
     {
       "name": "pricing-workbench",
       "type": "registry:block",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, an equity tranche card over native equityMetrics, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, an equity tranche card over native equityMetrics, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. A priced bond adds an Analytics tab with bond-credit-card, yield-workout-ladder and quote-converter, each opening on its own over the completed request; a priced term loan adds one with loan-yield-card. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "worker": "host"
     },
     {
@@ -634,6 +664,18 @@
     },
     {
       "name": "use-market-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-convertible-spot-ladder",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-bond-workout-ladder",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-compute-quotes",
       "type": "registry:hook"
     },
     {
@@ -1488,7 +1530,7 @@
   "provenance": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "6d889d0bcb3c4b7e42907df3dad1a9c618e8dd762cb447aa2adf32cca5de19a2"
+      "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
@@ -1512,7 +1554,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
-      "sha256": "0fa06a4979f734bb9a6ba39a63b806c6b306d01f864ef6b2092fa79045f370e0"
+      "sha256": "7a99d56e01adf878a52ba9c1caf99c6d3a1a9bce255da975ee5759c06e18c868"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/pool-report.json",
@@ -1524,7 +1566,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/deal-charts.json",
-      "sha256": "fe6933a1628c505ef6f61be050c2df0595778f5d71e0f349058da382121cbf7e"
+      "sha256": "a7afa2bde83f84a7e36d233af08c3b665fa2b2876f280a8c41a6a4dbfa171633"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/equity-tranche.json",
@@ -1532,27 +1574,43 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "9689871d433aa03c314eb570f0f8245e0c2cc661b999c74d761083b924e71c6a"
+      "sha256": "e6d0e78af8e951494574ebf379f85a09ae878155b91479e48e4d2b275b2a6e39"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
-      "sha256": "a4e8b76537de7b44526868f1d8cd0deb7a5bb77f3b72197ae66c20927fe07c1d"
+      "sha256": "666043322ac73c37764c866b1b138708bfddcffaa8a17312925ed6c56f92c9b8"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/bond-credit/cases.json",
+      "sha256": "3762c12398f7d46330aee268809ace86c04643fc05f13e39baa1a1764eb1f6ed"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/convertible/cases.json",
+      "sha256": "b9dbee02f7dfb319aaaca401c183f2d0b88c5e877fc51a668b7406c5fdeffa0b"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/workout-ladder/cases.json",
+      "sha256": "dfcfa85972586a4906e5a46aa411ca77086bd0bc6a4e634e73d2cf0194e0a43f"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/quote-converter/cases.json",
+      "sha256": "9d9080ad43aaf5f687d12cdee9b48f120ecb6b38469d7576d49d469c1734ee8b"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
-      "sha256": "b3b41dfa2022f36d14f3aa0dd80904a33eb2485abf34113a7965e9a8bf851200"
+      "sha256": "0965801897de2d912a19e63fe99d6c5762228de10c586fa51ef5ea3b2e524c22"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/horizon/cases.json",
-      "sha256": "a6ed012a6473c5994efebe28d902bbbde6ae0ded1534e5eef2e46bc2d493764d"
+      "sha256": "8782915d628b0e56c45d6da992812da68fb6fc1bd68d2bbfb4ba33689ff9b609"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/templates/cases.json",
-      "sha256": "85de11bab158c8a7102ecfb0a9eb0d0aaa8e32669829a95a3abf61d0a05bd64c"
+      "sha256": "9255a56f85624c940c289373f42e38c99b95a355b3215794ba4f70251406f631"
     },
     {
       "path": "finstack-quant-ui/tests/attribution/cases.json",
-      "sha256": "3d63dfd6d64f29d1bac71a35588741cbf0cba0024d46e9a0324b622bb7c09134"
+      "sha256": "17f439c57939b36c1af3ee8bd508423268553eaa76a5ba624f03c0a3707405a9"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",
@@ -1608,7 +1666,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "98b0f75aa07e657455a0dfbaf1aa75b9678a6bdaaecd0a8ed8b59826bc272158"
+      "sha256": "b4c994050555b30b53868e427db417281f053425e987a5230f6684b96b00eb08"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",

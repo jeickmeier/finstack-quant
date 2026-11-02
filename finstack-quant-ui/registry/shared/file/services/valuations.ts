@@ -26,8 +26,14 @@ export type ValuationsNative = {
       | "scenarioTableFieldUnits"
       | "simulationFieldUnits"
       | "equityMetricsFieldUnits"
+      | "Bond"
+      | "bondWorkoutLadder"
+      | "ConvertibleBond"
+      | "convertibleSpotLadder"
+      | "computeQuotes"
       | "poolReport"
       | "poolReportFieldUnits"
+      | "bondQuoteSetFieldUnits"
       | "standardDealFamilies"
     >;
   };
@@ -157,6 +163,52 @@ export function createValuationsService(
         ),
       );
     },
+    bondWorkoutLadder(request) {
+      return context.result(() => {
+        const bond = instruments.Bond.fromJson(request.instrumentJson);
+        try {
+          return instruments.bondWorkoutLadder(
+            bond,
+            request.marketJson,
+            request.asOf,
+          );
+        } finally {
+          bond.free();
+        }
+      });
+    },
+    convertibleSpotLadder(request) {
+      return context.result(() => {
+        const bond = instruments.ConvertibleBond.fromJson(
+          request.instrumentJson,
+        );
+        try {
+          return instruments.convertibleSpotLadder(
+            bond,
+            request.marketJson,
+            request.asOf,
+            request.spots as number[] | null | undefined,
+          );
+        } finally {
+          bond.free();
+        }
+      });
+    },
+    computeQuotes(request) {
+      return context.result(() => {
+        const bond = instruments.Bond.fromJson(request.instrumentJson);
+        try {
+          return instruments.computeQuotes(
+            bond,
+            request.marketJson,
+            request.asOf,
+            request.quoteInput,
+          );
+        } finally {
+          bond.free();
+        }
+      });
+    },
     poolReport(request) {
       return context.result(() =>
         withDeal(request.instrumentJson, (deal) =>
@@ -250,6 +302,8 @@ export function createValuationsService(
       context.result(() => instruments.simulationFieldUnits(currency)),
     equityMetricsFieldUnits: (currency) =>
       context.result(() => instruments.equityMetricsFieldUnits(currency)),
+    bondQuoteSetFieldUnits: (currency) =>
+      context.result(() => instruments.bondQuoteSetFieldUnits(currency)),
     poolReportFieldUnits: (currency) =>
       context.result(() => instruments.poolReportFieldUnits(currency)),
     trancheSolveFieldUnits: () =>

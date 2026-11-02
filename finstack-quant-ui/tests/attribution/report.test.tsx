@@ -170,7 +170,7 @@ it("shows the explain text, notes, stamp and JSON as returned", () => {
     />,
   );
   expect(screen.getByRole("region", { name: "Explain" }).textContent).toContain(
-    "Total P&L: USD -1060.42",
+    "Total P&L: USD -60.42",
   );
   const notes = screen.getByRole("region", { name: "Notes" });
   expect(within(notes).getAllByRole("listitem")).toHaveLength(

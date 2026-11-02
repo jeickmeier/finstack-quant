@@ -260,9 +260,7 @@ export type BarrierCrossing = "discrete" | "brownian_bridge";
  */
 export type CalibrationParameter = "debt_barrier" | "asset_vol";
 /**
- * Quote input for the bond quote engine.
- *
- * All spreads are expressed in **decimal** (`0.01 = 100bp`).
+ * The one market quote a bond's quote set is solved from: a price, a yield or a spread.
  */
 export type BondQuoteInput =
   | {
@@ -3755,6 +3753,10 @@ export type BasketAssetType = "equity" | "bond" | "etf" | "cash" | "commodity" |
  */
 export type FxConversionPolicy = "cashflow_date" | "period_end" | "period_average";
 /**
+ * How the holder leaves the bond on a [`BondWorkoutRow`]'s date.
+ */
+export type WorkoutExitKind = "call" | "put" | "maturity";
+/**
  * Classifies captured cashflows by economic meaning.
  *
  * These tags are diagnostic metadata only. They do not change pricing logic by
@@ -3945,6 +3947,15 @@ export type SchemaVersion = number;
  * Canonical schema marker for persisted instrument envelopes.
  */
 export type InstrumentSchema = "finstack_quant.instrument/1";
+/**
+ * Which of bond or stock drives a convertible's value at a share price.
+ *
+ * Classified by [`ConvertibleSpotRow::hedge_ratio`] on the market bands of 40 and
+ * 80 delta. Managers do not agree on the cutoffs: these are the bands Putnam and
+ * Lord Abbett publish, and MSCI uses thirds. See
+ * `docs/REFERENCES.md#convertible-delta-bands`.
+ */
+export type ConvertibleRegime = "busted" | "balanced" | "equity_sensitive";
 /**
  * Stage of persisted artifact loading that produced a diagnostic.
  */
@@ -4641,6 +4652,13 @@ export interface ModelConfig {
    * at the contractual call price.
    */
   call_friction_cents?: number | null;
+  /**
+   * Optional government discount curve identifier for the bond `g_spread` metric.
+   *
+   * The metric subtracts this curve's par yield from the bond's yield. It
+   * enters no price, and `g_spread` is an error when it is unset.
+   */
+  government_curve_id?: Id | null;
   /**
    * Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
    * lattice, annualised.
@@ -17628,6 +17646,154 @@ export interface BasketPricingConfig {
   fx_policy: FxConversionPolicy;
 }
 /**
+ * Every price, yield and spread quote of a bond, solved from any one of them.
+ */
+export interface BondQuoteSet {
+  /**
+   * Asset swap market spread (decimal). `None` under the same rule as
+   * `asw_par`, including on a plain floating-rate note, which the `asw_market`
+   * metric alone would still value.
+   */
+  asw_market?: number | null;
+  /**
+   * Asset swap par spread (decimal). `None` unless the bond has a fixed coupon
+   * and no custom cashflows, or custom cashflows with a floating specification.
+   */
+  asw_par?: number | null;
+  /**
+   * Clean price in the bond's currency, for its whole notional.
+   */
+  clean_price_currency: number;
+  /**
+   * Clean price as percentage of par (`99.5` = 99.5%, the quote convention).
+   */
+  clean_price_pct: number;
+  /**
+   * Dirty price at the quote date in the bond's currency, for its whole
+   * notional: clean price plus accrued interest to the quote date.
+   */
+  dirty_price_currency: number;
+  /**
+   * Discount margin (decimal). `None` unless the bond has floating coupons.
+   */
+  discount_margin?: number | null;
+  /**
+   * I-spread (decimal): the yield less the swap par rate. On a bond with
+   * exercise rights the yield and horizon are the worst exit's.
+   */
+  i_spread?: number | null;
+  /**
+   * Japanese simple yield (単利, decimal). `None` unless the coupon is fixed.
+   */
+  japanese_simple_yield?: number | null;
+  /**
+   * Moosmüller yield to maturity (decimal): simple interest to the next
+   * coupon, then periodic compounding.
+   */
+  moosmuller_ytm?: number | null;
+  /**
+   * Option-adjusted spread (decimal), from the bond's tree model.
+   */
+  oas?: number | null;
+  /**
+   * Street yield to maturity (decimal), compounded at the coupon frequency.
+   */
+  ytm?: number | null;
+  /**
+   * Yield to worst across every call, put and maturity exit (decimal).
+   */
+  ytw?: number | null;
+  /**
+   * Z-spread over the discount curve (decimal). On a bond with exercise
+   * rights it discounts the worst exit's flows.
+   */
+  z_spread?: number | null;
+}
+/**
+ * Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked.
+ */
+export interface BondWorkoutLadder {
+  /**
+   * Valuation date.
+   */
+  as_of: DateWire;
+  /**
+   * Clean price every row is solved at, as percent of the original notional:
+   * the quoted clean price, or for a bond with no exercise rights and no quote
+   * the model price at the quote date.
+   */
+  clean_price_pct: number;
+  /**
+   * `clean_price_pct` plus accrued interest at the quote date, in the bond's
+   * currency. Exits are alternatives for one price, so the rows share it.
+   */
+  dirty_price: Money;
+  /**
+   * Identifier of the bond.
+   */
+  instrument_id: string;
+  /**
+   * Settlement date of the quote; every yield is timed from it.
+   */
+  quote_date: DateWire;
+  /**
+   * One row per candidate exit, in date order. Adjacent call windows that share
+   * a boundary date each keep a row; a put and a call on one date each keep
+   * theirs. A bond with no exercise rights has one maturity row.
+   */
+  rows: BondWorkoutRow[];
+}
+/**
+ * One admissible exit of a bond: a row of a [`BondWorkoutLadder`].
+ */
+export interface BondWorkoutRow {
+  /**
+   * Exit date. A maturity row carries the business-day-adjusted final payment
+   * date when that is later than the contractual maturity.
+   */
+  date: DateWire;
+  /**
+   * `yield_rate` less the swap par rate from the quote date, as a decimal, the
+   * convention of the `i_spread` metric. The par rate runs to `date` when the
+   * bond has an exit other than maturity, and to contractual maturity when it
+   * has none, which differs from `date` if the final payment rolls. `None` when
+   * `yield_rate` is `None`.
+   */
+  i_spread?: number | null;
+  /**
+   * Whether this is the worst exit, the one the `ytw` metric selects. At most
+   * one row is marked; none is when no exit has a yield and each pays at least
+   * the price at once.
+   */
+  is_worst: boolean;
+  /**
+   * Whether the exit is a call, a put or maturity.
+   */
+  kind: WorkoutExitKind;
+  /**
+   * Whether the redemption is a make-whole price off a reference curve.
+   */
+  make_whole: boolean;
+  /**
+   * Clean cash the exit redeems, in the bond's currency; accrued interest is
+   * paid on top.
+   */
+  redemption_amount: Money;
+  /**
+   * Clean redemption as percent of the principal outstanding at the exit
+   * (`103.0` = 103%). A make-whole call shows its make-whole price, which can
+   * exceed the contractual strike.
+   */
+  redemption_price_pct: number;
+  /**
+   * Street yield to this exit as a decimal, compounded at the coupon
+   * frequency, timed from the quote date. `None` when the path has no finite
+   * yield: an exit on the quote date, or same-day cash at or above the price. A
+   * worst row can be `None`, where the `ytw` metric is negative infinity.
+   */
+  yield_rate?: number | null;
+}
+/**
  * Asset-backed facility borrowing base, availability and advance-rate test.
  */
 export interface BorrowingBaseReport {
@@ -18875,6 +19041,84 @@ export interface ConvertibleGreeks {
    */
   vega: number;
   [k: string]: unknown;
+}
+/**
+ * Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices.
+ */
+export interface ConvertibleSpotLadder {
+  /**
+   * Valuation date.
+   */
+  as_of: DateWire;
+  /**
+   * Currency of the bond, which every money field is in.
+   */
+  currency: Currency;
+  /**
+   * Identifier of the bond.
+   */
+  instrument_id: string;
+  /**
+   * Share price the market holds.
+   */
+  market_spot: number;
+  /**
+   * One row per share price, in ascending order.
+   */
+  rows: ConvertibleSpotRow[];
+}
+/**
+ * A convertible at one share price: a row of a [`ConvertibleSpotLadder`].
+ */
+export interface ConvertibleSpotRow {
+  /**
+   * Value of the coupons and principal with no conversion or exercise rights, the
+   * `bond_floor` metric in currency. It does not depend on the share price, so every
+   * row holds the same number.
+   */
+  bond_floor: number;
+  /**
+   * [`price`](Self::price) over conversion value, less one, as a decimal; the
+   * `conversion_premium` metric. `null` when conversion value is not positive or the
+   * ratio is not finite.
+   */
+  conversion_premium?: number | null;
+  /**
+   * Immediate conversion value of the position in currency, the `conversion_value` metric.
+   */
+  conversion_value: number;
+  /**
+   * Change in [`price`](Self::price) per unit of share price, by central difference
+   * with the bond's spot bump, the `delta` metric's definition. `null` if not finite.
+   */
+  delta?: number | null;
+  /**
+   * [`delta`](Self::delta) as a share of the effective conversion ratio, the decimal
+   * the regime bands read. `null` on a mandatory-variable bond, whose share count
+   * moves with the stock, if the ratio is not positive, or if the delta is `null`.
+   */
+  hedge_ratio?: number | null;
+  /**
+   * Whether [`spot`](Self::spot) is the share price the market holds.
+   */
+  is_market_spot: boolean;
+  /**
+   * Conversion value over notional, the `parity` metric (`1.0` is par, not one dollar).
+   */
+  parity: number;
+  /**
+   * Tree value of the whole position in [`currency`](ConvertibleSpotLadder::currency),
+   * the PV of the bond priced on this share price.
+   */
+  price: number;
+  /**
+   * Regime of this row; `null` where [`hedge_ratio`](Self::hedge_ratio) is.
+   */
+  regime?: ConvertibleRegime | null;
+  /**
+   * Share price of this row, in the bond's currency.
+   */
+  spot: number;
 }
 /**
  * When one coverage test first failed over a simulation.

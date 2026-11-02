@@ -937,6 +937,9 @@ public = [
     "BarrierCrossing",
     "Bond",
     "BondBuilder",
+    "BondQuoteSet",
+    "BondWorkoutLadder",
+    "BondWorkoutRow",
     "BorrowingBaseRules",
     "CallAssumption",
     "CallPutSchedule",
@@ -955,6 +958,8 @@ public = [
     "ConversionSpec",
     "ConvertibleBond",
     "ConvertibleBondBuilder",
+    "ConvertibleSpotLadder",
+    "ConvertibleSpotRow",
     "CoverageRules",
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
@@ -1015,8 +1020,12 @@ public = [
     "VarResult",
     "Waterfall",
     "bond_from_cashflows_json",
+    "bond_quote_set_field_units",
+    "bond_workout_ladder",
     "calculate_pool_stats",
     "calculate_var",
+    "compute_quotes",
+    "convertible_spot_ladder",
     "equity_metrics_field_units",
     "instrument_cashflows",
     "instrument_envelope_from_spec",
@@ -2187,7 +2196,7 @@ types = { CompositeExposureReport = "CompositeExposureReport", CompositeHistoryR
 
 [parity.modules."finstack_quant.valuations.instruments"]
 js = "valuations.instruments"
-types = { AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", InstrumentCashflowEnvelope = "InstrumentCashflowEnvelope", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcCalibrationSpec = "MertonMcCalibrationSpec", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PoolConcentrationEntry = "PoolConcentrationEntry", PoolReport = "PoolReport", PoolStats = "PoolStats", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SimulationRun = "SimulationRun", StandardDealParams = "StandardDealParams", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", VarResult = "VarResult", Waterfall = "Waterfall" }
+types = { AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", BondQuoteSet = "BondQuoteSet", BondWorkoutLadder = "BondWorkoutLadder", BondWorkoutRow = "BondWorkoutRow", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", ConvertibleSpotLadder = "ConvertibleSpotLadder", ConvertibleSpotRow = "ConvertibleSpotRow", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", InstrumentCashflowEnvelope = "InstrumentCashflowEnvelope", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcCalibrationSpec = "MertonMcCalibrationSpec", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PoolConcentrationEntry = "PoolConcentrationEntry", PoolReport = "PoolReport", PoolStats = "PoolStats", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SimulationRun = "SimulationRun", StandardDealParams = "StandardDealParams", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", VarResult = "VarResult", Waterfall = "Waterfall" }
 
 [parity.modules."finstack_quant.valuations.market"]
 js = "valuations.market"

@@ -31,6 +31,15 @@ from finstack_quant.valuations.instruments._instruments import (
     TermLoan as TermLoan,
     TermLoanBuilder as TermLoanBuilder,
 )
+from finstack_quant.valuations.instruments._bond_quotes import (
+    BondQuoteSet as BondQuoteSet,
+    compute_quotes as compute_quotes,
+)
+from finstack_quant.valuations.instruments._bond_workout import (
+    BondWorkoutLadder as BondWorkoutLadder,
+    BondWorkoutRow as BondWorkoutRow,
+    bond_workout_ladder as bond_workout_ladder,
+)
 from finstack_quant.valuations.instruments._merton_mc import (
     BarrierCrossing as BarrierCrossing,
     MertonMcCalibrationSpec as MertonMcCalibrationSpec,
@@ -78,6 +87,11 @@ from finstack_quant.valuations.instruments._typed_convertible import (
     ConversionSpec as ConversionSpec,
     ConvertibleBond as ConvertibleBond,
     ConvertibleBondBuilder as ConvertibleBondBuilder,
+)
+from finstack_quant.valuations.instruments._convertible_spot_ladder import (
+    ConvertibleSpotLadder as ConvertibleSpotLadder,
+    ConvertibleSpotRow as ConvertibleSpotRow,
+    convertible_spot_ladder as convertible_spot_ladder,
 )
 from finstack_quant.valuations.instruments._typed_fx import (
     FxForward as FxForward,
@@ -151,6 +165,7 @@ from finstack_quant.valuations.instruments._pricing import (
     price_driver_fields as price_driver_fields,
     price_instrument as price_instrument,
     pool_report_field_units as pool_report_field_units,
+    bond_quote_set_field_units as bond_quote_set_field_units,
     standard_deal_families as standard_deal_families,
     scenario_table_field_units as scenario_table_field_units,
     simulation_field_units as simulation_field_units,
@@ -198,6 +213,9 @@ __all__ = [
     "BarrierCrossing",
     "Bond",
     "BondBuilder",
+    "BondQuoteSet",
+    "BondWorkoutLadder",
+    "BondWorkoutRow",
     "CallAssumption",
     "CallPutSchedule",
     "CapFloor",
@@ -214,6 +232,8 @@ __all__ = [
     "ConversionSpec",
     "ConvertibleBond",
     "ConvertibleBondBuilder",
+    "ConvertibleSpotLadder",
+    "ConvertibleSpotRow",
     "CoverageRules",
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
@@ -263,8 +283,12 @@ __all__ = [
     "VarResult",
     "Waterfall",
     "bond_from_cashflows_json",
+    "bond_quote_set_field_units",
+    "bond_workout_ladder",
     "calculate_pool_stats",
     "calculate_var",
+    "compute_quotes",
+    "convertible_spot_ladder",
     "instrument_cashflows",
     "instrument_envelope_from_spec",
     "list_models",

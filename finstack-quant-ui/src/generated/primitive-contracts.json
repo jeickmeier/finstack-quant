@@ -204,5 +204,167 @@
       "title": "Tenor",
       "type": "object"
     }
+  },
+  "bond_quote_input": {
+    "source": "finstack-quant/valuations/schemas/common/1/bond_quote_input.schema.json",
+    "schema": {
+      "$id": "https://finstack_quant.dev/schemas/common/1/bond_quote_input.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "The one market quote a bond's quote set is solved from: a price, a yield or a spread.",
+      "examples": [
+        {
+          "clean_price_pct": 98.5
+        },
+        {
+          "ytm": 0.055
+        },
+        {
+          "z_spread": 0.012
+        }
+      ],
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Clean price quoted as percentage of par (e.g., 99.5 = 99.5% of par).",
+          "properties": {
+            "clean_price_pct": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "clean_price_pct"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Dirty price in currency units.",
+          "properties": {
+            "dirty_price_currency": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "dirty_price_currency"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Yield to maturity (decimal).",
+          "properties": {
+            "ytm": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "ytm"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Yield to worst (decimal).\n\nFor non-callable bonds this is equivalent to [`BondQuoteInput::Ytm`].\nFor callable, puttable, or return-floor bonds, inversion prices every\nadmissible workout path at this Street yield and selects the minimum\ndirty price.",
+          "properties": {
+            "ytw": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "ytw"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Z-spread over the discount curve (decimal).",
+          "properties": {
+            "z_spread": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "z_spread"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Discount margin for FRNs (decimal).",
+          "properties": {
+            "discount_margin": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "discount_margin"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Option-adjusted spread (decimal).",
+          "properties": {
+            "oas": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "oas"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Asset swap market spread (decimal).",
+          "properties": {
+            "asw_market": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "asw_market"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "I-spread (decimal).",
+          "properties": {
+            "i_spread": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "i_spread"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Japanese simple yield (単利, decimal).\n\nClosed-form Tokyo quote: remaining ACT/365F life versus dirty price as\na percent of par. This is **not** a discount-factor convention and does\nnot alter Street [`BondQuoteInput::Ytm`].",
+          "properties": {
+            "japanese_simple_yield": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "japanese_simple_yield"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "BondQuoteInput"
+    }
   }
 }

@@ -120,6 +120,45 @@ export interface StandardDealRequest {
 export type DealTranches = StructuredCredit["tranches"];
 /** Native report of a deal's collateral pool. */
 export type PoolReport = ReturnType<typeof valuations.instruments.poolReport>;
+/** Yield and I-spread to every exit of a bond, worst marked by Rust. */
+export type BondWorkoutLadder = ReturnType<
+  typeof valuations.instruments.bondWorkoutLadder
+>;
+/** One bond on a complete market at a valuation date. */
+export interface BondWorkoutLadderRequest {
+  readonly instrumentJson: string;
+  readonly marketJson: string;
+  /** ISO-8601 valuation date. */
+  readonly asOf: string;
+}
+/** A convertible's price, delta, parity, premium, regime and floor by share price. */
+export type ConvertibleSpotLadder = ReturnType<
+  typeof valuations.instruments.convertibleSpotLadder
+>;
+/** One convertible on a complete market at a valuation date. */
+export interface ConvertibleSpotLadderRequest {
+  readonly instrumentJson: string;
+  readonly marketJson: string;
+  /** ISO-8601 valuation date. */
+  readonly asOf: string;
+  /** Share prices; null or omitted is Rust's default ladder. */
+  readonly spots?: readonly number[] | null;
+}
+/** Every price, yield and spread quote of a bond, from any one of them. */
+export type BondQuoteSet = ReturnType<
+  typeof valuations.instruments.computeQuotes
+>;
+/** One bond on a complete market at a valuation date, with the one quote to solve from. */
+export interface ComputeQuotesRequest {
+  readonly instrumentJson: string;
+  readonly marketJson: string;
+  /** ISO-8601 valuation date. */
+  readonly asOf: string;
+  /** One BondQuoteInput: a single key naming the quote kind. */
+  readonly quoteInput: Parameters<
+    typeof valuations.instruments.computeQuotes
+  >[3];
+}
 /** One deal's collateral pool at a date. */
 export interface PoolReportRequest {
   readonly instrumentJson: string;
@@ -1167,6 +1206,16 @@ export interface ValuationsApi {
   equityMetrics(
     request: EquityMetricsRequest,
   ): Promise<Envelope<EquityMetrics>>;
+  /** valuations.instruments.ConvertibleBond.fromJson + convertibleSpotLadder: the bond at each share price. */
+  convertibleSpotLadder(
+    request: ConvertibleSpotLadderRequest,
+  ): Promise<Envelope<ConvertibleSpotLadder>>;
+  /** valuations.instruments.Bond.fromJson + bondWorkoutLadder: yield and I-spread to every exit. */
+  bondWorkoutLadder(
+    request: BondWorkoutLadderRequest,
+  ): Promise<Envelope<BondWorkoutLadder>>;
+  /** valuations.instruments.Bond.fromJson + computeQuotes: the whole quote set from any one quote. */
+  computeQuotes(request: ComputeQuotesRequest): Promise<Envelope<BondQuoteSet>>;
   /** valuations.instruments.poolReport over the deal's pool: statistics, WARF and concentration. */
   poolReport(request: PoolReportRequest): Promise<Envelope<PoolReport>>;
   /** valuations.instruments.StructuredCredit.fromJson + trancheScenarioTable. */
@@ -1207,6 +1256,10 @@ export interface ValuationsApi {
   equityMetricsFieldUnits(
     currency: string,
   ): Promise<Envelope<EquityMetricsFieldUnits>>;
+  /** valuations.instruments.bondQuoteSetFieldUnits: units of a quote set's fields. */
+  bondQuoteSetFieldUnits(
+    currency: string,
+  ): Promise<Envelope<MetricFieldUnit[]>>;
   /** valuations.instruments.poolReportFieldUnits: units of a pool report's fields. */
   poolReportFieldUnits(
     currency: string,

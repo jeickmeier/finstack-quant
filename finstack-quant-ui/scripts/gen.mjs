@@ -380,6 +380,7 @@ export async function generate(repo = repoRoot) {
     "day_count",
     "business_day_convention",
     "tenor",
+    "bond_quote_input",
   ]) {
     const entry = [...contracts.values()].find((entry) =>
       entry.source.endsWith(`/common/1/${name}.schema.json`),

@@ -174,9 +174,9 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twenty-four native fixture generators under
+`mise run ui-fixtures` runs the twenty-six native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
-horizon return, scenario templates, attribution, cashflows → details; loan yields;
+horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
 scenario-table; statements → covenants; analytics; models credit, risk, options and liability management;
 margin), then
@@ -733,6 +733,14 @@ submission. **Use calibrated market** validates the returned market and updates
 the shared market editor and pricing request. Editing the envelope disables that
 handoff until the current envelope has been solved.
 
+A priced bond adds an **Analytics** result tab with `BondCreditCard`, `YieldWorkoutLadder`
+and `QuoteConverter`. Each opens on its own, makes its own native calls over the completed
+request and shows its own error, so one that fails or takes long leaves the others. The
+worker is one thread, though, so a slow card holds the next call back until it returns: on
+a callable with a `credit_curve_id`, the bond's default model is the rates-credit tree, and
+`oas`, `embedded_option_value`, `cs01` and `recovery01` each take minutes. A priced term
+loan adds the tab with `LoanYieldCard`. A new panel is one entry in `analyticsPanels`.
+
 Evaluated market views take explicit domain inputs through public options:
 
 ```tsx
@@ -975,22 +983,112 @@ the discount-margin error, so a card asking for them together would go blank. Ea
 id keeps its value or its native error; a malformed instrument or market is the
 whole error.
 
+`MetricValuesTable` (`@finstack/metric-values-table`) draws those rows, and
+`applicableMetrics` keeps the ids `metricsForInstrument` lists for the type.
+
 `LoanYieldCard` is the view over it, for term loans: `ytm`, `ytw`, `ytc`, `yt2y`,
 `yt3y`, `yt4y`, `discount_margin`, `all_in_rate`, `oid_eir_rate`,
-`oid_eir_amortization` and `embedded_option_value`. `applicableLoanYieldMetrics`
-keeps those `metricsForInstrument` lists for the type, and all eleven are listed
-for `term_loan`. An id Rust rejects shows its error in its row:
-`embedded_option_value` on a callable loan needs the `tree` model, and
-`discount_margin` needs a floating loan and, when callable, a
-`quoted_clean_price_pct`. Yields solve to that quote when the instrument carries
+`oid_eir_amortization`, `embedded_option_value`, `recovery01` and
+`jump_to_default`; all thirteen are listed for `term_loan`. An id Rust rejects
+shows its error in its row: `embedded_option_value` on a callable loan needs the
+`tree` model, `discount_margin` needs a floating loan and, when callable, a
+`quoted_clean_price_pct`, and `recovery01` and `jump_to_default` need a
+`credit_curve_id` under the `tree` model. Yields solve to that quote when the instrument carries
 one, otherwise to the model price, which differs by model. Unit and group are what
 `metricMetadata` declares. It declares no unit for the ids outside a metric group
 (`ytc`, `yt2y`, `yt3y`, `yt4y`, `all_in_rate`, `oid_eir_rate`,
 `oid_eir_amortization`), so the card says "not declared" and never rescales.
 `oid_eir_amortization` shows Rust's total; the per-date keys Rust also returns are
 not shown. The revolver's own card is a later item; on a revolver this card shows
-the five ids Rust lists. The native fixture is
+the seven ids Rust lists. The native fixture is
 `tests/valuations/loan-yield/cases.json`.
+
+## Bond credit card
+
+`BondCreditCard` (`@finstack/bond-credit-card`) answers what a bond's spreads, option
+value, durations, default risk and carry are, and how much a spread or yield can move
+before carry is gone. It draws `useMetricValues` rows for `z_spread`, `i_spread`,
+`g_spread`, `oas`, `asw_par`, `asw_market`, `discount_margin`, `embedded_option_value`,
+`duration_mod`, `duration_mac`, `convexity`, `dv01`, `cs01`, `recovery01`,
+`jump_to_default`, `theta`, `theta_carry`, `theta_roll_down`, `carry_total`,
+`coupon_income`, `pull_to_par`, `roll_down`, `funding_cost`, `theta_period_days` and
+`breakeven`; all twenty-five are listed for `bond`. `MetricGroup::Carry`'s
+`implied_financing_rate`, `roll_specialness` and `carry_decomposition_degenerate` are not.
+
+`metricsForInstrument` lists an id for every bond even where a given bond cannot price
+it, so a row can hold Rust's error and no script decides: `g_spread` needs
+`instrument_pricing_overrides.model_config.government_curve_id`; `recovery01` and
+`jump_to_default` need a `credit_curve_id` under `hazard_rate` or the rates-credit tree;
+`oas` needs a price driver; `discount_margin` needs a floating coupon; `cs01` on a hazard
+curve needs its calibration recipe. Under `discounting` or `hazard_rate` a bond with
+exercise rights errors in every row: select `tree`.
+
+`breakeven` is the first-order or iterative solve of `BreakevenConfig` over the
+`theta_period` horizon. The card's form, with `onOverridesChange`, is the schema's for
+those two `MetricPricingOverrides` fields, over the supplied document, so the other
+fields stay as supplied. The JSON it applies goes on the request as
+`metricPricingOverrides`, which the worker gives Rust to merge into the instrument: no
+target, mode or horizon is assumed. With no `breakeven_config` the row shows Rust's
+error, and with no `theta_period` carry is one day; `theta_period_days` reports it.
+Under `linear` the value is `-carry_total / cs01` for `z_spread` and `oas`, and
+`-carry_total / dv01` for `ytm`, in basis points. `metricMetadata` declares no unit for
+`breakeven`, because it follows the target, so the card says "not declared" and the
+form's target states it. The card's note states the conventions a reader would otherwise
+misread: z-spread compounds at the coupon frequency and OAS on `oas_quote_compounding`,
+continuous by default, and `asw_par` does not move with the quoted price while
+`asw_market` does. The native fixture is `tests/valuations/bond-credit/cases.json`.
+
+## Convertible card
+
+`ConvertibleCard` (`@finstack/convertible-card`) answers how a convertible moves with
+its stock. It draws one `valuations.instruments.convertibleSpotLadder` result, fetched
+with `useConvertibleSpotLadder` (`@finstack/use-convertible-spot-ladder`): a chart of
+price, conversion value and bond floor with a dot for each regime, a chart of parity
+and conversion premium, and one row per share price in Rust's ascending order, with
+the market row marked. Metric ids follow through `metric-values-table`, each on its own
+call so one id's error stays in its row. `onSpotsChange` shows a form for share prices;
+empty sends none, so the rows are Rust's default ladder, and Rust sorts, dedupes and
+rejects what is entered. No range rule lives here. Regime is Rust's, from the hedge
+ratio on the 40 and 80 delta bands, and is null with the hedge ratio on a
+mandatory-variable bond, which shows as "Undefined". Column units are what
+`metricMetadata` declares for `ladderMetrics`. The default ladder prices 8 rows on the
+200-step tree in milliseconds, so the workbench panel prices on opening the tab, unlike
+the bond cards. `oas` and `implied_vol` need a quoted clean price and `cs01` a hazard
+curve with a calibration recipe; the native fixture is
+`tests/valuations/convertible/cases.json`.
+
+## Yield workout ladder
+
+`YieldWorkoutLadder` (`@finstack/yield-workout-ladder`) answers which call date is
+the worst workout and what the yield to each is. It draws one
+`valuations.instruments.bondWorkoutLadder` result, fetched with
+`useBondWorkoutLadder` (`@finstack/use-bond-workout-ladder`): the one price every
+exit is solved at, then one row per call, put and maturity exit in Rust's date order
+with its redemption, yield and I-spread. The mark sits on the row Rust's `is_worst`
+names, the exit the `ytw` metric selects; no yield is compared in JavaScript. Yield
+and spread units are what `metricMetadata` declares for `workoutLadderMetrics`. A
+null yield, an exit with no finite yield, shows as "No yield". A bond with exercise
+rights needs `quoted_clean_price_pct`, or the native error shows as returned.
+Z-spread is not reported per exit, because no per-exit convention exists. The native
+fixture is `tests/valuations/workout-ladder/cases.json`.
+
+## Quote converter
+
+`QuoteConverter` (`@finstack/quote-converter`) answers what a bond's other quotes are
+given any one of them. The user picks a kind and enters a value; it draws one
+`valuations.instruments.computeQuotes` result, fetched with `useComputeQuotes`
+(`@finstack/use-compute-quotes`), in Rust's field order. The kinds are the branches
+of the `BondQuoteInput` schema, carried in `primitive-contracts.json` as the day-count
+and business-day selects carry theirs. Each yield and spread is the metric of the same
+name at that clean price. Units are what `bondQuoteSetFieldUnits` returns for the bond's
+currency, fetched with `useBondQuoteSetFieldUnits`, one record per field in struct order.
+A null field shows as "No value", never zero: it does not apply to the bond or has no
+finite value. A quote that cannot be solved shows the native error as returned: a kind
+the bond does not have (`discount_margin` with no floating coupons, `asw_market` or
+`japanese_simple_yield` on a floating coupon, `z_spread` or `asw_market` with exercise rights), or one
+metric of the set failing, which fails the whole set. A bond with exercise rights needs
+HW1F parameters for its `oas`. Nothing is converted or compared in JavaScript. The native
+fixture is `tests/valuations/quote-converter/cases.json`.
 
 ## Option calculator
 

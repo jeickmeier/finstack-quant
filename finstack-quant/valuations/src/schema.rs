@@ -725,7 +725,10 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
     use crate::instruments::fixed_income::asset_backed_facility::FacilityProjection;
     use crate::instruments::fixed_income::bond::pricing::merton_mc::MertonMcResult;
-    use crate::instruments::fixed_income::convertible::ConvertibleGreeks;
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
+        BondQuoteSet, BondWorkoutLadder,
+    };
+    use crate::instruments::fixed_income::convertible::{ConvertibleGreeks, ConvertibleSpotLadder};
     use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
         BorrowingBaseReport, EquityMetrics, OasConfig, OasResult, PoolReport, PoolStats,
@@ -733,6 +736,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         StandardDealParams, TrancheCashflows, TrancheMetrics,
     };
     use crate::instruments::json_loader::InstrumentJson;
+    use crate::instruments::BondQuoteInput;
     use crate::instruments::MarketDependencies;
     use crate::market::conventions::{
         CdsConventionSpec, InflationSwapConventions, IrFutureConventions, RateIndexConventions,
@@ -1127,6 +1131,26 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_kind(SchemaKind::Output)
         .with_examples(examples::pool_stats),
         finstack_quant_core::schema_artifact!(
+            BondQuoteSet,
+            "results",
+            "bond_quote_set",
+            Component,
+            "Every price, yield and spread quote of a bond, solved from any one of them."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::bond_quote_set),
+        finstack_quant_core::schema_artifact!(
+            BondWorkoutLadder,
+            "results",
+            "bond_workout_ladder",
+            Component,
+            "Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::bond_workout_ladder),
+        finstack_quant_core::schema_artifact!(
             PoolReport,
             "results",
             "pool_report",
@@ -1156,6 +1180,15 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::tranche_cashflows),
+        finstack_quant_core::schema_artifact!(
+            BondQuoteInput,
+            "common",
+            "bond_quote_input",
+            Input,
+            "The one market quote a bond's quote set is solved from: a price, a yield or a spread."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::bond_quote_input),
         finstack_quant_core::schema_artifact!(
             StandardDealParams,
             "common",
@@ -1215,6 +1248,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::convertible_greeks),
+        finstack_quant_core::schema_artifact!(
+            ConvertibleSpotLadder,
+            "results",
+            "convertible_spot_ladder",
+            Component,
+            "Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::convertible_spot_ladder),
         finstack_quant_core::schema_artifact!(
             FacilityProjection,
             "results",

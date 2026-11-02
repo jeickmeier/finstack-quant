@@ -2,6 +2,68 @@
 
 ## [Unreleased]
 
+### Convertibles: theta carry no longer counts the issue draw or a same-day coupon
+
+`theta_carry`, and so `theta`, on a `ConvertibleBond` counted the -notional issue draw when valued on its issue date, and a coupon paid on the valuation date, which the tree's PV already leaves out. A bond issued on the valuation date showed theta near -1,000,000. Both now follow `Bond`: carry excludes the draw and receipts fall in `(as_of, horizon]`. Values change on those two dates only.
+
+P&L attribution of a convertible from one of those dates reads the same carry, so it changes too: the UI's fixture, one day from a 1,000 issue on 2025-01-01, moves from total P&L -1,060.42 and carry -999.90 to -60.42 and 0.10.
+
+### Convertibles: value across share prices
+
+`convertible_spot_ladder(bond, market, as_of, spots)` answers how a convertible moves with its stock. Each row reprices on the market with only the share price moved and gives price, delta, hedge ratio, regime, conversion value, parity, conversion premium and the bond floor, in ascending share price. Omit `spots` for 0.25 to 3 times the market's share price. Spots must be finite and positive; they are sorted and duplicates dropped. Price, delta, parity, conversion value, premium and floor are the definitions of the metrics of those names, so the market row equals them.
+
+Regime is new and defined once in Rust, from `hedge_ratio`, delta over the effective conversion ratio: `busted` below 0.40, `balanced` to 0.80, `equity_sensitive` above. The cutoffs are one market convention, the bands Putnam and Lord Abbett publish; MSCI uses thirds (`docs/REFERENCES.md#convertible-delta-bands`). A mandatory-variable bond delivers a moving share count, so its hedge ratio and regime are null.
+
+Bound in Python (`convertible_spot_ladder`, `ConvertibleSpotLadder`, `ConvertibleSpotRow`) and WASM (`valuations.instruments.convertibleSpotLadder`). `metricMetadata` now declares the units of `parity` (dimensionless), `conversion_premium` (decimal), `conversion_value` and `bond_floor` (currency), which were `unknown`. No value moves.
+
+`@finstack/convertible-card` draws it: price, conversion value, floor and regime by share price, parity and premium, one row per share price and metrics by id. A priced convertible in the pricing workbench adds it as an Analytics tab, priced on opening; the ladder and all 17 metric ids take milliseconds. Share prices come from the user or Rust's default ladder.
+
+### UI: bond and loan analytics in the pricing workbench
+
+A priced bond now adds an Analytics result tab with `bond-credit-card`, `yield-workout-ladder` and `quote-converter`, each opening on its own over the completed request; a priced term loan adds one with `loan-yield-card`. No value moved.
+
+### UI: bond credit card, shared metric table, loan default risk
+
+`bond-credit-card` shows a bond's spreads, option value, durations, default risk, carry and breakeven by metric id, each id with its own native error, and offers the schema's form for `theta_period` and `breakeven_config`. `metric-values-table` is the table it shares with `loan-yield-card`; `applicableLoanYieldMetrics` and `LoanYieldRow` give way to its `applicableMetrics` and `MetricValueRow`. `loan-yield-card` adds `recovery01` and `jump_to_default`. No value moved.
+
+### Bonds and loans: recovery01 and jump to default on a hazard curve
+
+`recovery01` and `jump_to_default` are now registered on `Bond`, `TermLoan` and `RevolvingCredit`, in currency, for the whole notional, from the holder's perspective.
+
+`recovery01` is the PV change per +1% (0.01 absolute) recovery move, by central difference of the full PV. It bumps the recovery each pricer reads: the hazard curve's on a bond or term loan, the facility's `recovery_rate` on a revolver. As for a CDS, a curve carrying its calibration recipe is re-bootstrapped to the same par spreads at the bumped recovery, and a hand-built curve keeps its hazard rates. The two differ greatly: at 250bp flat spreads and 40% recovery, a 5% five-year bond on 1mm has 8.03 recalibrated against 1,767.89 frozen, and a premium bond's recalibrated figure is negative. A quoted bond or loan is held at its calibrated spread, as CS01 is.
+
+`jump_to_default` is value on immediate default less current value, and it follows the fractional recovery of par each pricer uses, without accrued interest: `R` times outstanding principal on a bond, `R` times funded balance on a term loan, and `R × drawn + (R − 1) × (leq × undrawn + LC draw)` on a revolver. Notional must be positive on these instruments, so a short is a position with negative quantity.
+
+A bond, term loan or revolver not priced on a hazard curve gets a `Validation` error for either id, never a zero: no `credit_curve_id`, a bond under a model other than `hazard_rate` or `rates_credit`, a term loan under a model other than `tree`, or a revolver with stochastic draws, which takes survival from its simulated spread path. `metricsForInstrument` reads the type, so it lists both for every such instrument; nothing requests them by default. No existing value moves.
+
+### Bonds: G-spread over a named government curve
+
+The new `g_spread` metric is the bond's yield minus the par yield of a named government discount curve, in decimals. It uses the same yield and horizon as `i_spread`, through one shared helper: the worst exit on a bond with exercise rights and a quoted clean price, maturity otherwise. Over the bond's own discount curve it equals `i_spread` bit for bit. This is a working convention, pending the desk's decision on the benchmark: it interpolates the named curve at the horizon and selects no on-the-run bond.
+
+Name the curve in `instrument_pricing_overrides.model_config.government_curve_id`, where `asw_forward_curve_id` already lives. No curve named is a `Validation` error (Python `ValueError`, WASM `kind: "validation"`), never a fallback to the discount curve, and a named curve missing from the market is the usual not-found error. `metricsForInstrument` lists `g_spread` for every bond because it reads the type, so a bond with no curve gets that error only when it asks for the id. Nothing requests it by default: `compute_quotes` and every default metric set are unchanged.
+
+A named curve joins the bond's `market_dependencies` as a discount curve. No price or parallel DV01 moves, with the curve in the market or not, and `bucketed_dv01` gains zero rows for that curve.
+
+### Bonds: an asset-swap quote no longer prices a bond with exercise rights
+
+**Behaviour change.** A bond with exercise rights and `quoted_asw_market`, or `BondQuoteInput::AswMarket` on one, is now an error at every spread, as a Z-spread quote already is. It used to return a price: the inverse runs the swap to maturity, while the `asw_market` metric runs it to the worst exit, which depends on the price, so the returned `asw_market` could differ from the quote (a callable at 108 came back at 119.1566). This reaches every route through the quote path: `value`, `price_instrument`, the price metrics, OAS from a quote and `compute_quotes`. The `asw_market` metric and output field on such a bond are unchanged, and so is the quote on a plain fixed-coupon bond. Quote a clean price, or use OAS.
+
+### Bonds: the whole quote set from any one quote
+
+`compute_quotes` is now bound in Python (`compute_quotes`, `BondQuoteSet`) and WASM (`valuations.instruments.computeQuotes`), with JSON Schemas for `BondQuoteSet` and `BondQuoteInput`. Each yield and spread equals the metric of the same name at that clean price. A field is null when it does not apply to the bond or its metric has no finite value, never infinity or NaN; no finite value moves. A quote kind the bond does not have is an error: `discount_margin` with no floating coupons, `asw_market` or `japanese_simple_yield` on a floating coupon, `z_spread` or `asw_market` with exercise rights. One failed metric fails the whole set. `BondQuoteInput` adds `deny_unknown_fields`; it already rejected an unknown or second key.
+
+`bond_quote_set_field_units(currency)` (Python) and `valuations.instruments.bondQuoteSetFieldUnits` (WASM) state the unit of every field in struct order, including `clean_price_pct` as `% of par`.
+
+The `quote-converter` registry component and `useComputeQuotes` and `useBondQuoteSetFieldUnits` hooks draw it: enter any one quote, read the whole set Rust returns.
+
+### Bonds: yield and spread to every exit
+
+`bond_workout_ladder(bond, market, as_of)` answers which call date is the worst workout and what the yield to each is. It returns one row per admissible call, put and maturity exit: date, kind, redemption price and amount, whether the redemption is make-whole, Street yield, I-spread and whether the row is the worst. The ladder and the `ytw` metric run one walk (`solve_workout_exits`), so the worst row holds that metric's yield and the `i_spread` metric's spread. As that metric does, the spread's par rate runs to the exit date when the bond has an exit other than maturity, and to contractual maturity when it has none. It needs a quoted clean price on a bond with exercise rights and lowers a return floor into calls, as `ytw` does. Yield and spread are null on a path with no finite yield: an exit on the quote date, or same-day cash at or above the price. A worst row can be null, where `ytw` is negative infinity. Z-spread is not reported per exit: no per-exit convention exists.
+
+Bound in Python (`bond_workout_ladder`, `BondWorkoutLadder`, `BondWorkoutRow`) and WASM (`valuations.instruments.bondWorkoutLadder`). No existing value moves.
+
+The `yield-workout-ladder` registry component and `useBondWorkoutLadder` hook draw it, with the row Rust marks as the worst workout.
+
 ### Structured credit: a custom waterfall pays a debt class only what a note is owed
 
 Per tranche and date, `interest_flows` plus `principal_flows` now equals `cashflows` with no exception. A note is owed interest at its rate and the return of its balance. A fixed or percentage amount is a fee formula with no contractual basis as either: it cannot be an extra coupon, and treating it as principal would silently retire the notional of what is usually an interest-only strip or a misrouted fee. So these waterfalls are now refused rather than reclassified.

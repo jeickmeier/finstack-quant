@@ -625,6 +625,12 @@ pub struct ModelConfig {
     /// this forward curve instead of using a discount-curve par-rate proxy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asw_forward_curve_id: Option<CurveId>,
+    /// Optional government discount curve identifier for the bond `g_spread` metric.
+    ///
+    /// The metric subtracts this curve's par yield from the bond's yield. It
+    /// enters no price, and `g_spread` is an error when it is unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub government_curve_id: Option<CurveId>,
     /// Quote compounding convention for OAS inputs and outputs.
     ///
     /// The OAS is added to each short rate on this basis: a semiannual
@@ -930,6 +936,17 @@ impl InstrumentPricingOverrides {
     /// Set the forward curve used by asset-swap metrics.
     pub fn with_asw_forward_curve_id(mut self, curve_id: impl Into<CurveId>) -> Self {
         self.model_config.asw_forward_curve_id = Some(curve_id.into());
+        self
+    }
+
+    /// Set the government discount curve the bond `g_spread` metric reads.
+    ///
+    /// # Arguments
+    ///
+    /// * `curve_id` - Identifier of a discount curve in the market. The metric
+    ///   takes its par yield at the bond's horizon; no price reads it.
+    pub fn with_government_curve_id(mut self, curve_id: impl Into<CurveId>) -> Self {
+        self.model_config.government_curve_id = Some(curve_id.into());
         self
     }
 

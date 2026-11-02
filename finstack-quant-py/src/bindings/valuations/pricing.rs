@@ -521,6 +521,20 @@ fn equity_metrics_field_units<'py>(
     )
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "bond_quote_set_field_units")]
+#[pyfunction]
+#[pyo3(text_signature = "(currency)")]
+fn bond_quote_set_field_units<'py>(
+    py: Python<'py>,
+    currency: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let currency = crate::bindings::core::currency::extract_currency(currency)?;
+    serde_to_py(
+        py,
+        &finstack_quant_valuations::pricer::bond_quote_set_field_units(currency),
+    )
+}
+
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "pool_report_field_units")]
 #[pyfunction]
 #[pyo3(text_signature = "(currency)")]
@@ -736,6 +750,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(metric_metadata, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(price_driver_fields, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(pool_report_field_units, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(bond_quote_set_field_units, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(standard_deal_families, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(scenario_table_field_units, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(simulation_field_units, m)?)?;
@@ -764,6 +779,7 @@ pub(crate) const EXPORTS: &[&str] = &[
     "price_driver_fields",
     "price_instrument",
     "pool_report_field_units",
+    "bond_quote_set_field_units",
     "standard_deal_families",
     "scenario_table_field_units",
     "simulation_field_units",

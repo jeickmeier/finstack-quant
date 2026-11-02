@@ -313,6 +313,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -709,6 +713,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -1109,6 +1117,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -1501,6 +1513,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -2571,6 +2587,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -3187,6 +3207,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -3731,6 +3755,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -4119,6 +4147,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -5670,6 +5702,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -7430,6 +7466,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -7957,6 +7997,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -8704,6 +8748,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -9306,6 +9354,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -9729,6 +9781,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -10331,6 +10387,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -10758,6 +10818,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -11144,6 +11208,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -11542,6 +11610,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -11916,6 +11988,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -12314,6 +12390,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -12730,6 +12810,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -13124,6 +13208,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -13492,6 +13580,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -13878,6 +13970,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -14254,6 +14350,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -14636,6 +14736,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -15004,6 +15108,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -15366,6 +15474,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -15756,6 +15868,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -17219,6 +17335,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -19128,6 +19248,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -19742,6 +19866,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -20188,6 +20316,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -20563,6 +20695,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -20951,6 +21087,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -21326,6 +21466,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -21693,6 +21837,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -22083,6 +22231,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -22467,6 +22619,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -22843,6 +22999,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -23236,6 +23396,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -23779,6 +23943,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -24315,6 +24483,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -24837,6 +25009,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -25197,6 +25373,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -25573,6 +25753,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -26106,6 +26290,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -26643,6 +26831,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -27172,6 +27364,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -27698,6 +27894,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -28247,6 +28447,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -28649,6 +28853,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -29065,6 +29273,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -29463,6 +29675,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -29872,6 +30088,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -30262,6 +30482,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -30850,6 +31074,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -31577,6 +31805,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -32217,6 +32449,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -32747,6 +32983,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -33290,6 +33530,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -33848,6 +34092,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -34393,6 +34641,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -34965,6 +35217,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -35390,6 +35646,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -35858,6 +36118,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -36306,6 +36570,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -37388,6 +37656,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -38311,6 +38583,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -38716,6 +38992,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -39315,6 +39595,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -39958,6 +40242,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -40579,6 +40867,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -41016,6 +41308,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -41392,6 +41688,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -41765,6 +42065,10 @@
         "nullable-union": [
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
@@ -42323,6 +42627,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma_schedule",
             "keyword": "anyOf"
           },
@@ -42731,6 +43039,10 @@
           },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
             "keyword": "anyOf"
           },
           {
