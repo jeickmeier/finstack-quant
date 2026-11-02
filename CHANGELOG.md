@@ -10,6 +10,8 @@ Regime is new and defined once in Rust, from `hedge_ratio`, delta over the effec
 
 Bound in Python (`convertible_spot_ladder`, `ConvertibleSpotLadder`, `ConvertibleSpotRow`) and WASM (`valuations.instruments.convertibleSpotLadder`). `metricMetadata` now declares the units of `parity` (dimensionless), `conversion_premium` (decimal), `conversion_value` and `bond_floor` (currency), which were `unknown`. No value moves.
 
+`@finstack/convertible-card` draws it: price, conversion value, floor and regime by share price, parity and premium, one row per share price and metrics by id. A priced convertible in the pricing workbench adds it as an Analytics tab, priced on opening; the ladder and all 17 metric ids take milliseconds. Share prices come from the user or Rust's default ladder.
+
 ### UI: bond and loan analytics in the pricing workbench
 
 A priced bond now adds an Analytics result tab with `bond-credit-card`, `yield-workout-ladder` and `quote-converter`, each opening on its own over the completed request; a priced term loan adds one with `loan-yield-card`. No value moved.

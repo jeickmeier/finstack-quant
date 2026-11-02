@@ -2322,6 +2322,42 @@
       }
     },
     {
+      "id": "convertible-card",
+      "route": "returned-report",
+      "convention": "Returned ConvertibleSpotLadder of one convertible on the tree model: one row per share price in Rust's ascending order, the share prices the ones entered or Rust's default ladder. Each row's price, delta, parity, conversion value, premium and floor are the metrics of those names at that share price, with volatility, rates and credit as supplied. The regime and the market row are what Rust returned; nothing is classified or compared here. Regime is one market convention, delta over the conversion ratio on the 40 and 80 delta bands. A null hedge ratio, regime or premium shows as undefined, never zero. Metric rows are each priced on their own valuations.instruments.priceInstrumentWithMarket call, so an id's native error stays in its row; column units are what metricMetadata declares.",
+      "api": {
+        "name": "valuations.instruments.convertibleSpotLadder",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "convertibleSpotLadder",
+        "inputs": [
+          {
+            "name": "bond",
+            "type": "ConvertibleBond",
+            "optional": false
+          },
+          {
+            "name": "marketJson",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "spots",
+            "type": "readonly number[] | null",
+            "optional": true
+          }
+        ],
+        "returns": "generated.valuations.ConvertibleSpotLadder",
+        "declaration": "/**\n   * Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices (mirrors Rust `convertible_spot_ladder`).\n   * @param bond - Borrowed `ConvertibleBond` handle; it is not consumed. Its `metric_pricing_overrides.bump_config` sets the spot bump behind delta (default 1% of each row's share price).\n   * @param marketJson - Canonical market-context JSON holding the bond's discount curve, share price, volatility and any dividend yield, hazard curve and floating index.\n   * @param asOf - ISO-8601 valuation date and origin of the tree's ACT/365F clock.\n   * @param spots - Share prices in the bond's currency, each finite and positive, sorted ascending with duplicates dropped; omit for 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2 and 3 times the market's share price.\n   * @returns `ConvertibleSpotLadder` plain object: `instrument_id`, `as_of`, `currency`, `market_spot` and `rows` in ascending share price, each with `spot`, `is_market_spot`, `price`, `conversion_value` and `bond_floor` in `currency`, `parity` over notional, and `delta` per unit of share price, `hedge_ratio` as a decimal share of the conversion ratio, `regime` (`busted` below 0.40, `balanced` to 0.80, `equity_sensitive` above) and `conversion_premium` as a decimal, each `null` where undefined: a mandatory-variable bond has no hedge ratio or regime.\n   * @throws Error - Throws with kind `validation` if `spots` is empty or holds a value that is not finite and positive, or the bond or market JSON is invalid, and kind `not_found` if market data the bond needs is missing.\n   */\n  convertibleSpotLadder(\n    bond: ConvertibleBond,\n    marketJson: string,\n    asOf: string,\n    spots?: readonly number[] | null\n  ): generated.valuations.ConvertibleSpotLadder;",
+        "sha256": "02f7a82dce7ff98978561236fd6eeeba6cba23bb1ef45896fbbe41fb2103728c"
+      }
+    },
+    {
       "id": "loan-yield-card",
       "route": "returned-model",
       "convention": "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model; recovery01 and jump_to_default price on a credit curve under the tree model.",

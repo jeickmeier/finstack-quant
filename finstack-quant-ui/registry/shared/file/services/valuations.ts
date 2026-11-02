@@ -28,6 +28,8 @@ export type ValuationsNative = {
       | "equityMetricsFieldUnits"
       | "Bond"
       | "bondWorkoutLadder"
+      | "ConvertibleBond"
+      | "convertibleSpotLadder"
       | "computeQuotes"
       | "poolReport"
       | "poolReportFieldUnits"
@@ -169,6 +171,23 @@ export function createValuationsService(
             bond,
             request.marketJson,
             request.asOf,
+          );
+        } finally {
+          bond.free();
+        }
+      });
+    },
+    convertibleSpotLadder(request) {
+      return context.result(() => {
+        const bond = instruments.ConvertibleBond.fromJson(
+          request.instrumentJson,
+        );
+        try {
+          return instruments.convertibleSpotLadder(
+            bond,
+            request.marketJson,
+            request.asOf,
+            request.spots as number[] | null | undefined,
           );
         } finally {
           bond.free();
