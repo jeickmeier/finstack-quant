@@ -6,6 +6,8 @@
 
 `theta_carry`, and so `theta`, on a `ConvertibleBond` counted the -notional issue draw when valued on its issue date, and a coupon paid on the valuation date, which the tree's PV already leaves out. A bond issued on the valuation date showed theta near -1,000,000. Both now follow `Bond`: carry excludes the draw and receipts fall in `(as_of, horizon]`. Values change on those two dates only.
 
+P&L attribution of a convertible from one of those dates reads the same carry, so it changes too: the UI's fixture, one day from a 1,000 issue on 2025-01-01, moves from total P&L -1,060.42 and carry -999.90 to -60.42 and 0.10.
+
 ### Convertibles: value across share prices
 
 `convertible_spot_ladder(bond, market, as_of, spots)` answers how a convertible moves with its stock. Each row reprices on the market with only the share price moved and gives price, delta, hedge ratio, regime, conversion value, parity, conversion premium and the bond floor, in ascending share price. Omit `spots` for 0.25 to 3 times the market's share price. Spots must be finite and positive; they are sorted and duplicates dropped. Price, delta, parity, conversion value, premium and floor are the definitions of the metrics of those names, so the market row equals them.
