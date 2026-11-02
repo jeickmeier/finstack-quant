@@ -733,6 +733,14 @@ submission. **Use calibrated market** validates the returned market and updates
 the shared market editor and pricing request. Editing the envelope disables that
 handoff until the current envelope has been solved.
 
+A priced bond adds an **Analytics** result tab with `BondCreditCard`, `YieldWorkoutLadder`
+and `QuoteConverter`. Each opens on its own, makes its own native calls over the completed
+request and shows its own error, so one that fails or takes long leaves the others. The
+worker is one thread, though, so a slow card holds the next call back until it returns: on
+a callable with a `credit_curve_id`, the bond's default model is the rates-credit tree, and
+`oas`, `embedded_option_value`, `cs01` and `recovery01` each take minutes. A priced term
+loan adds the tab with `LoanYieldCard`. A new panel is one entry in `analyticsPanels`.
+
 Evaluated market views take explicit domain inputs through public options:
 
 ```tsx

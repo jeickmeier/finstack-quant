@@ -937,8 +937,8 @@
       "name": "pricing-workbench",
       "type": "registry:block",
       "title": "Pricing workbench",
-      "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows, tranche analytics and scenarios.",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, an equity tranche card over native equityMetrics, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. Host owns routes and domain inputs; the structured-credit seeds are optional.",
+      "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows, bond and loan analytics, tranche analytics and scenarios.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, an equity tranche card over native equityMetrics, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. A priced bond adds an Analytics tab with bond-credit-card, yield-workout-ladder and quote-converter, each opening on its own over the completed request; a priced term loan adds one with loan-yield-card. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "files": [
         {
           "path": "blocks/pricing-workbench/pricing-workbench.tsx",
@@ -979,6 +979,26 @@
           "path": "blocks/pricing-workbench/deal-preset-form.tsx",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/deal-preset-form.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/lazy-section.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/lazy-section.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/instrument-metrics.ts",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/instrument-metrics.ts"
+        },
+        {
+          "path": "blocks/pricing-workbench/bond-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/bond-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/loan-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/loan-panel.tsx"
         },
         {
           "path": "blocks/pricing-workbench/structured-credit-panel.tsx",
@@ -1087,6 +1107,15 @@
         "@finstack/use-list-builtin-template-metadata",
         "@finstack/use-build-from-template",
         "@finstack/use-build-template-component",
+        "@finstack/bond-credit-card",
+        "@finstack/loan-yield-card",
+        "@finstack/metric-values-table",
+        "@finstack/yield-workout-ladder",
+        "@finstack/quote-converter",
+        "@finstack/use-metric-values",
+        "@finstack/use-bond-workout-ladder",
+        "@finstack/use-compute-quotes",
+        "@finstack/primitive-contracts",
         "@finstack/use-compose-scenarios",
         "@finstack/use-apply-market-scenario",
         "@finstack/horizon-return-report",
