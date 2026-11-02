@@ -2,10 +2,13 @@
 import type { MetricMetadata } from "finstack-quant-wasm";
 import type { ExampleProps } from "./props";
 import {
-  applicableLoanYieldMetrics,
   LoanYieldCard,
-  type LoanYieldRow,
+  loanYieldMetrics,
 } from "@/components/finstack/valuations/components/loan-yield-card/loan-yield-card";
+import {
+  applicableMetrics,
+  type MetricValueRow,
+} from "@/components/finstack/valuations/components/metric-values-table/metric-values-table";
 import {
   useMetricMetadata,
   useMetrics,
@@ -21,13 +24,13 @@ const sixPlaces = (value: number) => value.toFixed(6);
 function Card({ density }: ExampleProps) {
   const available = useMetrics(type);
   const metrics = available.data
-    ? applicableLoanYieldMetrics(available.data)
+    ? applicableMetrics(loanYieldMetrics, available.data)
     : null;
   const values = useMetricValues(metrics && { ...request, metrics });
   const metadata = useMetricMetadata(metrics ?? [], metrics !== null);
   return (
     <LoanYieldCard
-      rows={(values.data as LoanYieldRow[] | undefined) ?? null}
+      rows={(values.data as MetricValueRow[] | undefined) ?? null}
       metadata={metadata.data}
       loading={available.isFetching || values.isFetching}
       error={available.error?.message ?? values.error?.message}
@@ -44,7 +47,7 @@ export function Example({ density = "compact" }: ExampleProps) {
       <div className="space-y-6">
         <Card density={density} />
         <LoanYieldCard
-          rows={discounting.rows as unknown as LoanYieldRow[]}
+          rows={discounting.rows as unknown as MetricValueRow[]}
           metadata={discounting.metadata as unknown as MetricMetadata[]}
           formatValue={sixPlaces}
           density={density}

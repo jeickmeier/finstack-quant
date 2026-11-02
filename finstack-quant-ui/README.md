@@ -975,22 +975,57 @@ the discount-margin error, so a card asking for them together would go blank. Ea
 id keeps its value or its native error; a malformed instrument or market is the
 whole error.
 
+`MetricValuesTable` (`@finstack/metric-values-table`) draws those rows, and
+`applicableMetrics` keeps the ids `metricsForInstrument` lists for the type.
+
 `LoanYieldCard` is the view over it, for term loans: `ytm`, `ytw`, `ytc`, `yt2y`,
 `yt3y`, `yt4y`, `discount_margin`, `all_in_rate`, `oid_eir_rate`,
-`oid_eir_amortization` and `embedded_option_value`. `applicableLoanYieldMetrics`
-keeps those `metricsForInstrument` lists for the type, and all eleven are listed
-for `term_loan`. An id Rust rejects shows its error in its row:
-`embedded_option_value` on a callable loan needs the `tree` model, and
-`discount_margin` needs a floating loan and, when callable, a
-`quoted_clean_price_pct`. Yields solve to that quote when the instrument carries
+`oid_eir_amortization`, `embedded_option_value`, `recovery01` and
+`jump_to_default`; all thirteen are listed for `term_loan`. An id Rust rejects
+shows its error in its row: `embedded_option_value` on a callable loan needs the
+`tree` model, `discount_margin` needs a floating loan and, when callable, a
+`quoted_clean_price_pct`, and `recovery01` and `jump_to_default` need a
+`credit_curve_id` under the `tree` model. Yields solve to that quote when the instrument carries
 one, otherwise to the model price, which differs by model. Unit and group are what
 `metricMetadata` declares. It declares no unit for the ids outside a metric group
 (`ytc`, `yt2y`, `yt3y`, `yt4y`, `all_in_rate`, `oid_eir_rate`,
 `oid_eir_amortization`), so the card says "not declared" and never rescales.
 `oid_eir_amortization` shows Rust's total; the per-date keys Rust also returns are
 not shown. The revolver's own card is a later item; on a revolver this card shows
-the five ids Rust lists. The native fixture is
+the seven ids Rust lists. The native fixture is
 `tests/valuations/loan-yield/cases.json`.
+
+## Bond credit card
+
+`BondCreditCard` (`@finstack/bond-credit-card`) answers what a bond's spreads, option
+value, durations, default risk and carry are, and how much a spread or yield can move
+before carry is gone. It draws `useMetricValues` rows for `z_spread`, `i_spread`,
+`g_spread`, `oas`, `asw_par`, `asw_market`, `discount_margin`, `embedded_option_value`,
+`duration_mod`, `duration_mac`, `convexity`, `dv01`, `cs01`, `recovery01`,
+`jump_to_default`, `theta`, `theta_carry`, `theta_roll_down`, `carry_total`,
+`coupon_income`, `pull_to_par`, `roll_down`, `funding_cost`, `theta_period_days` and
+`breakeven`; all twenty-five are listed for `bond`. `MetricGroup::Carry`'s
+`implied_financing_rate`, `roll_specialness` and `carry_decomposition_degenerate` are not.
+
+`metricsForInstrument` lists an id for every bond even where a given bond cannot price
+it, so a row can hold Rust's error and no script decides: `g_spread` needs
+`instrument_pricing_overrides.model_config.government_curve_id`; `recovery01` and
+`jump_to_default` need a `credit_curve_id` under `hazard_rate` or the rates-credit tree;
+`oas` needs a price driver; `discount_margin` needs a floating coupon; `cs01` on a hazard
+curve needs its calibration recipe. Under `discounting` or `hazard_rate` a bond with
+exercise rights errors in every row: select `tree`.
+
+`breakeven` is the first-order or iterative solve of `BreakevenConfig` over the
+`theta_period` horizon. The card's form, with `onOverridesChange`, is the schema's for
+those two `MetricPricingOverrides` fields, over the supplied document, so the other
+fields stay as supplied. The JSON it applies goes on the request as
+`metricPricingOverrides`, which the worker gives Rust to merge into the instrument: no
+target, mode or horizon is assumed. With no `breakeven_config` the row shows Rust's
+error, and with no `theta_period` carry is one day; `theta_period_days` reports it.
+Under `linear` the value is `-carry_total / cs01` for `z_spread` and `oas`, and
+`-carry_total / dv01` for `ytm`, in basis points. `metricMetadata` declares no unit for
+`breakeven`, because it follows the target, so the card says "not declared" and the
+form's target states it. The native fixture is `tests/valuations/bond-credit/cases.json`.
 
 ## Yield workout ladder
 

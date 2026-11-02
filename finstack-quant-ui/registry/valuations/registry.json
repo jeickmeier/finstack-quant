@@ -2,16 +2,16 @@
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "items": [
     {
-      "name": "loan-yield-card",
+      "name": "metric-values-table",
       "type": "registry:component",
-      "title": "Loan yield card",
-      "description": "Yields, discount margin, all-in rate, OID and the call value of a loan by metric id, as Rust returned them, with each id's own native error.",
-      "docs": "Shows the metric ids a loan analyst reads together: ytm, ytw, ytc, yt2y, yt3y, yt4y, discount_margin, all_in_rate, oid_eir_rate, oid_eir_amortization and embedded_option_value. applicableLoanYieldMetrics keeps those Rust lists for the instrument type (metricsForInstrument); pass the result to useMetricValues, which prices each id on its own call because one failing id fails a whole native request, and useMetricMetadata for units and groups. An id Rust rejects (embedded_option_value without the tree model, discount_margin on a fixed loan or on a callable loan without a quote) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. Unit shows what metricMetadata declares and says not declared otherwise; values are never rescaled. Accepts rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "title": "Metric values table",
+      "description": "Metric ids as Rust returned them, each with its own native error, its declared unit and its group.",
+      "docs": "The table the metric-id cards share. Draws useMetricValues rows in the supplied order with labelFor labels; an id Rust rejects shows its native error in its own row and leaves the others, and a whole-request error replaces the table. Unit and group are what metricMetadata declares; a unit it leaves unknown says not declared, and values are never rescaled. applicableMetrics keeps the supplied ids Rust lists for an instrument type (metricsForInstrument). Accepts label, rows, metadata, loading, error, formatValue, density and note props; no worker or query provider required.",
       "files": [
         {
-          "path": "components/loan-yield-card/loan-yield-card.tsx",
+          "path": "components/metric-values-table/metric-values-table.tsx",
           "type": "registry:component",
-          "target": "components/finstack/valuations/components/loan-yield-card/loan-yield-card.tsx"
+          "target": "components/finstack/valuations/components/metric-values-table/metric-values-table.tsx"
         }
       ],
       "registryDependencies": [
@@ -25,6 +25,65 @@
         "finstack-quant-wasm@0.11.0",
         "react@19.2.8"
       ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "bond-credit-card",
+      "type": "registry:component",
+      "title": "Bond credit card",
+      "description": "Spreads, option value, durations, default risk, carry and breakeven of a bond by metric id, as Rust returned them, with each id's own native error.",
+      "docs": "Shows z_spread, i_spread, g_spread, oas, asw_par, asw_market, discount_margin, embedded_option_value, duration_mod, duration_mac, convexity, dv01, cs01, recovery01, jump_to_default, theta, theta_carry, theta_roll_down, carry_total, coupon_income, pull_to_par, roll_down, funding_cost, theta_period_days and breakeven. applicableMetrics keeps those Rust lists for the instrument type; pass the result to useMetricValues and useMetricMetadata. An id Rust rejects (g_spread with no government curve named, recovery01 and jump_to_default off a hazard curve, breakeven with no config, oas with no quote) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. With onOverridesChange it offers the schema's form for theta_period and breakeven_config over the supplied MetricPricingOverrides, keeping the fields it does not edit: pass the applied JSON as the request's metricPricingOverrides. Accepts rows, metadata, loading, error, formatValue, density, overrides and onOverridesChange props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/bond-credit-card/bond-credit-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/bond-credit-card/bond-credit-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/metric-values-table",
+        "@finstack/pricing-params-form",
+        "@finstack/schema-form"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "loan-yield-card",
+      "type": "registry:component",
+      "title": "Loan yield card",
+      "description": "Yields, discount margin, all-in rate, OID, the call value and default risk of a loan by metric id, as Rust returned them, with each id's own native error.",
+      "docs": "Shows the metric ids a loan analyst reads together: ytm, ytw, ytc, yt2y, yt3y, yt4y, discount_margin, all_in_rate, oid_eir_rate, oid_eir_amortization, embedded_option_value, recovery01 and jump_to_default. applicableMetrics from metric-values-table keeps those Rust lists for the instrument type (metricsForInstrument); pass the result to useMetricValues, which prices each id on its own call because one failing id fails a whole native request, and useMetricMetadata for units and groups. An id Rust rejects (embedded_option_value without the tree model, discount_margin on a fixed loan or on a callable loan without a quote, recovery01 and jump_to_default without a credit curve under the tree model) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. Unit shows what metricMetadata declares and says not declared otherwise; values are never rescaled. Accepts rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/loan-yield-card/loan-yield-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/loan-yield-card/loan-yield-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/metric-values-table"
+      ],
+      "dependencies": ["react@19.2.8"],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
@@ -487,6 +546,11 @@
           "path": "components/pricing-params-form/pricing-params-form.tsx",
           "type": "registry:component",
           "target": "components/finstack/valuations/components/pricing-params-form/pricing-params-form.tsx"
+        },
+        {
+          "path": "components/pricing-params-form/metric-overrides.ts",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/pricing-params-form/metric-overrides.ts"
         }
       ],
       "registryDependencies": [
