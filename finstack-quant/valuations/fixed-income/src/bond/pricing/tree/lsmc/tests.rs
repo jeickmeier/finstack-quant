@@ -984,7 +984,7 @@ fn default_daily_training_budget_is_time_blocked_without_path_truncation() {
     let physical_paths = simulated_path_count(DEFAULT_BOND_LSMC_PATHS, true).expect("count");
     // ⌈√3650⌉ = 61 decisions per block.
     let block_len = training_block_len(3_650);
-    let boundaries = training_boundaries(&template).expect("boundaries");
+    let boundaries = training_boundaries(&template, physical_paths).expect("boundaries");
     assert_eq!(block_len, 61);
     assert_eq!(boundaries.len(), 3_650_usize.div_ceil(61) + 1);
     assert_eq!(boundaries.first(), Some(&0));
@@ -1075,7 +1075,14 @@ fn issue_date_initial_exchange_does_not_double_replay_outstanding() {
     tree.sample_path_into(1, 0, false, &mut path)
         .expect("factor path");
     let replay = template
-        .replay(&bond, &path, &config, None, &mut ReplayBuffers::default())
+        .replay(
+            &bond,
+            &path,
+            &config,
+            None,
+            &ReplayTerms::new(&template, &tree, &bond, &config).expect("terms"),
+            &mut ReplayBuffers::default(),
+        )
         .expect("product replay");
     assert_eq!(replay.snapshots[0].features[2], 100.0);
 }
@@ -1279,6 +1286,7 @@ fn overnight_pik_replays_daily_caps_and_mid_accrual_exercise_state() {
             &sampled,
             &config,
             None,
+            &ReplayTerms::new(&capped_template, &tree, &capped, &config).expect("terms"),
             &mut ReplayBuffers::default(),
         )
         .expect("capped overnight replay");
@@ -1288,6 +1296,7 @@ fn overnight_pik_replays_daily_caps_and_mid_accrual_exercise_state() {
             &sampled,
             &config,
             None,
+            &ReplayTerms::new(&uncapped_template, &tree, &uncapped, &config).expect("terms"),
             &mut ReplayBuffers::default(),
         )
         .expect("uncapped overnight replay");
@@ -1324,6 +1333,7 @@ fn overnight_pik_replays_daily_caps_and_mid_accrual_exercise_state() {
             &sampled,
             &config,
             None,
+            &ReplayTerms::new(&callable_template, &tree, &callable, &config).expect("terms"),
             &mut ReplayBuffers::default(),
         )
         .expect("callable overnight replay");
@@ -1561,6 +1571,7 @@ fn two_time_blocks_match_full_replay_at_cash_amortization_exercise_boundary() {
             &full_path,
             &config,
             None,
+            &ReplayTerms::new(&template, &tree, &bond, &config).expect("terms"),
             &mut ReplayBuffers::default(),
         )
         .expect("full product replay");
@@ -1593,6 +1604,7 @@ fn two_time_blocks_match_full_replay_at_cash_amortization_exercise_boundary() {
             0,
             1,
             None,
+            &ReplayTerms::new(&template, &tree, &bond, &config).expect("terms"),
             &mut segment,
         )
         .expect("low block");
@@ -1608,6 +1620,7 @@ fn two_time_blocks_match_full_replay_at_cash_amortization_exercise_boundary() {
             1,
             2,
             None,
+            &ReplayTerms::new(&template, &tree, &bond, &config).expect("terms"),
             &mut segment,
         )
         .expect("high block");
@@ -1753,4 +1766,74 @@ fn same_day_terminal_claim_has_no_next_day_credit_or_rate_exposure() {
         ..terminal.clone()
     };
     assert_eq!(issuer_call.exercise_value(-999.0, 999.0), 90.0);
+}
+
+#[test]
+fn few_exercise_dates_train_in_one_block_without_a_checkpoint_pass() {
+    let mut template = synthetic_daily_template(1_000, false);
+    template.decision_steps = vec![0, 400, 700, 1_000];
+    let physical_paths = simulated_path_count(DEFAULT_BOND_LSMC_PATHS, true).expect("count");
+    assert_eq!(
+        training_boundaries(&template, physical_paths).expect("boundaries"),
+        vec![0, 3]
+    );
+}
+
+/// The tables are an optimization: replaying through them must give the same
+/// bits as the path-dependent arithmetic they stand in for, on every node a path
+/// reaches, in or out of the tabulated band.
+#[test]
+fn replay_terms_tables_preserve_replay_bits() {
+    let as_of = time::macros::date!(2025 - 01 - 01);
+    let maturity = time::macros::date!(2025 - 01 - 05);
+    let bond = stochastic_test_bond(as_of, maturity);
+    let tree = stochastic_test_tree(4);
+    let mut template = synthetic_daily_template(4, false);
+    template.step_dates = (0_i64..=4)
+        .map(|offset| as_of.checked_add(Duration::days(offset)))
+        .collect();
+    template.decision_steps = vec![0, 2, 4];
+    template.static_cash[2].push(CashEvent {
+        amount_at_step: 15.0,
+        event_minus_step: 0.0,
+    });
+    template.balance_events[2].push(BalanceEvent { delta: -10.0 });
+    let config = BondLsmcConfig {
+        paths: 1,
+        antithetic: false,
+        seed: 77,
+        oas_bp: 125.0,
+        target_ci_half_width: None,
+    };
+    let tabled = ReplayTerms::new(&template, &tree, &bond, &config).expect("terms");
+    let direct = ReplayTerms::new(&template, &tree, &bond, &config)
+        .expect("terms")
+        .without_tables();
+    let mut path = Vec::new();
+    for path_index in 0..64 {
+        tree.sample_path_into(9, path_index, false, &mut path)
+            .expect("factor path");
+        let replay = |terms: &ReplayTerms| {
+            template
+                .replay(
+                    &bond,
+                    &path,
+                    &config,
+                    None,
+                    terms,
+                    &mut ReplayBuffers::default(),
+                )
+                .expect("replay")
+        };
+        let (tabled, direct) = (replay(&tabled), replay(&direct));
+        for (tabled, direct) in tabled.snapshots.iter().zip(&direct.snapshots) {
+            assert_eq!(tabled.a_to_next.to_bits(), direct.a_to_next.to_bits());
+            assert_eq!(tabled.b_to_next.to_bits(), direct.b_to_next.to_bits());
+            assert_eq!(tabled.current_cash.to_bits(), direct.current_cash.to_bits());
+            assert_eq!(
+                tabled.features.map(f64::to_bits),
+                direct.features.map(f64::to_bits)
+            );
+        }
+    }
 }
