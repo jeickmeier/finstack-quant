@@ -10,114 +10,72 @@
       "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c"
     }
   ],
-  "metadata": [
+  "currency": "USD",
+  "units": [
     {
-      "key": "clean_price",
-      "metric": "clean_price",
-      "components": [],
-      "coordinates": [],
-      "unit": "currency",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "clean_price_currency",
+      "label": "USD",
+      "source": "valuations::BondQuoteSet::clean_price_currency"
     },
     {
-      "key": "dirty_price",
-      "metric": "dirty_price",
-      "components": [],
-      "coordinates": [],
-      "unit": "currency",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "clean_price_pct",
+      "label": "% of par",
+      "source": "valuations::BondQuoteSet::clean_price_pct"
     },
     {
-      "key": "ytm",
-      "metric": "ytm",
-      "components": [],
-      "coordinates": [],
-      "unit": "decimal",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "dirty_price_currency",
+      "label": "USD",
+      "source": "valuations::BondQuoteSet::dirty_price_currency"
     },
     {
-      "key": "ytw",
-      "metric": "ytw",
-      "components": [],
-      "coordinates": [],
-      "unit": "decimal",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "ytm",
+      "label": "decimal",
+      "source": "valuations::BondQuoteSet::ytm"
     },
     {
-      "key": "z_spread",
-      "metric": "z_spread",
-      "components": [],
-      "coordinates": [],
-      "unit": "decimal",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "ytw",
+      "label": "decimal",
+      "source": "valuations::BondQuoteSet::ytw"
     },
     {
-      "key": "discount_margin",
-      "metric": "discount_margin",
-      "components": [],
-      "coordinates": [],
-      "unit": "decimal",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "z_spread",
+      "label": "decimal",
+      "source": "valuations::BondQuoteSet::z_spread"
     },
     {
-      "key": "oas",
-      "metric": "oas",
-      "components": [],
-      "coordinates": [],
-      "unit": "decimal",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "discount_margin",
+      "label": "decimal",
+      "source": "valuations::BondQuoteSet::discount_margin"
     },
     {
-      "key": "asw_par",
-      "metric": "asw_par",
-      "components": [],
-      "coordinates": [],
-      "unit": "decimal",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "oas",
+      "label": "decimal",
+      "source": "valuations::BondQuoteSet::oas"
     },
     {
-      "key": "asw_market",
-      "metric": "asw_market",
-      "components": [],
-      "coordinates": [],
-      "unit": "decimal",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "asw_par",
+      "label": "decimal",
+      "source": "valuations::BondQuoteSet::asw_par"
     },
     {
-      "key": "i_spread",
-      "metric": "i_spread",
-      "components": [],
-      "coordinates": [],
-      "unit": "decimal",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "asw_market",
+      "label": "decimal",
+      "source": "valuations::BondQuoteSet::asw_market"
     },
     {
-      "key": "japanese_simple_yield",
-      "metric": "japanese_simple_yield",
-      "components": [],
-      "coordinates": [],
-      "unit": "decimal",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "i_spread",
+      "label": "decimal",
+      "source": "valuations::BondQuoteSet::i_spread"
     },
     {
-      "key": "moosmuller_ytm",
-      "metric": "moosmuller_ytm",
-      "components": [],
-      "coordinates": [],
-      "unit": "decimal",
-      "group": "Pricing",
-      "bucketed": false
+      "field": "japanese_simple_yield",
+      "label": "decimal",
+      "source": "valuations::BondQuoteSet::japanese_simple_yield"
+    },
+    {
+      "field": "moosmuller_ytm",
+      "label": "decimal",
+      "source": "valuations::BondQuoteSet::moosmuller_ytm"
     }
   ],
   "errors": {

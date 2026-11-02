@@ -23259,6 +23259,13 @@ export interface ValuationInstrumentsNamespace {
    */
   poolReportFieldUnits(currency: string): PoolReportFieldUnits;
   /**
+   * Units of the `BondQuoteSet` fields, in struct order, the one place a host reads them from.
+   * @param currency - ISO-4217 code of the bond whose set is being labelled, in any ASCII case; it names the unit of `clean_price_currency` and `dirty_price_currency`.
+   * @returns One `MetricFieldUnit` per `BondQuoteSet` field in struct order: the wire field name, its unit text and the Rust field the unit is documented on.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  bondQuoteSetFieldUnits(currency: string): MetricFieldUnit[];
+  /**
    * Units of the scalar `TrancheMetrics` fields, in struct order.
    * @param currency - ISO-4217 code of the result's `TrancheMetrics.currency`, in any ASCII case; it names the unit of `pv`, `accrued` and `cs01`.
    * @returns One `MetricFieldUnit` per scalar field: the wire field name, its unit text and the Rust field that documents it. `tranche_id`, `currency` and the `metrics` map are not listed.

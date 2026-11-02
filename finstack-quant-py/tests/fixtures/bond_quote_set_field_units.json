@@ -1,0 +1,67 @@
+[
+  {
+    "field": "clean_price_currency",
+    "label": "EUR",
+    "source": "valuations::BondQuoteSet::clean_price_currency"
+  },
+  {
+    "field": "clean_price_pct",
+    "label": "% of par",
+    "source": "valuations::BondQuoteSet::clean_price_pct"
+  },
+  {
+    "field": "dirty_price_currency",
+    "label": "EUR",
+    "source": "valuations::BondQuoteSet::dirty_price_currency"
+  },
+  {
+    "field": "ytm",
+    "label": "decimal",
+    "source": "valuations::BondQuoteSet::ytm"
+  },
+  {
+    "field": "ytw",
+    "label": "decimal",
+    "source": "valuations::BondQuoteSet::ytw"
+  },
+  {
+    "field": "z_spread",
+    "label": "decimal",
+    "source": "valuations::BondQuoteSet::z_spread"
+  },
+  {
+    "field": "discount_margin",
+    "label": "decimal",
+    "source": "valuations::BondQuoteSet::discount_margin"
+  },
+  {
+    "field": "oas",
+    "label": "decimal",
+    "source": "valuations::BondQuoteSet::oas"
+  },
+  {
+    "field": "asw_par",
+    "label": "decimal",
+    "source": "valuations::BondQuoteSet::asw_par"
+  },
+  {
+    "field": "asw_market",
+    "label": "decimal",
+    "source": "valuations::BondQuoteSet::asw_market"
+  },
+  {
+    "field": "i_spread",
+    "label": "decimal",
+    "source": "valuations::BondQuoteSet::i_spread"
+  },
+  {
+    "field": "japanese_simple_yield",
+    "label": "decimal",
+    "source": "valuations::BondQuoteSet::japanese_simple_yield"
+  },
+  {
+    "field": "moosmuller_ytm",
+    "label": "decimal",
+    "source": "valuations::BondQuoteSet::moosmuller_ytm"
+  }
+]

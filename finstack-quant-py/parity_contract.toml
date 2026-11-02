@@ -1018,6 +1018,7 @@ public = [
     "VarResult",
     "Waterfall",
     "bond_from_cashflows_json",
+    "bond_quote_set_field_units",
     "bond_workout_ladder",
     "calculate_pool_stats",
     "calculate_var",

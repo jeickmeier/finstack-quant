@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { MetricMetadata } from "finstack-quant-wasm";
+import type { MetricFieldUnit } from "finstack-quant-wasm";
 import type { valuations } from "finstack-quant-wasm/types";
 import { Button } from "@/components/ui/button";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
@@ -20,26 +20,6 @@ const kinds = contracts.bond_quote_input.schema.oneOf.map((branch) => ({
   label: labelFor(branch.required[0]),
   description: branch.description,
 }));
-/** The metric id of a set field named differently from its metric; clean_price_pct has none. */
-const fieldMetric: Readonly<Record<string, string>> = {
-  clean_price_currency: "clean_price",
-  dirty_price_currency: "dirty_price",
-};
-/** Metric ids whose units `metricMetadata` declares for the set's fields. */
-export const quoteSetMetrics = [
-  "clean_price",
-  "dirty_price",
-  "ytm",
-  "ytw",
-  "z_spread",
-  "discount_margin",
-  "oas",
-  "asw_par",
-  "asw_market",
-  "i_spread",
-  "japanese_simple_yield",
-  "moosmuller_ytm",
-] as const;
 type Row = readonly [field: string, value: number | null | undefined];
 /** An empty field is NaN, which Rust rejects, not the zero `Number("")` would send. */
 const typed = (value: string) =>
@@ -51,8 +31,8 @@ export interface QuoteConverterProps {
   onSubmit(input: QuoteInput): void;
   /** The native computeQuotes result; null while none is available. */
   quotes: QuoteSet | null;
-  /** Native metricMetadata of `quoteSetMetrics`: the units of the set's fields. */
-  metadata?: readonly MetricMetadata[];
+  /** Native bondQuoteSetFieldUnits for the bond's currency; connect useBondQuoteSetFieldUnits. */
+  units: readonly MetricFieldUnit[] | null;
   loading?: boolean;
   /** The native error of the request (a failed solve, a quote kind the bond lacks), shown as returned. */
   error?: string;
@@ -69,7 +49,7 @@ export function QuoteConverter({
   defaultInput,
   onSubmit,
   quotes,
-  metadata,
+  units,
   loading,
   error,
   formatValue = String,
@@ -80,9 +60,7 @@ export function QuoteConverter({
   const [value, setValue] = useState(String(defaultValue));
   const columns = useMemo<ColumnDef<{}, Row, any>[]>(() => {
     const unit = (field: string) => {
-      const declared = metadata?.find(
-        (entry) => entry.key === (fieldMetric[field] ?? field),
-      )?.unit;
+      const declared = units?.find((entry) => entry.field === field)?.label;
       return declared ? ` (${declared})` : "";
     };
     return [
@@ -116,7 +94,7 @@ export function QuoteConverter({
         meta: { className: "text-right finstack-numeric" },
       },
     ];
-  }, [metadata, formatValue]);
+  }, [units, formatValue]);
   const rows = useMemo<Row[]>(
     () => (quotes ? (Object.entries(quotes) as unknown as Row[]) : []),
     [quotes],

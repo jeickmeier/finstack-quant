@@ -1015,8 +1015,8 @@ given any one of them. The user picks a kind and enters a value; it draws one
 (`@finstack/use-compute-quotes`), in Rust's field order. The kinds are the branches
 of the `BondQuoteInput` schema, carried in `primitive-contracts.json` as the day-count
 and business-day selects carry theirs. Each yield and spread is the metric of the same
-name at that clean price, with the unit `metricMetadata` declares for
-`quoteSetMetrics`; `clean_price_pct` has no metric id and its label states its unit.
+name at that clean price. Units are what `bondQuoteSetFieldUnits` returns for the bond's
+currency, fetched with `useBondQuoteSetFieldUnits`, one record per field in struct order.
 A null field shows as "No value", never zero: it does not apply to the bond or has no
 finite value. A quote that cannot be solved shows the native error as returned: a kind
 the bond does not have (`discount_margin` with no floating coupons, `asw_market` or

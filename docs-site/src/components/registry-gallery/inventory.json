@@ -183,7 +183,7 @@
     {
       "name": "quote-converter",
       "type": "registry:component",
-      "docs": "Answers what a bond's other quotes are given any one of them. Offers the quote kinds of the BondQuoteInput schema and presents a native valuations.instruments.computeQuotes result (useComputeQuotes) in Rust's field order. Pass metricMetadata of quoteSetMetrics for the units. A null field shows as no value, never zero. A quote that cannot be solved, a kind the bond does not have or one metric of the set failing, shows the native error as returned. Nothing is converted or compared. Accepts defaultInput, onSubmit, quotes, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "docs": "Answers what a bond's other quotes are given any one of them. Offers the quote kinds of the BondQuoteInput schema and presents a native valuations.instruments.computeQuotes result (useComputeQuotes) in Rust's field order. Pass native bondQuoteSetFieldUnits (useBondQuoteSetFieldUnits) for the units. A null field shows as no value, never zero. A quote that cannot be solved, a kind the bond does not have or one metric of the set failing, shows the native error as returned. Nothing is converted or compared. Accepts defaultInput, onSubmit, quotes, units, loading, error, formatValue and density props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -1564,7 +1564,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/quote-converter/cases.json",
-      "sha256": "fa80ae1e7163b8657b71b3b583fabca76e5d74cbbfa1e99be871a456fae30917"
+      "sha256": "9d9080ad43aaf5f687d12cdee9b48f120ecb6b38469d7576d49d469c1734ee8b"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",

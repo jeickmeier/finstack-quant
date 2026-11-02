@@ -10,7 +10,9 @@
 
 `compute_quotes` is now bound in Python (`compute_quotes`, `BondQuoteSet`) and WASM (`valuations.instruments.computeQuotes`), with JSON Schemas for `BondQuoteSet` and `BondQuoteInput`. Each yield and spread equals the metric of the same name at that clean price. A field is null when it does not apply to the bond or its metric has no finite value, never infinity or NaN; no finite value moves. A quote kind the bond does not have is an error: `discount_margin` with no floating coupons, `asw_market` or `japanese_simple_yield` on a floating coupon, `z_spread` or `asw_market` with exercise rights. One failed metric fails the whole set. `BondQuoteInput` adds `deny_unknown_fields`; it already rejected an unknown or second key.
 
-The `quote-converter` registry component and `useComputeQuotes` hook draw it: enter any one quote, read the whole set Rust returns.
+`bond_quote_set_field_units(currency)` (Python) and `valuations.instruments.bondQuoteSetFieldUnits` (WASM) state the unit of every field in struct order, including `clean_price_pct` as `% of par`.
+
+The `quote-converter` registry component and `useComputeQuotes` and `useBondQuoteSetFieldUnits` hooks draw it: enter any one quote, read the whole set Rust returns.
 
 ### Bonds: yield and spread to every exit
 

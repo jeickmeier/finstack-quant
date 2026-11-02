@@ -23,12 +23,12 @@ import {
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
 import {
   computeQuotesOptions,
+  useBondQuoteSetFieldUnits,
   useComputeQuotes,
   type ComputeQuotesRequest,
 } from "@/hooks/valuations/use-compute-quotes/use-compute-quotes";
 import {
   QuoteConverter,
-  quoteSetMetrics,
   type QuoteConverterProps,
   type QuoteInput,
   type QuoteSet,
@@ -56,6 +56,10 @@ beforeEach(() => {
     call: vi.fn(async (method: string, request: unknown) => {
       if (method === "initialize")
         return unwrap(await harness.proxy.initialize());
+      if (method === "bondQuoteSetFieldUnits")
+        return unwrap(
+          await harness.proxy.bondQuoteSetFieldUnits(request as string),
+        );
       if (method === "computeQuotes")
         return unwrap(
           await harness.proxy.computeQuotes(request as ComputeQuotesRequest),
@@ -69,8 +73,8 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-const { cases, errors } = fixture;
-const metadata = fixture.metadata as QuoteConverterProps["metadata"];
+const { cases, errors, currency } = fixture;
+const units = fixture.units as QuoteConverterProps["units"];
 const setOf = (entry: { quotes: unknown }) => entry.quotes as QuoteSet;
 const inputOf = (entry: { request: { quoteInput: unknown } }) =>
   entry.request.quoteInput as QuoteInput;
@@ -127,6 +131,7 @@ it("offers the kinds the BondQuoteInput schema accepts, in its order", async () 
       defaultInput={{ clean_price_pct: 99 }}
       onSubmit={() => {}}
       quotes={null}
+      units={null}
     />,
   );
   fireEvent.click(screen.getByRole("combobox"));
@@ -144,6 +149,7 @@ it("submits the entered kind and value as Rust's single-key quote", () => {
       defaultInput={{ ytm: 0.05 }}
       onSubmit={onSubmit}
       quotes={null}
+      units={null}
     />,
   );
   fireEvent.change(screen.getByRole("textbox"), {
@@ -161,6 +167,7 @@ it(
         defaultInput={{ ytm: 0.05 }}
         onSubmit={onSubmit}
         quotes={null}
+        units={null}
       />,
     );
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "" } });
@@ -181,7 +188,7 @@ it("draws every field Rust returned, in its order, with its declared unit", () =
       defaultInput={inputOf(cases.clean)}
       onSubmit={() => {}}
       quotes={quotes}
-      metadata={metadata}
+      units={units}
     />,
   );
   const rows = screen.getAllByRole("row").slice(1);
@@ -196,12 +203,25 @@ it("draws every field Rust returned, in its order, with its declared unit", () =
   );
   expect(
     valueOf("clean_price_currency").getByRole("rowheader").textContent,
-  ).toBe(`${labelFor("clean_price_currency")} (currency)`);
-  expect(
-    within(rows[1]).getByRole("rowheader").textContent,
-    "clean_price_pct has no metric, so no unit of its own",
-  ).toBe(labelFor("clean_price_pct"));
+  ).toBe(`${labelFor("clean_price_currency")} (${currency})`);
+  expect(within(rows[1]).getByRole("rowheader").textContent).toBe(
+    `${labelFor("clean_price_pct")} (% of par)`,
+  );
 });
+it("lists a unit for every field of the set, in the set's order", () => {
+  expect(fixture.units.map((unit) => unit.field)).toEqual(
+    Object.keys(setOf(cases.clean)),
+  );
+});
+it(
+  "the worker returns the native units",
+  async () => {
+    expect(
+      unwrap(await harness.proxy.bondQuoteSetFieldUnits(currency)),
+    ).toEqual(fixture.units);
+  },
+  budget(30000),
+);
 it("draws a supplied value as it came, compared with nothing", () => {
   // ytw above ytm can't come from Rust's walk: nothing here clamps or reorders it.
   const swapped = { ...setOf(cases.clean), ytm: 0.01, ytw: 0.09 };
@@ -210,6 +230,7 @@ it("draws a supplied value as it came, compared with nothing", () => {
       defaultInput={inputOf(cases.clean)}
       onSubmit={() => {}}
       quotes={swapped}
+      units={null}
     />,
   );
   expect(valueOf("ytm").getByTitle("0.01")).toBeTruthy();
@@ -221,6 +242,7 @@ it("shows a null field as no value, never zero", () => {
       defaultInput={inputOf(cases.clean)}
       onSubmit={() => {}}
       quotes={setOf(cases.clean)}
+      units={null}
     />,
   );
   expect(setOf(cases.clean).discount_margin).toBeNull();
@@ -231,6 +253,7 @@ it("shows a null field as no value, never zero", () => {
       defaultInput={inputOf(cases.frn)}
       onSubmit={() => {}}
       quotes={setOf(cases.frn)}
+      units={null}
     />,
   );
   expect(valueOf("asw_market").getByText("No value")).toBeTruthy();
@@ -247,6 +270,7 @@ it("shows the native error of a failed solve as returned, and keeps the form", (
       defaultInput={{ clean_price_pct: 100 }}
       onSubmit={() => {}}
       quotes={null}
+      units={null}
       error={message}
     />,
   );
@@ -255,18 +279,17 @@ it("shows the native error of a failed solve as returned, and keeps the form", (
   expect(screen.getByRole("button", { name: "Convert" })).toBeTruthy();
 });
 it("states loading and no result", () => {
-  const props = { defaultInput: { ytm: 0.05 }, onSubmit: () => {} };
+  const props = {
+    defaultInput: { ytm: 0.05 },
+    onSubmit: () => {},
+    units: null,
+  };
   const { rerender } = render(
     <QuoteConverter {...props} quotes={null} loading />,
   );
   expect(screen.getByRole("status").textContent).toBe("Solving quotes…");
   rerender(<QuoteConverter {...props} quotes={null} />);
   expect(screen.getByRole("status").textContent).toBe("No quote set");
-});
-it("asks metricMetadata for every id a field maps to", () => {
-  expect(new Set(fixture.metadata.map((entry) => entry.key))).toEqual(
-    new Set(quoteSetMetrics),
-  );
 });
 it("the hook is disabled without a request and keys on the whole request", () => {
   const client = {} as FinstackClient;
@@ -278,11 +301,13 @@ it("the hook is disabled without a request and keys on the whole request", () =>
 });
 function Live() {
   const quotes = useComputeQuotes(requestOf(cases.callable));
+  const fieldUnits = useBondQuoteSetFieldUnits(currency);
   return (
     <QuoteConverter
       defaultInput={inputOf(cases.callable)}
       onSubmit={() => {}}
       quotes={(quotes.data as QuoteSet | undefined) ?? null}
+      units={fieldUnits.data ?? null}
       error={quotes.error?.message}
     />
   );
@@ -301,6 +326,13 @@ it(
     expect(
       valueOf("ytw").getByTitle(String(setOf(cases.callable).ytw)),
     ).toBeTruthy();
+    await waitFor(
+      () =>
+        expect(valueOf("ytw").getByRole("rowheader").textContent).toBe(
+          "YTW (decimal)",
+        ),
+      { timeout: budget(30000) },
+    );
   },
   budget(40000),
 );
