@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: bond and loan analytics in the pricing workbench
+
+A priced bond now adds an Analytics result tab with `bond-credit-card`, `yield-workout-ladder` and `quote-converter`, each opening on its own over the completed request; a priced term loan adds one with `loan-yield-card`. No value moved.
+
 ### UI: bond credit card, shared metric table, loan default risk
 
 `bond-credit-card` shows a bond's spreads, option value, durations, default risk, carry and breakeven by metric id, each id with its own native error, and offers the schema's form for `theta_period` and `breakeven_config`. `metric-values-table` is the table it shares with `loan-yield-card`; `applicableLoanYieldMetrics` and `LoanYieldRow` give way to its `applicableMetrics` and `MetricValueRow`. `loan-yield-card` adds `recovery01` and `jump_to_default`. No value moved.

@@ -1,5 +1,5 @@
 "use client";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { InstrumentForm } from "@/components/finstack/valuations/components/instrument-form/instrument-form";
@@ -23,6 +23,8 @@ import {
 } from "@/components/finstack/models/components/fx-surface-chart/fx-surface-chart";
 import { DealPresetPanel } from "./deal-preset-panel";
 import { StructuredCreditPanel } from "./structured-credit-panel";
+import { BondPanel } from "./bond-panel";
+import { LoanPanel } from "./loan-panel";
 import { CalibrationPanel } from "./calibration-panel";
 import {
   MarketScenarioInputs,
@@ -44,6 +46,16 @@ import { resolveModel } from "@/workers/finstack-contract";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import { useWorkbenchSession } from "./use-workbench-session";
 import { WorkbenchSettings } from "./workbench-settings";
+/** The analytics panel of a priced instrument type; a type absent here has no Analytics tab. */
+const analyticsPanels: Readonly<
+  Record<
+    string,
+    ComponentType<{
+      request: PriceRequest;
+      density?: "compact" | "comfortable";
+    }>
+  >
+> = { bond: BondPanel, term_loan: LoanPanel };
 export function PricingWorkbench({
   defaultRequest,
   density = "compact",
@@ -191,6 +203,9 @@ export function PricingWorkbench({
   const comparison = printSnapshot
     ? noComparison
     : marketScenarioSession.comparison;
+  const AnalyticsPanel = completed
+    ? analyticsPanels[completed.instrumentType]
+    : undefined;
   const dimensionalCount = dimensionalMeasureCount({
     result: shown?.result,
     metadata: measureMetadata.data,
@@ -564,6 +579,9 @@ export function PricingWorkbench({
                     {type === "structured_credit" && (
                       <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
                     )}
+                    {Object.hasOwn(analyticsPanels, type) && (
+                      <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                    )}
                   </TabsList>
                 </div>
                 <TabsContent value="measures" className="print:hidden">
@@ -670,6 +688,17 @@ export function PricingWorkbench({
                     label="Last priced request JSON"
                     text={completed ? JSON.stringify(completed.request) : null}
                   />
+                </TabsContent>
+                <TabsContent value="analytics" className="print:hidden">
+                  {AnalyticsPanel && completed ? (
+                    <AnalyticsPanel
+                      key={JSON.stringify(completed.request)}
+                      request={completed.request}
+                      density={currentDensity}
+                    />
+                  ) : (
+                    <p>Analytics are unavailable for this instrument.</p>
+                  )}
                 </TabsContent>
                 <TabsContent value="scenarios" className="print:hidden">
                   {completed?.instrumentType === "structured_credit" ? (
