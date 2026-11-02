@@ -58,10 +58,11 @@ pub fn package_schema(schema: &mut Value) -> Result<()> {
 }
 
 use crate::{
-    analysis::BridgeChart, analysis::CapexReconciliation, analysis::CeclConfig,
-    analysis::CeclResult, analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions,
-    analysis::CoverageFloorCheck, analysis::CreditAssessment, analysis::DcfOptions,
-    analysis::DcfSensitivityResult, analysis::DependencyTree, analysis::DepreciationReconciliation,
+    analysis::BridgeChart, analysis::CapexReconciliation, analysis::CapitalStructureSummary,
+    analysis::CapitalStructureSummaryConfig, analysis::CeclConfig, analysis::CeclResult,
+    analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions, analysis::CoverageFloorCheck,
+    analysis::CreditAssessment, analysis::DcfOptions, analysis::DcfSensitivityResult,
+    analysis::DependencyTree, analysis::DepreciationReconciliation,
     analysis::DividendReconciliation, analysis::EclConfig, analysis::EffectiveTaxRateCheck,
     analysis::Explanation, analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
     analysis::GoalSeekResult, analysis::GrowthRateConsistency,
@@ -93,6 +94,22 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "capex_reconciliation",
         Component,
         "Verifies that cash-flow-statement capex equals the sum of PP&E additions and intangible additions."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CapitalStructureSummary,
+        "statements_analytics",
+        "capital_structure_summary",
+        Output,
+        "Debt stack by seniority at one period: leverage and coverage through each payment class, and the maturity wall."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CapitalStructureSummaryConfig,
+        "statements_analytics",
+        "capital_structure_summary_config",
+        Input,
+        "Reporting period and statement nodes for a capital structure summary."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

@@ -21,6 +21,7 @@ export const statements_analytics = {
   plSummaryReportText: wasm.plSummaryReportText,
   creditAssessmentReportText: wasm.creditAssessmentReportText,
   creditAssessment: wasm.creditAssessment,
+  capitalStructureSummary: wasm.capitalStructureSummary,
   evaluateCovenants: wasm.evaluateCovenants,
   // Raw export is prefixed: `forecastBreaches` is also the covenants
   // namespace's forecast over dated metric rows, so the raw names must differ.

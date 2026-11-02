@@ -3,7 +3,7 @@
 //! This module provides tools for:
 //!
 //! - DCF corporate valuation and the orchestrated analysis pipeline
-//! - Covenant forecasting and credit coverage metrics
+//! - Covenant forecasting, credit coverage metrics and the debt stack by seniority
 //! - Scenario sets, sensitivity sweeps, and variance
 //! - Dependency tracing and formula explanation ([`DependencyTracer`], [`explain_formula`])
 //! - Formatted P&L summaries and credit assessment reports ([`PLSummaryReport`])
@@ -53,8 +53,10 @@ mod reports;
 
 pub use backtesting::{backtest_forecast, ForecastMetrics};
 pub use credit::{
-    compute_credit_context, evaluate_covenants, forecast_breaches, CreditContextMetrics,
-    CreditNumeratorNodes, StatementsAdapter,
+    capital_structure_summary, compute_credit_context, evaluate_covenants, forecast_breaches,
+    CapitalStructureSummary, CapitalStructureSummaryConfig, CapitalStructureTranche,
+    CreditContextMetrics, CreditNumeratorNodes, DebtInstrumentKind, MaturityWallBucket,
+    StatementsAdapter,
 };
 pub use goal_seek::{goal_seek, GoalSeekResult};
 pub use introspection::{

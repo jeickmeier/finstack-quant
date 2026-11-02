@@ -4167,6 +4167,7 @@
       "addRollForwardWithOpening",
       "addVintageBuildup",
       "backtestForecast",
+      "capitalStructureSummary",
       "classifyStage",
       "companyMetricsGet",
       "computeEcl",
@@ -4296,6 +4297,9 @@
     "kind": "function"
   },
   "statements_analytics.creditAssessment": {
+    "kind": "function"
+  },
+  "statements_analytics.capitalStructureSummary": {
     "kind": "function"
   },
   "statements_analytics.evaluateCovenants": {

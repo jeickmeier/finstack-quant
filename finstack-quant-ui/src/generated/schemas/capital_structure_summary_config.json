@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Reporting period and statement nodes for a capital structure summary.",
+  "properties": {
+    "cash_node": {
+      "description": "Statement node holding the cash balance at the end of each period.\nOmitted, the summary has no cash, net debt or net leverage.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ebitda_node": {
+      "description": "Statement node holding EBITDA for each single period (not already\ntrailing). Never inferred from a conventional name.",
+      "type": "string"
+    },
+    "period": {
+      "$ref": "#/$defs/d_c53a00668cf357faa951",
+      "description": "Reporting period: balances are read at it and the LTM window ends at it."
+    }
+  },
+  "required": [
+    "period",
+    "ebitda_node"
+  ],
+  "title": "CapitalStructureSummaryConfig",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary_config.schema.json",
+  "$defs": {
+    "d_c53a00668cf357faa951": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    }
+  }
+}

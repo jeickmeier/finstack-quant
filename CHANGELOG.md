@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Statements: debt stack by seniority
+
+`capital_structure_summary(results, model, config)` answers how much debt sits ahead of each tranche and what leverage and coverage look like through it. It gives one row per bond, convertible, term loan and revolver at its balance at `config.period`, with a revolver at its drawn balance and swaps, cap/floors and swaptions left out; rank and class come from the waterfall's payment classes, or one implicit class when there are none. Tranches in a class are pari passu, so cumulative debt, leverage and coverage are figures through the whole class. It also gives total debt, cash, net debt, LTM EBITDA, total and net leverage, total coverage, and a maturity wall by calendar year of final maturity, which uses the balance at the period and ignores later amortization.
+
+`ebitda_node` is required and never guessed; `cash_node` is optional. LTM EBITDA and interest sum the trailing year of calendar periods, the slots `ttm()` reads. A window short of a year, or with an EBITDA value missing, gives null ratios and `ltm_periods_found` says how many periods held: a quarterly figure is never annualised. Zero or negative LTM EBITDA also gives null ratios. Mixed currencies are an error, since no FX is applied.
+
+Bound in Python (`capital_structure_summary`, `CapitalStructureSummary`, `CapitalStructureTranche`, `MaturityWallBucket`) and WASM (`statements_analytics.capitalStructureSummary`), with schemas for the request and the result. No value moves.
+
 ### Convertibles: theta carry no longer counts the issue draw or a same-day coupon
 
 `theta_carry`, and so `theta`, on a `ConvertibleBond` counted the -notional issue draw when valued on its issue date, and a coupon paid on the valuation date, which the tree's PV already leaves out. A bond issued on the valuation date showed theta near -1,000,000. Both now follow `Bond`: carry excludes the draw and receipts fall in `(as_of, horizon]`. Values change on those two dates only.

@@ -271,6 +271,14 @@ export type SignConventionPolicy = "magnitude_positive" | "inflow_positive";
  */
 export type PeriodScope = "all_periods" | "actuals_only" | "forecast_only";
 /**
+ * Instrument type of a tranche in the debt stack.
+ */
+export type DebtInstrumentKind = "bond" | "convertible_bond" | "term_loan" | "revolving_credit";
+/**
+ * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+ */
+export type DateWire = string;
+/**
  * CECL calculation methodology.
  *
  * [`CeclMethodology::PdLgdEad`] is the discounted PD-LGD-EAD integration;
@@ -323,10 +331,6 @@ export type CompanyId = string;
  * Status of a corkscrew validation run.
  */
 export type CorkscrewStatus = "success" | "failed";
-/**
- * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
- */
-export type DateWire = string;
 /**
  * Terminal value calculation method for DCF.
  */
@@ -993,6 +997,172 @@ export interface CapexReconciliation {
    */
   tolerance?: number | null;
   [k: string]: unknown;
+}
+/**
+ * Debt stack by seniority at one period: leverage and coverage through each payment class, and the maturity wall.
+ */
+export interface CapitalStructureSummary {
+  /**
+   * Reporting period.
+   */
+  as_of: PeriodId;
+  /**
+   * Cash balance at the reporting period; `None` without a `cash_node`.
+   */
+  cash?: Money | null;
+  /**
+   * Currency every tranche and monetary node is in.
+   */
+  currency: Currency;
+  /**
+   * EBITDA summed over the LTM window; `None` when the window is short. It
+   * is reported when zero or negative, though the ratios are then `None`.
+   */
+  ltm_ebitda?: Money | null;
+  /**
+   * Periods of the window that are in the model and hold an EBITDA value.
+   */
+  ltm_periods_found: number;
+  /**
+   * Periods a full LTM window holds at the reporting period's frequency (4
+   * for quarters, 12 for months).
+   */
+  ltm_periods_required: number;
+  /**
+   * Non-zero balances by calendar year of final maturity, ascending. Uses the
+   * balance at the reporting period and ignores any scheduled amortization
+   * after it.
+   */
+  maturity_wall: MaturityWallBucket[];
+  /**
+   * `total_debt` less `cash`; `None` without a `cash_node`. Negative when
+   * cash exceeds debt.
+   */
+  net_debt?: Money | null;
+  /**
+   * `net_debt` over LTM EBITDA, in turns; `None` without a `cash_node` or
+   * when LTM EBITDA is partial or not positive. Negative when cash exceeds
+   * debt.
+   */
+  net_leverage?: number | null;
+  /**
+   * LTM EBITDA over the LTM interest of every tranche, in turns; `None` when
+   * LTM EBITDA is partial or not positive, or that interest is unavailable or
+   * not positive.
+   */
+  total_coverage?: number | null;
+  /**
+   * Sum of tranche balances at the reporting period.
+   */
+  total_debt: Money;
+  /**
+   * `total_debt` over LTM EBITDA, in turns; `None` when LTM EBITDA is
+   * partial or not positive.
+   */
+  total_leverage?: number | null;
+  /**
+   * Tranches by rank, then model declaration order.
+   */
+  tranches: CapitalStructureTranche[];
+}
+/**
+ * Outstanding balance falling due in one calendar year.
+ */
+export interface MaturityWallBucket {
+  /**
+   * Balance at the reporting period of the tranches maturing in `year`.
+   */
+  amount: Money;
+  /**
+   * `amount` over total debt as a decimal; `None` when total debt is not
+   * positive.
+   */
+  share_of_debt?: number | null;
+  /**
+   * Calendar year of the final maturities in this bucket.
+   */
+  year: number;
+}
+/**
+ * One debt instrument's row in a [`CapitalStructureSummary`].
+ *
+ * Tranches in one payment class are pari passu, so the figures "through this
+ * class" are the same on every tranche of the class: they count the whole
+ * class and every class senior to it.
+ */
+export interface CapitalStructureTranche {
+  /**
+   * Debt balance at the end of the reporting period. For a revolver this is
+   * the drawn balance, not the commitment.
+   */
+  balance: Money;
+  /**
+   * Total balance of this payment class and every class senior to it.
+   */
+  cumulative_debt: Money;
+  /**
+   * Instrument identifier in the capital structure.
+   */
+  id: string;
+  /**
+   * LTM EBITDA over the LTM interest of this class and every class senior to
+   * it, in turns; `None` when LTM EBITDA is partial or not positive, or that
+   * interest is unavailable or not positive.
+   */
+  interest_coverage?: number | null;
+  /**
+   * Instrument type.
+   */
+  kind: DebtInstrumentKind;
+  /**
+   * `cumulative_debt` over LTM EBITDA, in turns (`3.5` means 3.5x); `None`
+   * when LTM EBITDA is partial or not positive.
+   */
+  leverage?: number | null;
+  /**
+   * This tranche's cash plus PIK interest expense summed over the LTM window;
+   * `None` when the window is short or the instrument has no cashflows in
+   * one of its periods.
+   */
+  ltm_interest?: Money | null;
+  /**
+   * Final contractual maturity of the instrument.
+   */
+  maturity: DateWire;
+  /**
+   * Identifier of the payment class; `None` when the waterfall declares no
+   * payment classes.
+   */
+  payment_class?: string | null;
+  /**
+   * Seniority rank of the payment class; `0` is most senior. Every tranche
+   * has rank `0` when the waterfall declares no payment classes.
+   */
+  rank: number;
+  /**
+   * `balance` over total debt as a decimal (`0.25` means 25%); `None` when
+   * total debt is not positive.
+   */
+  share_of_debt?: number | null;
+}
+/**
+ * Reporting period and statement nodes for a capital structure summary.
+ */
+export interface CapitalStructureSummaryConfig {
+  /**
+   * Statement node holding the cash balance at the end of each period.
+   * Omitted, the summary has no cash, net debt or net leverage.
+   */
+  cash_node?: string | null;
+  /**
+   * Statement node holding EBITDA for each single period (not already
+   * trailing). Never inferred from a conventional name.
+   */
+  ebitda_node: string;
+  /**
+   * Reporting period: balances are read at it and the LTM window ends at it.
+   */
+  period: PeriodId;
 }
 /**
  * Configuration for CECL (US GAAP ASC 326) calculation.

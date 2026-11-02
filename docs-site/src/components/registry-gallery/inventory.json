@@ -1439,6 +1439,14 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-capital-structure-summary-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-capital-structure-summary",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-credit-assessment",
       "type": "registry:lib"
     },

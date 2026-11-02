@@ -34,11 +34,30 @@ function evaluate(model) {
   }
 }
 
+/** The shared capital-structure model and its evaluation on the shared market. */
+function evaluatedCapitalStructure() {
+  const evaluator = new statements.Evaluator();
+  try {
+    const model = INPUTS.capital_structure_model;
+    return {
+      model,
+      results: evaluator.evaluateWithMarket(
+        model,
+        INPUTS.capital_structure_market,
+        INPUTS.capital_structure_as_of
+      ),
+    };
+  } finally {
+    evaluator.free();
+  }
+}
+
 const valueOf = (model, node, period) =>
   orNull(statements.statementResultGet(evaluate(model), node, period));
 
 test('statements_analytics matches the cross-host golden', () => {
   const result = evaluate(MODEL);
+  const capitalStructure = evaluatedCapitalStructure();
   const tracer = new sa.DependencyTracer(MODEL);
 
   const corkBuilder = new statements.ModelBuilder('cork');
@@ -198,6 +217,17 @@ test('statements_analytics matches the cross-host golden', () => {
         check_mappings: INPUTS.lbo_check_mappings,
       }),
     },
+    capital_structure_summary: {
+      full_year: sa.capitalStructureSummary(capitalStructure.results, capitalStructure.model, {
+        period: '2025Q4',
+        ebitda_node: 'ebitda',
+        cash_node: 'cash',
+      }),
+      short_window: sa.capitalStructureSummary(capitalStructure.results, capitalStructure.model, {
+        period: '2025Q3',
+        ebitda_node: 'ebitda',
+      }),
+    },
     dcf_sensitivity: {
       gordon_growth: sa.dcfSensitivity(
         INPUTS.dcf_model,
@@ -220,6 +250,50 @@ test('statements_analytics matches the cross-host golden', () => {
   corkscrew.free();
   scorecard.free();
   assertMatches(plain(actual), EXPECTED.statements_analytics, 'statements_analytics');
+});
+
+test('capitalStructureSummary reads the LTM window and rejects a bad request', () => {
+  const { model, results } = evaluatedCapitalStructure();
+  const summary = sa.capitalStructureSummary(results, model, {
+    period: '2025Q4',
+    ebitda_node: 'ebitda',
+    cash_node: 'cash',
+  });
+  assert.deepEqual(
+    summary.tranches.map((tranche) => [tranche.id, tranche.rank, tranche.payment_class]),
+    [
+      ['SR-A', 0, '1L'],
+      ['SR-B', 0, '1L'],
+      ['SUB', 1, '2L'],
+    ]
+  );
+  // 920,000 of debt over 100,000 + 110,000 + 120,000 + 130,000 of EBITDA.
+  assert.equal(summary.total_leverage, 2);
+  assert.deepEqual(
+    summary.maturity_wall.map((bucket) => [bucket.year, bucket.amount.amount]),
+    [
+      [2029, '500000'],
+      [2031, '420000'],
+    ]
+  );
+  const short = sa.capitalStructureSummary(results, model, {
+    period: '2025Q3',
+    ebitda_node: 'ebitda',
+  });
+  assert.deepEqual(
+    [short.ltm_periods_required, short.ltm_periods_found, short.total_leverage],
+    [4, 3, null]
+  );
+  for (const request of [
+    { period: '2025Q4', ebitda_node: 'nope' },
+    { period: '2030Q1', ebitda_node: 'ebitda' },
+    { period: '2025Q4', ebitda_node: 'ebitda', guess: true },
+  ]) {
+    assert.throws(
+      () => sa.capitalStructureSummary(results, model, request),
+      (error) => error.kind === 'validation'
+    );
+  }
 });
 
 test('plSummaryReport returns the Rust table of the text report', () => {

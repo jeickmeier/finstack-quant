@@ -7,6 +7,7 @@
 //! vintage / real-estate templates.
 
 mod analysis;
+mod capital_structure;
 mod checks;
 mod comps;
 mod corkscrew;
@@ -82,6 +83,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     typed::register(py, &m)?;
     valuation::register(py, &m)?;
     checks::register(py, &m)?;
+    capital_structure::register(py, &m)?;
     covenants::register(py, &m)?;
     reports::register(py, &m)?;
     ecl::register(py, &m)?;
@@ -98,6 +100,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "AccountType",
             "BridgeChart",
             "BridgeStep",
+            "CapitalStructureSummary",
+            "CapitalStructureTranche",
             "CompanyMetrics",
             "CorkscrewAccount",
             "CorkscrewConfig",
@@ -128,6 +132,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "LeaseSpec",
             "ManagementFeeBase",
             "ManagementFeeSpec",
+            "MaturityWallBucket",
             "PLSummaryReport",
             "ParameterSpec",
             "PeerFilter",
@@ -168,6 +173,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "add_roll_forward_with_opening",
             "add_vintage_buildup",
             "backtest_forecast",
+            "capital_structure_summary",
             "classify_stage",
             "compute_ecl",
             "compute_ecl_weighted",

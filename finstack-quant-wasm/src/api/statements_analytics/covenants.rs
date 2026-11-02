@@ -1,18 +1,11 @@
 //! Covenant evaluation and breach forecasting over evaluated statement results.
 
-use super::parse_model;
+use super::{parse_model, parse_results};
 use crate::api::covenants::engine::JsCovenantEngine;
-use crate::utils::input::json_text;
 use crate::utils::wire::js_opt_wire;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_covenants::CovenantForecastConfig;
-use finstack_quant_statements::evaluator::StatementResult;
 use wasm_bindgen::prelude::*;
-
-/// Parse a `StatementResult` argument (object or JSON).
-fn parse_results(results: &JsValue) -> Result<StatementResult, JsValue> {
-    serde_json::from_str(&json_text(results, "results")?).map_err(to_js_err)
-}
 
 /// Evaluate covenant compliance at the end of every statement result period.
 ///

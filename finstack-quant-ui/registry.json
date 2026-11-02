@@ -4489,6 +4489,72 @@
       }
     },
     {
+      "name": "contract-capital-structure-summary-config",
+      "type": "registry:lib",
+      "title": "Capital structure summary config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust capital_structure_summary_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/capital_structure_summary_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/capital_structure_summary_config.json"
+        },
+        {
+          "path": "src/generated/types/capital_structure_summary_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/capital_structure_summary_config.ts"
+        },
+        {
+          "path": "src/generated/meta/capital_structure_summary_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/capital_structure_summary_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-capital-structure-summary",
+      "type": "registry:lib",
+      "title": "Capital structure summary contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust capital_structure_summary contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/capital_structure_summary.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/capital_structure_summary.json"
+        },
+        {
+          "path": "src/generated/types/capital_structure_summary.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/capital_structure_summary.ts"
+        },
+        {
+          "path": "src/generated/meta/capital_structure_summary.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/capital_structure_summary.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-credit-assessment",
       "type": "registry:lib",
       "title": "Credit assessment contract",

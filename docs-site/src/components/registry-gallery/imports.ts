@@ -1745,6 +1745,24 @@ export const importHarnesses = {
       name: "contract-bridge-chart",
       modules: modules.length,
     })),
+  "contract-capital-structure-summary-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/capital_structure_summary_config.json"),
+      import("@/lib/finstack/generated/types/capital_structure_summary_config"),
+      import("@/lib/finstack/generated/meta/capital_structure_summary_config"),
+    ]).then((modules) => ({
+      name: "contract-capital-structure-summary-config",
+      modules: modules.length,
+    })),
+  "contract-capital-structure-summary": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/capital_structure_summary.json"),
+      import("@/lib/finstack/generated/types/capital_structure_summary"),
+      import("@/lib/finstack/generated/meta/capital_structure_summary"),
+    ]).then((modules) => ({
+      name: "contract-capital-structure-summary",
+      modules: modules.length,
+    })),
   "contract-credit-assessment": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/credit_assessment.json"),
