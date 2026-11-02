@@ -15,6 +15,7 @@ impl RatesCreditTree {
     ///
     /// Returns an error when the tree is uncalibrated or any index is outside
     /// the calibrated lattice.
+    #[cfg(test)]
     pub(crate) fn transition_probabilities(
         &self,
         step: usize,
@@ -156,43 +157,158 @@ impl RatesCreditTree {
             .take(end_step + 1)
             .skip(checkpoint.step)
         {
-            let short_rate = self.rate_at_node(step, rate_node)?;
-            let hazard_rate = Self::effective_hazard(self.hazard_at_node(step, hazard_node)?);
-            let (discount_to_next, survival_to_next, default_to_next) = if step < self.config.steps
-            {
-                let discount = (-short_rate * dt).exp();
-                let hazard_exponent = -hazard_rate * dt;
-                (discount, hazard_exponent.exp(), -hazard_exponent.exp_m1())
-            } else {
-                (1.0, 1.0, 0.0)
-            };
+            let rate = self.cached_rate_terms(step, rate_node, dt);
+            let hazard = self.cached_hazard_terms(step, hazard_node, dt);
             output.push(RatesCreditPathState {
                 step,
                 time,
                 rate_node,
                 hazard_node,
-                short_rate,
-                hazard_rate,
-                discount_to_next,
-                survival_to_next,
-                default_to_next,
+                short_rate: rate.level,
+                hazard_rate: hazard.level,
+                discount_to_next: rate.decay_to_next,
+                survival_to_next: hazard.decay_to_next,
+                default_to_next: hazard.complement_to_next,
             });
 
             if step == end_step {
                 break;
             }
-            let probabilities = self.transition_probabilities(step, rate_node, hazard_node)?;
+            let (up_up, up_down, down_up, down_down) =
+                self.joint_probabilities(rate.up_prob, hazard.up_prob);
             rng.fill_u01(&mut uniform);
             let draw = if antithetic {
                 1.0 - uniform[0]
             } else {
                 uniform[0]
             };
-            let (rate_up, hazard_up) = Self::sampled_moves(probabilities, draw);
+            let (rate_up, hazard_up) = Self::sampled_moves(
+                RatesCreditTransition {
+                    up_up,
+                    up_down,
+                    down_up,
+                    down_down,
+                },
+                draw,
+            );
             rate_node += usize::from(rate_up);
             hazard_node += usize::from(hazard_up);
         }
         Ok(())
+    }
+
+    /// One lattice state, with the interval weights a sampled path would carry.
+    ///
+    /// # Arguments
+    ///
+    /// * `step` - Zero-based lattice step, up to and including `config.steps`.
+    /// * `rate_node` - Rate-factor node index in `0..=step`.
+    /// * `hazard_node` - Hazard-factor node index in `0..=step`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the tree is uncalibrated or an index is outside
+    /// the calibrated lattice.
+    pub fn state_at(
+        &self,
+        step: usize,
+        rate_node: usize,
+        hazard_node: usize,
+    ) -> Result<RatesCreditPathState> {
+        let dt = self.calibrated_dt()?;
+        let time = self.time_grid()?[step.min(self.config.steps)];
+        let raw_rate = self.rate_at_node(step, rate_node)?;
+        let raw_hazard = self.hazard_at_node(step, hazard_node)?;
+        let rate = self.rate_node_terms(step, raw_rate, dt);
+        let hazard = self.hazard_node_terms(step, raw_hazard, dt);
+        Ok(RatesCreditPathState {
+            step,
+            time,
+            rate_node,
+            hazard_node,
+            short_rate: rate.level,
+            hazard_rate: hazard.level,
+            discount_to_next: rate.decay_to_next,
+            survival_to_next: hazard.decay_to_next,
+            default_to_next: hazard.complement_to_next,
+        })
+    }
+
+    /// Rate nodes of row `step` that sampled paths usually visit.
+    ///
+    /// A consumer that derives an expensive per-node quantity can tabulate it
+    /// over this range, sized about `4√step` nodes, and compute the rare node
+    /// outside it on demand. An uncalibrated tree returns an empty range.
+    ///
+    /// # Arguments
+    ///
+    /// * `step` - Zero-based lattice step, up to and including `config.steps`.
+    pub fn usual_rate_nodes(&self, step: usize) -> std::ops::Range<usize> {
+        self.calibrated_rates
+            .get(step)
+            .map_or(0..0, |&row| NodeTermsTable::band(row, step))
+    }
+
+    /// One-step rate terms of a node at short rate `rate` on row `step`.
+    pub(super) fn rate_node_terms(&self, step: usize, rate: f64, dt: f64) -> NodeTerms {
+        NodeTerms {
+            level: rate,
+            up_prob: Self::mean_reverting_up_prob(
+                rate,
+                self.rate_ref,
+                self.config.rate_mean_reversion,
+                self.config.rate_vol,
+                dt,
+            ),
+            decay_to_next: if step < self.config.steps {
+                (-rate * dt).exp()
+            } else {
+                1.0
+            },
+            complement_to_next: 0.0,
+        }
+    }
+
+    /// One-step hazard terms of a node at raw hazard `hazard` on row `step`.
+    ///
+    /// The up-probability reads the raw factor; survival and default read the
+    /// floored hazard.
+    pub(super) fn hazard_node_terms(&self, step: usize, hazard: f64, dt: f64) -> NodeTerms {
+        let effective = Self::effective_hazard(hazard);
+        let exponent = -effective * dt;
+        let (decay_to_next, complement_to_next) = if step < self.config.steps {
+            (exponent.exp(), -exponent.exp_m1())
+        } else {
+            (1.0, 0.0)
+        };
+        NodeTerms {
+            level: effective,
+            up_prob: Self::mean_reverting_up_prob(
+                hazard,
+                self.hazard_ref,
+                self.config.hazard_mean_reversion,
+                self.config.hazard_vol,
+                dt,
+            ),
+            decay_to_next,
+            complement_to_next,
+        }
+    }
+
+    #[inline]
+    fn cached_rate_terms(&self, step: usize, node: usize, dt: f64) -> NodeTerms {
+        let row = self.calibrated_rates[step];
+        self.rate_terms
+            .get(row, step, node)
+            .unwrap_or_else(|| self.rate_node_terms(step, row.value_unchecked(node), dt))
+    }
+
+    #[inline]
+    fn cached_hazard_terms(&self, step: usize, node: usize, dt: f64) -> NodeTerms {
+        let row = self.calibrated_hazards[step];
+        self.hazard_terms
+            .get(row, step, node)
+            .unwrap_or_else(|| self.hazard_node_terms(step, row.value_unchecked(node), dt))
     }
 
     #[inline]
@@ -243,9 +359,13 @@ impl RatesCreditTree {
     /// such in debug builds.
     #[inline]
     pub(super) fn joint_probabilities(&self, p_r: f64, p_h: f64) -> (f64, f64, f64, f64) {
-        let var_r = p_r * (1.0 - p_r);
-        let var_h = p_h * (1.0 - p_h);
-        let a_target = p_r * p_h + self.config.correlation * (var_r * var_h).sqrt();
+        let a_target = if self.config.correlation == 0.0 {
+            p_r * p_h
+        } else {
+            let var_r = p_r * (1.0 - p_r);
+            let var_h = p_h * (1.0 - p_h);
+            p_r * p_h + self.config.correlation * (var_r * var_h).sqrt()
+        };
 
         let a_lo = (p_r + p_h - 1.0).max(0.0);
         let a_hi = p_r.min(p_h);

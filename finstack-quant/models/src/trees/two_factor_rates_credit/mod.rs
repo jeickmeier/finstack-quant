@@ -388,6 +388,10 @@ pub struct RatesCreditTree {
     hazard_floor_saturation: HazardFloorSaturation,
     /// Explicit calibration coordinates. Empty until calibration succeeds.
     calibration_times: Vec<f64>,
+    /// One-step rate terms of the nodes sampled paths usually visit.
+    rate_terms: NodeTermsTable,
+    /// One-step hazard terms of the nodes sampled paths usually visit.
+    hazard_terms: NodeTermsTable,
 }
 
 /// How much of the calibrated hazard lattice sits on the zero floor.
@@ -644,6 +648,90 @@ impl FactorRow {
     }
 }
 
+/// One-step terms of one factor node, as sampling consumes them.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct NodeTerms {
+    /// Short rate, or the non-negative effective hazard.
+    level: f64,
+    /// Marginal up-probability of the factor from this node.
+    up_prob: f64,
+    /// `exp(-level * dt)` to the next slice; `1` on the terminal slice.
+    decay_to_next: f64,
+    /// `1 - decay_to_next`, accurate for small exponents; `0` on the terminal
+    /// slice.
+    complement_to_next: f64,
+}
+
+/// [`NodeTerms`] of the nodes sampled paths usually visit.
+///
+/// A daily lattice has about `steps² / 2` nodes per factor, but a binomial walk
+/// stays near the centre of each row, so sampling a path spends almost all its
+/// time in a band about `4√step` nodes wide, each node visited by many paths.
+/// Holding the terms of that band turns three transcendental calls per path
+/// step into a lookup. A node outside the band is computed on the spot from the
+/// same expressions, so the table changes speed and never a value. A factor with
+/// zero volatility has one level per row and needs one entry per row.
+#[derive(Debug, Clone, Default)]
+struct NodeTermsTable {
+    /// First entry of each row in `terms`.
+    starts: Vec<usize>,
+    /// Lowest node index held for each row.
+    lows: Vec<usize>,
+    /// Row entries, concatenated.
+    terms: Vec<NodeTerms>,
+}
+
+impl NodeTermsTable {
+    /// Half-width of the band held for a row, in nodes: four standard
+    /// deviations of a driftless walk (`√step / 2`) plus a small margin.
+    fn half_width(step: usize) -> usize {
+        2 * (step as f64).sqrt().ceil() as usize + 2
+    }
+
+    /// Node range held for row `step` of a factor with `rows[step]`.
+    fn band(row: FactorRow, step: usize) -> std::ops::Range<usize> {
+        if row.shift == 0.0 {
+            return 0..1;
+        }
+        let half_width = Self::half_width(step);
+        let centre = step / 2;
+        centre.saturating_sub(half_width)..(centre + half_width + 1).min(row.nodes)
+    }
+
+    fn build(rows: &[FactorRow], terms_at: impl Fn(usize, f64) -> NodeTerms) -> Self {
+        let mut table = Self {
+            starts: Vec::with_capacity(rows.len()),
+            lows: Vec::with_capacity(rows.len()),
+            terms: Vec::new(),
+        };
+        for (step, &row) in rows.iter().enumerate() {
+            let band = Self::band(row, step);
+            table.starts.push(table.terms.len());
+            table.lows.push(band.start);
+            table
+                .terms
+                .extend(band.map(|node| terms_at(step, row.value_unchecked(node))));
+        }
+        table
+    }
+
+    /// Terms of `node` on row `step`, or `None` outside the band.
+    #[inline]
+    fn get(&self, row: FactorRow, step: usize, node: usize) -> Option<NodeTerms> {
+        if row.shift == 0.0 {
+            return self.terms.get(self.starts[step]).copied();
+        }
+        let offset = node.checked_sub(self.lows[step])?;
+        let end = self
+            .starts
+            .get(step + 1)
+            .copied()
+            .unwrap_or(self.terms.len());
+        let index = self.starts[step] + offset;
+        (index < end).then(|| self.terms[index])
+    }
+}
+
 /// Per-factor lattice geometry and calibration target shared by the rate and
 /// hazard passes of [`RatesCreditTree::calibrate`].
 #[derive(Debug, Clone, Copy)]
@@ -673,6 +761,8 @@ impl RatesCreditTree {
             hazard_ref: 0.0,
             hazard_floor_saturation: HazardFloorSaturation::default(),
             calibration_times: Vec::new(),
+            rate_terms: NodeTermsTable::default(),
+            hazard_terms: NodeTermsTable::default(),
         }
     }
 
