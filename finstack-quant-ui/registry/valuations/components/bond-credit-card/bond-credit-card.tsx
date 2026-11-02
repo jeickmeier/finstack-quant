@@ -84,10 +84,15 @@ export function BondCreditCard({
           <>
             Values as Rust returned them. Spreads and durations solve to a
             quoted clean price when the bond carries one, otherwise to the model
-            price. Carry metrics cover the horizon Theta period days reports.
-            Breakeven is the move in the configured target that offsets carry
-            over that horizon; its unit follows the target, as the form&apos;s
-            target describes it.
+            price. Z-spread compounds at the bond&apos;s coupon frequency and
+            OAS on its OAS quote compounding, continuous by default, so the two
+            differ even when they price the same flows. ASW par is the coupon
+            less the par rate and does not move with the quoted price; ASW
+            market does. Carry metrics cover the horizon Theta period days
+            reports. Breakeven is the move in the configured target that offsets
+            carry over that horizon: basis points for z-spread, OAS and yield
+            targets, vol points for implied vol and correlation points for base
+            correlation.
           </>
         }
       />
