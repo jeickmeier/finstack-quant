@@ -46958,7 +46958,7 @@
         "method": "parallel",
         "attribution": {
           "total_pnl": {
-            "amount": "-1060.422577323474",
+            "amount": "-60.422577323474",
             "currency": "USD"
           },
           "mark_to_market_pnl": {
@@ -46974,7 +46974,7 @@
             "currency": "USD"
           },
           "carry": {
-            "amount": "-999.899955113005",
+            "amount": "0.100044886995",
             "currency": "USD"
           },
           "rates_curves_pnl": {
@@ -47023,7 +47023,7 @@
           },
           "carry_detail": {
             "total": {
-              "amount": "-999.899955113005",
+              "amount": "0.100044886995",
               "currency": "USD"
             },
             "coupon_income": {
@@ -47034,7 +47034,7 @@
             },
             "roll_down": {
               "total": {
-                "amount": "-1000.036941414374863",
+                "amount": "-0.036941414374863",
                 "currency": "USD"
               }
             }
@@ -47073,16 +47073,16 @@
           },
           "result_invalid": false
         },
-        "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Coupon Income: USD 0.14\n  │   ├─ Roll-Down: USD -1000.04\n  ├─ Credit Curves: USD -60.52 (5.7%)\n  └─ Residual: USD 0.00 (-0.0%)",
+        "explain": "Total P&L: USD -60.42\n  ├─ Carry: USD 0.10 (-0.2%)\n  │   ├─ Coupon Income: USD 0.14\n  │   ├─ Roll-Down: USD -0.04\n  ├─ Credit Curves: USD -60.52 (100.2%)\n  └─ Residual: USD 0.00 (-0.0%)",
         "residualWithinTolerance": true,
         "buckets": [
           {
             "field": "carry",
             "amount": {
-              "amount": "-999.899955113005",
+              "amount": "0.100044886995",
               "currency": "USD"
             },
-            "pct_of_total": 94.29259396162338
+            "pct_of_total": -0.16557533860134238
           },
           {
             "field": "rates_curves_pnl",
@@ -47098,7 +47098,7 @@
               "amount": "-60.522622210469",
               "currency": "USD"
             },
-            "pct_of_total": 5.707406038376626
+            "pct_of_total": 100.16557533860136
           },
           {
             "field": "inflation_curves_pnl",
@@ -47191,7 +47191,7 @@
         },
         "attribution": {
           "total_pnl": {
-            "amount": "-1060.422577323474",
+            "amount": "-60.422577323474",
             "currency": "USD"
           },
           "mark_to_market_pnl": {
@@ -47207,7 +47207,7 @@
             "currency": "USD"
           },
           "carry": {
-            "amount": "-999.899955113005",
+            "amount": "0.100044886995",
             "currency": "USD"
           },
           "rates_curves_pnl": {
@@ -47256,7 +47256,7 @@
           },
           "carry_detail": {
             "total": {
-              "amount": "-999.899955113005",
+              "amount": "0.100044886995",
               "currency": "USD"
             },
             "coupon_income": {
@@ -47267,7 +47267,7 @@
             },
             "roll_down": {
               "total": {
-                "amount": "-1000.036941414374863",
+                "amount": "-0.036941414374863",
                 "currency": "USD"
               }
             }
@@ -47471,16 +47471,16 @@
           },
           "result_invalid": false
         },
-        "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Coupon Income: USD 0.14\n  │   ├─ Roll-Down: USD -1000.04\n  ├─ Credit Curves: USD -60.52 (5.7%)\n  └─ Residual: USD 0.00 (-0.0%)",
+        "explain": "Total P&L: USD -60.42\n  ├─ Carry: USD 0.10 (-0.2%)\n  │   ├─ Coupon Income: USD 0.14\n  │   ├─ Roll-Down: USD -0.04\n  ├─ Credit Curves: USD -60.52 (100.2%)\n  └─ Residual: USD 0.00 (-0.0%)",
         "residualWithinTolerance": true,
         "buckets": [
           {
             "field": "carry",
             "amount": {
-              "amount": "-999.899955113005",
+              "amount": "0.100044886995",
               "currency": "USD"
             },
-            "pct_of_total": 94.29259396162338
+            "pct_of_total": -0.16557533860134238
           },
           {
             "field": "rates_curves_pnl",
@@ -47496,7 +47496,7 @@
               "amount": "-60.522622210469",
               "currency": "USD"
             },
-            "pct_of_total": 5.707406038376626
+            "pct_of_total": 100.16557533860136
           },
           {
             "field": "inflation_curves_pnl",
@@ -47577,7 +47577,7 @@
         "method": "metrics_based",
         "attribution": {
           "total_pnl": {
-            "amount": "-1060.422577323474",
+            "amount": "-60.422577323474",
             "currency": "USD"
           },
           "mark_to_market_pnl": {
@@ -47593,7 +47593,7 @@
             "currency": "USD"
           },
           "carry": {
-            "amount": "-999.899955113005",
+            "amount": "0.1000448869949651",
             "currency": "USD"
           },
           "rates_curves_pnl": {
@@ -47637,17 +47637,17 @@
             "currency": "USD"
           },
           "residual": {
-            "amount": "2.9819806520507",
+            "amount": "2.9819806520507349",
             "currency": "USD"
           },
           "carry_detail": {
             "total": {
-              "amount": "-999.899955113005",
+              "amount": "0.1000448869949651",
               "currency": "USD"
             },
             "roll_down": {
               "total": {
-                "amount": "-999.899955113005",
+                "amount": "0.1000448869949651",
                 "currency": "USD"
               }
             }
@@ -47858,7 +47858,7 @@
             "num_repricings": 2,
             "tolerance_abs": 10,
             "tolerance_pct": 1,
-            "residual_pct": -0.28120682413017595,
+            "residual_pct": -4.935209294510255,
             "rounding": {
               "mode": "bankers",
               "ingest_scale_by_currency": {},
@@ -47876,16 +47876,16 @@
           },
           "result_invalid": false
         },
-        "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Roll-Down: USD -999.90\n  ├─ Credit Curves: USD -63.50 (6.0%)\n  └─ Residual: USD 2.98 (-0.3%)",
+        "explain": "Total P&L: USD -60.42\n  ├─ Carry: USD 0.10 (-0.2%)\n  │   ├─ Roll-Down: USD 0.10\n  ├─ Credit Curves: USD -63.50 (105.1%)\n  └─ Residual: USD 2.98 (-4.9%)",
         "residualWithinTolerance": true,
         "buckets": [
           {
             "field": "carry",
             "amount": {
-              "amount": "-999.899955113005",
+              "amount": "0.1000448869949651",
               "currency": "USD"
             },
-            "pct_of_total": 94.29259396162338
+            "pct_of_total": -0.16557533860128462
           },
           {
             "field": "rates_curves_pnl",
@@ -47901,7 +47901,7 @@
               "amount": "-63.5046028625197",
               "currency": "USD"
             },
-            "pct_of_total": 5.988612862506802
+            "pct_of_total": 105.10078463311152
           },
           {
             "field": "inflation_curves_pnl",
@@ -47970,10 +47970,10 @@
           {
             "field": "residual",
             "amount": {
-              "amount": "2.9819806520507",
+              "amount": "2.9819806520507349",
               "currency": "USD"
             },
-            "pct_of_total": -0.28120682413017595
+            "pct_of_total": -4.935209294510255
           }
         ]
       },
@@ -47984,7 +47984,7 @@
         },
         "attribution": {
           "total_pnl": {
-            "amount": "-1060.422577323474",
+            "amount": "-60.422577323474",
             "currency": "USD"
           },
           "mark_to_market_pnl": {
@@ -48000,7 +48000,7 @@
             "currency": "USD"
           },
           "carry": {
-            "amount": "-999.8999551130050349",
+            "amount": "0.1000448869949651",
             "currency": "USD"
           },
           "rates_curves_pnl": {
@@ -48049,7 +48049,7 @@
           },
           "carry_detail": {
             "total": {
-              "amount": "-999.8999551130050349",
+              "amount": "0.1000448869949651",
               "currency": "USD"
             },
             "coupon_income": {
@@ -48060,7 +48060,7 @@
             },
             "roll_down": {
               "total": {
-                "amount": "-999.8999551130050349",
+                "amount": "0.1000448869949651",
                 "currency": "USD"
               }
             }
@@ -48263,7 +48263,7 @@
                 "currency": "USD"
               },
               "explained_pnl": {
-                "amount": "-999.899955113005",
+                "amount": "0.1000448869949651",
                 "currency": "USD"
               }
             }
@@ -48283,7 +48283,7 @@
             "num_repricings": 29,
             "tolerance_abs": 10,
             "tolerance_pct": 5,
-            "residual_pct": -0.28120682413017917,
+            "residual_pct": -4.935209294510255,
             "rounding": {
               "mode": "bankers",
               "ingest_scale_by_currency": {},
@@ -48295,22 +48295,22 @@
             },
             "execution_policy": "serial",
             "notes": [
-              "Taylor attribution: -0.28% residual (6 factors, 29 repricings)",
+              "Taylor attribution: -4.94% residual (6 factors, 29 repricings)",
               "Taylor coverage: rates/credit/vol/FX-exposure/inflation/correlations/market-scalars/model-parameters/theta. Restore-and-reprice families (FX, inflation, correlations, scalars, model parameters) isolate the full family P&L; rates/credit/vol remain sensitivity × observed move."
             ]
           },
           "result_invalid": false
         },
-        "explain": "Total P&L: USD -1060.42\n  ├─ Carry: USD -999.90 (94.3%)\n  │   ├─ Coupon Income: USD 0.00\n  │   ├─ Roll-Down: USD -999.90\n  ├─ Credit Curves: USD -63.50 (6.0%)\n  └─ Residual: USD 2.98 (-0.3%)",
+        "explain": "Total P&L: USD -60.42\n  ├─ Carry: USD 0.10 (-0.2%)\n  │   ├─ Coupon Income: USD 0.00\n  │   ├─ Roll-Down: USD 0.10\n  ├─ Credit Curves: USD -63.50 (105.1%)\n  └─ Residual: USD 2.98 (-4.9%)",
         "residualWithinTolerance": true,
         "buckets": [
           {
             "field": "carry",
             "amount": {
-              "amount": "-999.8999551130050349",
+              "amount": "0.1000448869949651",
               "currency": "USD"
             },
-            "pct_of_total": 94.29259396162338
+            "pct_of_total": -0.16557533860128462
           },
           {
             "field": "rates_curves_pnl",
@@ -48326,7 +48326,7 @@
               "amount": "-63.5046028625197",
               "currency": "USD"
             },
-            "pct_of_total": 5.988612862506802
+            "pct_of_total": 105.10078463311152
           },
           {
             "field": "inflation_curves_pnl",
@@ -48398,7 +48398,7 @@
               "amount": "2.9819806520507349",
               "currency": "USD"
             },
-            "pct_of_total": -0.28120682413017917
+            "pct_of_total": -4.935209294510255
           }
         ]
       }

@@ -1610,7 +1610,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/attribution/cases.json",
-      "sha256": "fdd975c7426342e68a66e96854c9fe33a5cdce2cff0660b0336c2b246ce67741"
+      "sha256": "17f439c57939b36c1af3ee8bd508423268553eaa76a5ba624f03c0a3707405a9"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",
