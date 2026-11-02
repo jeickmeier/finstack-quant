@@ -3384,6 +3384,13 @@
             "bytes": 1342
           },
           {
+            "path": "schemas/results/1/convertible_spot_ladder.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/convertible_spot_ladder.schema.json",
+            "type_name": "ConvertibleSpotLadder",
+            "kind": "output",
+            "bytes": 6472
+          },
+          {
             "path": "schemas/results/1/currency_ladder.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/currency_ladder.schema.json",
             "type_name": "CurrencyLadder",
@@ -5625,6 +5632,14 @@
             "type_name": "ConvertibleGreeks",
             "kind": "output",
             "bytes": 1342
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/convertible_spot_ladder.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/convertible_spot_ladder.schema.json",
+            "type_name": "ConvertibleSpotLadder",
+            "kind": "output",
+            "bytes": 6472
           },
           {
             "domain": "valuations",

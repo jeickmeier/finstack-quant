@@ -478,6 +478,48 @@ pub(super) fn market_dependencies() -> Result<Vec<Value>> {
     example(&crate::instruments::fixed_income::bond::Bond::example()?.market_dependencies()?)
 }
 
+/// A row in each regime of a convertible with a conversion price of 100.
+pub(super) fn convertible_spot_ladder() -> Result<Vec<Value>> {
+    use crate::instruments::fixed_income::convertible::{
+        ConvertibleRegime, ConvertibleSpotLadder, ConvertibleSpotRow,
+    };
+    let row = |spot: f64, is_market_spot, price: f64, delta: f64, regime| ConvertibleSpotRow {
+        spot,
+        is_market_spot,
+        price,
+        delta: Some(delta),
+        hedge_ratio: Some(delta / 10_000.0),
+        regime: Some(regime),
+        conversion_value: spot * 10_000.0,
+        parity: spot / 100.0,
+        conversion_premium: Some(price / (spot * 10_000.0) - 1.0),
+        bond_floor: 818_730.75,
+    };
+    example(&ConvertibleSpotLadder {
+        instrument_id: "CB-EXAMPLE".to_string(),
+        as_of: date(2025, time::Month::January, 1)?,
+        currency: finstack_quant_core::currency::Currency::USD,
+        market_spot: 100.0,
+        rows: vec![
+            row(50.0, false, 874_656.14, 3_347.45, ConvertibleRegime::Busted),
+            row(
+                100.0,
+                true,
+                1_158_348.78,
+                7_368.0,
+                ConvertibleRegime::Balanced,
+            ),
+            row(
+                150.0,
+                false,
+                1_571_793.63,
+                8_921.0,
+                ConvertibleRegime::EquitySensitive,
+            ),
+        ],
+    })
+}
+
 pub(super) fn convertible_greeks() -> Result<Vec<Value>> {
     example(
         &crate::instruments::fixed_income::convertible::ConvertibleGreeks {

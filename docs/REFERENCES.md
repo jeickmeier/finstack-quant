@@ -972,6 +972,20 @@ risk calculation with a standard reference.
 - Ayache, E., Forsyth, P. A., and Vetzal, K. R. "Valuation of Convertible
   Bonds with Credit Risk." *Journal of Derivatives*, 11(1), 9-29.
 
+<a id="convertible-delta-bands"></a>
+
+### Convertible Delta Bands
+
+- Putnam Investments. Literature TL913: busted convertibles usually trade at 0 to
+  40 delta and balanced convertibles at 40 to 80 delta.
+  <https://www-dev.putnam.com/literature/pdf/TL913_IN.pdf>
+- Lord Abbett. "The Road Ahead for the Convertible Bond Market." Credit-sensitive
+  below 40% delta and equity-sensitive above 80%.
+  <https://lordabbett.com/en-us/financial-advisor/insights/markets-and-economy/the-road-ahead-for-the-convertible-bond-market.html>
+- MSCI. "Investing in Convertible Bonds." A different convention: bond-like below
+  33% delta, balanced to 66% and equity-like above.
+  <https://support.msci.com/www/blog-posts/investing-in-convertible-bonds/01180853317>
+
 <a id="whaley-2009-vix"></a>
 
 ### Whaley 2009 VIX

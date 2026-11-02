@@ -141,9 +141,12 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "yt3y"
         | "yt4y"
         | "all_in_rate"
-        | "oid_eir_rate" => Decimal,
-        // A custom loan total in the facility currency.
-        "oid_eir_amortization" => Currency,
+        | "oid_eir_rate"
+        // A custom convertible price over conversion value, less one.
+        | "conversion_premium" => Decimal,
+        // A custom loan total in the facility currency, and custom convertible
+        // position values.
+        "oid_eir_amortization" | "conversion_value" | "bond_floor" => Currency,
         // Basis points.
         "par_spread"
         | "basis_par_spread"
@@ -187,7 +190,9 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "variance_notional"
         | "theta_period_days"
         | "carry_decomposition_degenerate"
-        | "index_delta" => Dimensionless,
+        | "index_delta"
+        // A custom convertible conversion value over notional.
+        | "parity" => Dimensionless,
         // Calculator-dependent second-order measures and the breakeven shift
         // (whose unit follows the configured target).
         "ir_convexity" | "inflation_convexity" | "breakeven" => Unknown,
@@ -225,6 +230,18 @@ mod tests {
             MetricUnit::Currency
         );
         assert_eq!(MetricId::custom("my_metric").unit(), MetricUnit::Unknown);
+    }
+
+    #[test]
+    fn custom_convertible_metrics_declare_their_units() {
+        for (id, unit) in [
+            ("parity", MetricUnit::Dimensionless),
+            ("conversion_premium", MetricUnit::Decimal),
+            ("conversion_value", MetricUnit::Currency),
+            ("bond_floor", MetricUnit::Currency),
+        ] {
+            assert_eq!(MetricId::custom(id).unit(), unit, "{id}");
+        }
     }
 
     #[test]

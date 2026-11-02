@@ -7367,6 +7367,160 @@
       }
     ]
   },
+  "convertible_spot_ladder": {
+    "market": "{\"schema_version\":1,\"curves\":[{\"type\":\"hazard\",\"id\":\"USD-CREDIT-BBB\",\"base\":\"2025-01-15\",\"knot_points\":[[1.0,0.025]],\"recovery_rate\":0.0,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-IG\",\"base\":\"2025-01-15\",\"day_count\":\"act_365f\",\"knot_points\":[[0.0,1.0],[1.0,0.9607894391523232]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":1e-6,\"rate_calibration\":null,\"fx_policy\":null}],\"fx\":null,\"surfaces\":[],\"prices\":{\"TECH\":{\"price\":{\"amount\":\"100\",\"currency\":\"USD\"}},\"TECH-VOL\":{\"unitless\":0.3}},\"series\":[],\"inflation_indices\":[],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+    "as_of": "2025-01-15",
+    "bond": "{\"schema\": \"finstack_quant.instrument/1\", \"instrument\": {\"type\": \"convertible_bond\", \"spec\": {\"id\": \"CB-TECH-5Y\", \"notional\": {\"amount\": \"1000000\", \"currency\": \"USD\"}, \"issue_date\": \"2024-01-15\", \"maturity\": \"2029-01-15\", \"discount_curve_id\": \"USD-IG\", \"credit_curve_id\": \"USD-CREDIT-BBB\", \"conversion\": {\"ratio\": 10000.0, \"price\": null, \"policy\": \"voluntary\", \"anti_dilution\": \"none\", \"dividend_adjustment\": \"none\", \"dilution_events\": []}, \"spot_id\": \"TECH\", \"vol_surface_id\": \"TECH-VOL\", \"div_yield_id\": null, \"call_put\": null, \"recovery_rate\": 0.0, \"cashflow_spec\": {\"fixed\": {\"coupon_type\": \"cash\", \"rate\": \"0.02\", \"frequency\": {\"count\": 6, \"unit\": \"months\"}, \"day_count\": \"30_360\", \"business_day_convention\": \"following\", \"calendar_id\": \"weekends_only\", \"stub\": \"none\", \"end_of_month\": false, \"payment_lag_days\": 0}}, \"attributes\": {}}}}",
+    "spots": [50.0, 100.0, 300.0],
+    "supplied": {
+      "instrument_id": "CB-TECH-5Y",
+      "as_of": "2025-01-15",
+      "currency": "USD",
+      "market_spot": 100.0,
+      "rows": [
+        {
+          "spot": 50.0,
+          "is_market_spot": false,
+          "price": 890139.62882991,
+          "delta": 3197.2195999809774,
+          "hedge_ratio": 0.3197219599980977,
+          "regime": "busted",
+          "conversion_value": 500000.0,
+          "parity": 0.5,
+          "conversion_premium": 0.7802792576598199,
+          "bond_floor": 840222.2618254982
+        },
+        {
+          "spot": 100.0,
+          "is_market_spot": true,
+          "price": 1181985.93774976,
+          "delta": 7681.307531954953,
+          "hedge_ratio": 0.7681307531954954,
+          "regime": "balanced",
+          "conversion_value": 1000000.0,
+          "parity": 1.0,
+          "conversion_premium": 0.1819859377497599,
+          "bond_floor": 840222.2618254982
+        },
+        {
+          "spot": 300.0,
+          "is_market_spot": false,
+          "price": 3072843.118731068,
+          "delta": 9943.796154764636,
+          "hedge_ratio": 0.9943796154764636,
+          "regime": "equity_sensitive",
+          "conversion_value": 3000000.0,
+          "parity": 3.0,
+          "conversion_premium": 0.024281039577022767,
+          "bond_floor": 840222.2618254982
+        }
+      ]
+    },
+    "default": {
+      "instrument_id": "CB-TECH-5Y",
+      "as_of": "2025-01-15",
+      "currency": "USD",
+      "market_spot": 100.0,
+      "rows": [
+        {
+          "spot": 25.0,
+          "is_market_spot": false,
+          "price": 843172.039577229,
+          "delta": 541.9440776139963,
+          "hedge_ratio": 0.05419440776139963,
+          "regime": "busted",
+          "conversion_value": 250000.0,
+          "parity": 0.25,
+          "conversion_premium": 2.372688158308916,
+          "bond_floor": 840222.2618254982
+        },
+        {
+          "spot": 50.0,
+          "is_market_spot": false,
+          "price": 890139.62882991,
+          "delta": 3197.2195999809774,
+          "hedge_ratio": 0.3197219599980977,
+          "regime": "busted",
+          "conversion_value": 500000.0,
+          "parity": 0.5,
+          "conversion_premium": 0.7802792576598199,
+          "bond_floor": 840222.2618254982
+        },
+        {
+          "spot": 75.0,
+          "is_market_spot": false,
+          "price": 1009442.081237535,
+          "delta": 5946.545425537974,
+          "hedge_ratio": 0.5946545425537973,
+          "regime": "balanced",
+          "conversion_value": 750000.0,
+          "parity": 0.75,
+          "conversion_premium": 0.34592277498338,
+          "bond_floor": 840222.2618254982
+        },
+        {
+          "spot": 100.0,
+          "is_market_spot": true,
+          "price": 1181985.93774976,
+          "delta": 7681.307531954953,
+          "hedge_ratio": 0.7681307531954954,
+          "regime": "balanced",
+          "conversion_value": 1000000.0,
+          "parity": 1.0,
+          "conversion_premium": 0.1819859377497599,
+          "bond_floor": 840222.2618254982
+        },
+        {
+          "spot": 125.0,
+          "is_market_spot": false,
+          "price": 1387787.218076679,
+          "delta": 8617.033142218366,
+          "hedge_ratio": 0.8617033142218367,
+          "regime": "equity_sensitive",
+          "conversion_value": 1250000.0,
+          "parity": 1.25,
+          "conversion_premium": 0.11022977446134319,
+          "bond_floor": 840222.2618254982
+        },
+        {
+          "spot": 150.0,
+          "is_market_spot": false,
+          "price": 1611588.59205598,
+          "delta": 9147.806062461963,
+          "hedge_ratio": 0.9147806062461963,
+          "regime": "equity_sensitive",
+          "conversion_value": 1500000.0,
+          "parity": 1.5,
+          "conversion_premium": 0.07439239470398684,
+          "bond_floor": 840222.2618254982
+        },
+        {
+          "spot": 200.0,
+          "is_market_spot": false,
+          "price": 2086504.326790734,
+          "delta": 9736.071813162765,
+          "hedge_ratio": 0.9736071813162765,
+          "regime": "equity_sensitive",
+          "conversion_value": 2000000.0,
+          "parity": 2.0,
+          "conversion_premium": 0.04325216339536708,
+          "bond_floor": 840222.2618254982
+        },
+        {
+          "spot": 300.0,
+          "is_market_spot": false,
+          "price": 3072843.118731068,
+          "delta": 9943.796154764636,
+          "hedge_ratio": 0.9943796154764636,
+          "regime": "equity_sensitive",
+          "conversion_value": 3000000.0,
+          "parity": 3.0,
+          "conversion_premium": 0.024281039577022767,
+          "bond_floor": 840222.2618254982
+        }
+      ]
+    }
+  },
   "compute_quotes": {
     "market": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2024-01-15\",\"day_count\":\"act_365f\",\"knot_points\":[[0.0,1.0],[1.0,0.9607894391523232]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":1e-6,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"forward\",\"id\":\"USD-SOFR-3M\",\"base\":\"2024-01-02\",\"reset_lag\":2,\"day_count\":\"act_360\",\"tenor\":0.25,\"knot_points\":[[0.0,0.03],[1.0,0.03]],\"projection_grid\":null,\"interp_style\":\"linear\",\"extrapolation\":\"flat_zero\",\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-TREASURY\",\"base\":\"2024-01-15\",\"day_count\":\"act_365f\",\"knot_points\":[[0.0,1.0],[1.0,0.9607894391523232]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":1e-6,\"rate_calibration\":null,\"fx_policy\":null}],\"fx\":null,\"surfaces\":[],\"prices\":{},\"series\":[],\"inflation_indices\":[],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
     "as_of": "2024-01-15",
