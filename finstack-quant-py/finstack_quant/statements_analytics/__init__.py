@@ -100,6 +100,12 @@ add_ncf_buildup = _sa.add_ncf_buildup
 add_rent_roll = _sa.add_rent_roll
 add_property_operating_statement = _sa.add_property_operating_statement
 
+# Debt stack by seniority
+capital_structure_summary = _sa.capital_structure_summary
+CapitalStructureSummary = _sa.CapitalStructureSummary
+CapitalStructureTranche = _sa.CapitalStructureTranche
+MaturityWallBucket = _sa.MaturityWallBucket
+
 # Typed results, specs and mappings
 CompanyMetrics = _sa.CompanyMetrics
 CorporateAnalysis = _sa.CorporateAnalysis
@@ -140,6 +146,8 @@ __all__: list[str] = [
     "AccountType",
     "BridgeChart",
     "BridgeStep",
+    "CapitalStructureSummary",
+    "CapitalStructureTranche",
     "CompanyMetrics",
     "CorkscrewAccount",
     "CorkscrewConfig",
@@ -170,6 +178,7 @@ __all__: list[str] = [
     "LeaseSpec",
     "ManagementFeeBase",
     "ManagementFeeSpec",
+    "MaturityWallBucket",
     "PLSummaryReport",
     "ParameterSpec",
     "PeerFilter",
@@ -210,6 +219,7 @@ __all__: list[str] = [
     "add_roll_forward_with_opening",
     "add_vintage_buildup",
     "backtest_forecast",
+    "capital_structure_summary",
     "classify_stage",
     "compute_ecl",
     "compute_ecl_weighted",

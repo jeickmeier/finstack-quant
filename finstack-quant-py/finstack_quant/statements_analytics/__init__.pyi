@@ -110,6 +110,12 @@ from finstack_quant.statements_analytics._valuation import (
     run_corporate_analysis as run_corporate_analysis,
     wacc as wacc,
 )
+from finstack_quant.statements_analytics._capital_structure import (
+    CapitalStructureSummary as CapitalStructureSummary,
+    CapitalStructureTranche as CapitalStructureTranche,
+    MaturityWallBucket as MaturityWallBucket,
+    capital_structure_summary as capital_structure_summary,
+)
 from finstack_quant.statements_analytics._reports import (
     CreditAssessment as CreditAssessment,
     CreditAssessmentPoint as CreditAssessmentPoint,
@@ -145,6 +151,8 @@ __all__ = [
     "AccountType",
     "BridgeChart",
     "BridgeStep",
+    "CapitalStructureSummary",
+    "CapitalStructureTranche",
     "CompanyMetrics",
     "CorkscrewAccount",
     "CorkscrewConfig",
@@ -175,6 +183,7 @@ __all__ = [
     "LeaseSpec",
     "ManagementFeeBase",
     "ManagementFeeSpec",
+    "MaturityWallBucket",
     "PLSummaryReport",
     "ParameterSpec",
     "PeerFilter",
@@ -215,6 +224,7 @@ __all__ = [
     "add_roll_forward_with_opening",
     "add_vintage_buildup",
     "backtest_forecast",
+    "capital_structure_summary",
     "classify_stage",
     "compute_ecl",
     "compute_ecl_weighted",

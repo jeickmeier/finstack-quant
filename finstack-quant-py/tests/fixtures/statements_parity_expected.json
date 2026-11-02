@@ -415,6 +415,212 @@
     }
   },
   "statements_analytics": {
+    "capital_structure_summary": {
+      "full_year": {
+        "as_of": "2025Q4",
+        "cash": {
+          "amount": "150000",
+          "currency": "USD"
+        },
+        "currency": "USD",
+        "ltm_ebitda": {
+          "amount": "460000",
+          "currency": "USD"
+        },
+        "ltm_periods_found": 4,
+        "ltm_periods_required": 4,
+        "maturity_wall": [
+          {
+            "amount": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.5434782608695652,
+            "year": 2029
+          },
+          {
+            "amount": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.45652173913043476,
+            "year": 2031
+          }
+        ],
+        "net_debt": {
+          "amount": "770000",
+          "currency": "USD"
+        },
+        "net_leverage": 1.673913043478261,
+        "total_coverage": 7.849829351535837,
+        "total_debt": {
+          "amount": "920000",
+          "currency": "USD"
+        },
+        "total_leverage": 2.0,
+        "tranches": [
+          {
+            "balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "id": "SR-A",
+            "interest_coverage": 18.4,
+            "kind": "bond",
+            "leverage": 1.0869565217391304,
+            "ltm_interest": {
+              "amount": "20000",
+              "currency": "USD"
+            },
+            "maturity": "2029-06-01",
+            "payment_class": "1L",
+            "rank": 0,
+            "share_of_debt": 0.43478260869565216
+          },
+          {
+            "balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "id": "SR-B",
+            "interest_coverage": 18.4,
+            "kind": "bond",
+            "leverage": 1.0869565217391304,
+            "ltm_interest": {
+              "amount": "5000",
+              "currency": "USD"
+            },
+            "maturity": "2029-01-15",
+            "payment_class": "1L",
+            "rank": 0,
+            "share_of_debt": 0.10869565217391304
+          },
+          {
+            "balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "cumulative_debt": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "id": "SUB",
+            "interest_coverage": 7.849829351535837,
+            "kind": "bond",
+            "leverage": 2.0,
+            "ltm_interest": {
+              "amount": "33600",
+              "currency": "USD"
+            },
+            "maturity": "2031-03-01",
+            "payment_class": "2L",
+            "rank": 1,
+            "share_of_debt": 0.45652173913043476
+          }
+        ]
+      },
+      "short_window": {
+        "as_of": "2025Q3",
+        "cash": null,
+        "currency": "USD",
+        "ltm_ebitda": null,
+        "ltm_periods_found": 3,
+        "ltm_periods_required": 4,
+        "maturity_wall": [
+          {
+            "amount": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.5434782608695652,
+            "year": 2029
+          },
+          {
+            "amount": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.45652173913043476,
+            "year": 2031
+          }
+        ],
+        "net_debt": null,
+        "net_leverage": null,
+        "total_coverage": null,
+        "total_debt": {
+          "amount": "920000",
+          "currency": "USD"
+        },
+        "total_leverage": null,
+        "tranches": [
+          {
+            "balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "id": "SR-A",
+            "interest_coverage": null,
+            "kind": "bond",
+            "leverage": null,
+            "ltm_interest": null,
+            "maturity": "2029-06-01",
+            "payment_class": "1L",
+            "rank": 0,
+            "share_of_debt": 0.43478260869565216
+          },
+          {
+            "balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "id": "SR-B",
+            "interest_coverage": null,
+            "kind": "bond",
+            "leverage": null,
+            "ltm_interest": null,
+            "maturity": "2029-01-15",
+            "payment_class": "1L",
+            "rank": 0,
+            "share_of_debt": 0.10869565217391304
+          },
+          {
+            "balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "cumulative_debt": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "id": "SUB",
+            "interest_coverage": null,
+            "kind": "bond",
+            "leverage": null,
+            "ltm_interest": null,
+            "maturity": "2031-03-01",
+            "payment_class": "2L",
+            "rank": 1,
+            "share_of_debt": 0.45652173913043476
+          }
+        ]
+      }
+    },
     "company_get": [
       100.0,
       42.0,

@@ -185,6 +185,8 @@ finstack-quant-ui/src/generated/meta/bridge_chart.ts
 finstack-quant-ui/src/generated/meta/calibration.ts
 finstack-quant-ui/src/generated/meta/callable_range_accrual.ts
 finstack-quant-ui/src/generated/meta/cap_floor.ts
+finstack-quant-ui/src/generated/meta/capital_structure_summary.ts
+finstack-quant-ui/src/generated/meta/capital_structure_summary_config.ts
 finstack-quant-ui/src/generated/meta/cds_index.ts
 finstack-quant-ui/src/generated/meta/cds_option.ts
 finstack-quant-ui/src/generated/meta/cds_tranche.ts
@@ -313,6 +315,8 @@ finstack-quant-ui/src/generated/schemas/bridge_chart.json
 finstack-quant-ui/src/generated/schemas/calibration.json
 finstack-quant-ui/src/generated/schemas/callable_range_accrual.json
 finstack-quant-ui/src/generated/schemas/cap_floor.json
+finstack-quant-ui/src/generated/schemas/capital_structure_summary.json
+finstack-quant-ui/src/generated/schemas/capital_structure_summary_config.json
 finstack-quant-ui/src/generated/schemas/cds_index.json
 finstack-quant-ui/src/generated/schemas/cds_option.json
 finstack-quant-ui/src/generated/schemas/cds_tranche.json
@@ -438,6 +442,8 @@ finstack-quant-ui/src/generated/types/bridge_chart.ts
 finstack-quant-ui/src/generated/types/calibration.ts
 finstack-quant-ui/src/generated/types/callable_range_accrual.ts
 finstack-quant-ui/src/generated/types/cap_floor.ts
+finstack-quant-ui/src/generated/types/capital_structure_summary.ts
+finstack-quant-ui/src/generated/types/capital_structure_summary_config.ts
 finstack-quant-ui/src/generated/types/cds_index.ts
 finstack-quant-ui/src/generated/types/cds_option.ts
 finstack-quant-ui/src/generated/types/cds_tranche.ts

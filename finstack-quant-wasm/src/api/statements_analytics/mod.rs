@@ -6,6 +6,7 @@
 //! classes: `DependencyTracer`, `CorkscrewExtension` and
 //! `CreditScorecardExtension`.
 
+mod capital_structure;
 mod comps;
 mod covenants;
 mod ecl;
@@ -15,6 +16,7 @@ mod templates;
 
 pub use handles::{JsCorkscrewExtension, JsCreditScorecardExtension, JsDependencyTracer};
 
+pub use capital_structure::capital_structure_summary;
 pub use covenants::{evaluate_covenants, forecast_breaches};
 
 pub use comps::{
@@ -33,6 +35,13 @@ use wasm_bindgen::prelude::*;
 /// Parse and semantically validate a `FinancialModelSpec` argument (object or JSON).
 pub(super) fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue> {
     FinancialModelSpec::from_json(&json_text(model, "model")?).map_err(to_js_err)
+}
+
+/// Parse a `StatementResult` argument (object or JSON).
+pub(super) fn parse_results(
+    results: &JsValue,
+) -> Result<finstack_quant_statements::evaluator::StatementResult, JsValue> {
+    serde_json::from_str(&json_text(results, "results")?).map_err(to_js_err)
 }
 
 /// Run a sensitivity analysis on a financial model.

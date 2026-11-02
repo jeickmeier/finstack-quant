@@ -125,6 +125,8 @@ export async function generate(repo = repoRoot) {
           "ohlson_o_score_input",
           "zmijewski_input",
           "credit_assessment",
+          "capital_structure_summary",
+          "capital_structure_summary_config",
           "dcf_options",
           "dcf_sensitivity_result",
           "lbo_config",

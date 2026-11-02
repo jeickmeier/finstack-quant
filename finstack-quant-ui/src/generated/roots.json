@@ -535,6 +535,16 @@
     "schema": "schemas/bridge_chart.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary_config.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/capital_structure_summary_config.schema.json",
+    "schema": "schemas/capital_structure_summary_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/capital_structure_summary.schema.json",
+    "schema": "schemas/capital_structure_summary.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/credit_assessment.schema.json",
     "schema": "schemas/credit_assessment.json"

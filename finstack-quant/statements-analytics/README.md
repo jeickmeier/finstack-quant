@@ -103,7 +103,7 @@ a submodule.
 | Scenarios | `ScenarioSet`, `ScenarioDefinition`, `ScenarioResults`, `ScenarioDiff` |
 | Sensitivity | `run_sensitivity`, `SensitivityConfig`, `SensitivityMode`, `SensitivityResult`, `ParameterSpec`, `TornadoEntry`, `generate_tornado_entries` |
 | Variance | `run_variance`, `variance_bridge`, `VarianceConfig`, `VarianceReport`, `VarianceRow`, `BridgeChart`, `BridgeStep` |
-| Credit | `compute_credit_context`, `CreditContextMetrics`, `evaluate_covenants`, `forecast_breaches`, `StatementsAdapter` |
+| Credit | `capital_structure_summary`, `CapitalStructureSummary`, `CapitalStructureSummaryConfig`, `CapitalStructureTranche`, `DebtInstrumentKind`, `MaturityWallBucket`, `compute_credit_context`, `CreditContextMetrics`, `evaluate_covenants`, `forecast_breaches`, `StatementsAdapter` |
 | Checks | `three_statement_checks`, `credit_underwriting_checks`, `lbo_model_checks`, `ThreeStatementMapping`, `CreditMapping`, `FormulaCheckSpec`, `render_check_report_text`, `render_check_report_html`, plus reconciliation / consistency / credit check types |
 | ECL | `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `compute_ecl`, `compute_ecl_weighted`, `classify_stage_from_curves`, `compute_ecl_from_curve`, `compute_ecl_weighted_from_curves`, `StagingConfig`, `PdTermStructure` |
 | Comps | `PeerSet`, `PeerFilter`, `PeerStats`, `compute_peer_multiples`, `compute_multiple`, `regression_fair_value`, `score_relative_value`, `percentile_rank`, `z_score` |
@@ -136,7 +136,10 @@ as_of)` prices market-dependent instruments;
 `generate_tornado_entries` ranks the result. Statement-model Monte Carlo lives in
 `finstack-quant-statements`, not here.
 
-**Credit and covenants.** `compute_credit_context` derives coverage, leverage,
+**Credit and covenants.** `capital_structure_summary` reports the debt stack by
+waterfall payment class at one period: balances, leverage and coverage through
+each class on LTM EBITDA and interest, and the maturity wall. A window short of a
+year gives null ratios, never an annualised one. `compute_credit_context` derives coverage, leverage,
 and LTV metrics from a `StatementResult` plus capital-structure cashflows.
 `CreditNumeratorNodes` separates CFADS for DSCR from EBITDA/EBIT for interest
 coverage. Instrument cashflows must already be in the reporting currency;

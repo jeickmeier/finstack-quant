@@ -19,6 +19,24 @@
       "type_name": "CapexReconciliation"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary.schema.json",
+      "bytes": 29213,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/capital_structure_summary.schema.json",
+      "summary": "Debt stack by seniority at one period: leverage and coverage through each payment class, and the maturity wall.",
+      "title": "CapitalStructureSummary",
+      "type_name": "CapitalStructureSummary"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary_config.schema.json",
+      "bytes": 1198,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/capital_structure_summary_config.schema.json",
+      "summary": "Reporting period and statement nodes for a capital structure summary.",
+      "title": "CapitalStructureSummaryConfig",
+      "type_name": "CapitalStructureSummaryConfig"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/cecl_config.schema.json",
       "bytes": 5497,
       "kind": "input",
