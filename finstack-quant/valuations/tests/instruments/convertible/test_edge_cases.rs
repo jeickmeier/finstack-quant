@@ -504,3 +504,30 @@ fn test_empty_call_put_schedule() {
         price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
     assert!(price.amount() > 0.0, "Empty call/put schedule should work");
 }
+
+/// Theta's carry matches the tree's boundary: the tree leaves out a flow on the
+/// valuation date, so carry does too, and buying the bond at issue is not income.
+#[test]
+fn test_theta_carry_leaves_out_issue_draw_and_coupon_on_valuation_date() {
+    use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+    use finstack_quant_valuations::metrics::MetricId;
+
+    let bond = create_standard_convertible();
+    let market = create_market_context();
+    let carry = |as_of: Date| {
+        bond.price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ThetaCarry],
+            PricingOptions::default(),
+        )
+        .expect("theta carry")
+        .measures["theta_carry"]
+    };
+    let coupon_date = Date::from_calendar_date(2025, Month::July, 1).expect("date");
+
+    assert_eq!(carry(bond.issue_date), 0.0);
+    assert_eq!(carry(coupon_date), 0.0);
+    // The coupon falls inside the one-day horizon of the day before.
+    assert!(carry(coupon_date.previous_day().expect("date")) > 0.0);
+}
