@@ -771,6 +771,14 @@ impl finstack_quant_valuations_core::instruments::Instrument for ConvertibleBond
         finstack_quant_valuations_core::pricer::ModelKey::Tree
     }
 
+    fn notional_draw_date(&self) -> Option<finstack_quant_core::dates::Date> {
+        Some(self.issue_date)
+    }
+
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
+
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()
     }
