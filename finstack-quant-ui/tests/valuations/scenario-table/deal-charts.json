@@ -1153,7 +1153,7 @@
                 "date": "2024-07-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "865581.44380135",
+                  "amount": "865581.443801350",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -1213,7 +1213,7 @@
                 "date": "2025-04-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "792606.710144446",
+                  "amount": "792606.7101444463",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -1253,7 +1253,7 @@
                 "date": "2025-10-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "765017.253324241",
+                  "amount": "765017.2533242413",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -1273,7 +1273,7 @@
                 "date": "2026-01-02",
                 "reset_date": null,
                 "amount": {
-                  "amount": "743186.430818712",
+                  "amount": "743186.4308187125",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -1535,7 +1535,7 @@
               [
                 "2024-07-01",
                 {
-                  "amount": "865581.44380135",
+                  "amount": "865581.443801350",
                   "currency": "USD"
                 }
               ],
@@ -1556,7 +1556,7 @@
               [
                 "2025-04-01",
                 {
-                  "amount": "792606.710144446",
+                  "amount": "792606.7101444463",
                   "currency": "USD"
                 }
               ],
@@ -1570,14 +1570,14 @@
               [
                 "2025-10-01",
                 {
-                  "amount": "765017.253324241",
+                  "amount": "765017.2533242413",
                   "currency": "USD"
                 }
               ],
               [
                 "2026-01-02",
                 {
-                  "amount": "743186.430818712",
+                  "amount": "743186.4308187125",
                   "currency": "USD"
                 }
               ],
@@ -1719,7 +1719,7 @@
               "currency": "USD"
             },
             "total_interest": {
-              "amount": "9260112.57641468085",
+              "amount": "9260112.57641468195",
               "currency": "USD"
             },
             "total_principal": {

@@ -27,6 +27,8 @@
 //! - **CS01**: Credit spread sensitivity (parallel)
 //! - **BucketedCS01**: Credit spread sensitivity by tenor
 //! - **Theta**: Time decay (1-day price change)
+//! - **Recovery01**: PV change per +1% recovery on a loan with a credit curve
+//! - **Jump to Default**: Recovery of par less current value on such a loan
 //!
 //! # Quick Example
 //!
@@ -63,6 +65,7 @@
 //! - [`AllInRateCalculator`] for borrower cost calculation
 
 mod cs01;
+mod default_risk;
 mod discount_margin;
 pub(crate) mod irr_helpers;
 mod oas;
@@ -93,7 +96,8 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 ///
 /// # Registered Metrics
 ///
-/// - Standard: YTM, Discount Margin, DV01, BucketedDV01, CS01, BucketedCS01, Theta
+/// - Standard: YTM, Discount Margin, DV01, BucketedDV01, CS01, BucketedCS01, Theta,
+///   Recovery01, Jump to Default
 /// - Custom: YTW (`"ytw"`), YTC (`"ytc"`), YT2Y/3Y/4Y, All-In Rate (`"all_in_rate"`),
 ///   OID EIR amortization (`"oid_eir_amortization"`), OID effective rate (`"oid_eir_rate"`)
 ///
@@ -120,6 +124,8 @@ pub(crate) fn register_term_loan_metrics(
             (BucketedDv01, risk_view::TermLoanBucketedDv01Calculator),
             (Cs01, risk_view::TermLoanCs01Calculator),
             (BucketedCs01, risk_view::TermLoanBucketedCs01Calculator),
+            (Recovery01, default_risk::TermLoanRecovery01Calculator),
+            (JumpToDefault, default_risk::TermLoanJumpToDefaultCalculator),
             (Ytm, YtmCalculator),
             (DiscountMargin, DiscountMarginCalculator),
             // Callable-tree metrics

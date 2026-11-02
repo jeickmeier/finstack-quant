@@ -9,7 +9,7 @@
 /// All spreads are expressed in **decimal** (`0.01 = 100bp`).
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum BondQuoteInput {
     /// Clean price quoted as percentage of par (e.g., 99.5 = 99.5% of par).
     CleanPricePct(f64),

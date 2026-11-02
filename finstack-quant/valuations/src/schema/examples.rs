@@ -309,6 +309,66 @@ pub(super) fn pool_stats() -> Result<Vec<Value>> {
     )?)
 }
 
+/// The workout ladder of the example callable bond at 108 clean on a flat curve.
+pub(super) fn bond_workout_ladder() -> Result<Vec<Value>> {
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions;
+    use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+    let as_of = date(2025, time::Month::January, 15)?;
+    let mut bond = Bond::example_callable()?;
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(108.0);
+    let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (10.0, 0.70)])
+        .build()?;
+    let market = MarketContext::new().insert(curve);
+    example(&quote_conversions::bond_workout_ladder(
+        &bond, &market, as_of,
+    )?)
+}
+
+/// The quote set of the example bond at 98.5 clean on a sloping curve.
+pub(super) fn bond_quote_set() -> Result<Vec<Value>> {
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions;
+    use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::{BondQuoteInput, PricingOptions};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+    let bond = Bond::example()?;
+    let as_of = bond.issue_date;
+    let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (10.0, 0.70)])
+        .build()?;
+    let market = MarketContext::new().insert(curve);
+    example(&quote_conversions::compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::CleanPricePct(98.5),
+        PricingOptions::default(),
+    )?)
+}
+
+/// A quote of each form: a price, a yield and a spread.
+pub(super) fn bond_quote_input() -> Result<Vec<Value>> {
+    use crate::instruments::BondQuoteInput;
+
+    [
+        BondQuoteInput::CleanPricePct(98.5),
+        BondQuoteInput::Ytm(0.055),
+        BondQuoteInput::ZSpread(0.012),
+    ]
+    .iter()
+    .map(|input| Ok(example(input)?.remove(0)))
+    .collect()
+}
+
 /// Report on the canonical example CLO pool at its closing date.
 pub(super) fn pool_report() -> Result<Vec<Value>> {
     let deal = structured_credit::StructuredCredit::example()?;
@@ -416,6 +476,48 @@ pub(super) fn simulation_run() -> Result<Vec<Value>> {
 pub(super) fn market_dependencies() -> Result<Vec<Value>> {
     use crate::instruments::Instrument;
     example(&crate::instruments::fixed_income::bond::Bond::example()?.market_dependencies()?)
+}
+
+/// A row in each regime of a convertible with a conversion price of 100.
+pub(super) fn convertible_spot_ladder() -> Result<Vec<Value>> {
+    use crate::instruments::fixed_income::convertible::{
+        ConvertibleRegime, ConvertibleSpotLadder, ConvertibleSpotRow,
+    };
+    let row = |spot: f64, is_market_spot, price: f64, delta: f64, regime| ConvertibleSpotRow {
+        spot,
+        is_market_spot,
+        price,
+        delta: Some(delta),
+        hedge_ratio: Some(delta / 10_000.0),
+        regime: Some(regime),
+        conversion_value: spot * 10_000.0,
+        parity: spot / 100.0,
+        conversion_premium: Some(price / (spot * 10_000.0) - 1.0),
+        bond_floor: 818_730.75,
+    };
+    example(&ConvertibleSpotLadder {
+        instrument_id: "CB-EXAMPLE".to_string(),
+        as_of: date(2025, time::Month::January, 1)?,
+        currency: finstack_quant_core::currency::Currency::USD,
+        market_spot: 100.0,
+        rows: vec![
+            row(50.0, false, 874_656.14, 3_347.45, ConvertibleRegime::Busted),
+            row(
+                100.0,
+                true,
+                1_158_348.78,
+                7_368.0,
+                ConvertibleRegime::Balanced,
+            ),
+            row(
+                150.0,
+                false,
+                1_571_793.63,
+                8_921.0,
+                ConvertibleRegime::EquitySensitive,
+            ),
+        ],
+    })
 }
 
 pub(super) fn convertible_greeks() -> Result<Vec<Value>> {

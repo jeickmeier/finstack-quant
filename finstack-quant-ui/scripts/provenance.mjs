@@ -508,6 +508,50 @@ const displays = [
       "Returned native values of one stored object per supplied point: DiscountCurve.df and zeroRate (default continuous compounding) and forward (continuously compounded, year fractions only), ForwardCurve.rate (simple, on the curve day count), HazardCurve.sp and hazardRate, and models.volatility.getSurfaceVol (expiry in years, strike in the surface's units, inside the grid). Curve dates pass through as ISO text for Rust to convert with the curve day count; no date, unit or tenor conversion happens here. A point Rust rejects keeps its native error in its cell.",
   },
   {
+    id: "yield-workout-ladder",
+    api: [
+      "valuations.instruments.bondWorkoutLadder",
+      "ValuationInstrumentsNamespace",
+      "bondWorkoutLadder",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned BondWorkoutLadder of one bond: one row per call, put and maturity exit in Rust's date order, every yield solved at the one price shown. The worst row is the one is_worst marks, the exit the ytw metric selects; no yield is compared here. Yield and I-spread units are what metricMetadata declares for ytw and i_spread, and a null yield is shown as no yield, never zero. Z-spread is not reported per exit.",
+  },
+  {
+    id: "quote-converter",
+    api: [
+      "valuations.instruments.computeQuotes",
+      "ValuationInstrumentsNamespace",
+      "computeQuotes",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned BondQuoteSet of one bond from the one quote entered: every price, yield and spread in Rust's field order, each the metric of the same name at that clean price. Quote kinds are the branches of the BondQuoteInput schema. Units are the labels bondQuoteSetFieldUnits returns for each field, which Rust tests against metricMetadata. A null field is shown as no value, never zero, and a quote that cannot be solved shows the native error. Nothing is converted or compared here.",
+  },
+  {
+    id: "bond-credit-card",
+    api: [
+      "valuations.instruments.priceInstrumentWithMarket",
+      "ValuationInstrumentsNamespace",
+      "priceInstrumentWithMarket",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned measures of one bond, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row, so no script decides whether a bond has a government curve or is hazard-priced. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown, as for breakeven, whose unit follows its target); values are never rescaled, classified, summed or derived. theta_period and breakeven_config come from the MetricPricingOverrides schema's form and reach Rust as the request's metricPricingOverrides; no horizon, target or mode is assumed.",
+  },
+  {
+    id: "convertible-card",
+    api: [
+      "valuations.instruments.convertibleSpotLadder",
+      "ValuationInstrumentsNamespace",
+      "convertibleSpotLadder",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned ConvertibleSpotLadder of one convertible on the tree model: one row per share price in Rust's ascending order, the share prices the ones entered or Rust's default ladder. Each row's price, delta, parity, conversion value, premium and floor are the metrics of those names at that share price, with volatility, rates and credit as supplied. The regime and the market row are what Rust returned; nothing is classified or compared here. Regime is one market convention, delta over the conversion ratio on the 40 and 80 delta bands. A null hedge ratio, regime or premium shows as undefined, never zero. Metric rows are each priced on their own valuations.instruments.priceInstrumentWithMarket call, so an id's native error stays in its row; column units are what metricMetadata declares.",
+  },
+  {
     id: "loan-yield-card",
     api: [
       "valuations.instruments.priceInstrumentWithMarket",
@@ -516,7 +560,7 @@ const displays = [
     ],
     route: "returned-model",
     convention:
-      "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model.",
+      "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model; recovery01 and jump_to_default price on a credit curve under the tree model.",
   },
   {
     id: "liability-management-card",

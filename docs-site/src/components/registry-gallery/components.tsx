@@ -55,6 +55,11 @@ import { Example as Example51 } from "./examples/benchmark-report";
 import { Example as Example52 } from "./examples/merton-calculator";
 import { Example as Example72 } from "./examples/curve-query";
 import { Example as Example73 } from "./examples/loan-yield-card";
+import { Example as Example81 } from "./examples/bond-credit-card";
+import { Example as ExampleConvertibleCard } from "./examples/convertible-card";
+import { Example as Example82 } from "./examples/metric-values-table";
+import { Example as Example80 } from "./examples/yield-workout-ladder";
+import { Example as ExampleQuoteConverter } from "./examples/quote-converter";
 import { Example as Example74 } from "./examples/liability-management-card";
 import { Example as Example75 } from "./examples/pool-report";
 import { Example as Example76 } from "./examples/waterfall-report";
@@ -136,6 +141,11 @@ const examples = {
   "merton-calculator": Example52,
   "curve-query": Example72,
   "loan-yield-card": Example73,
+  "bond-credit-card": Example81,
+  "convertible-card": ExampleConvertibleCard,
+  "metric-values-table": Example82,
+  "yield-workout-ladder": Example80,
+  "quote-converter": ExampleQuoteConverter,
   "liability-management-card": Example74,
   "waterfall-report": Example76,
   "coverage-test-chart": Example77,

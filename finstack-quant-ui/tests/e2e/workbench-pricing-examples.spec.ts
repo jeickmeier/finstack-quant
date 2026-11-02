@@ -376,3 +376,69 @@ test("structured-credit tranche analytics take no default price and solve OAS on
   );
   expect(errors).toEqual([]);
 });
+
+test("a priced bond opens its cards on their own in the Analytics tab", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=pricing-workbench&theme=light&density=compact&focus=1&instrument=bond",
+  );
+  await expect(page.locator(".finstack-workbench__state")).toHaveText("Priced");
+  const results = page.getByRole("region", { name: "Results", exact: true });
+  await results.getByRole("tab", { name: "Analytics" }).click();
+  await results
+    .locator("summary", { hasText: /^Yield workout ladder$/ })
+    .click();
+  await expect(
+    results.getByRole("table", { name: "Yield to each exit" }),
+  ).toBeVisible();
+  await results
+    .locator("summary", { hasText: /^Spreads, risk and carry$/ })
+    .click();
+  const credit = results.getByRole("region", { name: "Bond credit" });
+  // No government curve is named on this bond: Rust's error in that row alone.
+  await expect(
+    credit.getByRole("row", { name: /^G spread/ }).getByRole("alert"),
+  ).toContainText("requires a government curve");
+  await expect(
+    credit.getByRole("row", { name: /^Duration mod/ }).getByRole("alert"),
+  ).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("a priced convertible shows the card by share price in the Analytics tab", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=pricing-workbench&theme=light&density=compact&focus=1&instrument=convertible_bond",
+  );
+  await expect(page.locator(".finstack-workbench__state")).toHaveText("Priced");
+  const results = page.getByRole("region", { name: "Results", exact: true });
+  await results.getByRole("tab", { name: "Analytics" }).click();
+  const ladder = results.getByRole("region", {
+    name: "Convertible by share price",
+  });
+  await expect(
+    ladder.getByRole("rowheader", { name: /\(market\)$/ }),
+  ).toHaveCount(1);
+  // Rust's error on this bond with no quote, in that row alone.
+  const metrics = results.getByRole("region", {
+    name: "Convertible",
+    exact: true,
+  });
+  await expect(
+    metrics.getByRole("row", { name: /^Oas/i }).getByRole("alert"),
+  ).toContainText("quoted_clean_price_pct");
+  await expect(
+    metrics.getByRole("row", { name: /^Parity/ }).getByRole("alert"),
+  ).toHaveCount(0);
+  // A share price entered reprices; Rust's rejection of one shows as returned.
+  await ladder.getByRole("textbox", { name: /Share prices/ }).fill("0");
+  await ladder.getByRole("button", { name: "Apply" }).click();
+  await expect(ladder.getByRole("alert")).toContainText("finite and positive");
+  expect(errors).toEqual([]);
+});

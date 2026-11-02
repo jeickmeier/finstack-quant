@@ -6,15 +6,17 @@
 //! When the hazard curve carries its bootstrap par-spread quotes, Recovery01
 //! reboots the hazard curve under the bumped recovery so quoted spreads remain
 //! invariant. Curves without par quotes fall back to a frozen-curve local bump.
-//! The finite-difference scheme and the bump bounds are the CDS ones
-//! ([`crate::cds::metrics::recovery01`]).
+//! The finite-difference scheme and the bump bounds are the shared ones
+//! ([`finstack_quant_valuations_core::metrics::sensitivities::recovery01`]).
 
 use crate::cds::metrics::market_doc_clause;
-use crate::cds::metrics::recovery01::{market_with_recovery, recovery01_fd, RecoveryReplayTerms};
 use crate::cds_option::pricer::synthetic_underlying_cds;
 use crate::cds_option::CdsOption;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::sensitivities::recovery01::{
+    market_with_recovery, recovery01_fd, RecoveryReplayTerms,
+};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Recovery01 calculator for CDS Option.

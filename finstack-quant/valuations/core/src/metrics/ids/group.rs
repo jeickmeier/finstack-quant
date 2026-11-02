@@ -101,6 +101,7 @@ impl MetricGroup {
                 MetricId::ZSpread,
                 MetricId::Oas,
                 MetricId::ISpread,
+                MetricId::GSpread,
                 MetricId::ASWPar,
                 MetricId::ASWMarket,
                 MetricId::DiscountMargin,

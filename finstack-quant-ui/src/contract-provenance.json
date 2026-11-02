@@ -2199,9 +2199,168 @@
       }
     },
     {
+      "id": "yield-workout-ladder",
+      "route": "returned-report",
+      "convention": "Returned BondWorkoutLadder of one bond: one row per call, put and maturity exit in Rust's date order, every yield solved at the one price shown. The worst row is the one is_worst marks, the exit the ytw metric selects; no yield is compared here. Yield and I-spread units are what metricMetadata declares for ytw and i_spread, and a null yield is shown as no yield, never zero. Z-spread is not reported per exit.",
+      "api": {
+        "name": "valuations.instruments.bondWorkoutLadder",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "bondWorkoutLadder",
+        "inputs": [
+          {
+            "name": "bond",
+            "type": "Bond",
+            "optional": false
+          },
+          {
+            "name": "marketJson",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.valuations.BondWorkoutLadder",
+        "declaration": "/**\n   * Yield and I-spread to every call, put and maturity exit of a bond at one market price, with the worst marked (mirrors Rust `bond_workout_ladder`).\n   * @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights must carry `quoted_clean_price_pct`; one with none falls back to its model price.\n   * @param marketJson - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index and make-whole reference curves.\n   * @param asOf - ISO-8601 valuation date; the quote date and coupon entitlement follow the bond's settlement convention.\n   * @returns `BondWorkoutLadder` plain object: `clean_price_pct` and `dirty_price`, the one price every exit is solved at, and `rows` in date order, each with `date`, `kind` (`call`, `put` or `maturity`), `redemption_price_pct` in percent of the principal redeemed, `redemption_amount`, `make_whole`, `yield_rate` and `i_spread` as decimals (the par rate runs to `date` when the bond has an exit other than maturity, and to contractual maturity when it has none) or `null` when the path has no finite yield (an exit on the quote date, or same-day cash at or above the price; a worst row can be `null`, where the `ytw` metric is negative infinity), and `is_worst`.\n   * @throws Error - Throws with kind `not_found` if a bond with exercise rights has no quoted clean price or a curve is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if a yield cannot be solved.\n   */\n  bondWorkoutLadder(\n    bond: Bond,\n    marketJson: string,\n    asOf: string\n  ): generated.valuations.BondWorkoutLadder;",
+        "sha256": "5dff63e0c3dda8fa795e07cf98ea01a8d4ed216c393f459014de7e56b78d07ab"
+      }
+    },
+    {
+      "id": "quote-converter",
+      "route": "returned-report",
+      "convention": "Returned BondQuoteSet of one bond from the one quote entered: every price, yield and spread in Rust's field order, each the metric of the same name at that clean price. Quote kinds are the branches of the BondQuoteInput schema. Units are the labels bondQuoteSetFieldUnits returns for each field, which Rust tests against metricMetadata. A null field is shown as no value, never zero, and a quote that cannot be solved shows the native error. Nothing is converted or compared here.",
+      "api": {
+        "name": "valuations.instruments.computeQuotes",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "computeQuotes",
+        "inputs": [
+          {
+            "name": "bond",
+            "type": "Bond",
+            "optional": false
+          },
+          {
+            "name": "marketJson",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "quoteInput",
+            "type": "generated.valuations.BondQuoteInput | string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.valuations.BondQuoteSet",
+        "declaration": "/**\n   * Every price, yield and spread quote of a bond, solved from any one of them (mirrors Rust `compute_quotes`).\n   * @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights needs HW1F parameters on the bond or in the market, because its `oas` is part of the set.\n   * @param marketJson - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index curve.\n   * @param asOf - ISO-8601 valuation date; the quote date and accrued interest follow the bond's settlement convention.\n   * @param quoteInput - One `BondQuoteInput`, a plain object or JSON string with exactly one key: `clean_price_pct` (percent of par), `dirty_price_currency` (currency, the whole notional), `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_market`, `i_spread` or `japanese_simple_yield` (decimals, `0.01` = 100bp).\n   * @returns `BondQuoteSet` plain object: `clean_price_currency`, `clean_price_pct`, `dirty_price_currency`, and `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_par`, `asw_market`, `i_spread`, `japanese_simple_yield` and `moosmuller_ytm` as decimals, each `null` when it does not apply to the bond or has no finite value.\n   * @throws Error - Throws with kind `validation` if `quoteInput` has an unknown or second key or a non-finite value, a dirty price is not positive, the market JSON or `asOf` is malformed, the quote kind does not apply to the bond (`discount_margin` with no floating coupons, `asw_market` or `japanese_simple_yield` on a floating coupon, `z_spread` or `asw_market` with exercise rights, whose workout path depends on the price), or a metric of the set cannot be solved, which fails the whole set (`z_spread` with a call or put on the quote date below the price, `oas` with exercise rights and no HW1F parameters); and with kind `not_found` if a curve the bond needs to normalize the quote is missing.\n   */\n  computeQuotes(\n    bond: Bond,\n    marketJson: string,\n    asOf: string,\n    quoteInput: generated.valuations.BondQuoteInput | string\n  ): generated.valuations.BondQuoteSet;",
+        "sha256": "2bc09c0e99bbfca417dfa2ba64f2aefabda81ed328714d238cdab80dd880cd8c"
+      }
+    },
+    {
+      "id": "bond-credit-card",
+      "route": "returned-model",
+      "convention": "Returned measures of one bond, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row, so no script decides whether a bond has a government curve or is hazard-priced. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown, as for breakeven, whose unit follows its target); values are never rescaled, classified, summed or derived. theta_period and breakeven_config come from the MetricPricingOverrides schema's form and reach Rust as the request's metricPricingOverrides; no horizon, target or mode is assumed.",
+      "api": {
+        "name": "valuations.instruments.priceInstrumentWithMarket",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "priceInstrumentWithMarket",
+        "inputs": [
+          {
+            "name": "instrumentJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "market",
+            "type": "MarketContext",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": "string | null",
+            "optional": true
+          },
+          {
+            "name": "metrics",
+            "type": "string[] | null",
+            "optional": true
+          },
+          {
+            "name": "metricPricingOverrides",
+            "type": "JsonInput | null",
+            "optional": true
+          },
+          {
+            "name": "marketHistory",
+            "type": "JsonInput | null",
+            "optional": true
+          },
+          {
+            "name": "explain",
+            "type": "boolean | null",
+            "optional": true
+          }
+        ],
+        "returns": "ValuationResult",
+        "declaration": "/**\n   * Price an instrument using a pre-parsed `core.MarketContext` handle.\n   *\n   * Avoids the per-call market-parse overhead of `priceInstrument`.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * Their `seed` is a lossless `bigint`; serialize such results with\n   * `valuations.valuationResultToJson`.\n   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.\n   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data for this call.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit, `null`, or `\"default\"` for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result.\n   * @param metricPricingOverrides - Optional JSON object patch applied before validation. Only supplied fields replace stored overrides; `{}` preserves them. Supplied `bump_config` fields merge into the stored object. Explicit `null` clears nullable fields to their Rust fallback. Omit the argument or pass JavaScript `null`/`undefined` to retain the envelope configuration.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Under `\"discounting\"` and `\"hazard_rate\"` it holds one `cashflow_pv` entry per projected cashflow (date, amount, discount factor, curve, survival probability, present value) summing to the price, capped at 1000 entries; other models get one `computation_step` entry stating that no per-flow decomposition exists. Omit or pass `false` for no trace.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, `provenance`, …). `provenance` records the model, requested date, declared market dependencies, scenario adjustment and, when metrics are requested, the finite-difference bump sizes.\n   * @throws Error - Throws a JavaScript exception if an instrument, metric-pricing-override, or market- history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrumentWithMarket(\n    instrumentJson: JsonInput,\n    market: MarketContext,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    metricPricingOverrides?: JsonInput | null,\n    marketHistory?: JsonInput | null,\n    explain?: boolean | null\n  ): ValuationResult;",
+        "sha256": "887a88441ef4e22d6e41cd856482d6f2b7382acb8c3ae062a92460444b2d5097"
+      }
+    },
+    {
+      "id": "convertible-card",
+      "route": "returned-report",
+      "convention": "Returned ConvertibleSpotLadder of one convertible on the tree model: one row per share price in Rust's ascending order, the share prices the ones entered or Rust's default ladder. Each row's price, delta, parity, conversion value, premium and floor are the metrics of those names at that share price, with volatility, rates and credit as supplied. The regime and the market row are what Rust returned; nothing is classified or compared here. Regime is one market convention, delta over the conversion ratio on the 40 and 80 delta bands. A null hedge ratio, regime or premium shows as undefined, never zero. Metric rows are each priced on their own valuations.instruments.priceInstrumentWithMarket call, so an id's native error stays in its row; column units are what metricMetadata declares.",
+      "api": {
+        "name": "valuations.instruments.convertibleSpotLadder",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "ValuationInstrumentsNamespace",
+        "member": "convertibleSpotLadder",
+        "inputs": [
+          {
+            "name": "bond",
+            "type": "ConvertibleBond",
+            "optional": false
+          },
+          {
+            "name": "marketJson",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "asOf",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "spots",
+            "type": "readonly number[] | null",
+            "optional": true
+          }
+        ],
+        "returns": "generated.valuations.ConvertibleSpotLadder",
+        "declaration": "/**\n   * Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices (mirrors Rust `convertible_spot_ladder`).\n   * @param bond - Borrowed `ConvertibleBond` handle; it is not consumed. Its `metric_pricing_overrides.bump_config` sets the spot bump behind delta (default 1% of each row's share price).\n   * @param marketJson - Canonical market-context JSON holding the bond's discount curve, share price, volatility and any dividend yield, hazard curve and floating index.\n   * @param asOf - ISO-8601 valuation date and origin of the tree's ACT/365F clock.\n   * @param spots - Share prices in the bond's currency, each finite and positive, sorted ascending with duplicates dropped; omit for 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2 and 3 times the market's share price.\n   * @returns `ConvertibleSpotLadder` plain object: `instrument_id`, `as_of`, `currency`, `market_spot` and `rows` in ascending share price, each with `spot`, `is_market_spot`, `price`, `conversion_value` and `bond_floor` in `currency`, `parity` over notional, and `delta` per unit of share price, `hedge_ratio` as a decimal share of the conversion ratio, `regime` (`busted` below 0.40, `balanced` to 0.80, `equity_sensitive` above) and `conversion_premium` as a decimal, each `null` where undefined: a mandatory-variable bond has no hedge ratio or regime.\n   * @throws Error - Throws with kind `validation` if `spots` is empty or holds a value that is not finite and positive, or the bond or market JSON is invalid, and kind `not_found` if market data the bond needs is missing.\n   */\n  convertibleSpotLadder(\n    bond: ConvertibleBond,\n    marketJson: string,\n    asOf: string,\n    spots?: readonly number[] | null\n  ): generated.valuations.ConvertibleSpotLadder;",
+        "sha256": "02f7a82dce7ff98978561236fd6eeeba6cba23bb1ef45896fbbe41fb2103728c"
+      }
+    },
+    {
       "id": "loan-yield-card",
       "route": "returned-model",
-      "convention": "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model.",
+      "convention": "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model; recovery01 and jump_to_default price on a credit curve under the tree model.",
       "api": {
         "name": "valuations.instruments.priceInstrumentWithMarket",
         "source": "finstack-quant-wasm/index.d.ts",

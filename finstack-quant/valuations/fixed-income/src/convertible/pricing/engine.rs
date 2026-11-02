@@ -274,6 +274,60 @@ pub(super) struct PricingInputs {
     spot_scalar: MarketScalar,
 }
 
+impl PricingInputs {
+    /// `market` with the bond's share price at `spot`, keeping its scalar variant.
+    pub(super) fn market_at_spot(
+        &self,
+        market: &MarketContext,
+        spot: f64,
+    ) -> Result<MarketContext> {
+        let scalar = match &self.spot_scalar {
+            MarketScalar::Price(money) => MarketScalar::Price(Money::new(spot, money.currency())?),
+            MarketScalar::Unitless(_) => MarketScalar::Unitless(spot),
+        };
+        Ok(market.clone().insert_price(self.spot_id.as_str(), scalar))
+    }
+}
+
+/// Prices at either side of a central-difference bump of the share price.
+pub(super) struct SpotBumpPrices {
+    /// Bump width in share price, half the distance between the two prices.
+    spot_bump: f64,
+    /// Value with the share price up by the bump.
+    price_up: f64,
+    /// Value with the share price down by the bump.
+    price_down: f64,
+}
+
+impl SpotBumpPrices {
+    /// Central-difference delta: `(P(S+h) - P(S-h)) / (2h)`.
+    pub(super) fn delta(&self) -> f64 {
+        (self.price_up - self.price_down) / (2.0 * self.spot_bump)
+    }
+}
+
+/// Reprice `bond` either side of a relative bump of the share price in `inputs`,
+/// or `None` when the share price is zero and has no relative bump.
+pub(super) fn spot_bump_prices(
+    bond: &ConvertibleBond,
+    market: &MarketContext,
+    inputs: &PricingInputs,
+    bump_pct: f64,
+    as_of: Date,
+) -> Result<Option<SpotBumpPrices>> {
+    let spot_bump = bump_pct * inputs.spot;
+    if spot_bump <= 0.0 {
+        return Ok(None);
+    }
+    let market_up = inputs.market_at_spot(market, inputs.spot + spot_bump)?;
+    let market_down = inputs.market_at_spot(market, inputs.spot - spot_bump)?;
+    Ok(Some(SpotBumpPrices {
+        spot_bump,
+        price_up: price_convertible_bond(bond, &market_up, as_of)?.amount(),
+        price_down: price_convertible_bond(bond, &market_down, as_of)?.amount(),
+    }))
+}
+
 /// Resolve an already-exercised contract without recreating its debt or options.
 fn resolved_value(
     bond: &ConvertibleBond,
@@ -632,29 +686,10 @@ pub fn calculate_convertible_greeks(
     };
 
     // ---- Delta & Gamma: bump equity spot (central differences) ----
-    let h_spot = bump_pct * inputs.spot;
-    if h_spot > 0.0 {
-        let bump_scalar = |amount: f64| -> finstack_quant_core::Result<MarketScalar> {
-            Ok(match &inputs.spot_scalar {
-                MarketScalar::Price(money) => MarketScalar::Price(
-                    finstack_quant_core::money::Money::new(amount, money.currency())?,
-                ),
-                MarketScalar::Unitless(_) => MarketScalar::Unitless(amount),
-            })
-        };
-
-        let market_up = market
-            .clone()
-            .insert_price(inputs.spot_id.as_str(), bump_scalar(inputs.spot + h_spot)?);
-        let market_down = market
-            .clone()
-            .insert_price(inputs.spot_id.as_str(), bump_scalar(inputs.spot - h_spot)?);
-
-        let price_up = price_convertible_bond(bond, &market_up, as_of)?.amount();
-        let price_down = price_convertible_bond(bond, &market_down, as_of)?.amount();
-
-        greeks.delta = (price_up - price_down) / (2.0 * h_spot);
-        greeks.gamma = (price_up - 2.0 * greeks.price + price_down) / (h_spot * h_spot);
+    if let Some(bump) = spot_bump_prices(bond, market, &inputs, bump_pct, as_of)? {
+        greeks.delta = bump.delta();
+        greeks.gamma = (bump.price_up - 2.0 * greeks.price + bump.price_down)
+            / (bump.spot_bump * bump.spot_bump);
     }
 
     // ---- Vega: bump volatility (B1: central differences) ----

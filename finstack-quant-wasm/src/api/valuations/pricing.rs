@@ -525,6 +525,18 @@ pub fn equity_metrics_field_units(currency: JsValue) -> Result<JsValue, JsValue>
     to_js_value(&finstack_quant_valuations::pricer::equity_metrics_field_units(currency))
 }
 
+/// Units of the `BondQuoteSet` fields, in struct order, the one place a host reads them from.
+///
+/// The set mixes currency prices, a percent-of-par price and decimal yields and spreads. Each field with a metric states that metric's unit, and `clean_price_pct`, which has none, states its quote convention. Values are never rescaled.
+/// @param currency - ISO-4217 code of the bond whose set is being labelled, in any ASCII case; it names the unit of `clean_price_currency` and `dirty_price_currency`.
+/// @returns One `MetricFieldUnit` per `BondQuoteSet` field in struct order: the wire field name, its unit text and the Rust field the unit is documented on.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = bondQuoteSetFieldUnits)]
+pub fn bond_quote_set_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::bond_quote_set_field_units(currency))
+}
+
 /// Units of the `PoolReport` fields, the one place a host reads them from.
 ///
 /// `PoolStats` mixes a decimal coupon, a basis-point spread and a percent-point

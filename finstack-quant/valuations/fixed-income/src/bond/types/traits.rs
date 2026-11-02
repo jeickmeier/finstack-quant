@@ -136,6 +136,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         {
             deps.add_forward_curve(curve_id.clone());
         }
+        if let Some(curve_id) = &self
+            .instrument_pricing_overrides
+            .model_config
+            .government_curve_id
+        {
+            deps.add_discount_curve(curve_id.clone());
+        }
         Ok(deps)
     }
 

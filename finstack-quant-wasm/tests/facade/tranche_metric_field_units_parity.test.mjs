@@ -99,3 +99,19 @@ test('equityMetricsFieldUnits matches the records pinned for both hosts', () => 
     EQUITY_PINNED
   );
 });
+
+const BOND_QUOTE_PINNED = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/fixtures/bond_quote_set_field_units.json',
+      import.meta.url
+    )
+  )
+);
+
+test('bondQuoteSetFieldUnits matches the records pinned for both hosts', () => {
+  assert.deepEqual(
+    plain(facade.valuations.instruments.bondQuoteSetFieldUnits('EUR')),
+    BOND_QUOTE_PINNED
+  );
+});

@@ -26,11 +26,13 @@ import {
   type MetricValuesRequest,
 } from "@/hooks/valuations/use-metric-values/use-metric-values";
 import {
-  applicableLoanYieldMetrics,
   LoanYieldCard,
   loanYieldMetrics,
-  type LoanYieldRow,
 } from "@/components/finstack/valuations/components/loan-yield-card/loan-yield-card";
+import {
+  applicableMetrics,
+  type MetricValueRow,
+} from "@/components/finstack/valuations/components/metric-values-table/metric-values-table";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { unwrap, type PriceRequest } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
@@ -68,7 +70,7 @@ afterEach(() => {
 });
 const { cases } = fixture;
 const rowsOf = (entry: { rows: unknown }) =>
-  entry.rows as unknown as LoanYieldRow[];
+  entry.rows as unknown as MetricValueRow[];
 const metadataOf = (entry: { metadata: unknown }) =>
   entry.metadata as unknown as MetricMetadata[];
 const failing = (entry: { rows: unknown }) =>
@@ -126,30 +128,59 @@ it("a malformed instrument is the error of the whole request", async () => {
   });
   expect(result.ok).toBe(false);
 });
-it("Rust lists every id of the card for a term loan and five of them for a revolver", () => {
+it("Rust lists every id of the card for a term loan and seven of them for a revolver", () => {
   expect(cases.fixed.request.metrics).toEqual([...loanYieldMetrics]);
-  expect(applicableLoanYieldMetrics(cases.fixed.available)).toEqual([
+  expect(applicableMetrics(loanYieldMetrics, cases.fixed.available)).toEqual([
     ...loanYieldMetrics,
   ]);
-  expect(applicableLoanYieldMetrics(cases.revolver.available)).toEqual([
-    "ytm",
-    "discount_margin",
-    "all_in_rate",
-    "oid_eir_rate",
-    "oid_eir_amortization",
-  ]);
+  expect(applicableMetrics(loanYieldMetrics, cases.revolver.available)).toEqual(
+    [
+      "ytm",
+      "discount_margin",
+      "all_in_rate",
+      "oid_eir_rate",
+      "oid_eir_amortization",
+      "recovery01",
+      "jump_to_default",
+    ],
+  );
 });
+const defaultRisk = ["recovery01", "jump_to_default"];
 it("shows every value of a quoted callable loan under the tree model as returned", () => {
   const entry = cases.quotedTree;
-  expect(failing(entry)).toEqual([]);
+  expect(failing(entry)).toEqual(defaultRisk);
   render(<LoanYieldCard rows={rowsOf(entry)} metadata={metadataOf(entry)} />);
-  for (const row of rowsOf(entry)) {
+  for (const row of rowsOf(entry).filter(({ value }) => value.ok)) {
     const cells = rowFor(row.metric).children;
     expect(cells[1].textContent).toBe(
       String((row.value as { value: number }).value),
     );
   }
-  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getAllByRole("alert")).toHaveLength(defaultRisk.length);
+});
+it("prices recovery01 and jump to default on a hazard-priced loan", () => {
+  const entry = cases.hazard;
+  expect(failing(entry)).not.toEqual(expect.arrayContaining(defaultRisk));
+  render(<LoanYieldCard rows={rowsOf(entry)} metadata={metadataOf(entry)} />);
+  for (const metric of defaultRisk) {
+    const row = rowsOf(entry).find((candidate) => candidate.metric === metric)!;
+    expect(rowFor(metric).children[1].textContent).toBe(
+      String((row.value as { value: number }).value),
+    );
+    expect(rowFor(metric).children[2].textContent).toBe("currency");
+  }
+});
+it("shows Rust's reason in the default-risk rows of a loan not on a hazard curve", () => {
+  render(
+    <LoanYieldCard
+      rows={rowsOf(cases.fixed)}
+      metadata={metadataOf(cases.fixed)}
+    />,
+  );
+  for (const metric of defaultRisk)
+    expect(within(rowFor(metric)).getByRole("alert").textContent).toContain(
+      "requires hazard pricing",
+    );
 });
 it("labels by labelFor and states only the unit and group Rust declares", () => {
   const entry = cases.quotedTree;
@@ -177,11 +208,11 @@ it.each([
   "%s keeps the error of %s beside the other rows",
   (name, metric, message) => {
     const entry = cases[name];
-    expect(failing(entry)).toEqual([metric]);
+    expect(failing(entry)).toEqual([metric, ...defaultRisk]);
     render(<LoanYieldCard rows={rowsOf(entry)} metadata={metadataOf(entry)} />);
     const alert = within(rowFor(metric)).getByRole("alert");
     expect(alert.textContent).toContain(message);
-    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.getAllByRole("alert")).toHaveLength(1 + defaultRisk.length);
     const ytm = rowsOf(entry)[0];
     expect(rowFor("ytm").children[1].textContent).toBe(
       String((ytm.value as { value: number }).value),
@@ -230,7 +261,7 @@ function Connected({ request }: { request: MetricValuesRequest }) {
   const query = useMetricValues(request);
   return (
     <LoanYieldCard
-      rows={(query.data as LoanYieldRow[] | undefined) ?? null}
+      rows={(query.data as MetricValueRow[] | undefined) ?? null}
       loading={query.isFetching}
       error={query.error?.message}
     />

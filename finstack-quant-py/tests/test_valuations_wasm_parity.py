@@ -27,7 +27,7 @@ import pytest
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
-from finstack_quant.core.market_data import HazardCurve, VolSurface
+from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, HazardCurve, MarketContext, VolSurface
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Bps, Rate
 from finstack_quant.models.credit import MertonModel
@@ -100,6 +100,148 @@ def _pool_report_case(pool: ins.AssetPool, close: datetime.date) -> dict[str, An
     return {
         "pool": pool_json,
         "report": ins.pool_report(ins.AssetPool.from_json(pool_json), close).to_dict(),
+    }
+
+
+def _bond_workout_ladder_case() -> dict[str, Any]:
+    """Ladders of a callable at a premium, and of one with a call on the quote date."""
+    as_of = datetime.date(2025, 1, 15)
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+    spec = json.loads(ins.Bond.example_callable().to_json())
+    spec["instrument"]["spec"]["instrument_pricing_overrides"] = {"market_quotes": {"quoted_clean_price_pct": 108.0}}
+    callable_json = json.dumps(spec)
+    calls = spec["instrument"]["spec"]["call_put"]["calls"]
+    calls.insert(0, {**calls[0], "start": "2025-01-17", "end": "2025-01-17"})
+    quote_date_call_json = json.dumps(spec)
+    return {
+        "market": market.to_json(),
+        "as_of": as_of.isoformat(),
+        "cases": [
+            {"bond": bond, "ladder": ins.bond_workout_ladder(ins.Bond.from_json(bond), market, as_of).to_dict()}
+            for bond in (callable_json, quote_date_call_json)
+        ],
+    }
+
+
+def _compute_quotes_case() -> dict[str, Any]:
+    """Quote sets of a bullet, a callable from each of two kinds, and an FRN, with a rejected kind."""
+    as_of = datetime.date(2024, 1, 15)
+    market = (
+        MarketContext()
+        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+        .insert(DiscountCurve.flat("USD-TREASURY", as_of, 0.04))
+        .insert(ForwardCurve.flat("USD-SOFR-3M", 0.25, datetime.date(2024, 1, 2), 0.03))
+    )
+    callable_spec = json.loads(ins.Bond.example_callable().to_json())
+    callable_spec["instrument"]["spec"]["instrument_pricing_overrides"] = {
+        "model_config": {"hw1f_mean_reversion": 0.03, "hw1f_sigma": 0.01}
+    }
+    bullet_json = ins.Bond.example().to_json()
+    callable_json = json.dumps(callable_spec)
+    frn_json = ins.Bond.example_floating().to_json()
+    return {
+        "market": market.to_json(),
+        "as_of": as_of.isoformat(),
+        "cases": [
+            {
+                "bond": bond,
+                "quote_input": quote_input,
+                "quotes": ins.compute_quotes(ins.Bond.from_json(bond), market, as_of, quote_input).to_dict(),
+            }
+            for bond, quote_input in (
+                (bullet_json, {"clean_price_pct": 98.5}),
+                (bullet_json, {"ytm": 0.05}),
+                (callable_json, {"clean_price_pct": 108.0}),
+                (callable_json, {"oas": 0.01}),
+                (frn_json, {"discount_margin": 0.01}),
+            )
+        ],
+        "rejected": {"bond": bullet_json, "quote_input": {"discount_margin": 0.01}},
+    }
+
+
+def _g_spread_case() -> dict[str, Any]:
+    """G-spread by metric id: over another curve, over the bond's discount curve, and with no curve named."""
+    as_of = datetime.date(2024, 1, 15)
+    plain = ins.Bond.example()
+    spec = json.loads(plain.to_json())
+    discount_curve_id = spec["instrument"]["spec"]["discount_curve_id"]
+    market = (
+        MarketContext()
+        .insert(DiscountCurve.flat(discount_curve_id, as_of, 0.04))
+        .insert(DiscountCurve.flat("USD-GOVT", as_of, 0.035))
+    )
+
+    def naming(curve_id: str) -> ins.Bond:
+        spec["instrument"]["spec"]["instrument_pricing_overrides"] = {"model_config": {"government_curve_id": curve_id}}
+        return ins.Bond.from_json(json.dumps(spec))
+
+    govt = naming("USD-GOVT")
+    own_curve = naming(discount_curve_id)
+    return {
+        "market": market.to_json(),
+        "as_of": as_of.isoformat(),
+        "bond": govt.to_json(),
+        "plain_bond": plain.to_json(),
+        "own_curve_bond": own_curve.to_json(),
+        "g_spread": govt.metric(market, as_of, "g_spread"),
+        "g_spread_over_own_curve": own_curve.metric(market, as_of, "g_spread"),
+        "i_spread": own_curve.metric(market, as_of, "i_spread"),
+    }
+
+
+def _default_risk_case() -> dict[str, Any]:
+    """Recovery01 and jump to default by metric id on a bond, term loan and revolver on a hazard curve."""
+    as_of = datetime.date(2024, 1, 15)
+    examples = {
+        "Bond": ins.Bond.example(),
+        "TermLoan": ins.TermLoan.example(),
+        "RevolvingCredit": ins.RevolvingCredit.example(),
+    }
+    specs = {name: json.loads(example.to_json()) for name, example in examples.items()}
+    specs["RevolvingCredit"]["instrument"]["spec"]["rate"] = {"fixed": {"rate": 0.05}}
+    market = MarketContext().insert(HazardCurve.flat("HY-CREDIT", as_of, 0.02, 0.4))
+    for spec in specs.values():
+        spec["instrument"]["spec"]["credit_curve_id"] = "HY-CREDIT"
+        curve_id = spec["instrument"]["spec"]["discount_curve_id"]
+        market = market.insert(DiscountCurve.flat(curve_id, as_of, 0.04))
+    cases = {}
+    for name, spec in specs.items():
+        instrument = getattr(ins, name).from_json(json.dumps(spec))
+        cases[name] = {
+            "json": json.dumps(spec),
+            "recovery01": instrument.metric(market, as_of, "recovery01"),
+            "jump_to_default": instrument.metric(market, as_of, "jump_to_default"),
+        }
+    return {
+        "market": market.to_json(),
+        "as_of": as_of.isoformat(),
+        "cases": cases,
+        "not_hazard_priced": examples["Bond"].to_json(),
+    }
+
+
+def _convertible_spot_ladder_case() -> dict[str, Any]:
+    """Convertible spot ladders: supplied spots through every regime, and the default grid."""
+    as_of = datetime.date(2025, 1, 15)
+    market = (
+        MarketContext()
+        .insert(DiscountCurve.flat("USD-IG", as_of, 0.04))
+        .insert(HazardCurve("USD-CREDIT-BBB", as_of, [(1.0, 0.025)], recovery_rate=0.0))
+        .insert_price("TECH", 100.0, "USD")
+        .insert_price("TECH-VOL", 0.30)
+    )
+    spec = json.loads(ins.ConvertibleBond.example().to_json())
+    spec["instrument"]["spec"]["conversion"]["ratio"] = 10_000.0
+    bond_json = json.dumps(spec)
+    bond = ins.ConvertibleBond.from_json(bond_json)
+    return {
+        "market": market.to_json(),
+        "as_of": as_of.isoformat(),
+        "bond": bond_json,
+        "spots": [50.0, 100.0, 300.0],
+        "supplied": ins.convertible_spot_ladder(bond, market, as_of, [50.0, 100.0, 300.0]).to_dict(),
+        "default": ins.convertible_spot_ladder(bond, market, as_of).to_dict(),
     }
 
 
@@ -290,6 +432,12 @@ def build_cases() -> dict[str, Any]:
         "pool_report": _pool_report_case(deal.pool, close),
         "standard_deal_families": ins.standard_deal_families(),
     }
+
+    cases["bond_workout_ladder"] = _bond_workout_ladder_case()
+    cases["convertible_spot_ladder"] = _convertible_spot_ladder_case()
+    cases["compute_quotes"] = _compute_quotes_case()
+    cases["g_spread"] = _g_spread_case()
+    cases["default_risk"] = _default_risk_case()
 
     # -- Merton Monte Carlo ------------------------------------------------
     merton = MertonModel(100.0, 0.25, 60.0, 0.04)
@@ -501,6 +649,24 @@ def test_valuation_result_methods_match_the_typed_wrapper() -> None:
     assert str(result.value.amount_decimal) == wire["value"]["amount"]
     assert list(result.metrics) == list(wire["measures"])
     assert result.get_metric("not_a_metric") is None
+
+
+def test_g_spread_with_no_government_curve_is_a_value_error() -> None:
+    case = _g_spread_case()
+    assert case["g_spread_over_own_curve"] == case["i_spread"]
+    bond = ins.Bond.from_json(case["plain_bond"])
+    market = MarketContext.from_json(case["market"])
+    with pytest.raises(ValueError, match="government_curve_id"):
+        bond.metric(market, case["as_of"], "g_spread")
+
+
+def test_default_risk_off_a_hazard_curve_is_a_value_error() -> None:
+    case = _default_risk_case()
+    bond = ins.Bond.from_json(case["not_hazard_priced"])
+    market = MarketContext.from_json(case["market"])
+    for metric in ("recovery01", "jump_to_default"):
+        with pytest.raises(ValueError, match="requires hazard pricing"):
+            bond.metric(market, case["as_of"], metric)
 
 
 def test_unknown_tranche_is_a_lookup_miss() -> None:
