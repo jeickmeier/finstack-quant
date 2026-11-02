@@ -96,6 +96,7 @@
       "duration_mac",
       "duration_mod",
       "embedded_option_value",
+      "g_spread",
       "i_spread",
       "japanese_simple_yield",
       "moic",

@@ -26,6 +26,7 @@
 //! - **Z-Spread**: Zero-volatility spread over discount curve
 //! - **OAS**: Option-adjusted spread (for call, put, or return-floor rights)
 //! - **I-Spread**: Interpolated spread (YTM - par swap rate)
+//! - **G-Spread**: Same yield over the par yield of a named government curve
 //! - **Discount Margin**: Spread measure for floating-rate notes
 //! - **Asset Swap Spreads**: Par and market asset swap spreads
 //!
@@ -75,7 +76,7 @@ pub(crate) use duration_modified::ModifiedDurationCalculator;
 pub(crate) use dv01::{BondBucketedDv01Calculator, BondDv01Calculator};
 pub(crate) use price_yield_spread::{
     AssetSwapMarketCalculator, AssetSwapParCalculator, BondVegaCalculator, CleanPriceCalculator,
-    DirtyPriceCalculator, EmbeddedOptionValueCalculator, ISpreadCalculator,
+    DirtyPriceCalculator, EmbeddedOptionValueCalculator, GSpreadCalculator, ISpreadCalculator,
     JapaneseSimpleYieldCalculator, OasCalculator, YtmCalculator, YtwCalculator,
 };
 pub use price_yield_spread::{DiscountMarginCalculator, ZSpreadCalculator};
@@ -264,6 +265,7 @@ pub(crate) fn register_bond_metrics(
             (Vega, BondVegaCalculator),
             (ZSpread, ZSpreadCalculator),
             (ISpread, ISpreadCalculator),
+            (GSpread, GSpreadCalculator),
             (DiscountMargin, DiscountMarginCalculator),
             (ASWPar, AssetSwapParCalculator),
             (ASWMarket, AssetSwapMarketCalculator),

@@ -946,6 +946,35 @@ test('bondWorkoutLadder matches Python, a null yield included', () => {
   );
 });
 
+test('g_spread by metric id matches Python and errors with no government curve named', () => {
+  const {
+    market,
+    as_of: asOf,
+    bond,
+    own_curve_bond: ownCurve,
+    plain_bond: plainBond,
+    ...expected
+  } = golden.g_spread;
+  const metric = (json, id) => {
+    const instrument = instruments.Bond.fromJson(json);
+    try {
+      return instrument.metric(market, asOf, id);
+    } finally {
+      instrument.free();
+    }
+  };
+  close(metric(bond, 'g_spread'), expected.g_spread, TIGHT, 'g_spread');
+  close(metric(ownCurve, 'g_spread'), expected.g_spread_over_own_curve, TIGHT, 'over own curve');
+  close(metric(ownCurve, 'i_spread'), expected.i_spread, TIGHT, 'i_spread');
+  assert.equal(metric(ownCurve, 'g_spread'), metric(ownCurve, 'i_spread'));
+  assert.throws(
+    () => metric(plainBond, 'g_spread'),
+    (e) => e.kind === 'validation' && e.message.includes('government_curve_id')
+  );
+  const [metadata] = instruments.metricMetadata(['g_spread']);
+  assert.equal(metadata.unit, 'decimal');
+});
+
 test('computeQuotes matches Python, a null field included, and rejects a kind the bond lacks', () => {
   const { market, as_of: asOf, cases, rejected } = golden.compute_quotes;
   for (const { bond: bondJson, quote_input: quoteInput, quotes } of cases) {

@@ -55,7 +55,7 @@ bond/
 │   ├── settlement.rs        # quote date, accrued interest, ex-coupon windows
 │   └── time_basis.rs        # metric time axis helpers
 └── metrics/                 # bond-specific MetricCalculator impls
-    ├── price_yield_spread/  # clean/dirty price, YTM, YTW, Z, OAS, I-spread, DM, ASW, vega
+    ├── price_yield_spread/  # clean/dirty price, YTM, YTW, Z, OAS, I-spread, G-spread, DM, ASW, vega
     ├── return_metrics/      # MOIC and XIRR (spot and to-worst)
     ├── accrued.rs  convexity.rs  cs01.rs  dv01.rs  yield_dv01.rs
     ├── duration_macaulay.rs  duration_modified.rs  effective.rs  spread_duration.rs  wal.rs

@@ -335,7 +335,8 @@ _KPI_METRICS: dict[str, list[str]] = {
 
 # Analytics column groupings per type: list of groups of metric_ids.
 # Reconciliation: "default_probability" replaced with "default01" for CDS;
-#                 "g_spread" removed from bond (not a real metric).
+#                 "g_spread" left out of bond: it errors unless the bond names a
+#                 government curve.
 _ANALYTICS_GROUPS: dict[str, list[list[str]]] = {
     "bond": [
         ["clean_price", "dirty_price", "accrued"],

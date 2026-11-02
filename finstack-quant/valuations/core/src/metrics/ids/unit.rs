@@ -108,6 +108,7 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "z_spread"
         | "oas"
         | "i_spread"
+        | "g_spread"
         | "asw_par"
         | "asw_market"
         | "discount_margin"

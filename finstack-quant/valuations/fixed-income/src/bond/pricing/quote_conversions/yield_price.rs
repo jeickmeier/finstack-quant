@@ -1076,7 +1076,7 @@ pub(crate) fn price_from_i_spread(
     as_of: Date,
     i_spread: f64,
 ) -> finstack_quant_core::Result<f64> {
-    use super::i_spread_par_rate;
+    use super::curve_par_rate;
 
     let disc = curves.get_discount(&bond.discount_curve_id)?;
     let effective_bond = bond.effective_for_pricing(curves, as_of)?;
@@ -1088,7 +1088,7 @@ pub(crate) fn price_from_i_spread(
         .as_ref()
         .is_some_and(|cp| cp.has_options())
     {
-        let par = i_spread_par_rate(bond, disc.as_ref(), quote_date, bond.maturity)?;
+        let par = curve_par_rate(bond, disc.as_ref(), quote_date, bond.maturity)?;
         return price_from_ytm(bond, &flows, quote_date, i_spread + par);
     }
 
@@ -1097,7 +1097,7 @@ pub(crate) fn price_from_i_spread(
     let mut candidates = Vec::with_capacity(paths.len());
     for path in paths {
         let horizon = path.flows.last().map_or(bond.maturity, |(date, _)| *date);
-        let par = i_spread_par_rate(bond, disc.as_ref(), quote_date, horizon)?;
+        let par = curve_par_rate(bond, disc.as_ref(), quote_date, horizon)?;
         let price = price_workout_path_from_yield(
             &effective_bond,
             &path.flows,
