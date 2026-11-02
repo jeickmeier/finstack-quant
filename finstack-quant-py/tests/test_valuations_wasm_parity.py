@@ -190,6 +190,37 @@ def _g_spread_case() -> dict[str, Any]:
     }
 
 
+def _default_risk_case() -> dict[str, Any]:
+    """Recovery01 and jump to default by metric id on a bond, term loan and revolver on a hazard curve."""
+    as_of = datetime.date(2024, 1, 15)
+    examples = {
+        "Bond": ins.Bond.example(),
+        "TermLoan": ins.TermLoan.example(),
+        "RevolvingCredit": ins.RevolvingCredit.example(),
+    }
+    specs = {name: json.loads(example.to_json()) for name, example in examples.items()}
+    specs["RevolvingCredit"]["instrument"]["spec"]["rate"] = {"fixed": {"rate": 0.05}}
+    market = MarketContext().insert(HazardCurve.flat("HY-CREDIT", as_of, 0.02, 0.4))
+    for spec in specs.values():
+        spec["instrument"]["spec"]["credit_curve_id"] = "HY-CREDIT"
+        curve_id = spec["instrument"]["spec"]["discount_curve_id"]
+        market = market.insert(DiscountCurve.flat(curve_id, as_of, 0.04))
+    cases = {}
+    for name, spec in specs.items():
+        instrument = getattr(ins, name).from_json(json.dumps(spec))
+        cases[name] = {
+            "json": json.dumps(spec),
+            "recovery01": instrument.metric(market, as_of, "recovery01"),
+            "jump_to_default": instrument.metric(market, as_of, "jump_to_default"),
+        }
+    return {
+        "market": market.to_json(),
+        "as_of": as_of.isoformat(),
+        "cases": cases,
+        "not_hazard_priced": examples["Bond"].to_json(),
+    }
+
+
 def _money(value: Money) -> dict[str, Any]:
     return {"amount": value.amount, "currency": str(value.currency)}
 
@@ -381,6 +412,7 @@ def build_cases() -> dict[str, Any]:
     cases["bond_workout_ladder"] = _bond_workout_ladder_case()
     cases["compute_quotes"] = _compute_quotes_case()
     cases["g_spread"] = _g_spread_case()
+    cases["default_risk"] = _default_risk_case()
 
     # -- Merton Monte Carlo ------------------------------------------------
     merton = MertonModel(100.0, 0.25, 60.0, 0.04)
@@ -601,6 +633,15 @@ def test_g_spread_with_no_government_curve_is_a_value_error() -> None:
     market = MarketContext.from_json(case["market"])
     with pytest.raises(ValueError, match="government_curve_id"):
         bond.metric(market, case["as_of"], "g_spread")
+
+
+def test_default_risk_off_a_hazard_curve_is_a_value_error() -> None:
+    case = _default_risk_case()
+    bond = ins.Bond.from_json(case["not_hazard_priced"])
+    market = MarketContext.from_json(case["market"])
+    for metric in ("recovery01", "jump_to_default"):
+        with pytest.raises(ValueError, match="requires hazard pricing"):
+            bond.metric(market, case["as_of"], metric)
 
 
 def test_unknown_tranche_is_a_lookup_miss() -> None:

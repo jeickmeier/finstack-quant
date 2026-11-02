@@ -103,7 +103,7 @@ pub(super) fn with_term_loan_risk_view<R>(
     }
 }
 
-fn uses_credit_tree(context: &MetricContext, loan: &TermLoan) -> bool {
+pub(super) fn uses_credit_tree(context: &MetricContext, loan: &TermLoan) -> bool {
     loan.credit_curve_id.is_some()
         && matches!(
             context

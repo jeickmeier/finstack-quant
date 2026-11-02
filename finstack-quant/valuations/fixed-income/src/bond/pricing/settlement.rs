@@ -239,6 +239,20 @@ pub(crate) fn recovery_principal_path(schedule: &CashFlowSchedule) -> Result<Vec
     cash_schedule.outstanding_by_date()
 }
 
+/// Last balance of an after-event `path` dated on or before `date`, else `initial`.
+///
+/// # Arguments
+///
+/// * `path` - Dated after-event balances in date order.
+/// * `date` - Date the balance is read at; an event on this date counts.
+/// * `initial` - Balance before the first event, in currency.
+pub(crate) fn balance_on(path: &[(Date, Money)], date: Date, initial: f64) -> f64 {
+    path.iter()
+        .take_while(|(event, _)| *event <= date)
+        .last()
+        .map_or(initial, |(_, balance)| balance.amount())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

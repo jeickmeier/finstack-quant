@@ -975,6 +975,33 @@ test('g_spread by metric id matches Python and errors with no government curve n
   assert.equal(metadata.unit, 'decimal');
 });
 
+test('recovery01 and jump_to_default match Python and error off a hazard curve', () => {
+  const { market, as_of: asOf, cases, not_hazard_priced: plainBond } = golden.default_risk;
+  for (const [name, expected] of Object.entries(cases)) {
+    const instrument = instruments[name].fromJson(expected.json);
+    try {
+      for (const id of ['recovery01', 'jump_to_default']) {
+        close(instrument.metric(market, asOf, id), expected[id], TIGHT, `${name} ${id}`);
+      }
+    } finally {
+      instrument.free();
+    }
+  }
+  const bond = instruments.Bond.fromJson(plainBond);
+  try {
+    for (const id of ['recovery01', 'jump_to_default']) {
+      assert.throws(
+        () => bond.metric(market, asOf, id),
+        (e) => e.kind === 'validation' && e.message.includes('requires hazard pricing')
+      );
+    }
+  } finally {
+    bond.free();
+  }
+  const units = instruments.metricMetadata(['recovery01', 'jump_to_default']).map((m) => m.unit);
+  assert.deepEqual(units, ['currency', 'currency']);
+});
+
 test('computeQuotes matches Python, a null field included, and rejects a kind the bond lacks', () => {
   const { market, as_of: asOf, cases, rejected } = golden.compute_quotes;
   for (const { bond: bondJson, quote_input: quoteInput, quotes } of cases) {

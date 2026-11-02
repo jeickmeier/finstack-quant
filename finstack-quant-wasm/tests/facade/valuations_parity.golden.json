@@ -7494,6 +7494,28 @@
     "g_spread_over_own_curve": -1.2986636042239263e-7,
     "i_spread": -1.2986636042239263e-7
   },
+  "default_risk": {
+    "market": "{\"schema_version\":1,\"curves\":[{\"type\":\"hazard\",\"id\":\"HY-CREDIT\",\"base\":\"2024-01-15\",\"knot_points\":[[1.0,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2024-01-15\",\"day_count\":\"act_365f\",\"knot_points\":[[0.0,1.0],[1.0,0.9607894391523232]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":1e-6,\"rate_calibration\":null,\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-TREASURY\",\"base\":\"2024-01-15\",\"day_count\":\"act_365f\",\"knot_points\":[[0.0,1.0],[1.0,0.9607894391523232]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":1e-6,\"rate_calibration\":null,\"fx_policy\":null}],\"fx\":null,\"surfaces\":[],\"prices\":{},\"series\":[],\"inflation_indices\":[],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+    "as_of": "2024-01-15",
+    "cases": {
+      "Bond": {
+        "json": "{\"schema\": \"finstack_quant.instrument/1\", \"instrument\": {\"type\": \"bond\", \"spec\": {\"id\": \"US912828XG33\", \"notional\": {\"amount\": \"1000000\", \"currency\": \"USD\"}, \"issue_date\": \"2024-01-15\", \"maturity\": \"2034-01-15\", \"cashflow_spec\": {\"fixed\": {\"coupon_type\": \"cash\", \"rate\": \"0.0425\", \"frequency\": {\"count\": 6, \"unit\": \"months\"}, \"day_count\": \"act_act_isma\", \"business_day_convention\": \"following\", \"calendar_id\": \"sifma\", \"stub\": \"short_front\", \"end_of_month\": false, \"payment_lag_days\": 0}}, \"discount_curve_id\": \"USD-TREASURY\", \"credit_curve_id\": \"HY-CREDIT\", \"call_put\": null, \"attributes\": {}, \"settlement_days\": 1, \"ex_coupon_days\": 0, \"ex_coupon_calendar_id\": \"sifma\"}}}",
+        "recovery01": 1505.4641887975145,
+        "jump_to_default": -523324.906853813
+      },
+      "TermLoan": {
+        "json": "{\"schema\": \"finstack_quant.instrument/1\", \"instrument\": {\"type\": \"term_loan\", \"spec\": {\"id\": \"TERM-LOAN-USD-5Y\", \"currency\": \"USD\", \"notional_limit\": {\"amount\": \"10000000\", \"currency\": \"USD\"}, \"issue_date\": \"2024-01-01\", \"maturity\": \"2029-01-01\", \"rate\": {\"fixed\": {\"rate\": 0.06}}, \"frequency\": {\"count\": 3, \"unit\": \"months\"}, \"day_count\": \"act_360\", \"business_day_convention\": \"modified_following\", \"calendar_id\": null, \"stub\": \"none\", \"discount_curve_id\": \"USD-OIS\", \"credit_curve_id\": \"HY-CREDIT\", \"amortization\": {\"percent_of_remaining_per_period\": {\"pct\": 0.025}}, \"coupon_type\": \"cash\", \"upfront_fee\": null, \"ddtl\": null, \"covenants\": null, \"oid_eir\": null, \"call_schedule\": null, \"settlement_days\": 2, \"attributes\": {}}}}",
+        "recovery01": 6903.527543686325,
+        "jump_to_default": -6313217.238207126
+      },
+      "RevolvingCredit": {
+        "json": "{\"schema\": \"finstack_quant.instrument/1\", \"instrument\": {\"type\": \"revolving_credit\", \"spec\": {\"id\": \"RCF-USD-3Y\", \"commitment\": {\"amount\": \"50000000\", \"currency\": \"USD\"}, \"commitment_steps\": [], \"margin_steps\": [], \"lc\": null, \"scheduled_fees\": [], \"oid_eir\": null, \"drawn\": {\"amount\": \"10000000\", \"currency\": \"USD\"}, \"issue_date\": \"2024-01-01\", \"maturity\": \"2027-01-01\", \"rate\": {\"fixed\": {\"rate\": 0.05}}, \"day_count\": \"act_360\", \"frequency\": {\"count\": 3, \"unit\": \"months\"}, \"fees\": {\"upfront_fee\": null, \"commitment_fee_tiers\": [{\"threshold\": \"0\", \"bp\": \"25\"}], \"usage_fee_tiers\": [{\"threshold\": \"0\", \"bp\": \"10\"}], \"facility_fee_bp\": 5.0, \"steps\": []}, \"draw_repay_spec\": {\"deterministic\": [{\"date\": \"2024-03-01\", \"amount\": {\"amount\": \"5000000\", \"currency\": \"USD\"}, \"is_draw\": true}, {\"date\": \"2025-06-01\", \"amount\": {\"amount\": \"3000000\", \"currency\": \"USD\"}, \"is_draw\": false}]}, \"discount_curve_id\": \"USD-OIS\", \"credit_curve_id\": \"HY-CREDIT\", \"recovery_rate\": 0.0, \"leq\": 0.0, \"stub\": \"short_front\", \"business_day_convention\": \"modified_following\", \"calendar_id\": \"usny\", \"payment_lag_days\": 0, \"settlement_days\": 0, \"attributes\": {}}}}",
+        "recovery01": 7185.7553733401,
+        "jump_to_default": -10027207.47963173
+      }
+    },
+    "not_hazard_priced": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"bond\",\"spec\":{\"id\":\"US912828XG33\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"cashflow_spec\":{\"fixed\":{\"coupon_type\":\"cash\",\"rate\":\"0.0425\",\"frequency\":{\"count\":6,\"unit\":\"months\"},\"day_count\":\"act_act_isma\",\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"stub\":\"short_front\",\"end_of_month\":false,\"payment_lag_days\":0}},\"discount_curve_id\":\"USD-TREASURY\",\"credit_curve_id\":null,\"call_put\":null,\"attributes\":{},\"settlement_days\":1,\"ex_coupon_days\":0,\"ex_coupon_calendar_id\":\"sifma\"}}}"
+  },
   "merton": {
     "model": {
       "asset_value": 100.0,

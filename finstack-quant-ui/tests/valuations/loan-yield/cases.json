@@ -32,7 +32,7 @@
           "theta_period_days",
           "theta_roll_down"
         ],
-        "Credit": ["bucketed_cs01", "cs01"],
+        "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
         "Instrument Specific": [
           "all_in_rate",
           "oid_eir_amortization",
@@ -267,7 +267,7 @@
           "theta_period_days",
           "theta_roll_down"
         ],
-        "Credit": ["bucketed_cs01", "cs01"],
+        "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
         "Instrument Specific": [
           "all_in_rate",
           "oid_eir_amortization",
@@ -506,7 +506,7 @@
           "theta_period_days",
           "theta_roll_down"
         ],
-        "Credit": ["bucketed_cs01", "cs01"],
+        "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
         "Instrument Specific": [
           "all_in_rate",
           "oid_eir_amortization",
@@ -745,7 +745,7 @@
           "theta_period_days",
           "theta_roll_down"
         ],
-        "Credit": ["bucketed_cs01", "cs01"],
+        "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
         "Instrument Specific": [
           "all_in_rate",
           "oid_eir_amortization",
@@ -984,7 +984,13 @@
           "theta_period_days",
           "theta_roll_down"
         ],
-        "Credit": ["bucketed_cs01", "cs01", "expected_loss"],
+        "Credit": [
+          "bucketed_cs01",
+          "cs01",
+          "expected_loss",
+          "jump_to_default",
+          "recovery01"
+        ],
         "Instrument Specific": [
           "accrued_interest",
           "all_in_rate",
