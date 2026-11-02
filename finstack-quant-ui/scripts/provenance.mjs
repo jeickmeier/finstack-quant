@@ -530,6 +530,17 @@ const displays = [
       "Returned BondQuoteSet of one bond from the one quote entered: every price, yield and spread in Rust's field order, each the metric of the same name at that clean price. Quote kinds are the branches of the BondQuoteInput schema. Units are the labels bondQuoteSetFieldUnits returns for each field, which Rust tests against metricMetadata. A null field is shown as no value, never zero, and a quote that cannot be solved shows the native error. Nothing is converted or compared here.",
   },
   {
+    id: "bond-credit-card",
+    api: [
+      "valuations.instruments.priceInstrumentWithMarket",
+      "ValuationInstrumentsNamespace",
+      "priceInstrumentWithMarket",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned measures of one bond, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row, so no script decides whether a bond has a government curve or is hazard-priced. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown, as for breakeven, whose unit follows its target); values are never rescaled, classified, summed or derived. theta_period and breakeven_config come from the MetricPricingOverrides schema's form and reach Rust as the request's metricPricingOverrides; no horizon, target or mode is assumed.",
+  },
+  {
     id: "loan-yield-card",
     api: [
       "valuations.instruments.priceInstrumentWithMarket",
@@ -538,7 +549,7 @@ const displays = [
     ],
     route: "returned-model",
     convention:
-      "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model.",
+      "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model; recovery01 and jump_to_default price on a credit curve under the tree model.",
   },
   {
     id: "liability-management-card",

@@ -24,6 +24,7 @@ const generators = [
   "tests/valuations/cashflows/generate.mjs",
   "tests/valuations/details/generate.mjs",
   "tests/valuations/loan-yield/generate.mjs",
+  "tests/valuations/bond-credit/generate.mjs",
   "tests/valuations/workout-ladder/generate.mjs",
   "tests/valuations/quote-converter/generate.mjs",
   "tests/core/curves/generate.mjs",

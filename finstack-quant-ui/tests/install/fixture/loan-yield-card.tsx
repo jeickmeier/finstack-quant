@@ -1,8 +1,6 @@
 "use client";
-import {
-  LoanYieldCard,
-  type LoanYieldRow,
-} from "@/components/finstack/valuations/components/loan-yield-card/loan-yield-card";
+import { LoanYieldCard } from "@/components/finstack/valuations/components/loan-yield-card/loan-yield-card";
+import type { MetricValueRow } from "@/components/finstack/valuations/components/metric-values-table/metric-values-table";
 import type { MetricMetadata } from "finstack-quant-wasm";
 
 import data from "./data.json";
@@ -13,7 +11,7 @@ export function InstalledItem() {
     <>
       <p>Supplied valid fixture; standalone loan yield card.</p>
       <LoanYieldCard
-        rows={rows as unknown as LoanYieldRow[]}
+        rows={rows as unknown as MetricValueRow[]}
         metadata={metadata as unknown as MetricMetadata[]}
       />
     </>

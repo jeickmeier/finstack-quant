@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: bond credit card, shared metric table, loan default risk
+
+`bond-credit-card` shows a bond's spreads, option value, durations, default risk, carry and breakeven by metric id, each id with its own native error, and offers the schema's form for `theta_period` and `breakeven_config`. `metric-values-table` is the table it shares with `loan-yield-card`; `applicableLoanYieldMetrics` and `LoanYieldRow` give way to its `applicableMetrics` and `MetricValueRow`. `loan-yield-card` adds `recovery01` and `jump_to_default`. No value moved.
+
 ### Bonds and loans: recovery01 and jump to default on a hazard curve
 
 `recovery01` and `jump_to_default` are now registered on `Bond`, `TermLoan` and `RevolvingCredit`, in currency, for the whole notional, from the holder's perspective.
