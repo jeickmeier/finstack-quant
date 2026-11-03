@@ -344,7 +344,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report.schema.json",
-      "bytes": 22384,
+      "bytes": 22534,
       "kind": "output",
       "path": "schemas/statements_analytics/1/relative_value_report.schema.json",
       "summary": "Comps table, peer statistics, regression scatter and composite rich/cheap score of a subject against its filtered peers.",

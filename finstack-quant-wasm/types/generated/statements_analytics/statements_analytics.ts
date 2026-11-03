@@ -3960,6 +3960,10 @@ export interface RelativeValuePoint {
    */
   fitted_y?: number | null;
   /**
+   * Whether this point is the subject's.
+   */
+  is_subject: boolean;
+  /**
    * X metric.
    */
   x: number;

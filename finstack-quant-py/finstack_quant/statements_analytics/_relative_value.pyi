@@ -345,9 +345,11 @@ class RelativeValuePoint:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import RelativeValuePoint
-    >>> point = RelativeValuePoint.from_json('{"company_id": "P1", "x": 1.0, "y": 100.0, "fitted_y": 105.0}')
-    >>> point.company_id, point.x, point.y, point.fitted_y
-    ('P1', 1.0, 100.0, 105.0)
+    >>> point = RelativeValuePoint.from_json(
+    ...     '{"company_id": "P1", "is_subject": false, "x": 1.0, "y": 100.0, "fitted_y": 105.0}'
+    ... )
+    >>> point.company_id, point.is_subject, point.x, point.y, point.fitted_y
+    ('P1', False, 1.0, 100.0, 105.0)
     """
 
     @staticmethod
@@ -449,6 +451,22 @@ class RelativeValuePoint:
         -------
         str
             The identifier.
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def is_subject(self) -> bool:
+        """
+        Whether this point is the subject's.
+
+        Returns
+        -------
+        bool
+            ``True`` on the subject's point only, which is the first point when
+            the subject has both metrics.
         Notes
         -----
         This accessor does not raise; it returns the stored value.

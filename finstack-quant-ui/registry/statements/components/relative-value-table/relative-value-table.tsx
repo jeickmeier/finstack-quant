@@ -107,14 +107,11 @@ export interface ScatterPoint extends Point {
 }
 const subjectRole = "Subject";
 const peerRole = "Peer";
-/** A dimension's returned points, the subject found by its id. */
-export function scatterPoints(
-  report: RelativeValueReport,
-  dimension: Dimension,
-): ScatterPoint[] {
+/** A dimension's returned points, each marked by Rust's `is_subject`. */
+export function scatterPoints(dimension: Dimension): ScatterPoint[] {
   return dimension.points.map((point) => ({
     ...point,
-    role: point.company_id === report.subject_id ? subjectRole : peerRole,
+    role: point.is_subject ? subjectRole : peerRole,
   }));
 }
 /** The returned fitted values in order of the supplied X: the regression line. */
@@ -307,7 +304,6 @@ function RelativeValueResults({
       {report.dimensions.map((dimension, index) => (
         <DimensionPanel
           key={index}
-          report={report}
           dimension={dimension}
           formatNumber={formatNumber}
           formatPercentile={formatPercentile}
@@ -472,12 +468,10 @@ function Multiples({
   );
 }
 function DimensionPanel({
-  report,
   dimension,
   formatNumber,
   formatPercentile,
 }: {
-  report: RelativeValueReport;
   dimension: Dimension;
   formatNumber: (value: number) => string;
   formatPercentile: (value: number) => string;
@@ -515,10 +509,7 @@ function DimensionPanel({
         ] as const)
       : []),
   ];
-  const points = useMemo(
-    () => scatterPoints(report, dimension),
-    [report, dimension],
-  );
+  const points = useMemo(() => scatterPoints(dimension), [dimension]);
   const line = useMemo(() => fittedLine(dimension), [dimension]);
   const definition = useMemo(
     () =>

@@ -109,12 +109,15 @@ def test_regression_dimension_matches_the_hand_calculation() -> None:
     assert dimension.regression.residual == pytest.approx(52.5)
     assert dimension.signal == pytest.approx(52.5 / math.sqrt(350.0 / 3.0))
     assert dimension.excluded_reason is None
-    assert [(point.company_id, point.x, point.y, pytest.approx(point.fitted_y)) for point in dimension.points] == [
-        ("SUBJ", 2.5, 300.0, 247.5),
-        ("P1", 1.0, 100.0, 105.0),
-        ("P2", 2.0, 200.0, 200.0),
-        ("P3", 3.0, 310.0, 295.0),
-        ("P4", 4.0, 380.0, 390.0),
+    assert [
+        (point.company_id, point.is_subject, point.x, point.y, pytest.approx(point.fitted_y))
+        for point in dimension.points
+    ] == [
+        ("SUBJ", True, 2.5, 300.0, 247.5),
+        ("P1", False, 1.0, 100.0, 105.0),
+        ("P2", False, 2.0, 200.0, 200.0),
+        ("P3", False, 3.0, 310.0, 295.0),
+        ("P4", False, 4.0, 380.0, 390.0),
     ]
 
 

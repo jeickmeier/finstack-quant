@@ -395,48 +395,56 @@
             "points": [
               {
                 "company_id": "NORTHWIND",
+                "is_subject": true,
                 "x": 3.9,
                 "y": 365,
                 "fitted_y": 372.14285714285717
               },
               {
                 "company_id": "ALDER",
+                "is_subject": false,
                 "x": 3.1,
                 "y": 290,
                 "fitted_y": 280.46144121365364
               },
               {
                 "company_id": "BIRCH",
+                "is_subject": false,
                 "x": 4.6,
                 "y": 455,
                 "fitted_y": 452.3640960809102
               },
               {
                 "company_id": "CEDAR",
+                "is_subject": false,
                 "x": 2.8,
                 "y": 250,
                 "fitted_y": 246.0809102402023
               },
               {
                 "company_id": "ELM",
+                "is_subject": false,
                 "x": 5.3,
                 "y": 540,
                 "fitted_y": 532.5853350189634
               },
               {
                 "company_id": "FIR",
+                "is_subject": false,
                 "x": 3.6,
                 "y": 330,
                 "fitted_y": 337.76232616940587
               },
               {
                 "company_id": "GINKGO",
+                "is_subject": false,
                 "x": 4.2,
                 "y": 395,
                 "fitted_y": 406.5233881163085
               },
               {
                 "company_id": "JUNIPER",
+                "is_subject": false,
                 "x": 3.7,
                 "y": 345,
                 "fitted_y": 349.2225031605563
@@ -719,48 +727,56 @@
             "points": [
               {
                 "company_id": "NORTHWIND",
+                "is_subject": true,
                 "x": 3.9,
                 "y": 365,
                 "fitted_y": 372.14285714285717
               },
               {
                 "company_id": "ALDER",
+                "is_subject": false,
                 "x": 3.1,
                 "y": 290,
                 "fitted_y": 280.46144121365364
               },
               {
                 "company_id": "BIRCH",
+                "is_subject": false,
                 "x": 4.6,
                 "y": 455,
                 "fitted_y": 452.3640960809102
               },
               {
                 "company_id": "CEDAR",
+                "is_subject": false,
                 "x": 2.8,
                 "y": 250,
                 "fitted_y": 246.0809102402023
               },
               {
                 "company_id": "ELM",
+                "is_subject": false,
                 "x": 5.3,
                 "y": 540,
                 "fitted_y": 532.5853350189634
               },
               {
                 "company_id": "FIR",
+                "is_subject": false,
                 "x": 3.6,
                 "y": 330,
                 "fitted_y": 337.76232616940587
               },
               {
                 "company_id": "GINKGO",
+                "is_subject": false,
                 "x": 4.2,
                 "y": 395,
                 "fitted_y": 406.5233881163085
               },
               {
                 "company_id": "JUNIPER",
+                "is_subject": false,
                 "x": 3.7,
                 "y": 345,
                 "fitted_y": 349.2225031605563
@@ -826,48 +842,56 @@
             "points": [
               {
                 "company_id": "ALDER",
+                "is_subject": false,
                 "x": 5.2,
                 "y": 290,
                 "fitted_y": null
               },
               {
                 "company_id": "BIRCH",
+                "is_subject": false,
                 "x": 3.1,
                 "y": 455,
                 "fitted_y": null
               },
               {
                 "company_id": "CEDAR",
+                "is_subject": false,
                 "x": 6,
                 "y": 250,
                 "fitted_y": null
               },
               {
                 "company_id": "ELM",
+                "is_subject": false,
                 "x": 2.4,
                 "y": 540,
                 "fitted_y": null
               },
               {
                 "company_id": "FIR",
+                "is_subject": false,
                 "x": 4.7,
                 "y": 330,
                 "fitted_y": null
               },
               {
                 "company_id": "GINKGO",
+                "is_subject": false,
                 "x": 3.9,
                 "y": 395,
                 "fitted_y": null
               },
               {
                 "company_id": "HAZEL",
+                "is_subject": false,
                 "x": 2.9,
                 "y": 480,
                 "fitted_y": null
               },
               {
                 "company_id": "JUNIPER",
+                "is_subject": false,
                 "x": 4.1,
                 "y": 345,
                 "fitted_y": null
@@ -1060,12 +1084,14 @@
             "points": [
               {
                 "company_id": "NORTHWIND",
+                "is_subject": true,
                 "x": 3.9,
                 "y": 365,
                 "fitted_y": null
               },
               {
                 "company_id": "DOGWOOD",
+                "is_subject": false,
                 "x": 4.1,
                 "y": 160,
                 "fitted_y": null

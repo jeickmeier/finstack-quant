@@ -334,8 +334,14 @@ test('relativeValueReport hands over the table, the scatter and the score', () =
   const [regression, , disabled, unavailable] = report.dimensions;
   // y = 10 + 95x over the four pairs, so 105 at x = 1; P5 has no leverage and no point.
   assert.deepEqual(
-    regression.points.map((point) => point.company_id),
-    ['SUBJ', 'P1', 'P2', 'P3', 'P4']
+    regression.points.map((point) => [point.company_id, point.is_subject]),
+    [
+      ['SUBJ', true],
+      ['P1', false],
+      ['P2', false],
+      ['P3', false],
+      ['P4', false],
+    ]
   );
   assert.ok(Math.abs(regression.points[1].fitted_y - 105) < 1e-9);
   assert.equal(disabled.excluded_reason, 'zero_weight');

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Comps: each scatter point says whether it is the subject
+
+`RelativeValuePoint` carries `is_subject`, true on the subject's point (the first point of a dimension whose subject has both metrics) and false on every peer's, as `RelativeValueCompany` already does for the comps table. Python `RelativeValuePoint.is_subject`, the WASM `relativeValueReport` result and the generated schema and TypeScript types include it; `RelativeValuePoint.from_json` now requires it. `relative-value-table` marks the subject on its scatter from it instead of comparing `company_id` with `subject_id`. No value moves.
+
 ### Comps and capital structure: only the conditions they name
 
 `capital_structure_summary` lists the hedges it leaves out (interest rate swaps, cap/floors and swaptions) instead of skipping every instrument that is not one of the four debt kinds; an instrument that is neither is an error naming its type, as the statements crate's capital structure already does. Every instrument a model can hold today is one or the other, so no value moves. `relative_value_report` reports `non_finite_score` only when the composite or confidence is non-finite; any other scoring error is returned instead of being relabelled. No value moves.

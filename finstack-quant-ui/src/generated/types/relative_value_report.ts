@@ -323,6 +323,10 @@ export interface DE3A785C5Fc1D129Cad8A {
    */
   fitted_y?: number | null;
   /**
+   * Whether this point is the subject's.
+   */
+  is_subject: boolean;
+  /**
    * X metric.
    */
   x: number;
