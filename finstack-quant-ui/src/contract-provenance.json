@@ -2230,6 +2230,156 @@
       }
     },
     {
+      "id": "statement-export",
+      "route": "returned-report",
+      "convention": "Returned TableEnvelope of one StatementResult in the wide or long layout the user picks, statementResultToTableLong for long, in Rust's row and column order. The CSV holds exactly those cells: RFC 4180 quoting, the native column names as its header, and each number as String(value), unrounded. A cell Rust holds with no value (NaN, null in JSON) shows as undefined and is an empty field, never zero. Nothing is computed here.",
+      "api": {
+        "name": "statements.statementResultToTableWide",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StatementsNamespace",
+        "member": "statementResultToTableWide",
+        "inputs": [
+          {
+            "name": "resultJson",
+            "type": "StatementResult | string",
+            "optional": false
+          }
+        ],
+        "returns": "TableEnvelope",
+        "declaration": "/**\n   * Export a statement result as a wide-format table (twin of Python `StatementResult.to_arrow_wide`, Rust `StatementResult::to_table_wide`).\n   * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).\n   * @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds `NaN` (serialized as `null`), not zero.\n   * @throws Error - Throws with kind `validation` if the result input is malformed or table construction fails.\n   */\n  statementResultToTableWide(resultJson: StatementResult | string): TableEnvelope;",
+        "sha256": "efcf9053f59b4cd7789076de3be933e23287f2b367f2c7356f373b7978051867"
+      }
+    },
+    {
+      "id": "normalization-editor",
+      "route": "returned-report",
+      "convention": "Returned NormalizationResult per period of the target node, in Rust's period order, in the target's units (its currency when monetary). Each adjustment carries its raw amount, its capped amount, Rust's is_capped and adjusted_value, the target through that step; the bridge draws each step from the previous step's adjusted_value (base_value for the first) to its own, and the base and final value from zero. Nothing is summed, capped or classified here; a duplicate id, a missing node or a non-finite base shows the native error.",
+      "api": {
+        "name": "statements.normalize",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StatementsNamespace",
+        "member": "normalize",
+        "inputs": [
+          {
+            "name": "results",
+            "type": "StatementResult | string",
+            "optional": false
+          },
+          {
+            "name": "config",
+            "type": "generated.statements.NormalizationConfig | string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.statements.NormalizationResult[]",
+        "declaration": "/**\n   * Normalize a target metric by applying an adjustment catalog period by period.\n   *\n   * Twin of Python `normalize` (Rust `adjustments::normalize`).\n   * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).\n   * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).\n   * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped amounts and `adjusted_value`, the target through that step) and the final value.\n   * @throws Error - Throws with kind `validation` if an input is malformed, the target node or a referenced node is absent from the results, the configuration is invalid, or the target and a reference node have incompatible units.\n   */\n  normalize(\n    results: StatementResult | string,\n    config: generated.statements.NormalizationConfig | string\n  ): generated.statements.NormalizationResult[];",
+        "sha256": "265294c694d86770be407c35707a6aa450dadf99c72e595e81d84f0796842457"
+      }
+    },
+    {
+      "id": "capital-structure-report",
+      "route": "returned-report",
+      "convention": "Returned CapitalStructureSummary at the configured period, in its currency: money as Rust's exact decimal strings, ratios in turns and shares of debt as decimal fractions (shown as percent digits). Tranches in Rust's rank-then-declaration order with cumulative debt, leverage and interest coverage through each payment class; the maturity wall in Rust's year order, each bar drawn from zero to its returned amount. A null ratio (short LTM window, non-positive EBITDA or debt) or a live NaN shows as undefined beside Rust's ltm_periods_found and ltm_periods_required; negative net debt and net leverage show as returned. Nothing is summed, netted or divided here; a model with no capital structure or a missing node shows the native error.",
+      "api": {
+        "name": "statements_analytics.capitalStructureSummary",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StatementsAnalyticsNamespace",
+        "member": "capitalStructureSummary",
+        "inputs": [
+          {
+            "name": "results",
+            "type": "StatementResult | string",
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "config",
+            "type": "generated.statements_analytics.CapitalStructureSummaryConfig | string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.statements_analytics.CapitalStructureSummary",
+        "declaration": "/**\n   * Summarize the debt stack by seniority at one period (mirrors Rust `capital_structure_summary`).\n   * @param results - Evaluated `StatementResult` (object or JSON) holding `cs_cashflows` and both configured nodes. A scalar EBITDA or cash node is read as an amount in the debt currency.\n   * @param model - `FinancialModelSpec` (object or JSON) whose capital structure gives the instruments, their declaration order and the payment classes, and whose periods bound the LTM window.\n   * @param config - `CapitalStructureSummaryConfig` (object or JSON): `period` (the reporting period, such as `\"2025Q4\"`), `ebitda_node` (required; the node holding EBITDA for each single period, never inferred from a conventional name) and `cash_node` (optional; the node holding the period-end cash balance, omitted means null cash, net debt and net leverage).\n   * @returns `CapitalStructureSummary` plain object: `as_of`, `currency`, `total_debt`, `cash`, `net_debt` and `ltm_ebitda` as money, `ltm_periods_required`, `ltm_periods_found`, `total_leverage`, `net_leverage` and `total_coverage` in turns, `tranches` by rank then declaration order (`id`, `kind`, `rank`, `payment_class`, `balance` with a revolver at its drawn balance, `share_of_debt` as a decimal, `maturity`, `cumulative_debt`, `leverage` and `interest_coverage` through the class, `ltm_interest`) and `maturity_wall` by calendar year of final maturity, ascending (`year`, `amount`, `share_of_debt`), using the balance at the period and ignoring any scheduled amortization after it.\n   * @throws If an argument is malformed, the model has no capital structure or no debt instruments once hedges are excluded, `cs_cashflows` is absent, the period is not in the model, a configured node is not in the results or the cash node has no value at the period, an instrument has no cashflows at the period or is in no class while payment classes are declared, a consumed value or ratio is non-finite, tranches are in more than one currency (no FX is applied), or the EBITDA or cash node is monetary in another currency (kind `validation`).\n   */\n  capitalStructureSummary(\n    results: StatementResult | string,\n    model: JsonInput,\n    config: generated.statements_analytics.CapitalStructureSummaryConfig | string\n  ): generated.statements_analytics.CapitalStructureSummary;",
+        "sha256": "2063524c18646e2d31c830bfe290d01bed077866cf8adaa1cc1308b7bf0582d1"
+      }
+    },
+    {
+      "id": "relative-value-table",
+      "route": "returned-report",
+      "convention": "Returned RelativeValueReport of a host-supplied subject and universe, metrics in their own units as supplied (monetary ones in one currency, normalized by the host). The comps table has the subject first, marked by Rust's is_subject, then the peers in universe order, one returned value per configured multiple. Per multiple: the subject value, percentile (a 0-1 share, shown as a percent and drawn as a bar from zero to it), z-score and peer statistics. Per dimension: Rust's subject values, percentile, z-score, regression, direction-adjusted signal (positive meaning cheap; -0 shown as 0) and exclusion reason, and a scatter of the returned points, the subject found by comparing company_id with subject_id and the line drawn through each point's returned fitted_y in order of x. The composite score and confidence, or Rust's composite_excluded_reason. A null or live NaN shows as undefined; nothing is computed here, and a misspelt field shows the native error.",
+      "api": {
+        "name": "statements_analytics.relativeValueReport",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StatementsAnalyticsNamespace",
+        "member": "relativeValueReport",
+        "inputs": [
+          {
+            "name": "subject",
+            "type": "generated.statements_analytics.CompanyMetrics | string",
+            "optional": false
+          },
+          {
+            "name": "universe",
+            "type": "generated.statements_analytics.CompanyMetrics[] | string",
+            "optional": false
+          },
+          {
+            "name": "config",
+            "type": "generated.statements_analytics.RelativeValueReportConfig | string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.statements_analytics.RelativeValueReport",
+        "declaration": "/**\n   * Compare one subject with its filtered peers (mirrors Rust `relative_value_report`).\n   *\n   * Returns the comps table, peer statistics, regression scatter and composite\n   * rich/cheap score in one result, so a caller has nothing to compute. A used\n   * dimension and the composite are exactly what `scoreRelativeValue` returns on\n   * the same peers and dimensions; where that function throws because no dimension\n   * is usable, this one still returns the table.\n   * @param subject - `CompanyMetrics` of the company being evaluated (object or JSON). Monetary metrics carry no currency and every company's must already be in one currency. It need not be in `universe`.\n   * @param universe - Candidate peers as `CompanyMetrics` (array or JSON), in the order the report returns them. A member with the subject's id is never a peer and does not count as excluded.\n   * @param config - `RelativeValueReportConfig` (object or JSON): `filter` (optional; a `PeerFilter` in which every field is optional, an omitted field meaning no constraint and an unknown one rejected; an omitted filter makes every other company a peer), `period_basis` (required; `\"ltm\"`, `\"ntm\"` or `{custom: \"<label>\"}`; it labels the report and the metrics are used as given), `dimensions` (required; `ScoringDimension` objects with finite non-negative weights, zero disabling one; may be empty when `multiples` is not) and `multiples` (required; multiple identifiers such as `\"ev_ebitda\"`, the columns in order; may be empty when `dimensions` is not).\n   * @returns `RelativeValueReport` plain object: `subject_id`, `period_basis`, `peer_count`, `excluded_count` (universe members the filter dropped, not counting the subject), `companies` (subject first, then peers in universe order: `id`, `is_subject`, `values` with one number or null per configured multiple), `multiples` in config order (`multiple`, `subject_value`, `peer_stats`, `percentile`, `z_score`), `dimensions` in config order including excluded ones (`label`, `weight`, `direction`, `y`, `x`, `subject_y`, `subject_x`, `peer_stats`, `percentile`, `z_score`, `regression`, `signal` positive meaning cheap, `excluded_reason`, and `points` for the scatter with `company_id`, `is_subject` (true on the subject's point, first when the subject has both metrics), `x`, `y`, `fitted_y`), `composite` (the `scoreRelativeValue` result, or null) and `composite_excluded_reason` (`no_dimensions`, `no_usable_dimension`, `non_finite_score`, or null).\n   * @throws If an argument is malformed or carries an unknown field (a misspelt `CompanyMetrics` or `PeerFilter` key included), `dimensions` and `multiples` are both empty, or a weight is negative or non-finite (kind `validation`). No usable dimension is not an error: the table is returned with a null `composite`.\n   */\n  relativeValueReport(\n    subject: generated.statements_analytics.CompanyMetrics | string,\n    universe: generated.statements_analytics.CompanyMetrics[] | string,\n    config: generated.statements_analytics.RelativeValueReportConfig | string\n  ): generated.statements_analytics.RelativeValueReport;",
+        "sha256": "f7e409fb5bd82bafcfe46537ad7f441a58e396ab5702e02d9ddcbd334f537789"
+      }
+    },
+    {
+      "id": "wacc-calculator",
+      "route": "returned-report",
+      "convention": "Returned WACC of the five entered decimals, itself a decimal. The two capital weights are separate inputs; nothing is blended, defaulted or checked here, and weights that do not sum to one or a tax rate outside [0, 1] show the native error. Applying the rate to a DCF is an explicit user action that passes the returned number unchanged.",
+      "api": {
+        "name": "statements_analytics.wacc",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StatementsAnalyticsNamespace",
+        "member": "wacc",
+        "inputs": [
+          {
+            "name": "equityWeight",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "costOfEquity",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "debtWeight",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "costOfDebt",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "taxRate",
+            "type": "number",
+            "optional": false
+          }
+        ],
+        "returns": "number",
+        "declaration": "/**\n   * Weighted-average cost of capital (WACC).\n   *\n   * Blends the required return on equity with the after-tax cost of debt:\n   * `WACC = w_E * r_E + w_D * r_D * (1 - T)`.\n   * @returns Returns the blended discount rate as a decimal fraction.\n   * @param equityWeight - Equity share of total capital as a decimal fraction (0.6 = 60% equity-funded).\n   * @param costOfEquity - Required return on equity in decimal form, typically from CAPM (0.115 = 11.5%).\n   * @param debtWeight - Debt share of total capital as a decimal fraction; must sum with the equity weight to 1.0.\n   * @param costOfDebt - Pre-tax marginal borrowing yield in decimal form, before the interest tax shield (0.06 = 6%).\n   * @param taxRate - Marginal corporate tax rate as a decimal fraction in [0, 1] (0.25 = 25%).\n   * @throws Error - Rejects any non-finite input, negative capital weights, weights that do not sum to one within tolerance, or a `tax_rate` outside `[0, 1]`.\n   */\n  wacc(\n    equityWeight: number,\n    costOfEquity: number,\n    debtWeight: number,\n    costOfDebt: number,\n    taxRate: number\n  ): number;",
+        "sha256": "978a242a765fbbb5f68b7765919fe7a45648c492179d4a682a52ebf635fecdd3"
+      }
+    },
+    {
       "id": "quote-converter",
       "route": "returned-report",
       "convention": "Returned BondQuoteSet of one bond from the one quote entered: every price, yield and spread in Rust's field order, each the metric of the same name at that clean price. Quote kinds are the branches of the BondQuoteInput schema. Units are the labels bondQuoteSetFieldUnits returns for each field, which Rust tests against metricMetadata. A null field is shown as no value, never zero, and a quote that cannot be solved shows the native error. Nothing is converted or compared here.",
@@ -2452,6 +2602,32 @@
         "returns": "ExchangeOfferAnalysis",
         "declaration": "/**\n   * Compare hold-versus-tender economics for a distressed exchange offer.\n   * Tendering is recommended only when total consideration exceeds the\n   * hold-out present value by more than 2%.\n   * @returns Tender total, NPV pickup, breakeven recovery, and recommendation.\n   * @param oldPv - Present value of the existing claim if it is not tendered, in the caller's monetary unit.\n   * @param newPv - Present value of the new instrument received on tendering, in the same unit as oldPv.\n   * @param consentFee - Cash consent or early-tender fee paid to participating holders, in the same unit as oldPv.\n   * @param equitySweetenerValue - Estimated value of equity or warrants attached to the new instrument, in the same unit as oldPv.\n   * @param exchangeType - Canonical offer structure: par_for_par, discount, uptier, or downtier.\n   * @throws Error - Throws a JavaScript exception if `exchangeType` is unrecognized, any monetary input is negative or non-finite, or the result cannot be converted to a JavaScript object.\n   */\n  analyzeExchangeOffer(\n    oldPv: number,\n    newPv: number,\n    consentFee: number,\n    equitySweetenerValue: number,\n    exchangeType: string\n  ): ExchangeOfferAnalysis;",
         "sha256": "a5aa9e45ed42a262f0d47bbd03d094a53e0e4605ca3a7b5cb89c1ec64e8a543b"
+      }
+    },
+    {
+      "id": "recovery-waterfall",
+      "route": "returned-model",
+      "convention": "Returned models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.workoutLgd and seniorityRecoveryStats results as Rust returned them. Allocations are in Rust's priority-then-entry order; each claim's total, collateral and general recovery, recovery rate and deficiency, and the estate's distributed and undistributed totals, are Rust's fields, never summed or divided here. Amounts are in one caller-defined unit with no currency conversion; rates are fractions. Seniority classes and collateral types are the generated SeniorityClass and WorkoutCollateralType contracts; calibration ids are seniorityCalibrationIds, default first. A class a calibration lacks shows Rust's error.",
+      "api": {
+        "name": "models.credit.recoveryWaterfall.allocateRecovery",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "CreditRecoveryWaterfallNamespace",
+        "member": "allocateRecovery",
+        "inputs": [
+          {
+            "name": "estateValue",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "claims",
+            "type": "readonly generated.models.RecoveryClaim[] | string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.models.RecoveryWaterfallResult",
+        "declaration": "/**\n   * Allocate a bankruptcy estate across claims under the absolute priority rule.\n   *\n   * Secured claims first recover from their own collateral (after the haircut);\n   * the remaining estate is then distributed by `priority`, pro rata within a\n   * priority level.\n   * @param estateValue - Distributable estate value in monetary units; non-negative.\n   * @param claims - Array of `RecoveryClaim` objects, or its JSON text. Each claim holds `id`, `seniority`, `priority` (lower is more senior), `principal`, `accrued`, `penalties`, `collateral_value` (or `null`) and `collateral_haircut` in `[0, 1]`.\n   * @returns The `RecoveryWaterfallResult` object (`allocations`, `total_distributed`, `undistributed_estate`, `apr_satisfied`).\n   * @throws Error - Throws a `TypeError` if `claims` is neither a string nor a plain array, and a `validation` error if the estate or a claim amount is negative or non-finite, a haircut is out of range, or claim identifiers repeat.\n   */\n  allocateRecovery(\n    estateValue: number,\n    claims: readonly generated.models.RecoveryClaim[] | string\n  ): generated.models.RecoveryWaterfallResult;",
+        "sha256": "e36f8e8495fbaaccafccc0da24acdafe328f1c85358a5229f02bb68400d39f05"
       }
     },
     {

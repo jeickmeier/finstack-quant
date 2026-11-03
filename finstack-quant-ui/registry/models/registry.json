@@ -65,6 +65,81 @@
       }
     },
     {
+      "name": "recovery-waterfall",
+      "type": "registry:component",
+      "title": "Recovery waterfall",
+      "description": "Allocate an estate down a stack of claims under absolute priority, calculate a workout LGD and read seniority recovery statistics, all as Rust returns them.",
+      "docs": "Three forms. Recovery waterfall: an estate value and claims (id, a free-text seniority label, integer priority, principal, accrued, penalties, an optional collateral value and its haircut), with Rust's allocations in its priority-then-entry order (total claim, collateral and general recovery, total recovery, recovery rate and deficiency per claim) and the estate's total distributed, undistributed estate and apr_satisfied. Workout LGD: EAD, direct and indirect cost fractions, years to resolution, a discount rate and collateral pieces whose types come from the generated WorkoutCollateralType contract, with the returned net recovery, LGD and recovery rate. Recovery by seniority: a class from the generated SeniorityClass contract and a calibration from the supplied calibrationIds (Rust's seniorityCalibrationIds, default first), with the Beta distribution's mean, standard deviation, variance, shape parameters, mode and mean LGD. Nothing is summed, divided or ranked here; amounts use one unit you choose and rates are fractions. An empty amount is sent as NaN for Rust to reject, an empty collateral value is an unsecured claim, and each analysis shows its own native error, including a class a calibration lacks. Accepts defaultWaterfall, defaultWorkout, defaultSeniority, onWaterfallSubmit, onWorkoutSubmit, onStatsSubmit, waterfall, workout, stats, calibrationIds, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/recovery-waterfall/recovery-waterfall.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/recovery-waterfall/recovery-waterfall.tsx"
+        },
+        {
+          "path": "components/recovery-waterfall/recovery-contracts.ts",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/recovery-waterfall/recovery-contracts.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/field-frame",
+        "@finstack/contract-workout-lgd",
+        "@finstack/contract-seniority-calibration",
+        "@finstack/contract-recovery-claim",
+        "button",
+        "input"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/seniority_calibration.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/workout_lgd.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-recovery-waterfall",
+      "type": "registry:hook",
+      "title": "useRecoveryWaterfall",
+      "description": "Runs the native recovery waterfall, workout LGD and seniority recovery statistics and lists the calibration ids through the WASM worker.",
+      "docs": "useAllocateRecovery calls models.credit.recoveryWaterfall.allocateRecovery, useWorkoutLgd calls models.credit.lgd.workoutLgd, useSeniorityRecoveryStats calls seniorityRecoveryStats (the worker reads the BetaRecovery handle's getters and frees it) and useSeniorityCalibrationIds calls seniorityCalibrationIds, each one native call with its arguments in the binding's positions. Null means no request. Requires FinstackQueryProvider. A rejected input is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-recovery-waterfall/use-recovery-waterfall.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-recovery-waterfall/use-recovery-waterfall.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "option-calculator",
       "type": "registry:component",
       "title": "Option calculator",

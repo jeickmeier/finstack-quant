@@ -1,0 +1,1791 @@
+{
+  "model": {
+    "id": "capital-structure",
+    "periods": [
+      {
+        "id": "2025Q1",
+        "start": "2025-01-01",
+        "end": "2025-04-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q2",
+        "start": "2025-04-01",
+        "end": "2025-07-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q3",
+        "start": "2025-07-01",
+        "end": "2025-10-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q4",
+        "start": "2025-10-01",
+        "end": "2026-01-01",
+        "is_actual": false
+      }
+    ],
+    "nodes": {
+      "ebitda": {
+        "node_id": "ebitda",
+        "node_type": "value",
+        "values": {
+          "2025Q1": 100000,
+          "2025Q2": 110000,
+          "2025Q3": 120000,
+          "2025Q4": 130000
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "cash": {
+        "node_id": "cash",
+        "node_type": "value",
+        "values": {
+          "2025Q1": 150000,
+          "2025Q2": 150000,
+          "2025Q3": 150000,
+          "2025Q4": 150000
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      }
+    },
+    "capital_structure": {
+      "debt_instruments": [
+        {
+          "id": "SUB",
+          "spec": {
+            "type": "bond",
+            "spec": {
+              "id": "SUB",
+              "notional": {
+                "amount": "420000",
+                "currency": "USD"
+              },
+              "issue_date": "2024-01-01",
+              "maturity": "2031-03-01",
+              "cashflow_spec": {
+                "fixed": {
+                  "coupon_type": "cash",
+                  "rate": "0.08",
+                  "frequency": {
+                    "count": 6,
+                    "unit": "months"
+                  },
+                  "day_count": "30_360",
+                  "business_day_convention": "modified_following",
+                  "calendar_id": "usny",
+                  "stub": "short_front",
+                  "end_of_month": false,
+                  "payment_lag_days": 0
+                }
+              },
+              "discount_curve_id": "USD-OIS",
+              "credit_curve_id": null,
+              "call_put": null,
+              "attributes": {},
+              "settlement_days": 1,
+              "ex_coupon_days": 0,
+              "ex_coupon_calendar_id": "usny"
+            }
+          }
+        },
+        {
+          "id": "SR-A",
+          "spec": {
+            "type": "bond",
+            "spec": {
+              "id": "SR-A",
+              "notional": {
+                "amount": "400000",
+                "currency": "USD"
+              },
+              "issue_date": "2024-01-01",
+              "maturity": "2029-06-01",
+              "cashflow_spec": {
+                "fixed": {
+                  "coupon_type": "cash",
+                  "rate": "0.05",
+                  "frequency": {
+                    "count": 6,
+                    "unit": "months"
+                  },
+                  "day_count": "30_360",
+                  "business_day_convention": "modified_following",
+                  "calendar_id": "usny",
+                  "stub": "short_front",
+                  "end_of_month": false,
+                  "payment_lag_days": 0
+                }
+              },
+              "discount_curve_id": "USD-OIS",
+              "credit_curve_id": null,
+              "call_put": null,
+              "attributes": {},
+              "settlement_days": 1,
+              "ex_coupon_days": 0,
+              "ex_coupon_calendar_id": "usny"
+            }
+          }
+        },
+        {
+          "id": "SR-B",
+          "spec": {
+            "type": "bond",
+            "spec": {
+              "id": "SR-B",
+              "notional": {
+                "amount": "100000",
+                "currency": "USD"
+              },
+              "issue_date": "2024-01-15",
+              "maturity": "2029-01-15",
+              "cashflow_spec": {
+                "fixed": {
+                  "coupon_type": "cash",
+                  "rate": "0.05",
+                  "frequency": {
+                    "count": 6,
+                    "unit": "months"
+                  },
+                  "day_count": "30_360",
+                  "business_day_convention": "modified_following",
+                  "calendar_id": "usny",
+                  "stub": "short_front",
+                  "end_of_month": false,
+                  "payment_lag_days": 0
+                }
+              },
+              "discount_curve_id": "USD-OIS",
+              "credit_curve_id": null,
+              "call_put": null,
+              "attributes": {},
+              "settlement_days": 1,
+              "ex_coupon_days": 0,
+              "ex_coupon_calendar_id": "usny"
+            }
+          }
+        }
+      ],
+      "waterfall": {
+        "priority_of_payments": ["fees", "interest", "amortization"],
+        "available_cash_node": "cash",
+        "payment_classes": [
+          {
+            "id": "2L",
+            "rank": 1,
+            "instrument_ids": ["SUB"]
+          },
+          {
+            "id": "1L",
+            "rank": 0,
+            "instrument_ids": ["SR-A", "SR-B"]
+          }
+        ]
+      }
+    },
+    "schema_version": 1
+  },
+  "result": {
+    "schema_version": 1,
+    "periods": [
+      {
+        "id": "2025Q1",
+        "start": "2025-01-01",
+        "end": "2025-04-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q2",
+        "start": "2025-04-01",
+        "end": "2025-07-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q3",
+        "start": "2025-07-01",
+        "end": "2025-10-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q4",
+        "start": "2025-10-01",
+        "end": "2026-01-01",
+        "is_actual": false
+      }
+    ],
+    "nodes": {
+      "cash": {
+        "2025Q1": 150000,
+        "2025Q2": 150000,
+        "2025Q3": 150000,
+        "2025Q4": 150000
+      },
+      "ebitda": {
+        "2025Q1": 100000,
+        "2025Q2": 110000,
+        "2025Q3": 120000,
+        "2025Q4": 130000
+      }
+    },
+    "node_value_types": {
+      "ebitda": {
+        "type": "scalar"
+      },
+      "cash": {
+        "type": "scalar"
+      }
+    },
+    "node_sources": {
+      "cash": {
+        "2025Q1": "value",
+        "2025Q2": "value",
+        "2025Q3": "value",
+        "2025Q4": "value"
+      },
+      "ebitda": {
+        "2025Q1": "value",
+        "2025Q2": "value",
+        "2025Q3": "value",
+        "2025Q4": "value"
+      }
+    },
+    "cs_cashflows": {
+      "by_instrument": {
+        "SUB": {
+          "2025Q1": {
+            "interest_expense_cash": {
+              "amount": "16800",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "2800",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q2": {
+            "interest_expense_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "11106.66666666667",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q3": {
+            "interest_expense_cash": {
+              "amount": "16800",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "2706.666666666667",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q4": {
+            "interest_expense_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "11200",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          }
+        },
+        "SR-A": {
+          "2025Q1": {
+            "interest_expense_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "6666.66666666667",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q2": {
+            "interest_expense_cash": {
+              "amount": "10000",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "1611.111111111111",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q3": {
+            "interest_expense_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "6611.11111111111",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q4": {
+            "interest_expense_cash": {
+              "amount": "10000",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "1666.666666666667",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          }
+        },
+        "SR-B": {
+          "2025Q1": {
+            "interest_expense_cash": {
+              "amount": "2500",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "1055.555555555556",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q2": {
+            "interest_expense_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "2291.666666666667",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q3": {
+            "interest_expense_cash": {
+              "amount": "2500",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "1041.666666666667",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q4": {
+            "interest_expense_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "2305.555555555556",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          }
+        }
+      },
+      "totals": {
+        "2025Q1": {
+          "interest_expense_cash": {
+            "amount": "19300",
+            "currency": "USD"
+          },
+          "interest_income_cash": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "interest_expense_pik": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "principal_payment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fees": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "debt_balance": {
+            "amount": "920000",
+            "currency": "USD"
+          },
+          "accrued_interest": {
+            "amount": "10522.222222222226",
+            "currency": "USD"
+          },
+          "opening_balance": {
+            "amount": "920000",
+            "currency": "USD"
+          },
+          "scheduled_principal": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "mandatory_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "sweep_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "voluntary_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          }
+        },
+        "2025Q2": {
+          "interest_expense_cash": {
+            "amount": "10000",
+            "currency": "USD"
+          },
+          "interest_income_cash": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "interest_expense_pik": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "principal_payment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fees": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "debt_balance": {
+            "amount": "920000",
+            "currency": "USD"
+          },
+          "accrued_interest": {
+            "amount": "15009.444444444448",
+            "currency": "USD"
+          },
+          "opening_balance": {
+            "amount": "920000",
+            "currency": "USD"
+          },
+          "scheduled_principal": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "mandatory_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "sweep_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "voluntary_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          }
+        },
+        "2025Q3": {
+          "interest_expense_cash": {
+            "amount": "19300",
+            "currency": "USD"
+          },
+          "interest_income_cash": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "interest_expense_pik": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "principal_payment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fees": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "debt_balance": {
+            "amount": "920000",
+            "currency": "USD"
+          },
+          "accrued_interest": {
+            "amount": "10359.444444444444",
+            "currency": "USD"
+          },
+          "opening_balance": {
+            "amount": "920000",
+            "currency": "USD"
+          },
+          "scheduled_principal": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "mandatory_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "sweep_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "voluntary_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          }
+        },
+        "2025Q4": {
+          "interest_expense_cash": {
+            "amount": "10000",
+            "currency": "USD"
+          },
+          "interest_income_cash": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "interest_expense_pik": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "principal_payment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fees": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "debt_balance": {
+            "amount": "920000",
+            "currency": "USD"
+          },
+          "accrued_interest": {
+            "amount": "15172.222222222223",
+            "currency": "USD"
+          },
+          "opening_balance": {
+            "amount": "920000",
+            "currency": "USD"
+          },
+          "scheduled_principal": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "mandatory_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "sweep_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "voluntary_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          }
+        }
+      },
+      "totals_by_currency": {
+        "USD": {
+          "2025Q1": {
+            "interest_expense_cash": {
+              "amount": "19300",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "10522.222222222226",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q2": {
+            "interest_expense_cash": {
+              "amount": "10000",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "15009.444444444448",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q3": {
+            "interest_expense_cash": {
+              "amount": "19300",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "10359.444444444444",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "2025Q4": {
+            "interest_expense_cash": {
+              "amount": "10000",
+              "currency": "USD"
+            },
+            "interest_income_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_expense_pik": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "principal_payment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "fees": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "debt_balance": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "accrued_interest": {
+              "amount": "15172.222222222223",
+              "currency": "USD"
+            },
+            "opening_balance": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "scheduled_principal": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "mandatory_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "sweep_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          }
+        }
+      },
+      "reporting_currency": "USD",
+      "equity_distribution": {
+        "2025Q1": {
+          "amount": "130700",
+          "currency": "USD"
+        },
+        "2025Q2": {
+          "amount": "140000",
+          "currency": "USD"
+        },
+        "2025Q3": {
+          "amount": "130700",
+          "currency": "USD"
+        },
+        "2025Q4": {
+          "amount": "140000",
+          "currency": "USD"
+        }
+      },
+      "available_cash": {
+        "2025Q1": {
+          "amount": "150000",
+          "currency": "USD"
+        },
+        "2025Q2": {
+          "amount": "150000",
+          "currency": "USD"
+        },
+        "2025Q3": {
+          "amount": "150000",
+          "currency": "USD"
+        },
+        "2025Q4": {
+          "amount": "150000",
+          "currency": "USD"
+        }
+      }
+    },
+    "meta": {
+      "num_nodes": 2,
+      "num_periods": 4,
+      "numeric_mode": "float64",
+      "parallel": false
+    }
+  },
+  "cases": {
+    "full": {
+      "config": {
+        "period": "2025Q4",
+        "ebitda_node": "ebitda",
+        "cash_node": "cash"
+      },
+      "summary": {
+        "as_of": "2025Q4",
+        "currency": "USD",
+        "total_debt": {
+          "amount": "920000",
+          "currency": "USD"
+        },
+        "cash": {
+          "amount": "150000",
+          "currency": "USD"
+        },
+        "net_debt": {
+          "amount": "770000",
+          "currency": "USD"
+        },
+        "ltm_ebitda": {
+          "amount": "460000",
+          "currency": "USD"
+        },
+        "ltm_periods_required": 4,
+        "ltm_periods_found": 4,
+        "total_leverage": 2,
+        "net_leverage": 1.673913043478261,
+        "total_coverage": 7.849829351535837,
+        "tranches": [
+          {
+            "id": "SR-A",
+            "kind": "bond",
+            "rank": 0,
+            "payment_class": "1L",
+            "balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.43478260869565216,
+            "maturity": "2029-06-01",
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "leverage": 1.0869565217391304,
+            "interest_coverage": 18.4,
+            "ltm_interest": {
+              "amount": "20000",
+              "currency": "USD"
+            }
+          },
+          {
+            "id": "SR-B",
+            "kind": "bond",
+            "rank": 0,
+            "payment_class": "1L",
+            "balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.10869565217391304,
+            "maturity": "2029-01-15",
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "leverage": 1.0869565217391304,
+            "interest_coverage": 18.4,
+            "ltm_interest": {
+              "amount": "5000",
+              "currency": "USD"
+            }
+          },
+          {
+            "id": "SUB",
+            "kind": "bond",
+            "rank": 1,
+            "payment_class": "2L",
+            "balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.45652173913043476,
+            "maturity": "2031-03-01",
+            "cumulative_debt": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "leverage": 2,
+            "interest_coverage": 7.849829351535837,
+            "ltm_interest": {
+              "amount": "33600",
+              "currency": "USD"
+            }
+          }
+        ],
+        "maturity_wall": [
+          {
+            "year": 2029,
+            "amount": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.5434782608695652
+          },
+          {
+            "year": 2031,
+            "amount": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.45652173913043476
+          }
+        ]
+      }
+    },
+    "shortWindow": {
+      "config": {
+        "period": "2025Q3",
+        "ebitda_node": "ebitda",
+        "cash_node": "cash"
+      },
+      "summary": {
+        "as_of": "2025Q3",
+        "currency": "USD",
+        "total_debt": {
+          "amount": "920000",
+          "currency": "USD"
+        },
+        "cash": {
+          "amount": "150000",
+          "currency": "USD"
+        },
+        "net_debt": {
+          "amount": "770000",
+          "currency": "USD"
+        },
+        "ltm_ebitda": null,
+        "ltm_periods_required": 4,
+        "ltm_periods_found": 3,
+        "total_leverage": null,
+        "net_leverage": null,
+        "total_coverage": null,
+        "tranches": [
+          {
+            "id": "SR-A",
+            "kind": "bond",
+            "rank": 0,
+            "payment_class": "1L",
+            "balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.43478260869565216,
+            "maturity": "2029-06-01",
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "leverage": null,
+            "interest_coverage": null,
+            "ltm_interest": null
+          },
+          {
+            "id": "SR-B",
+            "kind": "bond",
+            "rank": 0,
+            "payment_class": "1L",
+            "balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.10869565217391304,
+            "maturity": "2029-01-15",
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "leverage": null,
+            "interest_coverage": null,
+            "ltm_interest": null
+          },
+          {
+            "id": "SUB",
+            "kind": "bond",
+            "rank": 1,
+            "payment_class": "2L",
+            "balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.45652173913043476,
+            "maturity": "2031-03-01",
+            "cumulative_debt": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "leverage": null,
+            "interest_coverage": null,
+            "ltm_interest": null
+          }
+        ],
+        "maturity_wall": [
+          {
+            "year": 2029,
+            "amount": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.5434782608695652
+          },
+          {
+            "year": 2031,
+            "amount": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.45652173913043476
+          }
+        ]
+      }
+    },
+    "noCash": {
+      "config": {
+        "period": "2025Q4",
+        "ebitda_node": "ebitda"
+      },
+      "summary": {
+        "as_of": "2025Q4",
+        "currency": "USD",
+        "total_debt": {
+          "amount": "920000",
+          "currency": "USD"
+        },
+        "cash": null,
+        "net_debt": null,
+        "ltm_ebitda": {
+          "amount": "460000",
+          "currency": "USD"
+        },
+        "ltm_periods_required": 4,
+        "ltm_periods_found": 4,
+        "total_leverage": 2,
+        "net_leverage": null,
+        "total_coverage": 7.849829351535837,
+        "tranches": [
+          {
+            "id": "SR-A",
+            "kind": "bond",
+            "rank": 0,
+            "payment_class": "1L",
+            "balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.43478260869565216,
+            "maturity": "2029-06-01",
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "leverage": 1.0869565217391304,
+            "interest_coverage": 18.4,
+            "ltm_interest": {
+              "amount": "20000",
+              "currency": "USD"
+            }
+          },
+          {
+            "id": "SR-B",
+            "kind": "bond",
+            "rank": 0,
+            "payment_class": "1L",
+            "balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.10869565217391304,
+            "maturity": "2029-01-15",
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "leverage": 1.0869565217391304,
+            "interest_coverage": 18.4,
+            "ltm_interest": {
+              "amount": "5000",
+              "currency": "USD"
+            }
+          },
+          {
+            "id": "SUB",
+            "kind": "bond",
+            "rank": 1,
+            "payment_class": "2L",
+            "balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.45652173913043476,
+            "maturity": "2031-03-01",
+            "cumulative_debt": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "leverage": 2,
+            "interest_coverage": 7.849829351535837,
+            "ltm_interest": {
+              "amount": "33600",
+              "currency": "USD"
+            }
+          }
+        ],
+        "maturity_wall": [
+          {
+            "year": 2029,
+            "amount": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.5434782608695652
+          },
+          {
+            "year": 2031,
+            "amount": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.45652173913043476
+          }
+        ]
+      }
+    },
+    "netCash": {
+      "config": {
+        "period": "2025Q4",
+        "ebitda_node": "ebitda",
+        "cash_node": "cash"
+      },
+      "summary": {
+        "as_of": "2025Q4",
+        "currency": "USD",
+        "total_debt": {
+          "amount": "920000",
+          "currency": "USD"
+        },
+        "cash": {
+          "amount": "980000",
+          "currency": "USD"
+        },
+        "net_debt": {
+          "amount": "-60000",
+          "currency": "USD"
+        },
+        "ltm_ebitda": {
+          "amount": "460000",
+          "currency": "USD"
+        },
+        "ltm_periods_required": 4,
+        "ltm_periods_found": 4,
+        "total_leverage": 2,
+        "net_leverage": -0.13043478260869565,
+        "total_coverage": 7.849829351535837,
+        "tranches": [
+          {
+            "id": "SR-A",
+            "kind": "bond",
+            "rank": 0,
+            "payment_class": "1L",
+            "balance": {
+              "amount": "400000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.43478260869565216,
+            "maturity": "2029-06-01",
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "leverage": 1.0869565217391304,
+            "interest_coverage": 18.4,
+            "ltm_interest": {
+              "amount": "20000",
+              "currency": "USD"
+            }
+          },
+          {
+            "id": "SR-B",
+            "kind": "bond",
+            "rank": 0,
+            "payment_class": "1L",
+            "balance": {
+              "amount": "100000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.10869565217391304,
+            "maturity": "2029-01-15",
+            "cumulative_debt": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "leverage": 1.0869565217391304,
+            "interest_coverage": 18.4,
+            "ltm_interest": {
+              "amount": "5000",
+              "currency": "USD"
+            }
+          },
+          {
+            "id": "SUB",
+            "kind": "bond",
+            "rank": 1,
+            "payment_class": "2L",
+            "balance": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.45652173913043476,
+            "maturity": "2031-03-01",
+            "cumulative_debt": {
+              "amount": "920000",
+              "currency": "USD"
+            },
+            "leverage": 2,
+            "interest_coverage": 7.849829351535837,
+            "ltm_interest": {
+              "amount": "33600",
+              "currency": "USD"
+            }
+          }
+        ],
+        "maturity_wall": [
+          {
+            "year": 2029,
+            "amount": {
+              "amount": "500000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.5434782608695652
+          },
+          {
+            "year": 2031,
+            "amount": {
+              "amount": "420000",
+              "currency": "USD"
+            },
+            "share_of_debt": 0.45652173913043476
+          }
+        ]
+      }
+    }
+  },
+  "errors": {
+    "missingNode": {
+      "config": {
+        "period": "2025Q4",
+        "ebitda_node": "adjusted_ebitda",
+        "cash_node": "cash"
+      },
+      "message": "Invalid input: Capital structure summary node 'adjusted_ebitda' is not in the results"
+    },
+    "noCapitalStructure": {
+      "config": {
+        "period": "2025Q4",
+        "ebitda_node": "ebitda",
+        "cash_node": "cash"
+      },
+      "message": "Invalid input: Capital structure summary: model 'ACME-SOFTWARE-3STMT' has no capital structure"
+    }
+  }
+}

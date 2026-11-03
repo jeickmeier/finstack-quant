@@ -519,6 +519,53 @@ const displays = [
       "Returned BondWorkoutLadder of one bond: one row per call, put and maturity exit in Rust's date order, every yield solved at the one price shown. The worst row is the one is_worst marks, the exit the ytw metric selects; no yield is compared here. Yield and I-spread units are what metricMetadata declares for ytw and i_spread, and a null yield is shown as no yield, never zero. Z-spread is not reported per exit.",
   },
   {
+    id: "statement-export",
+    api: [
+      "statements.statementResultToTableWide",
+      "StatementsNamespace",
+      "statementResultToTableWide",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned TableEnvelope of one StatementResult in the wide or long layout the user picks, statementResultToTableLong for long, in Rust's row and column order. The CSV holds exactly those cells: RFC 4180 quoting, the native column names as its header, and each number as String(value), unrounded. A cell Rust holds with no value (NaN, null in JSON) shows as undefined and is an empty field, never zero. Nothing is computed here.",
+  },
+  {
+    id: "normalization-editor",
+    api: ["statements.normalize", "StatementsNamespace", "normalize"],
+    route: "returned-report",
+    convention:
+      "Returned NormalizationResult per period of the target node, in Rust's period order, in the target's units (its currency when monetary). Each adjustment carries its raw amount, its capped amount, Rust's is_capped and adjusted_value, the target through that step; the bridge draws each step from the previous step's adjusted_value (base_value for the first) to its own, and the base and final value from zero. Nothing is summed, capped or classified here; a duplicate id, a missing node or a non-finite base shows the native error.",
+  },
+  {
+    id: "capital-structure-report",
+    api: [
+      "statements_analytics.capitalStructureSummary",
+      "StatementsAnalyticsNamespace",
+      "capitalStructureSummary",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned CapitalStructureSummary at the configured period, in its currency: money as Rust's exact decimal strings, ratios in turns and shares of debt as decimal fractions (shown as percent digits). Tranches in Rust's rank-then-declaration order with cumulative debt, leverage and interest coverage through each payment class; the maturity wall in Rust's year order, each bar drawn from zero to its returned amount. A null ratio (short LTM window, non-positive EBITDA or debt) or a live NaN shows as undefined beside Rust's ltm_periods_found and ltm_periods_required; negative net debt and net leverage show as returned. Nothing is summed, netted or divided here; a model with no capital structure or a missing node shows the native error.",
+  },
+  {
+    id: "relative-value-table",
+    api: [
+      "statements_analytics.relativeValueReport",
+      "StatementsAnalyticsNamespace",
+      "relativeValueReport",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned RelativeValueReport of a host-supplied subject and universe, metrics in their own units as supplied (monetary ones in one currency, normalized by the host). The comps table has the subject first, marked by Rust's is_subject, then the peers in universe order, one returned value per configured multiple. Per multiple: the subject value, percentile (a 0-1 share, shown as a percent and drawn as a bar from zero to it), z-score and peer statistics. Per dimension: Rust's subject values, percentile, z-score, regression, direction-adjusted signal (positive meaning cheap; -0 shown as 0) and exclusion reason, and a scatter of the returned points, the subject found by comparing company_id with subject_id and the line drawn through each point's returned fitted_y in order of x. The composite score and confidence, or Rust's composite_excluded_reason. A null or live NaN shows as undefined; nothing is computed here, and a misspelt field shows the native error.",
+  },
+  {
+    id: "wacc-calculator",
+    api: ["statements_analytics.wacc", "StatementsAnalyticsNamespace", "wacc"],
+    route: "returned-report",
+    convention:
+      "Returned WACC of the five entered decimals, itself a decimal. The two capital weights are separate inputs; nothing is blended, defaulted or checked here, and weights that do not sum to one or a tax rate outside [0, 1] show the native error. Applying the rate to a DCF is an explicit user action that passes the returned number unchanged.",
+  },
+  {
     id: "quote-converter",
     api: [
       "valuations.instruments.computeQuotes",
@@ -572,6 +619,17 @@ const displays = [
     route: "returned-model",
     convention:
       "Returned models.credit.liabilityManagement.analyzeExchangeOffer and analyzeLme results as Rust returned them. The tender recommendation is Rust's tender_recommended field; tenderRecommendationHurdle shows beside it as supplied and is never compared here. Amounts are in one caller-defined unit with no currency conversion; percentages are fractions and leverage a multiple. The LME price input is a price, an extension fee or a transferred-asset fraction by structure, as the facade documents.",
+  },
+  {
+    id: "recovery-waterfall",
+    api: [
+      "models.credit.recoveryWaterfall.allocateRecovery",
+      "CreditRecoveryWaterfallNamespace",
+      "allocateRecovery",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.workoutLgd and seniorityRecoveryStats results as Rust returned them. Allocations are in Rust's priority-then-entry order; each claim's total, collateral and general recovery, recovery rate and deficiency, and the estate's distributed and undistributed totals, are Rust's fields, never summed or divided here. Amounts are in one caller-defined unit with no currency conversion; rates are fractions. Seniority classes and collateral types are the generated SeniorityClass and WorkoutCollateralType contracts; calibration ids are seniorityCalibrationIds, default first. A class a calibration lacks shows Rust's error.",
   },
   {
     id: "option-calculator",

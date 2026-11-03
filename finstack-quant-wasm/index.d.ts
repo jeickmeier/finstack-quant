@@ -27283,6 +27283,12 @@ export interface CreditLgdNamespace {
    */
   EadCalculator: EadCalculatorConstructor;
   /**
+   * Seniority recovery calibration IDs held by the embedded credit registry.
+   * @returns Exact calibration IDs, each accepted unchanged by `seniorityRecoveryStats`: the registry's default calibration first, then the others in registry order.
+   * @throws Error - Throws a `validation` error if the embedded registry is malformed.
+   */
+  seniorityCalibrationIds(): string[];
+  /**
    * Historical Beta recovery distribution for a debt seniority class.
    * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
    * @param calibrationId - Exact registry methodology ID, such as `"moodys_recovery_1982_2023"` or `"sp_recovery_historical"`; aliases are rejected.
@@ -32169,7 +32175,7 @@ export interface StatementsNamespace {
    * Twin of Python `normalize` (Rust `adjustments::normalize`).
    * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
    * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
-   * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped) and the final value.
+   * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped amounts and `adjusted_value`, the target through that step) and the final value.
    * @throws Error - Throws with kind `validation` if an input is malformed, the target node or a referenced node is absent from the results, the configuration is invalid, or the target and a reference node have incompatible units.
    */
   normalize(
@@ -32799,6 +32805,19 @@ export interface StatementsAnalyticsNamespace {
    */
   creditAssessment(resultsJson: JsonInput, period: string): CreditAssessment;
   /**
+   * Summarize the debt stack by seniority at one period (mirrors Rust `capital_structure_summary`).
+   * @param results - Evaluated `StatementResult` (object or JSON) holding `cs_cashflows` and both configured nodes. A scalar EBITDA or cash node is read as an amount in the debt currency.
+   * @param model - `FinancialModelSpec` (object or JSON) whose capital structure gives the instruments, their declaration order and the payment classes, and whose periods bound the LTM window.
+   * @param config - `CapitalStructureSummaryConfig` (object or JSON): `period` (the reporting period, such as `"2025Q4"`), `ebitda_node` (required; the node holding EBITDA for each single period, never inferred from a conventional name) and `cash_node` (optional; the node holding the period-end cash balance, omitted means null cash, net debt and net leverage).
+   * @returns `CapitalStructureSummary` plain object: `as_of`, `currency`, `total_debt`, `cash`, `net_debt` and `ltm_ebitda` as money, `ltm_periods_required`, `ltm_periods_found`, `total_leverage`, `net_leverage` and `total_coverage` in turns, `tranches` by rank then declaration order (`id`, `kind`, `rank`, `payment_class`, `balance` with a revolver at its drawn balance, `share_of_debt` as a decimal, `maturity`, `cumulative_debt`, `leverage` and `interest_coverage` through the class, `ltm_interest`) and `maturity_wall` by calendar year of final maturity, ascending (`year`, `amount`, `share_of_debt`), using the balance at the period and ignoring any scheduled amortization after it.
+   * @throws If an argument is malformed, the model has no capital structure or no debt instruments once hedges are excluded, `cs_cashflows` is absent, the period is not in the model, a configured node is not in the results or the cash node has no value at the period, an instrument has no cashflows at the period or is in no class while payment classes are declared, a consumed value or ratio is non-finite, tranches are in more than one currency (no FX is applied), or the EBITDA or cash node is monetary in another currency (kind `validation`).
+   */
+  capitalStructureSummary(
+    results: StatementResult | string,
+    model: JsonInput,
+    config: generated.statements_analytics.CapitalStructureSummaryConfig | string
+  ): generated.statements_analytics.CapitalStructureSummary;
+  /**
    * Evaluate covenant compliance at the end of every statement result period.
    *
    * Each period that carries a value in `results` is tested on its last
@@ -32972,6 +32991,25 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects when `peer_set` or `dimensions` cannot be decoded into its declared schema, when a weight is negative/non-finite, no positive-weight dimension has usable data, the composite is non-finite, or the result cannot be serialized to JavaScript. Unusable dimensions are excluded; regression dimensions do not fall back to univariate scoring.
    */
   scoreRelativeValue(peerSet: unknown, dimensions: unknown[]): RelativeValueResult;
+  /**
+   * Compare one subject with its filtered peers (mirrors Rust `relative_value_report`).
+   *
+   * Returns the comps table, peer statistics, regression scatter and composite
+   * rich/cheap score in one result, so a caller has nothing to compute. A used
+   * dimension and the composite are exactly what `scoreRelativeValue` returns on
+   * the same peers and dimensions; where that function throws because no dimension
+   * is usable, this one still returns the table.
+   * @param subject - `CompanyMetrics` of the company being evaluated (object or JSON). Monetary metrics carry no currency and every company's must already be in one currency. It need not be in `universe`.
+   * @param universe - Candidate peers as `CompanyMetrics` (array or JSON), in the order the report returns them. A member with the subject's id is never a peer and does not count as excluded.
+   * @param config - `RelativeValueReportConfig` (object or JSON): `filter` (optional; a `PeerFilter` in which every field is optional, an omitted field meaning no constraint and an unknown one rejected; an omitted filter makes every other company a peer), `period_basis` (required; `"ltm"`, `"ntm"` or `{custom: "<label>"}`; it labels the report and the metrics are used as given), `dimensions` (required; `ScoringDimension` objects with finite non-negative weights, zero disabling one; may be empty when `multiples` is not) and `multiples` (required; multiple identifiers such as `"ev_ebitda"`, the columns in order; may be empty when `dimensions` is not).
+   * @returns `RelativeValueReport` plain object: `subject_id`, `period_basis`, `peer_count`, `excluded_count` (universe members the filter dropped, not counting the subject), `companies` (subject first, then peers in universe order: `id`, `is_subject`, `values` with one number or null per configured multiple), `multiples` in config order (`multiple`, `subject_value`, `peer_stats`, `percentile`, `z_score`), `dimensions` in config order including excluded ones (`label`, `weight`, `direction`, `y`, `x`, `subject_y`, `subject_x`, `peer_stats`, `percentile`, `z_score`, `regression`, `signal` positive meaning cheap, `excluded_reason`, and `points` for the scatter with `company_id`, `is_subject` (true on the subject's point, first when the subject has both metrics), `x`, `y`, `fitted_y`), `composite` (the `scoreRelativeValue` result, or null) and `composite_excluded_reason` (`no_dimensions`, `no_usable_dimension`, `non_finite_score`, or null).
+   * @throws If an argument is malformed or carries an unknown field (a misspelt `CompanyMetrics` or `PeerFilter` key included), `dimensions` and `multiples` are both empty, or a weight is negative or non-finite (kind `validation`). No usable dimension is not an error: the table is returned with a null `composite`.
+   */
+  relativeValueReport(
+    subject: generated.statements_analytics.CompanyMetrics | string,
+    universe: generated.statements_analytics.CompanyMetrics[] | string,
+    config: generated.statements_analytics.RelativeValueReportConfig | string
+  ): generated.statements_analytics.RelativeValueReport;
   /**
    * Reusable dependency tracer for a financial model.
    */

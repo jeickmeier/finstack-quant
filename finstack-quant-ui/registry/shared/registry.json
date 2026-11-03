@@ -83,7 +83,7 @@
       "type": "registry:ui",
       "title": "Table envelope",
       "description": "Presents a native column-oriented TableEnvelope in its own column and row order, with labelFor headers, exact numeric digits and null cells as an em dash.",
-      "docs": "Display-only table-envelope primitive. Import the installed finstack theme. Pass the TableEnvelope a Rust table function returned (for example statements_analytics.plSummaryReport or Performance#summary) and a caption. Columns and rows keep their native order; numeric columns are right-aligned with every supplied digit; nothing is sorted, grouped, totalled, rounded or converted. No worker or workbench is required.",
+      "docs": "Display-only table-envelope primitive. Import the installed finstack theme. Pass the TableEnvelope a Rust table function returned (for example statements_analytics.plSummaryReport or Performance#summary) and a caption. Columns and rows keep their native order; numeric columns are right-aligned with every supplied digit; nothing is sorted, grouped, totalled, rounded or converted. missingCell, when supplied, is shown for a null or NaN cell. No worker or workbench is required.",
       "files": [
         {
           "path": "table/table-envelope/table-envelope.tsx",
@@ -160,7 +160,7 @@
       "type": "registry:ui",
       "title": "ID combobox",
       "description": "Free-text identifier input with virtualized supplied suggestions.",
-      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; IDs are never inferred.",
+      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; typed text is the value and survives Tab, blur and Escape; IDs are never inferred.",
       "files": [
         {
           "path": "primitives/id-combobox/id-combobox.tsx",

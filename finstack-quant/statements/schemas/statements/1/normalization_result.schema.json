@@ -3,6 +3,11 @@
     "AppliedAdjustment": {
       "description": "Details of a single applied adjustment.",
       "properties": {
+        "adjusted_value": {
+          "description": "Target value through this adjustment: the period's `base_value` plus\nthe capped amounts of this and every earlier adjustment, in declaration\norder and the target's units. The last adjustment's value equals the\nperiod's `final_value`, so a base-to-adjusted bridge reads each step's\nspan from the previous step's value (or `base_value`) to this one.",
+          "format": "double",
+          "type": "number"
+        },
         "adjustment_id": {
           "description": "ID of the adjustment",
           "type": "string"
@@ -31,7 +36,8 @@
         "name",
         "raw_amount",
         "capped_amount",
-        "is_capped"
+        "is_capped",
+        "adjusted_value"
       ],
       "type": "object"
     },
@@ -883,6 +889,7 @@
     {
       "adjustments": [
         {
+          "adjusted_value": 13500000.0,
           "adjustment_id": "restructuring",
           "capped_amount": 1500000.0,
           "is_capped": false,

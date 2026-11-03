@@ -225,7 +225,7 @@ it("sends a VarianceConfig the generated contract accepts", () => {
 it("draws each returned value as its own bar in Rust's order, with no running sum", async () => {
   const bridge = capturedBridge as unknown as BridgeChart;
   render(<VarianceBridgeChart bridge={bridge} />);
-  const table = screen.getByRole("table", { name: "Ebitda bridge, 2025Q2" });
+  const table = screen.getByRole("table", { name: "EBITDA bridge, 2025Q2" });
   expect(
     within(table)
       .getAllByRole("row")

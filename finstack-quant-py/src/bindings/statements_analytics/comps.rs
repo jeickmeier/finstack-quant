@@ -47,7 +47,7 @@ fn parse_period_basis(label: &str) -> PeriodBasis {
         .unwrap_or_else(|_| PeriodBasis::Custom(label.to_string()))
 }
 
-fn period_basis_label(basis: &PeriodBasis) -> String {
+pub(super) fn period_basis_label(basis: &PeriodBasis) -> String {
     match basis {
         PeriodBasis::Custom(label) => label.clone(),
         other => finstack_quant_core::wire::serde_label(other).unwrap_or_default(),
@@ -58,7 +58,7 @@ fn parse_extractor(name: &str) -> PyResult<MetricExtractor> {
     name.parse().map_err(display_to_py)
 }
 
-fn extractor_label(extractor: &MetricExtractor) -> String {
+pub(super) fn extractor_label(extractor: &MetricExtractor) -> String {
     match extractor {
         MetricExtractor::Named(name) | MetricExtractor::Custom(name) => name.clone(),
         MetricExtractor::Multiple(multiple) => {
@@ -203,7 +203,10 @@ fn dict_to_company_metrics(id: &str, d: &Bound<'_, PyDict>) -> PyResult<CompanyM
 
 /// Extract a `CompanyMetrics` from a typed object, a dict of the serde shape,
 /// or a JSON string.
-fn extract_company_metrics(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<CompanyMetrics> {
+pub(super) fn extract_company_metrics(
+    py: Python<'_>,
+    obj: &Bound<'_, PyAny>,
+) -> PyResult<CompanyMetrics> {
     if let Ok(metrics) = obj.extract::<PyRef<'_, PyCompanyMetrics>>() {
         return Ok(metrics.inner.clone());
     }

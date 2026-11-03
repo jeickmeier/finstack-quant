@@ -248,7 +248,9 @@ add-backs. Each `Adjustment` carries an `AdjustmentValue` (fixed per-period
 amounts or a percentage of another node) and an optional `AdjustmentCap`. The
 returned `Vec<NormalizationResult>` keeps both the adjusted total (`final_value`)
 and the per-adjustment audit trail (`adjustments: Vec<AppliedAdjustment>`), so
-the reported-to-adjusted bridge stays explainable.
+the reported-to-adjusted bridge stays explainable: each `AppliedAdjustment`
+carries its raw and capped amounts and `adjusted_value`, the target through
+that step, so a bridge chart reads every step's position without summing.
 `adjustments::merge_into_results(&mut result, &normalized, "adj_ebitda")`
 folds the adjusted series back into a `StatementResult` as a new node.
 

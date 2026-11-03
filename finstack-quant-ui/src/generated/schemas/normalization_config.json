@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Financial statement normalization policy and adjustment catalog.",
+  "examples": [
+    {
+      "adjustments": [
+        {
+          "category": "non_recurring",
+          "id": "restructuring",
+          "name": "Restructuring charges",
+          "value": {
+            "amounts": {
+              "2024Q1": 1500000,
+              "2024Q2": 1250000
+            },
+            "type": "fixed"
+          }
+        },
+        {
+          "category": "synergies",
+          "id": "run_rate_synergies",
+          "name": "Run-rate cost synergies",
+          "value": {
+            "node_id": "revenue",
+            "percentage": 0.02,
+            "type": "percentage_of_node"
+          }
+        }
+      ],
+      "target_node": "ebitda"
+    }
+  ],
+  "properties": {
+    "adjustments": {
+      "description": "List of adjustments to apply",
+      "items": {
+        "$ref": "#/$defs/d_38f91644b05ebd53d53e"
+      },
+      "type": "array"
+    },
+    "target_node": {
+      "description": "The target node to normalize (e.g., \"EBITDA\")",
+      "type": "string"
+    }
+  },
+  "required": [
+    "target_node"
+  ],
+  "title": "NormalizationConfig",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
+  "$defs": {
+    "d_38f91644b05ebd53d53e": {
+      "additionalProperties": false,
+      "description": "Specification for a single adjustment (add-back or deduction).",
+      "properties": {
+        "cap": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_b067e48c60674cfe1858"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional cap on the adjustment amount"
+        },
+        "category": {
+          "description": "Category for grouping (optional)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Unique identifier for this adjustment",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable name (e.g., \"Synergies\", \"Management Fees\")",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/d_88d20696bddd99308e45",
+          "description": "How the adjustment value is calculated"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "d_88d20696bddd99308e45": {
+      "description": "Defines how an adjustment value is derived.",
+      "oneOf": [
+        {
+          "description": "Fixed amount per period",
+          "properties": {
+            "amounts": {
+              "additionalProperties": {
+                "format": "double",
+                "type": "number"
+              },
+              "description": "Map of period_id -> amount",
+              "type": "object"
+            },
+            "type": {
+              "const": "fixed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "amounts"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Percentage of a reference node's value",
+          "properties": {
+            "node_id": {
+              "description": "Node ID to reference (e.g., \"revenue\")",
+              "type": "string"
+            },
+            "percentage": {
+              "description": "Percentage to apply (e.g., 0.05 for 5%)",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "percentage_of_node",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "node_id",
+            "percentage"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_b067e48c60674cfe1858": {
+      "additionalProperties": false,
+      "description": "Defines a cap on an adjustment.",
+      "properties": {
+        "base_mode": {
+          "$ref": "#/$defs/d_b9875cc1f097d9f62ef9",
+          "default": "reported",
+          "description": "For self-referential caps (`base_node == target_node`), choose whether\nto size the cap against the reported or the progressively adjusted\nbase. Defaults to `Reported`, the standard LBO / credit-agreement\nconvention. Ignored when `base_node` is `None` or points to a\ndifferent node."
+        },
+        "base_node": {
+          "description": "The base node to calculate the cap against (e.g., \"EBITDA\")\nIf None, the cap is a fixed absolute amount.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "description": "The percentage of the base node to cap at (e.g., 0.20 for 20%)\nOr the absolute amount if base_node is None.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "type": "object"
+    },
+    "d_b9875cc1f097d9f62ef9": {
+      "description": "How a self-referential cap base (where `base_node == target_node`) is\nresolved each period.",
+      "oneOf": [
+        {
+          "const": "reported",
+          "description": "Cap against the **reported** (pre-adjustment) value of the base node.\nThis is the standard credit-agreement convention — e.g., \"add-backs\ncapped at 25% of reported EBITDA\" uses a fixed denominator that does\nnot widen as earlier add-backs are applied.",
+          "type": "string"
+        },
+        {
+          "const": "progressive",
+          "description": "Cap against the **progressively adjusted** value\n(`base_value + running_total_of_earlier_adjustments`). Earlier\nadjustments widen the cap room for later ones. Use this only when a\ndocument explicitly caps against \"adjusted\" EBITDA at each step.",
+          "type": "string"
+        }
+      ]
+    }
+  }
+}

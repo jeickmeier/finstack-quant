@@ -382,7 +382,7 @@
       "type": "registry:component",
       "title": "DCF assumptions form",
       "description": "Edits the arguments of a native statements_analytics DCF: WACC, the terminal-value method and its fields, the UFCF node, an optional net-debt override and the generated DcfOptions form.",
-      "docs": "Edit the evaluateDcf assumptions: WACC as a decimal, the TerminalValueSpec variant (Gordon growth, exit multiple or H-model, the one hand-written Rust wire union) and its fields, the UFCF node and the exit-multiple metric node as id-comboboxes over the supplied model node ids, an optional net-debt override, and the remaining DcfOptions in the schema form over the generated contract. A cleared required number is sent as NaN, never 0; an empty optional value and empty options stay unset so Rust applies its defaults. The facade has no standalone DcfOptions parse, so the options are checked structurally here and validated by Rust (unknown keys included) when the model is valued. Calculate passes the submission to the caller (usually the useEvaluateDcf and useDcfSensitivity requests). Accepts defaultAssumptions, nodeIds, onSubmit, submitLabel, disabled and density props.",
+      "docs": "Edit the evaluateDcf assumptions: WACC as a decimal, the TerminalValueSpec variant (Gordon growth, exit multiple or H-model, the one hand-written Rust wire union) and its fields, the UFCF node and the exit-multiple metric node as id-comboboxes over the supplied model node ids, an optional net-debt override, and the remaining DcfOptions in the schema form over the generated contract. A cleared required number is sent as NaN, never 0; an empty optional value and empty options stay unset so Rust applies its defaults. The facade has no standalone DcfOptions parse, so the options are checked structurally here and validated by Rust (unknown keys included) when the model is valued. Calculate passes the submission to the caller (usually the useEvaluateDcf and useDcfSensitivity requests). A host may hold the WACC field text through wacc and onWaccChange, so a rate can be set without remounting the rest of the form. Accepts defaultAssumptions, nodeIds, wacc, onWaccChange, onSubmit, submitLabel, disabled and density props.",
       "files": [
         {
           "path": "components/dcf-assumptions-form/dcf-assumptions-form.tsx",
@@ -977,6 +977,374 @@
       }
     },
     {
+      "name": "wacc-calculator",
+      "type": "registry:component",
+      "title": "WACC calculator",
+      "description": "Enter capital weights, costs and a tax rate and see the WACC Rust returns, with an optional button that passes it on.",
+      "docs": "Answers what a company's blended cost of capital is. Five decimal inputs, the two capital weights separate, and one native statements_analytics.wacc rate (useWacc) shown as returned. Weights that do not sum to one, a tax rate outside [0, 1] or an empty field show the native error; nothing is blended, defaulted or checked here. onApply renders a button that passes the rate shown, on the user's click only and never after an edit since it was calculated. Accepts defaultInputs, onSubmit, rate, loading, error, onApply, applyLabel, formatValue, disabled and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/wacc-calculator/wacc-calculator.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/wacc-calculator/wacc-calculator.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/decimal-input",
+        "button"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "normalization-editor",
+      "type": "registry:component",
+      "title": "Normalization editor",
+      "description": "Edit the add-backs and deductions to a statement metric such as EBITDA and see Rust's base-to-adjusted bridge and the adjustments by period.",
+      "docs": "Answers what adjusted EBITDA is and how each add-back gets there. Edits a NormalizationConfig with the schema form over the generated normalization_config contract (target, percentage and cap-base nodes as id-comboboxes over the supplied node ids; fixed per-period amounts, percentages of a node and caps as Rust declares them), validated natively (useNormalizationConfigValidator; a duplicate id is Rust's error). Normalize passes the canonical config to the caller (usually the useNormalize request). The native statements.normalize results are shown as returned, above the form: for a chosen period, a bridge from the reported base through each adjustment in declaration order to the final value, each step drawn from the previous step's adjusted_value (the base for the first) to its own, coloured by Rust's is_capped, and a table of every adjustment's capped amount by period with the raw amount beside a capped one. A missing node, a non-finite base or a negative cap shows the native error. Nothing is summed, capped or classified here. Accepts defaultConfig, nodeIds, validate, onSubmit, results, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/normalization-editor/normalization-editor.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/normalization-editor/normalization-editor.tsx"
+        },
+        {
+          "path": "components/normalization-editor/normalization-config.ts",
+          "type": "registry:lib",
+          "target": "components/finstack/statements/components/normalization-editor/normalization-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-codec",
+        "@finstack/finstack-worker",
+        "@finstack/schema-form",
+        "@finstack/enum-field",
+        "@finstack/id-combobox",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/contract-normalization-config",
+        "@finstack/contract-normalization-result"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "capital-structure-report",
+      "type": "registry:component",
+      "title": "Capital structure report",
+      "description": "Summarize a model's debt stack at one period: Rust's leverage and coverage through each payment class, LTM EBITDA and the maturity wall.",
+      "docs": "Answers how much debt sits ahead of each tranche and what leverage and coverage look like through it. Edits a CapitalStructureSummaryConfig with the schema form over the generated capital_structure_summary_config contract (the reporting period as a select over the supplied periodIds; the EBITDA and optional cash nodes as id-comboboxes over the supplied nodeIds); Summarize passes the structurally valid config to the caller (usually the useCapitalStructureSummary request) and Rust validates it. The native statements_analytics.capitalStructureSummary result is shown as returned, above the form: total debt, cash, net debt, LTM EBITDA with the LTM periods Rust found of those it requires, and total and net leverage and total coverage; the debt stack in Rust's rank-then-declaration order (kind, payment class, rank, balance, share of debt, cumulative debt, leverage and interest coverage through the class, LTM interest, maturity); and the maturity wall by year of final maturity as a bar chart. A ratio Rust returns as null (a short LTM window, non-positive EBITDA or debt), or a live NaN, shows as Undefined; a negative net debt or net leverage shows as returned. A model with no capital structure or a node the results lack shows the native error. Nothing is summed, netted or divided here. Accepts defaultConfig, nodeIds, periodIds, onSubmit, summary, loading, error, formatRatio, formatShare and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/capital-structure-report/capital-structure-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/capital-structure-report/capital-structure-report.tsx"
+        },
+        {
+          "path": "components/capital-structure-report/capital-structure-config.ts",
+          "type": "registry:lib",
+          "target": "components/finstack/statements/components/capital-structure-report/capital-structure-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-codec",
+        "@finstack/finstack-worker",
+        "@finstack/schema-form",
+        "@finstack/enum-field",
+        "@finstack/id-combobox",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/contract-capital-structure-summary-config",
+        "@finstack/contract-capital-structure-summary"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary_config.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "relative-value-table",
+      "type": "registry:component",
+      "title": "Relative value table",
+      "description": "Compare a subject with its filtered peers: Rust's comps table, each multiple's peer statistics and percentile, each scoring dimension's regression scatter and signal, and the composite rich/cheap score.",
+      "docs": "Answers how a name compares with its peers. Takes the host-supplied subject and universe (CompanyMetrics serde documents; Rust rejects a misspelt key) and edits a RelativeValueReportConfig with the schema form over the generated relative_value_report_config contract: the PeerFilter (every field optional; GICS sectors, industries, countries, ratings, tags and selectors are free text, since Rust declares no list of them), the period basis, the scoring dimensions and the multiple columns, whose choices come from the contract. Compare passes the subject, universe and structurally valid config JSON to the caller (usually the useRelativeValueReport request) and Rust validates them. The native statements_analytics.relativeValueReport result is shown as returned, above the form: the subject, period basis, peer and excluded counts and the composite score and confidence, or Rust's reason for no composite; the comps table with the subject first, marked from Rust's is_subject, and one column per multiple; per multiple, the subject value, percentile, z-score and peer statistics, with a bar per multiple drawn at Rust's percentile; per dimension, its weight, direction, subject values, percentile, z-score, signal (positive meaning cheap), regression and peer statistics, Rust's exclusion reason when the composite leaves it out, and a scatter of Rust's points with the subject marked from each point's is_subject and the line drawn through Rust's fitted values. A null or a live NaN shows as Undefined and -0 as 0. Nothing is computed here. Accepts subject, universe, defaultConfig, onSubmit, report, loading, error, formatNumber, formatPercentile and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/relative-value-table/relative-value-table.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/relative-value-table/relative-value-table.tsx"
+        },
+        {
+          "path": "components/relative-value-table/relative-value-config.ts",
+          "type": "registry:lib",
+          "target": "components/finstack/statements/components/relative-value-table/relative-value-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-codec",
+        "@finstack/finstack-worker",
+        "@finstack/schema-form",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/contract-relative-value-report-config",
+        "@finstack/contract-relative-value-report",
+        "badge"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "statement-export",
+      "type": "registry:component",
+      "title": "Statement export",
+      "description": "A statement result as a table in the wide or long layout, with a CSV download of exactly those cells.",
+      "docs": "Answers what the statement numbers are as a file a spreadsheet can open. Presents a native statements.statementResultToTableWide or statementResultToTableLong TableEnvelope (useStatementResultTable) in Rust's order, with a wide or long switch the host follows. Download CSV writes exactly those cells: RFC 4180 quoting, native column names as the header, every number as its plain String form. A cell Rust holds with no value shows as undefined and is an empty field. Nothing is computed. Accepts layout, onLayoutChange, table, loading, error and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/statement-export/statement-export.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/statement-export/statement-export.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/enum-field",
+        "@finstack/table-envelope",
+        "@finstack/contract-table-envelope",
+        "button"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-statement-result-table",
+      "type": "registry:hook",
+      "title": "useStatementResultTable",
+      "description": "Builds a native table of an evaluated statement result, wide or long, through the WASM worker.",
+      "docs": "statements.statementResultToTableWide or statementResultToTableLong, by the requested layout, of the host-serialized StatementResult. In a live table a node with no value holds NaN. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-statement-result-table/use-statement-result-table.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-statement-result-table/use-statement-result-table.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-wacc",
+      "type": "registry:hook",
+      "title": "useWacc",
+      "description": "Blends capital weights, costs and a tax rate into a WACC through the WASM worker.",
+      "docs": "Native statements_analytics.wacc of the five supplied decimals. Keyed by the complete immutable request and worker session, with a NaN from an empty field kept distinct from null; null disables the query. A rejection (weights that do not sum to one, a tax rate out of range, a non-finite input) is the hook error, unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-wacc/use-wacc.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-wacc/use-wacc.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-normalize",
+      "type": "registry:hook",
+      "title": "useNormalize",
+      "description": "Normalizes a statement metric with a NormalizationConfig through the WASM worker.",
+      "docs": "Native statements.normalize of the host-serialized StatementResult and canonical NormalizationConfig JSON: one NormalizationResult per period of the target node, in period order, each adjustment with its raw and capped amounts and the adjusted_value through it. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-normalize/use-normalize.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-normalize/use-normalize.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-capital-structure-summary",
+      "type": "registry:hook",
+      "title": "useCapitalStructureSummary",
+      "description": "Summarizes a model's debt stack at one period through the WASM worker.",
+      "docs": "Native statements_analytics.capitalStructureSummary of the host-serialized StatementResult, the canonical FinancialModelSpec and CapitalStructureSummaryConfig JSON: the debt stack by seniority with leverage and coverage through each payment class, LTM EBITDA and the maturity wall. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-capital-structure-summary/use-capital-structure-summary.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-capital-structure-summary/use-capital-structure-summary.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-relative-value-report",
+      "type": "registry:hook",
+      "title": "useRelativeValueReport",
+      "description": "Compares a subject with its filtered peers through the WASM worker.",
+      "docs": "Native statements_analytics.relativeValueReport of the subject's CompanyMetrics JSON, the universe's CompanyMetrics JSON array and RelativeValueReportConfig JSON: the comps table, peer statistics and percentiles, regression scatter and composite rich/cheap score. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-relative-value-report/use-relative-value-report.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-relative-value-report/use-relative-value-report.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-normalization-config-validator",
+      "type": "registry:hook",
+      "title": "useNormalizationConfigValidator",
+      "description": "Validates and canonicalizes NormalizationConfig JSON through the WASM worker, for schema-form.",
+      "docs": "Native NormalizationConfig validation (statements.validateNormalizationConfigJson; rejects a duplicate adjustment id) using the existing FinstackProvider worker. Returns canonical JSON and rejects superseded revisions.",
+      "files": [
+        {
+          "path": "hooks/use-normalization-config-validator/use-normalization-config-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-normalization-config-validator/use-normalization-config-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-pl-summary-report",
       "type": "registry:hook",
       "title": "usePlSummaryReport",
@@ -1267,7 +1635,7 @@
       "type": "registry:block",
       "title": "Statements workbench",
       "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error, and a native breach forecast, statements_analytics.forecastBreaches, under a submitted CovenantForecastConfig), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, a table and CSV export of the shown result, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary and, in a disclosure, a native normalization of the reported result (adjusted EBITDA: a NormalizationConfig editor and statements.normalize's base-to-adjusted bridge) and, in another, the native debt stack (statements_analytics.capitalStructureSummary: leverage and coverage through each payment class and the maturity wall; a model with no capital structure shows Rust's error), a native DCF valuation with its enterprise-value tornado, a native WACC calculator that sets the DCF WACC field on the user's click, and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error, and a native breach forecast, statements_analytics.forecastBreaches, under a submitted CovenantForecastConfig), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -1305,6 +1673,11 @@
           "target": "components/finstack/statements/blocks/statements-workbench/valuation-panel.tsx"
         },
         {
+          "path": "blocks/statements-workbench/export-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/export-panel.tsx"
+        },
+        {
           "path": "blocks/statements-workbench/sensitivity-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/statements/blocks/statements-workbench/sensitivity-panel.tsx"
@@ -1323,17 +1696,31 @@
           "path": "blocks/statements-workbench/covenants-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/statements/blocks/statements-workbench/covenants-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/normalization-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/normalization-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/capital-structure-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/capital-structure-panel.tsx"
         }
       ],
       "registryDependencies": [
         "@finstack/financial-model-editor",
         "@finstack/statement-grid",
+        "@finstack/statement-export",
         "@finstack/statement-chart",
         "@finstack/statement-explanation",
         "@finstack/statement-checks",
         "@finstack/variance-table",
         "@finstack/credit-assessment-report",
+        "@finstack/normalization-editor",
+        "@finstack/capital-structure-report",
         "@finstack/dcf-assumptions-form",
+        "@finstack/wacc-calculator",
         "@finstack/dcf-report",
         "@finstack/lbo-report",
         "@finstack/statement-sensitivity",
@@ -1353,6 +1740,11 @@
         "@finstack/use-trace-statement-scenario",
         "@finstack/use-credit-assessment",
         "@finstack/use-pl-summary-report",
+        "@finstack/use-normalize",
+        "@finstack/use-normalization-config-validator",
+        "@finstack/use-capital-structure-summary",
+        "@finstack/use-wacc",
+        "@finstack/use-statement-result-table",
         "@finstack/use-evaluate-dcf",
         "@finstack/use-dcf-sensitivity",
         "@finstack/use-evaluate-lbo",
@@ -1404,9 +1796,13 @@
           "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary_config.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",

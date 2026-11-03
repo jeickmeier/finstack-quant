@@ -354,6 +354,13 @@ export const importHarnesses = {
       name: "use-liability-management",
       modules: modules.length,
     })),
+  "use-recovery-waterfall": () =>
+    Promise.all([
+      import("@/hooks/models/use-recovery-waterfall/use-recovery-waterfall"),
+    ]).then((modules) => ({
+      name: "use-recovery-waterfall",
+      modules: modules.length,
+    })),
   "use-option-calculator": () =>
     Promise.all([
       import("@/hooks/models/use-option-calculator/use-option-calculator"),
@@ -528,6 +535,42 @@ export const importHarnesses = {
       import("@/hooks/statements/use-credit-assessment/use-credit-assessment"),
     ]).then((modules) => ({
       name: "use-credit-assessment",
+      modules: modules.length,
+    })),
+  "use-statement-result-table": () =>
+    Promise.all([
+      import("@/hooks/statements/use-statement-result-table/use-statement-result-table"),
+    ]).then((modules) => ({
+      name: "use-statement-result-table",
+      modules: modules.length,
+    })),
+  "use-wacc": () =>
+    Promise.all([import("@/hooks/statements/use-wacc/use-wacc")]).then(
+      (modules) => ({ name: "use-wacc", modules: modules.length }),
+    ),
+  "use-normalize": () =>
+    Promise.all([
+      import("@/hooks/statements/use-normalize/use-normalize"),
+    ]).then((modules) => ({ name: "use-normalize", modules: modules.length })),
+  "use-capital-structure-summary": () =>
+    Promise.all([
+      import("@/hooks/statements/use-capital-structure-summary/use-capital-structure-summary"),
+    ]).then((modules) => ({
+      name: "use-capital-structure-summary",
+      modules: modules.length,
+    })),
+  "use-relative-value-report": () =>
+    Promise.all([
+      import("@/hooks/statements/use-relative-value-report/use-relative-value-report"),
+    ]).then((modules) => ({
+      name: "use-relative-value-report",
+      modules: modules.length,
+    })),
+  "use-normalization-config-validator": () =>
+    Promise.all([
+      import("@/hooks/statements/use-normalization-config-validator/use-normalization-config-validator"),
+    ]).then((modules) => ({
+      name: "use-normalization-config-validator",
       modules: modules.length,
     })),
   "use-pl-summary-report": () =>
@@ -1664,6 +1707,33 @@ export const importHarnesses = {
       name: "contract-ohlson-o-score-input",
       modules: modules.length,
     })),
+  "contract-recovery-claim": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/recovery_claim.json"),
+      import("@/lib/finstack/generated/types/recovery_claim"),
+      import("@/lib/finstack/generated/meta/recovery_claim"),
+    ]).then((modules) => ({
+      name: "contract-recovery-claim",
+      modules: modules.length,
+    })),
+  "contract-seniority-calibration": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/seniority_calibration.json"),
+      import("@/lib/finstack/generated/types/seniority_calibration"),
+      import("@/lib/finstack/generated/meta/seniority_calibration"),
+    ]).then((modules) => ({
+      name: "contract-seniority-calibration",
+      modules: modules.length,
+    })),
+  "contract-workout-lgd": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/workout_lgd.json"),
+      import("@/lib/finstack/generated/types/workout_lgd"),
+      import("@/lib/finstack/generated/meta/workout_lgd"),
+    ]).then((modules) => ({
+      name: "contract-workout-lgd",
+      modules: modules.length,
+    })),
   "contract-zmijewski-input": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/zmijewski_input.json"),
@@ -1745,6 +1815,24 @@ export const importHarnesses = {
       name: "contract-bridge-chart",
       modules: modules.length,
     })),
+  "contract-capital-structure-summary-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/capital_structure_summary_config.json"),
+      import("@/lib/finstack/generated/types/capital_structure_summary_config"),
+      import("@/lib/finstack/generated/meta/capital_structure_summary_config"),
+    ]).then((modules) => ({
+      name: "contract-capital-structure-summary-config",
+      modules: modules.length,
+    })),
+  "contract-capital-structure-summary": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/capital_structure_summary.json"),
+      import("@/lib/finstack/generated/types/capital_structure_summary"),
+      import("@/lib/finstack/generated/meta/capital_structure_summary"),
+    ]).then((modules) => ({
+      name: "contract-capital-structure-summary",
+      modules: modules.length,
+    })),
   "contract-credit-assessment": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/credit_assessment.json"),
@@ -1797,6 +1885,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/lbo_result"),
     ]).then((modules) => ({
       name: "contract-lbo-result",
+      modules: modules.length,
+    })),
+  "contract-relative-value-report-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/relative_value_report_config.json"),
+      import("@/lib/finstack/generated/types/relative_value_report_config"),
+      import("@/lib/finstack/generated/meta/relative_value_report_config"),
+    ]).then((modules) => ({
+      name: "contract-relative-value-report-config",
+      modules: modules.length,
+    })),
+  "contract-relative-value-report": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/relative_value_report.json"),
+      import("@/lib/finstack/generated/types/relative_value_report"),
+      import("@/lib/finstack/generated/meta/relative_value_report"),
+    ]).then((modules) => ({
+      name: "contract-relative-value-report",
       modules: modules.length,
     })),
   "contract-scenario-diff": () =>
@@ -1879,6 +1985,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/monte_carlo_results"),
     ]).then((modules) => ({
       name: "contract-monte-carlo-results",
+      modules: modules.length,
+    })),
+  "contract-normalization-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/normalization_config.json"),
+      import("@/lib/finstack/generated/types/normalization_config"),
+      import("@/lib/finstack/generated/meta/normalization_config"),
+    ]).then((modules) => ({
+      name: "contract-normalization-config",
+      modules: modules.length,
+    })),
+  "contract-normalization-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/normalization_result.json"),
+      import("@/lib/finstack/generated/types/normalization_result"),
+      import("@/lib/finstack/generated/meta/normalization_result"),
+    ]).then((modules) => ({
+      name: "contract-normalization-result",
       modules: modules.length,
     })),
   "contract-rollup-spec": () =>

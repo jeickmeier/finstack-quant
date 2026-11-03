@@ -8,7 +8,7 @@ use finstack_quant_core::math::stats::{mean, quantile_sorted, OnlineCovariance, 
 use serde::{Deserialize, Serialize};
 
 /// Descriptive statistics for a peer set metric.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeerStats {
     /// Number of observations.
@@ -155,7 +155,7 @@ pub fn z_score(values: &[f64], value: f64) -> Option<f64> {
 }
 
 /// OLS regression result for fair-value estimation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RegressionResult {
     /// Intercept (alpha).

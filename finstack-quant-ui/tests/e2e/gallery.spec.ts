@@ -267,6 +267,45 @@ test("coverage-test-chart a trigger with no ratio by date", async ({
     report.getByText("First breach 2026-07-01", { exact: false }),
   ).toBeVisible();
 });
+test("relative-value-table regression and a narrower peer filter", async ({
+  page,
+}) => {
+  const item = await open(page, "relative-value-table", "light", "comfortable");
+  // The four item baselines stop inside the multiples; this is the first dimension.
+  const regression = item.getByRole("region", { name: "Spread vs leverage" });
+  await expect(
+    regression.getByRole("img", { name: /OAS bp on Leverage/ }),
+  ).toBeVisible();
+  await expect(regression).toHaveScreenshot(
+    "relative-value-table-regression.png",
+  );
+  // Screen on the utilities instead: two peers, too few for the regression.
+  const sector = item.getByRole("textbox", { name: "Gics sectors 1" });
+  await sector.fill("Utilities");
+  await item.getByRole("button", { name: "Compare" }).click();
+  await expect(
+    item
+      .getByRole("table", { name: "Comparable companies, LTM" })
+      .getByRole("rowheader"),
+  ).toHaveText(["NORTHWINDSubject", "DOGWOOD", "IRONWOOD"]);
+  await expect(
+    regression.getByText(/Excluded from the composite: Regression unusable/),
+  ).toBeVisible();
+});
+test("recovery-waterfall allocations and seniority statistics", async ({
+  page,
+}) => {
+  const item = await open(page, "recovery-waterfall", "light", "comfortable");
+  // The four item baselines stop at the top of the allocation table.
+  const allocations = item.getByRole("table", { name: "Recovery by claim" });
+  await expect(allocations).toBeVisible();
+  await expect(allocations).toHaveScreenshot(
+    "recovery-waterfall-allocations.png",
+  );
+  const seniority = item.getByRole("region", { name: "Seniority recovery" });
+  await expect(seniority.getByRole("table")).toBeVisible();
+  await expect(seniority).toHaveScreenshot("recovery-waterfall-seniority.png");
+});
 test("merton-calculator model parameters", async ({ page }) => {
   const item = await open(page, "merton-calculator", "light", "comfortable");
   // The four item baselines stop inside the term structure, above this table.

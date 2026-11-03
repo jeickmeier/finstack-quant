@@ -490,6 +490,21 @@
     "schema": "schemas/ohlson_o_score_input.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/recovery_claim.schema.json",
+    "schema": "schemas/recovery_claim.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/seniority_calibration.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/seniority_calibration.schema.json",
+    "schema": "schemas/seniority_calibration.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/workout_lgd.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/workout_lgd.schema.json",
+    "schema": "schemas/workout_lgd.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/models/1/zmijewski_input.schema.json",
     "source": "finstack-quant/models/schemas/models/1/zmijewski_input.schema.json",
     "schema": "schemas/zmijewski_input.json"
@@ -535,6 +550,16 @@
     "schema": "schemas/bridge_chart.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary_config.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/capital_structure_summary_config.schema.json",
+    "schema": "schemas/capital_structure_summary_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/capital_structure_summary.schema.json",
+    "schema": "schemas/capital_structure_summary.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/credit_assessment.schema.json",
     "schema": "schemas/credit_assessment.json"
@@ -563,6 +588,16 @@
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/lbo_result.schema.json",
     "schema": "schemas/lbo_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/relative_value_report_config.schema.json",
+    "schema": "schemas/relative_value_report_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/relative_value_report.schema.json",
+    "schema": "schemas/relative_value_report.json"
   },
   {
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
@@ -608,6 +643,16 @@
     "uri": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
     "source": "finstack-quant/statements/schemas/statements/1/monte_carlo_results.schema.json",
     "schema": "schemas/monte_carlo_results.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
+    "source": "finstack-quant/statements/schemas/statements/1/normalization_config.schema.json",
+    "schema": "schemas/normalization_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
+    "source": "finstack-quant/statements/schemas/statements/1/normalization_result.schema.json",
+    "schema": "schemas/normalization_result.json"
   },
   {
     "uri": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",

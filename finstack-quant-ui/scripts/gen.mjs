@@ -124,7 +124,14 @@ export async function generate(repo = repoRoot) {
           "altman_z_double_prime_input",
           "ohlson_o_score_input",
           "zmijewski_input",
+          "workout_lgd",
+          "seniority_calibration",
+          "recovery_claim",
           "credit_assessment",
+          "capital_structure_summary",
+          "capital_structure_summary_config",
+          "relative_value_report",
+          "relative_value_report_config",
           "dcf_options",
           "dcf_sensitivity_result",
           "lbo_config",
@@ -135,6 +142,8 @@ export async function generate(repo = repoRoot) {
           "forecast_metrics",
           "monte_carlo_config",
           "monte_carlo_results",
+          "normalization_config",
+          "normalization_result",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )
     .sort((a, b) => a.$id.localeCompare(b.$id));

@@ -13,6 +13,10 @@ export type StatementsNative = {
     | "statementResultRollup"
     | "rollupSpecDefaultFor"
     | "monteCarloBreachProbability"
+    | "statementResultToTableWide"
+    | "statementResultToTableLong"
+    | "validateNormalizationConfigJson"
+    | "normalize"
   >;
   statements_analytics: Pick<
     typeof statements_analytics,
@@ -30,6 +34,8 @@ export type StatementsNative = {
     | "evaluateDcf"
     | "dcfSensitivity"
     | "evaluateLbo"
+    | "capitalStructureSummary"
+    | "relativeValueReport"
     | "parameterSpecWithPercentages"
     | "runSensitivity"
     | "generateTornadoEntries"
@@ -37,6 +43,7 @@ export type StatementsNative = {
     | "runVariance"
     | "varianceBridge"
     | "backtestForecast"
+    | "wacc"
   >;
 };
 /** StatementsApi over the statements and statements_analytics facade namespaces. */
@@ -188,6 +195,37 @@ export function createStatementsService(
         ),
       );
     },
+    validateNormalizationConfig(json) {
+      return context.result(() =>
+        native.statements.validateNormalizationConfigJson(json),
+      );
+    },
+    normalize(request) {
+      return context.result(() =>
+        native.statements.normalize(request.resultJson, request.configJson),
+      );
+    },
+    statementResultToTableWide(resultJson) {
+      return context.result(() =>
+        native.statements.statementResultToTableWide(resultJson),
+      );
+    },
+    statementResultToTableLong(resultJson) {
+      return context.result(() =>
+        native.statements.statementResultToTableLong(resultJson),
+      );
+    },
+    wacc(request) {
+      return context.result(() =>
+        native.statements_analytics.wacc(
+          request.equityWeight,
+          request.costOfEquity,
+          request.debtWeight,
+          request.costOfDebt,
+          request.taxRate,
+        ),
+      );
+    },
     evaluateDcf(request) {
       return context.result(() =>
         native.statements_analytics.evaluateDcf(
@@ -218,6 +256,24 @@ export function createStatementsService(
       return context.result(() =>
         native.statements_analytics.evaluateLbo(
           request.modelJson,
+          request.configJson,
+        ),
+      );
+    },
+    capitalStructureSummary(request) {
+      return context.result(() =>
+        native.statements_analytics.capitalStructureSummary(
+          request.resultJson,
+          request.modelJson,
+          request.configJson,
+        ),
+      );
+    },
+    relativeValueReport(request) {
+      return context.result(() =>
+        native.statements_analytics.relativeValueReport(
+          request.subjectJson,
+          request.universeJson,
           request.configJson,
         ),
       );

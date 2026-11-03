@@ -9,6 +9,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { useState } from "react";
 import { QueryClient, hashKey } from "@tanstack/react-query";
 import model from "../../src/fixtures/statements/analyst-model.json";
 import assumptions from "../../src/fixtures/statements/analyst-dcf-assumptions.json";
@@ -393,6 +394,38 @@ it("submits the assumptions as typed, leaving unset optional values unset", asyn
     },
     optionsJson: JSON.stringify(assumptions.options),
   });
+});
+
+it("shows the default WACC until a host that holds the field sets its text", () => {
+  // As the workbench's valuation panel: undefined until the calculator or an edit sets it.
+  function Host() {
+    const [wacc, setWacc] = useState<string | undefined>(undefined);
+    return (
+      <>
+        <button type="button" onClick={() => setWacc("0.085")}>
+          Apply
+        </button>
+        <DcfAssumptionsForm
+          defaultAssumptions={assumptions as DcfAssumptions}
+          nodeIds={Object.keys(model.nodes)}
+          wacc={wacc}
+          onWaccChange={setWacc}
+          onSubmit={() => {}}
+        />
+      </>
+    );
+  }
+  render(<Host />);
+  const box = () =>
+    screen.getByRole("textbox", { name: "WACC" }) as HTMLInputElement;
+  expect(box().value).toBe(String(assumptions.wacc));
+  fireEvent.change(box(), { target: { value: "0.12" } });
+  expect(box().value).toBe("0.12");
+  fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+  expect(box().value).toBe("0.085");
+  // Once the host holds it, an empty field stays empty.
+  fireEvent.change(box(), { target: { value: "" } });
+  expect(box().value).toBe("");
 });
 
 it("leaves empty options unset", async () => {

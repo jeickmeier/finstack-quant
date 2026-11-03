@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 
 from finstack_quant import statements as st, statements_analytics as sa
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -176,6 +177,38 @@ def statements_cases() -> dict[str, Any]:
     }
 
 
+def capital_structure_cases() -> dict[str, Any]:
+    """Debt stack over a real evaluation: two classes, a pari passu pair and a swap."""
+    model_json = json.dumps(INPUTS["capital_structure_model"])
+    results = st.Evaluator().evaluate_with_market(
+        st.FinancialModelSpec.from_json(model_json),
+        MarketContext.from_json(json.dumps(INPUTS["capital_structure_market"])),
+        INPUTS["capital_structure_as_of"],
+    )
+    return {
+        "full_year": doc(
+            sa.capital_structure_summary(
+                results, model_json, {"period": "2025Q4", "ebitda_node": "ebitda", "cash_node": "cash"}
+            )
+        ),
+        "short_window": doc(
+            sa.capital_structure_summary(results, model_json, {"period": "2025Q3", "ebitda_node": "ebitda"})
+        ),
+    }
+
+
+def relative_value_cases() -> dict[str, Any]:
+    """Comps table, regression scatter and score; a table with no usable dimension; a partial filter."""
+    subject, universe = INPUTS["relative_value_subject"], INPUTS["relative_value_universe"]
+    return {
+        "full": doc(sa.relative_value_report(subject, universe, INPUTS["relative_value_config"])),
+        "table_only": doc(sa.relative_value_report(subject, universe, INPUTS["relative_value_table_only_config"])),
+        "partial_filter": doc(
+            sa.relative_value_report(subject, universe, INPUTS["relative_value_partial_filter_config"])
+        ),
+    }
+
+
 def analytics_cases() -> dict[str, Any]:
     result = st.Evaluator().evaluate(MODEL)
     tracer = sa.DependencyTracer(MODEL)
@@ -306,6 +339,8 @@ def analytics_cases() -> dict[str, Any]:
             "parameter_missing": sensitivity.get_parameter_value(0, f"cogs@{Q2}"),
             "value": sensitivity.get_value(0, "profit", Q2),
         },
+        "capital_structure_summary": capital_structure_cases(),
+        "relative_value_report": relative_value_cases(),
         "explanation_text": sa.explain_formula(MODEL, result, "profit", Q1).to_text(),
         "forecast_summary": sa.backtest_forecast([100.0, 110.0], [98.0, 112.0]).summary(),
         # Execution goldens for the comps statistics, the LBO and the DCF tornado

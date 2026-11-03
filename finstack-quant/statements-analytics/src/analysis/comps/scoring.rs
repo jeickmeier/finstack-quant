@@ -5,7 +5,7 @@
 
 use super::multiples::compute_multiple;
 use super::peer_set::PeerSet;
-use super::stats::{percentile_rank, regression_fair_value, z_score};
+use super::stats::{percentile_rank, regression_fair_value, z_score, RegressionResult};
 use super::types::{CompanyId, CompanyMetrics, Multiple};
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::{Error, Result};
@@ -70,7 +70,7 @@ pub struct ScoringDimension {
 }
 
 /// Identifies which metric to extract from CompanyMetrics.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum MetricExtractor {
@@ -97,7 +97,7 @@ impl FromStr for MetricExtractor {
 }
 
 /// Decomposed score for a single dimension.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DimensionScore {
     /// Label of the dimension.
@@ -120,7 +120,7 @@ pub struct DimensionScore {
 }
 
 /// Composite relative value result.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RelativeValueResult {
     /// Company being scored.
@@ -139,6 +139,158 @@ pub struct RelativeValueResult {
     pub confidence: f64,
     /// Number of peers used in the analysis.
     pub peer_count: usize,
+}
+
+/// Why a configured dimension contributes no signal to the composite score.
+///
+/// The conditions are tested in declaration order and the first that holds is
+/// reported.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum DimensionExclusion {
+    /// The configured weight is zero, which disables the dimension.
+    ZeroWeight,
+    /// The subject has no finite value of the Y metric.
+    NoSubjectValue,
+    /// No peer has a finite value of the Y metric.
+    NoPeerValues,
+    /// Fewer than two peers have the Y metric, or their values do not differ,
+    /// so the z-score is undefined.
+    NoDispersion,
+    /// The subject has no finite value of the X metric.
+    NoSubjectX,
+    /// The regression cannot be fitted: fewer than three peers have both
+    /// metrics, X does not vary, or a fitted figure is non-finite.
+    RegressionUnusable,
+    /// The regression fits but the peers sit on the line, so the subject's
+    /// residual cannot be standardized.
+    NoResidualDispersion,
+}
+
+/// Every figure computed for one dimension, shared by [`score_relative_value`]
+/// and the relative value report so the two cannot disagree.
+pub(super) struct DimensionEvaluation<'a> {
+    /// Subject's Y metric.
+    pub(super) subject_y: Option<f64>,
+    /// Subject's X metric; `None` without an X extractor.
+    pub(super) subject_x: Option<f64>,
+    /// Y metric of every peer that has it, in peer order.
+    pub(super) peer_y: Vec<f64>,
+    /// `(company, x, y)` of every peer that has both metrics, in peer order.
+    pub(super) peer_pairs: Vec<(&'a CompanyId, f64, f64)>,
+    /// Percentile rank of the subject's Y within `peer_y`.
+    pub(super) percentile: Option<f64>,
+    /// Z-score of the subject's Y within `peer_y`.
+    pub(super) z_score: Option<f64>,
+    /// Fit over `peer_pairs` evaluated at the subject.
+    pub(super) regression: Option<RegressionResult>,
+    /// Direction-adjusted signal (positive = cheap) entering the composite;
+    /// `None` exactly when `excluded_reason` is set.
+    pub(super) signal: Option<f64>,
+    /// Why the dimension contributes no signal; `None` when it is used.
+    pub(super) excluded_reason: Option<DimensionExclusion>,
+}
+
+/// Evaluate one dimension against the peer set.
+///
+/// Figures are computed whether or not the dimension is used, so an excluded
+/// dimension still reports what it has. A regression dimension never falls back
+/// to its z-score.
+pub(super) fn evaluate_dimension<'a>(
+    peer_set: &'a PeerSet,
+    dim: &ScoringDimension,
+) -> DimensionEvaluation<'a> {
+    let subject_y = extract_subject_value(peer_set, &dim.y_extractor);
+    let peer_y = extract_values(peer_set, &dim.y_extractor);
+    let percentile = subject_y.and_then(|y| percentile_rank(&peer_y, y));
+    let z = subject_y.and_then(|y| z_score(&peer_y, y));
+
+    let subject_x = dim
+        .x_extractor
+        .as_ref()
+        .and_then(|x| extract_subject_value(peer_set, x));
+    // Pairwise per peer, so a peer missing one metric drops the *pair* instead
+    // of misaligning the two vectors.
+    let peer_pairs = dim
+        .x_extractor
+        .as_ref()
+        .map_or_else(Vec::new, |x| extract_pairs(peer_set, x, &dim.y_extractor));
+    let (peer_x, peer_y_aligned): (Vec<f64>, Vec<f64>) =
+        peer_pairs.iter().map(|&(_, x, y)| (x, y)).unzip();
+    let regression = subject_x
+        .zip(subject_y)
+        .and_then(|(x, y)| regression_fair_value(&peer_x, &peer_y_aligned, x, y));
+    let std_residual = regression.as_ref().and_then(|reg| {
+        standardized_residual(
+            &peer_x,
+            &peer_y_aligned,
+            reg.intercept,
+            reg.slope,
+            reg.residual,
+        )
+    });
+
+    let excluded_reason = if dim.weight == 0.0 {
+        Some(DimensionExclusion::ZeroWeight)
+    } else if subject_y.is_none() {
+        Some(DimensionExclusion::NoSubjectValue)
+    } else if peer_y.is_empty() {
+        Some(DimensionExclusion::NoPeerValues)
+    } else if z.is_none() {
+        Some(DimensionExclusion::NoDispersion)
+    } else if dim.x_extractor.is_none() {
+        None
+    } else if subject_x.is_none() {
+        Some(DimensionExclusion::NoSubjectX)
+    } else if regression.is_none() {
+        Some(DimensionExclusion::RegressionUnusable)
+    } else if std_residual.is_none() {
+        Some(DimensionExclusion::NoResidualDispersion)
+    } else {
+        None
+    };
+
+    // Raw signal in "higher Y = cheap" orientation: the standardized regression
+    // residual (positive = actual above fitted fair value), or the raw z-score
+    // for univariate dimensions. The dimension's direction flag then maps it to
+    // the composite convention (positive = cheap).
+    let raw_signal = if dim.x_extractor.is_some() {
+        std_residual
+    } else {
+        z
+    };
+    let signal = raw_signal
+        .filter(|_| excluded_reason.is_none())
+        .map(|raw| match dim.direction {
+            ScoreDirection::HigherIsCheap => raw,
+            ScoreDirection::HigherIsRich => -raw,
+        });
+
+    DimensionEvaluation {
+        subject_y,
+        subject_x,
+        peer_y,
+        peer_pairs,
+        percentile,
+        z_score: z,
+        regression,
+        signal,
+        excluded_reason,
+    }
+}
+
+/// Reject negative or non-finite dimension weights.
+pub(super) fn validate_dimension_weights(dimensions: &[ScoringDimension]) -> Result<()> {
+    if dimensions
+        .iter()
+        .any(|dim| !dim.weight.is_finite() || dim.weight < 0.0)
+    {
+        return Err(Error::Validation(
+            "scoring dimension weights must be finite and non-negative".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Score a subject company against its peer set across multiple dimensions.
@@ -176,19 +328,39 @@ pub fn score_relative_value(
     peer_set: &PeerSet,
     dimensions: &[ScoringDimension],
 ) -> Result<RelativeValueResult> {
+    let result = score_relative_value_unchecked(peer_set, dimensions)?;
+    if !is_finite_score(&result) {
+        return Err(Error::Validation(
+            "relative value score must be finite".into(),
+        ));
+    }
+    Ok(result)
+}
+
+/// Whether a score's composite and confidence are both finite, the one
+/// condition [`score_relative_value`] adds to [`score_relative_value_unchecked`].
+pub(super) fn is_finite_score(result: &RelativeValueResult) -> bool {
+    result.composite_score.is_finite() && result.confidence.is_finite()
+}
+
+/// [`score_relative_value`] without its final finiteness check: the composite
+/// and confidence may be non-finite. Every other error is the same.
+///
+/// # Arguments
+///
+/// * `peer_set` - Peer universe containing the subject and its peers.
+/// * `dimensions` - Non-empty scoring dimensions with finite, non-negative
+///   weights.
+pub(super) fn score_relative_value_unchecked(
+    peer_set: &PeerSet,
+    dimensions: &[ScoringDimension],
+) -> Result<RelativeValueResult> {
     if dimensions.is_empty() {
         return Err(Error::Validation(
             "at least one scoring dimension is required".into(),
         ));
     }
-    if dimensions
-        .iter()
-        .any(|dim| !dim.weight.is_finite() || dim.weight < 0.0)
-    {
-        return Err(Error::Validation(
-            "scoring dimension weights must be finite and non-negative".into(),
-        ));
-    }
+    validate_dimension_weights(dimensions)?;
     if !dimensions.iter().any(|dim| dim.weight > 0.0) {
         return Err(Error::Validation(
             "at least one usable positive-weight scoring dimension is required".into(),
@@ -204,68 +376,15 @@ pub fn score_relative_value(
     let mut confidence_scale = 0.0;
 
     for dim in dimensions {
-        if dim.weight == 0.0 {
-            continue;
-        }
-        // Extract Y values from peers and subject
-        let peer_y = extract_values(peer_set, &dim.y_extractor);
-        let subject_y = extract_subject_value(peer_set, &dim.y_extractor);
-        let (peer_vals, subject_val) = match (peer_y.as_slice(), subject_y) {
-            (vals, Some(sv)) if !vals.is_empty() => (vals, sv),
-            _ => continue, // Skip dimension if data is insufficient
-        };
-
-        let (Some(pctile), Some(zs)) = (
-            percentile_rank(peer_vals, subject_val),
-            z_score(peer_vals, subject_val),
-        ) else {
+        let evaluation = evaluate_dimension(peer_set, dim);
+        let (Some(score), Some(pctile), Some(zs)) =
+            (evaluation.signal, evaluation.percentile, evaluation.z_score)
+        else {
             continue;
         };
+        let reg_residual = evaluation.regression.as_ref().map(|reg| reg.residual);
+        let r_sq = evaluation.regression.as_ref().map(|reg| reg.r_squared);
 
-        let (reg_residual, r_sq, std_residual) = if let Some(x_extractor) = &dim.x_extractor {
-            // Extract (x, y) pairwise per peer so a peer missing one metric
-            // drops the *pair* instead of misaligning the two vectors.
-            let (peer_x, peer_y_aligned) = extract_pairs(peer_set, x_extractor, &dim.y_extractor);
-            let subject_x = extract_subject_value(peer_set, x_extractor);
-            match subject_x {
-                Some(sx) if peer_x.len() >= 3 => {
-                    match regression_fair_value(&peer_x, &peer_y_aligned, sx, subject_val) {
-                        Some(reg) => {
-                            let std_res = standardized_residual(
-                                &peer_x,
-                                &peer_y_aligned,
-                                reg.intercept,
-                                reg.slope,
-                                reg.residual,
-                            );
-                            (Some(reg.residual), Some(reg.r_squared), std_res)
-                        }
-                        None => (None, None, None),
-                    }
-                }
-                _ => (None, None, None),
-            }
-        } else {
-            (None, None, None)
-        };
-
-        // Raw signal in "higher Y = cheap" orientation: the standardized
-        // regression residual (positive = actual above fitted fair value),
-        // or the raw z-score for univariate dimensions. The dimension's
-        // direction flag then maps it to the composite convention
-        // (positive = cheap).
-        let raw_signal = if dim.x_extractor.is_some() {
-            let Some(signal) = std_residual else {
-                continue;
-            };
-            signal
-        } else {
-            zs
-        };
-        let score = match dim.direction {
-            ScoreDirection::HigherIsCheap => raw_signal,
-            ScoreDirection::HigherIsRich => -raw_signal,
-        };
         // Scaling all weights by the same factor preserves their relative
         // influence while avoiding overflow from large finite input weights.
         if dim.weight > weight_scale {
@@ -313,12 +432,6 @@ pub fn score_relative_value(
     } else {
         0.0
     };
-    if !composite.is_finite() || !confidence.is_finite() {
-        return Err(Error::Validation(
-            "relative value score must be finite".into(),
-        ));
-    }
-
     Ok(RelativeValueResult {
         company_id: peer_set.subject.id.clone(),
         composite_score: composite,
@@ -337,31 +450,28 @@ fn extract_values(peer_set: &PeerSet, extractor: &MetricExtractor) -> Vec<f64> {
         .collect()
 }
 
-/// Extract aligned `(x, y)` pairs from peers, keeping a peer only when
-/// both metrics are present and finite.
+/// Extract aligned `(company, x, y)` observations from peers, keeping a peer
+/// only when both metrics are present and finite.
 ///
 /// This guarantees positional alignment for regression: a peer missing
 /// one of the two metrics is dropped entirely instead of shifting every
 /// subsequent pairing.
-fn extract_pairs(
-    peer_set: &PeerSet,
+fn extract_pairs<'a>(
+    peer_set: &'a PeerSet,
     x_extractor: &MetricExtractor,
     y_extractor: &MetricExtractor,
-) -> (Vec<f64>, Vec<f64>) {
-    let mut xs = Vec::with_capacity(peer_set.peers.len());
-    let mut ys = Vec::with_capacity(peer_set.peers.len());
-    for peer in &peer_set.peers {
-        if let (Some(x), Some(y)) = (
-            extract_single(peer, x_extractor),
-            extract_single(peer, y_extractor),
-        ) {
-            if x.is_finite() && y.is_finite() {
-                xs.push(x);
-                ys.push(y);
-            }
-        }
-    }
-    (xs, ys)
+) -> Vec<(&'a CompanyId, f64, f64)> {
+    peer_set
+        .peers
+        .iter()
+        .filter_map(|peer| {
+            Some((
+                &peer.id,
+                extract_single(peer, x_extractor)?,
+                extract_single(peer, y_extractor)?,
+            ))
+        })
+        .collect()
 }
 
 /// Standardize the subject's regression residual against the peer
@@ -543,5 +653,43 @@ mod tests {
             .expect("regression confidence");
         assert!(regression_r_squared > 0.9);
         assert_eq!(result.confidence, regression_r_squared);
+    }
+
+    #[test]
+    fn unchecked_score_differs_from_the_checked_one_only_on_a_non_finite_composite() {
+        // Each z-score is about 1.4e308; their weighted sum overflows.
+        let set = PeerSet::new(
+            company("subject", None, Some(1e308)),
+            vec![company("a", None, Some(1.0)), company("b", None, Some(2.0))],
+            PeriodBasis::Ltm,
+        );
+        let dimensions = [dimension(false, 1.0), dimension(false, 1.0)];
+        let unchecked =
+            score_relative_value_unchecked(&set, &dimensions).expect("only the composite fails");
+        assert!(!is_finite_score(&unchecked));
+        assert!(score_relative_value(&set, &dimensions).is_err());
+
+        // Every other rejection is an error of both, never a non-finite score.
+        for dimensions in [
+            vec![],
+            vec![dimension(false, 0.0)],
+            vec![dimension(true, 1.0)],
+        ] {
+            assert!(score_relative_value_unchecked(&set, &dimensions).is_err());
+            assert!(score_relative_value(&set, &dimensions).is_err());
+        }
+
+        let finite = PeerSet::new(
+            company("subject", None, Some(3.0)),
+            vec![company("a", None, Some(1.0)), company("b", None, Some(2.0))],
+            PeriodBasis::Ltm,
+        );
+        let dimensions = [dimension(false, 1.0)];
+        let unchecked = score_relative_value_unchecked(&finite, &dimensions).expect("finite");
+        assert!(is_finite_score(&unchecked));
+        assert_eq!(
+            Some(unchecked),
+            score_relative_value(&finite, &dimensions).ok()
+        );
     }
 }

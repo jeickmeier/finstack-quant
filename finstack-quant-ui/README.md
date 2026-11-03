@@ -174,11 +174,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twenty-six native fixture generators under
+`mise run ui-fixtures` runs the thirty-four native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
-scenario-table; statements → covenants; analytics; models credit, risk, options and liability management;
+scenario-table; statements → covenants, normalizations, capital structures, relative value; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -498,6 +498,47 @@ reported period, and shows both in `CreditAssessmentReport`: the returned
 values, the two ratios charted over Rust's series with the periods Rust leaves
 without a value listed instead of plotted, and the summary through
 `TableEnvelope`.
+`StatementExport` (`@finstack/statement-export`), fetched with
+`useStatementResultTable` (`@finstack/use-statement-result-table`), draws one
+`statements.statementResultToTableWide` or `statementResultToTableLong` result
+through `TableEnvelope`, with a wide or long switch, and Download CSV writes
+exactly those cells: RFC 4180 quoting, native column names as the header and each
+number as `String(value)`. A node with no value is `NaN` in a live table and null
+in JSON; both show as Undefined and write an empty field, never zero. In the
+workbench it sits below the statement grids in a disclosure that calls Rust when
+first opened, over the result the grids show, reported or annual. The native
+fixture is `tests/statements/export/cases.json`.
+`NormalizationEditor` (`@finstack/normalization-editor`), fetched with
+`useNormalize` (`@finstack/use-normalize`) and validated with
+`useNormalizationConfigValidator`
+(`@finstack/use-normalization-config-validator`), answers what adjusted EBITDA
+is. It edits a `NormalizationConfig` with a schema form over the generated
+`normalization_config` contract (node fields as id-comboboxes) and shows
+`statements.normalize` as returned: a bridge for a chosen period from the
+reported base through each adjustment to the final value, each step drawn from
+the previous step's `adjusted_value` (the base for the first) to its own, and a
+table of every adjustment's capped amount by period, with the raw amount beside
+a capped one. Rust returns every position, so nothing is summed. In the
+workbench it sits in Metrics & ratios, in a disclosure that calls Rust when
+first opened, over the reported result. The native fixture is
+`tests/statements/normalization/cases.json`.
+`CapitalStructureReport` (`@finstack/capital-structure-report`), fetched with
+`useCapitalStructureSummary` (`@finstack/use-capital-structure-summary`),
+answers how much debt sits ahead of each tranche and what leverage and coverage
+look like through it. It edits a `CapitalStructureSummaryConfig` with a schema
+form over the generated `capital_structure_summary_config` contract (the period
+over the model's periods, the EBITDA and cash nodes as id-comboboxes; Rust
+validates it on the call) and shows `statements_analytics.capitalStructureSummary`
+as returned: total debt, cash, net debt, LTM EBITDA with the LTM periods Rust
+found of those it requires, total and net leverage and total coverage; the debt
+stack in Rust's rank-then-declaration order with cumulative debt, leverage and
+interest coverage through each payment class; and the maturity wall by year. A
+ratio Rust returns as null (a short LTM window, non-positive EBITDA or debt), or
+a live NaN, shows as Undefined; negative net debt shows as returned. In the
+workbench it sits in Metrics & ratios, in a disclosure that calls Rust when
+first opened; a model with no capital structure shows Rust's error. The native
+fixture is `tests/statements/capital-structure/cases.json`, a quarterly model
+with two first-lien bonds and a second-lien bond.
 `useEvaluateDcf` (`use-evaluate-dcf`) and `useDcfSensitivity`
 (`use-dcf-sensitivity`) pass the model, WACC, `TerminalValueSpec` and the
 optional UFCF node, net-debt override and `DcfOptions` JSON to
@@ -511,6 +552,16 @@ model is valued, because the facade has no standalone `DcfOptions` parse) and
 `DcfReport`, which shows the valuation, bridge fields, per-period present
 values, terminal value and the native tornado through `TornadoChart` as
 returned.
+`WaccCalculator` (`@finstack/wacc-calculator`), fetched with `useWacc`
+(`@finstack/use-wacc`), takes five decimals, the two capital weights separate,
+and shows the one `statements_analytics.wacc` rate as returned. Weights that do
+not sum to one, a tax rate outside [0, 1] or an empty field show the native
+error; nothing is blended or checked in JavaScript. In the Valuation tab its
+Use as WACC button sets the form's WACC field, through the form's optional
+`wacc` and `onWaccChange` props so the other fields keep what was typed. It
+passes the returned number on the user's click only, never after an edit since
+the rate was calculated, and valuing stays the form's own action. The native
+fixture is `tests/statements/wacc/cases.json`.
 `useEvaluateLbo` (`use-evaluate-lbo`) passes the model and `LboConfig` JSON
 to `statements_analytics.evaluateLbo`. The Valuation tab's `LboReport` edits
 the config with a schema form over the generated `lbo_config` contract (string
@@ -1125,6 +1176,56 @@ input means a price, an extension fee or a transferred-asset fraction by structu
 An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset,
 which leaves the leverage block out. Leverage covers the target instrument's debt
 only. The native fixture is `tests/models/liability-management/cases.json`.
+
+## Recovery waterfall
+
+`useAllocateRecovery`, `useWorkoutLgd`, `useSeniorityRecoveryStats` and
+`useSeniorityCalibrationIds` (`@finstack/use-recovery-waterfall`) call
+`models.credit.recoveryWaterfall.allocateRecovery`, `models.credit.lgd.workoutLgd`,
+`seniorityRecoveryStats` and `seniorityCalibrationIds`, one native call each; the
+worker reads the returned `BetaRecovery` handle's getters into plain data and frees
+it. `RecoveryWaterfall` has a form and a table per analysis. The waterfall table is
+Rust's `allocations` in its priority-then-entry order, with each claim's total,
+collateral and general recovery, recovery rate and deficiency, and the estate's
+`total_distributed`, `undistributed_estate` and `apr_satisfied` below it: nothing is
+summed or divided here. A claim's seniority is a free-text reporting label, as Rust
+documents; priority orders the stack. The workout collateral types and the seniority
+classes come from the generated `workout_lgd` and `seniority_calibration`
+contracts, and the calibration choices from `seniorityCalibrationIds`, which lists
+the registry's default first. A class a calibration lacks, such as first-lien
+under `sp_recovery_historical`, shows Rust's error. An empty amount is sent as NaN
+for Rust to reject and an empty collateral value is an unsecured claim. The item is
+standalone: claims are entered, not read from a statements model. The native
+fixture is `tests/models/recovery/cases.json`.
+
+## Relative value table
+
+`useRelativeValueReport` (`@finstack/use-relative-value-report`) calls
+`statements_analytics.relativeValueReport` through one worker method.
+`RelativeValueTable` takes the host-supplied `subject` and `universe`
+(`CompanyMetrics` serde documents, which Rust now reads strictly) and edits a
+`RelativeValueReportConfig` with `SchemaForm` over the generated
+`relative_value_report_config` contract. Every choice the form offers (period
+basis, multiples, metric extractors, score direction) comes from that contract;
+the `PeerFilter` sectors, industries, countries, ratings, tags and selectors are
+free text, because Rust declares no list of them, and any filter field may be
+left out. There is no native parse of the config, so Compare passes the
+subject, universe and config JSON through and Rust validates them on the call.
+
+The report is shown as returned: the subject, period basis, peer and excluded
+counts and the composite score and confidence, or Rust's
+`composite_excluded_reason`; the comps table with the subject first, marked by
+Rust's `is_subject`; per multiple, the subject value, percentile, z-score and
+peer statistics, and one bar per multiple from zero to Rust's `percentile`; per
+dimension, Rust's subject values, percentile, z-score, regression, signal and
+`excluded_reason` with its contract description, and a scatter of Rust's
+`points`, the subject marked by each point's `is_subject` and the line drawn
+through each point's `fitted_y` in order of `x`. Numbers show to
+four decimals by default (`formatNumber`), never as "-0", and percentiles as a
+percent (`formatPercentile`); a null or a live NaN shows as Undefined. Nothing
+is computed here. The item is standalone: the universe is host-supplied, and
+the statements workbench holds one model, not a peer set. The native fixture is
+`tests/statements/relative-value/cases.json`.
 
 ## Credit scorecard
 

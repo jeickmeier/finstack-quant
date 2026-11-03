@@ -224,6 +224,12 @@ impl PyAppliedAdjustment {
         self.inner.is_capped
     }
 
+    /// Target value through this adjustment.
+    #[getter]
+    fn adjusted_value(&self) -> f64 {
+        self.inner.adjusted_value
+    }
+
     /// Return a concise diagnostic representation.
     fn __repr__(&self) -> String {
         format!(

@@ -2700,6 +2700,7 @@
       "WorkoutLgd",
       "WorkoutLgdBuilder",
       "collateralPieceLiquidationValue",
+      "seniorityCalibrationIds",
       "seniorityRecoveryStats",
       "workoutLgd"
     ]
@@ -2753,6 +2754,9 @@
     "statics": ["fromJson", "revolver", "termLoan"],
     "methods": ["free", "leqFromObservedEad", "toJson"],
     "getters": ["ead", "totalCommitment", "utilization"]
+  },
+  "models.credit.lgd.seniorityCalibrationIds": {
+    "kind": "function"
   },
   "models.credit.lgd.seniorityRecoveryStats": {
     "kind": "function"
@@ -4167,6 +4171,7 @@
       "addRollForwardWithOpening",
       "addVintageBuildup",
       "backtestForecast",
+      "capitalStructureSummary",
       "classifyStage",
       "companyMetricsGet",
       "computeEcl",
@@ -4195,6 +4200,7 @@
       "plSummaryReport",
       "plSummaryReportText",
       "regressionFairValue",
+      "relativeValueReport",
       "renderCheckReportHtml",
       "renderCheckReportText",
       "runChecks",
@@ -4298,6 +4304,9 @@
   "statements_analytics.creditAssessment": {
     "kind": "function"
   },
+  "statements_analytics.capitalStructureSummary": {
+    "kind": "function"
+  },
   "statements_analytics.evaluateCovenants": {
     "kind": "function"
   },
@@ -4335,6 +4344,9 @@
     "kind": "function"
   },
   "statements_analytics.scoreRelativeValue": {
+    "kind": "function"
+  },
+  "statements_analytics.relativeValueReport": {
     "kind": "function"
   },
   "statements_analytics.validateScorecardConfig": {

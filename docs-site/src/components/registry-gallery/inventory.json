@@ -21,7 +21,7 @@
     {
       "name": "table-envelope",
       "type": "registry:ui",
-      "docs": "Display-only table-envelope primitive. Import the installed finstack theme. Pass the TableEnvelope a Rust table function returned (for example statements_analytics.plSummaryReport or Performance#summary) and a caption. Columns and rows keep their native order; numeric columns are right-aligned with every supplied digit; nothing is sorted, grouped, totalled, rounded or converted. No worker or workbench is required.",
+      "docs": "Display-only table-envelope primitive. Import the installed finstack theme. Pass the TableEnvelope a Rust table function returned (for example statements_analytics.plSummaryReport or Performance#summary) and a caption. Columns and rows keep their native order; numeric columns are right-aligned with every supplied digit; nothing is sorted, grouped, totalled, rounded or converted. missingCell, when supplied, is shown for a null or NaN cell. No worker or workbench is required.",
       "worker": "none"
     },
     {
@@ -39,7 +39,7 @@
     {
       "name": "id-combobox",
       "type": "registry:ui",
-      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; IDs are never inferred.",
+      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; typed text is the value and survives Tab, blur and Escape; IDs are never inferred.",
       "worker": "none"
     },
     {
@@ -469,6 +469,12 @@
       "worker": "none"
     },
     {
+      "name": "recovery-waterfall",
+      "type": "registry:component",
+      "docs": "Three forms. Recovery waterfall: an estate value and claims (id, a free-text seniority label, integer priority, principal, accrued, penalties, an optional collateral value and its haircut), with Rust's allocations in its priority-then-entry order (total claim, collateral and general recovery, total recovery, recovery rate and deficiency per claim) and the estate's total distributed, undistributed estate and apr_satisfied. Workout LGD: EAD, direct and indirect cost fractions, years to resolution, a discount rate and collateral pieces whose types come from the generated WorkoutCollateralType contract, with the returned net recovery, LGD and recovery rate. Recovery by seniority: a class from the generated SeniorityClass contract and a calibration from the supplied calibrationIds (Rust's seniorityCalibrationIds, default first), with the Beta distribution's mean, standard deviation, variance, shape parameters, mode and mean LGD. Nothing is summed, divided or ranked here; amounts use one unit you choose and rates are fractions. An empty amount is sent as NaN for Rust to reject, an empty collateral value is an unsecured claim, and each analysis shows its own native error, including a class a calibration lacks. Accepts defaultWaterfall, defaultWorkout, defaultSeniority, onWaterfallSubmit, onWorkoutSubmit, onStatsSubmit, waterfall, workout, stats, calibrationIds, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "option-calculator",
       "type": "registry:component",
       "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. A price Rust cannot invert is the whole error; Greeks Rust rejects (at zero volatility under Black-Scholes) show their native error beside the price. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
@@ -591,7 +597,7 @@
     {
       "name": "dcf-assumptions-form",
       "type": "registry:component",
-      "docs": "Edit the evaluateDcf assumptions: WACC as a decimal, the TerminalValueSpec variant (Gordon growth, exit multiple or H-model, the one hand-written Rust wire union) and its fields, the UFCF node and the exit-multiple metric node as id-comboboxes over the supplied model node ids, an optional net-debt override, and the remaining DcfOptions in the schema form over the generated contract. A cleared required number is sent as NaN, never 0; an empty optional value and empty options stay unset so Rust applies its defaults. The facade has no standalone DcfOptions parse, so the options are checked structurally here and validated by Rust (unknown keys included) when the model is valued. Calculate passes the submission to the caller (usually the useEvaluateDcf and useDcfSensitivity requests). Accepts defaultAssumptions, nodeIds, onSubmit, submitLabel, disabled and density props.",
+      "docs": "Edit the evaluateDcf assumptions: WACC as a decimal, the TerminalValueSpec variant (Gordon growth, exit multiple or H-model, the one hand-written Rust wire union) and its fields, the UFCF node and the exit-multiple metric node as id-comboboxes over the supplied model node ids, an optional net-debt override, and the remaining DcfOptions in the schema form over the generated contract. A cleared required number is sent as NaN, never 0; an empty optional value and empty options stay unset so Rust applies its defaults. The facade has no standalone DcfOptions parse, so the options are checked structurally here and validated by Rust (unknown keys included) when the model is valued. Calculate passes the submission to the caller (usually the useEvaluateDcf and useDcfSensitivity requests). A host may hold the WACC field text through wacc and onWaccChange, so a rate can be set without remounting the rest of the form. Accepts defaultAssumptions, nodeIds, wacc, onWaccChange, onSubmit, submitLabel, disabled and density props.",
       "worker": "none"
     },
     {
@@ -631,9 +637,39 @@
       "worker": "none"
     },
     {
+      "name": "wacc-calculator",
+      "type": "registry:component",
+      "docs": "Answers what a company's blended cost of capital is. Five decimal inputs, the two capital weights separate, and one native statements_analytics.wacc rate (useWacc) shown as returned. Weights that do not sum to one, a tax rate outside [0, 1] or an empty field show the native error; nothing is blended, defaulted or checked here. onApply renders a button that passes the rate shown, on the user's click only and never after an edit since it was calculated. Accepts defaultInputs, onSubmit, rate, loading, error, onApply, applyLabel, formatValue, disabled and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "normalization-editor",
+      "type": "registry:component",
+      "docs": "Answers what adjusted EBITDA is and how each add-back gets there. Edits a NormalizationConfig with the schema form over the generated normalization_config contract (target, percentage and cap-base nodes as id-comboboxes over the supplied node ids; fixed per-period amounts, percentages of a node and caps as Rust declares them), validated natively (useNormalizationConfigValidator; a duplicate id is Rust's error). Normalize passes the canonical config to the caller (usually the useNormalize request). The native statements.normalize results are shown as returned, above the form: for a chosen period, a bridge from the reported base through each adjustment in declaration order to the final value, each step drawn from the previous step's adjusted_value (the base for the first) to its own, coloured by Rust's is_capped, and a table of every adjustment's capped amount by period with the raw amount beside a capped one. A missing node, a non-finite base or a negative cap shows the native error. Nothing is summed, capped or classified here. Accepts defaultConfig, nodeIds, validate, onSubmit, results, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "capital-structure-report",
+      "type": "registry:component",
+      "docs": "Answers how much debt sits ahead of each tranche and what leverage and coverage look like through it. Edits a CapitalStructureSummaryConfig with the schema form over the generated capital_structure_summary_config contract (the reporting period as a select over the supplied periodIds; the EBITDA and optional cash nodes as id-comboboxes over the supplied nodeIds); Summarize passes the structurally valid config to the caller (usually the useCapitalStructureSummary request) and Rust validates it. The native statements_analytics.capitalStructureSummary result is shown as returned, above the form: total debt, cash, net debt, LTM EBITDA with the LTM periods Rust found of those it requires, and total and net leverage and total coverage; the debt stack in Rust's rank-then-declaration order (kind, payment class, rank, balance, share of debt, cumulative debt, leverage and interest coverage through the class, LTM interest, maturity); and the maturity wall by year of final maturity as a bar chart. A ratio Rust returns as null (a short LTM window, non-positive EBITDA or debt), or a live NaN, shows as Undefined; a negative net debt or net leverage shows as returned. A model with no capital structure or a node the results lack shows the native error. Nothing is summed, netted or divided here. Accepts defaultConfig, nodeIds, periodIds, onSubmit, summary, loading, error, formatRatio, formatShare and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "relative-value-table",
+      "type": "registry:component",
+      "docs": "Answers how a name compares with its peers. Takes the host-supplied subject and universe (CompanyMetrics serde documents; Rust rejects a misspelt key) and edits a RelativeValueReportConfig with the schema form over the generated relative_value_report_config contract: the PeerFilter (every field optional; GICS sectors, industries, countries, ratings, tags and selectors are free text, since Rust declares no list of them), the period basis, the scoring dimensions and the multiple columns, whose choices come from the contract. Compare passes the subject, universe and structurally valid config JSON to the caller (usually the useRelativeValueReport request) and Rust validates them. The native statements_analytics.relativeValueReport result is shown as returned, above the form: the subject, period basis, peer and excluded counts and the composite score and confidence, or Rust's reason for no composite; the comps table with the subject first, marked from Rust's is_subject, and one column per multiple; per multiple, the subject value, percentile, z-score and peer statistics, with a bar per multiple drawn at Rust's percentile; per dimension, its weight, direction, subject values, percentile, z-score, signal (positive meaning cheap), regression and peer statistics, Rust's exclusion reason when the composite leaves it out, and a scatter of Rust's points with the subject marked from each point's is_subject and the line drawn through Rust's fitted values. A null or a live NaN shows as Undefined and -0 as 0. Nothing is computed here. Accepts subject, universe, defaultConfig, onSubmit, report, loading, error, formatNumber, formatPercentile and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "statement-export",
+      "type": "registry:component",
+      "docs": "Answers what the statement numbers are as a file a spreadsheet can open. Presents a native statements.statementResultToTableWide or statementResultToTableLong TableEnvelope (useStatementResultTable) in Rust's order, with a wide or long switch the host follows. Download CSV writes exactly those cells: RFC 4180 quoting, native column names as the header, every number as its plain String form. A cell Rust holds with no value shows as undefined and is an empty field. Nothing is computed. Accepts layout, onLayoutChange, table, loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error, and a native breach forecast, statements_analytics.forecastBreaches, under a submitted CovenantForecastConfig), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, a table and CSV export of the shown result, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary and, in a disclosure, a native normalization of the reported result (adjusted EBITDA: a NormalizationConfig editor and statements.normalize's base-to-adjusted bridge) and, in another, the native debt stack (statements_analytics.capitalStructureSummary: leverage and coverage through each payment class and the maturity wall; a model with no capital structure shows Rust's error), a native DCF valuation with its enterprise-value tornado, a native WACC calculator that sets the DCF WACC field on the user's click, and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error, and a native breach forecast, statements_analytics.forecastBreaches, under a submitted CovenantForecastConfig), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -843,6 +879,10 @@
       "type": "registry:hook"
     },
     {
+      "name": "use-recovery-waterfall",
+      "type": "registry:hook"
+    },
+    {
       "name": "use-option-calculator",
       "type": "registry:hook"
     },
@@ -944,6 +984,30 @@
     },
     {
       "name": "use-credit-assessment",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-statement-result-table",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-wacc",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-normalize",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-capital-structure-summary",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-relative-value-report",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-normalization-config-validator",
       "type": "registry:hook"
     },
     {
@@ -1403,6 +1467,18 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-recovery-claim",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-seniority-calibration",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-workout-lgd",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-zmijewski-input",
       "type": "registry:lib"
     },
@@ -1439,6 +1515,14 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-capital-structure-summary-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-capital-structure-summary",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-credit-assessment",
       "type": "registry:lib"
     },
@@ -1460,6 +1544,14 @@
     },
     {
       "name": "contract-lbo-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-relative-value-report-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-relative-value-report",
       "type": "registry:lib"
     },
     {
@@ -1496,6 +1588,14 @@
     },
     {
       "name": "contract-monte-carlo-results",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-normalization-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-normalization-result",
       "type": "registry:lib"
     },
     {
@@ -1645,6 +1745,10 @@
       "sha256": "6f51a7c35d8889becbb50185a69a67e4a744c692a82d85d261b9594cc9a872bf"
     },
     {
+      "path": "finstack-quant-ui/tests/models/recovery/cases.json",
+      "sha256": "eb71abd4d2a7034f9fc9559312fccc4c68a2f775a066e38eeb364924ba7bfda5"
+    },
+    {
       "path": "finstack-quant-ui/src/fixtures/margin/simm.json",
       "sha256": "14bb83029ea43f4f60a5fe925f8850558b10a024406339dcbf293a2edda386e0"
     },
@@ -1775,6 +1879,26 @@
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q4.json",
       "sha256": "978de34f77ec215aa5f9014affc187fca6dc899bad1c45a5a78ef1c3194c093f"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/wacc/cases.json",
+      "sha256": "5782f5a911c69da0fa101f500d75752084ebcb7faa46521b00b96e6cb7b5faf3"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/normalization/cases.json",
+      "sha256": "95b78aca6e160a2ad11a82bfd0795bd3bfaf46c1b2acab3fcb144ad3dd601cac"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
+      "sha256": "965ec88a37428138f17d1dc8d4edb8d0bb5375cddaf50c269462b96fb4709051"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/relative-value/cases.json",
+      "sha256": "b5832fff8381235b9c59eab609f8ae68423621a18138ba2f02fe75e293b01a40"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/export/cases.json",
+      "sha256": "7a9648b76d87423d757bdae647855708476ce957398298fcf9733fc507eff507"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",

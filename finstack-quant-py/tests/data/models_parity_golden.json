@@ -456,6 +456,10 @@
     500.0,
     900.0
   ],
+  "lgd.seniority_calibration_ids": [
+    "moodys_recovery_1982_2023",
+    "sp_recovery_historical"
+  ],
   "lgd.seniority_recovery_stats": [
     0.37,
     0.24,
