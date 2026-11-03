@@ -94,6 +94,11 @@ const statsTerms = fixture.stats.seniorUnsecured.request as SeniorityTerms;
 const shortfall = value<modelsWire.RecoveryWaterfallResult>(
   fixture.waterfall.shortfall,
 );
+/** The item's default display: four decimals, every digit in the title. */
+const shown = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 4,
+  signDisplay: "negative",
+}).format;
 function view(props: Partial<Parameters<typeof RecoveryWaterfall>[0]>) {
   return render(
     <RecoveryWaterfall
@@ -184,13 +189,16 @@ it("draws Rust's allocations in its order with each claim's own fields", () => {
     (cell) => cell.textContent,
   );
   const rate = rows[1].children[header.indexOf("Recovery rate")];
-  expect(rate.textContent).toBe(String(notes.recovery_rate));
+  expect(rate.textContent).toBe(shown(notes.recovery_rate));
+  expect(rate.firstElementChild!.getAttribute("title")).toBe(
+    String(notes.recovery_rate),
+  );
   const estate = screen.getByRole("table", { name: "Estate" });
   expect(
     within(estate)
       .getByRole("rowheader", { name: "Undistributed estate" })
       .closest("tr")!.children[1].textContent,
-  ).toBe(String(shortfall.undistributed_estate));
+  ).toBe(shown(shortfall.undistributed_estate));
 });
 it("shows the rate Rust returned even when it is not recovered over claim", () => {
   // A doctored rate: the view must show it, not recompute it.
@@ -291,12 +299,12 @@ it("tables the workout and seniority results as returned", () => {
   expect(
     within(lgd).getByRole("rowheader", { name: "LGD" }).closest("tr")!
       .children[1].textContent,
-  ).toBe(String(workout.lgd));
+  ).toBe(shown(workout.lgd));
   const beta = screen.getByRole("table", { name: "Beta recovery" });
   expect(
     within(beta).getByRole("rowheader", { name: "Mean LGD" }).closest("tr")!
       .children[1].textContent,
-  ).toBe(String(stats.mean_lgd));
+  ).toBe(shown(stats.mean_lgd));
 });
 it("shows each native error and keeps the other analyses", () => {
   const entry = fixture.stats.classNotCalibrated;

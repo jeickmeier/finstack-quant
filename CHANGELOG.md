@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: capital structure and recovery tables fit the gallery width
+
+`capital-structure-report` and `recovery-waterfall` now show returned numbers as `relative-value-table` does: ratios and rates to four decimals (never "-0") and the share of debt as a percent to two decimals, each cell keeping every returned digit in its title. The debt stack names its currency once in the caption ("Debt stack at 2025Q4 (USD)") instead of in three column headers. Both tables now show every column at gallery width, the debt stack's maturity and the recovery table's deficiency included. `formatRatio`, `formatShare` and `formatValue` still override the display.
+
 ### UI: id-combobox keeps typed free text
 
 The `id-combobox` registry primitive no longer empties its value when the suggestions close. Typing an id that is not among the suggestions and then pressing Tab, Escape or clicking elsewhere left the field (and every SchemaForm node, metric or curve id built on it) as `''`, so Rust reported for example "Target node '' not found". Typed text is now the value until the user types again or picks a suggestion.

@@ -6,7 +6,7 @@ import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import type { CapitalStructureSummary } from "@/workers/finstack-contract";
-import { formatPercent, groupDecimal } from "@/lib/finstack/format/format";
+import { groupDecimal } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import resultMetadata from "@/lib/finstack/generated/meta/capital_structure_summary";
 import {
@@ -21,14 +21,19 @@ import { capitalStructureConfigModule } from "./capital-structure-config";
 
 type Tranche = CapitalStructureSummary["tranches"][number];
 type Money = CapitalStructureSummary["total_debt"];
-/** Every supplied digit, grouped. */
-function exactValue(value: number): string {
-  return groupDecimal(String(value));
-}
-/** A share of debt (a decimal fraction) as its exact percent digits. */
-function exactShare(value: number): string {
-  return `${formatPercent(value)}%`;
-}
+/**
+ * A returned ratio to four decimals, never "-0", as relative-value-table
+ * shows its numbers; every digit stays in the cell's title.
+ */
+const defaultRatio = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 4,
+  signDisplay: "negative",
+}).format;
+/** A returned share of debt (a 0-1 fraction) as a percent, scaled by Intl for display only. */
+const defaultShare = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  maximumFractionDigits: 2,
+}).format;
 /**
  * No standalone native CapitalStructureSummaryConfig parse exists; Rust
  * validates the config (unknown keys included) when it summarizes the debt
@@ -60,6 +65,18 @@ function shown<T>(
   return value == null || (typeof value === "number" && Number.isNaN(value))
     ? undefinedValue(reason)
     : format(value);
+}
+/** A returned number through the display format, with every digit in its title. */
+function shownNumber(
+  value: number | null | undefined,
+  format: (value: number) => string,
+  reason?: string,
+): ReactNode {
+  return value == null || Number.isNaN(value) ? (
+    undefinedValue(reason)
+  ) : (
+    <span title={String(value)}>{format(value)}</span>
+  );
 }
 const amount = (money: Money) => groupDecimal(money.amount);
 /** One bar of the maturity wall: a returned bucket, drawn from zero. */
@@ -98,9 +115,9 @@ export interface CapitalStructureReportProps {
   loading?: boolean;
   /** Native error (no capital structure, a node the results lack, mixed currencies), shown as returned. */
   error?: string;
-  /** Display text of a returned ratio in turns; defaults to every supplied digit. */
+  /** Display text of a returned ratio in turns; defaults to four decimals, every digit in the title. */
   formatRatio?: (value: number) => string;
-  /** Display text of a returned share of debt (a decimal fraction); defaults to exact percent digits. */
+  /** Display text of a returned share of debt (a decimal fraction); defaults to a percent to two decimals, every digit in the title. */
   formatShare?: (value: number) => string;
   density?: "compact" | "comfortable";
 }
@@ -122,8 +139,8 @@ export function CapitalStructureReport({
   summary,
   loading,
   error,
-  formatRatio = exactValue,
-  formatShare = exactShare,
+  formatRatio = defaultRatio,
+  formatShare = defaultShare,
   density = "compact",
 }: CapitalStructureReportProps) {
   const [initial] = useState(() => defaultConfig);
@@ -219,15 +236,15 @@ function CapitalStructureResults({
     ],
     [
       "total_leverage",
-      shown(summary.total_leverage, formatRatio, root("total_leverage")),
+      shownNumber(summary.total_leverage, formatRatio, root("total_leverage")),
     ],
     [
       "net_leverage",
-      shown(summary.net_leverage, formatRatio, root("net_leverage")),
+      shownNumber(summary.net_leverage, formatRatio, root("net_leverage")),
     ],
     [
       "total_coverage",
-      shown(summary.total_coverage, formatRatio, root("total_coverage")),
+      shownNumber(summary.total_coverage, formatRatio, root("total_coverage")),
     ],
   ];
   const columns: ColumnDef<{}, Tranche, any>[] = [
@@ -259,7 +276,7 @@ function CapitalStructureResults({
     },
     {
       id: "balance",
-      header: `${labelFor("balance")}${unit}`,
+      header: labelFor("balance"),
       accessorFn: (row) => amount(row.balance),
       meta: { className: "text-right finstack-numeric" },
     },
@@ -268,7 +285,7 @@ function CapitalStructureResults({
       header: labelFor("share_of_debt"),
       accessorFn: (row) => row.share_of_debt,
       cell: ({ getValue }) =>
-        shown(
+        shownNumber(
           getValue() as number | null,
           formatShare,
           tranche("share_of_debt"),
@@ -277,7 +294,7 @@ function CapitalStructureResults({
     },
     {
       id: "cumulative_debt",
-      header: `${labelFor("cumulative_debt")}${unit}`,
+      header: labelFor("cumulative_debt"),
       accessorFn: (row) => amount(row.cumulative_debt),
       meta: { className: "text-right finstack-numeric" },
     },
@@ -286,7 +303,11 @@ function CapitalStructureResults({
       header: labelFor("leverage"),
       accessorFn: (row) => row.leverage,
       cell: ({ getValue }) =>
-        shown(getValue() as number | null, formatRatio, tranche("leverage")),
+        shownNumber(
+          getValue() as number | null,
+          formatRatio,
+          tranche("leverage"),
+        ),
       meta: { className: "text-right finstack-numeric" },
     },
     {
@@ -294,7 +315,7 @@ function CapitalStructureResults({
       header: labelFor("interest_coverage"),
       accessorFn: (row) => row.interest_coverage,
       cell: ({ getValue }) =>
-        shown(
+        shownNumber(
           getValue() as number | null,
           formatRatio,
           tranche("interest_coverage"),
@@ -303,7 +324,7 @@ function CapitalStructureResults({
     },
     {
       id: "ltm_interest",
-      header: `${labelFor("ltm_interest")}${unit}`,
+      header: labelFor("ltm_interest"),
       accessorFn: (row) => row.ltm_interest,
       cell: ({ getValue }) =>
         shown(getValue() as Money | null, amount, tranche("ltm_interest")),
@@ -380,7 +401,9 @@ function CapitalStructureResults({
         data={summary.tranches}
         columns={columns}
         getRowId={(row) => row.id}
-        caption={`Debt stack at ${summary.as_of}`}
+        // The currency sits in the caption, as normalization-editor does, so the
+        // columns stay narrow enough for the gallery width.
+        caption={`Debt stack at ${summary.as_of}${unit}`}
         density={density}
       />
       <figure className="min-w-0">
