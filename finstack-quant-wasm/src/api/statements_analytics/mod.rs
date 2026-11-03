@@ -20,8 +20,8 @@ pub use capital_structure::capital_structure_summary;
 pub use covenants::{evaluate_covenants, forecast_breaches};
 
 pub use comps::{
-    compute_multiple, peer_stats, percentile_rank, regression_fair_value, score_relative_value,
-    z_score,
+    compute_multiple, peer_stats, percentile_rank, regression_fair_value, relative_value_report,
+    score_relative_value, z_score,
 };
 
 use crate::utils::input::{

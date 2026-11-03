@@ -1817,6 +1817,24 @@ export const importHarnesses = {
       name: "contract-lbo-result",
       modules: modules.length,
     })),
+  "contract-relative-value-report-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/relative_value_report_config.json"),
+      import("@/lib/finstack/generated/types/relative_value_report_config"),
+      import("@/lib/finstack/generated/meta/relative_value_report_config"),
+    ]).then((modules) => ({
+      name: "contract-relative-value-report-config",
+      modules: modules.length,
+    })),
+  "contract-relative-value-report": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/relative_value_report.json"),
+      import("@/lib/finstack/generated/types/relative_value_report"),
+      import("@/lib/finstack/generated/meta/relative_value_report"),
+    ]).then((modules) => ({
+      name: "contract-relative-value-report",
+      modules: modules.length,
+    })),
   "contract-scenario-diff": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/scenario_diff.json"),

@@ -99,7 +99,9 @@ pub use ecl::{
 
 pub use comps::{
     compute_multiple, compute_peer_multiples, peer_stats, percentile_rank, regression_fair_value,
-    score_relative_value, z_score, CompanyId, CompanyMetrics, DimensionScore, MetricExtractor,
-    Multiple, PeerFilter, PeerSet, PeerStats, PeriodBasis, RegressionResult, RelativeValueResult,
-    ScoreDirection, ScoringDimension,
+    relative_value_report, score_relative_value, z_score, CompanyId, CompanyMetrics,
+    CompositeExclusion, DimensionExclusion, DimensionScore, MetricExtractor, Multiple, PeerFilter,
+    PeerSet, PeerStats, PeriodBasis, RegressionResult, RelativeValueCompany,
+    RelativeValueDimension, RelativeValueMultiple, RelativeValuePoint, RelativeValueReport,
+    RelativeValueReportConfig, RelativeValueResult, ScoreDirection, ScoringDimension,
 };

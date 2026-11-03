@@ -5,19 +5,25 @@
 //!
 //! Start with [`PeerSet::from_universe`] to build a filtered peer group,
 //! then use [`compute_peer_multiples`] for multiples and
-//! [`score_relative_value`] for the composite rich/cheap signal.
+//! [`score_relative_value`] for the composite rich/cheap signal, or call
+//! [`relative_value_report`] for all of it at once.
 
 mod multiples;
 mod peer_set;
+mod report;
 mod scoring;
 mod stats;
 mod types;
 
 pub use multiples::{compute_multiple, compute_peer_multiples};
 pub use peer_set::{PeerFilter, PeerSet};
+pub use report::{
+    relative_value_report, CompositeExclusion, RelativeValueCompany, RelativeValueDimension,
+    RelativeValueMultiple, RelativeValuePoint, RelativeValueReport, RelativeValueReportConfig,
+};
 pub use scoring::{
-    score_relative_value, DimensionScore, MetricExtractor, RelativeValueResult, ScoreDirection,
-    ScoringDimension,
+    score_relative_value, DimensionExclusion, DimensionScore, MetricExtractor, RelativeValueResult,
+    ScoreDirection, ScoringDimension,
 };
 pub use stats::{
     peer_stats, percentile_rank, regression_fair_value, z_score, PeerStats, RegressionResult,

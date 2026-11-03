@@ -37,6 +37,7 @@ export const statements_analytics = {
   regressionFairValue: wasm.regressionFairValue,
   computeMultiple: wasm.computeMultiple,
   scoreRelativeValue: wasm.scoreRelativeValue,
+  relativeValueReport: wasm.relativeValueReport,
   validateScorecardConfig: wasm.validateScorecardConfig,
   classifyStage: wasm.classifyStage,
   computeEcl: wasm.computeEcl,

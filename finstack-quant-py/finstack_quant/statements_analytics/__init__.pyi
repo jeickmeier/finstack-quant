@@ -116,6 +116,14 @@ from finstack_quant.statements_analytics._capital_structure import (
     MaturityWallBucket as MaturityWallBucket,
     capital_structure_summary as capital_structure_summary,
 )
+from finstack_quant.statements_analytics._relative_value import (
+    RelativeValueCompany as RelativeValueCompany,
+    RelativeValueDimension as RelativeValueDimension,
+    RelativeValueMultiple as RelativeValueMultiple,
+    RelativeValuePoint as RelativeValuePoint,
+    RelativeValueReport as RelativeValueReport,
+    relative_value_report as relative_value_report,
+)
 from finstack_quant.statements_analytics._reports import (
     CreditAssessment as CreditAssessment,
     CreditAssessmentPoint as CreditAssessmentPoint,
@@ -192,6 +200,11 @@ __all__ = [
     "PropertyTemplateNodes",
     "QualitativeFlags",
     "RegressionResult",
+    "RelativeValueCompany",
+    "RelativeValueDimension",
+    "RelativeValueMultiple",
+    "RelativeValuePoint",
+    "RelativeValueReport",
     "RelativeValueResult",
     "RenewalSpec",
     "RentRollOutputNodes",
@@ -245,6 +258,7 @@ __all__ = [
     "percentile_rank",
     "pl_summary_report",
     "regression_fair_value",
+    "relative_value_report",
     "render_check_report_html",
     "render_check_report_text",
     "run_checks",

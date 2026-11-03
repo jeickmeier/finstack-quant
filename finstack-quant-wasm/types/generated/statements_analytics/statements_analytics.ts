@@ -328,6 +328,10 @@ export type CheckSeverity = "info" | "warning" | "error";
  */
 export type CompanyId = string;
 /**
+ * Why a [`RelativeValueReport`] has no composite score.
+ */
+export type CompositeExclusion = "no_dimensions" | "no_usable_dimension" | "non_finite_score";
+/**
  * Status of a corkscrew validation run.
  */
 export type CorkscrewStatus = "success" | "failed";
@@ -386,6 +390,20 @@ export type ExitMultipleBump =
   | {
       relative: number;
     };
+/**
+ * Why a configured dimension contributes no signal to the composite score.
+ *
+ * The conditions are tested in declaration order and the first that holds is
+ * reported.
+ */
+export type DimensionExclusion =
+  | "zero_weight"
+  | "no_subject_value"
+  | "no_peer_values"
+  | "no_dispersion"
+  | "no_subject_x"
+  | "regression_unusable"
+  | "no_residual_dispersion";
 /**
  * Method for computing downturn LGD from base (through-the-cycle) LGD.
  */
@@ -3836,6 +3854,189 @@ export interface RegressionResult {
   [k: string]: unknown;
 }
 /**
+ * One company's row in the comps table.
+ */
+export interface RelativeValueCompany {
+  /**
+   * Company identifier.
+   */
+  id: CompanyId;
+  /**
+   * Whether this row is the subject.
+   */
+  is_subject: boolean;
+  /**
+   * One value per configured multiple, in config order; `None` when an input
+   * is missing, the denominator is not positive or the value is non-finite.
+   */
+  values: (number | null)[];
+}
+/**
+ * One configured scoring dimension, used by the composite or not.
+ */
+export interface RelativeValueDimension {
+  /**
+   * Rich/cheap sign convention of the Y metric.
+   */
+  direction: ScoreDirection;
+  /**
+   * Why the composite leaves this dimension out; `None` when it is used.
+   */
+  excluded_reason?: DimensionExclusion | null;
+  /**
+   * Dimension label.
+   */
+  label: string;
+  /**
+   * Statistics of Y over every peer that has it, including peers missing X;
+   * `None` when no peer has it.
+   */
+  peer_stats?: PeerStats | null;
+  /**
+   * Share of those peer Y values at or below the subject's, from 0 to 1.
+   */
+  percentile?: number | null;
+  /**
+   * Regression scatter: the subject first when it has both metrics, then
+   * every peer with both metrics in universe order. Empty without an X
+   * extractor.
+   */
+  points: RelativeValuePoint[];
+  /**
+   * Fit of Y on X over the peers that have both, evaluated at the subject:
+   * `fitted_value` is the subject's fitted Y and `residual` its actual less
+   * fitted, in Y units. `None` without an X extractor, without both subject
+   * metrics, or when it cannot be fitted. It can be present on an excluded
+   * dimension.
+   */
+  regression?: RegressionResult | null;
+  /**
+   * What this dimension contributes to the composite, positive meaning cheap:
+   * the standardized regression residual, or the z-score without an X
+   * extractor, with the sign set by `direction`. `None` when excluded.
+   */
+  signal?: number | null;
+  /**
+   * Subject's X metric; `None` without an X extractor or when missing or
+   * non-finite.
+   */
+  subject_x?: number | null;
+  /**
+   * Subject's Y metric; `None` when missing or non-finite.
+   */
+  subject_y?: number | null;
+  /**
+   * Configured weight, not normalized.
+   */
+  weight: number;
+  /**
+   * X metric extractor; `None` for a dimension scored on its peer
+   * distribution.
+   */
+  x?: MetricExtractor | null;
+  /**
+   * Y metric extractor.
+   */
+  y: MetricExtractor;
+  /**
+   * Subject's raw z-score within those peer Y values, before the direction
+   * convention is applied.
+   */
+  z_score?: number | null;
+}
+/**
+ * One company on a dimension's regression scatter.
+ */
+export interface RelativeValuePoint {
+  /**
+   * Company identifier.
+   */
+  company_id: CompanyId;
+  /**
+   * `intercept + slope * x` of the dimension's regression; `None` without a
+   * regression.
+   */
+  fitted_y?: number | null;
+  /**
+   * X metric.
+   */
+  x: number;
+  /**
+   * Y metric.
+   */
+  y: number;
+}
+/**
+ * One column of the comps table, summarised over the peers.
+ */
+export interface RelativeValueMultiple {
+  /**
+   * The multiple.
+   */
+  multiple: Multiple;
+  /**
+   * Statistics of the peers' computable values; `None` when no peer has one.
+   */
+  peer_stats?: PeerStats | null;
+  /**
+   * Share of those peer values at or below the subject's, from 0 to 1;
+   * `None` without a subject value or peer values.
+   */
+  percentile?: number | null;
+  /**
+   * Subject's value; `None` when it cannot be computed.
+   */
+  subject_value?: number | null;
+  /**
+   * Subject's z-score within those peer values; `None` without a subject
+   * value, with fewer than two peer values or when they do not differ.
+   */
+  z_score?: number | null;
+}
+/**
+ * Comps table, peer statistics, regression scatter and composite rich/cheap score of a subject against its filtered peers.
+ */
+export interface RelativeValueReport {
+  /**
+   * Comps table: the subject first, then the peers in universe order.
+   */
+  companies: RelativeValueCompany[];
+  /**
+   * Result of [`score_relative_value`] over the same peers and dimensions;
+   * `None` when `composite_excluded_reason` is set.
+   */
+  composite?: RelativeValueResult | null;
+  /**
+   * Why there is no composite; `None` when there is one.
+   */
+  composite_excluded_reason?: CompositeExclusion | null;
+  /**
+   * One entry per configured dimension, in config order, including excluded
+   * ones.
+   */
+  dimensions: RelativeValueDimension[];
+  /**
+   * Universe members the filter dropped, not counting the subject.
+   */
+  excluded_count: number;
+  /**
+   * One entry per configured multiple, in config order.
+   */
+  multiples: RelativeValueMultiple[];
+  /**
+   * Number of peers, excluding the subject.
+   */
+  peer_count: number;
+  /**
+   * Period basis from the config.
+   */
+  period_basis: PeriodBasis;
+  /**
+   * Subject company identifier.
+   */
+  subject_id: CompanyId;
+}
+/**
  * Composite relative value result.
  */
 export interface RelativeValueResult {
@@ -3866,6 +4067,58 @@ export interface RelativeValueResult {
    */
   peer_count: number;
   [k: string]: unknown;
+}
+/**
+ * Peer filter, period basis, scoring dimensions and multiple columns for a relative value report.
+ */
+export interface RelativeValueReportConfig {
+  /**
+   * Scoring dimensions, in the order the report returns them. May be empty
+   * when `multiples` is not.
+   */
+  dimensions: ScoringDimension[];
+  /**
+   * Screen applied to the universe. Omitted, every other company is a peer.
+   * When supplied it lists every [`PeerFilter`] field.
+   */
+  filter?: PeerFilter;
+  /**
+   * Columns of the comps table, in the order the report returns them. May be
+   * empty when `dimensions` is not.
+   */
+  multiples: Multiple[];
+  /**
+   * Period basis the supplied metrics are stated on. It labels the report;
+   * the metrics are used as given.
+   */
+  period_basis: PeriodBasis;
+}
+/**
+ * Configuration for a single rich/cheap scoring dimension.
+ */
+export interface ScoringDimension {
+  /**
+   * Rich/cheap sign convention for the Y metric (default:
+   * [`ScoreDirection::HigherIsCheap`], i.e. spread-like).
+   */
+  direction?: ScoreDirection;
+  /**
+   * Human-readable label (e.g., "Spread vs Leverage").
+   */
+  label: string;
+  /**
+   * Finite, non-negative relative weight in the composite score; zero disables it.
+   */
+  weight: number;
+  /**
+   * Optional explanatory metric for single-factor regression.
+   * Omit it to score the dependent metric against its peer distribution.
+   */
+  x_extractor?: MetricExtractor | null;
+  /**
+   * How to extract the Y variable (dependent) from CompanyMetrics.
+   */
+  y_extractor: MetricExtractor;
 }
 /**
  * Definition for a single named scenario.
@@ -4111,33 +4364,6 @@ export interface ScorecardReport {
    */
   warnings?: string[];
   [k: string]: unknown;
-}
-/**
- * Configuration for a single rich/cheap scoring dimension.
- */
-export interface ScoringDimension {
-  /**
-   * Rich/cheap sign convention for the Y metric (default:
-   * [`ScoreDirection::HigherIsCheap`], i.e. spread-like).
-   */
-  direction?: ScoreDirection;
-  /**
-   * Human-readable label (e.g., "Spread vs Leverage").
-   */
-  label: string;
-  /**
-   * Finite, non-negative relative weight in the composite score; zero disables it.
-   */
-  weight: number;
-  /**
-   * Optional explanatory metric for single-factor regression.
-   * Omit it to score the dependent metric against its peer distribution.
-   */
-  x_extractor?: MetricExtractor | null;
-  /**
-   * How to extract the Y variable (dependent) from CompanyMetrics.
-   */
-  y_extractor: MetricExtractor;
 }
 /**
  * Sensitivity analysis configuration.

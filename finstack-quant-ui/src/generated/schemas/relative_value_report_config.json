@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Peer filter, period basis, scoring dimensions and multiple columns for a relative value report.",
+  "properties": {
+    "dimensions": {
+      "description": "Scoring dimensions, in the order the report returns them. May be empty\nwhen `multiples` is not.",
+      "items": {
+        "$ref": "#/$defs/d_86000e716c2d71c7ab11"
+      },
+      "type": "array"
+    },
+    "filter": {
+      "$ref": "#/$defs/d_760f2d8fbcaab83250fc",
+      "default": {
+        "countries": [],
+        "excluded_tags": [],
+        "gics_industries": [],
+        "gics_sectors": [],
+        "market_cap_max": null,
+        "market_cap_min": null,
+        "ratings": [],
+        "required_tags": [],
+        "selectors": []
+      },
+      "description": "Screen applied to the universe. Omitted, every other company is a peer.\nWhen supplied it lists every [`PeerFilter`] field."
+    },
+    "multiples": {
+      "description": "Columns of the comps table, in the order the report returns them. May be\nempty when `dimensions` is not.",
+      "items": {
+        "$ref": "#/$defs/d_d930167a90656c3f1128"
+      },
+      "type": "array"
+    },
+    "period_basis": {
+      "$ref": "#/$defs/d_efbf7ae17b64150f666a",
+      "description": "Period basis the supplied metrics are stated on. It labels the report;\nthe metrics are used as given."
+    }
+  },
+  "required": [
+    "period_basis",
+    "dimensions",
+    "multiples"
+  ],
+  "title": "RelativeValueReportConfig",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json",
+  "$defs": {
+    "d_760f2d8fbcaab83250fc": {
+      "description": "Criteria for filtering companies into a peer set.\n\nAll criteria are AND-ed: a company must satisfy every non-empty\nconstraint to be included. For OR semantics across sectors or\nratings, supply multiple values in the respective `Vec`.",
+      "properties": {
+        "countries": {
+          "description": "ISO country codes to include (meta key: \"country\").",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "excluded_tags": {
+          "description": "Excluded attribute tags (none may be present).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "gics_industries": {
+          "description": "GICS industry codes to include (meta key: \"gics_industry\").",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "gics_sectors": {
+          "description": "GICS sector codes to include (meta key: \"gics_sector\").",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "market_cap_max": {
+          "description": "Market cap ceiling (inclusive).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "market_cap_min": {
+          "description": "Market cap floor (inclusive).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ratings": {
+          "description": "Credit rating bands to include (meta key: \"rating\").",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "required_tags": {
+          "description": "Required attribute tags (all must be present).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "selectors": {
+          "description": "Arbitrary attribute selector strings (uses `Attributes::matches_selector`).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "gics_sectors",
+        "gics_industries",
+        "countries",
+        "ratings",
+        "required_tags",
+        "excluded_tags",
+        "selectors"
+      ],
+      "type": "object"
+    },
+    "d_86000e716c2d71c7ab11": {
+      "additionalProperties": false,
+      "description": "Configuration for a single rich/cheap scoring dimension.",
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/d_b7600e1390554dd3776e",
+          "default": "higher_is_cheap",
+          "description": "Rich/cheap sign convention for the Y metric (default:\n[`ScoreDirection::HigherIsCheap`], i.e. spread-like)."
+        },
+        "label": {
+          "description": "Human-readable label (e.g., \"Spread vs Leverage\").",
+          "type": "string"
+        },
+        "weight": {
+          "description": "Finite, non-negative relative weight in the composite score; zero disables it.",
+          "format": "double",
+          "type": "number"
+        },
+        "x_extractor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_fd5098dfd610d422fd45"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional explanatory metric for single-factor regression.\nOmit it to score the dependent metric against its peer distribution."
+        },
+        "y_extractor": {
+          "$ref": "#/$defs/d_fd5098dfd610d422fd45",
+          "description": "How to extract the Y variable (dependent) from CompanyMetrics."
+        }
+      },
+      "required": [
+        "label",
+        "y_extractor",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "d_b7600e1390554dd3776e": {
+      "description": "Rich/cheap sign convention for a scoring dimension's Y metric.\n\nDetermines how a higher-than-peers Y value maps onto the composite\nscore (positive = cheap). Spread- and yield-like metrics are cheap\nwhen high ([`HigherIsCheap`](Self::HigherIsCheap)); valuation\nmultiples (P/E, EV/EBITDA) are rich when high\n([`HigherIsRich`](Self::HigherIsRich)).\n\nThe direction is applied consistently to both the regression-residual\npath and the univariate z-score path. The default,\n`HigherIsCheap`, matches the historical regression-path convention\n(positive residual = actual spread above fitted fair spread = cheap).",
+      "oneOf": [
+        {
+          "const": "higher_is_cheap",
+          "description": "Higher Y than peers means the subject is cheap (spread-like metrics).",
+          "type": "string"
+        },
+        {
+          "const": "higher_is_rich",
+          "description": "Higher Y than peers means the subject is rich (multiple-like metrics).",
+          "type": "string"
+        }
+      ]
+    },
+    "d_d930167a90656c3f1128": {
+      "description": "Valuation multiple.\n\nEnterprise value multiples use EV as the numerator. Equity multiples\nuse market capitalization or share price. Credit multiples use spread\nor yield as the numerator and a fundamental metric as denominator.",
+      "oneOf": [
+        {
+          "const": "ev_ebitda",
+          "description": "EV / EBITDA",
+          "type": "string"
+        },
+        {
+          "const": "ev_revenue",
+          "description": "EV / Revenue",
+          "type": "string"
+        },
+        {
+          "const": "ev_ebit",
+          "description": "EV / EBIT",
+          "type": "string"
+        },
+        {
+          "const": "ev_fcf",
+          "description": "EV / Free Cash Flow (unlevered)",
+          "type": "string"
+        },
+        {
+          "const": "pe",
+          "description": "Price / Earnings",
+          "type": "string"
+        },
+        {
+          "const": "pb",
+          "description": "Price / Book Value",
+          "type": "string"
+        },
+        {
+          "const": "ptbv",
+          "description": "Price / Tangible Book Value",
+          "type": "string"
+        },
+        {
+          "const": "p_fcf",
+          "description": "Price / Free Cash Flow (levered)",
+          "type": "string"
+        },
+        {
+          "const": "dividend_yield",
+          "description": "Dividend Yield (dividend / price, expressed as a ratio)",
+          "type": "string"
+        },
+        {
+          "const": "spread_per_turn",
+          "description": "Spread per turn of leverage (OAS / (Debt / EBITDA))",
+          "type": "string"
+        },
+        {
+          "const": "yield_per_coverage",
+          "description": "Yield / Interest Coverage",
+          "type": "string"
+        }
+      ]
+    },
+    "d_efbf7ae17b64150f666a": {
+      "description": "Time basis for computing a valuation multiple.",
+      "oneOf": [
+        {
+          "const": "ltm",
+          "description": "Last twelve months (trailing).",
+          "type": "string"
+        },
+        {
+          "const": "ntm",
+          "description": "Next twelve months (forward consensus or forecast).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Custom period identified by a label (e.g., \"FY2025E\").",
+          "properties": {
+            "custom": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "custom"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_fd5098dfd610d422fd45": {
+      "description": "Identifies which metric to extract from CompanyMetrics.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A named field (e.g., \"leverage\", \"oas_bp\", \"ebitda_margin\").",
+          "properties": {
+            "named": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "named"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A valuation multiple.",
+          "properties": {
+            "multiple": {
+              "$ref": "#/$defs/d_d930167a90656c3f1128"
+            }
+          },
+          "required": [
+            "multiple"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A custom metric key from the `custom` map.",
+          "properties": {
+            "custom": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "custom"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  }
+}

@@ -106,7 +106,7 @@ a submodule.
 | Credit | `capital_structure_summary`, `CapitalStructureSummary`, `CapitalStructureSummaryConfig`, `CapitalStructureTranche`, `DebtInstrumentKind`, `MaturityWallBucket`, `compute_credit_context`, `CreditContextMetrics`, `evaluate_covenants`, `forecast_breaches`, `StatementsAdapter` |
 | Checks | `three_statement_checks`, `credit_underwriting_checks`, `lbo_model_checks`, `ThreeStatementMapping`, `CreditMapping`, `FormulaCheckSpec`, `render_check_report_text`, `render_check_report_html`, plus reconciliation / consistency / credit check types |
 | ECL | `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `compute_ecl`, `compute_ecl_weighted`, `classify_stage_from_curves`, `compute_ecl_from_curve`, `compute_ecl_weighted_from_curves`, `StagingConfig`, `PdTermStructure` |
-| Comps | `PeerSet`, `PeerFilter`, `PeerStats`, `compute_peer_multiples`, `compute_multiple`, `regression_fair_value`, `score_relative_value`, `percentile_rank`, `z_score` |
+| Comps | `PeerSet`, `PeerFilter`, `PeerStats`, `compute_peer_multiples`, `compute_multiple`, `regression_fair_value`, `score_relative_value`, `percentile_rank`, `z_score`, `relative_value_report`, `RelativeValueReport`, `RelativeValueReportConfig`, `RelativeValueCompany`, `RelativeValueMultiple`, `RelativeValueDimension`, `RelativeValuePoint`, `DimensionExclusion`, `CompositeExclusion` |
 | Goal seek | `goal_seek` |
 | Backtesting | `backtest_forecast`, `ForecastMetrics` |
 | Introspection | `DependencyTracer`, `DependencyTree`, `explain_formula`, `Explanation`, `render_tree_ascii`, `render_tree_detailed` |
@@ -154,6 +154,15 @@ covenant window replaces the top-level set), and a metric is read only when an
 applicable covenant needs it, so a missing or non-finite node fails only where
 it is tested. For a single covenant pass `StatementsAdapter::new(&results,
 &model)` to `finstack_quant_covenants::forecast_covenant_generic`.
+
+**Comps.** `relative_value_report(&subject, &universe, &config)` filters the
+universe and returns what a comps screen draws, so a host computes nothing: one
+row per company with one value per configured multiple, peer statistics,
+percentile and z-score per multiple, and per dimension the same figures, the
+regression with a fitted Y per scatter point, the signal it adds to the composite
+or why it is excluded. It runs `score_relative_value` for the composite and
+reports `None` with a reason when no dimension is usable, so the table still
+renders. Metrics carry no currency: normalizing them is the caller's job.
 
 **Checks.** `analysis::checks` extends the structural checks in
 `finstack_quant_statements::checks::builtins` with cross-statement

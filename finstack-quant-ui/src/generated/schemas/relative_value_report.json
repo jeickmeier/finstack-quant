@@ -1,0 +1,726 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Comps table, peer statistics, regression scatter and composite rich/cheap score of a subject against its filtered peers.",
+  "properties": {
+    "companies": {
+      "description": "Comps table: the subject first, then the peers in universe order.",
+      "items": {
+        "$ref": "#/$defs/d_da0f5f4fb77050db0db0"
+      },
+      "type": "array"
+    },
+    "composite": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_35daf4c122ab9ff857cd"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Result of [`score_relative_value`] over the same peers and dimensions;\n`None` when `composite_excluded_reason` is set."
+    },
+    "composite_excluded_reason": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_b62008a548f399434906"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Why there is no composite; `None` when there is one."
+    },
+    "dimensions": {
+      "description": "One entry per configured dimension, in config order, including excluded\nones.",
+      "items": {
+        "$ref": "#/$defs/d_c79e08bb25679af7f85e"
+      },
+      "type": "array"
+    },
+    "excluded_count": {
+      "description": "Universe members the filter dropped, not counting the subject.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "multiples": {
+      "description": "One entry per configured multiple, in config order.",
+      "items": {
+        "$ref": "#/$defs/d_f11bafab717d4afd5364"
+      },
+      "type": "array"
+    },
+    "peer_count": {
+      "description": "Number of peers, excluding the subject.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "period_basis": {
+      "$ref": "#/$defs/d_995ad9e6c73745348443",
+      "description": "Period basis from the config."
+    },
+    "subject_id": {
+      "$ref": "#/$defs/d_24699bb691d7876870cc",
+      "description": "Subject company identifier."
+    }
+  },
+  "required": [
+    "subject_id",
+    "period_basis",
+    "peer_count",
+    "excluded_count",
+    "companies",
+    "multiples",
+    "dimensions"
+  ],
+  "title": "RelativeValueReport",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report.schema.json",
+  "$defs": {
+    "d_0694251fbd303906ae20": {
+      "description": "OLS regression result for fair-value estimation.",
+      "properties": {
+        "fitted_value": {
+          "description": "Fitted (fair) value for the subject.",
+          "format": "double",
+          "type": "number"
+        },
+        "intercept": {
+          "description": "Intercept (alpha).",
+          "format": "double",
+          "type": "number"
+        },
+        "n": {
+          "description": "Number of observations used.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "r_squared": {
+          "description": "R-squared goodness of fit.",
+          "format": "double",
+          "type": "number"
+        },
+        "residual": {
+          "description": "Residual: actual - fitted. Positive = cheap, negative = rich.",
+          "format": "double",
+          "type": "number"
+        },
+        "slope": {
+          "description": "Slope coefficient (beta).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "intercept",
+        "slope",
+        "r_squared",
+        "fitted_value",
+        "residual",
+        "n"
+      ],
+      "type": "object"
+    },
+    "d_12bbc95381b4b6564ac4": {
+      "description": "Why a configured dimension contributes no signal to the composite score.\n\nThe conditions are tested in declaration order and the first that holds is\nreported.",
+      "oneOf": [
+        {
+          "const": "zero_weight",
+          "description": "The configured weight is zero, which disables the dimension.",
+          "type": "string"
+        },
+        {
+          "const": "no_subject_value",
+          "description": "The subject has no finite value of the Y metric.",
+          "type": "string"
+        },
+        {
+          "const": "no_peer_values",
+          "description": "No peer has a finite value of the Y metric.",
+          "type": "string"
+        },
+        {
+          "const": "no_dispersion",
+          "description": "Fewer than two peers have the Y metric, or their values do not differ,\nso the z-score is undefined.",
+          "type": "string"
+        },
+        {
+          "const": "no_subject_x",
+          "description": "The subject has no finite value of the X metric.",
+          "type": "string"
+        },
+        {
+          "const": "regression_unusable",
+          "description": "The regression cannot be fitted: fewer than three peers have both\nmetrics, X does not vary, or a fitted figure is non-finite.",
+          "type": "string"
+        },
+        {
+          "const": "no_residual_dispersion",
+          "description": "The regression fits but the peers sit on the line, so the subject's\nresidual cannot be standardized.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_24699bb691d7876870cc": {
+      "description": "Opaque company identifier within a peer set.",
+      "type": "string"
+    },
+    "d_35daf4c122ab9ff857cd": {
+      "description": "Composite relative value result.",
+      "properties": {
+        "company_id": {
+          "$ref": "#/$defs/d_24699bb691d7876870cc",
+          "description": "Company being scored."
+        },
+        "composite_score": {
+          "description": "Composite rich/cheap score.\n\nPositive = cheap (trading below fair value across dimensions).\nNegative = rich (trading above fair value).\nMagnitude indicates conviction (bounded by number of dimensions\nand their weights).",
+          "format": "double",
+          "type": "number"
+        },
+        "confidence": {
+          "description": "Confidence in the composite score (average R-squared across\nregression-based dimensions, weighted by dimension weight).",
+          "format": "double",
+          "type": "number"
+        },
+        "dimensions": {
+          "description": "Per-dimension decomposition.",
+          "items": {
+            "$ref": "#/$defs/d_aeb814bf64804a76a420"
+          },
+          "type": "array"
+        },
+        "peer_count": {
+          "description": "Number of peers used in the analysis.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "company_id",
+        "composite_score",
+        "dimensions",
+        "confidence",
+        "peer_count"
+      ],
+      "type": "object"
+    },
+    "d_4b09cc364b90f7dfcfc7": {
+      "description": "Valuation multiple.\n\nEnterprise value multiples use EV as the numerator. Equity multiples\nuse market capitalization or share price. Credit multiples use spread\nor yield as the numerator and a fundamental metric as denominator.",
+      "oneOf": [
+        {
+          "const": "ev_ebitda",
+          "description": "EV / EBITDA",
+          "type": "string"
+        },
+        {
+          "const": "ev_revenue",
+          "description": "EV / Revenue",
+          "type": "string"
+        },
+        {
+          "const": "ev_ebit",
+          "description": "EV / EBIT",
+          "type": "string"
+        },
+        {
+          "const": "ev_fcf",
+          "description": "EV / Free Cash Flow (unlevered)",
+          "type": "string"
+        },
+        {
+          "const": "pe",
+          "description": "Price / Earnings",
+          "type": "string"
+        },
+        {
+          "const": "pb",
+          "description": "Price / Book Value",
+          "type": "string"
+        },
+        {
+          "const": "ptbv",
+          "description": "Price / Tangible Book Value",
+          "type": "string"
+        },
+        {
+          "const": "p_fcf",
+          "description": "Price / Free Cash Flow (levered)",
+          "type": "string"
+        },
+        {
+          "const": "dividend_yield",
+          "description": "Dividend Yield (dividend / price, expressed as a ratio)",
+          "type": "string"
+        },
+        {
+          "const": "spread_per_turn",
+          "description": "Spread per turn of leverage (OAS / (Debt / EBITDA))",
+          "type": "string"
+        },
+        {
+          "const": "yield_per_coverage",
+          "description": "Yield / Interest Coverage",
+          "type": "string"
+        }
+      ]
+    },
+    "d_64ae2275be50f6b09287": {
+      "description": "Descriptive statistics for a peer set metric.",
+      "properties": {
+        "count": {
+          "description": "Number of observations.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "iqr": {
+          "description": "Interquartile range (`q3 - q1`).",
+          "format": "double",
+          "type": "number"
+        },
+        "max": {
+          "description": "Maximum value.",
+          "format": "double",
+          "type": "number"
+        },
+        "mean": {
+          "description": "Arithmetic mean.",
+          "format": "double",
+          "type": "number"
+        },
+        "median": {
+          "description": "Median (50th percentile).",
+          "format": "double",
+          "type": "number"
+        },
+        "min": {
+          "description": "Minimum value.",
+          "format": "double",
+          "type": "number"
+        },
+        "q1": {
+          "description": "25th percentile.",
+          "format": "double",
+          "type": "number"
+        },
+        "q3": {
+          "description": "75th percentile.",
+          "format": "double",
+          "type": "number"
+        },
+        "std_dev": {
+          "description": "Sample standard deviation.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "count",
+        "mean",
+        "median",
+        "std_dev",
+        "min",
+        "max",
+        "q1",
+        "q3",
+        "iqr"
+      ],
+      "type": "object"
+    },
+    "d_6f8902f802898a257f44": {
+      "description": "Identifies which metric to extract from CompanyMetrics.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A named field (e.g., \"leverage\", \"oas_bp\", \"ebitda_margin\").",
+          "properties": {
+            "named": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "named"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A valuation multiple.",
+          "properties": {
+            "multiple": {
+              "$ref": "#/$defs/d_4b09cc364b90f7dfcfc7"
+            }
+          },
+          "required": [
+            "multiple"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A custom metric key from the `custom` map.",
+          "properties": {
+            "custom": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "custom"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_995ad9e6c73745348443": {
+      "description": "Time basis for computing a valuation multiple.",
+      "oneOf": [
+        {
+          "const": "ltm",
+          "description": "Last twelve months (trailing).",
+          "type": "string"
+        },
+        {
+          "const": "ntm",
+          "description": "Next twelve months (forward consensus or forecast).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Custom period identified by a label (e.g., \"FY2025E\").",
+          "properties": {
+            "custom": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "custom"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_aeb814bf64804a76a420": {
+      "description": "Decomposed score for a single dimension.",
+      "properties": {
+        "label": {
+          "description": "Label of the dimension.",
+          "type": "string"
+        },
+        "percentile": {
+          "description": "Percentile rank of the subject's Y within peers (0-1). Whether a\nhigh percentile means rich or cheap depends on the dimension's\n[`ScoringDimension::direction`].",
+          "format": "double",
+          "type": "number"
+        },
+        "r_squared": {
+          "description": "R-squared of the regression (confidence measure).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "regression_residual": {
+          "description": "Raw regression residual in Y units (actual − fitted). Positive\nmeans the subject's Y is above the peer fair-value line; the\ncomposite uses the standardized, direction-adjusted form.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weight": {
+          "description": "Dimension weight in composite.",
+          "format": "double",
+          "type": "number"
+        },
+        "z_score": {
+          "description": "Z-score of the subject's Y relative to the peer distribution\n(raw, before the direction convention is applied).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "percentile",
+        "z_score",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "d_b62008a548f399434906": {
+      "description": "Why a [`RelativeValueReport`] has no composite score.",
+      "oneOf": [
+        {
+          "const": "no_dimensions",
+          "description": "The config has no dimensions.",
+          "type": "string"
+        },
+        {
+          "const": "no_usable_dimension",
+          "description": "Every configured dimension is excluded; each says why.",
+          "type": "string"
+        },
+        {
+          "const": "non_finite_score",
+          "description": "Usable dimensions combine to a value too large to represent.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_c79e08bb25679af7f85e": {
+      "additionalProperties": false,
+      "description": "One configured scoring dimension, used by the composite or not.",
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/d_d48fd91f6cb32ab6859b",
+          "description": "Rich/cheap sign convention of the Y metric."
+        },
+        "excluded_reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_12bbc95381b4b6564ac4"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why the composite leaves this dimension out; `None` when it is used."
+        },
+        "label": {
+          "description": "Dimension label.",
+          "type": "string"
+        },
+        "peer_stats": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_64ae2275be50f6b09287"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Statistics of Y over every peer that has it, including peers missing X;\n`None` when no peer has it."
+        },
+        "percentile": {
+          "description": "Share of those peer Y values at or below the subject's, from 0 to 1.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "points": {
+          "description": "Regression scatter: the subject first when it has both metrics, then\nevery peer with both metrics in universe order. Empty without an X\nextractor.",
+          "items": {
+            "$ref": "#/$defs/d_e3a785c5fc1d129cad8a"
+          },
+          "type": "array"
+        },
+        "regression": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_0694251fbd303906ae20"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Fit of Y on X over the peers that have both, evaluated at the subject:\n`fitted_value` is the subject's fitted Y and `residual` its actual less\nfitted, in Y units. `None` without an X extractor, without both subject\nmetrics, or when it cannot be fitted. It can be present on an excluded\ndimension."
+        },
+        "signal": {
+          "description": "What this dimension contributes to the composite, positive meaning cheap:\nthe standardized regression residual, or the z-score without an X\nextractor, with the sign set by `direction`. `None` when excluded.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "subject_x": {
+          "description": "Subject's X metric; `None` without an X extractor or when missing or\nnon-finite.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "subject_y": {
+          "description": "Subject's Y metric; `None` when missing or non-finite.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weight": {
+          "description": "Configured weight, not normalized.",
+          "format": "double",
+          "type": "number"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_6f8902f802898a257f44"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "X metric extractor; `None` for a dimension scored on its peer\ndistribution."
+        },
+        "y": {
+          "$ref": "#/$defs/d_6f8902f802898a257f44",
+          "description": "Y metric extractor."
+        },
+        "z_score": {
+          "description": "Subject's raw z-score within those peer Y values, before the direction\nconvention is applied.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "label",
+        "weight",
+        "direction",
+        "y",
+        "points"
+      ],
+      "type": "object"
+    },
+    "d_d48fd91f6cb32ab6859b": {
+      "description": "Rich/cheap sign convention for a scoring dimension's Y metric.\n\nDetermines how a higher-than-peers Y value maps onto the composite\nscore (positive = cheap). Spread- and yield-like metrics are cheap\nwhen high ([`HigherIsCheap`](Self::HigherIsCheap)); valuation\nmultiples (P/E, EV/EBITDA) are rich when high\n([`HigherIsRich`](Self::HigherIsRich)).\n\nThe direction is applied consistently to both the regression-residual\npath and the univariate z-score path. The default,\n`HigherIsCheap`, matches the historical regression-path convention\n(positive residual = actual spread above fitted fair spread = cheap).",
+      "oneOf": [
+        {
+          "const": "higher_is_cheap",
+          "description": "Higher Y than peers means the subject is cheap (spread-like metrics).",
+          "type": "string"
+        },
+        {
+          "const": "higher_is_rich",
+          "description": "Higher Y than peers means the subject is rich (multiple-like metrics).",
+          "type": "string"
+        }
+      ]
+    },
+    "d_da0f5f4fb77050db0db0": {
+      "additionalProperties": false,
+      "description": "One company's row in the comps table.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/d_24699bb691d7876870cc",
+          "description": "Company identifier."
+        },
+        "is_subject": {
+          "description": "Whether this row is the subject.",
+          "type": "boolean"
+        },
+        "values": {
+          "description": "One value per configured multiple, in config order; `None` when an input\nis missing, the denominator is not positive or the value is non-finite.",
+          "items": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "is_subject",
+        "values"
+      ],
+      "type": "object"
+    },
+    "d_e3a785c5fc1d129cad8a": {
+      "additionalProperties": false,
+      "description": "One company on a dimension's regression scatter.",
+      "properties": {
+        "company_id": {
+          "$ref": "#/$defs/d_24699bb691d7876870cc",
+          "description": "Company identifier."
+        },
+        "fitted_y": {
+          "description": "`intercept + slope * x` of the dimension's regression; `None` without a\nregression.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "x": {
+          "description": "X metric.",
+          "format": "double",
+          "type": "number"
+        },
+        "y": {
+          "description": "Y metric.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "company_id",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "d_f11bafab717d4afd5364": {
+      "additionalProperties": false,
+      "description": "One column of the comps table, summarised over the peers.",
+      "properties": {
+        "multiple": {
+          "$ref": "#/$defs/d_4b09cc364b90f7dfcfc7",
+          "description": "The multiple."
+        },
+        "peer_stats": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_64ae2275be50f6b09287"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Statistics of the peers' computable values; `None` when no peer has one."
+        },
+        "percentile": {
+          "description": "Share of those peer values at or below the subject's, from 0 to 1;\n`None` without a subject value or peer values.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "subject_value": {
+          "description": "Subject's value; `None` when it cannot be computed.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "z_score": {
+          "description": "Subject's z-score within those peer values; `None` without a subject\nvalue, with fewer than two peer values or when they do not differ.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "multiple"
+      ],
+      "type": "object"
+    }
+  }
+}

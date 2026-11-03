@@ -1471,6 +1471,14 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-relative-value-report-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-relative-value-report",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-scenario-diff",
       "type": "registry:lib"
     },

@@ -575,6 +575,16 @@
     "schema": "schemas/lbo_result.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/relative_value_report_config.schema.json",
+    "schema": "schemas/relative_value_report_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report.schema.json",
+    "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/relative_value_report.schema.json",
+    "schema": "schemas/relative_value_report.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
     "source": "finstack-quant/statements-analytics/schemas/statements_analytics/1/scenario_diff.schema.json",
     "schema": "schemas/scenario_diff.json"

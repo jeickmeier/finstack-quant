@@ -197,6 +197,15 @@ def capital_structure_cases() -> dict[str, Any]:
     }
 
 
+def relative_value_cases() -> dict[str, Any]:
+    """Comps table, regression scatter and score; and a table with no usable dimension."""
+    subject, universe = INPUTS["relative_value_subject"], INPUTS["relative_value_universe"]
+    return {
+        "full": doc(sa.relative_value_report(subject, universe, INPUTS["relative_value_config"])),
+        "table_only": doc(sa.relative_value_report(subject, universe, INPUTS["relative_value_table_only_config"])),
+    }
+
+
 def analytics_cases() -> dict[str, Any]:
     result = st.Evaluator().evaluate(MODEL)
     tracer = sa.DependencyTracer(MODEL)
@@ -328,6 +337,7 @@ def analytics_cases() -> dict[str, Any]:
             "value": sensitivity.get_value(0, "profit", Q2),
         },
         "capital_structure_summary": capital_structure_cases(),
+        "relative_value_report": relative_value_cases(),
         "explanation_text": sa.explain_formula(MODEL, result, "profit", Q1).to_text(),
         "forecast_summary": sa.backtest_forecast([100.0, 110.0], [98.0, 112.0]).summary(),
         # Execution goldens for the comps statistics, the LBO and the DCF tornado

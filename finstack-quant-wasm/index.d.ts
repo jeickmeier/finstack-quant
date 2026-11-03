@@ -32986,6 +32986,25 @@ export interface StatementsAnalyticsNamespace {
    */
   scoreRelativeValue(peerSet: unknown, dimensions: unknown[]): RelativeValueResult;
   /**
+   * Compare one subject with its filtered peers (mirrors Rust `relative_value_report`).
+   *
+   * Returns the comps table, peer statistics, regression scatter and composite
+   * rich/cheap score in one result, so a caller has nothing to compute. A used
+   * dimension and the composite are exactly what `scoreRelativeValue` returns on
+   * the same peers and dimensions; where that function throws because no dimension
+   * is usable, this one still returns the table.
+   * @param subject - `CompanyMetrics` of the company being evaluated (object or JSON). Monetary metrics carry no currency and every company's must already be in one currency. It need not be in `universe`.
+   * @param universe - Candidate peers as `CompanyMetrics` (array or JSON), in the order the report returns them. A member with the subject's id is never a peer and does not count as excluded.
+   * @param config - `RelativeValueReportConfig` (object or JSON): `filter` (optional; a `PeerFilter` listing every field, omitted means every other company is a peer), `period_basis` (required; `"ltm"`, `"ntm"` or `{custom: "<label>"}`; it labels the report and the metrics are used as given), `dimensions` (required; `ScoringDimension` objects with finite non-negative weights, zero disabling one; may be empty when `multiples` is not) and `multiples` (required; multiple identifiers such as `"ev_ebitda"`, the columns in order; may be empty when `dimensions` is not).
+   * @returns `RelativeValueReport` plain object: `subject_id`, `period_basis`, `peer_count`, `excluded_count` (universe members the filter dropped, not counting the subject), `companies` (subject first, then peers in universe order: `id`, `is_subject`, `values` with one number or null per configured multiple), `multiples` in config order (`multiple`, `subject_value`, `peer_stats`, `percentile`, `z_score`), `dimensions` in config order including excluded ones (`label`, `weight`, `direction`, `y`, `x`, `subject_y`, `subject_x`, `peer_stats`, `percentile`, `z_score`, `regression`, `signal` positive meaning cheap, `excluded_reason`, and `points` for the scatter with `company_id`, `x`, `y`, `fitted_y`), `composite` (the `scoreRelativeValue` result, or null) and `composite_excluded_reason` (`no_dimensions`, `no_usable_dimension`, `non_finite_score`, or null).
+   * @throws If an argument is malformed or `config` carries an unknown field, `dimensions` and `multiples` are both empty, or a weight is negative or non-finite (kind `validation`). No usable dimension is not an error: the table is returned with a null `composite`.
+   */
+  relativeValueReport(
+    subject: generated.statements_analytics.CompanyMetrics | string,
+    universe: generated.statements_analytics.CompanyMetrics[] | string,
+    config: generated.statements_analytics.RelativeValueReportConfig | string
+  ): generated.statements_analytics.RelativeValueReport;
+  /**
    * Reusable dependency tracer for a financial model.
    */
   DependencyTracer: DependencyTracerConstructor;

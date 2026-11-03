@@ -127,6 +127,8 @@ export async function generate(repo = repoRoot) {
           "credit_assessment",
           "capital_structure_summary",
           "capital_structure_summary_config",
+          "relative_value_report",
+          "relative_value_report_config",
           "dcf_options",
           "dcf_sensitivity_result",
           "lbo_config",

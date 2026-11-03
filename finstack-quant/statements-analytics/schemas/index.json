@@ -343,6 +343,24 @@
       "type_name": "RegressionResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report.schema.json",
+      "bytes": 22384,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/relative_value_report.schema.json",
+      "summary": "Comps table, peer statistics, regression scatter and composite rich/cheap score of a subject against its filtered peers.",
+      "title": "RelativeValueReport",
+      "type_name": "RelativeValueReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json",
+      "bytes": 10192,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/relative_value_report_config.schema.json",
+      "summary": "Peer filter, period basis, scoring dimensions and multiple columns for a relative value report.",
+      "title": "RelativeValueReportConfig",
+      "type_name": "RelativeValueReportConfig"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_result.schema.json",
       "bytes": 3129,
       "kind": "output",

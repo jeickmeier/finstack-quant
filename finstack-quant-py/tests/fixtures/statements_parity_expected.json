@@ -1290,6 +1290,382 @@
       "PEER1"
     ],
     "pl_summary_text": "P&L Summary\n\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 Line Item \u2502 2025Q1 \u2502 2025Q2 \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 revenue   \u2502 100.00 \u2502 120.00 \u2502\n\u2502 profit    \u2502  60.00 \u2502  70.00 \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518",
+    "relative_value_report": {
+      "full": {
+        "companies": [
+          {
+            "id": "SUBJ",
+            "is_subject": true,
+            "values": [
+              120.0,
+              10.0,
+              null
+            ]
+          },
+          {
+            "id": "P1",
+            "is_subject": false,
+            "values": [
+              100.0,
+              8.0,
+              null
+            ]
+          },
+          {
+            "id": "P2",
+            "is_subject": false,
+            "values": [
+              100.0,
+              9.0,
+              null
+            ]
+          },
+          {
+            "id": "P3",
+            "is_subject": false,
+            "values": [
+              103.33333333333333,
+              12.0,
+              null
+            ]
+          },
+          {
+            "id": "P4",
+            "is_subject": false,
+            "values": [
+              95.0,
+              null,
+              null
+            ]
+          },
+          {
+            "id": "P5",
+            "is_subject": false,
+            "values": [
+              null,
+              11.0,
+              null
+            ]
+          }
+        ],
+        "composite": {
+          "company_id": "SUBJ",
+          "composite_score": 3.4023888666641264,
+          "confidence": 0.9923034634414514,
+          "dimensions": [
+            {
+              "label": "Spread vs Leverage",
+              "percentile": 0.6,
+              "r_squared": 0.9923034634414514,
+              "regression_residual": 52.5,
+              "weight": 0.7,
+              "z_score": 0.487666711453614
+            },
+            {
+              "label": "EV/EBITDA",
+              "percentile": 0.5,
+              "r_squared": null,
+              "regression_residual": null,
+              "weight": 0.3,
+              "z_score": 0.0
+            }
+          ],
+          "peer_count": 5
+        },
+        "composite_excluded_reason": null,
+        "dimensions": [
+          {
+            "direction": "higher_is_cheap",
+            "excluded_reason": null,
+            "label": "Spread vs Leverage",
+            "peer_stats": {
+              "count": 5,
+              "iqr": 110.0,
+              "max": 380.0,
+              "mean": 248.0,
+              "median": 250.0,
+              "min": 100.0,
+              "q1": 200.0,
+              "q3": 310.0,
+              "std_dev": 106.6302021005306
+            },
+            "percentile": 0.6,
+            "points": [
+              {
+                "company_id": "SUBJ",
+                "fitted_y": 247.5,
+                "x": 2.5,
+                "y": 300.0
+              },
+              {
+                "company_id": "P1",
+                "fitted_y": 105.0,
+                "x": 1.0,
+                "y": 100.0
+              },
+              {
+                "company_id": "P2",
+                "fitted_y": 200.0,
+                "x": 2.0,
+                "y": 200.0
+              },
+              {
+                "company_id": "P3",
+                "fitted_y": 295.0,
+                "x": 3.0,
+                "y": 310.0
+              },
+              {
+                "company_id": "P4",
+                "fitted_y": 390.0,
+                "x": 4.0,
+                "y": 380.0
+              }
+            ],
+            "regression": {
+              "fitted_value": 247.5,
+              "intercept": 10.0,
+              "n": 4,
+              "r_squared": 0.9923034634414514,
+              "residual": 52.5,
+              "slope": 95.0
+            },
+            "signal": 4.860555523805895,
+            "subject_x": 2.5,
+            "subject_y": 300.0,
+            "weight": 0.7,
+            "x": {
+              "named": "leverage"
+            },
+            "y": {
+              "named": "oas_bp"
+            },
+            "z_score": 0.487666711453614
+          },
+          {
+            "direction": "higher_is_rich",
+            "excluded_reason": null,
+            "label": "EV/EBITDA",
+            "peer_stats": {
+              "count": 4,
+              "iqr": 2.5,
+              "max": 12.0,
+              "mean": 10.0,
+              "median": 10.0,
+              "min": 8.0,
+              "q1": 8.75,
+              "q3": 11.25,
+              "std_dev": 1.8257418583505538
+            },
+            "percentile": 0.5,
+            "points": [],
+            "regression": null,
+            "signal": -0.0,
+            "subject_x": null,
+            "subject_y": 10.0,
+            "weight": 0.3,
+            "x": null,
+            "y": {
+              "multiple": "ev_ebitda"
+            },
+            "z_score": 0.0
+          },
+          {
+            "direction": "higher_is_cheap",
+            "excluded_reason": "zero_weight",
+            "label": "Disabled",
+            "peer_stats": {
+              "count": 5,
+              "iqr": 110.0,
+              "max": 380.0,
+              "mean": 248.0,
+              "median": 250.0,
+              "min": 100.0,
+              "q1": 200.0,
+              "q3": 310.0,
+              "std_dev": 106.6302021005306
+            },
+            "percentile": 0.6,
+            "points": [],
+            "regression": null,
+            "signal": null,
+            "subject_x": null,
+            "subject_y": 300.0,
+            "weight": 0.0,
+            "x": null,
+            "y": {
+              "named": "oas_bp"
+            },
+            "z_score": 0.487666711453614
+          },
+          {
+            "direction": "higher_is_cheap",
+            "excluded_reason": "no_subject_value",
+            "label": "Nobody has it",
+            "peer_stats": null,
+            "percentile": null,
+            "points": [],
+            "regression": null,
+            "signal": null,
+            "subject_x": null,
+            "subject_y": null,
+            "weight": 1.0,
+            "x": null,
+            "y": {
+              "custom": "missing"
+            },
+            "z_score": null
+          }
+        ],
+        "excluded_count": 1,
+        "multiples": [
+          {
+            "multiple": "spread_per_turn",
+            "peer_stats": {
+              "count": 4,
+              "iqr": 2.0833333333333286,
+              "max": 103.33333333333333,
+              "mean": 99.58333333333333,
+              "median": 100.0,
+              "min": 95.0,
+              "q1": 98.75,
+              "q3": 100.83333333333333,
+              "std_dev": 3.435921354681385
+            },
+            "percentile": 1.0,
+            "subject_value": 120.0,
+            "z_score": 5.942122813390153
+          },
+          {
+            "multiple": "ev_ebitda",
+            "peer_stats": {
+              "count": 4,
+              "iqr": 2.5,
+              "max": 12.0,
+              "mean": 10.0,
+              "median": 10.0,
+              "min": 8.0,
+              "q1": 8.75,
+              "q3": 11.25,
+              "std_dev": 1.8257418583505538
+            },
+            "percentile": 0.5,
+            "subject_value": 10.0,
+            "z_score": 0.0
+          },
+          {
+            "multiple": "pe",
+            "peer_stats": null,
+            "percentile": null,
+            "subject_value": null,
+            "z_score": null
+          }
+        ],
+        "peer_count": 5,
+        "period_basis": "ltm",
+        "subject_id": "SUBJ"
+      },
+      "table_only": {
+        "companies": [
+          {
+            "id": "SUBJ",
+            "is_subject": true,
+            "values": [
+              10.0
+            ]
+          },
+          {
+            "id": "P1",
+            "is_subject": false,
+            "values": [
+              8.0
+            ]
+          },
+          {
+            "id": "OUT",
+            "is_subject": false,
+            "values": [
+              null
+            ]
+          },
+          {
+            "id": "P2",
+            "is_subject": false,
+            "values": [
+              9.0
+            ]
+          },
+          {
+            "id": "P3",
+            "is_subject": false,
+            "values": [
+              12.0
+            ]
+          },
+          {
+            "id": "P4",
+            "is_subject": false,
+            "values": [
+              null
+            ]
+          },
+          {
+            "id": "P5",
+            "is_subject": false,
+            "values": [
+              11.0
+            ]
+          }
+        ],
+        "composite": null,
+        "composite_excluded_reason": "no_usable_dimension",
+        "dimensions": [
+          {
+            "direction": "higher_is_cheap",
+            "excluded_reason": "no_subject_value",
+            "label": "Nobody has it",
+            "peer_stats": null,
+            "percentile": null,
+            "points": [],
+            "regression": null,
+            "signal": null,
+            "subject_x": null,
+            "subject_y": null,
+            "weight": 1.0,
+            "x": null,
+            "y": {
+              "custom": "missing"
+            },
+            "z_score": null
+          }
+        ],
+        "excluded_count": 0,
+        "multiples": [
+          {
+            "multiple": "ev_ebitda",
+            "peer_stats": {
+              "count": 4,
+              "iqr": 2.5,
+              "max": 12.0,
+              "mean": 10.0,
+              "median": 10.0,
+              "min": 8.0,
+              "q1": 8.75,
+              "q3": 11.25,
+              "std_dev": 1.8257418583505538
+            },
+            "percentile": 0.5,
+            "subject_value": 10.0,
+            "z_score": 0.0
+          }
+        ],
+        "peer_count": 6,
+        "period_basis": {
+          "custom": "FY2025E"
+        },
+        "subject_id": "SUBJ"
+      }
+    },
     "scenario_diff": {
       "baseline": "base",
       "comparison": "down",
