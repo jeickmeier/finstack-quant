@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Portfolio: attribution explain text and bucket shares agree on a zero total
+
+`PortfolioAttribution::explain` treated `total_pnl` as zero only below `1e-10`, while `pct_of_total_by_bucket` uses the default `RoundingContext` (half a unit of the base currency's output scale). A total of 0.003 USD printed percentage shares in the text while the table had none. Both now use one rule, so the text prints `0.0%` exactly where the shares are `None`. Python and WASM explain text follow. No UI fixture moves.
+
 ### Analytics: correlation matrices stay inside [-1, 1]
 
 `Performance::correlation_matrix` now returns a diagonal of exactly 1 and clamps every off-diagonal to `[-1, 1]`, on the clean path and after Higham repair. The validator it applies first tolerates `1e-10` on the diagonal and `1e-12` past each bound, so rounding in the Pearson estimate or the repair could return a coefficient such as `1.0000000000000002`, which a correlation cannot take. Python `Performance.correlation_matrix` and WASM `correlationMatrix` document the bound. No UI fixture moves.
