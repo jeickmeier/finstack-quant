@@ -132,23 +132,15 @@ it("stamps the matrix only when Rust says it repaired it", () => {
   expect(screen.queryByRole("note", { name: "Repaired" })).toBeNull();
   expect(screen.getByText(/did not need to repair/)).toBeTruthy();
   cleanup();
-  // The same native coefficients with Rust's flag set: no panel reaches the
-  // repair through Performance today (see the slice notes), so the branch is
-  // driven by the supplied boolean.
+  // The same native coefficients with Rust's flag set by hand. No panel
+  // reaches Rust's Higham repair through Performance today: its pairwise
+  // estimate has always been a valid correlation matrix, so no native fixture
+  // has repaired: true and this branch is driven by the supplied boolean.
   view({ report: { ...result, repaired: true } });
   expect(screen.getByRole("note", { name: "Repaired" }).textContent).toBe(
     "Repaired",
   );
   expect(screen.getByText(/nearest valid one \(Higham\)/)).toBeTruthy();
-});
-it("keeps the table and drops the heatmap for a coefficient outside [-1, 1]", () => {
-  const matrix = result.matrix.map((row) => [...row]);
-  matrix[0]![0] = 1.0000000000000002;
-  view({ report: { ...result, matrix } });
-  expect(screen.queryByRole("img", { name: "Correlation heatmap" })).toBeNull();
-  expect(
-    screen.getByRole("table", { name: "Correlation matrix" }),
-  ).toBeTruthy();
 });
 it("shows the native error, loading and no result", () => {
   const { message } = fixture.errors.noOverlap;

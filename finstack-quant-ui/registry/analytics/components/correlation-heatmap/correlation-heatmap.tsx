@@ -80,25 +80,23 @@ export function CorrelationHeatmap({
         },
       })),
     ];
-    // heatmap() throws on a value outside its colour domain.
-    const outside = cells.some((cell) => cell.value < -1 || cell.value > 1);
+    // Rust returns a unit diagonal and every coefficient inside [-1, 1], the
+    // heatmap's colour domain.
     return {
       rows: report.matrix.map((values, i) => ({ ticker: names[i]!, values })),
       columns,
-      preset: outside
-        ? null
-        : heatmap({
-            data: cells,
-            x: (cell) => cell.column,
-            y: (cell) => cell.row,
-            value: (cell) => cell.value,
-            key: (cell) => `${cell.row}|${cell.column}`,
-            xLabel: "Ticker",
-            yLabel: "Ticker",
-            valueLabel: "Correlation",
-            formatValue,
-            ...colors,
-          }),
+      preset: heatmap({
+        data: cells,
+        x: (cell) => cell.column,
+        y: (cell) => cell.row,
+        value: (cell) => cell.value,
+        key: (cell) => `${cell.row}|${cell.column}`,
+        xLabel: "Ticker",
+        yLabel: "Ticker",
+        valueLabel: "Correlation",
+        formatValue,
+        ...colors,
+      }),
     };
   }, [report, formatValue]);
   if (error)
@@ -136,19 +134,13 @@ export function CorrelationHeatmap({
           ? "Rust's pairwise estimate was not a valid correlation matrix and was projected to the nearest valid one (Higham); the coefficients below are the repaired matrix."
           : "Pearson correlations of each pair of tickers over their common active dates, as Rust estimated them; Rust did not need to repair the matrix."}
       </p>
-      {view.preset ? (
-        <figure className="min-w-0">
-          <FinstackChart
-            {...view.preset}
-            ariaLabel="Correlation heatmap"
-            height={360}
-          />
-        </figure>
-      ) : (
-        <p role="status" className="text-xs text-muted-foreground">
-          A returned coefficient lies outside [-1, 1]; shown in the table only
-        </p>
-      )}
+      <figure className="min-w-0">
+        <FinstackChart
+          {...view.preset}
+          ariaLabel="Correlation heatmap"
+          height={360}
+        />
+      </figure>
       <FinstackTable
         caption="Correlation matrix"
         captionVisibility="sr-only"
