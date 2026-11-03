@@ -1,7 +1,7 @@
 //! Debt stack by seniority: balances, leverage and coverage through each payment
 //! class, and the maturity wall, from an evaluated capital structure.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, PeriodId};
@@ -127,8 +127,9 @@ pub struct CapitalStructureSummary {
     /// EBITDA summed over the LTM window; `None` when the window is short. It
     /// is reported when zero or negative, though the ratios are then `None`.
     pub ltm_ebitda: Option<Money>,
-    /// Periods a full LTM window holds at the reporting period's frequency (4
-    /// for quarters, 12 for months).
+    /// Periods a full LTM window holds: 4 for quarters, 12 for months, and for a
+    /// daily model the model's days in the trailing twelve months plus any
+    /// calendar days of that year before the model's first day.
     pub ltm_periods_required: u32,
     /// Periods of the window that are in the model and hold an EBITDA value.
     pub ltm_periods_found: u32,
@@ -168,9 +169,10 @@ struct StackEntry<'a> {
 /// payment classes. A model with no waterfall or no payment classes has one
 /// implicit class: every tranche has rank `0` and no class id.
 ///
-/// LTM EBITDA and LTM interest sum the trailing
-/// `period.kind().periods_per_year()` calendar periods ending at `period`, the
-/// slots `ttm()` reads in a formula. A window with a slot missing from the model
+/// LTM EBITDA and LTM interest sum the twelve calendar months of model periods
+/// ending at `period` given by [`ltm_window`](finstack_quant_core::dates::ltm_window),
+/// the slots `ttm()` reads in a formula: 4 quarters or 12 months, and on a daily
+/// model every calendar or business day of the trailing year. A window with a slot missing from the model
 /// or a slot where the EBITDA node has no value is never annualised or
 /// partially summed: LTM EBITDA and every ratio are `None`, and
 /// [`CapitalStructureSummary::ltm_periods_found`] says how many slots held. A
@@ -290,8 +292,7 @@ pub fn capital_structure_summary(
              its capital structure",
         )
     })?;
-    let model_periods: HashSet<PeriodId> = model.periods.iter().map(|p| p.id).collect();
-    if !model_periods.contains(&period) {
+    if !model.periods.iter().any(|p| p.id == period) {
         return Err(Error::invalid_input(format!(
             "Capital structure summary period {period} is not in the model"
         )));
@@ -314,17 +315,19 @@ pub fn capital_structure_summary(
         total_debt = add(total_debt, *balance)?;
     }
 
-    let required = period.kind().periods_per_year();
-    let window: Vec<PeriodId> = (0..required)
-        .rev()
-        .filter_map(|back| period.shift(-i32::from(back)).ok())
-        .filter(|slot| model_periods.contains(slot))
+    let ltm = finstack_quant_core::dates::ltm_window(period, &model.periods)
+        .map_err(|error| Error::invalid_input(error.to_string()))?;
+    let required = ltm.required();
+    let window: Vec<PeriodId> = ltm
+        .slots
+        .into_iter()
+        .filter(|slot| model.periods.iter().any(|p| p.id == *slot))
         .collect();
-    let full_window = window.len() == usize::from(required);
+    let full_window = window.len() == required;
 
     let ebitda_values = node_values(results, &config.ebitda_node, &window, currency)?;
     let found = ebitda_values.len();
-    let ltm_ebitda_amount = (found == usize::from(required))
+    let ltm_ebitda_amount = (found == required)
         .then(|| finite_sum(&ebitda_values, &config.ebitda_node))
         .transpose()?;
     let ltm_ebitda = ltm_ebitda_amount
@@ -400,7 +403,8 @@ pub fn capital_structure_summary(
         cash,
         net_debt,
         ltm_ebitda,
-        ltm_periods_required: u32::from(required),
+        ltm_periods_required: u32::try_from(required)
+            .map_err(|_| Error::invalid_input("LTM window is too long"))?,
         ltm_periods_found: found as u32,
         total_leverage: earnings
             .map(|ebitda| ratio(total_debt.amount(), ebitda))
@@ -716,7 +720,7 @@ fn share(part: Money, total: Money) -> Result<Option<f64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{build_periods, Period};
+    use finstack_quant_core::dates::{build_periods, Period, PeriodKind};
     use finstack_quant_statements::capital_structure::{
         CashflowBreakdown, PaymentClassSpec, WaterfallSpec,
     };
@@ -941,6 +945,70 @@ mod tests {
         assert_close(summary.net_leverage, 770.0 / 460.0);
         // 460 / (40 + 20 + 4); the swap's 396 stays out.
         assert_close(summary.total_coverage, 7.1875);
+    }
+
+    /// Business-day model over 2024-2025 with one term loan (balance 261,
+    /// interest 0.1 a day) and EBITDA of 1 a day.
+    fn business_day_fixture() -> (StatementResult, FinancialModelSpec, Vec<PeriodId>) {
+        let mut model = model_of(
+            "2025Q1..2025Q1",
+            vec![("TLA", term_loan(date!(2029 - 06 - 30)))],
+            vec![class("1L", 0, &["TLA"])],
+        );
+        model.periods.clear();
+        let mut day = date!(2024 - 01 - 01);
+        while day <= date!(2025 - 12 - 31) {
+            if day.weekday().number_days_from_monday() < 5 {
+                let id = PeriodId::from_date(day, PeriodKind::Daily, None).expect("day");
+                model.periods.push(Period {
+                    id,
+                    start: day,
+                    end: day.next_day().expect("next day"),
+                    is_actual: true,
+                });
+            }
+            day = day.next_day().expect("next day");
+        }
+        let days: Vec<PeriodId> = model.periods.iter().map(|p| p.id).collect();
+        let mut cashflows = CapitalStructureCashflows::new();
+        cashflows
+            .by_instrument
+            .insert("TLA".to_string(), rows(&days, 261.0, 0.1, 0.0));
+        let mut results = StatementResult::new();
+        results.cs_cashflows = Some(cashflows);
+        results.nodes.insert(
+            "ebitda".to_string(),
+            days.iter().map(|id| (*id, 1.0)).collect(),
+        );
+        (results, model, days)
+    }
+
+    #[test]
+    fn daily_ltm_covers_twelve_calendar_months_of_business_days() {
+        let (results, model, days) = business_day_fixture();
+        let at = *days.last().expect("last day");
+        let summary =
+            capital_structure_summary(&results, &model, &config(at, None)).expect("summary");
+        // 2025 has 261 weekdays; a fixed 252-row window would read ~8.3 months
+        // short of that and overstate leverage.
+        assert_eq!(summary.ltm_periods_required, 261);
+        assert_eq!(summary.ltm_periods_found, 261);
+        assert_eq!(summary.ltm_ebitda, Some(usd(261.0)));
+        assert_close(summary.total_leverage, 1.0);
+        let interest = summary.tranches[0].ltm_interest.expect("interest").amount();
+        assert!((interest - 26.1).abs() < 1e-9, "{interest}");
+    }
+
+    #[test]
+    fn daily_ltm_inside_the_first_year_is_short() {
+        let (results, model, _) = business_day_fixture();
+        let at = PeriodId::from_date(date!(2024 - 12 - 30), PeriodKind::Daily, None).expect("day");
+        let summary =
+            capital_structure_summary(&results, &model, &config(at, None)).expect("summary");
+        assert_eq!(summary.ltm_ebitda, None);
+        assert_eq!(summary.total_leverage, None);
+        assert_eq!(summary.tranches[0].ltm_interest, None);
+        assert!(summary.ltm_periods_found < summary.ltm_periods_required);
     }
 
     #[test]

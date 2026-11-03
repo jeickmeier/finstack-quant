@@ -69,6 +69,7 @@ impl Evaluator {
         instruments: &Instruments,
         cs_state: &mut crate::capital_structure::CapitalStructureState,
         cs_affected_nodes: &HashSet<NodeId>,
+        mut mc: Option<(u64, &mut super::engine::McZCache)>,
     ) -> Result<DynamicPeriodEvaluation> {
         let period_id = period.id;
 
@@ -93,9 +94,9 @@ impl Evaluator {
             is_actual,
             eval_order,
             &mut context,
+            mc.as_ref().map(|(seed, _)| *seed),
             None,
-            None,
-            None,
+            mc.as_mut().map(|(_, cache)| &mut **cache),
         )?;
 
         let mut waterfall_replaced_flows = false;
@@ -138,9 +139,9 @@ impl Evaluator {
                 is_actual,
                 eval_order,
                 &mut context,
-                None,
+                mc.as_ref().map(|(seed, _)| *seed),
                 Some(cs_affected_nodes),
-                None,
+                mc.as_mut().map(|(_, cache)| &mut **cache),
             )?;
         }
 
