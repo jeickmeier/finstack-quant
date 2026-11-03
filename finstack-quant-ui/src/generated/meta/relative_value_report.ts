@@ -590,6 +590,11 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_e3a785c5fc1d129cad8a/properties/is_subject",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report.schema.json#/$defs/RelativeValuePoint/properties/is_subject",
+    "description": "Whether this point is the subject's."
+  },
+  {
     "path": "#/$defs/d_e3a785c5fc1d129cad8a/properties/x",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report.schema.json#/$defs/RelativeValuePoint/properties/x",
     "description": "X metric.",

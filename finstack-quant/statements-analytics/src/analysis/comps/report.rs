@@ -77,6 +77,8 @@ pub struct RelativeValueMultiple {
 pub struct RelativeValuePoint {
     /// Company identifier.
     pub company_id: CompanyId,
+    /// Whether this point is the subject's.
+    pub is_subject: bool,
     /// X metric.
     pub x: f64,
     /// Y metric.
@@ -355,11 +357,17 @@ fn dimension_row(peer_set: &PeerSet, dim: &ScoringDimension) -> RelativeValueDim
     };
     let subject_point = evaluation.subject_x.zip(evaluation.subject_y);
     let points = subject_point
-        .map(|(x, y)| (&peer_set.subject.id, x, y))
+        .map(|(x, y)| (&peer_set.subject.id, true, x, y))
         .into_iter()
-        .chain(evaluation.peer_pairs.iter().copied())
-        .map(|(id, x, y)| RelativeValuePoint {
+        .chain(
+            evaluation
+                .peer_pairs
+                .iter()
+                .map(|&(id, x, y)| (id, false, x, y)),
+        )
+        .map(|(id, is_subject, x, y)| RelativeValuePoint {
             company_id: id.clone(),
+            is_subject,
             x,
             y,
             fitted_y: fitted(x),
@@ -591,8 +599,9 @@ mod tests {
             ("P4", 4.0, 380.0, 390.0),
         ];
         assert_eq!(dim.points.len(), expected.len());
-        for (point, (id, x, y, fitted)) in dim.points.iter().zip(expected) {
+        for (index, (point, (id, x, y, fitted))) in dim.points.iter().zip(expected).enumerate() {
             assert_eq!(point.company_id.as_str(), id);
+            assert_eq!(point.is_subject, index == 0);
             assert_eq!(point.x, x);
             assert_eq!(point.y, y);
             close(point.fitted_y.expect("regression"), fitted);
@@ -713,6 +722,7 @@ mod tests {
         assert_eq!(no_subject.regression, None);
         // The peers are still plotted, without a line, and the subject is not.
         assert_eq!(no_subject.points.len(), 3);
+        assert!(no_subject.points.iter().all(|p| !p.is_subject));
         assert!(no_subject.points.iter().all(|p| p.fitted_y.is_none()));
 
         let no_peers = exclusion_of(

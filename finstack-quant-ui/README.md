@@ -1219,8 +1219,8 @@ Rust's `is_subject`; per multiple, the subject value, percentile, z-score and
 peer statistics, and one bar per multiple from zero to Rust's `percentile`; per
 dimension, Rust's subject values, percentile, z-score, regression, signal and
 `excluded_reason` with its contract description, and a scatter of Rust's
-`points`, the subject found by comparing `company_id` with `subject_id` and the
-line drawn through each point's `fitted_y` in order of `x`. Numbers show to
+`points`, the subject marked by each point's `is_subject` and the line drawn
+through each point's `fitted_y` in order of `x`. Numbers show to
 four decimals by default (`formatNumber`), never as "-0", and percentiles as a
 percent (`formatPercentile`); a null or a live NaN shows as Undefined. Nothing
 is computed here. The item is standalone: the universe is host-supplied, and

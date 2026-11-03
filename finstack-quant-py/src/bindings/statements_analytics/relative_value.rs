@@ -141,8 +141,9 @@ impl PyRelativeValuePoint {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "RelativeValuePoint(company_id={:?}, x={}, y={}, fitted_y={:?})",
+            "RelativeValuePoint(company_id={:?}, is_subject={}, x={}, y={}, fitted_y={:?})",
             self.inner.company_id.as_str(),
+            py_bool(self.inner.is_subject),
             self.inner.x,
             self.inner.y,
             self.inner.fitted_y
@@ -153,6 +154,9 @@ impl PyRelativeValuePoint {
 crate::bindings::macros::py_getters!(PyRelativeValuePoint |s| {
     #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValuePoint.company_id")]
     company_id -> String = s.inner.company_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValuePoint.is_subject")]
+    is_subject -> bool = s.inner.is_subject;
 
     #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValuePoint.x")]
     x -> f64 = s.inner.x;

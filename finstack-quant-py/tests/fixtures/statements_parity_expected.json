@@ -1398,30 +1398,35 @@
               {
                 "company_id": "SUBJ",
                 "fitted_y": 247.5,
+                "is_subject": true,
                 "x": 2.5,
                 "y": 300.0
               },
               {
                 "company_id": "P1",
                 "fitted_y": 105.0,
+                "is_subject": false,
                 "x": 1.0,
                 "y": 100.0
               },
               {
                 "company_id": "P2",
                 "fitted_y": 200.0,
+                "is_subject": false,
                 "x": 2.0,
                 "y": 200.0
               },
               {
                 "company_id": "P3",
                 "fitted_y": 295.0,
+                "is_subject": false,
                 "x": 3.0,
                 "y": 310.0
               },
               {
                 "company_id": "P4",
                 "fitted_y": 390.0,
+                "is_subject": false,
                 "x": 4.0,
                 "y": 380.0
               }
@@ -1772,30 +1777,35 @@
               {
                 "company_id": "SUBJ",
                 "fitted_y": 247.5,
+                "is_subject": true,
                 "x": 2.5,
                 "y": 300.0
               },
               {
                 "company_id": "P1",
                 "fitted_y": 105.0,
+                "is_subject": false,
                 "x": 1.0,
                 "y": 100.0
               },
               {
                 "company_id": "P2",
                 "fitted_y": 200.0,
+                "is_subject": false,
                 "x": 2.0,
                 "y": 200.0
               },
               {
                 "company_id": "P3",
                 "fitted_y": 295.0,
+                "is_subject": false,
                 "x": 3.0,
                 "y": 310.0
               },
               {
                 "company_id": "P4",
                 "fitted_y": 390.0,
+                "is_subject": false,
                 "x": 4.0,
                 "y": 380.0
               }

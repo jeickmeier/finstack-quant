@@ -569,6 +569,10 @@
             "null"
           ]
         },
+        "is_subject": {
+          "description": "Whether this point is the subject's.",
+          "type": "boolean"
+        },
         "x": {
           "description": "X metric.",
           "format": "double",
@@ -582,6 +586,7 @@
       },
       "required": [
         "company_id",
+        "is_subject",
         "x",
         "y"
       ],

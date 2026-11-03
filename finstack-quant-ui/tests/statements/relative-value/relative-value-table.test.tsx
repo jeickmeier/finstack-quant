@@ -216,11 +216,14 @@ it("draws each percentile bar at Rust's percentile, with no arithmetic", async (
   expect(source).not.toMatch(/reduce\(|\+=|Big\(|intercept|slope \*/);
 });
 
-it("plots the regression points with the subject found by its id and the line through Rust's fitted values", () => {
+it("plots the regression points with Rust's subject mark and the line through Rust's fitted values", () => {
   const [regression] = full.dimensions;
-  const points = scatterPoints(full, regression!);
+  const points = scatterPoints(regression!);
   expect(points.map((point) => point.company_id)).toEqual(
     regression!.points.map((point) => point.company_id),
+  );
+  expect(points.map((point) => point.role)).toEqual(
+    regression!.points.map((point) => (point.is_subject ? "Subject" : "Peer")),
   );
   expect(
     points.filter((point) => point.role === "Subject").map((p) => p.company_id),
@@ -269,7 +272,7 @@ it("shows an excluded dimension's reason with no signal or scatter of the subjec
   expect(value(panel, "Signal")).toBe("Undefined");
   expect(value(panel, "Subject x")).toBe("Undefined");
   expect(
-    scatterPoints(report, excluded).some((point) => point.role === "Subject"),
+    scatterPoints(excluded).some((point) => point.role === "Subject"),
   ).toBe(false);
   // The composite still scores on the two usable dimensions.
   expect(report.composite).not.toBeNull();
