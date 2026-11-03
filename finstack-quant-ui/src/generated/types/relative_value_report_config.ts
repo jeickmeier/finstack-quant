@@ -98,25 +98,26 @@ export interface D_86000E716C2D71C7Ab11 {
 }
 /**
  * Screen applied to the universe. Omitted, every other company is a peer.
- * When supplied it lists every [`PeerFilter`] field.
+ * Any [`PeerFilter`] field may be omitted, meaning no constraint on it; an
+ * unknown field is rejected.
  */
 export interface D_760F2D8Fbcaab83250Fc {
   /**
    * ISO country codes to include (meta key: "country").
    */
-  countries: string[];
+  countries?: string[];
   /**
    * Excluded attribute tags (none may be present).
    */
-  excluded_tags: string[];
+  excluded_tags?: string[];
   /**
    * GICS industry codes to include (meta key: "gics_industry").
    */
-  gics_industries: string[];
+  gics_industries?: string[];
   /**
    * GICS sector codes to include (meta key: "gics_sector").
    */
-  gics_sectors: string[];
+  gics_sectors?: string[];
   /**
    * Market cap ceiling (inclusive).
    */
@@ -128,14 +129,13 @@ export interface D_760F2D8Fbcaab83250Fc {
   /**
    * Credit rating bands to include (meta key: "rating").
    */
-  ratings: string[];
+  ratings?: string[];
   /**
    * Required attribute tags (all must be present).
    */
-  required_tags: string[];
+  required_tags?: string[];
   /**
    * Arbitrary attribute selector strings (uses `Attributes::matches_selector`).
    */
-  selectors: string[];
-  [k: string]: unknown;
+  selectors?: string[];
 }

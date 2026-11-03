@@ -198,11 +198,14 @@ def capital_structure_cases() -> dict[str, Any]:
 
 
 def relative_value_cases() -> dict[str, Any]:
-    """Comps table, regression scatter and score; and a table with no usable dimension."""
+    """Comps table, regression scatter and score; a table with no usable dimension; a partial filter."""
     subject, universe = INPUTS["relative_value_subject"], INPUTS["relative_value_universe"]
     return {
         "full": doc(sa.relative_value_report(subject, universe, INPUTS["relative_value_config"])),
         "table_only": doc(sa.relative_value_report(subject, universe, INPUTS["relative_value_table_only_config"])),
+        "partial_filter": doc(
+            sa.relative_value_report(subject, universe, INPUTS["relative_value_partial_filter_config"])
+        ),
     }
 
 

@@ -9,11 +9,12 @@ export default [
   {
     "path": "#/$defs/d_760f2d8fbcaab83250fc",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json#/$defs/PeerFilter",
-    "description": "Criteria for filtering companies into a peer set.\n\nAll criteria are AND-ed: a company must satisfy every non-empty\nconstraint to be included. For OR semantics across sectors or\nratings, supply multiple values in the respective `Vec`."
+    "description": "Criteria for filtering companies into a peer set.\n\nAll criteria are AND-ed: a company must satisfy every non-empty\nconstraint to be included. For OR semantics across sectors or\nratings, supply multiple values in the respective `Vec`.\n\nEvery field may be omitted from the serde document: an omitted list or\nbound is no constraint, so `{}` (the [`Default`]) accepts every company.\nUnknown keys are rejected, so a misspelt criterion is an error rather than\na silently dropped screen."
   },
   {
     "path": "#/$defs/d_760f2d8fbcaab83250fc/properties/countries",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json#/$defs/PeerFilter/properties/countries",
+    "default": [],
     "description": "ISO country codes to include (meta key: \"country\")."
   },
   {
@@ -23,6 +24,7 @@ export default [
   {
     "path": "#/$defs/d_760f2d8fbcaab83250fc/properties/excluded_tags",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json#/$defs/PeerFilter/properties/excluded_tags",
+    "default": [],
     "description": "Excluded attribute tags (none may be present)."
   },
   {
@@ -32,6 +34,7 @@ export default [
   {
     "path": "#/$defs/d_760f2d8fbcaab83250fc/properties/gics_industries",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json#/$defs/PeerFilter/properties/gics_industries",
+    "default": [],
     "description": "GICS industry codes to include (meta key: \"gics_industry\")."
   },
   {
@@ -41,6 +44,7 @@ export default [
   {
     "path": "#/$defs/d_760f2d8fbcaab83250fc/properties/gics_sectors",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json#/$defs/PeerFilter/properties/gics_sectors",
+    "default": [],
     "description": "GICS sector codes to include (meta key: \"gics_sector\")."
   },
   {
@@ -50,18 +54,21 @@ export default [
   {
     "path": "#/$defs/d_760f2d8fbcaab83250fc/properties/market_cap_max",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json#/$defs/PeerFilter/properties/market_cap_max",
+    "default": null,
     "description": "Market cap ceiling (inclusive).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_760f2d8fbcaab83250fc/properties/market_cap_min",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json#/$defs/PeerFilter/properties/market_cap_min",
+    "default": null,
     "description": "Market cap floor (inclusive).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_760f2d8fbcaab83250fc/properties/ratings",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json#/$defs/PeerFilter/properties/ratings",
+    "default": [],
     "description": "Credit rating bands to include (meta key: \"rating\")."
   },
   {
@@ -71,6 +78,7 @@ export default [
   {
     "path": "#/$defs/d_760f2d8fbcaab83250fc/properties/required_tags",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json#/$defs/PeerFilter/properties/required_tags",
+    "default": [],
     "description": "Required attribute tags (all must be present)."
   },
   {
@@ -80,6 +88,7 @@ export default [
   {
     "path": "#/$defs/d_760f2d8fbcaab83250fc/properties/selectors",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json#/$defs/PeerFilter/properties/selectors",
+    "default": [],
     "description": "Arbitrary attribute selector strings (uses `Attributes::matches_selector`)."
   },
   {
@@ -305,7 +314,7 @@ export default [
       "required_tags": [],
       "selectors": []
     },
-    "description": "Screen applied to the universe. Omitted, every other company is a peer.\nWhen supplied it lists every [`PeerFilter`] field.",
+    "description": "Screen applied to the universe. Omitted, every other company is a peer.\nAny [`PeerFilter`] field may be omitted, meaning no constraint on it; an\nunknown field is rejected.",
     "ref": "#/$defs/PeerFilter",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json#/$defs/PeerFilter"
   },

@@ -113,8 +113,13 @@ impl FromStr for Multiple {
 /// All monetary values should be in the same currency before constructing
 /// a `PeerSet`. Currency normalization is the caller's responsibility.
 /// Ratios are plain scalars (e.g., `6.5` means 6.5x leverage).
+///
+/// The serde document rejects unknown keys: a metric outside the named fields
+/// belongs in `custom`, so a misspelt named metric is an error rather than a
+/// silently missing value.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CompanyMetrics {
     /// Company identifier.
     pub id: CompanyId,
@@ -316,5 +321,21 @@ mod tests {
         assert_eq!(metrics.get("rule_of_40"), Some(42.0));
         assert_eq!(metrics.get("leverage"), None);
         assert_eq!(metrics.get("unknown"), None);
+    }
+
+    #[test]
+    fn serde_document_is_strict() {
+        let metrics: CompanyMetrics =
+            serde_json::from_value(serde_json::json!({"id": "ACME", "ebitda": 100.0}))
+                .expect("omitted metrics are missing");
+        assert_eq!(metrics.ebitda, Some(100.0));
+        assert_eq!(metrics.leverage, None);
+
+        let error = serde_json::from_value::<CompanyMetrics>(serde_json::json!({
+            "id": "ACME",
+            "ebidta": 100.0,
+        }))
+        .expect_err("unknown field");
+        assert!(error.to_string().contains("ebidta"), "{error}");
     }
 }

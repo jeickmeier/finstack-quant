@@ -290,7 +290,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/peer_filter.schema.json",
-      "bytes": 2062,
+      "bytes": 2134,
       "kind": "component",
       "path": "schemas/statements_analytics/1/peer_filter.schema.json",
       "summary": "Criteria for filtering companies into a peer set.",
@@ -299,7 +299,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/peer_set.schema.json",
-      "bytes": 7845,
+      "bytes": 8060,
       "kind": "component",
       "path": "schemas/statements_analytics/1/peer_set.schema.json",
       "summary": "A set of comparable companies with their metrics.",
@@ -353,7 +353,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json",
-      "bytes": 10192,
+      "bytes": 10570,
       "kind": "input",
       "path": "schemas/statements_analytics/1/relative_value_report_config.schema.json",
       "summary": "Peer filter, period basis, scoring dimensions and multiple columns for a relative value report.",

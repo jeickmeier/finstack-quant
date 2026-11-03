@@ -19,7 +19,8 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct RelativeValueReportConfig {
     /// Screen applied to the universe. Omitted, every other company is a peer.
-    /// When supplied it lists every [`PeerFilter`] field.
+    /// Any [`PeerFilter`] field may be omitted, meaning no constraint on it; an
+    /// unknown field is rejected.
     #[serde(default)]
     pub filter: PeerFilter,
     /// Period basis the supplied metrics are stated on. It labels the report;
@@ -881,6 +882,28 @@ mod tests {
         }))
         .expect_err("unknown field");
         assert!(error.to_string().contains("guess"));
+
+        // A partial filter screens on the fields it names only.
+        let partial: RelativeValueReportConfig = serde_json::from_value(serde_json::json!({
+            "filter": {"gics_sectors": ["Energy"]},
+            "period_basis": "ltm",
+            "dimensions": [],
+            "multiples": ["ev_ebitda"],
+        }))
+        .expect("a partial filter deserializes");
+        let report =
+            relative_value_report(&subject(), &universe(), &partial).expect("valid request");
+        assert_eq!(report.peer_count, 5);
+        assert_eq!(report.excluded_count, 1);
+
+        let error = serde_json::from_value::<RelativeValueReportConfig>(serde_json::json!({
+            "filter": {"rating": ["BB"]},
+            "period_basis": "ltm",
+            "dimensions": [],
+            "multiples": ["ev_ebitda"],
+        }))
+        .expect_err("misspelt filter field");
+        assert!(error.to_string().contains("rating"), "{error}");
     }
 
     #[test]

@@ -1,9 +1,11 @@
 {
   "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/peer_filter.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Criteria for filtering companies into a peer set.",
   "properties": {
     "countries": {
+      "default": [],
       "description": "ISO country codes to include (meta key: \"country\").",
       "items": {
         "type": "string"
@@ -11,6 +13,7 @@
       "type": "array"
     },
     "excluded_tags": {
+      "default": [],
       "description": "Excluded attribute tags (none may be present).",
       "items": {
         "type": "string"
@@ -18,6 +21,7 @@
       "type": "array"
     },
     "gics_industries": {
+      "default": [],
       "description": "GICS industry codes to include (meta key: \"gics_industry\").",
       "items": {
         "type": "string"
@@ -25,6 +29,7 @@
       "type": "array"
     },
     "gics_sectors": {
+      "default": [],
       "description": "GICS sector codes to include (meta key: \"gics_sector\").",
       "items": {
         "type": "string"
@@ -32,6 +37,7 @@
       "type": "array"
     },
     "market_cap_max": {
+      "default": null,
       "description": "Market cap ceiling (inclusive).",
       "format": "double",
       "type": [
@@ -40,6 +46,7 @@
       ]
     },
     "market_cap_min": {
+      "default": null,
       "description": "Market cap floor (inclusive).",
       "format": "double",
       "type": [
@@ -48,6 +55,7 @@
       ]
     },
     "ratings": {
+      "default": [],
       "description": "Credit rating bands to include (meta key: \"rating\").",
       "items": {
         "type": "string"
@@ -55,6 +63,7 @@
       "type": "array"
     },
     "required_tags": {
+      "default": [],
       "description": "Required attribute tags (all must be present).",
       "items": {
         "type": "string"
@@ -62,6 +71,7 @@
       "type": "array"
     },
     "selectors": {
+      "default": [],
       "description": "Arbitrary attribute selector strings (uses `Attributes::matches_selector`).",
       "items": {
         "type": "string"
@@ -69,15 +79,6 @@
       "type": "array"
     }
   },
-  "required": [
-    "gics_sectors",
-    "gics_industries",
-    "countries",
-    "ratings",
-    "required_tags",
-    "excluded_tags",
-    "selectors"
-  ],
   "title": "PeerFilter",
   "type": "object"
 }

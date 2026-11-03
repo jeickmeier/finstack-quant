@@ -160,11 +160,25 @@ def test_table_survives_when_no_dimension_is_usable() -> None:
         {"period_basis": "ltm", "dimensions": [], "multiples": ["pe"], "guess": True},
         {"period_basis": "ltm", "dimensions": [], "multiples": ["not_a_multiple"]},
         {"dimensions": [], "multiples": ["pe"]},
+        {"filter": {"gics_sector": ["energy"]}, "period_basis": "ltm", "dimensions": [], "multiples": ["pe"]},
     ],
 )
 def test_invalid_requests_raise_value_error(config: dict[str, object]) -> None:
     with pytest.raises(ValueError, match=r".+"):
         relative_value_report(SUBJECT, UNIVERSE, config)
+
+
+def test_partial_filter_matches_the_full_filter() -> None:
+    partial = {**CONFIG, "filter": {"gics_sectors": ["energy"]}}
+    assert relative_value_report(SUBJECT, UNIVERSE, partial).to_json() == (
+        relative_value_report(SUBJECT, UNIVERSE, CONFIG).to_json()
+    )
+
+
+def test_misspelt_company_metric_raises_value_error() -> None:
+    misspelt = {"id": "TYPO", "attributes": {}, "ebidta": 100.0}
+    with pytest.raises(ValueError, match="ebidta"):
+        relative_value_report(SUBJECT, [misspelt], CONFIG)
 
 
 def test_accepts_serde_documents_and_json_text() -> None:

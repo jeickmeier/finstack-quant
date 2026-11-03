@@ -1568,6 +1568,10 @@ export interface FormulaCheckSpec {
  * All monetary values should be in the same currency before constructing
  * a `PeerSet`. Currency normalization is the caller's responsibility.
  * Ratios are plain scalars (e.g., `6.5` means 6.5x leverage).
+ *
+ * The serde document rejects unknown keys: a metric outside the named fields
+ * belongs in `custom`, so a misspelt named metric is an error rather than a
+ * silently missing value.
  */
 export interface CompanyMetrics {
   /**
@@ -1658,7 +1662,6 @@ export interface CompanyMetrics {
    * Yield to worst / yield to maturity.
    */
   yield_pct?: number | null;
-  [k: string]: unknown;
 }
 /**
  * Configuration for a single corkscrew account.
@@ -3628,19 +3631,19 @@ export interface PeerFilter {
   /**
    * ISO country codes to include (meta key: "country").
    */
-  countries: string[];
+  countries?: string[];
   /**
    * Excluded attribute tags (none may be present).
    */
-  excluded_tags: string[];
+  excluded_tags?: string[];
   /**
    * GICS industry codes to include (meta key: "gics_industry").
    */
-  gics_industries: string[];
+  gics_industries?: string[];
   /**
    * GICS sector codes to include (meta key: "gics_sector").
    */
-  gics_sectors: string[];
+  gics_sectors?: string[];
   /**
    * Market cap ceiling (inclusive).
    */
@@ -3652,16 +3655,15 @@ export interface PeerFilter {
   /**
    * Credit rating bands to include (meta key: "rating").
    */
-  ratings: string[];
+  ratings?: string[];
   /**
    * Required attribute tags (all must be present).
    */
-  required_tags: string[];
+  required_tags?: string[];
   /**
    * Arbitrary attribute selector strings (uses `Attributes::matches_selector`).
    */
-  selectors: string[];
-  [k: string]: unknown;
+  selectors?: string[];
 }
 /**
  * A set of comparable companies with their metrics.
@@ -4079,7 +4081,8 @@ export interface RelativeValueReportConfig {
   dimensions: ScoringDimension[];
   /**
    * Screen applied to the universe. Omitted, every other company is a peer.
-   * When supplied it lists every [`PeerFilter`] field.
+   * Any [`PeerFilter`] field may be omitted, meaning no constraint on it; an
+   * unknown field is rejected.
    */
   filter?: PeerFilter;
   /**

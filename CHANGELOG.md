@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Comps: partial and strict peer filters
+
+Every `PeerFilter` field may now be omitted from its serde document, an omitted list or bound screening on nothing, so `{"gics_sectors": ["Energy"]}` is a complete filter and `{}` accepts every company; until now a filter had to list all nine fields. `PeerFilter` and `CompanyMetrics` reject unknown keys, so a misspelt criterion (`gics_sector`) or metric (`ebidta`) is a validation error instead of being dropped. This applies to every host that passes either as JSON (`relative_value_report`, `PeerSet`, `PeerFilter.from_json`, `CompanyMetrics.from_json`, WASM `relativeValueReport` and `peerSetFromUniverse`); the flat-dict constructors, which file an unknown name under `custom`, are unchanged. No value moves.
+
 ### Statements: capital structure report in the UI
 
 The `capital-structure-report` registry component, with the `use-capital-structure-summary` hook, edits a `CapitalStructureSummaryConfig` (period, EBITDA node, optional cash node) with a schema form and draws `statements_analytics.capitalStructureSummary` as returned: headline debt, cash, net debt, LTM EBITDA with the LTM periods found, leverage and coverage; the debt stack in Rust's tranche order with the figures through each payment class; and the maturity wall by year. Ratios Rust leaves undefined show as Undefined. In the statements workbench's Metrics & ratios tab it sits in a capital structure disclosure. `labelFor` upper-cases `ebitda` and `ltm`, so labels such as "EBITDA bridge" and "LTM EBITDA" change case.

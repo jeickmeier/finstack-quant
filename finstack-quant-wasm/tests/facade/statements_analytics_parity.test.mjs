@@ -239,6 +239,11 @@ test('statements_analytics matches the cross-host golden', () => {
         INPUTS.relative_value_universe,
         INPUTS.relative_value_table_only_config
       ),
+      partial_filter: sa.relativeValueReport(
+        INPUTS.relative_value_subject,
+        INPUTS.relative_value_universe,
+        INPUTS.relative_value_partial_filter_config
+      ),
     },
     dcf_sensitivity: {
       gordon_growth: sa.dcfSensitivity(
@@ -348,6 +353,7 @@ test('relativeValueReport hands over the table, the scatter and the score', () =
   for (const config of [
     { period_basis: 'ltm', dimensions: [], multiples: [] },
     { period_basis: 'ltm', dimensions: [], multiples: ['ev_ebitda'], guess: true },
+    { filter: { gics_sector: ['energy'] }, period_basis: 'ltm', dimensions: [], multiples: ['pe'] },
     {
       period_basis: 'ltm',
       dimensions: [{ label: 'bad', y_extractor: { named: 'oas_bp' }, weight: -1 }],
@@ -359,6 +365,11 @@ test('relativeValueReport hands over the table, the scatter and the score', () =
       (error) => error.kind === 'validation'
     );
   }
+  assert.throws(
+    () =>
+      sa.relativeValueReport(subject, [{ id: 'TYPO', ebidta: 100 }], INPUTS.relative_value_config),
+    (error) => error.kind === 'validation' && /ebidta/.test(error.message)
+  );
 });
 
 test('plSummaryReport returns the Rust table of the text report', () => {
