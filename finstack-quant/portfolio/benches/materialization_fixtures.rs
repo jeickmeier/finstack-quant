@@ -16,8 +16,8 @@ use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, In
 use finstack_quant_valuations::instruments::rates::cms_swap::{CmsSwap, FundingLegSpec};
 use finstack_quant_valuations::instruments::{Instrument, MarketDependencies, PayReceive};
 use indexmap::IndexMap;
-use time::macros::date;
 use time::Month;
+use time::macros::date;
 
 /// Number of artifacts in the unique-instrument acceptance fixture.
 pub const FIXTURE_A_ARTIFACTS: usize = 5_000;

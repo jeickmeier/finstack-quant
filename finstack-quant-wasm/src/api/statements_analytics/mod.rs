@@ -358,7 +358,7 @@ pub fn dcf_sensitivity(
 ) -> Result<JsValue, JsValue> {
     let wacc = js_f64(&wacc, "wacc")?;
     let net_debt_override = js_opt_f64(net_debt_override.as_ref(), "netDebtOverride")?;
-    use finstack_quant_statements_analytics::analysis::{DcfOptions, DEFAULT_UFCF_NODE};
+    use finstack_quant_statements_analytics::analysis::{DEFAULT_UFCF_NODE, DcfOptions};
 
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let terminal_value_json: &str = &json_text(&terminal_value_json, "terminalValueJson")?;

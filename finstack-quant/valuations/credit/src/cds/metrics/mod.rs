@@ -20,8 +20,8 @@ pub(crate) mod dv01;
 mod jump_to_default;
 pub(crate) mod recovery01;
 
-use crate::cds::pricing::CdsPricer;
 use crate::cds::CreditDefaultSwap;
+use crate::cds::pricing::CdsPricer;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;

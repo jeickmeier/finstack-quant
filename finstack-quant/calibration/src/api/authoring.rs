@@ -688,16 +688,18 @@ mod tests {
         )
         .expect("upfront");
         assert_eq!(upfront.coupon_bp(), 100.0);
-        assert!(CdsQuote::par_spread(
-            "ACME-5Y",
-            "ACME",
-            "USD",
-            "bogus_clause",
-            "5Y".parse().expect("tenor"),
-            80.0,
-            0.4,
-        )
-        .is_err());
+        assert!(
+            CdsQuote::par_spread(
+                "ACME-5Y",
+                "ACME",
+                "USD",
+                "bogus_clause",
+                "5Y".parse().expect("tenor"),
+                80.0,
+                0.4,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -736,16 +738,18 @@ mod tests {
         assert_eq!(wire["cap_floor_vol"]["is_cap"], false);
         assert_eq!(wire["cap_floor_vol"]["quote_type"], "black_lognormal");
 
-        assert!(VolQuote::swaption_vol(
-            "Q",
-            date!(2027 - 05 - 08),
-            date!(2032 - 05 - 08),
-            0.04,
-            0.2,
-            "bogus",
-            None,
-        )
-        .is_err());
+        assert!(
+            VolQuote::swaption_vol(
+                "Q",
+                date!(2027 - 05 - 08),
+                date!(2032 - 05 - 08),
+                0.04,
+                0.2,
+                "bogus",
+                None,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -777,14 +781,16 @@ mod tests {
             serde_json::to_value(&xccy.far_pillar).expect("pillar"),
             serde_json::to_value("5Y".parse::<Pillar>().expect("tenor")).expect("pillar")
         );
-        assert!(XccyQuote::new(
-            "X",
-            "EUR-USD",
-            "5Y".parse().expect("tenor"),
-            1.0,
-            Some(-1.0),
-        )
-        .is_err());
+        assert!(
+            XccyQuote::new(
+                "X",
+                "EUR-USD",
+                "5Y".parse().expect("tenor"),
+                1.0,
+                Some(-1.0),
+            )
+            .is_err()
+        );
 
         let tranche = |attachment: f64| {
             CdsTrancheQuote::new(

@@ -3,8 +3,8 @@
 //! This module provides functions for loading golden test suites from files
 //! and strings.
 
-use crate::golden::types::GoldenSuite;
 use crate::Error;
+use crate::golden::types::GoldenSuite;
 use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::Path;
@@ -121,7 +121,7 @@ pub fn golden_path(manifest_dir: &str, relative_path: &str) -> std::path::PathBu
 /// ```
 #[macro_export]
 macro_rules! golden_path {
-    ($relative:expr) => {
+    ($relative:expr_2021) => {
         $crate::golden::golden_path(env!("CARGO_MANIFEST_DIR"), $relative)
     };
 }

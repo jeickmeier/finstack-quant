@@ -181,21 +181,20 @@ impl ScenarioSpec {
                 ))
             })?;
         }
-        if let Some(first) = scenarios.first() {
-            if let Some(conflicting) = scenarios
+        if let Some(first) = scenarios.first()
+            && let Some(conflicting) = scenarios
                 .iter()
                 .skip(1)
                 .find(|scenario| scenario.hazard_bump_mode != first.hazard_bump_mode)
-            {
-                return Err(crate::error::Error::validation(format!(
-                    "Cannot compose scenarios '{}' (hazard_bump_mode '{}') and '{}' \
+        {
+            return Err(crate::error::Error::validation(format!(
+                "Cannot compose scenarios '{}' (hazard_bump_mode '{}') and '{}' \
                      (hazard_bump_mode '{}'): all scenarios must use the same hazard_bump_mode.",
-                    first.id,
-                    finstack_quant_core::wire::serde_label(&first.hazard_bump_mode)?,
-                    conflicting.id,
-                    finstack_quant_core::wire::serde_label(&conflicting.hazard_bump_mode)?,
-                )));
-            }
+                first.id,
+                finstack_quant_core::wire::serde_label(&first.hazard_bump_mode)?,
+                conflicting.id,
+                finstack_quant_core::wire::serde_label(&conflicting.hazard_bump_mode)?,
+            )));
         }
 
         // Stable so equal-priority scenarios keep input order.

@@ -1,6 +1,6 @@
 //! Exact, non-recursive evaluation of rolled and continuously shocked curves.
 
-use super::super::common::{validate_pillars, PiecewiseLinearAdjustment, RateShock};
+use super::super::common::{PiecewiseLinearAdjustment, RateShock, validate_pillars};
 use super::DiscountCurve;
 use crate::market_data::bumps::BumpType;
 use crate::math::interp::Interp;

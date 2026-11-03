@@ -200,10 +200,9 @@ pub fn compute_credit_context(
         reference_values.unwrap_or(&[]).iter().copied().collect();
     for node_id in [numerators.cfads, numerators.interest_coverage] {
         if let Some(NodeValueType::Monetary { currency }) = statement.node_value_types.get(node_id)
+            && *currency != reporting_currency
         {
-            if *currency != reporting_currency {
-                return Err(Error::CurrencyMismatch(reporting_currency, *currency));
-            }
+            return Err(Error::CurrencyMismatch(reporting_currency, *currency));
         }
     }
 
@@ -222,10 +221,9 @@ pub fn compute_credit_context(
         for node in [numerators.cfads, numerators.interest_coverage] {
             if let Some(NodeValueType::Monetary { currency }) =
                 crate::analysis::units::node_unit_at(statement, node, &period.id)?
+                && currency != reporting_currency
             {
-                if currency != reporting_currency {
-                    return Err(Error::CurrencyMismatch(reporting_currency, currency));
-                }
+                return Err(Error::CurrencyMismatch(reporting_currency, currency));
             }
         }
         cf.validate_currency_invariant()?;

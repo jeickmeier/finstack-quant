@@ -5,7 +5,7 @@ use crate::bindings::macros::{label_enum, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
-    build_fiscal_periods, build_periods, FiscalConfig, Period, PeriodId, PeriodKind, PeriodPlan,
+    FiscalConfig, Period, PeriodId, PeriodKind, PeriodPlan, build_fiscal_periods, build_periods,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyIterator, PyList, PyModule, PyType};

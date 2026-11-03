@@ -3,7 +3,7 @@
 //! Solves the Black-Scholes PDE in log-spot coordinates on a sinh-concentrated
 //! grid. Supports both European and American exercise via the penalty method.
 
-use crate::equity_option::pricing::{has_future_discrete_dividends, model_inputs, ModelInputs};
+use crate::equity_option::pricing::{ModelInputs, has_future_discrete_dividends, model_inputs};
 use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -11,7 +11,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
@@ -247,7 +247,7 @@ mod tests {
     use super::*;
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use time::{macros::date, Duration};
+    use time::{Duration, macros::date};
 
     #[test]
     fn low_volatility_pde_mesh_refinement_converges_to_vanilla_limit() {

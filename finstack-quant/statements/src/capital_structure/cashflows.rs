@@ -653,10 +653,10 @@ impl CapitalStructureCashflows {
             "accrued_interest" => |flow| Ok(flow.accrued_interest.amount()),
             _ => {
                 return Err(crate::error::Error::capital_structure(format!(
-                "Unknown capital structure component: {component}. Expected: interest_expense, \
+                    "Unknown capital structure component: {component}. Expected: interest_expense, \
                  interest_expense_cash, interest_expense_pik, interest_income, principal_payment, \
                  debt_balance, fees, or accrued_interest"
-            )))
+                )));
             }
         };
         let flow = if instrument_or_total == "total" {
@@ -840,9 +840,11 @@ mod tests {
                 );
             }
         }
-        assert!(cs_cf
-            .get_component("unknown", "BOND-001", &period_id)
-            .is_err());
+        assert!(
+            cs_cf
+                .get_component("unknown", "BOND-001", &period_id)
+                .is_err()
+        );
         let missing = PeriodId::quarter(2025, 2).expect("period");
         assert!(cs_cf.get_component("fees", "total", &missing).is_err());
         let mut incompatible = CashflowBreakdown::with_currency(Currency::USD);
@@ -852,9 +854,11 @@ mod tests {
             .entry("BAD".into())
             .or_default()
             .insert(period_id, incompatible);
-        assert!(cs_cf
-            .get_component("interest_expense", "BAD", &period_id)
-            .is_err());
+        assert!(
+            cs_cf
+                .get_component("interest_expense", "BAD", &period_id)
+                .is_err()
+        );
 
         assert_eq!(
             cs_cf
@@ -906,9 +910,11 @@ mod tests {
             2_500.0
         );
 
-        assert!(cs_cf
-            .get_component("interest_expense", "NONEXISTENT", &period_id)
-            .is_err());
+        assert!(
+            cs_cf
+                .get_component("interest_expense", "NONEXISTENT", &period_id)
+                .is_err()
+        );
     }
 
     #[test]

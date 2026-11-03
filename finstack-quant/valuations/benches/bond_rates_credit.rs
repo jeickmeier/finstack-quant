@@ -13,7 +13,7 @@
 //! Measure the single-threaded cost, which is what a WASM host pays, with
 //! `RAYON_NUM_THREADS=1`.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, StubKind};
 use finstack_quant_core::market_data::context::MarketContext;

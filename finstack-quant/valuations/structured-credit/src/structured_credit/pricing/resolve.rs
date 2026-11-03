@@ -375,10 +375,9 @@ pub(crate) fn apply_net_wac_carryover<S: std::hash::BuildHasher>(
         for recipient in &mut tier.recipients {
             if let PaymentCalculation::NetWacCarryover { tranche_id, amount } =
                 &mut recipient.calculation
+                && let Some(balance) = carryover.get(tranche_id.as_str())
             {
-                if let Some(balance) = carryover.get(tranche_id.as_str()) {
-                    *amount = *balance;
-                }
+                *amount = *balance;
             }
         }
     }
@@ -431,10 +430,9 @@ pub(crate) fn apply_accumulation_lockout<S: std::hash::BuildHasher>(
                 target_balance,
                 ..
             } = &mut recipient.calculation
+                && let Some(balance) = tranche_balances.get(tranche_id.as_str())
             {
-                if let Some(balance) = tranche_balances.get(tranche_id.as_str()) {
-                    *target_balance = Some(*balance);
-                }
+                *target_balance = Some(*balance);
             }
         }
     }

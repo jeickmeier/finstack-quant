@@ -163,13 +163,15 @@ fn adjusted_payment_dates_control_simple_leg_pv_and_settlement() {
 
 #[test]
 fn zero_notional_is_rejected() {
-    assert!(BasisSwap::new(
-        "ZERO-NOTIONAL",
-        Money::new(0.0, USD).expect("valid money fixture"),
-        make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
-        make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
-    )
-    .is_err());
+    assert!(
+        BasisSwap::new(
+            "ZERO-NOTIONAL",
+            Money::new(0.0, USD).expect("valid money fixture"),
+            make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
+            make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
+        )
+        .is_err()
+    );
 }
 
 #[test]

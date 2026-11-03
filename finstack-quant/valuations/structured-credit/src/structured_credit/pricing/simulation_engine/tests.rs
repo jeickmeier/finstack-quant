@@ -95,10 +95,12 @@ mod cases {
             "{principal} vs {opening}"
         );
         for tranche in run.tranches.values() {
-            assert!(tranche
-                .principal_flows
-                .iter()
-                .all(|(date, _)| *date == date!(2024 - 06 - 28)));
+            assert!(
+                tranche
+                    .principal_flows
+                    .iter()
+                    .all(|(date, _)| *date == date!(2024 - 06 - 28))
+            );
         }
     }
 
@@ -2243,11 +2245,7 @@ mod cases {
                 weighted += years * amount.amount();
                 total += amount.amount();
             }
-            if total > 0.0 {
-                weighted / total
-            } else {
-                0.0
-            }
+            if total > 0.0 { weighted / total } else { 0.0 }
         };
 
         let mezz_wal_without = interest_wal(&untriggered, "CLASS_B");
@@ -2279,11 +2277,7 @@ mod cases {
                 weighted += years * amount.amount();
                 total += amount.amount();
             }
-            if total > 0.0 {
-                weighted / total
-            } else {
-                0.0
-            }
+            if total > 0.0 { weighted / total } else { 0.0 }
         };
 
         let wal_without = senior_principal_wal(&untriggered);
@@ -2338,8 +2332,8 @@ mod cases {
     /// Deal-attached OC trigger is evaluated and reports a breach.
     #[test]
     fn oc_trigger_is_evaluated_and_reports_its_breach() {
-        use crate::structured_credit::pricing::waterfall::execute_waterfall;
         use crate::structured_credit::pricing::waterfall::WaterfallContext;
+        use crate::structured_credit::pricing::waterfall::execute_waterfall;
         use crate::structured_credit::types::CoverageTestSpec;
 
         // A 150% OC requirement against a 10M pool supporting an 8M senior note
@@ -2405,8 +2399,8 @@ mod cases {
     /// Deal with no triggers reports no coverage tests.
     #[test]
     fn deal_without_triggers_reports_no_coverage_tests() {
-        use crate::structured_credit::pricing::waterfall::execute_waterfall;
         use crate::structured_credit::pricing::waterfall::WaterfallContext;
+        use crate::structured_credit::pricing::waterfall::execute_waterfall;
 
         let deal = oc_trigger_deal(vec![]);
         let market = MarketContext::new().insert(cleanup_discount_curve());
@@ -2487,7 +2481,7 @@ mod cases {
     /// Attached senior fees build a fee tier and pay service providers first.
     #[test]
     fn attached_fees_are_built_and_paid_ahead_of_the_notes() {
-        use crate::structured_credit::pricing::waterfall::{execute_waterfall, WaterfallContext};
+        use crate::structured_credit::pricing::waterfall::{WaterfallContext, execute_waterfall};
 
         let without = reserve_account_deal(0.0);
         let with_fees = reserve_account_deal(0.0).with_standard_fees();
@@ -3154,10 +3148,12 @@ mod cases {
             .map(|record| record.amount.amount())
             .sum();
         assert!((diverted - waterfall.diverted_cash.amount()).abs() < 1e-6);
-        assert!(waterfall
-            .payment_records
-            .iter()
-            .any(|record| record.diverted));
+        assert!(
+            waterfall
+                .payment_records
+                .iter()
+                .any(|record| record.diverted)
+        );
     }
 
     /// A clean-up call redeems the notes outside the waterfall.
@@ -3196,9 +3192,11 @@ mod cases {
             .find(|payment| payment.tranche_id == "CLASS_A")
             .expect("senior redeemed");
         assert!(class_a.interest.amount() > 0.0, "the premium is interest");
-        assert!(payments
-            .iter()
-            .any(|payment| payment.tranche_id == "EQUITY"));
+        assert!(
+            payments
+                .iter()
+                .any(|payment| payment.tranche_id == "EQUITY")
+        );
     }
 
     /// A funded reserve is released to the notes at deal end.
@@ -3627,10 +3625,12 @@ mod cases {
             .map(|breach| breach.test_id.as_str())
             .collect();
         assert_eq!(ids, vec!["IC_CLASS_A", "OC_CLASS_A", "OC_CLASS_B"]);
-        assert!(run_reconciled(&clo_with_mezz(Vec::new()))
-            .diagnostics
-            .first_breaches
-            .is_empty());
+        assert!(
+            run_reconciled(&clo_with_mezz(Vec::new()))
+                .diagnostics
+                .first_breaches
+                .is_empty()
+        );
     }
 
     /// A tranche trigger that diverts nothing never reaches `coverage_tests`,
@@ -3900,10 +3900,11 @@ mod cases {
             live.ratio.expect("claim outstanding") - live.trigger_level
         );
         let json = serde_json::to_value(&run.diagnostics.periods[0].coverage_tests).expect("json");
-        assert!(json
-            .as_array()
-            .expect("rows")
-            .iter()
-            .any(|row| row["ratio"].is_null()));
+        assert!(
+            json.as_array()
+                .expect("rows")
+                .iter()
+                .any(|row| row["ratio"].is_null())
+        );
     }
 }

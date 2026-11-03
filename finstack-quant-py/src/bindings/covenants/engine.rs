@@ -4,7 +4,7 @@
 use super::report::PyCovenantReport;
 use super::spec::{PyCovenantSpec, PyCovenantWaiver};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
+use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, display_to_py, value_error};
 use finstack_quant_covenants::{

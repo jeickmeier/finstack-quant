@@ -5,7 +5,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
-    resolve_hw1f_params, Hw1fParamFamily,
+    Hw1fParamFamily, resolve_hw1f_params,
 };
 
 /// Choice of short-rate model for the bond pricing tree.
@@ -607,9 +607,10 @@ mod tests {
 
         let err =
             bond_tree_config(&bond, &MarketContext::new()).expect_err("missing BDT vol must error");
-        assert!(err
-            .to_string()
-            .contains("instrument_pricing_overrides.model_config.bdt_sigma"));
+        assert!(
+            err.to_string()
+                .contains("instrument_pricing_overrides.model_config.bdt_sigma")
+        );
     }
 
     #[test]
@@ -630,9 +631,10 @@ mod tests {
 
         let err = bond_tree_config(&bond, &MarketContext::new())
             .expect_err("floor-only BDT bond needs a volatility");
-        assert!(err
-            .to_string()
-            .contains("instrument_pricing_overrides.model_config.bdt_sigma"));
+        assert!(
+            err.to_string()
+                .contains("instrument_pricing_overrides.model_config.bdt_sigma")
+        );
 
         bond.instrument_pricing_overrides.model_config.bdt_sigma = Some(0.20);
         let config =

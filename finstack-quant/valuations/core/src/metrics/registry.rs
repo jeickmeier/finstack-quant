@@ -567,16 +567,16 @@ impl MetricRegistry {
         state.path.push(id.clone());
 
         // If metric not found or not applicable, just skip it gracefully
-        if let Some(entry) = self.entries.get(&id) {
-            if let Some(calc) = entry.get_for(instrument_type) {
-                // Context-aware so calculators whose dependency set varies with
-                // instrument overrides (e.g. Breakeven's sensitivity metric)
-                // declare what they actually read from `context.computed`.
-                let deps = calc.dynamic_dependencies(context);
-                for dep_id in deps.iter() {
-                    // Propagate errors from dependencies
-                    self.visit_metric(dep_id.clone(), instrument_type, context, state)?;
-                }
+        if let Some(entry) = self.entries.get(&id)
+            && let Some(calc) = entry.get_for(instrument_type)
+        {
+            // Context-aware so calculators whose dependency set varies with
+            // instrument overrides (e.g. Breakeven's sensitivity metric)
+            // declare what they actually read from `context.computed`.
+            let deps = calc.dynamic_dependencies(context);
+            for dep_id in deps.iter() {
+                // Propagate errors from dependencies
+                self.visit_metric(dep_id.clone(), instrument_type, context, state)?;
             }
         }
 

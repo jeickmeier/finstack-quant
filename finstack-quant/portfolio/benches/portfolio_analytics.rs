@@ -8,25 +8,25 @@
 mod bench_common;
 
 use bench_common::{create_institutional_portfolio, create_market_context};
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_portfolio::book::Book;
-use finstack_quant_portfolio::brinson::{brinson_fachler, carino_link, SectorPeriod};
+use finstack_quant_portfolio::brinson::{SectorPeriod, brinson_fachler, carino_link};
 use finstack_quant_portfolio::excess_return::{
-    cell_returns_from_reference, excess_returns, CellConfig, ExcessReturnPosition, ReferenceReturn,
+    CellConfig, ExcessReturnPosition, ReferenceReturn, cell_returns_from_reference, excess_returns,
 };
-use finstack_quant_portfolio::factor_brinson::{factor_brinson_attribution, FactorBrinsonInput};
+use finstack_quant_portfolio::factor_brinson::{FactorBrinsonInput, factor_brinson_attribution};
 use finstack_quant_portfolio::fi_attribution::{
-    campisi_attribution, FiAttributionConfig, FiPositionSnapshot,
+    FiAttributionConfig, FiPositionSnapshot, campisi_attribution,
 };
-use finstack_quant_portfolio::grid_attribution::{grid_attribution, GridPosition};
+use finstack_quant_portfolio::grid_attribution::{GridPosition, grid_attribution};
 use finstack_quant_portfolio::grouping::aggregate_by_book;
 use finstack_quant_portfolio::primitive::primitive_exposures;
 use finstack_quant_portfolio::valuation::{
-    value_portfolio, PortfolioValuationOptions, RequestedMetrics,
+    PortfolioValuationOptions, RequestedMetrics, value_portfolio,
 };
-use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::metrics::MetricId;
 use std::hint::black_box;
 

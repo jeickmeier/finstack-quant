@@ -118,10 +118,10 @@ fn test_amortization_spec_schema_parity() {
                 if let Some(first) = req.first().and_then(|v| v.as_str()) {
                     variants.push(first);
                 }
-            } else if let Some(props) = variant.get("properties").and_then(|v| v.as_object()) {
-                if let Some(key) = props.keys().next() {
-                    variants.push(key);
-                }
+            } else if let Some(props) = variant.get("properties").and_then(|v| v.as_object())
+                && let Some(key) = props.keys().next()
+            {
+                variants.push(key);
             }
         }
         assert_enum_parity(

@@ -243,7 +243,7 @@ pub(crate) fn register_bond_metrics(
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
     use crate::bond::pricing::quote_conversions::YieldCompounding;
     use finstack_quant_valuations_core::metrics::sensitivities::cross_factor::{
-        make_credit_bumper, make_rates_bumper, CrossFactorCalculator,
+        CrossFactorCalculator, make_credit_bumper, make_rates_bumper,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
 

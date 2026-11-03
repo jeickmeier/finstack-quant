@@ -10,9 +10,9 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::money::Money;
 pub use finstack_quant_test_utils::assert::{approx_eq, relative_eq};
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
-use finstack_quant_valuations::instruments::PayReceive;
 use std::sync::Arc;
 use time::Month;
 

@@ -3,8 +3,8 @@
 //! Defines the risk class taxonomy, correlation scenarios, sensitivity
 //! containers, and result types per BCBS d457.
 
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::FxHashMap;
+use finstack_quant_core::currency::Currency;
 use std::collections::BTreeMap;
 
 /// FRTB risk classes per BCBS d457.

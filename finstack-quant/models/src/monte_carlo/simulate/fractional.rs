@@ -8,7 +8,7 @@
 //! second is always the first standard normal the generator consumes for that
 //! step, which is independent of everything generated before the step.
 
-use super::{TimeGridSpec, MAX_STORED_VALUES};
+use super::{MAX_STORED_VALUES, TimeGridSpec};
 use crate::monte_carlo::rng::fbm::{
     CholeskyFbm, FractionalNoiseGenerator, WindowedConditionalFbm, WindowedConditionalFbmConfig,
 };

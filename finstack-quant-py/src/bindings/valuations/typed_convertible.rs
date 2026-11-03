@@ -11,8 +11,8 @@ use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DilutionEvent, DividendAdjustment,
     PriceTrigger,
@@ -55,14 +55,17 @@ impl PyConversionSpec {
         dividend_adjustment: &str,
         dilution_events: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let policy: ConversionPolicy = if let Ok(label) = policy.cast::<PyString>() {
-            super::convert::enum_from_str(label.to_str()?, "conversion policy")?
-        } else if policy.is_instance_of::<PyDict>() {
-            spec_from_py(py, policy, "conversion policy")?
-        } else {
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                "policy: expected a bare conversion-policy label or a tagged dict",
-            ));
+        let policy: ConversionPolicy = match policy.cast::<PyString>() {
+            Ok(label) => super::convert::enum_from_str(label.to_str()?, "conversion policy")?,
+            _ => {
+                if policy.is_instance_of::<PyDict>() {
+                    spec_from_py(py, policy, "conversion policy")?
+                } else {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(
+                        "policy: expected a bare conversion-policy label or a tagged dict",
+                    ));
+                }
+            }
         };
         let anti_dilution: AntiDilutionPolicy =
             super::convert::enum_from_str(anti_dilution, "anti_dilution")?;
@@ -475,10 +478,9 @@ impl PyConvertibleBondBuilder {
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let conversion = if let Ok(spec) = value.cast::<PyConversionSpec>() {
-            spec.borrow().inner.clone()
-        } else {
-            spec_from_py(py, value, "conversion")?
+        let conversion = match value.cast::<PyConversionSpec>() {
+            Ok(spec) => spec.borrow().inner.clone(),
+            _ => spec_from_py(py, value, "conversion")?,
         };
         let shown = PyConversionSpec {
             inner: conversion.clone(),
@@ -534,10 +536,9 @@ impl PyConvertibleBondBuilder {
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let call_put = if let Ok(schedule) = value.cast::<PyCallPutSchedule>() {
-            schedule.borrow().inner.clone()
-        } else {
-            spec_from_py(py, value, "call_put")?
+        let call_put = match value.cast::<PyCallPutSchedule>() {
+            Ok(schedule) => schedule.borrow().inner.clone(),
+            _ => spec_from_py(py, value, "call_put")?,
         };
         let shown = format!(
             "CallPutSchedule(calls=<{}>, puts=<{}>)",

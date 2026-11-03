@@ -168,31 +168,32 @@ pub(super) fn record_tranche_flows(
         // Net-WAC carryover: settle what this period repaid, then accrue the
         // interest the cap withheld this period for repayment from later
         // excess (no interest accrues on the carryover itself).
-        if afc_carryover && tranche.seniority != TrancheSeniority::Equity {
-            if let Some(Some(_)) = claim_caps.get(tranche_id_str) {
-                let uncapped_due = tranche_period_interest_due(
-                    tranche,
-                    current_balance.amount(),
-                    TrancheAccrualDates {
-                        start: period_start,
-                        end: inputs.period.accrual_end,
-                        valuation: as_of,
-                    },
-                    context,
-                    0.0,
-                    false,
-                    state.floating_rate_shift,
-                )?;
-                let withheld = (uncapped_due - current_interest_due.amount()).max(0.0);
-                let entry = state
-                    .carryover_balance
-                    .entry(tranche_id_str.to_string())
-                    .or_insert(Money::from((0_i64, state.currency)));
-                *entry = Money::new(
-                    (entry.amount() - carryover_paid.amount() + withheld).max(0.0),
-                    state.currency,
-                )?;
-            }
+        if afc_carryover
+            && tranche.seniority != TrancheSeniority::Equity
+            && let Some(Some(_)) = claim_caps.get(tranche_id_str)
+        {
+            let uncapped_due = tranche_period_interest_due(
+                tranche,
+                current_balance.amount(),
+                TrancheAccrualDates {
+                    start: period_start,
+                    end: inputs.period.accrual_end,
+                    valuation: as_of,
+                },
+                context,
+                0.0,
+                false,
+                state.floating_rate_shift,
+            )?;
+            let withheld = (uncapped_due - current_interest_due.amount()).max(0.0);
+            let entry = state
+                .carryover_balance
+                .entry(tranche_id_str.to_string())
+                .or_insert(Money::from((0_i64, state.currency)));
+            *entry = Money::new(
+                (entry.amount() - carryover_paid.amount() + withheld).max(0.0),
+                state.currency,
+            )?;
         }
 
         if let Some(res) = state.results.get_mut(tranche_id_str) {

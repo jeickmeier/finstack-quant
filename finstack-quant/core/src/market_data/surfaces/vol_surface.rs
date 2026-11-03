@@ -39,10 +39,10 @@
 
 use crate::market_data::bumps::BumpType;
 use crate::{
+    Error,
     error::InputError,
     market_data::bumps::{BumpSpec, Bumpable},
     types::CurveId,
-    Error,
 };
 
 /// Semantic meaning of the secondary axis on a [`VolSurface`].
@@ -862,27 +862,31 @@ mod displacement_tests {
         assert!(
             VolSurface::from_grid("BAD", &[1.0, 2.0], &[0.03], &[0.2, 0.2], opts, None).is_err()
         );
-        assert!(VolSurface::from_grid(
-            "BAD",
-            &[1.0, 2.0],
-            &[0.03],
-            &[0.2, 0.2],
-            opts,
-            Some(&[0.02])
-        )
-        .is_err());
-        assert!(VolSurface::from_grid(
-            "UNSHIFTED",
-            &[1.0],
-            &[0.03],
-            &[0.2],
-            VolGridOpts {
-                quote_type: VolQuoteType::ShiftedBlackLognormal,
-                ..VolGridOpts::default()
-            },
-            None,
-        )
-        .is_err());
+        assert!(
+            VolSurface::from_grid(
+                "BAD",
+                &[1.0, 2.0],
+                &[0.03],
+                &[0.2, 0.2],
+                opts,
+                Some(&[0.02])
+            )
+            .is_err()
+        );
+        assert!(
+            VolSurface::from_grid(
+                "UNSHIFTED",
+                &[1.0],
+                &[0.03],
+                &[0.2],
+                VolGridOpts {
+                    quote_type: VolQuoteType::ShiftedBlackLognormal,
+                    ..VolGridOpts::default()
+                },
+                None,
+            )
+            .is_err()
+        );
 
         let surface = VolSurface::from_grid(
             "SHIFT",

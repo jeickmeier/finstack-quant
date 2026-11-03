@@ -1,24 +1,24 @@
 //! Convertible pricing pipeline and public pricing helpers.
 
-use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount};
+use finstack_quant_core::InputError;
+use finstack_quant_core::dates::{Date, DateExt, DayCount, adjust};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PriceId;
-use finstack_quant_core::InputError;
 use finstack_quant_core::{Error, Result};
 
 use crate::convertible::{
-    market_inputs::resolve_dividend_yield, ConvertibleBond, ConvertibleGreeks,
+    ConvertibleBond, ConvertibleGreeks, market_inputs::resolve_dividend_yield,
 };
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_valuations_core::instruments::{ConversionEvent, ConversionPolicy};
 use finstack_quant_valuations_core::instruments::{GreekBumps, Instrument};
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 
-use super::credit_tree::{terminal_payoff, CreditTreeEngine, CreditTreeMarketInputs};
+use super::credit_tree::{CreditTreeEngine, CreditTreeMarketInputs, terminal_payoff};
 use super::valuator::ConvertibleBondValuator;
 
 /// Compute the conversion value for any conversion policy given the spot price.
@@ -745,23 +745,23 @@ pub fn calculate_convertible_greeks(
 
     // ---- Theta: 1-day roll (forward difference), reported per calendar day ----
     {
-        if inputs.time_to_maturity > 1.0 / 365.25 {
-            if let Some(next_day) = as_of.next_day() {
-                // `roll_forward(1)` realizes one day of forwards on every
-                // curve (discount curves renormalize by DF(1d), hazard
-                // curves preserve hazard rates via conditional survival), so
-                // theta = price(rolled, t+1d) - price(t) captures both carry
-                // and roll-down. See module documentation
-                // (realized-forward roll semantics).
-                //
-                // A roll fails when a curve is too sparse to retain ≥ 2 knots
-                // after the shift; that error propagates rather than
-                // repricing on a market still anchored at `t`.
-                let rolled_market = market.roll_forward(1)?;
-                let fwd_price = price_convertible_bond(bond, &rolled_market, next_day)?;
-                // Theta = P(t+1d) - P(t), reported as change per calendar day.
-                greeks.theta = fwd_price.amount() - greeks.price;
-            }
+        if inputs.time_to_maturity > 1.0 / 365.25
+            && let Some(next_day) = as_of.next_day()
+        {
+            // `roll_forward(1)` realizes one day of forwards on every
+            // curve (discount curves renormalize by DF(1d), hazard
+            // curves preserve hazard rates via conditional survival), so
+            // theta = price(rolled, t+1d) - price(t) captures both carry
+            // and roll-down. See module documentation
+            // (realized-forward roll semantics).
+            //
+            // A roll fails when a curve is too sparse to retain ≥ 2 knots
+            // after the shift; that error propagates rather than
+            // repricing on a market still anchored at `t`.
+            let rolled_market = market.roll_forward(1)?;
+            let fwd_price = price_convertible_bond(bond, &rolled_market, next_day)?;
+            // Theta = P(t+1d) - P(t), reported as change per calendar day.
+            greeks.theta = fwd_price.amount() - greeks.price;
         }
     }
 

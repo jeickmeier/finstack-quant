@@ -8,13 +8,13 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
     CommitmentStep, DrawEvent, OidEirSpec,
 };
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
     self, DdtlSpec, OidPolicy, TermLoan,
 };
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::Pricer;
 
@@ -387,15 +387,19 @@ fn term_loan_pik_toggle_and_cash_sweep() {
         row.ending_balance.unwrap() - row.beginning_balance.unwrap()
     };
     let sweep_date = Date::from_calendar_date(2025, time::Month::October, 1).unwrap();
-    assert!(envelope
-        .flows
-        .iter()
-        .any(|row| row.date == sweep_date && (moved(row) + 500_000.0).abs() < 1e-6));
-    assert!(envelope
-        .flows
-        .iter()
-        .filter(|row| row.kind == CFKind::Pik)
-        .all(|row| moved(row) > 0.0));
+    assert!(
+        envelope
+            .flows
+            .iter()
+            .any(|row| row.date == sweep_date && (moved(row) + 500_000.0).abs() < 1e-6)
+    );
+    assert!(
+        envelope
+            .flows
+            .iter()
+            .filter(|row| row.kind == CFKind::Pik)
+            .all(|row| moved(row) > 0.0)
+    );
     assert!(envelope.flows.last().unwrap().ending_balance.unwrap().abs() < 1e-6);
 }
 
@@ -444,12 +448,16 @@ fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
         .filter(|flow| flow.kind == CFKind::Fixed)
         .map(|flow| (flow.date, flow.rate.expect("fixed coupon rate")))
         .collect();
-    assert!(coupons
-        .iter()
-        .any(|(date, rate)| { *date <= step_date && (*rate - 0.06).abs() < 1e-12 }));
-    assert!(coupons
-        .iter()
-        .any(|(date, rate)| { *date > step_date && (*rate - 0.08).abs() < 1e-12 }));
+    assert!(
+        coupons
+            .iter()
+            .any(|(date, rate)| { *date <= step_date && (*rate - 0.06).abs() < 1e-12 })
+    );
+    assert!(
+        coupons
+            .iter()
+            .any(|(date, rate)| { *date > step_date && (*rate - 0.08).abs() < 1e-12 })
+    );
 }
 
 #[test]

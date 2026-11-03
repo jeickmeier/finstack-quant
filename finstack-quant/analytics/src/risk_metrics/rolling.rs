@@ -8,8 +8,8 @@
 //! numerical recovery can trigger additional rebuilds.
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
+use finstack_quant_core::math::summation::neumaier_sum;
 
 use super::{annualized_ratio_or_sign_infinity, ratio_or_sign_infinity};
 

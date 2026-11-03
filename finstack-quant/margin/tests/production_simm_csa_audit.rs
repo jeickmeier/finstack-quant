@@ -1,13 +1,13 @@
 //! Independent historical SIMM v2.6 and Basel MAR21.93 regression vectors.
 //! ISDA source: September 2023 methodology, paragraphs 33, 39, 69, 74, 79.
 
-use finstack_quant_core::{currency::Currency, FxHashMap};
+use finstack_quant_core::{FxHashMap, currency::Currency};
+use finstack_quant_margin::SimmVersion;
 use finstack_quant_margin::calculators::im::SimmCalculator;
 use finstack_quant_margin::regulatory::frtb::{
     CorrelationScenario, FrtbRiskClass, FrtbSensitivities,
 };
 use finstack_quant_margin::types::SimmCreditSector;
-use finstack_quant_margin::SimmVersion;
 
 fn close(actual: f64, expected: f64) {
     assert!(

@@ -7,7 +7,7 @@
 use std::fmt;
 
 use crate::registry::margin_registry_from_config;
-use crate::registry::{embedded_registry, embedded_registry_or_panic, AssetClassDefault};
+use crate::registry::{AssetClassDefault, embedded_registry, embedded_registry_or_panic};
 use crate::types::serde_validation;
 use finstack_quant_core::config::FinstackConfig;
 use serde::{Deserialize, Serialize};
@@ -194,15 +194,15 @@ impl MaturityConstraints {
         // boundary used in eligibility schedules, comfortably above
         // f64 round-trip error from `time::Duration` ↔ year fractions.
         const TOLERANCE_YEARS: f64 = 2.7e-6;
-        if let Some(min) = self.min_remaining_years {
-            if remaining_years < min - TOLERANCE_YEARS {
-                return false;
-            }
+        if let Some(min) = self.min_remaining_years
+            && remaining_years < min - TOLERANCE_YEARS
+        {
+            return false;
         }
-        if let Some(max) = self.max_remaining_years {
-            if remaining_years > max + TOLERANCE_YEARS {
-                return false;
-            }
+        if let Some(max) = self.max_remaining_years
+            && remaining_years > max + TOLERANCE_YEARS
+        {
+            return false;
         }
         true
     }
@@ -526,17 +526,16 @@ impl EligibleCollateralSchedule {
         let mut breaches = Vec::new();
         for (asset_class, amount) in allocations {
             let fraction = amount / total;
-            if let Some(entry) = self.eligible.iter().find(|e| &e.asset_class == asset_class) {
-                if let Some(limit) = entry.concentration_limit {
-                    if fraction > limit {
-                        breaches.push(ConcentrationBreach {
-                            asset_class: asset_class.clone(),
-                            fraction,
-                            limit,
-                            excess: fraction - limit,
-                        });
-                    }
-                }
+            if let Some(entry) = self.eligible.iter().find(|e| &e.asset_class == asset_class)
+                && let Some(limit) = entry.concentration_limit
+                && fraction > limit
+            {
+                breaches.push(ConcentrationBreach {
+                    asset_class: asset_class.clone(),
+                    fraction,
+                    limit,
+                    excess: fraction - limit,
+                });
             }
         }
         breaches

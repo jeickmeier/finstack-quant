@@ -785,9 +785,11 @@ mod tests {
     fn date_offset_rejects_wrapping_cpi_lag() {
         let index = sample_cpi();
         for lag_months in [1_u32 << 31, u32::MAX] {
-            assert!(index
-                .ref_cpi_months_lag(make_date(2023, 5, 1), lag_months)
-                .is_err());
+            assert!(
+                index
+                    .ref_cpi_months_lag(make_date(2023, 5, 1), lag_months)
+                    .is_err()
+            );
         }
         assert!(index.ref_cpi_months_lag(Date::MIN, 1).is_err());
     }

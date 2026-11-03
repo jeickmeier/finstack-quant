@@ -16,8 +16,8 @@
 use crate::cds_option::bloomberg_quadrature::{self, ForwardCdsContext};
 use crate::cds_option::pricer::{resolve_sigma, synthetic_underlying_cds};
 use crate::cds_option::{CdsOption, CdsOptionStrikeKind};
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};

@@ -3,8 +3,8 @@
 use crate::market_data::bumps::Bumpable;
 use std::sync::Arc;
 
-use crate::types::CurveId;
 use crate::Result;
+use crate::types::CurveId;
 
 use super::super::term_structures::{
     BaseCorrelationCurve, BasisSpreadCurve, DiscountCurve, ForwardCurve, HazardBumpTarget,

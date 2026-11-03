@@ -8,10 +8,10 @@
 //!
 //! Market Standards Review (Week 5)
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_cashflows::aggregation::aggregate_cashflows_checked;
 use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
-use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

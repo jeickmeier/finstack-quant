@@ -139,7 +139,7 @@ macro_rules! wire_methods {
         }
         $crate::bindings::macros::wire_methods!(@reduce $py_type);
     };
-    (@json $py_type:ident, $rust_type:ty, $name:literal, [$($deref:tt)?], |$inner:ident| $checked:expr) => {
+    (@json $py_type:ident, $rust_type:ty, $name:literal, [$($deref:tt)?], |$inner:ident| $checked:expr_2021) => {
         $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [$($deref)?], |$inner| $checked,
             concat!(
                 "Serialize this ", $name, " to its canonical JSON wire form.\n\n",
@@ -153,7 +153,7 @@ macro_rules! wire_methods {
                 "Raises\n------\nValueError\n    If the JSON is malformed, carries unknown fields, or fails validation."
             ));
     };
-    (@documented_json $py_type:ident, $rust_type:ty, $name:literal, [$($deref:tt)?], |$inner:ident| $checked:expr, $to_doc:expr, $from_doc:expr) => {
+    (@documented_json $py_type:ident, $rust_type:ty, $name:literal, [$($deref:tt)?], |$inner:ident| $checked:expr_2021, $to_doc:expr_2021, $from_doc:expr_2021) => {
         #[::pyo3::pymethods]
         impl $py_type {
             #[doc = $to_doc]
@@ -185,7 +185,7 @@ macro_rules! wire_methods {
             "through the same strict serde round-trip as ``to_json`` / ``from_json``."
         ));
     };
-    (@reduce $py_type:ident, $doc:expr) => {
+    (@reduce $py_type:ident, $doc:expr_2021) => {
         #[::pyo3::pymethods]
         impl $py_type {
             #[doc = $doc]
@@ -231,7 +231,7 @@ macro_rules! label_enum {
     };
     (
         $py_type:ident, $rust_type:ident, $name:literal, from_name,
-        label = |$v:ident| $label:expr, { $($pairs:tt)+ }
+        label = |$v:ident| $label:expr_2021, { $($pairs:tt)+ }
     ) => {
         $crate::bindings::macros::label_enum!(
             @impl $py_type, $rust_type, $name, |$v| $label, { $($pairs)+ }
@@ -239,7 +239,7 @@ macro_rules! label_enum {
         $crate::bindings::macros::label_enum!(@from_name $py_type, $rust_type, $name);
     };
     (
-        @impl $py_type:ident, $rust_type:ident, $name:literal, |$v:ident| $label:expr,
+        @impl $py_type:ident, $rust_type:ident, $name:literal, |$v:ident| $label:expr_2021,
         { $( $(#[$meta:meta])* $const:ident => $variant:ident ),+ $(,)? }
     ) => {
         impl $py_type {
@@ -322,7 +322,7 @@ pub(crate) use label_enum;
 macro_rules! typed_or_label {
     (
         $vis:vis fn $fn_name:ident -> $inner:ty, $wrapper:ty, $expected:literal,
-        |$label:ident| $parse:expr
+        |$label:ident| $parse:expr_2021
     ) => {
         #[doc = concat!("Extract a value from a wrapper instance or its label; expects ", $expected, ".")]
         $vis fn $fn_name(obj: &::pyo3::Bound<'_, ::pyo3::PyAny>) -> ::pyo3::PyResult<$inner> {
@@ -353,7 +353,7 @@ macro_rules! impl_repr_html_via_dataframe {
             )
         );
     };
-    ($py_ty:ident, $doc:expr) => {
+    ($py_ty:ident, $doc:expr_2021) => {
         #[::pyo3::pymethods]
         impl $py_ty {
             #[doc = $doc]
@@ -376,7 +376,7 @@ pub(crate) use impl_repr_html_via_dataframe;
 /// Getters that need `py`, a lifetime or more than one statement stay
 /// hand-written.
 macro_rules! py_getters {
-    ($py_type:ident |$s:ident| { $( $(#[$doc:meta])* $name:ident -> $ret:ty = $body:expr; )+ }) => {
+    ($py_type:ident |$s:ident| { $( $(#[$doc:meta])* $name:ident -> $ret:ty = $body:expr_2021; )+ }) => {
         #[::pyo3::pymethods]
         impl $py_type {
             $(

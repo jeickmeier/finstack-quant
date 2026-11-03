@@ -479,12 +479,12 @@ impl AssetBackedFacility {
         if self.term_out.is_some_and(|t| t.months == 0) {
             return Err(invalid("term_out.months must be positive".to_string()));
         }
-        if let Some(price) = self.liquidation_price_pct {
-            if !price.is_finite() || price <= 0.0 {
-                return Err(invalid(format!(
-                    "liquidation_price_pct ({price}) must be a finite positive percent of par"
-                )));
-            }
+        if let Some(price) = self.liquidation_price_pct
+            && (!price.is_finite() || price <= 0.0)
+        {
+            return Err(invalid(format!(
+                "liquidation_price_pct ({price}) must be a finite positive percent of par"
+            )));
         }
         let mut previous_draw: Option<Date> = None;
         for draw in &self.draws {
@@ -507,12 +507,12 @@ impl AssetBackedFacility {
         }
         for event in &self.amortization_events {
             event.validate()?;
-            if let AmortizationEvent::Date { date } = event {
-                if *date <= self.closing_date || *date > self.maturity {
-                    return Err(invalid(format!(
-                        "amortization event date {date} must lie inside (closing, maturity]"
-                    )));
-                }
+            if let AmortizationEvent::Date { date } = event
+                && (*date <= self.closing_date || *date > self.maturity)
+            {
+                return Err(invalid(format!(
+                    "amortization event date {date} must lie inside (closing, maturity]"
+                )));
             }
         }
         self.borrowing_base_rules.validate()?;

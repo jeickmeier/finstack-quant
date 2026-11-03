@@ -166,8 +166,8 @@ fn m2_lsmc_partial_coupon_and_spread_match_cashflows() {
     );
 }
 
-use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -291,8 +291,8 @@ fn b11_icma_bond_duration_and_convexity_use_yield_clock() {
 #[test]
 fn b12_dm_inversion_applies_settlement_once() {
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
-    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_dm;
     use finstack_quant_valuations::instruments::fixed_income::bond::DiscountMarginCalculator;
+    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_dm;
     use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext};
     use std::sync::Arc;
     let as_of = date!(2025 - 01 - 01);
@@ -533,9 +533,11 @@ fn b1_bond_builder_requires_contractual_issue_date() {
         .discount_curve_id(bond.discount_curve_id)
         .build()
         .expect_err("a missing issue date must not shorten the bond");
-    assert!(error
-        .to_string()
-        .contains("missing required field 'issue_date'"));
+    assert!(
+        error
+            .to_string()
+            .contains("missing required field 'issue_date'")
+    );
 }
 
 #[test]
@@ -806,9 +808,11 @@ fn m4_inflation_zero_strike_requires_normal_quotes_without_fabricated_conversion
                 .build()
                 .expect("black surface"),
         );
-    assert!(option
-        .npv_with_model(&market, as_of, ModelKey::Black76)
-        .is_err());
+    assert!(
+        option
+            .npv_with_model(&market, as_of, ModelKey::Black76)
+            .is_err()
+    );
     let market = market.insert_surface(
         VolSurface::builder("USD-INFL-VOL")
             .quote_type(VolQuoteType::Normal)

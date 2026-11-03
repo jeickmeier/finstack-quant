@@ -12,12 +12,12 @@ use std::marker::PhantomData;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
+use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
-    compute_key_rate_cs01_series_with_context_raw, compute_parallel_cs01_with_context_raw,
-    cs01_reval, resolve_optional_cs01_curves, Cs01Request,
+    Cs01Request, compute_key_rate_cs01_series_with_context_raw,
+    compute_parallel_cs01_with_context_raw, cs01_reval, resolve_optional_cs01_curves,
 };
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_valuations_core::recalibration::DealCdsQuoteOverride;

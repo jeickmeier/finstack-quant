@@ -5,6 +5,7 @@
 //! and post-fixing (observed rate) valuation modes.
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
@@ -13,7 +14,6 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
 
@@ -384,16 +384,15 @@ impl Ndf {
     /// assert!(ndf_cny.validate_fixing_source().is_ok());
     /// ```
     pub fn validate_fixing_source(&self) -> Result<()> {
-        if let Some(fixing_source) = &self.fixing_source {
-            if let Some(expected_currency) = fixing_source.typical_currency() {
-                if expected_currency != self.base_currency {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Fixing source {} is typically used for {} but NDF base currency is {}. \
+        if let Some(fixing_source) = &self.fixing_source
+            && let Some(expected_currency) = fixing_source.typical_currency()
+            && expected_currency != self.base_currency
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Fixing source {} is typically used for {} but NDF base currency is {}. \
                          Consider using the appropriate fixing source for this currency.",
-                        fixing_source, expected_currency, self.base_currency
-                    )));
-                }
-            }
+                fixing_source, expected_currency, self.base_currency
+            )));
         }
         Ok(())
     }
@@ -473,7 +472,7 @@ impl Ndf {
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date};
-        use finstack_quant_core::dates::{adjust, resolve_joint_calendar, DateExt};
+        use finstack_quant_core::dates::{DateExt, adjust, resolve_joint_calendar};
 
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
         // delay a USD pair's spot date (FX spot convention

@@ -38,9 +38,9 @@
 //! determine when those values are known. The selected volatility-expiry convention
 //! determines the ACT/365F clock on which annualized option volatility is quoted.
 
-use crate::cap_floor::pricing::pricer::price_caplet_quote;
-use crate::cap_floor::pricing::CapletFloorletInputs;
 use crate::cap_floor::RateOptionType;
+use crate::cap_floor::pricing::CapletFloorletInputs;
+use crate::cap_floor::pricing::pricer::price_caplet_quote;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
 };
@@ -54,7 +54,7 @@ use finstack_quant_core::validation;
 use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
-    resolve_volatility, ResolvedVolatility, VolatilityRequest,
+    ResolvedVolatility, VolatilityRequest, resolve_volatility,
 };
 use finstack_quant_valuations_core::pricer::ModelKey;
 use rust_decimal::Decimal;
@@ -400,7 +400,7 @@ impl InflationCapFloor {
             _ => {
                 return Err(finstack_quant_core::Error::Validation(
                     "inflation cap/floor requires Normal or Black76 pricing".to_owned(),
-                ))
+                ));
             }
         };
         let strike = self.strike_f64();

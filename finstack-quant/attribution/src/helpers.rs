@@ -4,32 +4,32 @@
 //! and common `PnlAttribution` assembly. Currency conversion itself lives on
 //! [`MarketContext::convert_money`] — call sites here use it directly.
 
-use crate::factors::MarketRestoreFlags;
 use crate::AttributionRequest;
+use crate::factors::MarketRestoreFlags;
 use crate::{
     AttributionFactor, AttributionMethod, CarryDetail, ExecutionPolicy, MoveUnit, PnlAttribution,
     SensitivityBucket, SensitivityStep, SourceLine,
 };
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::Compounding;
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxPolicyMeta};
+use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
-    df_from_yield, YieldCompounding,
-};
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxPolicyMeta};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::MarketDependencies;
 use finstack_quant_valuations::instruments::PricingOptions;
-use finstack_quant_valuations::metrics::collect_period_cash;
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
+    YieldCompounding, df_from_yield,
+};
+use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::metrics::collect_period_cash;
 use std::sync::Arc;
 
 /// Families the instrument declares a pricing dependency on.
@@ -855,9 +855,9 @@ pub(crate) fn validate_attribution_period(as_of_t0: Date, as_of_t1: Date) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::Error;
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
-    use finstack_quant_core::Error;
     use std::sync::Arc;
     use time::macros::date;
 
@@ -1233,8 +1233,8 @@ mod tests {
     /// DF(1y) at 5% must be 1/1.05, not the hardcoded Street-2 (1.025)^-2.
     #[test]
     fn flat_ytm_market_uses_bond_coupon_frequency() {
-        use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
         use finstack_quant_valuations::instruments::BondConvention;
+        use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
         let as_of = date!(2025 - 01 - 01);
         let bond = Bond::with_convention(

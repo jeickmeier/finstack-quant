@@ -20,11 +20,11 @@
 
 use crate::cds::metrics::market_doc_clause;
 use crate::cds_index::{CdsIndex, IndexPricing};
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::sensitivities::recovery01::{
-    bumped_recovery, market_with_recovery, RecoveryReplayTerms, RECOVERY_BUMP,
+    RECOVERY_BUMP, RecoveryReplayTerms, bumped_recovery, market_with_recovery,
 };
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use std::sync::Arc;

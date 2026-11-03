@@ -3,7 +3,7 @@
 //! The location `m` is the recovery at zero total shock. The local scale
 //! `sigma` is not the standard deviation of the bounded recovery distribution.
 
-use super::{validate_correlated_inputs, validate_finite_recovery_input, RecoveryModel, Result};
+use super::{RecoveryModel, Result, validate_correlated_inputs, validate_finite_recovery_input};
 use finstack_quant_core::math::{
     integration::adaptive_simpson,
     special_functions::{norm_cdf, norm_pdf},

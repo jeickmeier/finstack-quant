@@ -56,16 +56,16 @@ use finstack_quant_core::Result;
 use crate::invalid_input;
 
 pub use types::{
-    days_to_liquidate, liquidity_tier, LiquidityProfile, LiquidityTier, SpreadVolatilityKind,
+    LiquidityProfile, LiquidityTier, SpreadVolatilityKind, days_to_liquidate, liquidity_tier,
 };
 
 pub use estimators::{amihud_illiquidity, roll_effective_spread};
 
-pub use lvar::{lvar_bangia, LvarBangiaScalar};
+pub use lvar::{LvarBangiaScalar, lvar_bangia};
 
 pub use almgren_chriss::AlmgrenChrissModel;
 pub use impact::{ExecutionTrajectory, ImpactEstimate, TradeParams};
-pub use kyle::{kyle_lambda, KyleLambdaModel};
+pub use kyle::{KyleLambdaModel, kyle_lambda};
 
 /// Build and evaluate a uniform Almgren-Chriss market-impact estimate.
 ///
@@ -124,10 +124,10 @@ pub fn almgren_chriss_impact(
     if !volatility.is_finite() || volatility <= 0.0 {
         return Err(invalid_input("volatility must be finite and positive"));
     }
-    if let Some(price) = reference_price {
-        if !price.is_finite() || price <= 0.0 {
-            return Err(invalid_input("reference_price must be finite and positive"));
-        }
+    if let Some(price) = reference_price
+        && (!price.is_finite() || price <= 0.0)
+    {
+        return Err(invalid_input("reference_price must be finite and positive"));
     }
 
     let mid = reference_price.unwrap_or(1.0);

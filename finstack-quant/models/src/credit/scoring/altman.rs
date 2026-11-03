@@ -13,7 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::types::{check_finite, CreditScoringError, ScoringResult, ScoringZone};
+use super::types::{CreditScoringError, ScoringResult, ScoringZone, check_finite};
 
 /// Input ratios for the original Altman Z-Score (1968).
 ///

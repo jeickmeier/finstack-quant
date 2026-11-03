@@ -20,8 +20,8 @@
 //!   used by `ZSpread`/`price_from_z_spread`; a continuous curve shift is deliberately
 //!   NOT used — wrong compounding basis).
 
-use crate::bond::metrics::effective::option_risk_bond_and_base_price;
 use crate::bond::Bond;
+use crate::bond::metrics::effective::option_risk_bond_and_base_price;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
 use finstack_quant_valuations_core::pricer::ModelKey;

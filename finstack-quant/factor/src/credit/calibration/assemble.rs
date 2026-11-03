@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::BumpUnits;
 use finstack_quant_core::math::linalg::{
-    nearest_correlation, unflatten_square, validate_correlation_matrix, NearestCorrelationOpts,
+    NearestCorrelationOpts, nearest_correlation, unflatten_square, validate_correlation_matrix,
 };
 use finstack_quant_core::types::IssuerId;
-use finstack_quant_core::Result;
 
 use super::config::{CovarianceStrategy, PanelSpace, VolModelChoice};
 use super::statistics::{d_rho_d, ledoit_wolf_cov_and_corr, sample_correlation_flat};
@@ -17,7 +17,7 @@ use crate::credit::hierarchy::{
     IssuerBetas, IssuerTags, LevelAnchor, LevelsAtAnchor, VolState,
 };
 use crate::matching::MatchingConfig;
-use crate::matching::{CreditHierarchicalConfig, CREDIT_GENERIC_FACTOR_ID};
+use crate::matching::{CREDIT_GENERIC_FACTOR_ID, CreditHierarchicalConfig};
 use crate::{
     FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
     MarketMapping,

@@ -9,10 +9,10 @@ use crate::utils::to_js_err;
 use crate::utils::wire::js_date;
 use finstack_quant_core::currency::Currency as RustCurrency;
 use finstack_quant_core::money::fx::{
-    fx_pair_convention as rust_fx_pair_convention, invert_fx_rate as rust_invert_fx_rate,
     CurrencyPair, FxConversionPolicy as RustFxConversionPolicy, FxMatrix as RustFxMatrix,
     FxPairConvention as RustFxPairConvention, FxQuery, FxQuoteConvention as RustFxQuoteConvention,
-    FxRateResult as RustFxRateResult,
+    FxRateResult as RustFxRateResult, fx_pair_convention as rust_fx_pair_convention,
+    invert_fx_rate as rust_invert_fx_rate,
 };
 use wasm_bindgen::prelude::*;
 

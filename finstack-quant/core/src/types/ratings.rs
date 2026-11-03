@@ -344,21 +344,21 @@ fn parse_credit_rating(value: &str) -> Result<CreditRating, crate::Error> {
     } else if base_slice.ends_with('-') {
         notch = Notch::Minus;
         base_slice = &base_slice[..base_slice.len() - 1];
-    } else if let Some(last) = base_slice.chars().last() {
-        if last.is_ascii_digit() {
-            notch = match last {
-                '1' => Notch::Plus,
-                '2' => Notch::Flat,
-                '3' => Notch::Minus,
-                _ => {
-                    return Err(crate::InputError::InvalidRating {
-                        value: value.to_string(),
-                    }
-                    .into())
+    } else if let Some(last) = base_slice.chars().last()
+        && last.is_ascii_digit()
+    {
+        notch = match last {
+            '1' => Notch::Plus,
+            '2' => Notch::Flat,
+            '3' => Notch::Minus,
+            _ => {
+                return Err(crate::InputError::InvalidRating {
+                    value: value.to_string(),
                 }
-            };
-            base_slice = &base_slice[..base_slice.len() - 1];
-        }
+                .into());
+            }
+        };
+        base_slice = &base_slice[..base_slice.len() - 1];
     }
 
     if base_slice.is_empty() {
@@ -410,7 +410,7 @@ fn parse_credit_rating(value: &str) -> Result<CreditRating, crate::Error> {
             return Err(crate::InputError::InvalidRating {
                 value: value.to_string(),
             }
-            .into())
+            .into());
         }
     };
 

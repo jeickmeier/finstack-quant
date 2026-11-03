@@ -663,9 +663,11 @@ fn period_builder_does_not_step_beyond_the_requested_terminal_period() {
 fn period_year_stepping_rejects_integer_overflow() {
     assert!(PeriodId::annual(i32::MAX).shift(1).is_err());
     assert!(PeriodId::annual(i32::MIN).shift(-1).is_err());
-    assert!(PeriodId::annual(i32::MAX)
-        .next_fiscal(FiscalConfig::us_federal())
-        .is_err());
+    assert!(
+        PeriodId::annual(i32::MAX)
+            .next_fiscal(FiscalConfig::us_federal())
+            .is_err()
+    );
 }
 
 #[test]
@@ -816,12 +818,14 @@ fn from_date_rejects_unrepresentable_period_boundaries() {
         }
     }
     assert!(PeriodId::from_date(Date::MIN, PeriodKind::Daily, None).is_ok());
-    assert!(PeriodId::from_date(
-        Date::MIN,
-        PeriodKind::Monthly,
-        Some(FiscalConfig::new(1, 15).unwrap())
-    )
-    .is_err());
+    assert!(
+        PeriodId::from_date(
+            Date::MIN,
+            PeriodKind::Monthly,
+            Some(FiscalConfig::new(1, 15).unwrap())
+        )
+        .is_err()
+    );
     assert!(
         PeriodId::from_date(Date::MAX.previous_day().unwrap(), PeriodKind::Daily, None).is_ok()
     );

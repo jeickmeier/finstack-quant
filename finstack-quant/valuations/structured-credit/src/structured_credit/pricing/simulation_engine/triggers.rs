@@ -16,8 +16,8 @@
 use super::*;
 use crate::structured_credit::pricing::coverage_tests::TestContext;
 use crate::structured_credit::pricing::waterfall::{
-    coverage_inputs, evaluate_coverage_tests, senior_fee_accrual, special_serviced_balance,
-    SeniorFeeInputs,
+    SeniorFeeInputs, coverage_inputs, evaluate_coverage_tests, senior_fee_accrual,
+    special_serviced_balance,
 };
 use crate::structured_credit::types::{
     CoverageTestAction, CoverageTestSpec, CoverageTrigger, PaymentCalculation, PaymentType,

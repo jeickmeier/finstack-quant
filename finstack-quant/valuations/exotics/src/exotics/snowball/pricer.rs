@@ -1,14 +1,14 @@
 //! Pricers for snowball and inverse-floater structured notes.
 
-use crate::exotics::hw1f_note::{exact_estimate, zero_estimate, Hw1fNote, Hw1fNotePricer};
+use crate::exotics::hw1f_note::{Hw1fNote, Hw1fNotePricer, exact_estimate, zero_estimate};
 use crate::exotics::snowball::types::SnowballCouponSpec;
 use crate::exotics::snowball::{Snowball, SnowballVariant};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
 use finstack_quant_models::rates::clock::model_time;
@@ -16,10 +16,10 @@ use finstack_quant_models::rates::hw1f::CouponEvent;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_models::rates::hw1f::Hw1fMcPricer;
 use finstack_quant_models::rates::hw1f::{
-    initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
+    Hw1fTermForward, PeriodForwardCoeffs, initial_short_rate_from_curve, prepare_hw1f_params,
 };
-use finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };

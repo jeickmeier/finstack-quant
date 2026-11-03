@@ -1,9 +1,9 @@
 //! Yield-to-maturity calculators (Street and Moosmüller compounding).
 //!
 use super::quote_date_dirty_target;
+use crate::bond::Bond;
 use crate::bond::pricing::quote_conversions::YieldCompounding;
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::bond::Bond;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

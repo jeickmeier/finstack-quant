@@ -121,13 +121,15 @@ fn a_required_non_finite_metric_fails_the_evaluation() {
     assert!(err.to_string().contains("'leverage'"), "{err}");
     assert!(err.to_string().contains("2024Q2"), "{err}");
     // The forecast fails on the same input.
-    assert!(forecast_breaches(
-        &results,
-        &engine(date!(2024 - 04 - 01)),
-        &model(),
-        CovenantForecastConfig::default()
-    )
-    .is_err());
+    assert!(
+        forecast_breaches(
+            &results,
+            &engine(date!(2024 - 04 - 01)),
+            &model(),
+            CovenantForecastConfig::default()
+        )
+        .is_err()
+    );
 }
 
 #[test]

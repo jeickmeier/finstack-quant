@@ -7,13 +7,13 @@
 //! back.
 
 use finstack_quant_statements_analytics::analysis::{
-    backtest_forecast, Explanation, RatingPdMap, RawPdCurve,
+    Explanation, RatingPdMap, RawPdCurve, backtest_forecast,
 };
 use finstack_quant_statements_analytics::schema::ARTIFACTS;
 use indexmap::IndexMap;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
 
 /// Schema for `type_name`: its root artifact, or a `$defs` entry of a
 /// registered artifact wrapped so its local references still resolve.

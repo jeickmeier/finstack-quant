@@ -5,15 +5,15 @@ use std::hash::{Hash, Hasher};
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::{FormatOpts, Money};
+use pyo3::IntoPyObjectExt;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyFloat, PyInt, PyList, PyString, PyType};
-use pyo3::IntoPyObjectExt;
 
-use crate::bindings::core::config::{extract_rounding_mode, PyFinstackConfig};
-use crate::bindings::core::currency::{extract_currency, PyCurrency};
+use crate::bindings::core::config::{PyFinstackConfig, extract_rounding_mode};
+use crate::bindings::core::currency::{PyCurrency, extract_currency};
 use crate::bindings::macros::wire_methods;
 use crate::errors::core_to_py;
 

@@ -545,12 +545,14 @@ impl PyAssetBackedFacilityBuilder {
             return Err(pyo3::exceptions::PyTypeError::new_err(
                 "term_out: expected int or TermOutSpec, got bool",
             ));
-        } else if let Ok(months) = value.extract::<u32>() {
-            TermOutSpec { months }
-        } else if let Ok(spec) = value.cast::<super::facility_terms::PyTermOutSpec>() {
-            spec.borrow().inner
         } else {
-            crate::bindings::module_utils::py_to_serde(py, value, "term_out")?
+            match value.extract::<u32>() {
+                Ok(months) => TermOutSpec { months },
+                _ => match value.cast::<super::facility_terms::PyTermOutSpec>() {
+                    Ok(spec) => spec.borrow().inner,
+                    _ => crate::bindings::module_utils::py_to_serde(py, value, "term_out")?,
+                },
+            }
         };
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.term_out(converted))
     }
@@ -628,10 +630,9 @@ impl PyAssetBackedFacilityBuilder {
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: PrepaymentModelSpec = if let Ok(typed) = value.cast::<PyPrepaymentModelSpec>() {
-            typed.borrow().inner.clone()
-        } else {
-            crate::bindings::module_utils::py_to_serde(py, value, "prepayment_spec")?
+        let spec: PrepaymentModelSpec = match value.cast::<PyPrepaymentModelSpec>() {
+            Ok(typed) => typed.borrow().inner.clone(),
+            _ => crate::bindings::module_utils::py_to_serde(py, value, "prepayment_spec")?,
         };
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.prepayment_spec(spec))
     }
@@ -643,10 +644,9 @@ impl PyAssetBackedFacilityBuilder {
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: DefaultModelSpec = if let Ok(typed) = value.cast::<PyDefaultModelSpec>() {
-            typed.borrow().inner.clone()
-        } else {
-            crate::bindings::module_utils::py_to_serde(py, value, "default_spec")?
+        let spec: DefaultModelSpec = match value.cast::<PyDefaultModelSpec>() {
+            Ok(typed) => typed.borrow().inner.clone(),
+            _ => crate::bindings::module_utils::py_to_serde(py, value, "default_spec")?,
         };
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.default_spec(spec))
     }
@@ -658,10 +658,9 @@ impl PyAssetBackedFacilityBuilder {
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: RecoveryModelSpec = if let Ok(typed) = value.cast::<PyRecoveryModelSpec>() {
-            typed.borrow().inner.clone()
-        } else {
-            crate::bindings::module_utils::py_to_serde(py, value, "recovery_spec")?
+        let spec: RecoveryModelSpec = match value.cast::<PyRecoveryModelSpec>() {
+            Ok(typed) => typed.borrow().inner.clone(),
+            _ => crate::bindings::module_utils::py_to_serde(py, value, "recovery_spec")?,
         };
         builder_set!(slf, |b: AssetBackedFacilityBuilder| b.recovery_spec(spec))
     }

@@ -1,9 +1,9 @@
 //! YTM (Yield to Maturity) calculator for structured credit.
 
 use crate::structured_credit::types::constants::YTM_SOLVER_TOLERANCE;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::math::solver::BrentSolver;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use serde::Deserialize;
 

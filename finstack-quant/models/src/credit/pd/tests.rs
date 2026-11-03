@@ -3,8 +3,8 @@
 #[cfg(test)]
 mod calibration_tests {
     use crate::credit::pd::{
-        apply_basel_irb_pd_floor, pit_to_ttc, ttc_to_pit, PdCalibrationError, PdCycleParams,
-        BASEL_IRB_PD_FLOOR,
+        BASEL_IRB_PD_FLOOR, PdCalibrationError, PdCycleParams, apply_basel_irb_pd_floor,
+        pit_to_ttc, ttc_to_pit,
     };
 
     /// PiT/TtC round-trip: converting TtC -> PiT -> TtC should recover the original.
@@ -197,7 +197,7 @@ mod calibration_tests {
 
 #[cfg(test)]
 mod central_tendency_tests {
-    use crate::credit::pd::{central_tendency, PdCalibrationError};
+    use crate::credit::pd::{PdCalibrationError, central_tendency};
 
     #[test]
     fn single_year() {
@@ -378,7 +378,7 @@ mod master_scale_tests {
 
     #[test]
     fn map_score_rejects_uncalibrated_score() {
-        use crate::credit::scoring::{altman_z_score, AltmanZScoreInput};
+        use crate::credit::scoring::{AltmanZScoreInput, altman_z_score};
 
         let input = AltmanZScoreInput {
             working_capital_to_total_assets: 0.10,

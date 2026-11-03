@@ -21,7 +21,7 @@ use finstack_quant_factor::credit::hierarchy::{
     IssuerBetaMode, IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags,
 };
 use finstack_quant_factor::{
-    AttributeFilter, CreditHierarchicalConfig, DependencyFilter, MappingRule, ISSUER_ID_META_KEY,
+    AttributeFilter, CreditHierarchicalConfig, DependencyFilter, ISSUER_ID_META_KEY, MappingRule,
 };
 use finstack_quant_factor::{
     CurveType, DependencyType, FactorId, MarketDependency, SensitivityMatrix,

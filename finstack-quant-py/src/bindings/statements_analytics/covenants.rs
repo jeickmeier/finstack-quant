@@ -6,7 +6,7 @@
 //! `finstack_quant.covenants` classes.
 
 use crate::bindings::covenants::{
-    dated_reports_frame, PyCovenantEngine, PyCovenantForecastConfig, PyFutureBreach,
+    PyCovenantEngine, PyCovenantForecastConfig, PyFutureBreach, dated_reports_frame,
 };
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::pydoc::pydoc;

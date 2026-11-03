@@ -87,7 +87,7 @@ impl TrsScheduleSpec {
 
     /// Builds the period date schedule in a canonical way.
     pub fn period_schedule(&self) -> finstack_quant_core::Result<Schedule> {
-        use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+        use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
 
         let periods = build_periods(BuildPeriodsParams::from_schedule(
             &self.params,

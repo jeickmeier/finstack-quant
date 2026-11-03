@@ -19,12 +19,12 @@
 //! Canonical citation: `docs/REFERENCES.md`
 //! (`#andersen-piterbarg-xccy-mtm-reset`).
 
-use crate::xccy_swap::types::{initial_principal_sign, XccySwap};
+use crate::xccy_swap::types::{XccySwap, initial_principal_sign};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::fx::FxQuery;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::ResettingSide;
 
 fn require_positive_finite(value: f64, id: &str, label: &str) -> Result<()> {
@@ -151,8 +151,8 @@ fn project_mtm_cashflows(
     finstack_quant_cashflows::builder::CashFlowMeta,
 )> {
     use finstack_quant_core::cashflow::{CFKind, CashFlow};
-    use finstack_quant_core::money::fx::FxQuery;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::money::fx::FxQuery;
 
     let (constant_leg, resetting_leg) = swap.partition_legs(resetting_side)?;
 
@@ -633,7 +633,7 @@ mod tests {
 
         let spot = 1.10_f64; // USD per EUR
         let n_c = 10_000_000.0; // USD
-                                // Exactly 365 days from base under Act/365F -> t = 1.0.
+        // Exactly 365 days from base under Act/365F -> t = 1.0.
         let date = Date::from_calendar_date(2026, Month::January, 2).expect("date");
         let swap_id = InstrumentId::new("TEST-XCCY-SWAP");
 

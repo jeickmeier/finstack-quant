@@ -25,12 +25,12 @@
 //! [`CdsIndex::cs01`]: crate::cds_index::CdsIndex::cs01
 
 use crate::cds_index::{CdsIndex, IndexPricing};
+use finstack_quant_core::Result;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
-    compute_key_rate_cs01_series_with_context_raw, cs01_reval, Cs01Request,
+    Cs01Request, compute_key_rate_cs01_series_with_context_raw, cs01_reval,
 };
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 

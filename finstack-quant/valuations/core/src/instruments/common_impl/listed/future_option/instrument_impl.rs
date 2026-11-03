@@ -2,7 +2,7 @@
 
 #[macro_export]
 macro_rules! impl_future_option_instrument {
-    ($ty:ty, $key:expr, $family:expr $(, require_rate_risk = $require_rate_risk:expr)?) => {
+    ($ty:ty, $key:expr_2021, $family:expr_2021 $(, require_rate_risk = $require_rate_risk:expr_2021)?) => {
         impl $ty {
             /// Validate the shared contract economics and lifecycle state.
             pub fn validate(&self) -> finstack_quant_core::Result<()> {
@@ -247,8 +247,8 @@ macro_rules! define_future_option {
     (
         $(#[$meta:meta])*
         pub struct $name:ident;
-        instrument_type: $key:expr,
-        family: $family:expr,
+        instrument_type: $key:expr_2021,
+        family: $family:expr_2021,
         register_metrics: $register:ident $(,)?
     ) => {
         $(#[$meta])*

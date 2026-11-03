@@ -481,10 +481,12 @@ fn test_golden_clo_oc_breach_diversion() {
         result.diverted_cash.amount(),
         4_000_000.0 - senior_to_test
     );
-    assert!(result
-        .diverted_amounts
-        .iter()
-        .all(|record| record.target_tranche == "class_a_prin"));
+    assert!(
+        result
+            .diverted_amounts
+            .iter()
+            .all(|record| record.target_tranche == "class_a_prin")
+    );
 }
 
 #[test]

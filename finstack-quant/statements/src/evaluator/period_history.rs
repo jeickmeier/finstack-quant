@@ -123,10 +123,10 @@ impl PeriodHistory {
         for (period, values) in named {
             let mut row = vec![None; n];
             for (name, value) in values {
-                if let Some(&idx) = node_to_column.get(name.as_str()) {
-                    if let Some(slot) = row.get_mut(idx) {
-                        *slot = Some(*value);
-                    }
+                if let Some(&idx) = node_to_column.get(name.as_str())
+                    && let Some(slot) = row.get_mut(idx)
+                {
+                    *slot = Some(*value);
                 }
             }
             history.push_row(*period, row);

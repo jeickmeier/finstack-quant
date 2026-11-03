@@ -3,8 +3,8 @@
 //! These tests load expected values from `data/realized_variance.json` and
 //! compare against computed results from the `finstack_quant_core::math::stats` module.
 
-use finstack_quant_core::math::stats::{realized_variance_ohlc, RealizedVarMethod};
-use finstack_quant_test_utils::golden::{load_suite_from_path, Expectation, GoldenAssert};
+use finstack_quant_core::math::stats::{RealizedVarMethod, realized_variance_ohlc};
+use finstack_quant_test_utils::golden::{Expectation, GoldenAssert, load_suite_from_path};
 use finstack_quant_test_utils::golden_path;
 use serde::Deserialize;
 

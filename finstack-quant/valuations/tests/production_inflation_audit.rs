@@ -1,7 +1,7 @@
 //! Inflation reference observations and market-convention production regressions.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{calendar_by_id_strict, DayCount};
+use finstack_quant_core::dates::{DayCount, calendar_by_id_strict};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationLag, SeriesInterpolation,
@@ -12,8 +12,8 @@ use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond:
 use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations::instruments::rates::repo::Repo;
 use finstack_quant_valuations::market::conventions::{
-    ids::{CdsConventionKey, CdsDocClause, InflationSwapConventionId, XccyConventionId},
     ConventionRegistry,
+    ids::{CdsConventionKey, CdsDocClause, InflationSwapConventionId, XccyConventionId},
 };
 use rust_decimal::Decimal;
 use time::macros::date;
@@ -158,9 +158,11 @@ fn m19_real_duration_requires_the_same_clean_quote_as_real_yield() {
     let error = bond
         .real_duration(date!(2025 - 01 - 15), 1.0)
         .expect_err("real duration needs the clean quote");
-    assert!(error
-        .to_string()
-        .contains("instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"));
+    assert!(
+        error
+            .to_string()
+            .contains("instrument_pricing_overrides.market_quotes.quoted_clean_price_pct")
+    );
 }
 
 #[test]
@@ -217,16 +219,18 @@ fn m23_repo_conveniences_reject_currencies_without_explicit_defaults() {
     use finstack_quant_valuations::instruments::rates::repo::CollateralSpec;
     let collateral = CollateralSpec::new("GILT", 100.0, "GILT-PRICE");
     let as_of = date!(2025 - 01 - 15);
-    assert!(Repo::term(
-        "GBP-REPO",
-        Money::from((100_000_i64, Currency::GBP)),
-        collateral.clone(),
-        0.05,
-        as_of,
-        date!(2025 - 01 - 22),
-        "GBP-OIS"
-    )
-    .is_err());
+    assert!(
+        Repo::term(
+            "GBP-REPO",
+            Money::from((100_000_i64, Currency::GBP)),
+            collateral.clone(),
+            0.05,
+            as_of,
+            date!(2025 - 01 - 22),
+            "GBP-OIS"
+        )
+        .is_err()
+    );
     // Explicit contract terms remain available for the unsupported preset.
     let repo = Repo::builder()
         .id("GBP-EXPLICIT".into())

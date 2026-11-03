@@ -879,11 +879,13 @@ fn zero_notional_par_spread_is_rejected_at_construction() {
         reset_lag_days: 0,
         compounding: Default::default(),
     };
-    assert!(BasisSwap::new(
-        "ZERO-NOTIONAL-PAR",
-        Money::new(0.0, USD).expect("valid money fixture"),
-        leg("USD-SOFR-3M"),
-        leg("USD-SOFR-1M"),
-    )
-    .is_err());
+    assert!(
+        BasisSwap::new(
+            "ZERO-NOTIONAL-PAR",
+            Money::new(0.0, USD).expect("valid money fixture"),
+            leg("USD-SOFR-3M"),
+            leg("USD-SOFR-1M"),
+        )
+        .is_err()
+    );
 }

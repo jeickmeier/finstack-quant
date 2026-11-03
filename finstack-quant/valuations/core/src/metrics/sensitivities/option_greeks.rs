@@ -13,10 +13,10 @@ use crate::instruments::{
     GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
     OptionGreeksRequest,
 };
-use crate::metrics::sensitivities::theta::{theta_period, GenericThetaAny};
+use crate::metrics::sensitivities::theta::{GenericThetaAny, theta_period};
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
-use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::Result;
+use finstack_quant_core::dates::Tenor;
 
 /// Hull-White 1F rate delta or gamma, when the request selected that model.
 ///
@@ -147,11 +147,11 @@ where
         {
             context.instrument_as::<I>()?;
             let instrument = Arc::clone(&context.instrument);
-            if let Some(inst) = instrument.as_any().downcast_ref::<I>() {
-                if let Some(value) = inst.selected_model_greek(self.kind, context)? {
-                    context.computed.insert(metric_id, value);
-                    return Ok(value);
-                }
+            if let Some(inst) = instrument.as_any().downcast_ref::<I>()
+                && let Some(value) = inst.selected_model_greek(self.kind, context)?
+            {
+                context.computed.insert(metric_id, value);
+                return Ok(value);
             }
         }
 
@@ -198,18 +198,18 @@ fn store_available_greeks(
             context.computed.entry(metric).or_insert(value);
         }
     }
-    if matches!(requested_kind, OptionGreekKind::Theta) {
-        if let Some(theta) = greeks.theta {
-            context.computed.entry(MetricId::Theta).or_insert(theta);
-            context.computed.entry(MetricId::ThetaCarry).or_insert(0.0);
-            context
-                .computed
-                .entry(MetricId::ThetaRollDown)
-                .or_insert(theta);
-            context
-                .computed
-                .entry(MetricId::ThetaPeriodDays)
-                .or_insert(1.0);
-        }
+    if matches!(requested_kind, OptionGreekKind::Theta)
+        && let Some(theta) = greeks.theta
+    {
+        context.computed.entry(MetricId::Theta).or_insert(theta);
+        context.computed.entry(MetricId::ThetaCarry).or_insert(0.0);
+        context
+            .computed
+            .entry(MetricId::ThetaRollDown)
+            .or_insert(theta);
+        context
+            .computed
+            .entry(MetricId::ThetaPeriodDays)
+            .or_insert(1.0);
     }
 }

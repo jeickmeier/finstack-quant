@@ -6,8 +6,8 @@ use crate::types::{AttributeValue, Entity, EntityId, PositionId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::wire::PercentageQuantityWire;
-use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
 use finstack_quant_valuations::instruments::MarketDependencies;
+use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 

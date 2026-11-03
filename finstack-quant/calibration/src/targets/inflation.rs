@@ -1,5 +1,6 @@
 //! Calibration target construction and shared input validation.
 //!
+use crate::CalibrationReport;
 use crate::api::schema::InflationCurveParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::{CalibrationConfig, CalibrationMethod};
@@ -11,17 +12,16 @@ use crate::solver::global;
 use crate::solver::traits::TimeGridAndGuesses;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::util::{
-    scheme_factor, sorted_knot_grid, validate_global_knot_grid, ContextScratch,
+    ContextScratch, scheme_factor, sorted_knot_grid, validate_global_knot_grid,
 };
-use crate::CalibrationReport;
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::DateExt;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_rates::inflation_swap::{InflationSwap, YoYInflationSwap};
@@ -136,13 +136,11 @@ impl InflationCurveTarget {
         if let Ok(index) = self
             .base_context
             .get_inflation_index(self.params.curve_id.as_str())
+            && index.interpolation() != conventions.interpolation
         {
-            if index.interpolation() != conventions.interpolation {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Inflation quote interpolation differs from the observed index convention"
-                        .into(),
-                ));
-            }
+            return Err(finstack_quant_core::Error::Validation(
+                "Inflation quote interpolation differs from the observed index convention".into(),
+            ));
         }
         let base_cpi = self.effective_base_cpi()?;
 

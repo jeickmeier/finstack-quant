@@ -83,8 +83,8 @@ fn sda_mdr_golden_values() {
     // SDA (Standard Default Assumption) Model Golden Values — PSA/BMA 100 SDA:
     // 0.02%/month ramp to 0.60% CDR at month 30, flat plateau months 30-60,
     // linear decline to 0.03% CDR by month 120, flat thereafter.
-    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::DefaultModelSpec;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
 
     let model = DefaultModelSpec::sda(1.0);
 
@@ -210,8 +210,8 @@ fn monthly_to_annual_rejects_invalid_smm() {
 fn psa_matches_industry_standard_ramp() {
     // Reference: Bond Market Association PSA Standard Prepayment Model
     // 100% PSA: Linear ramp from 0% CPR at month 0 to 6% CPR at month 30
-    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
 
     let model = PrepaymentModelSpec::psa(1.0);
 
@@ -255,8 +255,8 @@ fn psa_matches_industry_standard_ramp() {
 
 #[test]
 fn psa_multiplier_scales_correctly() {
-    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
 
     // 50% PSA, 100% PSA, 200% PSA at month 30
     let psa_50 = PrepaymentModelSpec::psa(0.5);
@@ -297,8 +297,8 @@ fn psa_multiplier_scales_correctly() {
 #[test]
 fn psa_terminal_rate_is_flat() {
     // After month 30, PSA should stay flat at terminal rate
-    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
 
     let model = PrepaymentModelSpec::psa(1.0);
     let terminal_cpr = 0.06;
@@ -322,8 +322,8 @@ fn sda_matches_industry_standard_curve() {
     // Reference: PSA/BMA Standard Default Assumption curve (100 SDA)
     // 0.02%/month ramp to 0.60% CDR at month 30, flat plateau through month
     // 60, linear decline to 0.03% CDR by month 120, flat thereafter.
-    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::DefaultModelSpec;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
 
     let model = DefaultModelSpec::sda(1.0);
 
@@ -379,8 +379,8 @@ fn sda_matches_industry_standard_curve() {
 
 #[test]
 fn sda_multiplier_scales_correctly() {
-    use finstack_quant_cashflows::builder::monthly_to_annual;
     use finstack_quant_cashflows::builder::DefaultModelSpec;
+    use finstack_quant_cashflows::builder::monthly_to_annual;
 
     let sda_100 = DefaultModelSpec::sda(1.0);
     let sda_200 = DefaultModelSpec::sda(2.0);
@@ -422,7 +422,7 @@ fn sda_multiplier_scales_correctly() {
 fn cmbs_lockout_boundary_months() {
     // The lockout boundary is inclusive: seasoning == lockout_months is still
     // locked out (SMM = 0); lockout_months + 1 prepays at the configured CPR.
-    use finstack_quant_cashflows::builder::{monthly_to_annual, PrepaymentModelSpec};
+    use finstack_quant_cashflows::builder::{PrepaymentModelSpec, monthly_to_annual};
 
     let spec = PrepaymentModelSpec::cmbs_with_lockout(60, 0.10);
 

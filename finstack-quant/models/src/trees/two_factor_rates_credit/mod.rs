@@ -143,7 +143,7 @@
 //!
 //! [`HullWhiteTree`]: super::hull_white_tree::HullWhiteTree
 
-use finstack_quant_cashflows::builder::{calculate_floating_rate, FloatingRateParams};
+use finstack_quant_cashflows::builder::{FloatingRateParams, calculate_floating_rate};
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error, Result};
 

@@ -52,20 +52,20 @@
 //! from the synthetic underlying CDS in its native day count (Act/360 for
 //! USD CDX/iTraxx Main).
 
-use crate::cds::pricing::CdsPricer;
 use crate::cds::CreditDefaultSwap;
+use crate::cds::pricing::CdsPricer;
 use crate::cds_option::CdsOption;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::special_functions::norm_pdf;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
-use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::constants::bloomberg_cdso;
 use rust_decimal::Decimal;
@@ -923,11 +923,7 @@ mod tests {
                 + t * (-0.356_563_782
                     + t * (1.781_477_937 + t * (-1.821_255_978 + t * 1.330_274_429))));
         let tail = norm_pdf(x) * poly;
-        if x >= 0.0 {
-            1.0 - tail
-        } else {
-            tail
-        }
+        if x >= 0.0 { 1.0 - tail } else { tail }
     }
 
     fn black76_payer_per_n(ctx: &ForwardCdsContext) -> f64 {

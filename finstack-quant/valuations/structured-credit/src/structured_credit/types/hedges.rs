@@ -11,8 +11,8 @@
 //! being valued as an NPV overlay outside the waterfall.
 
 use super::TrancheStructure;
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
+use finstack_quant_core::currency::Currency;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use serde::{Deserialize, Serialize};
@@ -100,13 +100,13 @@ impl HedgeSwap {
                 self.swap.id
             )));
         }
-        if let SwapNotional::TranchePar(id) = &self.notional {
-            if !tranches.tranches.iter().any(|t| t.id.as_str() == id) {
-                return Err(invalid(format!(
-                    "hedge swap {} tracks tranche {id}, which is not in the deal",
-                    self.swap.id
-                )));
-            }
+        if let SwapNotional::TranchePar(id) = &self.notional
+            && !tranches.tranches.iter().any(|t| t.id.as_str() == id)
+        {
+            return Err(invalid(format!(
+                "hedge swap {} tracks tranche {id}, which is not in the deal",
+                self.swap.id
+            )));
         }
         Ok(())
     }

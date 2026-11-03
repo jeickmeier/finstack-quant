@@ -57,10 +57,10 @@ use finstack_quant_core::types::CurveId;
 
 use crate::instruments::Instrument;
 use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01};
 use crate::metrics::sensitivities::cs01::{
     sensitivity_central_diff, validate_buckets_strictly_increasing,
 };
-use crate::metrics::sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01};
 use crate::metrics::sensitivities::cs01_direct_hazard::{
     DirectHazardBucketedCs01, DirectHazardParallelCs01,
 };

@@ -12,7 +12,8 @@
 //!   legs (`compounding` other than Simple) use the shared daily compounded
 //!   projector. Historical fixings are required once the fixing date is past.
 
-use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule, Notional};
+use finstack_quant_cashflows::builder::{CashFlowSchedule, Notional, merge_cashflow_schedules};
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -20,10 +21,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::FloatLegSpec;
 use finstack_quant_valuations_core::instruments::PayReceive;
@@ -279,7 +279,8 @@ impl XccySwap {
         if constant.notional.currency() == resetting.notional.currency() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "XccySwap '{}': MtM-reset partition requires different currencies on the two legs; both are {}",
-                self.id, constant.notional.currency()
+                self.id,
+                constant.notional.currency()
             )));
         }
         Ok((constant, resetting))
@@ -472,7 +473,8 @@ impl XccySwap {
         if !calendar_resolves && !self.allow_calendar_fallback {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "XccySwap '{}' leg {} requires a resolvable calendar_id; set allow_calendar_fallback=true to opt into weekends_only",
-                self.id, leg.notional.currency()
+                self.id,
+                leg.notional.currency()
             )));
         }
         // Decimal is always finite; no NaN/infinity check required.
@@ -488,14 +490,8 @@ impl XccySwap {
     ///   `allow_calendar_fallback` decides whether an unresolved ID falls back.
     pub(crate) fn resolve_leg_calendar_id<'a>(&self, leg: &'a XccySwapLeg) -> Result<&'a str> {
         match leg.leg.calendar_id.as_deref() {
-            Some(id)
-                if finstack_quant_core::dates::calendar_by_id_strict(id).is_ok() =>
-            {
-                Ok(id)
-            }
-            _ if self.allow_calendar_fallback => {
-                Ok(finstack_quant_core::dates::WEEKENDS_ONLY_ID)
-            }
+            Some(id) if finstack_quant_core::dates::calendar_by_id_strict(id).is_ok() => Ok(id),
+            _ if self.allow_calendar_fallback => Ok(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
             _ => Err(finstack_quant_core::Error::Validation(format!(
                 "XccySwap leg {} requires a resolvable calendar_id; set allow_calendar_fallback=true to opt into weekends_only",
                 leg.notional.currency()
@@ -566,8 +562,8 @@ impl XccySwap {
     ) -> Result<ProjectedXccyPeriod> {
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_valuations_core::instruments::pricing::overnight::{
-            adjust_overnight_accrual_boundaries, project_overnight_coupon,
             OvernightCouponProjectionInput, OvernightProjectionCurve,
+            adjust_overnight_accrual_boundaries, project_overnight_coupon,
         };
 
         let projected = if !matches!(leg.leg.compounding, FloatingLegCompounding::Simple) {
@@ -1193,12 +1189,16 @@ mod tests {
             flows.len() >= 6,
             "xccy swap should emit principal and coupon flows"
         );
-        assert!(flows
-            .iter()
-            .any(|(_, money)| money.currency() == Currency::USD));
-        assert!(flows
-            .iter()
-            .any(|(_, money)| money.currency() == Currency::EUR));
+        assert!(
+            flows
+                .iter()
+                .any(|(_, money)| money.currency() == Currency::USD)
+        );
+        assert!(
+            flows
+                .iter()
+                .any(|(_, money)| money.currency() == Currency::EUR)
+        );
     }
 
     #[test]
@@ -1639,7 +1639,7 @@ mod tests {
         use finstack_quant_core::dates::calendar_by_id_strict;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
         use finstack_quant_valuations_core::instruments::pricing::overnight::{
-            project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
+            OvernightCouponProjectionInput, OvernightProjectionCurve, project_overnight_coupon,
         };
 
         let start = Date::from_calendar_date(2025, time::Month::January, 2).expect("date");

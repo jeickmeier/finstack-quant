@@ -408,15 +408,18 @@ mod tests {
     fn non_finite_latent_and_conditional_results_are_errors() {
         let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.3).expect("valid copula");
         let mut rng = PhiloxRng::new(42);
-        assert!(sim
-            .simulate_period(f64::NAN, &[0.05], &mut rng, &mut Vec::new(), false)
-            .is_err());
-        assert!(sim
-            .conditional_default_probs(f64::NAN, &[0.05], &mut rng, &mut Vec::new())
-            .is_err());
-        assert!(sim
-            .conditional_default_prob(f64::NAN, 0.05, &mut rng)
-            .is_err());
+        assert!(
+            sim.simulate_period(f64::NAN, &[0.05], &mut rng, &mut Vec::new(), false)
+                .is_err()
+        );
+        assert!(
+            sim.conditional_default_probs(f64::NAN, &[0.05], &mut rng, &mut Vec::new())
+                .is_err()
+        );
+        assert!(
+            sim.conditional_default_prob(f64::NAN, 0.05, &mut rng)
+                .is_err()
+        );
     }
 
     /// Per-name conditional default probabilities share one mixing draw per

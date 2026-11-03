@@ -1,6 +1,7 @@
 //! Commodity option instrument definition and pricing logic.
 
 use crate::commodity::bump_price_curve_pct;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -8,7 +9,6 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams;
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_models::types::OptionMarketParams;
@@ -622,11 +622,7 @@ fn implied_carry(spot: f64, forward: f64, r: f64, t: f64) -> f64 {
         return r;
     }
     let carry = (forward / spot).ln() / t;
-    if carry.is_finite() {
-        r - carry
-    } else {
-        r
-    }
+    if carry.is_finite() { r - carry } else { r }
 }
 
 impl Instrument for CommoditySpotOption {
@@ -1454,11 +1450,13 @@ mod tests {
         let mut option = CommoditySpotOption::example().unwrap();
         option.exercise_style = ExerciseStyle::American;
         option.spot_id = None;
-        assert!(option
-            .validate()
-            .unwrap_err()
-            .to_string()
-            .contains("spot_id"));
+        assert!(
+            option
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .contains("spot_id")
+        );
     }
 
     #[test]

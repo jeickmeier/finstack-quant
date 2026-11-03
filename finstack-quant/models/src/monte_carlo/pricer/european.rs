@@ -12,9 +12,9 @@ use crate::monte_carlo::discretization::exact::ExactGbm;
 use crate::monte_carlo::payoff::vanilla::European;
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::rng::philox::PhiloxRng;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
-use finstack_quant_core::Result;
 
 /// Compact GBM-only pricer for European-style contracts.
 ///

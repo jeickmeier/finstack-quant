@@ -448,7 +448,9 @@ pub fn hw_ln_a(
     let p0t = df(t);
     let p0_maturity = df(maturity);
     if !p0t.is_finite() || p0t <= 0.0 || !p0_maturity.is_finite() || p0_maturity <= 0.0 {
-        return Err(Error::Validation(format!("Hull-White discount factors must be positive and finite: P(0,{t})={p0t}, P(0,{maturity})={p0_maturity}")));
+        return Err(Error::Validation(format!(
+            "Hull-White discount factors must be positive and finite: P(0,{t})={p0t}, P(0,{maturity})={p0_maturity}"
+        )));
     }
     let b = hw_b(kappa, t, maturity);
     let f0t = fd_instantaneous_forward(df, t).ok_or_else(|| {

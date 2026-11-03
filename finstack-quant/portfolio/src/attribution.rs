@@ -3,6 +3,7 @@
 //! Aggregates instrument-level attribution across all positions in a portfolio,
 //! with currency conversion to portfolio base currency.
 
+use crate::Portfolio;
 use crate::error::{Error, Result};
 use crate::evaluation::try_map_positions;
 use crate::evaluation::{EvaluationProfile, PortfolioEvaluationPlan, PositionExecution};
@@ -10,19 +11,18 @@ use crate::types::PositionId;
 use crate::valuation::{
     PortfolioValuation, PortfolioValuationOptions, PositionValue, RequestedMetrics,
 };
-use crate::Portfolio;
 use finstack_quant_attribution::{
-    attribute_pnl_metrics_based, default_attribution_metrics, translate_to_target_currency,
     AttributionMethod, AttributionRequest, PnlAttribution, PnlBucketShare,
+    attribute_pnl_metrics_based, default_attribution_metrics, translate_to_target_currency,
 };
 use finstack_quant_core::config::{FinstackConfig, RoundingContext, ZeroKind};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::composite::CompositeInstrument;
 use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
-use finstack_quant_valuations::instruments::Instrument;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -908,8 +908,8 @@ mod tests {
     use finstack_quant_valuations::results::ValuationResult;
     use std::any::Any;
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     };
     use time::macros::date;
 
@@ -998,11 +998,13 @@ mod tests {
         assert!((pv_t1.amount() - 30.0).abs() < 1.0e-9);
         assert!(position.waterfall_steps.is_empty() && position.sensitivity_steps.is_empty());
         assert_eq!(position.total_pnl.amount(), 10.0);
-        assert!(position
-            .meta
-            .notes
-            .iter()
-            .any(|note| note.contains("frozen primitive")));
+        assert!(
+            position
+                .meta
+                .notes
+                .iter()
+                .any(|note| note.contains("frozen primitive"))
+        );
         Ok(())
     }
 
@@ -1730,10 +1732,12 @@ mod tests {
             attribution.total_pnl.amount() > 0.0,
             "0.003 is kept, not rounded away"
         );
-        assert!(attribution
-            .pct_of_total_by_bucket()
-            .iter()
-            .all(|bucket| bucket.pct_of_total.is_none()));
+        assert!(
+            attribution
+                .pct_of_total_by_bucket()
+                .iter()
+                .all(|bucket| bucket.pct_of_total.is_none())
+        );
         let explained = attribution.explain();
         assert!(explained.contains("Carry: USD"), "{explained}");
         assert!(
@@ -1799,10 +1803,12 @@ mod tests {
         assert!(attribution.reconciliation_check(1e-9).is_reconciled);
 
         attribution.total_pnl = usd(0);
-        assert!(attribution
-            .pct_of_total_by_bucket()
-            .iter()
-            .all(|bucket| bucket.pct_of_total.is_none()));
+        assert!(
+            attribution
+                .pct_of_total_by_bucket()
+                .iter()
+                .all(|bucket| bucket.pct_of_total.is_none())
+        );
     }
 
     #[test]

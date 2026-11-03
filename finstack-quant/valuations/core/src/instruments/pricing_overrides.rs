@@ -708,26 +708,26 @@ impl ModelConfig {
 
     /// Validate model config (tree steps > 0, non-negative vol/friction).
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        if let Some(steps) = self.tree_steps {
-            if steps == 0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "tree_steps must be greater than zero".to_string(),
-                ));
-            }
+        if let Some(steps) = self.tree_steps
+            && steps == 0
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "tree_steps must be greater than zero".to_string(),
+            ));
         }
-        if let Some(paths) = self.mc_paths {
-            if paths == 0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "mc_paths must be greater than zero".to_string(),
-                ));
-            }
+        if let Some(paths) = self.mc_paths
+            && paths == 0
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "mc_paths must be greater than zero".to_string(),
+            ));
         }
-        if let Some(target) = self.mc_target_ci_half_width {
-            if !target.is_finite() || target <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "mc_target_ci_half_width must be finite and positive, got {target}"
-                )));
-            }
+        if let Some(target) = self.mc_target_ci_half_width
+            && (!target.is_finite() || target <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "mc_target_ci_half_width must be finite and positive, got {target}"
+            )));
         }
         // Friction, volatilities, and mean reversions must be finite and
         // non-negative. Correlation is signed, so it is range-checked
@@ -742,20 +742,20 @@ impl ModelConfig {
             (self.hazard_sigma, true),
             (self.hazard_mean_reversion, true),
         ])?;
-        if let Some(base_vol) = self.lmm_base_vol {
-            if !base_vol.is_finite() || base_vol <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "lmm_base_vol must be positive and finite, got {base_vol}"
-                )));
-            }
+        if let Some(base_vol) = self.lmm_base_vol
+            && (!base_vol.is_finite() || base_vol <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "lmm_base_vol must be positive and finite, got {base_vol}"
+            )));
         }
         validate_oas_quote_compounding(self.oas_quote_compounding)?;
-        if let Some(rho) = self.rate_credit_correlation {
-            if !rho.is_finite() || !(-1.0..=1.0).contains(&rho) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "rate_credit_correlation must be finite and in [-1, 1], got {rho}"
-                )));
-            }
+        if let Some(rho) = self.rate_credit_correlation
+            && (!rho.is_finite() || !(-1.0..=1.0).contains(&rho))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "rate_credit_correlation must be finite and in [-1, 1], got {rho}"
+            )));
         }
         Ok(())
     }
@@ -1015,7 +1015,7 @@ pub fn resolve_rates_credit_config(
 ) -> finstack_quant_core::Result<
     finstack_quant_models::trees::two_factor_rates_credit::RatesCreditConfig,
 > {
-    use finstack_quant_models::trees::two_factor_rates_credit::{RatesCreditConfig, KAPPA_MAX};
+    use finstack_quant_models::trees::two_factor_rates_credit::{KAPPA_MAX, RatesCreditConfig};
 
     let model = &overrides.model_config;
     let quotes = &overrides.market_quotes;
@@ -1486,27 +1486,33 @@ mod tests {
             )
             .expect("valid schedule fixture"),
         );
-        assert!(resolve_rates_credit_config(&scheduled, 32)
-            .expect_err("unsupported schedule must fail")
-            .to_string()
-            .contains("hw1f_sigma_schedule"));
+        assert!(
+            resolve_rates_credit_config(&scheduled, 32)
+                .expect_err("unsupported schedule must fail")
+                .to_string()
+                .contains("hw1f_sigma_schedule")
+        );
     }
 
     #[test]
     fn resolver_rejects_legacy_channels_without_canonical_counterpart() {
         let mut legacy_vol = InstrumentPricingOverrides::default();
         legacy_vol.market_quotes.implied_volatility = Some(0.01);
-        assert!(resolve_rates_credit_config(&legacy_vol, 32)
-            .expect_err("legacy vol must fail")
-            .to_string()
-            .contains("implied_volatility"));
+        assert!(
+            resolve_rates_credit_config(&legacy_vol, 32)
+                .expect_err("legacy vol must fail")
+                .to_string()
+                .contains("implied_volatility")
+        );
 
         let mut bdt = InstrumentPricingOverrides::default();
         bdt.model_config.bdt_sigma = Some(0.20);
-        assert!(resolve_rates_credit_config(&bdt, 32)
-            .expect_err("a BDT volatility is not a rates-credit input")
-            .to_string()
-            .contains("instrument_pricing_overrides.model_config.bdt_sigma"));
+        assert!(
+            resolve_rates_credit_config(&bdt, 32)
+                .expect_err("a BDT volatility is not a rates-credit input")
+                .to_string()
+                .contains("instrument_pricing_overrides.model_config.bdt_sigma")
+        );
 
         for field in ["bk_sigma", "bk_mean_reversion"] {
             let mut bk = InstrumentPricingOverrides::default();
@@ -1514,12 +1520,14 @@ mod tests {
                 "bk_sigma" => bk.model_config.bk_sigma = Some(0.20),
                 _ => bk.model_config.bk_mean_reversion = Some(0.03),
             }
-            assert!(resolve_rates_credit_config(&bk, 32)
-                .expect_err("a Black-Karasinski input is not a rates-credit input")
-                .to_string()
-                .contains(&format!(
-                    "instrument_pricing_overrides.model_config.{field}"
-                )));
+            assert!(
+                resolve_rates_credit_config(&bk, 32)
+                    .expect_err("a Black-Karasinski input is not a rates-credit input")
+                    .to_string()
+                    .contains(&format!(
+                        "instrument_pricing_overrides.model_config.{field}"
+                    ))
+            );
         }
     }
 
@@ -1595,9 +1603,11 @@ mod tests {
         let missing = MarketQuoteOverrides::default()
             .required_quoted_premium()
             .expect_err("missing premium");
-        assert!(missing
-            .to_string()
-            .contains("instrument_pricing_overrides.market_quotes.quoted_premium"));
+        assert!(
+            missing
+                .to_string()
+                .contains("instrument_pricing_overrides.market_quotes.quoted_premium")
+        );
     }
 
     #[test]
@@ -1683,10 +1693,12 @@ mod tests {
         assert!(instrument.validate().is_ok());
         assert!(metrics.validate().is_ok());
         assert!(scenario.validate().is_ok());
-        assert!(MetricPricingOverrides::default()
-            .with_vol_bump_decimal(-0.01)
-            .validate()
-            .is_err());
+        assert!(
+            MetricPricingOverrides::default()
+                .with_vol_bump_decimal(-0.01)
+                .validate()
+                .is_err()
+        );
     }
 
     #[test]
@@ -1832,10 +1844,12 @@ mod tests {
             serde_json::from_str::<MetricPricingOverrides>(r#"{"theta_period": "1W"}"#).is_err()
         );
         // A zero-length horizon is not a tenor.
-        assert!(serde_json::from_str::<MetricPricingOverrides>(
-            r#"{"theta_period": {"count": 0, "unit": "days"}}"#
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<MetricPricingOverrides>(
+                r#"{"theta_period": {"count": 0, "unit": "days"}}"#
+            )
+            .is_err()
+        );
     }
 
     #[test]

@@ -162,16 +162,15 @@ pub use result::{
 pub use factors::{MarketRestoreFlags, MarketSnapshot};
 pub use metrics_based::attribute_pnl_metrics_based;
 pub use return_contribution::{
-    attribute_return_contribution, attribute_return_contribution_json,
-    validate_return_contribution_json, BenchmarkRelativeContribution, FactorContribution,
-    GroupContribution, InstrumentContribution, ReturnContributionFactor,
-    ReturnContributionPosition, ReturnContributionResult, ReturnContributionSpec,
-    ReturnContributionWeighting,
+    BenchmarkRelativeContribution, FactorContribution, GroupContribution, InstrumentContribution,
+    ReturnContributionFactor, ReturnContributionPosition, ReturnContributionResult,
+    ReturnContributionSpec, ReturnContributionWeighting, attribute_return_contribution,
+    attribute_return_contribution_json, validate_return_contribution_json,
 };
 pub use spec::{
-    attribute_pnl_many, default_attribution_metrics, validate_attribution_json, AttributionConfig,
-    AttributionEnvelope, AttributionInputs, AttributionResult, AttributionResultEnvelope,
-    AttributionSchema, AttributionSpec,
+    AttributionConfig, AttributionEnvelope, AttributionInputs, AttributionResult,
+    AttributionResultEnvelope, AttributionSchema, AttributionSpec, attribute_pnl_many,
+    default_attribution_metrics, validate_attribution_json,
 };
 pub use target_currency::translate_to_target_currency;
 pub use taylor::TaylorAttributionConfig;

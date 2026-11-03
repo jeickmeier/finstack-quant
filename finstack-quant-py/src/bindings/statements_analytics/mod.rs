@@ -57,11 +57,7 @@ pub(crate) fn extract_serde_any<'py, T: serde::de::DeserializeOwned + Send>(
 
 /// Python-style rendering of a bool for `__repr__`.
 pub(crate) fn py_bool(value: bool) -> &'static str {
-    if value {
-        "True"
-    } else {
-        "False"
-    }
+    if value { "True" } else { "False" }
 }
 
 /// Python-style rendering of an optional string for `__repr__`.

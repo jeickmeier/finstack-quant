@@ -474,8 +474,8 @@ mod tests {
         let t_end = 1.0_f64;
         let n = 50usize;
 
-        let gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
-        let dt = gen.dt();
+        let r#gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
+        let dt = r#gen.dt();
         let mut rng = PhiloxRng::new(24680);
 
         let num_paths = 200_000usize;
@@ -487,7 +487,7 @@ mod tests {
         let mut sums = [0.0_f64; 3];
         for _ in 0..num_paths {
             rng.fill_std_normals(&mut vol_normals);
-            gen.generate(&vol_normals, &mut increments);
+            r#gen.generate(&vol_normals, &mut increments);
 
             let mut y_accum = 0.0;
             for (k, &incr) in increments.iter().enumerate() {
@@ -545,8 +545,8 @@ mod tests {
         let disc = CheyetteRoughEuler::new();
         let p = process.params();
 
-        let gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
-        let dt = gen.dt();
+        let r#gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
+        let dt = r#gen.dt();
         let mut rng = PhiloxRng::new(13579);
 
         let num_paths = 100_000usize;
@@ -560,8 +560,8 @@ mod tests {
         for _ in 0..num_paths {
             rng.fill_std_normals(&mut vol_normals);
             rng.fill_std_normals(&mut rate_normals);
-            gen.generate(&vol_normals, &mut increments);
-            gen.driving_normals_into(&vol_normals, &mut driving);
+            r#gen.generate(&vol_normals, &mut increments);
+            r#gen.driving_normals_into(&vol_normals, &mut driving);
 
             let mut work = [0.0];
             let mut m_t = 0.0;

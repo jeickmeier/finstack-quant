@@ -17,14 +17,14 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_portfolio::metrics::aggregate_metrics;
 use finstack_quant_portfolio::optimization::{
-    optimize, rebalance, Constraint, MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric,
-    PortfolioOptimizationProblem, WeightingScheme,
+    Constraint, MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric,
+    PortfolioOptimizationProblem, WeightingScheme, optimize, rebalance,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::{AttributeValue, Entity};
-use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
@@ -188,10 +188,10 @@ fn main() -> finstack_quant_portfolio::Result<()> {
     let mut ccc_weight = 0.0_f64;
     let portfolio_ref = &problem.portfolio;
     for (pos_id, &w) in &result.optimal_weights {
-        if let Some(position) = portfolio_ref.get_position(pos_id.as_str()) {
-            if position.attributes.get("rating") == Some(&AttributeValue::from("CCC")) {
-                ccc_weight += w;
-            }
+        if let Some(position) = portfolio_ref.get_position(pos_id.as_str())
+            && position.attributes.get("rating") == Some(&AttributeValue::from("CCC"))
+        {
+            ccc_weight += w;
         }
     }
     println!("\nCCC exposure (by weight): {:.2}%", ccc_weight * 100.0);

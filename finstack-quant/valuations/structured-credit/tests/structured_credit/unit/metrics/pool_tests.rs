@@ -16,8 +16,8 @@ use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_pool_stats, pool_report, AssetPool, CdrCalculator, CloWarfCalculator, CprCalculator,
-    DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, CdrCalculator, CloWarfCalculator, CprCalculator, DealType, PoolAsset,
+    StructuredCredit, Tranche, TrancheStructure, calculate_pool_stats, pool_report,
 };
 use std::sync::Arc;
 use time::Month;

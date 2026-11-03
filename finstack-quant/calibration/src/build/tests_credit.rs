@@ -1,15 +1,15 @@
 //! Quote-to-CDS-instrument construction tests.
 #![allow(clippy::unwrap_used, clippy::panic)]
 
-use crate::build::cds::build_cds_instrument;
-use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
 use crate::build::BuildCtx;
+use crate::build::cds::build_cds_instrument;
+use crate::build::cds_tranche::{CdsTrancheBuildOverrides, build_cds_tranche_instrument};
 use crate::quotes::CdsQuote;
 use crate::quotes::CdsTrancheQuote;
 use crate::quotes::Pillar;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, Tenor};
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations_core::market::conventions::{CdsConvention, CdsValuationConvention};

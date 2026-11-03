@@ -448,8 +448,8 @@ mod tests {
     }
 
     #[test]
-    fn covariance_forecast_preserves_calibrated_ridge_and_ledoit_wolf(
-    ) -> finstack_quant_core::Result<()> {
+    fn covariance_forecast_preserves_calibrated_ridge_and_ledoit_wolf()
+    -> finstack_quant_core::Result<()> {
         use crate::credit::calibration::{
             CovarianceStrategy, CreditCalibrationConfig, CreditCalibrationInputs, CreditCalibrator,
             GenericFactorSeries, HistoryPanel, IssuerTagPanel,
@@ -525,9 +525,11 @@ mod tests {
         )
         .unwrap();
         for years in [-1.0, f64::NAN, f64::INFINITY] {
-            assert!(FactorCovarianceForecast::new(&model)
-                .covariance_at(VolHorizon::Years(years))
-                .is_err());
+            assert!(
+                FactorCovarianceForecast::new(&model)
+                    .covariance_at(VolHorizon::Years(years))
+                    .is_err()
+            );
         }
     }
 
@@ -545,9 +547,11 @@ mod tests {
             .idiosyncratic_vol(&issuer, VolHorizon::NSteps(4))
             .expect("issuer forecast");
         assert!((vol - 0.6).abs() < 1e-12);
-        assert!(forecast
-            .idiosyncratic_vol(&IssuerId::new("MISSING"), VolHorizon::OneStep)
-            .is_err());
+        assert!(
+            forecast
+                .idiosyncratic_vol(&IssuerId::new("MISSING"), VolHorizon::OneStep)
+                .is_err()
+        );
     }
 
     /// The forecast never returns a non-finite vol: an overflowing horizon

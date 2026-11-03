@@ -132,11 +132,7 @@ impl ShortRateBasis {
 
 impl BasisFunctions for ShortRateBasis {
     fn num_basis(&self) -> usize {
-        if self.is_extended() {
-            6
-        } else {
-            4
-        }
+        if self.is_extended() { 6 } else { 4 }
     }
 
     fn evaluate(&self, state: f64, out: &mut [f64]) {

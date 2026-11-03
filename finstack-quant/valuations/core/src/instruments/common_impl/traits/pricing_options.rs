@@ -2,8 +2,8 @@
 //! to `Instrument::price_with_metrics`.
 // Pricing Options
 
-use crate::metrics::risk::MarketHistory;
 use crate::metrics::MetricRegistry;
+use crate::metrics::risk::MarketHistory;
 use crate::pricer::{ModelKey, PricerRegistry};
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::explain::ExplainOpts;

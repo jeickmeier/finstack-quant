@@ -175,8 +175,8 @@ mod discount_margin_tests {
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        calculate_tranche_z_spread, tranche_discount_margin, tranche_metrics, AssetPool, DealType,
-        PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+        calculate_tranche_z_spread, tranche_discount_margin, tranche_metrics,
     };
     use time::Month;
 
@@ -469,8 +469,8 @@ mod breakeven_cdr_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        tranche_breakeven_cdr, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
-        TrancheStructure,
+        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+        tranche_breakeven_cdr,
     };
     use time::Month;
 
@@ -585,8 +585,8 @@ mod scenario_table_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        tranche_scenario_table, AssetPool, DealType, PoolAsset, ScenarioGrid, StructuredCredit,
-        Tranche, TrancheStructure,
+        AssetPool, DealType, PoolAsset, ScenarioGrid, StructuredCredit, Tranche, TrancheStructure,
+        tranche_scenario_table,
     };
     use time::Month;
 
@@ -736,8 +736,8 @@ mod oas_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        calculate_tranche_z_spread, tranche_oas, AssetPool, DealType, OasConfig, PoolAsset,
-        StructuredCredit, Tranche, TrancheStructure,
+        AssetPool, DealType, OasConfig, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+        calculate_tranche_z_spread, tranche_oas,
     };
     use time::Month;
 

@@ -1,6 +1,6 @@
 //! Contractual term-index caplet schedules on the ACT/365F model clock.
 
-use super::{pricing::cap_floor_periods, CapFloorQuote, SwapFrequency};
+use super::{CapFloorQuote, SwapFrequency, pricing::cap_floor_periods};
 use finstack_quant_core::{Error, Result};
 
 /// One live term-index caplet or floorlet, per unit notional.
@@ -106,14 +106,14 @@ pub(super) fn prepare_cap_floor_schedules(
     schedules: Option<&[CapFloorSchedule]>,
     frequency: SwapFrequency,
 ) -> Result<Vec<CapFloorSchedule>> {
-    if let Some(schedules) = schedules {
-        if schedules.len() != quotes.len() {
-            return Err(Error::Validation(format!(
-                "cap/floor schedules.len() ({}) must match quotes.len() ({})",
-                schedules.len(),
-                quotes.len()
-            )));
-        }
+    if let Some(schedules) = schedules
+        && schedules.len() != quotes.len()
+    {
+        return Err(Error::Validation(format!(
+            "cap/floor schedules.len() ({}) must match quotes.len() ({})",
+            schedules.len(),
+            quotes.len()
+        )));
     }
     quotes
         .iter()

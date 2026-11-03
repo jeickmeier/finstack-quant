@@ -2,8 +2,8 @@
 //!
 use finstack_quant_calibration::validation::ValidationConfig;
 use finstack_quant_calibration::validation::{
-    validate_butterfly_spread, validate_calendar_spread, validate_surface, validate_vol_bounds,
-    CurveValidator,
+    CurveValidator, validate_butterfly_spread, validate_calendar_spread, validate_surface,
+    validate_vol_bounds,
 };
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::interp::InterpStyle;

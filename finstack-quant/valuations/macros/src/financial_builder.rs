@@ -3,7 +3,7 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::HashMap;
-use syn::{parse_macro_input, Data, DeriveInput, Expr, Fields, Lit, Meta};
+use syn::{Data, DeriveInput, Expr, Fields, Lit, Meta, parse_macro_input};
 
 /// Implementation of the FinancialBuilder derive macro.
 ///
@@ -88,7 +88,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
                 "FinancialBuilder can only be derived for structs",
             )
             .to_compile_error()
-            .into()
+            .into();
         }
     };
 
@@ -132,8 +132,8 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
 
             let mut default_expr: Option<Expr> = None;
             for attr in f.attrs {
-                if attr.path().is_ident("builder") {
-                    if let Err(error) = attr.parse_nested_meta(|meta| {
+                if attr.path().is_ident("builder")
+                    && let Err(error) = attr.parse_nested_meta(|meta| {
                         if meta.path.is_ident("default") {
                             // Support #[builder(default)] and #[builder(default = <expr>)]
                             if meta.input.peek(syn::Token![=]) {
@@ -151,9 +151,9 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
                             );
                         }
                         Ok(())
-                    }) {
-                        return error.to_compile_error().into();
-                    }
+                    })
+                {
+                    return error.to_compile_error().into();
                 }
             }
 

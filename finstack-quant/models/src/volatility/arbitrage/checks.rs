@@ -74,7 +74,7 @@
 //! non-negative.
 
 use super::types::{ArbitrageSeverity, ArbitrageType, ArbitrageViolation, ViolationLocation};
-use crate::volatility::dupire::{dupire_node, MoneynessLookup};
+use crate::volatility::dupire::{MoneynessLookup, dupire_node};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 
 /// Classify violation magnitude into a severity bucket.

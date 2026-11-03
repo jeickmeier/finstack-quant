@@ -11,6 +11,7 @@
 //! - Bucketed CS01 sums to total CS01
 //! - Bucketed Vega sums to total Vega (for instruments with vol surfaces)
 
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -18,11 +19,10 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::SettlementType;
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::metrics::{MetricContext, MetricId};
 use finstack_quant_valuations::pricer::STANDARD;
 use std::sync::Arc;
@@ -385,7 +385,9 @@ fn test_bucketed_dv01_sums_to_parallel() {
         assert!(
             diff_pct < 0.0001,
             "Sum of bucketed DV01 ({:.4}) should be within 0.01% of parallel DV01 ({:.4}), got {:.3}%",
-            sum_bucketed, total_dv01, diff_pct * 100.0
+            sum_bucketed,
+            total_dv01,
+            diff_pct * 100.0
         );
 
         // The 10y bucket should capture most of the sensitivity

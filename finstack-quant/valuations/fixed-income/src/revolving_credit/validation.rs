@@ -5,7 +5,7 @@
 //! schedules, fee tiers, the coupon specification and the draw/repay or
 //! stochastic utilization specification.
 
-use finstack_quant_core::dates::{calendar_by_id_strict, Date};
+use finstack_quant_core::dates::{Date, calendar_by_id_strict};
 use rust_decimal::Decimal;
 
 use super::types::{CreditSpreadProcessSpec, DrawRepaySpec, RevolvingCredit, UtilizationProcess};
@@ -289,7 +289,10 @@ impl RevolvingCredit {
                 )?;
                 if let Some(prev) = previous {
                     validation::require_with(event.date >= prev, || {
-                        format!("RevolvingCredit lc.events must be sorted by date: [{index}] {} < {prev}", event.date)
+                        format!(
+                            "RevolvingCredit lc.events must be sorted by date: [{index}] {} < {prev}",
+                            event.date
+                        )
                     })?;
                 }
                 previous = Some(event.date);

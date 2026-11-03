@@ -2,12 +2,12 @@
 
 use serde::{Deserialize, Serialize};
 
+use finstack_quant_statements::Result;
 use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Severity,
 };
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_statements::Result;
 
 /// Tracks consecutive periods of negative free cash flow and flags at
 /// configurable thresholds.

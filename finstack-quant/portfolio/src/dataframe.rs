@@ -13,8 +13,8 @@
 
 use crate::metrics::PortfolioMetrics;
 use crate::valuation::PortfolioValuation;
-use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use finstack_quant_core::Result;
+use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use indexmap::IndexMap;
 use serde_json::json;
 
@@ -202,11 +202,11 @@ pub fn aggregated_metrics_to_table(metrics: &PortfolioMetrics) -> Result<TableEn
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Portfolio;
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market;
     use crate::types::Entity;
     use crate::valuation::value_portfolio;
-    use crate::Portfolio;
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;

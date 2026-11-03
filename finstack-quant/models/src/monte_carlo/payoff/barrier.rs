@@ -392,10 +392,10 @@ impl Payoff for BarrierOptionPayoff {
             // maturity so the engine's DF(T) nets to DF(τ). A knock-in that
             // never touched the barrier has no hit time and pays at expiry.
             let mut rebate_amount = self.rebate.unwrap_or(0.0);
-            if let Some(rate) = self.rebate_at_hit_rate {
-                if self.barrier_hit {
-                    rebate_amount *= (rate * (self.total_time - self.hit_time)).exp();
-                }
+            if let Some(rate) = self.rebate_at_hit_rate
+                && self.barrier_hit
+            {
+                rebate_amount *= (rate * (self.total_time - self.hit_time)).exp();
             }
             Money::new(rebate_amount * self.notional, currency)
         }

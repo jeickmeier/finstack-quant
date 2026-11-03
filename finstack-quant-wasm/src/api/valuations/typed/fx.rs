@@ -172,9 +172,25 @@ fx_class!(
 macro_rules! fx_option_with_all_greeks {
     ($rust_name:ident, $js_name:literal, $rust_ty:ty, $instrument_type:ident, $theta_returns:literal) => {
         fx_option!(
-            $rust_name, $js_name, $rust_ty, $instrument_type, $theta_returns,
-            (vanna, vanna, "vanna", "Vanna of the option.", "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."),
-            (volga, volga, "volga", "Volga of the option.", "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."),
+            $rust_name,
+            $js_name,
+            $rust_ty,
+            $instrument_type,
+            $theta_returns,
+            (
+                vanna,
+                vanna,
+                "vanna",
+                "Vanna of the option.",
+                "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."
+            ),
+            (
+                volga,
+                volga,
+                "volga",
+                "Volga of the option.",
+                "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."
+            ),
         );
     };
 }
@@ -459,13 +475,15 @@ mod tests {
                 .instrument("{}")
                 .is_err()
         );
-        assert!(super::super::option_greeks(
-            Box::new(instruments::fx::fx_option::FxOption::example().expect("example")),
-            "not-market-json",
-            "not-a-date",
-            Some("not-a-model"),
-        )
-        .is_err());
+        assert!(
+            super::super::option_greeks(
+                Box::new(instruments::fx::fx_option::FxOption::example().expect("example")),
+                "not-market-json",
+                "not-a-date",
+                Some("not-a-model"),
+            )
+            .is_err()
+        );
     }
 
     /// The Greeks the registry computes for `instrument_type`, in

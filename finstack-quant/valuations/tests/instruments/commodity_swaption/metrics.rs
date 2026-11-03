@@ -88,8 +88,8 @@ fn test_commodity_swaption_dv01_and_bucketed_dv01() -> finstack_quant_core::Resu
 }
 
 #[test]
-fn commodity_swaption_zero_vol_delta_matches_parallel_price_shift(
-) -> finstack_quant_core::Result<()> {
+fn commodity_swaption_zero_vol_delta_matches_parallel_price_shift()
+-> finstack_quant_core::Result<()> {
     use finstack_quant_valuations::instruments::{GreekBumps, OptionGreeksProvider};
     for kind in [OptionType::Call, OptionType::Put] {
         for f in [2.0, 3.5, 5.0] {

@@ -9,8 +9,8 @@ use crate::cds::CreditDefaultSwap;
 use finstack_quant_core::dates::{Date, DayCountContext, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::math::ZERO_TOLERANCE;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::credit;
@@ -763,8 +763,8 @@ mod cds_hazard_reprice_cache_tests {
     }
 
     #[test]
-    fn cds_hazard_reprice_cache_matches_value_for_current_coupon_with_accrual_on_default(
-    ) -> finstack_quant_core::Result<()> {
+    fn cds_hazard_reprice_cache_matches_value_for_current_coupon_with_accrual_on_default()
+    -> finstack_quant_core::Result<()> {
         let as_of = date!(2025 - 02 - 15);
         let cds = create_test_cds(CdsValuationConvention::IsdaDirty)?;
         let (market, hazard) = create_test_market()?;
@@ -790,8 +790,8 @@ mod cds_hazard_reprice_cache_tests {
     }
 
     #[test]
-    fn cds_hazard_reprice_cache_matches_value_for_bloomberg_clean_accrued(
-    ) -> finstack_quant_core::Result<()> {
+    fn cds_hazard_reprice_cache_matches_value_for_bloomberg_clean_accrued()
+    -> finstack_quant_core::Result<()> {
         let as_of = date!(2025 - 02 - 15);
         let cds = create_test_cds(CdsValuationConvention::BloombergCdswClean)?;
         let (market, hazard) = create_test_market()?;
@@ -808,8 +808,8 @@ mod cds_hazard_reprice_cache_tests {
 #[cfg(test)]
 mod cds_review_regression_tests {
     use super::{CdsHazardRepriceCache, CdsPricer};
-    use crate::cds::pricing::AccrualDayCountPolicy;
     use crate::cds::CreditDefaultSwap;
+    use crate::cds::pricing::AccrualDayCountPolicy;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -892,8 +892,8 @@ mod cds_review_regression_tests {
     }
 
     #[test]
-    fn cds_unpaid_final_coupon_survives_protection_expiry_and_cache(
-    ) -> finstack_quant_core::Result<()> {
+    fn cds_unpaid_final_coupon_survives_protection_expiry_and_cache()
+    -> finstack_quant_core::Result<()> {
         let start = date!(2025 - 06 - 20);
         let end = date!(2025 - 09 - 20); // Saturday; payment is Monday September 22.
         for convention in [
@@ -950,8 +950,8 @@ mod cds_review_regression_tests {
     }
 
     #[test]
-    fn cds_completed_coupon_is_certain_below_historical_survival_floor(
-    ) -> finstack_quant_core::Result<()> {
+    fn cds_completed_coupon_is_certain_below_historical_survival_floor()
+    -> finstack_quant_core::Result<()> {
         let start = date!(2025 - 06 - 20);
         let end = date!(2025 - 09 - 20);
         let hazard_base = date!(2020 - 09 - 20);
@@ -1013,8 +1013,8 @@ mod cds_review_regression_tests {
     }
 
     #[test]
-    fn cds_aod_cashflows_match_independent_integral_for_both_clean_denominators(
-    ) -> finstack_quant_core::Result<()> {
+    fn cds_aod_cashflows_match_independent_integral_for_both_clean_denominators()
+    -> finstack_quant_core::Result<()> {
         let as_of = date!(2025 - 01 - 15);
         let end = date!(2025 - 03 - 20);
         let lambda: f64 = 0.2;

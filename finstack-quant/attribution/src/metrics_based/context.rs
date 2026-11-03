@@ -1,20 +1,20 @@
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::diff::{
-    measure_credit_curve_shift, measure_fx_shift, measure_scalar_absolute_shift,
-    measure_scalar_shift, TenorSamplingMethod,
+    TenorSamplingMethod, measure_credit_curve_shift, measure_fx_shift,
+    measure_scalar_absolute_shift, measure_scalar_shift,
 };
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use finstack_quant_models::volatility::measure_vol_surface_shift;
 use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
 use finstack_quant_valuations::results::ValuationResult;
 use std::sync::Arc;
 
 use super::shifts::{
-    average_over, extract_credit_keyrates, extract_keyrate_per_curve, measure_per_tenor_rate_shift,
-    measure_rate_curve_shift_bp, CreditKeyRateBucket,
+    CreditKeyRateBucket, average_over, extract_credit_keyrates, extract_keyrate_per_curve,
+    measure_per_tenor_rate_shift, measure_rate_curve_shift_bp,
 };
 
 pub(super) struct MarketShifts {
@@ -96,14 +96,18 @@ impl<'a> MetricsContext<'a> {
         let mut paired_rate_keyrates = finstack_quant_core::FxHashMap::default();
         for (curve_id, buckets) in rate_keyrates.drain() {
             let tenors: Vec<_> = buckets.iter().map(|(tenor, _)| *tenor).collect();
-            let moves =
-                measure_per_tenor_rate_shift(curve_id.as_str(), market_t0, market_t1, &tenors)
-                    .filter(|moves| moves.iter().all(|movement| movement.is_finite()))
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(format!(
+            let moves = measure_per_tenor_rate_shift(
+                curve_id.as_str(),
+                market_t0,
+                market_t1,
+                &tenors,
+            )
+            .filter(|moves| moves.iter().all(|movement| movement.is_finite()))
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
                     "bucketed_dv01 for '{curve_id}' has no complete measurable curve movement"
                 ))
-                    })?;
+            })?;
             paired_rate_keyrates.insert(
                 curve_id,
                 buckets

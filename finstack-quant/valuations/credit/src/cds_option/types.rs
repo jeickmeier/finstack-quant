@@ -260,7 +260,8 @@ impl CdsOption {
         if let Some(exercise_settlement) = self.exercise_settlement_date {
             if exercise_settlement < self.expiry {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "exercise_settlement_date ({exercise_settlement}) must be on or after legal expiry ({})", self.expiry,
+                    "exercise_settlement_date ({exercise_settlement}) must be on or after legal expiry ({})",
+                    self.expiry,
                 )));
             }
             if exercise_settlement >= self.underlying_maturity {
@@ -270,13 +271,13 @@ impl CdsOption {
                 )));
             }
         }
-        if let Some(underlying_start_date) = self.underlying_start_date {
-            if underlying_start_date >= self.underlying_maturity {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "underlying_start_date ({}) must be before CDS maturity ({})",
-                    underlying_start_date, self.underlying_maturity
-                )));
-            }
+        if let Some(underlying_start_date) = self.underlying_start_date
+            && underlying_start_date >= self.underlying_maturity
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "underlying_start_date ({}) must be before CDS maturity ({})",
+                underlying_start_date, self.underlying_maturity
+            )));
         }
 
         // Recovery rate: the shared credit-instrument invariant, `[0, 1)`.
@@ -300,12 +301,12 @@ impl CdsOption {
                 "coupon_bp is required for CDS index options".to_string(),
             ));
         }
-        if let Some(coupon_bp) = self.coupon_bp {
-            if coupon_bp <= Decimal::ZERO {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "coupon_bp must be positive when set, got {coupon_bp}"
-                )));
-            }
+        if let Some(coupon_bp) = self.coupon_bp
+            && coupon_bp <= Decimal::ZERO
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "coupon_bp must be positive when set, got {coupon_bp}"
+            )));
         }
 
         // Implied volatility override validation
@@ -780,11 +781,13 @@ mod tests {
     fn pricing_boundary_rejects_non_finite_terms() {
         let mut option = CdsOption::example().expect("example");
         option.recovery_rate = f64::NAN;
-        assert!(option
-            .validate_for_pricing()
-            .expect_err("NaN recovery must fail")
-            .to_string()
-            .contains("finite"));
+        assert!(
+            option
+                .validate_for_pricing()
+                .expect_err("NaN recovery must fail")
+                .to_string()
+                .contains("finite")
+        );
     }
 
     #[test]

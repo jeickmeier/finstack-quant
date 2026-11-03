@@ -23,6 +23,6 @@ pub use types::{
     TornadoEntry,
 };
 pub use variance::{
-    run_variance, variance_bridge, BridgeChart, BridgeStep, VarianceConfig, VarianceReport,
-    VarianceRow,
+    BridgeChart, BridgeStep, VarianceConfig, VarianceReport, VarianceRow, run_variance,
+    variance_bridge,
 };

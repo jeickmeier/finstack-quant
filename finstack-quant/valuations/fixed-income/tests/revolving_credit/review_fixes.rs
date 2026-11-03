@@ -10,9 +10,9 @@
 //! 4. Stochastic (Hull-White) rates keep the index-over-OIS basis.
 //! 5. Loan-equivalent exposure (`leq`) adds the cost of draws at default.
 
+use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_cashflows::builder::FloatingRateSpec;
 use finstack_quant_cashflows::builder::RateSpec;
-use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
@@ -525,11 +525,12 @@ fn leq_prices_the_draw_at_default() {
     assert_eq!(default_leq, 0.0);
     let mut bad = build("RC-LEQ-BAD", 0.0);
     bad.leq = 1.5;
-    assert!(bad
-        .validate()
-        .expect_err("leq > 1 must fail")
-        .to_string()
-        .contains("leq"));
+    assert!(
+        bad.validate()
+            .expect_err("leq > 1 must fail")
+            .to_string()
+            .contains("leq")
+    );
 }
 
 /// Draws smaller than the old booking threshold are still funded: a

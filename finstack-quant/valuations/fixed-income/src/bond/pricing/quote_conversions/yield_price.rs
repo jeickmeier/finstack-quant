@@ -1,10 +1,10 @@
+use super::ExitCandidate;
 use super::types::YieldCompounding;
 use super::workout_ladder::WorkoutExitKind;
-use super::ExitCandidate;
+use crate::bond::Bond;
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::pricing::tree::BondValuator;
-use crate::bond::pricing::ytm_solver::{solve_bond_ytm, YtmPricingSpec};
-use crate::bond::Bond;
+use crate::bond::pricing::ytm_solver::{YtmPricingSpec, solve_bond_ytm};
 use finstack_quant_cashflows::accrual::AccrualIndex;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CFKind;
@@ -1235,12 +1235,16 @@ mod tests {
             .collect();
 
         assert_eq!(calls.len(), 2);
-        assert!(calls
-            .iter()
-            .any(|spec| spec.reference_curve_id.as_str() == "REF-A"));
-        assert!(calls
-            .iter()
-            .any(|spec| spec.reference_curve_id.as_str() == "REF-B"));
+        assert!(
+            calls
+                .iter()
+                .any(|spec| spec.reference_curve_id.as_str() == "REF-A")
+        );
+        assert!(
+            calls
+                .iter()
+                .any(|spec| spec.reference_curve_id.as_str() == "REF-B")
+        );
         assert_eq!(puts.len(), 1);
         assert_eq!(puts[0].price_pct_of_par, 101.0);
     }
@@ -1507,9 +1511,11 @@ mod tests {
         )
         .expect("same-day YTW solve");
         assert!((solved - target_ytw).abs() < 1e-10);
-        assert!(selected_path
-            .iter()
-            .any(|(date, amount)| *date == as_of && amount.amount() > 0.0));
+        assert!(
+            selected_path
+                .iter()
+                .any(|(date, amount)| *date == as_of && amount.amount() > 0.0)
+        );
     }
 
     #[test]
@@ -1548,10 +1554,12 @@ mod tests {
             .effective_for_pricing(&market, as_of)
             .expect("lowered floor");
         assert!(effective.return_floor.is_none());
-        assert!(effective
-            .call_put
-            .as_ref()
-            .is_some_and(CallPutSchedule::has_options));
+        assert!(
+            effective
+                .call_put
+                .as_ref()
+                .is_some_and(CallPutSchedule::has_options)
+        );
         let quote_ctx = QuoteDateContext::new(&effective, &market, as_of).expect("quote context");
         let flows = quote_ctx
             .entitled_flows(&effective, &market, as_of)

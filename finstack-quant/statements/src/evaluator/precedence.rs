@@ -36,12 +36,11 @@ pub(crate) fn resolve_node_value(
     hidden: Option<HiddenObservation>,
 ) -> Result<NodeValueSource> {
     // 1. Check for explicit value (highest precedence)
-    if hidden.is_none() {
-        if let Some(values) = &node_spec.values {
-            if let Some(amount_or_scalar) = values.get(period_id) {
-                return Ok(NodeValueSource::Value(amount_or_scalar.value()));
-            }
-        }
+    if hidden.is_none()
+        && let Some(values) = &node_spec.values
+        && let Some(amount_or_scalar) = values.get(period_id)
+    {
+        return Ok(NodeValueSource::Value(amount_or_scalar.value()));
     }
 
     // 2. Check for forecast (only in forecast periods, not actuals)

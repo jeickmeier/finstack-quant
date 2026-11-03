@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::Result;
 use crate::checks::helpers::{get_finite_node_value, sum_nodes};
 use crate::checks::types::effective_tolerance;
 use crate::checks::{
@@ -10,7 +11,6 @@ use crate::checks::{
 };
 use crate::error::Error;
 use crate::types::NodeId;
-use crate::Result;
 
 /// Verifies that Assets = Liabilities + Equity for every period.
 ///

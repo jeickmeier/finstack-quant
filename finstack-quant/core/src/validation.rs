@@ -21,11 +21,7 @@
 /// error's category and diagnostic information.
 #[inline]
 pub fn require_or(condition: bool, err: impl Into<crate::Error>) -> crate::Result<()> {
-    if condition {
-        Ok(())
-    } else {
-        Err(err.into())
-    }
+    if condition { Ok(()) } else { Err(err.into()) }
 }
 
 /// Require a condition to be true, lazily constructing the error message.
@@ -426,18 +422,22 @@ mod tests {
         assert!(validate_money_gt(money, 2.0, "test").is_err());
         assert!(validate_money_currency(money, crate::currency::Currency::USD, "test").is_ok());
         assert!(validate_money_currency(money, crate::currency::Currency::EUR, "test").is_err());
-        assert!(validate_distinct_currencies(
-            crate::currency::Currency::EUR,
-            crate::currency::Currency::USD,
-            "pair"
-        )
-        .is_ok());
-        assert!(validate_distinct_currencies(
-            crate::currency::Currency::USD,
-            crate::currency::Currency::USD,
-            "pair"
-        )
-        .is_err());
+        assert!(
+            validate_distinct_currencies(
+                crate::currency::Currency::EUR,
+                crate::currency::Currency::USD,
+                "pair"
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_distinct_currencies(
+                crate::currency::Currency::USD,
+                crate::currency::Currency::USD,
+                "pair"
+            )
+            .is_err()
+        );
     }
 
     #[test]

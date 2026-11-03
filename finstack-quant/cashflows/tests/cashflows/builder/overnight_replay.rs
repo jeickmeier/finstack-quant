@@ -2,8 +2,8 @@ use finstack_quant_cashflows::builder::{
     FloatingLegCompounding, OvernightIndexConstraintApplication, OvernightObservationSchedule,
     OvernightRateConstraints,
 };
-use finstack_quant_core::dates::{Date, DateExt, WEEKENDS_ONLY};
 use finstack_quant_core::Result;
+use finstack_quant_core::dates::{Date, DateExt, WEEKENDS_ONLY};
 use time::Month;
 
 fn january(day: u8) -> Date {
@@ -210,9 +210,11 @@ fn observation_shift_rejects_a_positive_period_with_an_empty_observation_window(
         &WEEKENDS_ONLY,
     )
     .expect_err("a positive coupon cannot be annualized over zero observation days");
-    assert!(error
-        .to_string()
-        .contains("empty shifted observation window"));
+    assert!(
+        error
+            .to_string()
+            .contains("empty shifted observation window")
+    );
 
     let empty =
         OvernightObservationSchedule::compile(january(11), january(11), method, &WEEKENDS_ONLY)
@@ -245,9 +247,11 @@ fn observation_shift_rejects_an_empty_partial_window_without_advancing_state() {
     let error = schedule
         .advance(&mut state, january(12), constant_rate)
         .expect_err("positive contractual accrual cannot report a zero-weight rate");
-    assert!(error
-        .to_string()
-        .contains("empty shifted observation window"));
+    assert!(
+        error
+            .to_string()
+            .contains("empty shifted observation window")
+    );
     assert_eq!(state.result().expect("preserved state"), before);
     let result = schedule
         .advance(&mut state, january(14), constant_rate)
@@ -396,9 +400,11 @@ fn overflow_and_wrong_schedule_fail_without_changing_accumulated_state() {
         let mut state = schedule
             .accumulator(360.0, OvernightRateConstraints::default())
             .expect("accumulator");
-        assert!(schedule
-            .advance(&mut state, january(13), |_| Ok(rate))
-            .is_err());
+        assert!(
+            schedule
+                .advance(&mut state, january(13), |_| Ok(rate))
+                .is_err()
+        );
         assert_eq!(state.result().expect("unchanged state").weight_days, 0);
         let different = OvernightObservationSchedule::compile(
             january(6),
@@ -407,9 +413,11 @@ fn overflow_and_wrong_schedule_fail_without_changing_accumulated_state() {
             &WEEKENDS_ONLY,
         )
         .expect("different schedule");
-        assert!(different
-            .advance(&mut state, january(13), constant_rate)
-            .is_err());
+        assert!(
+            different
+                .advance(&mut state, january(13), constant_rate)
+                .is_err()
+        );
         assert_eq!(state.result().expect("unchanged state").weight_days, 0);
         schedule
             .clone()

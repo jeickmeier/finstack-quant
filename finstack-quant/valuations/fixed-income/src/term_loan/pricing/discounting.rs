@@ -55,12 +55,12 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
-use crate::term_loan::cashflows::generate_cashflows;
 use crate::term_loan::TermLoan;
+use crate::term_loan::cashflows::generate_cashflows;
 
 /// Term loan pricer using deterministic cashflow discounting.
 ///

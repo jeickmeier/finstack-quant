@@ -11,7 +11,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::DateExt;
 use finstack_quant_factor::credit::calibration::{
@@ -21,7 +21,7 @@ use finstack_quant_factor::credit::calibration::{
 use finstack_quant_factor::credit::hierarchy::{
     CreditHierarchySpec, HierarchyDimension, IssuerBetaPolicy,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use time::Month;
 
 /// Deterministic pseudo-random float in [0, 1) based on two seed ints.

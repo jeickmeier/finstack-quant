@@ -171,7 +171,7 @@ fn resolve_bump_targets(
                         return Err(Error::TenorNotFound {
                             tenor: tenor_str.clone(),
                             curve_id: curve_id.to_string(),
-                        })
+                        });
                     }
                 };
 

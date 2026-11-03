@@ -398,13 +398,13 @@ fn validate_call_put_entries(
                 entry.start, entry.end
             )));
         }
-        if let Some(make_whole) = &entry.make_whole {
-            if !make_whole.spread_bp.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "{instrument_name} {side} make-whole spread must be finite, got {} for period [{}, {}]",
-                    make_whole.spread_bp, entry.start, entry.end
-                )));
-            }
+        if let Some(make_whole) = &entry.make_whole
+            && !make_whole.spread_bp.is_finite()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{instrument_name} {side} make-whole spread must be finite, got {} for period [{}, {}]",
+                make_whole.spread_bp, entry.start, entry.end
+            )));
         }
     }
     Ok(())

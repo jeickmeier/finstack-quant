@@ -72,7 +72,7 @@ use crate::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler;
 use crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
 use crate::monte_carlo::discretization::schwartz_smith::ExactSchwartzSmith;
 use crate::monte_carlo::engine::{
-    build_correlation_factor, fill_shocks, McEngine, NoiseHook, MAX_CAPTURED_PATHS,
+    MAX_CAPTURED_PATHS, McEngine, NoiseHook, build_correlation_factor, fill_shocks,
 };
 use crate::monte_carlo::process::brownian::{
     BrownianParams, BrownianProcess, MultiBrownianProcess,

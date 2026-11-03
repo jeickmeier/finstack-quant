@@ -7,7 +7,7 @@
 //! hazards through the index.
 
 use super::cs01::{active_hazards, replace_hazard};
-use crate::cds::metrics::dv01::{rate_bumped_market_with_hazard_replay, HazardReplay};
+use crate::cds::metrics::dv01::{HazardReplay, rate_bumped_market_with_hazard_replay};
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;

@@ -3,9 +3,9 @@
 //! This submodule implements the canonical heterogeneous bump entry points used
 //! for risk and scenario analysis across curves, surfaces, market scalars, and FX.
 
+use crate::Result;
 use crate::market_data::bumps::{BumpSpec, Bumpable, MarketBump};
 use crate::types::CurveId;
-use crate::Result;
 use std::sync::Arc;
 
 use super::{ContextScratchBump, CurveStorage, MarketContext};
@@ -696,12 +696,14 @@ mod tests {
             .expect("forward")
             .rate(5.0);
 
-        assert!(scratch
-            .apply_curve_bump_in_place(
-                &CurveId::from("USD-SOFR-3M"),
-                BumpSpec::parallel_bp(f64::NAN),
-            )
-            .is_err());
+        assert!(
+            scratch
+                .apply_curve_bump_in_place(
+                    &CurveId::from("USD-SOFR-3M"),
+                    BumpSpec::parallel_bp(f64::NAN),
+                )
+                .is_err()
+        );
         assert_eq!(
             scratch
                 .get_forward("USD-SOFR-3M")
@@ -711,18 +713,20 @@ mod tests {
             forward_before.to_bits()
         );
 
-        assert!(scratch
-            .bump([
-                MarketBump::Curve {
-                    id: CurveId::from("USD-OIS"),
-                    spec: BumpSpec::parallel_bp(1.0),
-                },
-                MarketBump::Curve {
-                    id: CurveId::from("USD-SOFR-3M"),
-                    spec: BumpSpec::parallel_bp(f64::INFINITY),
-                },
-            ])
-            .is_err());
+        assert!(
+            scratch
+                .bump([
+                    MarketBump::Curve {
+                        id: CurveId::from("USD-OIS"),
+                        spec: BumpSpec::parallel_bp(1.0),
+                    },
+                    MarketBump::Curve {
+                        id: CurveId::from("USD-SOFR-3M"),
+                        spec: BumpSpec::parallel_bp(f64::INFINITY),
+                    },
+                ])
+                .is_err()
+        );
         assert_eq!(
             scratch
                 .get_discount("USD-OIS")

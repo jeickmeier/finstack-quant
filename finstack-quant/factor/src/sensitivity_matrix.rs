@@ -500,13 +500,15 @@ mod tests {
 
         // Row-major storage: (0, 3) would silently read (1, 0) without the check.
         let err = matrix.delta(0, 3).expect_err("factor out of range");
-        assert!(err
-            .to_string()
-            .contains("factor_idx 3 out of bounds for 3 factors"));
+        assert!(
+            err.to_string()
+                .contains("factor_idx 3 out of bounds for 3 factors")
+        );
         let err = matrix.delta(2, 0).expect_err("position out of range");
-        assert!(err
-            .to_string()
-            .contains("position_idx 2 out of bounds for 2 positions"));
+        assert!(
+            err.to_string()
+                .contains("position_idx 2 out of bounds for 2 positions")
+        );
         assert!(matrix.position_deltas(2).is_err());
         assert!(matrix.factor_deltas(3).is_err());
 

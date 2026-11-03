@@ -5,12 +5,12 @@
 //! strike with the spot and the bumped PV would barely change, so the spot
 //! Greeks first fix the reference level at the unbumped spot.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::PriceId;
-use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use std::marker::PhantomData;
 use std::sync::Arc;

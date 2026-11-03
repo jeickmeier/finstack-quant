@@ -24,11 +24,11 @@ use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::{
-    dates::Date, market_data::context::MarketContext, money::Money, types::InstrumentId, Result,
+    Result, dates::Date, market_data::context::MarketContext, money::Money, types::InstrumentId,
 };
 
 use finstack_quant_cashflows::builder::{
-    merge_cashflow_schedules, CashFlowSchedule, FloatingRateFallback, Notional, PrincipalExchange,
+    CashFlowSchedule, FloatingRateFallback, Notional, PrincipalExchange, merge_cashflow_schedules,
 };
 use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -345,10 +345,10 @@ impl BasisSwap {
     }
 
     fn resolve_leg_calendar<'a>(&self, leg_name: &str, leg: &'a FloatLegSpec) -> Result<&'a str> {
-        if let Some(id) = leg.calendar_id.as_deref() {
-            if finstack_quant_core::dates::calendar_by_id_strict(id).is_ok() {
-                return Ok(id);
-            }
+        if let Some(id) = leg.calendar_id.as_deref()
+            && finstack_quant_core::dates::calendar_by_id_strict(id).is_ok()
+        {
+            return Ok(id);
         }
         if self.allow_calendar_fallback {
             return Ok(finstack_quant_core::dates::WEEKENDS_ONLY_ID);
@@ -701,8 +701,8 @@ fn project_overnight_period(
     >,
 > {
     use finstack_quant_valuations_core::instruments::pricing::overnight::{
-        adjust_overnight_accrual_boundaries, project_overnight_coupon,
         OvernightCouponProjectionInput, OvernightProjectionCurve,
+        adjust_overnight_accrual_boundaries, project_overnight_coupon,
     };
     let (accrual_start, accrual_end) = adjust_overnight_accrual_boundaries(
         period.accrual_start,
@@ -1546,7 +1546,7 @@ mod tests {
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::dates::calendar_by_id_strict;
         use finstack_quant_valuations_core::instruments::pricing::overnight::{
-            project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
+            OvernightCouponProjectionInput, OvernightProjectionCurve, project_overnight_coupon,
         };
 
         let start = date(2025, 1, 2);
@@ -1665,7 +1665,7 @@ mod tests {
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::dates::calendar_by_id_strict;
         use finstack_quant_valuations_core::instruments::pricing::overnight::{
-            project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
+            OvernightCouponProjectionInput, OvernightProjectionCurve, project_overnight_coupon,
         };
 
         let start = date(2025, 1, 2);

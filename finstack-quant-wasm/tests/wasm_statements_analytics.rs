@@ -155,11 +155,13 @@ fn scoring_accepts_one_optional_predictor_and_rejects_vectors() {
         "label": "spread", "y_extractor": {"named": "oas_bp"},
         "x_extractors": [{"named": "leverage"}], "weight": 1.0
     }]);
-    assert!(score_relative_value(
-        crate::js_object(&peers),
-        js_sys::JSON::parse(&dimensions.to_string()).expect("dimensions"),
-    )
-    .is_err());
+    assert!(
+        score_relative_value(
+            crate::js_object(&peers),
+            js_sys::JSON::parse(&dimensions.to_string()).expect("dimensions"),
+        )
+        .is_err()
+    );
 }
 
 #[wasm_bindgen_test]

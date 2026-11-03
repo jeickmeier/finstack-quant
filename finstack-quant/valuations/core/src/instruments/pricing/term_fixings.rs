@@ -4,9 +4,9 @@
 //! tenor it projects; instruments that reset off such a curve validate the
 //! tenor once and read fixings at reset dates through these two helpers.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext, Tenor};
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
-use finstack_quant_core::Result;
 
 /// Validate that a term-index curve represents the instrument's contractual
 /// reset tenor.

@@ -13,9 +13,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_equity_metrics, pool_report, AssetPool, CoverageTestSpec, DealType,
-    PeriodDiagnostics, PeriodWaterfall, PoolAsset, ReserveInterestDestination,
-    SimulationDiagnostics, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, CoverageTestSpec, DealType, PeriodDiagnostics, PeriodWaterfall, PoolAsset,
+    ReserveInterestDestination, SimulationDiagnostics, StructuredCredit, Tranche, TrancheStructure,
+    calculate_equity_metrics, pool_report,
 };
 use time::Month;
 
@@ -143,14 +143,18 @@ fn period_diagnostics_carry_the_executor_coverage_ratios_and_pool_path() {
     let stressed = (clo(0.10)).run_simulation(&market(), close()).expect("run");
     let periods = &stressed.diagnostics.periods;
     assert!(periods[0].defaults.amount() > 0.0);
-    assert!(periods
-        .windows(2)
-        .all(|pair| pair[1].pool_factor <= pair[0].pool_factor + 1e-12));
+    assert!(
+        periods
+            .windows(2)
+            .all(|pair| pair[1].pool_factor <= pair[0].pool_factor + 1e-12)
+    );
     // Recoveries arrive one year after the first defaults.
     assert_eq!(periods[0].recoveries.amount(), 0.0);
-    assert!(periods
-        .iter()
-        .any(|period| period.recoveries.amount() > 0.0));
+    assert!(
+        periods
+            .iter()
+            .any(|period| period.recoveries.amount() > 0.0)
+    );
     // A failing OC test in the record is exactly a period in which the
     // executor diverted cash into class A principal.
     for period in periods {

@@ -14,21 +14,21 @@ mod report;
 use std::fmt;
 use std::sync::Arc;
 
+use crate::Error;
+use crate::Portfolio;
 use crate::dependencies::DependencyIndex;
 use crate::position::Position;
 use crate::types::PositionId;
-use crate::Error;
-use crate::Portfolio;
 use cache::{CacheKey, CachedArtifact};
 use finstack_quant_core::canonical::CANONICAL_VERSION;
 use finstack_quant_core::contract::{
-    check_json_limits, ContractDescriptor, ContractError, Diagnostic, LoadLimits, LoadPhase,
-    Severity, ValidationReport,
+    ContractDescriptor, ContractError, Diagnostic, LoadLimits, LoadPhase, Severity,
+    ValidationReport, check_json_limits,
 };
 use finstack_quant_core::{FxHashMap, FxHashSet};
-use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
-use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
 use finstack_quant_valuations::instruments::MarketDependencies;
+use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use serde::de::{IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 
@@ -543,9 +543,10 @@ fn validate_and_decode(
         }
         dependency_count = dependency_count
             .saturating_add(crate::dependencies::flatten_dependencies(&cached.dependencies).len());
-        if let Some(claimed) = claimed_dependencies {
-            if claimed != cached.dependencies {
-                diagnostics.push_bounded(
+        if let Some(claimed) = claimed_dependencies
+            && claimed != cached.dependencies
+        {
+            diagnostics.push_bounded(
                     limits,
                     Diagnostic::new(
                         "portfolio/dependencies-mismatch",
@@ -558,7 +559,6 @@ fn validate_and_decode(
                     .with_revision_id(artifact_id.clone())
                     .with_artifact_hash(content_hash),
                 );
-            }
         }
         decoded.insert(artifact_id, cached);
     }

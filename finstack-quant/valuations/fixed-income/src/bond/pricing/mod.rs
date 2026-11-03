@@ -44,10 +44,10 @@ use crate::bond::Bond;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::attach_mc_diagnostics;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::common_impl::helpers::attach_mc_diagnostics;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
 };
 use finstack_quant_valuations_core::results::{
     MonteCarloValuationDetails, ValuationDetails, ValuationResult,

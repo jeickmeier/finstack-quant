@@ -16,9 +16,9 @@
 //! positive spreads. When violated, a warning is logged and the process may occasionally
 //! touch zero. The QE discretization scheme handles boundary behavior gracefully.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::Result;
 
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_models::monte_carlo::discretization::credit_line::CreditLineDiscretization;

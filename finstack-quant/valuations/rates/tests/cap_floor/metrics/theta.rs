@@ -14,8 +14,8 @@ use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_rates::cap_floor::{CapFloor, CapFloorVolType, RateOptionType};
 use rust_decimal::Decimal;
-use time::macros::date;
 use time::Duration;
+use time::macros::date;
 
 fn build_flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> ForwardCurve {
     ForwardCurve::builder(curve_id, 0.25)

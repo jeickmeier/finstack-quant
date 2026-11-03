@@ -2,12 +2,12 @@
 use crate::irs::{resolve_fixed_leg, resolve_float_leg};
 use crate::swaption::CashSettlementMethod;
 use finstack_quant_cashflows::builder::{build_periods, period_accrual};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::Result;
 use finstack_quant_models::rates::clock::model_time;
 use finstack_quant_models::rates::hull_white::{
-    hw1f_delayed_coupon_adjustment, HullWhiteCalibrationParams,
+    HullWhiteCalibrationParams, hw1f_delayed_coupon_adjustment,
 };
 use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
 use finstack_quant_models::types::OptionType;

@@ -16,7 +16,7 @@
 //! ## Business Day Count
 //! - Bus/252 - calendar-dependent
 
-use super::common::{by_id, make_date, DAYCOUNT_TOLERANCE};
+use super::common::{DAYCOUNT_TOLERANCE, by_id, make_date};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor, TenorUnit};
 use proptest::prelude::*;
 use time::Duration;
@@ -719,12 +719,16 @@ fn act365l_requires_enclosing_coupon_context() {
         coupon_period: Some((start, end)),
         ..Default::default()
     };
-    assert!(DayCount::Act365L
-        .year_fraction(make_date(2023, 10, 14), end, ctx)
-        .is_err());
-    assert!(DayCount::Act365L
-        .year_fraction(start, make_date(2024, 4, 16), ctx)
-        .is_err());
+    assert!(
+        DayCount::Act365L
+            .year_fraction(make_date(2023, 10, 14), end, ctx)
+            .is_err()
+    );
+    assert!(
+        DayCount::Act365L
+            .year_fraction(start, make_date(2024, 4, 16), ctx)
+            .is_err()
+    );
 }
 
 #[test]
@@ -1229,35 +1233,41 @@ fn actact_isma_rejects_reference_endpoints_outside_nominal_month_grid() {
         adjusted_end,
     )
     .is_err());
-    assert!(DayCount::ActActIsma
-        .year_fraction(
-            start,
-            end,
-            DayCountContext {
-                frequency: Some(Tenor::semi_annual()),
-                coupon_period: Some((reference_start, adjusted_end)),
-                ..Default::default()
-            },
-        )
-        .is_err());
+    assert!(
+        DayCount::ActActIsma
+            .year_fraction(
+                start,
+                end,
+                DayCountContext {
+                    frequency: Some(Tenor::semi_annual()),
+                    coupon_period: Some((reference_start, adjusted_end)),
+                    ..Default::default()
+                },
+            )
+            .is_err()
+    );
 }
 
 #[test]
 fn actact_isma_reference_period_rejects_invalid_ranges() {
-    assert!(act_act_isma_year_fraction_with_reference_period(
-        make_date(2025, 3, 31),
-        make_date(2025, 1, 15),
-        make_date(2024, 9, 30),
-        make_date(2025, 3, 31),
-    )
-    .is_err());
-    assert!(act_act_isma_year_fraction_with_reference_period(
-        make_date(2025, 1, 15),
-        make_date(2025, 3, 31),
-        make_date(2025, 3, 31),
-        make_date(2025, 3, 31),
-    )
-    .is_err());
+    assert!(
+        act_act_isma_year_fraction_with_reference_period(
+            make_date(2025, 3, 31),
+            make_date(2025, 1, 15),
+            make_date(2024, 9, 30),
+            make_date(2025, 3, 31),
+        )
+        .is_err()
+    );
+    assert!(
+        act_act_isma_year_fraction_with_reference_period(
+            make_date(2025, 1, 15),
+            make_date(2025, 3, 31),
+            make_date(2025, 3, 31),
+            make_date(2025, 3, 31),
+        )
+        .is_err()
+    );
 }
 
 // Bus/252 - Calendar-Dependent
@@ -1295,9 +1305,11 @@ fn bus252_rejects_zero_basis() {
         end_is_termination_date: false,
     };
 
-    assert!(DayCount::Bus252
-        .year_fraction(make_date(2025, 1, 1), make_date(2025, 1, 10), ctx)
-        .is_err());
+    assert!(
+        DayCount::Bus252
+            .year_fraction(make_date(2025, 1, 1), make_date(2025, 1, 10), ctx)
+            .is_err()
+    );
 }
 
 #[test]

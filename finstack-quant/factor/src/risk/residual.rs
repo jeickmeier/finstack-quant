@@ -141,7 +141,7 @@ fn variance_from_measure(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::risk::{decompose_factors, ResidualContributionSource};
+    use crate::risk::{ResidualContributionSource, decompose_factors};
     use crate::{FactorCovarianceMatrix, FactorId, SensitivityMatrix};
 
     fn base(measure: RiskMeasure) -> finstack_quant_core::Result<RiskDecomposition> {
@@ -186,8 +186,8 @@ mod tests {
     }
 
     #[test]
-    fn residual_allocations_allow_hedges_but_reject_invalid_totals(
-    ) -> finstack_quant_core::Result<()> {
+    fn residual_allocations_allow_hedges_but_reject_invalid_totals()
+    -> finstack_quant_core::Result<()> {
         let mut decomposition = base(RiskMeasure::Variance)?;
         apply_residual_contributions(&mut decomposition, vec![residual(50.0), residual(-25.0)])?;
         assert_eq!(decomposition.total_risk, 125.0);

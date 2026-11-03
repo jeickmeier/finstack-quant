@@ -41,13 +41,15 @@ fn test_lag_function() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Q1: lag(100, 1) should be NaN (no prior period)
-    assert!(results
-        .get(
-            "lagged_revenue",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture")
-        )
-        .unwrap()
-        .is_nan());
+    assert!(
+        results
+            .get(
+                "lagged_revenue",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap()
+            .is_nan()
+    );
 
     // Q2: lag(110, 1) should be 100 (Q1 value)
     assert_eq!(
@@ -119,20 +121,24 @@ fn test_lag_multiple_periods() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Q1 and Q2: lag(_, 2) should be NaN (no prior periods)
-    assert!(results
-        .get(
-            "lagged_revenue_2",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture")
-        )
-        .unwrap()
-        .is_nan());
-    assert!(results
-        .get(
-            "lagged_revenue_2",
-            &PeriodId::quarter(2025, 2).expect("valid period fixture")
-        )
-        .unwrap()
-        .is_nan());
+    assert!(
+        results
+            .get(
+                "lagged_revenue_2",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap()
+            .is_nan()
+    );
+    assert!(
+        results
+            .get(
+                "lagged_revenue_2",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
+            .unwrap()
+            .is_nan()
+    );
 
     // Q3: lag(120, 2) should be 100 (Q1 value)
     assert_eq!(
@@ -193,13 +199,15 @@ fn test_diff_function() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Q1: diff(100) = NaN (no prior period)
-    assert!(results
-        .get(
-            "revenue_change",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture")
-        )
-        .unwrap()
-        .is_nan());
+    assert!(
+        results
+            .get(
+                "revenue_change",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap()
+            .is_nan()
+    );
 
     // Q2: diff(110) = 110 - 100 = 10
     assert_eq!(
@@ -271,13 +279,15 @@ fn test_pct_change_function() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Q1: pct_change(100) = NaN (no prior period)
-    assert!(results
-        .get(
-            "revenue_growth",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture")
-        )
-        .unwrap()
-        .is_nan());
+    assert!(
+        results
+            .get(
+                "revenue_growth",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap()
+            .is_nan()
+    );
 
     // Q2: pct_change(110) = (110 - 100) / 100 = 0.10
     assert_eq!(

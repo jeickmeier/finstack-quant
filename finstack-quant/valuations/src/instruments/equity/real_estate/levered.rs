@@ -8,11 +8,11 @@
 use super::levered_pricer;
 use super::types::RealEstateAsset;
 use crate::impl_instrument_base;
+use crate::instruments::Instrument;
 use crate::instruments::fixed_income::bond::Bond;
 use crate::instruments::fixed_income::revolving_credit::RevolvingCredit;
 use crate::instruments::fixed_income::term_loan::TermLoan;
 use crate::instruments::rates::repo::Repo;
-use crate::instruments::Instrument;
 use crate::pricer::InstrumentType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};

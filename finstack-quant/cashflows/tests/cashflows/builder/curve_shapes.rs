@@ -3,7 +3,7 @@
 //! vectors by month of default.
 
 use finstack_quant_cashflows::builder::{
-    abs_to_smm, annual_to_monthly, DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+    DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec, abs_to_smm, annual_to_monthly,
 };
 
 const TOL: f64 = 1e-12;
@@ -65,12 +65,16 @@ fn vector_curves_hold_the_last_value() {
     assert_eq!(default.mdr(2).unwrap(), default.mdr(240).unwrap());
 
     assert!(PrepaymentModelSpec::vector(Vec::new()).smm(1).is_err());
-    assert!(DefaultModelSpec::vector(vec![0.01, 1.5])
-        .validate()
-        .is_err());
-    assert!(PrepaymentModelSpec::vector(vec![f64::NAN])
-        .validate()
-        .is_err());
+    assert!(
+        DefaultModelSpec::vector(vec![0.01, 1.5])
+            .validate()
+            .is_err()
+    );
+    assert!(
+        PrepaymentModelSpec::vector(vec![f64::NAN])
+            .validate()
+            .is_err()
+    );
 }
 
 #[test]
@@ -146,31 +150,45 @@ fn timing_curve_sums_to_the_cumulative_default_rate() {
     }
     assert!((defaulted - 0.06).abs() < TOL);
 
-    assert!(DefaultModelSpec::timing(0.06, vec![50.0, 40.0])
-        .validate()
-        .is_err());
-    assert!(DefaultModelSpec::timing(1.5, vec![100.0])
-        .validate()
-        .is_err());
-    assert!(DefaultModelSpec::timing(0.05, vec![120.0, -20.0])
-        .validate()
-        .is_err());
+    assert!(
+        DefaultModelSpec::timing(0.06, vec![50.0, 40.0])
+            .validate()
+            .is_err()
+    );
+    assert!(
+        DefaultModelSpec::timing(1.5, vec![100.0])
+            .validate()
+            .is_err()
+    );
+    assert!(
+        DefaultModelSpec::timing(0.05, vec![120.0, -20.0])
+            .validate()
+            .is_err()
+    );
 }
 
 #[test]
 fn cumulative_loss_curves_must_be_non_decreasing_with_a_positive_severity() {
-    assert!(DefaultModelSpec::cumulative_loss(vec![1.0, 0.5], 0.5)
-        .validate()
-        .is_err());
-    assert!(DefaultModelSpec::cumulative_loss(vec![1.0], 0.0)
-        .validate()
-        .is_err());
-    assert!(DefaultModelSpec::cumulative_loss(vec![1.0], 1.5)
-        .validate()
-        .is_err());
-    assert!(DefaultModelSpec::cumulative_loss(Vec::new(), 0.5)
-        .validate()
-        .is_err());
+    assert!(
+        DefaultModelSpec::cumulative_loss(vec![1.0, 0.5], 0.5)
+            .validate()
+            .is_err()
+    );
+    assert!(
+        DefaultModelSpec::cumulative_loss(vec![1.0], 0.0)
+            .validate()
+            .is_err()
+    );
+    assert!(
+        DefaultModelSpec::cumulative_loss(vec![1.0], 1.5)
+            .validate()
+            .is_err()
+    );
+    assert!(
+        DefaultModelSpec::cumulative_loss(Vec::new(), 0.5)
+            .validate()
+            .is_err()
+    );
 }
 
 #[test]
@@ -184,14 +202,18 @@ fn severity_vector_overrides_the_flat_recovery_by_month_of_default() {
     assert!((spec.recovery_rate(60) - 0.4).abs() < TOL);
     assert_eq!(RecoveryModelSpec::with_lag(0.40, 12).recovery_rate(7), 0.40);
 
-    assert!(RecoveryModelSpec::with_lag(0.4, 1)
-        .with_severity_vector(vec![1.2])
-        .validate()
-        .is_err());
-    assert!(RecoveryModelSpec::with_lag(0.4, 1)
-        .with_severity_vector(Vec::new())
-        .validate()
-        .is_err());
+    assert!(
+        RecoveryModelSpec::with_lag(0.4, 1)
+            .with_severity_vector(vec![1.2])
+            .validate()
+            .is_err()
+    );
+    assert!(
+        RecoveryModelSpec::with_lag(0.4, 1)
+            .with_severity_vector(Vec::new())
+            .validate()
+            .is_err()
+    );
 }
 
 #[test]
@@ -224,7 +246,9 @@ fn curve_shapes_round_trip_through_serde() {
         serde_json::from_str::<RecoveryModelSpec>(&json).unwrap(),
         recovery
     );
-    assert!(!serde_json::to_string(&RecoveryModelSpec::with_lag(0.4, 6))
-        .unwrap()
-        .contains("severity_vector"));
+    assert!(
+        !serde_json::to_string(&RecoveryModelSpec::with_lag(0.4, 6))
+            .unwrap()
+            .contains("severity_vector")
+    );
 }

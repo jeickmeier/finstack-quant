@@ -6,8 +6,8 @@ use finstack_quant_valuations::instruments::equity::autocallable::Autocallable;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
 use finstack_quant_valuations::instruments::rates::cap_floor::CapFloor;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 fn assert_canonical_override_wire<T>(instrument: &T, pointers: &[(&str, Value)], label: &str)

@@ -1,6 +1,6 @@
 //! Integration tests for ResultsMeta stamping.
 
-use finstack_quant_core::config::{results_meta, FinstackConfig, ResultsMeta, NUMERIC_MODE_F64};
+use finstack_quant_core::config::{FinstackConfig, NUMERIC_MODE_F64, ResultsMeta, results_meta};
 
 #[test]
 fn test_results_meta_default_stamping() {

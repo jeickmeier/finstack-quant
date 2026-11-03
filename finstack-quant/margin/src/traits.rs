@@ -6,10 +6,10 @@
 use crate::types::OtcMarginSpec;
 use crate::types::RepoMarginSpec;
 use crate::types::{NettingSetId, SimmSensitivities};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 /// Trait for instruments that support margin calculations.
 ///

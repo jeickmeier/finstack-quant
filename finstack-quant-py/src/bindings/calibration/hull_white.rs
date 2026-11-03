@@ -367,7 +367,8 @@ impl PyCapFloorCalibrationConfig {
     fn __repr__(&self) -> String {
         format!(
             "CapFloorCalibrationConfig(fit_tolerance={}, frequency={:?}, fixed_kappa={}, initial_guess={})",
-            self.inner.fit_tolerance, self.frequency(),
+            self.inner.fit_tolerance,
+            self.frequency(),
             self.inner
                 .fixed_kappa
                 .map_or("None".to_string(), |k| k.to_string()),
@@ -483,7 +484,11 @@ impl PyPiecewiseSigmaCalibrationConfig {
     fn __repr__(&self) -> String {
         format!(
             "PiecewiseSigmaCalibrationConfig(fixed_kappa={}, sigma_min={}, sigma_max={}, fit_tolerance={}, frequency={:?})",
-            self.inner.fixed_kappa, self.inner.sigma_min, self.inner.sigma_max, self.inner.fit_tolerance, self.frequency()
+            self.inner.fixed_kappa,
+            self.inner.sigma_min,
+            self.inner.sigma_max,
+            self.inner.fit_tolerance,
+            self.frequency()
         )
     }
 }

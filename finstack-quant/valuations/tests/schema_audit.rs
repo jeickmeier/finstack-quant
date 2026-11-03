@@ -5,7 +5,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsO
 use finstack_quant_valuations::instruments::envelope::InstrumentSchema;
 use finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo;
 use finstack_quant_valuations::instruments::json_loader::{
-    instrument_registry, InstrumentEnvelope, InstrumentJson,
+    InstrumentEnvelope, InstrumentJson, instrument_registry,
 };
 
 mod schema_roundtrip {
@@ -434,10 +434,10 @@ mod generated_schema_contract {
     fn collect_noncanonical_decimal_patterns(value: &Value, path: &str, out: &mut Vec<String>) {
         match value {
             Value::Object(map) => {
-                if let Some(pattern) = map.get("pattern").and_then(Value::as_str) {
-                    if pattern != DECIMAL_PATTERN || !schema_accepts_string(value) {
-                        out.push(format!("{path} pattern={pattern:?}"));
-                    }
+                if let Some(pattern) = map.get("pattern").and_then(Value::as_str)
+                    && (pattern != DECIMAL_PATTERN || !schema_accepts_string(value))
+                {
+                    out.push(format!("{path} pattern={pattern:?}"));
                 }
 
                 for (key, child) in map {
@@ -547,12 +547,11 @@ mod generated_schema_contract {
     fn collect_local_def_refs(value: &Value, out: &mut BTreeSet<String>) {
         match value {
             Value::Object(map) => {
-                if let Some(reference) = map.get("$ref").and_then(Value::as_str) {
-                    if let Some(rest) = reference.strip_prefix("#/$defs/") {
-                        if let Some(segment) = rest.split('/').next() {
-                            out.insert(json_pointer_unescape(segment));
-                        }
-                    }
+                if let Some(reference) = map.get("$ref").and_then(Value::as_str)
+                    && let Some(rest) = reference.strip_prefix("#/$defs/")
+                    && let Some(segment) = rest.split('/').next()
+                {
+                    out.insert(json_pointer_unescape(segment));
                 }
                 for child in map.values() {
                     collect_local_def_refs(child, out);

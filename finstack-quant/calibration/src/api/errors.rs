@@ -152,7 +152,9 @@ pub enum EnvelopeError {
         suggestion: Option<String>,
     },
     /// Two calibration steps use the same audit identifier.
-    #[error("step[{duplicate_index}] duplicates step ID '{step_id}' first declared at step[{first_index}]")]
+    #[error(
+        "step[{duplicate_index}] duplicates step ID '{step_id}' first declared at step[{first_index}]"
+    )]
     DuplicateStepId {
         /// Duplicated step identifier.
         step_id: String,
@@ -162,7 +164,10 @@ pub enum EnvelopeError {
         duplicate_index: usize,
     },
     /// A solver step did not converge to within tolerance.
-    #[error("step '{step_id}' did not converge: max residual {max_residual:.3e} > tolerance {tolerance:.3e} after {iterations} iterations.{}", format_worst_quote(worst_quote_id, worst_quote_residual))]
+    #[error(
+        "step '{step_id}' did not converge: max residual {max_residual:.3e} > tolerance {tolerance:.3e} after {iterations} iterations.{}",
+        format_worst_quote(worst_quote_id, worst_quote_residual)
+    )]
     SolverNotConverged {
         /// Step identifier.
         step_id: String,
@@ -202,7 +207,9 @@ pub enum EnvelopeError {
     },
     /// A quote ID listed in `plan.quote_sets[name]` doesn't resolve to any
     /// quote-kind entry in `market_data`.
-    #[error("quote_set '{quote_set}' references id '{id}', which is not present in market_data as a quote")]
+    #[error(
+        "quote_set '{quote_set}' references id '{id}', which is not present in market_data as a quote"
+    )]
     QuoteIdNotInMarketData {
         /// The named quote set in `plan.quote_sets`.
         quote_set: String,

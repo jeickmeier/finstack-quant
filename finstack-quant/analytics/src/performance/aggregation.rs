@@ -1,13 +1,13 @@
 //! Series, correlation, lookback, and period-aggregation methods on
 //! [`Performance`].
 
-use super::{invalid_return_series, LookbackReturns, Performance};
-use crate::aggregation::{group_period_buckets, period_stats_inner, PeriodStats, PeriodicReturn};
-use crate::drawdown::{drawdown_details, to_drawdown_series, DrawdownEpisode};
+use super::{LookbackReturns, Performance, invalid_return_series};
+use crate::aggregation::{PeriodStats, PeriodicReturn, group_period_buckets, period_stats_inner};
+use crate::drawdown::{DrawdownEpisode, drawdown_details, to_drawdown_series};
 use crate::returns::{comp_sum, comp_total, excess_returns};
 use finstack_quant_core::dates::{Date, DateExt, FiscalConfig, PeriodKind};
 use finstack_quant_core::math::linalg::{
-    nearest_correlation, unflatten_square, validate_correlation_matrix, NearestCorrelationOpts,
+    NearestCorrelationOpts, nearest_correlation, unflatten_square, validate_correlation_matrix,
 };
 use finstack_quant_core::math::stats::{correlation, mean_var};
 use finstack_quant_core::math::summation::NeumaierAccumulator;

@@ -13,8 +13,8 @@ use super::periods::SchedulePeriod;
 use super::specs::RollRule;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
-    adjust, is_cds_date, is_imm_date, next_cds_date, prev_cds_date, BusinessDayConvention, Date,
-    DateExt, DayCount, HolidayCalendar, Schedule, StubKind, Tenor, TenorUnit,
+    BusinessDayConvention, Date, DateExt, DayCount, HolidayCalendar, Schedule, StubKind, Tenor,
+    TenorUnit, adjust, is_cds_date, is_imm_date, next_cds_date, prev_cds_date,
 };
 
 /// Resolve the coupon tenor, which the ISDA standard CDS grid fixes at quarterly.

@@ -358,15 +358,15 @@ impl CdsIndex {
         if let Some(margin_spec) = &self.margin_spec {
             margin_spec.validate_for_credit()?;
         }
-        if let Some((_, upfront)) = self.upfront {
-            if upfront.currency() != self.notional.currency() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CDS Index '{}' upfront currency {} must match notional currency {}",
-                    self.id,
-                    upfront.currency(),
-                    self.notional.currency()
-                )));
-            }
+        if let Some((_, upfront)) = self.upfront
+            && upfront.currency() != self.notional.currency()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS Index '{}' upfront currency {} must match notional currency {}",
+                self.id,
+                upfront.currency(),
+                self.notional.currency()
+            )));
         }
         Ok(())
     }

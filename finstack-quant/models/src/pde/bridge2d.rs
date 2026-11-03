@@ -112,7 +112,7 @@ impl PdeProblem2D for HestonPde {
 
 #[cfg(test)]
 mod tests {
-    use super::super::adi::{fill_boundaries, AdiWorkBuffers, McsStepper};
+    use super::super::adi::{AdiWorkBuffers, McsStepper, fill_boundaries};
     use super::super::grid::Grid1D;
     use super::super::grid2d::Grid2D;
     use super::super::solver2d::Solver2D;
@@ -134,7 +134,7 @@ mod tests {
         rho: f64,
         v0: f64,
     ) -> f64 {
-        use crate::closed_form::{heston_call_price_fourier, HestonPricingParams};
+        use crate::closed_form::{HestonPricingParams, heston_call_price_fourier};
         let params = HestonPricingParams::new(r, q, kappa, theta, sigma_v, rho, v0)
             .expect("valid heston params");
         heston_call_price_fourier(spot, strike, maturity, &params, None)

@@ -13,14 +13,14 @@
 //! `hull_white` and `cap_floor_hull_white` engine steps.
 
 use super::{
-    bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
-    calibrate_hull_white_to_cap_floors_with_fn, calibrate_hull_white_to_swaptions_with_fn,
     CapFloorCalibrationConfig, CapFloorQuote, HullWhiteCalibrationParams, HullWhiteParams,
     PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionQuote,
+    bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
+    calibrate_hull_white_to_cap_floors_with_fn, calibrate_hull_white_to_swaptions_with_fn,
 };
 use crate::CalibrationReport;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::Result;
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_models::rates::clock::ModelDiscountCurve;
 
 /// Run `solve` with discount-factor closures for the discount and projection curves.
@@ -329,9 +329,11 @@ mod tests {
         )
         .expect("piecewise config");
         assert_eq!(piecewise.frequency, SwapFrequency::SemiAnnual);
-        assert!(serde_json::from_str::<CapFloorCalibrationConfig>(
-            r#"{"fit_tolerance": 1e-4, "kappa": 0.03}"#
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<CapFloorCalibrationConfig>(
+                r#"{"fit_tolerance": 1e-4, "kappa": 0.03}"#
+            )
+            .is_err()
+        );
     }
 }

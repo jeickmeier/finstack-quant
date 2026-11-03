@@ -13,7 +13,7 @@ use super::overnight::{
     OvernightObservationSchedule, OvernightObservationSlice, OvernightRateAccumulator,
     OvernightRateConstraints,
 };
-use super::rate_helpers::{calculate_floating_rate, FloatingRateParams};
+use super::rate_helpers::{FloatingRateParams, calculate_floating_rate};
 
 /// Contractual dates and year fraction for one floating coupon.
 #[derive(Debug, Clone, Copy)]
@@ -906,12 +906,16 @@ mod tests {
         coupon
             .advance_overnight(&mut state, date!(2025 - 01 - 08), |_| Ok(0.03))
             .expect("partial replay");
-        assert!(coupon
-            .accrued_amount(&state, date!(2025 - 01 - 07))
-            .is_err());
-        assert!(coupon
-            .accrued_amount(&state, date!(2025 - 01 - 09))
-            .is_err());
+        assert!(
+            coupon
+                .accrued_amount(&state, date!(2025 - 01 - 07))
+                .is_err()
+        );
+        assert!(
+            coupon
+                .accrued_amount(&state, date!(2025 - 01 - 09))
+                .is_err()
+        );
         assert!(coupon.accrued_amount(&state, date!(2025 - 01 - 08)).is_ok());
     }
 
@@ -926,20 +930,24 @@ mod tests {
         );
         let mut economics = coupon.economics().clone();
         economics.rate_params.index_cap_bp = Some(400.0);
-        assert!(CompiledFloatingCoupon::compile(
-            coupon.period(),
-            economics,
-            coupon.observation().clone()
-        )
-        .is_err());
+        assert!(
+            CompiledFloatingCoupon::compile(
+                coupon.period(),
+                economics,
+                coupon.observation().clone()
+            )
+            .is_err()
+        );
         let mut period = coupon.period();
         period.accrual_factor *= 2.0;
-        assert!(CompiledFloatingCoupon::compile(
-            period,
-            coupon.economics().clone(),
-            coupon.observation().clone()
-        )
-        .is_err());
+        assert!(
+            CompiledFloatingCoupon::compile(
+                period,
+                coupon.economics().clone(),
+                coupon.observation().clone()
+            )
+            .is_err()
+        );
     }
 
     #[test]

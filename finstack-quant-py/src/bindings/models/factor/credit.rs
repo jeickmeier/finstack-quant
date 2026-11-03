@@ -14,21 +14,21 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple, PyType};
 
 use finstack_quant_core::types::IssuerId;
+use finstack_quant_factor::credit::VolHorizon;
 use finstack_quant_factor::credit::calibration::{
     CreditCalibrationConfig, CreditCalibrationInputs, GenericFactorSeries, HistoryPanel,
     IssuerTagPanel,
 };
 use finstack_quant_factor::credit::hierarchy::{
-    dimension_key, CreditFactorModel, GenericFactorSpec, IssuerTags,
+    CreditFactorModel, GenericFactorSpec, IssuerTags, dimension_key,
 };
-use finstack_quant_factor::credit::VolHorizon;
 use finstack_quant_factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::{
-    dict_to_dataframe, labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py,
-    ColumnSchema,
+    ColumnSchema, dict_to_dataframe, labeled_values_to_series, serde_rows_to_dataframe_with_schema,
+    serde_to_py,
 };
 use crate::bindings::pickle_support::reduce_via_json;
 use crate::errors::{core_to_py, kinded_to_py, serde_json_to_py, value_error};

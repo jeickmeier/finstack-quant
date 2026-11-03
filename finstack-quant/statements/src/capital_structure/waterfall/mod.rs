@@ -59,7 +59,7 @@ mod excess_cash_flow;
 mod payment_in_kind;
 mod payment_stack;
 
-use crate::capital_structure::cashflows::{add_optional_money, CashflowBreakdown};
+use crate::capital_structure::cashflows::{CashflowBreakdown, add_optional_money};
 use crate::capital_structure::state::CapitalStructureState;
 use crate::capital_structure::waterfall_spec::{PaymentPriority, WaterfallSpec};
 use crate::error::Result;
@@ -71,10 +71,10 @@ use indexmap::IndexMap;
 use std::collections::HashSet;
 
 use cash_distribution::{
-    allocate_by_class, apply_cash_cap_to_category, apply_prepayment, PrincipalComponent,
-    StagedInstrumentFlow,
+    PrincipalComponent, StagedInstrumentFlow, allocate_by_class, apply_cash_cap_to_category,
+    apply_prepayment,
 };
-use excess_cash_flow::{calculate_ecf_sweep, EcfDeductions};
+use excess_cash_flow::{EcfDeductions, calculate_ecf_sweep};
 use payment_in_kind::{apply_pik_transitions, evaluate_pik_toggle, is_pik_enabled};
 use payment_stack::waterfall_currency;
 
@@ -306,14 +306,13 @@ fn execute_waterfall_inner(
         .ecf_sweep
         .as_ref()
         .and_then(|s| s.target_instrument_id.as_ref())
+        && !contractual_flows.contains_key(target)
     {
-        if !contractual_flows.contains_key(target) {
-            return Err(crate::error::Error::build(format!(
-                "WaterfallSpec: `ecf_sweep.target_instrument_id` '{target}' does not match any \
+        return Err(crate::error::Error::build(format!(
+            "WaterfallSpec: `ecf_sweep.target_instrument_id` '{target}' does not match any \
                  debt instrument; the sweep would be silently dropped. Check for typos or \
                  trailing whitespace."
-            )));
-        }
+        )));
     }
     if let Some(targets) = waterfall_spec
         .pik_toggle
@@ -435,16 +434,16 @@ fn execute_waterfall_inner(
                     .checked_add(shortfall)?;
             }
         }
-        if let Some(shortfall) = state.fee_shortfall.shift_remove(instrument_id.as_str()) {
-            if shortfall.amount() > 0.0 {
-                if shortfall.currency() != currency {
-                    return Err(crate::error::Error::CurrencyMismatch(
-                        currency,
-                        shortfall.currency(),
-                    ));
-                }
-                staged_breakdown.fees = staged_breakdown.fees.checked_add(shortfall)?;
+        if let Some(shortfall) = state.fee_shortfall.shift_remove(instrument_id.as_str())
+            && shortfall.amount() > 0.0
+        {
+            if shortfall.currency() != currency {
+                return Err(crate::error::Error::CurrencyMismatch(
+                    currency,
+                    shortfall.currency(),
+                ));
             }
+            staged_breakdown.fees = staged_breakdown.fees.checked_add(shortfall)?;
         }
         let scheduled_principal = principal.get_scheduled_capacity()?;
         let zero = Money::from((0_i64, currency));

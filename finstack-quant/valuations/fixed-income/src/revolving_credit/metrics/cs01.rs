@@ -26,9 +26,9 @@
 //! [`ZSpreadParallelCs01`]: finstack_quant_valuations_core::metrics::ZSpreadParallelCs01
 //! [`ZSpreadBucketedCs01`]: finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01
 
+use crate::revolving_credit::RevolvingCredit;
 use crate::revolving_credit::cashflow_engine::CashflowEngine;
 use crate::revolving_credit::types::DrawRepaySpec;
-use crate::revolving_credit::RevolvingCredit;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;

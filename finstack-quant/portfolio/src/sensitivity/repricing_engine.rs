@@ -1,7 +1,7 @@
 //! Full-repricing engine for per-factor scenario P&L profiles.
 //!
 use super::delta_engine::{mapping_to_market_bumps, validate_position_weights};
-use super::traits::{factor_bump, mapping_bumps_fx, FactorRepricingPlan};
+use super::traits::{FactorRepricingPlan, factor_bump, mapping_bumps_fx};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -298,8 +298,8 @@ mod tests {
     use finstack_quant_core::market_data::bumps::BumpUnits;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_core::money::fx::{FxMatrix, FxQuery, SimpleFxProvider};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::money::fx::{FxMatrix, FxQuery, SimpleFxProvider};
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_factor::{FactorType, MarketMapping};
@@ -307,8 +307,8 @@ mod tests {
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     };
     use time::macros::date;
 
@@ -1067,9 +1067,11 @@ mod tests {
         let error = delta
             .compute_sensitivities(&positions, &factors, &market, as_of, Currency::USD)
             .expect_err("finite endpoints must not produce an infinite weighted sensitivity");
-        assert!(error
-            .to_string()
-            .contains("non-finite weighted sensitivity"));
+        assert!(
+            error
+                .to_string()
+                .contains("non-finite weighted sensitivity")
+        );
         let full = FullRepricingEngine::new(BumpSizeConfig::default(), 5)?;
         let error = full
             .compute_pnl_profiles(&positions, &factors, &market, as_of, Currency::USD)
@@ -1095,9 +1097,10 @@ mod tests {
                 .compute_sensitivities(&positions, &[], &market, as_of, Currency::USD)
                 .expect_err("invalid weight must fail before the empty factor pass");
             assert!(error.to_string().contains("weight must be finite"));
-            assert!(full
-                .compute_pnl_profiles(&positions, &[], &market, as_of, Currency::USD)
-                .is_err());
+            assert!(
+                full.compute_pnl_profiles(&positions, &[], &market, as_of, Currency::USD)
+                    .is_err()
+            );
         }
         Ok(())
     }

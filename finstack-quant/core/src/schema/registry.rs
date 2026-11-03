@@ -2,8 +2,8 @@
 //! and the shared common-definition table.
 #[cfg(feature = "json-schema")]
 use schemars::JsonSchema;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use super::externalize::*;

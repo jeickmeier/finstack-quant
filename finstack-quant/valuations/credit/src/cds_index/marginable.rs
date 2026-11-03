@@ -1,17 +1,17 @@
 //! `Marginable` implementation for [`CdsIndex`].
 
 use super::CdsIndex;
-use crate::cds::marginable::{credit_simm_sensitivities, CreditSimmTerms};
+use crate::cds::marginable::{CreditSimmTerms, credit_simm_sensitivities};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
+use finstack_quant_margin::Marginable;
 use finstack_quant_margin::types::NettingSetId;
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_margin::types::SimmSensitivities;
-use finstack_quant_margin::Marginable;
-use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
 
 impl Marginable for CdsIndex {
     fn id(&self) -> &str {

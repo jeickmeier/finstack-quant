@@ -19,9 +19,9 @@ use finstack_quant_models::rates::dtsm::{DieboldLi, YieldPanel, YieldPca};
 use finstack_quant_models::rates::hull_white::HullWhiteParams;
 use finstack_quant_models::volatility::rough_heston::RoughHestonFourierParams;
 use finstack_quant_models::volatility::svi::SviParams;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
 use time::Month;
 
 /// Schema for `type_name`: its root artifact, or a `$defs` entry of any
@@ -224,9 +224,11 @@ fn optimal_toggle_schema_and_serde_reject_the_removed_discount_rate() {
     let model = ToggleExerciseModel::optimal(100, 0.3, 0.03, 1.0).expect("valid optimal toggle");
     assert_wire_matches_schema("ToggleExerciseModel", &model);
     let mut wire = serde_json::to_value(&model).expect("serialize");
-    assert!(wire["optimal_exercise"]
-        .get("equity_discount_rate")
-        .is_none());
+    assert!(
+        wire["optimal_exercise"]
+            .get("equity_discount_rate")
+            .is_none()
+    );
     wire["optimal_exercise"]["equity_discount_rate"] = json!(1000.0);
     assert!(serde_json::from_value::<ToggleExerciseModel>(wire.clone()).is_err());
     assert!(serde_json::from_value::<OptimalToggle>(wire["optimal_exercise"].clone()).is_err());

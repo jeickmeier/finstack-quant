@@ -14,7 +14,7 @@ pub(crate) fn register_fx_option_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
     use finstack_quant_valuations_core::metrics::sensitivities::cross_factor::{
-        make_fx_bumper, make_rates_bumper, make_vol_bumper, CrossFactorCalculator,
+        CrossFactorCalculator, make_fx_bumper, make_rates_bumper, make_vol_bumper,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
 

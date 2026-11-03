@@ -1,7 +1,7 @@
 //! Public-boundary tests for the statements formula DSL.
 
 use finstack_quant_core::expr::{BinOp, ExprNode, Function, UnaryOp};
-use finstack_quant_statements::dsl::{parse_and_compile, parse_formula, StmtExpr};
+use finstack_quant_statements::dsl::{StmtExpr, parse_and_compile, parse_formula};
 
 #[test]
 fn operators_precedence_and_conditionals_parse_and_compile_consistently() {

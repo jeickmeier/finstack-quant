@@ -1,15 +1,15 @@
 //! Shared runtime types and solver contracts for market calibration.
 //!
+use crate::CalibrationReport;
 use crate::api::schema::{
     CalibrationStep, CapFloorHullWhiteStepParams, HullWhiteVolatilityMode, StepParams,
 };
 use crate::config::CalibrationConfig;
 use crate::hull_white::{
-    bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
-    calibrate_hull_white_to_cap_floors_with_fn, calibrate_hull_white_to_swaptions_with_fn,
     CapFloorCalibrationConfig, CapFloorQuote, CapFloorSchedule, CapletSchedule,
     PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionFloatingPeriod, SwaptionQuote,
-    SwaptionSchedule,
+    SwaptionSchedule, bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
+    calibrate_hull_white_to_cap_floors_with_fn, calibrate_hull_white_to_swaptions_with_fn,
 };
 use crate::quotes::MarketQuote;
 use crate::quotes::VolQuote;
@@ -24,9 +24,9 @@ use crate::targets::svi;
 use crate::targets::swaption;
 use crate::targets::vol;
 use crate::targets::xccy_basis::XccyBasisTarget;
-use crate::validation::attach_validation_result;
 use crate::validation::CurveValidator;
-use crate::CalibrationReport;
+use crate::validation::attach_validation_result;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::explain::TraceEntry;
@@ -34,11 +34,10 @@ use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::market_data::scalars::{MarketScalar, ScalarTimeSeries};
 use finstack_quant_core::market_data::surfaces::{VolCube, VolQuoteType, VolSurface};
 use finstack_quant_core::market_data::term_structures::{CreditIndexData, DiscountCurve};
-use finstack_quant_core::Result;
 use finstack_quant_models::rates::clock::model_time_on_curve;
 use finstack_quant_models::rates::hull_white::{
-    capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key, hw1f_scalar_keys,
-    HullWhiteCalibrationParams,
+    HullWhiteCalibrationParams, capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key,
+    hw1f_scalar_keys,
 };
 use std::sync::Arc;
 
@@ -215,7 +214,7 @@ fn prepare_hw_cap_schedule(
     params: &CapFloorHullWhiteStepParams,
     maturity: finstack_quant_core::dates::Date,
 ) -> Result<CapFloorSchedule> {
-    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
     use finstack_quant_core::dates::StubKind;
     use finstack_quant_models::rates::clock::model_time;
     use finstack_quant_valuations_core::market::conventions::{ConventionRegistry, RateIndexKind};

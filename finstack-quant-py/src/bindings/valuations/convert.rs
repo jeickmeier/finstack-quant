@@ -25,8 +25,8 @@ use crate::bindings::date_utils::date_to_py;
 use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, serde_json_to_py, value_error};
-use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 
 /// Coerce `Money | float | int` to [`Money`](finstack_quant_core::money::Money).
 ///
@@ -134,11 +134,7 @@ pub(crate) fn opt_repr<T: std::fmt::Display>(value: Option<T>) -> String {
 
 /// Render a `bool` the Python way (`True`/`False`).
 pub(crate) fn bool_repr(value: bool) -> &'static str {
-    if value {
-        "True"
-    } else {
-        "False"
-    }
+    if value { "True" } else { "False" }
 }
 
 /// Parse a business-day-convention name with the Rust `FromStr` (the parser

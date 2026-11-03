@@ -25,13 +25,13 @@ pub(crate) fn validated_input_value_type(
         None => None,
     };
     let result_type = context.results.node_value_types.get(node).copied();
-    if let (Some(expected), Some(actual)) = (model_type, result_type) {
-        if expected != actual {
-            return Err(crate::Error::invalid_input(format!(
-                "{check_id}: input '{node}' has result units {actual:?} but model units are \
+    if let (Some(expected), Some(actual)) = (model_type, result_type)
+        && expected != actual
+    {
+        return Err(crate::Error::invalid_input(format!(
+            "{check_id}: input '{node}' has result units {actual:?} but model units are \
                  {expected:?}; supply results for this model"
-            )));
-        }
+        )));
     }
     Ok(result_type.or(model_type).unwrap_or(NodeValueType::Scalar))
 }
@@ -176,7 +176,9 @@ pub(crate) fn arithmetic_failure(
     crate::checks::CheckFinding {
         check_id: check_id.to_string(),
         severity: crate::checks::Severity::Error,
-        message: format!("Arithmetic overflow while evaluating {check_id} in {period}; the identity could not be compared."),
+        message: format!(
+            "Arithmetic overflow while evaluating {check_id} in {period}; the identity could not be compared."
+        ),
         period: Some(period),
         materiality: None,
         nodes,

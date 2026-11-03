@@ -4,9 +4,9 @@
 //! zero-coupon inflation swaps (ZCIS) and year-on-year (YoY) inflation swaps.
 
 use super::ids::QuoteId;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::validation::validate_f64_finite;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
 
 /// Inflation instrument quotes for CPI and inflation curve calibration.
@@ -184,16 +184,18 @@ mod tests {
         assert!(value.get("yoy_inflation_swap").is_some());
 
         // schema-rejection-test
-        assert!(serde_json::from_value::<InflationQuote>(serde_json::json!({
-            "yo_y_inflation_swap": {
-                "id": "USA-CPI-U-YOY-5Y",
-                "maturity": "2029-06-20",
-                "rate": 0.025,
-                "index": "US-CPI-U",
-                "frequency": "1Y",
-                "convention": "USD-CPI"
-            }
-        }))
-        .is_err());
+        assert!(
+            serde_json::from_value::<InflationQuote>(serde_json::json!({
+                "yo_y_inflation_swap": {
+                    "id": "USA-CPI-U-YOY-5Y",
+                    "maturity": "2029-06-20",
+                    "rate": 0.025,
+                    "index": "US-CPI-U",
+                    "frequency": "1Y",
+                    "convention": "USD-CPI"
+                }
+            }))
+            .is_err()
+        );
     }
 }

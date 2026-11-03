@@ -4,11 +4,11 @@
 //! [`evaluate_covenants`] tests compliance at every result period end and
 //! [`forecast_breaches`] projects breaches over the same periods.
 
-use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::Result;
+use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_covenants::{
-    evaluate_series_generic, forecast_breaches_generic, CovenantEngine, CovenantForecastConfig,
-    DatedCovenantReports, FutureBreach, ModelTimeSeries,
+    CovenantEngine, CovenantForecastConfig, DatedCovenantReports, FutureBreach, ModelTimeSeries,
+    evaluate_series_generic, forecast_breaches_generic,
 };
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
@@ -200,8 +200,8 @@ pub fn forecast_breaches(
 mod tests {
     use super::*;
     use finstack_quant_core::dates::{Date, Tenor};
-    use finstack_quant_covenants::forecast_covenant_generic;
     use finstack_quant_covenants::CovenantType;
+    use finstack_quant_covenants::forecast_covenant_generic;
     use finstack_quant_covenants::{Covenant, CovenantEngine, CovenantMetricId, CovenantSpec};
     use finstack_quant_statements::evaluator::StatementResult;
     use indexmap::IndexMap;
@@ -260,13 +260,15 @@ mod tests {
         assert_eq!(automatic.breach_probability, explicit.breach_probability);
         assert_eq!(automatic.test_dates, vec![date!(2024 - 09 - 30)]);
         let missing: PeriodId = "FY2025Q2".parse().unwrap();
-        assert!(forecast_covenant_generic(
-            &spec,
-            &StatementsAdapter::new(&results, &model),
-            &[missing],
-            CovenantForecastConfig::default()
-        )
-        .is_err());
+        assert!(
+            forecast_covenant_generic(
+                &spec,
+                &StatementsAdapter::new(&results, &model),
+                &[missing],
+                CovenantForecastConfig::default()
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -308,13 +310,15 @@ mod tests {
                 reference_date: Some(time::macros::date!(2024 - 03 - 31)),
                 ..Default::default()
             };
-            assert!(forecast_covenant_generic(
-                &covenant,
-                &StatementsAdapter::new(&results, &model),
-                &periods,
-                config.clone()
-            )
-            .is_err());
+            assert!(
+                forecast_covenant_generic(
+                    &covenant,
+                    &StatementsAdapter::new(&results, &model),
+                    &periods,
+                    config.clone()
+                )
+                .is_err()
+            );
             let forecast = forecast_covenant_generic(
                 &covenant,
                 &StatementsAdapter::new(&results, &model),
@@ -361,18 +365,20 @@ mod tests {
             ..StatementResult::default()
         };
 
-        assert!(forecast_breaches(
-            &results,
-            &engine,
-            &{
-                let mut model_builder =
-                    finstack_quant_statements::builder::ModelBuilder::new("calendar");
-                model_builder.periods("2025Q1..Q2", None).unwrap();
-                model_builder.build().unwrap()
-            },
-            CovenantForecastConfig::default()
-        )
-        .is_err());
+        assert!(
+            forecast_breaches(
+                &results,
+                &engine,
+                &{
+                    let mut model_builder =
+                        finstack_quant_statements::builder::ModelBuilder::new("calendar");
+                    model_builder.periods("2025Q1..Q2", None).unwrap();
+                    model_builder.build().unwrap()
+                },
+                CovenantForecastConfig::default()
+            )
+            .is_err()
+        );
     }
 
     #[test]

@@ -178,14 +178,14 @@ pub fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
             // panics on the non-finite result (core/src/money/types.rs), so a
             // malformed weight took down the pricing call rather than being
             // reported. Testing for non-finite explicitly closes that.
-            if let Some(weight) = recipient.weight {
-                if !weight.is_finite() || weight < 0.0 {
-                    errors.push(ValidationError::InvalidWeight {
-                        tier_id: tier.id.clone(),
-                        recipient_id: recipient.id.clone(),
-                        weight,
-                    });
-                }
+            if let Some(weight) = recipient.weight
+                && (!weight.is_finite() || weight < 0.0)
+            {
+                errors.push(ValidationError::InvalidWeight {
+                    tier_id: tier.id.clone(),
+                    recipient_id: recipient.id.clone(),
+                    weight,
+                });
             }
             // A non-finite payment PARAMETER reaches `Money::new` in
             // `calculate_payment_amount` and panics there. Validation is the

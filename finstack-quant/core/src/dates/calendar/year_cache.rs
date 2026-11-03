@@ -12,7 +12,7 @@ use super::algo::{BASE_YEAR, END_YEAR};
 use super::business_days::count_business_days_by_scan;
 use super::types::Calendar;
 use crate::dates::DateExt;
-use crate::{recover_lock, FxHashMap};
+use crate::{FxHashMap, recover_lock};
 
 /// 366-day holiday mask plus inclusive business-day prefix sums for one year.
 #[derive(Clone, Copy)]
@@ -169,10 +169,10 @@ pub(super) fn count_business_days_cached(cal: &Calendar, start: Date, end: Date)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dates::HolidayCalendar;
     use crate::dates::calendar::rule::Rule;
     use crate::dates::calendar::types::Calendar;
     use crate::dates::calendar::{BSE, CNBE, NYSE, TARGET2};
-    use crate::dates::HolidayCalendar;
     use time::Month;
 
     fn date(year: i32, month: Month, day: u8) -> Date {

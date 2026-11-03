@@ -75,15 +75,15 @@ impl SchemaGenerationCommand {
                 _ => {
                     return Err(Error::Validation(format!(
                         "unknown schema generator argument {argument:?}"
-                    )))
+                    )));
                 }
             };
-            if let Some(selected) = selected {
-                if mode.replace(selected).is_some() {
-                    return Err(Error::Validation(
-                        "choose exactly one of --write, --check, or --list".to_string(),
-                    ));
-                }
+            if let Some(selected) = selected
+                && mode.replace(selected).is_some()
+            {
+                return Err(Error::Validation(
+                    "choose exactly one of --write, --check, or --list".to_string(),
+                ));
             }
         }
         let mode = mode.ok_or_else(|| {
@@ -300,7 +300,7 @@ fn sync_outputs(
                         return Err(Error::Internal(format!(
                             "read {label} {}: {error}",
                             path.display()
-                        )))
+                        )));
                     }
                 }
             }

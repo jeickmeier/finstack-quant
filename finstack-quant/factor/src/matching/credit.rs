@@ -26,10 +26,10 @@
 
 use super::filter::DependencyFilter;
 use super::matchers::{FactorMatchEntry, FactorMatchError, FactorMatcher};
-use crate::credit::hierarchy::{
-    dimension_key, CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerTags,
-};
 use crate::FactorId;
+use crate::credit::hierarchy::{
+    CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerTags, dimension_key,
+};
 use crate::{DependencyType, MarketDependency};
 use finstack_quant_core::types::{Attributes, IssuerId};
 use serde::{Deserialize, Serialize};
@@ -231,14 +231,14 @@ impl FactorMatcher for CreditHierarchicalMatcher {
         // A calibrated row whose beta vector disagrees with the hierarchy
         // depth is an inconsistent config; substituting β = 1.0 silently
         // would misstate risk.
-        if let Some((_, r)) = row {
-            if r.betas.levels.len() != self.config.hierarchy.levels.len() {
-                return Err(FactorMatchError::BetaShapeMismatch {
-                    issuer_id: r.issuer_id.as_str().to_owned(),
-                    actual: r.betas.levels.len(),
-                    expected: self.config.hierarchy.levels.len(),
-                });
-            }
+        if let Some((_, r)) = row
+            && r.betas.levels.len() != self.config.hierarchy.levels.len()
+        {
+            return Err(FactorMatchError::BetaShapeMismatch {
+                issuer_id: r.issuer_id.as_str().to_owned(),
+                actual: r.betas.levels.len(),
+                expected: self.config.hierarchy.levels.len(),
+            });
         }
 
         // Emit PC factor first.

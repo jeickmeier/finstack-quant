@@ -1,18 +1,18 @@
 //! `Marginable` implementation for [`CreditDefaultSwap`].
 
 use super::CreditDefaultSwap;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
+use finstack_quant_margin::Marginable;
 use finstack_quant_margin::constants::DURATION_APPROXIMATION_FACTOR;
 use finstack_quant_margin::constants::STANDARD_CDS_MATURITY_YEARS;
 use finstack_quant_margin::types::NettingSetId;
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_margin::types::SimmSensitivities;
-use finstack_quant_margin::Marginable;
 use finstack_quant_valuations_core::instruments::common_impl::margin::add_classified_credit_delta;
 use finstack_quant_valuations_core::instruments::common_impl::margin::assign_credit_tenor_bucket;
 use finstack_quant_valuations_core::instruments::common_impl::margin::extract_reference_entity;
@@ -155,10 +155,12 @@ mod tests {
             .simm_sensitivities(&MarketContext::new(), as_of)
             .expect("CDS sensitivities");
 
-        assert!(sensitivities
-            .credit_qualifying_delta
-            .keys()
-            .any(|(sector, _, _)| *sector == SimmCreditSector::HighYieldFinancial));
+        assert!(
+            sensitivities
+                .credit_qualifying_delta
+                .keys()
+                .any(|(sector, _, _)| *sector == SimmCreditSector::HighYieldFinancial)
+        );
         assert!(sensitivities.credit_non_qualifying_delta.is_empty());
     }
 

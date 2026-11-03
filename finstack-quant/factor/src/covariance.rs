@@ -88,11 +88,7 @@ impl FactorCovarianceMatrix {
         let stdevs = (0..n)
             .map(|i| {
                 let variance = data[i * n + i];
-                if variance > 0.0 {
-                    variance.sqrt()
-                } else {
-                    0.0
-                }
+                if variance > 0.0 { variance.sqrt() } else { 0.0 }
             })
             .collect();
 

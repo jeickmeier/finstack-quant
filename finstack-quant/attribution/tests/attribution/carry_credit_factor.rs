@@ -6,7 +6,7 @@ use finstack_quant_attribution::{
     CreditFactorDetailOptions, PnlAttribution,
 };
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{create_date, DayCount};
+use finstack_quant_core::dates::{DayCount, create_date};
 use finstack_quant_core::market_data::context::{CurveState, MarketContextState};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
@@ -591,10 +591,10 @@ fn bare_money_carry_detail_is_rejected() {
         .and_then(|cd| cd.as_object_mut())
     {
         for key in ["coupon_income", "roll_down"] {
-            if let Some(line) = carry.get(key).cloned() {
-                if let Some(total) = line.get("total").cloned() {
-                    carry.insert(key.to_string(), total);
-                }
+            if let Some(line) = carry.get(key).cloned()
+                && let Some(total) = line.get("total").cloned()
+            {
+                carry.insert(key.to_string(), total);
             }
         }
     }

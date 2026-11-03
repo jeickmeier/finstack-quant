@@ -1,15 +1,15 @@
 //! FX variance swap type definitions and pricing logic.
 
 use super::pricer;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::RealizedVarMethod;
-use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;

@@ -2,12 +2,12 @@
 //!
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{
     FxConfig, FxConversionPolicy, FxMatrix, FxProvider, FxQuery, SimpleFxProvider,
 };
-use finstack_quant_core::money::Money;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 struct StaticFx {
     rate: f64,
@@ -416,14 +416,16 @@ fn repeated_provider_updates_fail_rate_and_snapshot_after_bounded_retries() {
     let provider = Arc::new(ChangingFx(AtomicUsize::new(0)));
     let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>);
     let on = Date::from_ordinal_date(2025, 1).expect("date");
-    assert!(matrix
-        .rate(FxQuery::new(
-            Currency::EUR,
-            Currency::USD,
-            on,
-            Default::default()
-        ))
-        .is_err());
+    assert!(
+        matrix
+            .rate(FxQuery::new(
+                Currency::EUR,
+                Currency::USD,
+                on,
+                Default::default()
+            ))
+            .is_err()
+    );
     assert_eq!(provider.0.load(Ordering::SeqCst), 3);
     assert!(matrix.get_serializable_state().is_err());
     assert_eq!(provider.0.load(Ordering::SeqCst), 6);
@@ -1493,16 +1495,18 @@ fn snapshot_only_scoped_crosses_do_not_pin_the_live_bumped_provider() {
         .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, on)
         .expect("cross shock");
     let state = bumped.get_serializable_state().expect("stable FX state");
-    assert!(state
-        .provider_pinned_quotes
-        .iter()
-        .any(|&(from, to, date, policy, rate)| {
-            from == Currency::EUR
-                && to == Currency::GBP
-                && date == on
-                && policy == FxConversionPolicy::CashflowDate
-                && (rate - 0.968).abs() < 1e-12
-        }));
+    assert!(
+        state
+            .provider_pinned_quotes
+            .iter()
+            .any(|&(from, to, date, policy, rate)| {
+                from == Currency::EUR
+                    && to == Currency::GBP
+                    && date == on
+                    && policy == FxConversionPolicy::CashflowDate
+                    && (rate - 0.968).abs() < 1e-12
+            })
+    );
     // A newly published direct provider quote still outranks triangulation.
     provider
         .set_quotes(&[(Currency::EUR, Currency::GBP, 2.0)])
@@ -1519,12 +1523,14 @@ fn snapshot_only_scoped_crosses_do_not_pin_the_live_bumped_provider() {
             .rate,
         2.2
     );
-    assert!(bumped
-        .get_serializable_state()
-        .expect("stable FX state")
-        .provider_pinned_quotes
-        .iter()
-        .all(|&(from, to, _, _, _)| !(from == Currency::EUR && to == Currency::GBP)));
+    assert!(
+        bumped
+            .get_serializable_state()
+            .expect("stable FX state")
+            .provider_pinned_quotes
+            .iter()
+            .all(|&(from, to, _, _, _)| !(from == Currency::EUR && to == Currency::GBP))
+    );
 }
 
 #[test]
@@ -1573,9 +1579,11 @@ fn fx_bumps_reject_overflowing_static_scopes_outside_the_reference_date() {
                 .abs()
                 < 1e-12
         );
-        assert!(matrix
-            .with_bumped_rate(Currency::EUR, Currency::GBP, 9.0, reference)
-            .is_err());
+        assert!(
+            matrix
+                .with_bumped_rate(Currency::EUR, Currency::GBP, 9.0, reference)
+                .is_err()
+        );
         assert!(
             serde_json::to_string(&matrix.get_serializable_state().expect("stable FX state"))
                 .is_ok()
@@ -1613,14 +1621,16 @@ fn mutable_provider_overflow_fails_snapshot_serialization_without_emitting_null(
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, f64::MAX)])
         .expect("finite positive provider update");
-    assert!(bumped
-        .rate(FxQuery::new(
-            Currency::EUR,
-            Currency::USD,
-            on,
-            Default::default()
-        ))
-        .is_err());
+    assert!(
+        bumped
+            .rate(FxQuery::new(
+                Currency::EUR,
+                Currency::USD,
+                on,
+                Default::default()
+            ))
+            .is_err()
+    );
     let captured = bumped.get_serializable_state().expect("stable FX state");
     assert!(serde_json::to_string(&captured).is_err());
     assert!(serde_json::to_value(&captured).is_err());

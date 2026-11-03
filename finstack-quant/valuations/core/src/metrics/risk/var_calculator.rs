@@ -10,15 +10,15 @@
 use crate::instruments::Instrument;
 use crate::metrics::risk::MarketHistory;
 use crate::pricer::PricingDispatch;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::quantile_sorted;
-use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
+use finstack_quant_core::math::summation::{NeumaierAccumulator, neumaier_sum};
+use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_core::money::fx::FxQuery;
-use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use std::sync::Arc;
 
 /// VaR calculation method.
@@ -499,7 +499,7 @@ fn resolve_reporting_currency_from_values(
             Some(_) => {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{context_name} requires an explicit reporting currency for mixed-currency portfolios"
-                )))
+                )));
             }
         }
     }
@@ -582,11 +582,11 @@ pub(crate) fn relevant_taylor_scenario(
     // its domain. Preserve that net direction when selecting feasible steps.
     let mut net: Vec<super::RiskFactorShift> = Vec::with_capacity(shifts.len());
     for shift in shifts {
-        if matches!(shift.factor, RiskFactorType::ImpliedVol { .. }) {
-            if let Some(existing) = net.iter_mut().find(|value| value.factor == shift.factor) {
-                existing.shift += shift.shift;
-                continue;
-            }
+        if matches!(shift.factor, RiskFactorType::ImpliedVol { .. })
+            && let Some(existing) = net.iter_mut().find(|value| value.factor == shift.factor)
+        {
+            existing.shift += shift.shift;
+            continue;
         }
         net.push(shift);
     }
@@ -637,7 +637,9 @@ fn directional_taylor_pnl(
                     .iter()
                     .position(|v| v.to_bits() == strike.to_bits());
                 let (Some(row), Some(col)) = (row, col) else {
-                    return Err(finstack_quant_core::Error::Validation(format!("Taylor volatility point ({expiry_years}, {strike}) must exactly match a grid node on '{vol_surface_id}'")));
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "Taylor volatility point ({expiry_years}, {strike}) must exactly match a grid node on '{vol_surface_id}'"
+                    )));
                 };
                 let vol = surface.vols()[row * surface.strikes().len() + col];
                 if vol + shift.shift < 0.0 {
@@ -801,9 +803,11 @@ mod tests {
     #[test]
     fn pricing_dispatch_from_model_maps_default_and_explicit_keys() -> Result<()> {
         let registry = || crate::pricer::Family::unregistered().shared_pricers();
-        assert!(PricingDispatch::from_model("default", registry())?
-            .model()
-            .is_none());
+        assert!(
+            PricingDispatch::from_model("default", registry())?
+                .model()
+                .is_none()
+        );
         assert_eq!(
             PricingDispatch::from_model("discounting", registry())?.model(),
             Some(crate::pricer::ModelKey::Discounting)
@@ -854,11 +858,13 @@ mod tests {
                 "confidence level {confidence_level} must be rejected"
             );
         }
-        assert!(serde_json::from_value::<VarConfig>(serde_json::json!({
-            "confidence_level": 0.95,
-            "unexpected": true
-        }))
-        .is_err());
+        assert!(
+            serde_json::from_value::<VarConfig>(serde_json::json!({
+                "confidence_level": 0.95,
+                "unexpected": true
+            }))
+            .is_err()
+        );
 
         let schema =
             serde_json::to_value(schemars::schema_for!(VarConfig)).expect("VaR config schema");

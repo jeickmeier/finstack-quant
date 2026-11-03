@@ -1,8 +1,8 @@
 //! Loan cashflow and call-exercise regressions from the finance review.
 
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{FloatingLegCompounding, FloatingRateSpec};
-use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

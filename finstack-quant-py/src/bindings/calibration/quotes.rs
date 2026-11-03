@@ -27,8 +27,8 @@ use finstack_quant_calibration::quotes::RateQuote;
 use finstack_quant_calibration::quotes::VolQuote;
 use finstack_quant_calibration::quotes::XccyQuote;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;
+use pyo3::prelude::*;
 
 /// Pillar from a tenor / ISO-date string, ``datetime.date``, or wire mapping.
 pub(crate) fn extract_pillar(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Pillar> {

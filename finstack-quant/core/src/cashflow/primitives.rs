@@ -18,12 +18,12 @@ fn serialize_optional_rate<S>(rate: &Option<f64>, serializer: S) -> Result<S::Ok
 where
     S: serde::Serializer,
 {
-    if let Some(rate) = rate {
-        if !rate.is_finite() {
-            return Err(serde::ser::Error::custom(InputError::NonFiniteValue {
-                kind: NonFiniteKind::classify(*rate),
-            }));
-        }
+    if let Some(rate) = rate
+        && !rate.is_finite()
+    {
+        return Err(serde::ser::Error::custom(InputError::NonFiniteValue {
+            kind: NonFiniteKind::classify(*rate),
+        }));
     }
     serde::Serialize::serialize(rate, serializer)
 }
@@ -556,28 +556,28 @@ impl CashFlow {
             ));
         }
 
-        if let Some(rate) = self.rate {
-            if !rate.is_finite() {
-                let kind = NonFiniteKind::classify(rate);
-                return Err(InputError::NonFiniteValue { kind }.into());
-            }
+        if let Some(rate) = self.rate
+            && !rate.is_finite()
+        {
+            let kind = NonFiniteKind::classify(rate);
+            return Err(InputError::NonFiniteValue { kind }.into());
         }
 
-        if let Some(reset) = self.reset_date {
-            if reset > self.date {
-                return Err(crate::Error::Validation(
-                    "CashFlow: reset_date must not be after payment date".into(),
-                ));
-            }
+        if let Some(reset) = self.reset_date
+            && reset > self.date
+        {
+            return Err(crate::Error::Validation(
+                "CashFlow: reset_date must not be after payment date".into(),
+            ));
         }
 
-        if let Some(delta) = self.principal_delta {
-            if delta.currency() != self.amount.currency() {
-                return Err(crate::Error::CurrencyMismatch {
-                    expected: self.amount.currency(),
-                    actual: delta.currency(),
-                });
-            }
+        if let Some(delta) = self.principal_delta
+            && delta.currency() != self.amount.currency()
+        {
+            return Err(crate::Error::CurrencyMismatch {
+                expected: self.amount.currency(),
+                actual: delta.currency(),
+            });
         }
         if let Some(accrual) = &self.accrual {
             if accrual
@@ -593,13 +593,13 @@ impl CashFlow {
                     "CashFlow: accrual start must be before accrual end".into(),
                 ));
             }
-            if let Some(projected_index_rate) = accrual.projected_index_rate {
-                if !projected_index_rate.is_finite() {
-                    return Err(InputError::NonFiniteValue {
-                        kind: NonFiniteKind::classify(projected_index_rate),
-                    }
-                    .into());
+            if let Some(projected_index_rate) = accrual.projected_index_rate
+                && !projected_index_rate.is_finite()
+            {
+                return Err(InputError::NonFiniteValue {
+                    kind: NonFiniteKind::classify(projected_index_rate),
                 }
+                .into());
             }
         }
 

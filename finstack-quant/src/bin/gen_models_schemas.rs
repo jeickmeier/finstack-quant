@@ -11,7 +11,7 @@
 
 use std::path::Path;
 
-use finstack_quant_core::schema::{run_schema_generator, SchemaArtifact, SchemaGenerationCommand};
+use finstack_quant_core::schema::{SchemaArtifact, SchemaGenerationCommand, run_schema_generator};
 
 fn main() {
     let command = SchemaGenerationCommand::from_env()

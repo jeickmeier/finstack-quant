@@ -4,7 +4,7 @@
 //! direct multiplier on path-dependent pricers. Measured across the step
 //! counts typical for daily and intraday simulation grids.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::math::random::BrownianBridge;
 use std::hint::black_box;
 

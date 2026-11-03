@@ -4,7 +4,7 @@
 //! style. Provides descriptive statistics, percentile ranking, z-scores,
 //! and single-factor OLS regression for fair-value estimation.
 
-use finstack_quant_core::math::stats::{mean, quantile_sorted, OnlineCovariance, OnlineStats};
+use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats, mean, quantile_sorted};
 use serde::{Deserialize, Serialize};
 
 /// Descriptive statistics for a peer set metric.

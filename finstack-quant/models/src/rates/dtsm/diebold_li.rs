@@ -33,7 +33,7 @@
 use nalgebra::{DMatrix, DVector};
 use serde::{Deserialize, Serialize};
 
-use super::types::{validate_tenors, FactorTimeSeries, YieldForecast, YieldPanel};
+use super::types::{FactorTimeSeries, YieldForecast, YieldPanel, validate_tenors};
 
 /// Default Diebold-Li decay parameter, expressed for tenors **in years** (the
 /// workspace-wide tenor convention; see the `dtsm` module examples).
@@ -163,7 +163,7 @@ impl TryFrom<RawDieboldLi> for DieboldLi {
                 return Err(finstack_quant_core::Error::Validation(
                     "DieboldLi mean, VAR coefficients, and covariance must all be fitted together"
                         .into(),
-                ))
+                ));
             }
         }
         Ok(Self {

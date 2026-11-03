@@ -8,8 +8,8 @@
 use crate::utils::input::{from_js_json, js_bool, js_epoch_days, js_int, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{
-    days_since_epoch, BusinessDayConvention, Date, Schedule, ScheduleBuilder, ScheduleSpec,
-    StubKind, Tenor,
+    BusinessDayConvention, Date, Schedule, ScheduleBuilder, ScheduleSpec, StubKind, Tenor,
+    days_since_epoch,
 };
 use wasm_bindgen::prelude::*;
 

@@ -61,11 +61,11 @@
 use std::sync::Arc;
 
 use finstack_quant_attribution::{
-    attribute_pnl, AttributionFactor, AttributionMethod, AttributionRequest, ExecutionPolicy,
-    PnlAttribution,
+    AttributionFactor, AttributionMethod, AttributionRequest, ExecutionPolicy, PnlAttribution,
+    attribute_pnl,
 };
 use finstack_quant_core::config::FinstackConfig;
-use finstack_quant_core::dates::{calendar_by_id_strict, Date, HolidayCalendar};
+use finstack_quant_core::dates::{Date, HolidayCalendar, calendar_by_id_strict};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CalendarId;
@@ -871,9 +871,11 @@ mod tests {
 
         assert!(result.total_return().is_nan());
         assert!(result.annualized_return().is_none());
-        assert!(result
-            .factor_contribution(&AttributionFactor::Carry)
-            .is_nan());
+        assert!(
+            result
+                .factor_contribution(&AttributionFactor::Carry)
+                .is_nan()
+        );
     }
 
     /// A negative initial value (payer swap, short protection, any liability
@@ -893,9 +895,11 @@ mod tests {
             gain_on_liability.annualized_return().is_none(),
             "non-finite total return must not annualize"
         );
-        assert!(gain_on_liability
-            .factor_contribution(&AttributionFactor::Carry)
-            .is_nan());
+        assert!(
+            gain_on_liability
+                .factor_contribution(&AttributionFactor::Carry)
+                .is_nan()
+        );
     }
 
     #[test]
@@ -903,9 +907,11 @@ mod tests {
         for pnl in [0.0, 5.0, -5.0] {
             let result = synthetic_result(Currency::USD, 0.0, Currency::USD, pnl, 30);
             assert!(result.total_return().is_nan());
-            assert!(result
-                .factor_contribution(&AttributionFactor::Carry)
-                .is_nan());
+            assert!(
+                result
+                    .factor_contribution(&AttributionFactor::Carry)
+                    .is_nan()
+            );
             assert!(result.annualized_return().is_none());
         }
     }

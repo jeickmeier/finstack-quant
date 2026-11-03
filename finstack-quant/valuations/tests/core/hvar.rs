@@ -1,23 +1,23 @@
 //! Historical VaR and expected shortfall through the metrics framework.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::risk::var_calculator::{calculate_var, VarConfig};
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::metrics::risk::var_calculator::{VarConfig, calculate_var};
 use finstack_quant_valuations::metrics::risk::{
     MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType,
 };
-use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::PricingDispatch;
 use std::sync::Arc;
-use time::macros::date;
 use time::Duration;
+use time::macros::date;
 
 fn sample_as_of() -> Date {
     date!(2024 - 01 - 01)

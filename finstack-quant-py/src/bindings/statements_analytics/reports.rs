@@ -9,7 +9,7 @@
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::extract::extract_results_ref;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
+use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
 use crate::bindings::statements::parse_period_id;
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::PeriodId;

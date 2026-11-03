@@ -1,13 +1,13 @@
 //! The bond yield clock for the carry decomposition.
 
-use crate::bond::pricing::quote_conversions::{df_from_yield, YieldCompounding};
-use crate::bond::pricing::time_basis::{act365l_year_fraction, bond_coupon_periods};
 use crate::bond::Bond;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use crate::bond::pricing::quote_conversions::{YieldCompounding, df_from_yield};
+use crate::bond::pricing::time_basis::{act365l_year_fraction, bond_coupon_periods};
 use finstack_quant_core::Result;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period;
-use finstack_quant_valuations_core::metrics::sensitivities::carry_decomposition::YieldClock;
 use finstack_quant_valuations_core::metrics::MetricContext;
+use finstack_quant_valuations_core::metrics::sensitivities::carry_decomposition::YieldClock;
 
 /// Street-convention accretion on the bond's coupon frequency and day count.
 ///
@@ -56,9 +56,9 @@ impl YieldClock for BondYieldClock {
 #[cfg(test)]
 mod tests {
     use super::BondYieldClock;
-    use crate::bond::pricing::quote_conversions::{df_from_yield, YieldCompounding};
     use crate::bond::Bond;
     use crate::bond::CashflowSpec;
+    use crate::bond::pricing::quote_conversions::{YieldCompounding, df_from_yield};
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};

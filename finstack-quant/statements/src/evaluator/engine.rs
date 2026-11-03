@@ -2,17 +2,17 @@
 
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
-use crate::evaluator::dag::{evaluate_order, DependencyGraph};
+use crate::evaluator::dag::{DependencyGraph, evaluate_order};
 use crate::evaluator::forecast_eval;
 use crate::evaluator::formula::evaluate_formula;
 use crate::evaluator::formula_helpers::is_truthy;
 use crate::evaluator::monte_carlo::{
     MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults, PathResult,
 };
-use crate::evaluator::precedence::{resolve_node_value, HiddenObservation, NodeValueSource};
+use crate::evaluator::precedence::{HiddenObservation, NodeValueSource, resolve_node_value};
 use crate::evaluator::results::{CellSource, EvalStats, EvalWarning, StatementResult};
 use crate::evaluator::{
-    capital_structure_runtime, capital_structure_runtime::dependent_closure, PeriodHistory,
+    PeriodHistory, capital_structure_runtime, capital_structure_runtime::dependent_closure,
 };
 use crate::types::{FinancialModelSpec, NodeId, NodeValueType};
 use finstack_quant_core::dates::PeriodId;
@@ -898,10 +898,10 @@ impl Evaluator {
             .find(|period| period.id == *period_id)
             .ok_or_else(|| Error::eval(format!("Period '{period_id}' not found in model")))?;
         for node_id in eval_order {
-            if let Some(filter) = node_filter {
-                if !filter.contains(node_id.as_str()) {
-                    continue;
-                }
+            if let Some(filter) = node_filter
+                && !filter.contains(node_id.as_str())
+            {
+                continue;
             }
 
             let node_spec = model

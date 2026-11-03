@@ -4,8 +4,8 @@ use crate::utils::input::{js_f64, json_text};
 use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_covenants::{
-    templates, CovenantEngine, CovenantScope, CovenantSpec, CovenantWaiver, DatedMetrics,
-    HashMapMetricSource,
+    CovenantEngine, CovenantScope, CovenantSpec, CovenantWaiver, DatedMetrics, HashMapMetricSource,
+    templates,
 };
 use wasm_bindgen::prelude::*;
 

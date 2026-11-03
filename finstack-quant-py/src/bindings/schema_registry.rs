@@ -18,7 +18,7 @@
 /// * `$module` - Public dotted path of the schema namespace
 ///   (`"finstack_quant.core.schema"`); the three docstrings come from its stub.
 macro_rules! schema_registry_functions {
-    ($registry:expr, $module:literal) => {
+    ($registry:expr_2021, $module:literal) => {
         #[doc = $crate::bindings::pydoc::pydoc!($module, "index")]
         #[pyfunction]
         #[pyo3(text_signature = "()")]

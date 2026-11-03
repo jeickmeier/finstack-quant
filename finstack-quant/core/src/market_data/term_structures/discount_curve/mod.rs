@@ -117,7 +117,7 @@ pub use validation::ValidationMode;
 
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{
-    dates::{calendar_by_id_strict, canonical_calendar_id, Date, DayCount, HolidayCalendar},
+    dates::{Date, DayCount, HolidayCalendar, calendar_by_id_strict, canonical_calendar_id},
     math::interp::Interp,
     types::CurveId,
 };

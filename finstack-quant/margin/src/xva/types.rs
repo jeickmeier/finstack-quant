@@ -109,13 +109,13 @@ impl FundingConfig {
                 )));
             }
         }
-        if let Some(margin_spread) = self.margin_funding_spread_bp {
-            if !margin_spread.is_finite() || margin_spread < 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "FundingConfig: margin_funding_spread_bp {margin_spread} must be \
+        if let Some(margin_spread) = self.margin_funding_spread_bp
+            && (!margin_spread.is_finite() || margin_spread < 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "FundingConfig: margin_funding_spread_bp {margin_spread} must be \
                      non-negative and finite"
-                )));
-            }
+            )));
         }
         if let Some(ref im_profile) = self.im_profile {
             im_profile.validate()?;

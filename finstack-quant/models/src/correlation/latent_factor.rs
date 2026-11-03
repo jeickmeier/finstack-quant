@@ -45,7 +45,7 @@
 
 use crate::correlation::{Error, Result};
 use finstack_quant_core::math::linalg::{
-    cholesky_correlation, validate_correlation_matrix, CorrelationError, CorrelationFactor,
+    CorrelationError, CorrelationFactor, cholesky_correlation, validate_correlation_matrix,
 };
 
 /// Closed enum over the concrete factor models for correlated behavior.
@@ -890,18 +890,22 @@ mod tests {
             assert!(serde_json::from_value::<LatentFactorSpec>(wire).is_err());
         }
         assert!(LatentMultiFactor::uncorrelated(0, vec![]).is_err());
-        assert!(LatentMultiFactor::new(
-            2,
-            vec![0.1, 0.2],
-            vec![1.0, 1.0000000001, 1.0000000001, 1.0]
-        )
-        .is_err());
-        assert!(LatentFactorSpec::SingleFactor {
-            volatility: -0.1,
-            mean_reversion: 0.0
-        }
-        .build()
-        .is_err());
+        assert!(
+            LatentMultiFactor::new(
+                2,
+                vec![0.1, 0.2],
+                vec![1.0, 1.0000000001, 1.0000000001, 1.0]
+            )
+            .is_err()
+        );
+        assert!(
+            LatentFactorSpec::SingleFactor {
+                volatility: -0.1,
+                mean_reversion: 0.0
+            }
+            .build()
+            .is_err()
+        );
     }
 
     #[test]

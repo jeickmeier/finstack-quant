@@ -18,11 +18,11 @@ use crate::utils::{
     to_js_value_numeric,
 };
 use finstack_quant_analytics::{
-    CagrDayCount, DatedSeries, Performance, ReturnKind, RollingGreeks, DEFAULT_ANNUALIZE,
-    DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR,
-    DEFAULT_PERIODIC_FREQUENCY, DEFAULT_RISK_FREE_RATE, DEFAULT_ROLLING_WINDOW,
+    CagrDayCount, DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY,
+    DEFAULT_MAR, DEFAULT_PERIODIC_FREQUENCY, DEFAULT_RISK_FREE_RATE, DEFAULT_ROLLING_WINDOW,
+    DatedSeries, Performance, ReturnKind, RollingGreeks,
 };
-use finstack_quant_core::dates::{calendar_by_id_strict, HolidayCalendar, PeriodKind};
+use finstack_quant_core::dates::{HolidayCalendar, PeriodKind, calendar_by_id_strict};
 use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
 

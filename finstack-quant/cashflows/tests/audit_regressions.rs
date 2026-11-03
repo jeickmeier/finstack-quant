@@ -5,7 +5,7 @@ use cf::builder::{
 };
 use finstack_quant_cashflows as cf;
 use finstack_quant_core::cashflow::CFKind;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn spec(issue: &str, maturity: &str) -> Value {
     json!({"notional":{"initial":{"amount":"1000000","currency":"USD"},"amort":"none"},
@@ -226,12 +226,14 @@ fn b13_adjusted_payment_does_not_delay_amortization_interest_base() {
             .amount(),
         250_000.0,
     );
-    assert!(replay
-        .get_flows()
-        .iter()
-        .any(|flow| flow.kind == CFKind::Amortization
-            && flow.date == date("2025-11-17")
-            && flow.principal_date == Some(date("2025-11-15"))));
+    assert!(
+        replay
+            .get_flows()
+            .iter()
+            .any(|flow| flow.kind == CFKind::Amortization
+                && flow.date == date("2025-11-17")
+                && flow.principal_date == Some(date("2025-11-15")))
+    );
 }
 
 #[test]
@@ -504,15 +506,17 @@ fn overnight_replay_is_independent_of_weekend_checkpoints() {
 fn lockout_requires_a_preceding_fixing() {
     let cal = finstack_quant_core::dates::calendar_by_id_strict("weekends_only").expect("calendar");
     for lockout_days in [5, 6, u32::MAX] {
-        assert!(OvernightObservationSchedule::compile(
-            date("2025-01-06"),
-            date("2025-01-13"),
-            FloatingLegCompounding::CompoundedWithRateCutoff {
-                cutoff_days: lockout_days
-            },
-            cal
-        )
-        .is_err());
+        assert!(
+            OvernightObservationSchedule::compile(
+                date("2025-01-06"),
+                date("2025-01-13"),
+                FloatingLegCompounding::CompoundedWithRateCutoff {
+                    cutoff_days: lockout_days
+                },
+                cal
+            )
+            .is_err()
+        );
     }
     let schedule = OvernightObservationSchedule::compile(
         date("2025-01-06"),

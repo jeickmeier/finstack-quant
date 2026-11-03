@@ -5,17 +5,17 @@
 //! pricing overrides, parse the as-of date and model key, and dispatch through
 //! the caller-selected registry or the shared standard registry.
 
-use super::{parse_model_key, ModelKey, STANDARD};
-use crate::instruments::envelope::{instrument_load_error, MAX_JSON_BYTES};
+use super::{ModelKey, STANDARD, parse_model_key};
+use crate::instruments::Instrument;
+use crate::instruments::envelope::{MAX_JSON_BYTES, instrument_load_error};
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use crate::instruments::pricing_overrides::MetricPricingOverrides;
-use crate::instruments::Instrument;
-use crate::metrics::{parse_key_rate_label, MetricId};
+use crate::metrics::{MetricId, parse_key_rate_label};
 use crate::results::ValuationResult;
-use finstack_quant_core::contract::{parse_json_value, LoadLimits};
+use finstack_quant_core::Error;
+use finstack_quant_core::contract::{LoadLimits, parse_json_value};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::Error;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -1255,16 +1255,16 @@ fn merge_metric_patch(
         ))
     })?;
     for (key, value) in patch {
-        if key == "bump_config" {
-            if let (Some(existing), Some(provided)) = (
+        if key == "bump_config"
+            && let (Some(existing), Some(provided)) = (
                 metric_pricing_overrides
                     .get_mut(&key)
                     .and_then(Value::as_object_mut),
                 value.as_object(),
-            ) {
-                existing.extend(provided.clone());
-                continue;
-            }
+            )
+        {
+            existing.extend(provided.clone());
+            continue;
         }
         metric_pricing_overrides.insert(key, value);
     }
@@ -1341,10 +1341,10 @@ mod tests {
         assert_eq!(at("inf"), ("inf".to_string(), None));
     }
 
-    fn bond_quote_set(
-    ) -> crate::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteSet {
-        use crate::instruments::fixed_income::bond::pricing::quote_conversions::compute_quotes;
+    fn bond_quote_set()
+    -> crate::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteSet {
         use crate::instruments::fixed_income::bond::Bond;
+        use crate::instruments::fixed_income::bond::pricing::quote_conversions::compute_quotes;
         use crate::instruments::{BondQuoteInput, PricingOptions};
         use finstack_quant_core::market_data::context::MarketContext;
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -1413,7 +1413,7 @@ mod tests {
     #[test]
     fn pool_report_field_units_list_every_numeric_field_in_struct_order() {
         use finstack_quant_valuations_structured_credit::structured_credit::{
-            pool_report, AssetPool, DealType, PoolAsset,
+            AssetPool, DealType, PoolAsset, pool_report,
         };
         let as_of = time::macros::date!(2025 - 01 - 01);
         let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::EUR);
@@ -1698,7 +1698,7 @@ mod tests {
     use crate::instruments::rates::swaption::Swaption;
     use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
     use crate::pricer::{
-        expect_inst, InstrumentType, Pricer, PricerKey, PricerRegistry, PricingError,
+        InstrumentType, Pricer, PricerKey, PricerRegistry, PricingError, expect_inst,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -1871,8 +1871,8 @@ mod tests {
     fn equity_option_json_with_negative_vol_override() -> String {
         let option = EquityOption::example().expect("option");
         let mut json = envelope_value(InstrumentJson::EquityOption(option));
-        json["instrument"]["spec"]["instrument_pricing_overrides"]["market_quotes"]
-            ["implied_volatility"] = Value::from(-0.20);
+        json["instrument"]["spec"]["instrument_pricing_overrides"]["market_quotes"]["implied_volatility"] =
+            Value::from(-0.20);
         serde_json::to_string(&json).expect("serialize")
     }
 
@@ -2005,9 +2005,10 @@ mod tests {
             serde_json::json!({"type": "fx_spot", "spec": fx_spot_spec_value()}),
         )
         .expect_err("tagged payload should be rejected");
-        assert!(err
-            .to_string()
-            .contains("constructor requires a bare spec object"));
+        assert!(
+            err.to_string()
+                .contains("constructor requires a bare spec object")
+        );
     }
 
     #[test]
@@ -2019,9 +2020,10 @@ mod tests {
         .expect("json");
         let err = validate_typed_instrument_json("fx_forward", &fx_spot)
             .expect_err("wrong envelope type should be rejected");
-        assert!(err
-            .to_string()
-            .contains("expected instrument type `fx_forward`, got `fx_spot`"));
+        assert!(
+            err.to_string()
+                .contains("expected instrument type `fx_forward`, got `fx_spot`")
+        );
     }
 
     #[test]
@@ -2038,9 +2040,10 @@ mod tests {
             parse_typed_instrument_json::<crate::instruments::fx::fx_forward::FxForward>(&fx_spot)
                 .expect_err("wrong envelope type should be rejected");
         assert!(matches!(err, Error::Validation(_)));
-        assert!(err
-            .to_string()
-            .contains("expected instrument type `fx_forward`, got `fx_spot`"));
+        assert!(
+            err.to_string()
+                .contains("expected instrument type `fx_forward`, got `fx_spot`")
+        );
     }
 
     #[test]
@@ -2190,19 +2193,23 @@ mod tests {
         let mut cds_option = CdsOption::example().expect("CDS option");
         cds_option.exercise_settlement_date = Some(cds_option.expiry - time::Duration::days(1));
         let json = envelope_json(InstrumentJson::CdsOption(cds_option));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("exercise settlement before expiry must fail")
-            .to_string()
-            .contains("on or after legal expiry"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("exercise settlement before expiry must fail")
+                .to_string()
+                .contains("on or after legal expiry")
+        );
 
         let mut convertible = ConvertibleBond::example().expect("convertible");
         convertible.conversion.ratio = None;
         convertible.conversion.price = None;
         let json = envelope_json(InstrumentJson::ConvertibleBond(convertible));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("missing conversion terms must fail")
-            .to_string()
-            .contains("conversion.ratio"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("missing conversion terms must fail")
+                .to_string()
+                .contains("conversion.ratio")
+        );
     }
 
     #[test]
@@ -2217,10 +2224,12 @@ mod tests {
                 },
             ]);
         let json = envelope_json(InstrumentJson::RevolvingCredit(facility));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("post-maturity draw must fail")
-            .to_string()
-            .contains("maturity"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("post-maturity draw must fail")
+                .to_string()
+                .contains("maturity")
+        );
     }
 
     #[test]
@@ -2229,18 +2238,22 @@ mod tests {
         future.contract_specs.convexity_adjustment = None;
         future.vol_surface_id = None;
         let json = envelope_json(InstrumentJson::InterestRateFuture(future));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("missing convexity source must fail")
-            .to_string()
-            .contains("convexity_adjustment"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("missing convexity source must fail")
+                .to_string()
+                .contains("convexity_adjustment")
+        );
 
         let mut cmo = AgencyCmo::example().expect("CMO");
         cmo.reference_tranche_id = "MISSING".to_string();
         let json = envelope_json(InstrumentJson::AgencyCmo(cmo));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("unknown reference tranche must fail")
-            .to_string()
-            .contains("reference tranche"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("unknown reference tranche must fail")
+                .to_string()
+                .contains("reference tranche")
+        );
     }
 
     #[test]
@@ -2248,10 +2261,12 @@ mod tests {
         let mut loan = TermLoan::example().expect("term loan");
         loan.notional_limit = Money::from((-1_i64, Currency::USD));
         let json = envelope_json(InstrumentJson::TermLoan(loan));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("negative notional must fail")
-            .to_string()
-            .contains("notional_limit"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("negative notional must fail")
+                .to_string()
+                .contains("notional_limit")
+        );
     }
 
     #[test]
@@ -2325,10 +2340,12 @@ mod tests {
             validate_instrument_json(&prepared, None).expect("valid"),
             prepared
         );
-        assert!(validate_instrument_json(&json, Some("{"))
-            .expect_err("bad options")
-            .to_string()
-            .contains("invalid metric_pricing_overrides JSON"));
+        assert!(
+            validate_instrument_json(&json, Some("{"))
+                .expect_err("bad options")
+                .to_string()
+                .contains("invalid metric_pricing_overrides JSON")
+        );
     }
 
     #[test]
@@ -2403,9 +2420,11 @@ mod tests {
             parse_boxed_instruments_from_json(&format!("[{json},{json}]")).expect("inventory");
         assert_eq!(inventory.len(), 2);
         assert_eq!(inventory[0].id(), "TEST-BOND");
-        assert!(parse_boxed_instruments_from_json("[]")
-            .expect("empty inventory")
-            .is_empty());
+        assert!(
+            parse_boxed_instruments_from_json("[]")
+                .expect("empty inventory")
+                .is_empty()
+        );
 
         let bare: Value = serde_json::from_str::<Value>(&json).expect("json")["instrument"].clone();
         let single = parse_boxed_instrument_from_json(&bare.to_string(), None)
@@ -2701,9 +2720,11 @@ mod tests {
         .expect("HVar should price when market history is supplied");
 
         assert!(result.measures.contains_key(MetricId::HVar.as_str()));
-        assert!(result
-            .measures
-            .contains_key(MetricId::ExpectedShortfall.as_str()));
+        assert!(
+            result
+                .measures
+                .contains_key(MetricId::ExpectedShortfall.as_str())
+        );
     }
 
     #[test]

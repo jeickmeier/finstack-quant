@@ -7,16 +7,16 @@ use super::pipeline::CompiledCashFlowPlan;
 use super::schedule::CashFlowSchedule;
 use super::specs::PrincipalEventSpec;
 use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
+use finstack_quant_core::InputError;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::decimal::f64_to_decimal;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 
 use super::compiler::{
-    build_fee_schedules, compute_coupon_schedules, CompiledSchedules, CouponProgramPiece,
-    FeeSchedules, FixedSchedule, FloatSchedule, PaymentProgramPiece,
+    CompiledSchedules, CouponProgramPiece, FeeSchedules, FixedSchedule, FloatSchedule,
+    PaymentProgramPiece, build_fee_schedules, compute_coupon_schedules,
 };
 use super::date_generation::CompiledPeriod;
 use super::specs::FeeSpec;
@@ -164,13 +164,13 @@ fn derive_amortization_setup(
     // Rate groups and fixed/float switches partition coupon windows, not amortization cadence.
     let mut payment_dates = finstack_quant_core::FxHashMap::default();
     for period in coupon_periods(fixed_schedules, float_schedules).map(|entry| &entry.period) {
-        if let Some(previous) = payment_dates.insert(period.accrual_end, period.payment_date) {
-            if previous != period.payment_date {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "ambiguous amortization payment dates for accrual boundary {}",
-                    period.accrual_end
-                )));
-            }
+        if let Some(previous) = payment_dates.insert(period.accrual_end, period.payment_date)
+            && previous != period.payment_date
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "ambiguous amortization payment dates for accrual boundary {}",
+                period.accrual_end
+            )));
         }
     }
     if payment_dates.is_empty()

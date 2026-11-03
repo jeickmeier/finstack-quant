@@ -4,7 +4,7 @@
 //! with consistent vol-point units and sensible first/second-order scaling.
 
 use finstack_quant_attribution::{
-    attribute_pnl, AttributionMethod, AttributionRequest, ExecutionPolicy, TaylorAttributionConfig,
+    AttributionMethod, AttributionRequest, ExecutionPolicy, TaylorAttributionConfig, attribute_pnl,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
@@ -14,10 +14,10 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::SettlementType;
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use std::sync::Arc;
 use time::macros::date;
 

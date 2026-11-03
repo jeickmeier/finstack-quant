@@ -7,7 +7,7 @@
 use super::capital_structure::PyWaterfallSpec;
 use super::registry::PyRegistry;
 use super::types::{PyFinancialModelSpec, PyForecastSpec, PyNodeSpec};
-use super::{extract_money_series, extract_scalar_series, extract_value_series, PERIOD_GRAMMAR};
+use super::{PERIOD_GRAMMAR, extract_money_series, extract_scalar_series, extract_value_series};
 use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;

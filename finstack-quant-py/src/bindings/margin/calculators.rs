@@ -3,7 +3,7 @@
 use super::types::{PyCsaSpec, PyImMethodology};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{
-    dict_to_dataframe, serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
+    ColumnSchema, dict_to_dataframe, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_core::currency::Currency;

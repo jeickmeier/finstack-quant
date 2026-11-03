@@ -6,13 +6,13 @@
 
 use std::sync::Arc;
 
+use crate::FxHashSet;
 use crate::contract::{
     ContractDescriptor, ContractError, Diagnostic, LoadLimits, LoadPhase, Severity,
     ValidationReport,
 };
 use crate::types::CurveId;
 use crate::wire::SchemaVersion;
-use crate::FxHashSet;
 
 use super::{CurveStorage, MarketContext};
 

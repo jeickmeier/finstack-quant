@@ -462,16 +462,10 @@ mod tests {
         assert!(RangeAccrualPayoff::new(vec![0.5, 0.25], 95.0, 105.0, 0.08, 100_000.0,).is_err());
 
         // past_in_range exceeds total_past_observations.
-        assert!(RangeAccrualPayoff::new_with_history(
-            vec![0.25],
-            95.0,
-            105.0,
-            0.08,
-            100_000.0,
-            3,
-            2,
-        )
-        .is_err());
+        assert!(
+            RangeAccrualPayoff::new_with_history(vec![0.25], 95.0, 105.0, 0.08, 100_000.0, 3, 2,)
+                .is_err()
+        );
     }
     #[test]
     fn equal_time_range_observations_keep_distinct_carry_and_counts() {

@@ -9,6 +9,7 @@
 #![allow(clippy::result_large_err)]
 
 use super::schema::{CalibrationEnvelope, CalibrationPlan};
+use crate::CalibrationReport;
 use crate::api::context_builder;
 use crate::api::errors::{EnvelopeError, StrictLoadDiagnostic};
 use crate::api::market_datum::MarketDatum;
@@ -20,7 +21,6 @@ use crate::quotes::MarketQuote;
 use crate::step_runtime;
 use crate::step_runtime::StepOutcome;
 use crate::validation::preflight_step;
-use crate::CalibrationReport;
 use finstack_quant_core::explain::{ExplanationTrace, TraceEntry};
 use finstack_quant_core::market_data::context::MarketContext;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -576,17 +576,16 @@ fn apply_batch_results(
     state: &mut ExecutionState,
     fail_on_bad_fit: bool,
 ) -> std::result::Result<(), ExecuteError> {
-    if fail_on_bad_fit {
-        if let Some((item, failing)) = batch
+    if fail_on_bad_fit
+        && let Some((item, failing)) = batch
             .iter()
             .zip(results.iter())
             .find(|(_, r)| !r.report.success)
-        {
-            return Err(ExecuteError::envelope(
-                ExecutionStage::Solver,
-                bad_fit_envelope_error(&item.step.id, &failing.report)?,
-            ));
-        }
+    {
+        return Err(ExecuteError::envelope(
+            ExecutionStage::Solver,
+            bad_fit_envelope_error(&item.step.id, &failing.report)?,
+        ));
     }
     for (item, result) in batch.into_iter().zip(results) {
         let StepOutcome {
@@ -881,12 +880,14 @@ mod tests {
             assert_eq!(actual, tolerance);
         }
         let mut state = ExecutionState::new();
-        assert!(state
-            .record_result(
-                "step",
-                CalibrationReport::new(BTreeMap::new(), 0, true, "no gate")
-            )
-            .is_err());
+        assert!(
+            state
+                .record_result(
+                    "step",
+                    CalibrationReport::new(BTreeMap::new(), 0, true, "no gate")
+                )
+                .is_err()
+        );
     }
 
     #[test]
@@ -942,10 +943,12 @@ mod tests {
             report.solver_method,
             Some(crate::SolverMethod::PlanExecution)
         );
-        assert!(report
-            .residuals
-            .keys()
-            .all(|key| key.ends_with(":tolerance_ratio")));
+        assert!(
+            report
+                .residuals
+                .keys()
+                .all(|key| key.ends_with(":tolerance_ratio"))
+        );
     }
 
     #[test]

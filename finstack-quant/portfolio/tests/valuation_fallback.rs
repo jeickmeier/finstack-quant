@@ -1,17 +1,17 @@
 //! Valuation fallback tests for portfolio.
 
 use crate::common::*;
+use finstack_quant_core::Error;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
-use finstack_quant_core::Error;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::valuation::{PortfolioValuationOptions, RequestedMetrics};
-use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::results::{FxValuationDetails, ValuationDetails, ValuationResult};
@@ -305,10 +305,12 @@ fn empty_metric_request_uses_the_pv_only_path() {
         position.risk_error
     );
     assert!(valuation.degraded_positions.is_empty());
-    assert!(position
-        .valuation_result
-        .as_ref()
-        .is_some_and(|result| result.measures.is_empty()));
+    assert!(
+        position
+            .valuation_result
+            .as_ref()
+            .is_some_and(|result| result.measures.is_empty())
+    );
 }
 
 #[test]

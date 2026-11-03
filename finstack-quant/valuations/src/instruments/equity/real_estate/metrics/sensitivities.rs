@@ -9,10 +9,10 @@
 //! `(PV(cap + h) − PV(cap − h)) / (2h) × 1bp` with `h = rate_bump_bp` from the
 //! resolved sensitivities config (1bp by default).
 
+use crate::instruments::Instrument;
 use crate::instruments::equity::real_estate::{
     LeveredRealEstateEquity, RealEstateAsset, RealEstateValuationMethod,
 };
-use crate::instruments::Instrument;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Error;

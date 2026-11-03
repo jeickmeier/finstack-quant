@@ -27,7 +27,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
@@ -106,10 +106,10 @@ impl PdeProblem1D for BarrierPde {
     }
 
     fn lower_boundary(&self, time: f64) -> BoundaryCondition {
-        if !self.barrier_is_upper {
-            if let Some(value) = self.barrier_boundary(time) {
-                return BoundaryCondition::Dirichlet(value);
-            }
+        if !self.barrier_is_upper
+            && let Some(value) = self.barrier_boundary(time)
+        {
+            return BoundaryCondition::Dirichlet(value);
         }
         if let Some(cash) = self.terminal_cash {
             BoundaryCondition::Dirichlet(cash * (-self.rate * (self.maturity - time)).exp())
@@ -121,10 +121,10 @@ impl PdeProblem1D for BarrierPde {
     }
 
     fn upper_boundary(&self, time: f64) -> BoundaryCondition {
-        if self.barrier_is_upper {
-            if let Some(value) = self.barrier_boundary(time) {
-                return BoundaryCondition::Dirichlet(value);
-            }
+        if self.barrier_is_upper
+            && let Some(value) = self.barrier_boundary(time)
+        {
+            return BoundaryCondition::Dirichlet(value);
         }
         if let Some(cash) = self.terminal_cash {
             BoundaryCondition::Dirichlet(cash * (-self.rate * (self.maturity - time)).exp())
@@ -795,7 +795,7 @@ mod tests {
     /// met by the Rannacher solve but breached by an oscillating CN solve.
     #[test]
     fn w01_rannacher_knock_out_matches_analytical_continuous() {
-        use finstack_quant_models::closed_form::{barrier_price, BarrierParams};
+        use finstack_quant_models::closed_form::{BarrierParams, barrier_price};
 
         let as_of = date(2024, 1, 1);
         let expiry = date(2025, 1, 1);
@@ -935,7 +935,7 @@ mod tests {
     /// the leading-order error so the parity is tight.
     #[test]
     fn w08_knock_in_parity_consistent_with_shared_grid() {
-        use finstack_quant_models::closed_form::{barrier_price, BarrierParams};
+        use finstack_quant_models::closed_form::{BarrierParams, barrier_price};
 
         let as_of = date(2024, 1, 1);
         let expiry = date(2025, 1, 1);

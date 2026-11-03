@@ -146,7 +146,7 @@ pub(crate) struct JsonCompositeTemplate {
 mod loader_tests {
     #![allow(clippy::expect_used, clippy::panic)]
 
-    use super::{load_embedded_documents, JsonTemplateDocument, EMBEDDED_TEMPLATE_JSONS};
+    use super::{EMBEDDED_TEMPLATE_JSONS, JsonTemplateDocument, load_embedded_documents};
     use crate::{OperationSpec, ScenarioSpec};
     use finstack_quant_core::currency::Currency;
 

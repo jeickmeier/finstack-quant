@@ -8,11 +8,11 @@
 use crate::utils::input::{js_currency, js_opt_string, js_string};
 use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use finstack_quant_valuations::market::conventions::ids::{
     CdsConventionKey, InflationSwapConventionId, IrFutureContractId, SwaptionConventionId,
     XccyConventionId,
 };
-use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use wasm_bindgen::prelude::*;
 
 fn registry() -> Result<&'static ConventionRegistry, JsValue> {

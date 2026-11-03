@@ -412,15 +412,10 @@ mod tests {
         let vol_fn = |_t: f64, _k: f64| 0.2;
         let bs_fn =
             |k: f64, v: f64, opt: OptionType| bs_price_unchecked(100.0, k, 0.0, 0.0, v, 1.0, opt);
-        assert!(carr_madan_forward_variance(
-            &[110.0, 120.0, 130.0],
-            100.0,
-            0.0,
-            1.0,
-            vol_fn,
-            bs_fn,
-        )
-        .is_none());
+        assert!(
+            carr_madan_forward_variance(&[110.0, 120.0, 130.0], 100.0, 0.0, 1.0, vol_fn, bs_fn,)
+                .is_none()
+        );
         assert!(
             carr_madan_forward_variance(&[70.0, 80.0, 90.0], 100.0, 0.0, 1.0, vol_fn, bs_fn,)
                 .is_none()

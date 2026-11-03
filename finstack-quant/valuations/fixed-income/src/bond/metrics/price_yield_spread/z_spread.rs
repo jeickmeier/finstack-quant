@@ -1,8 +1,8 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::bond::pricing::quote_conversions::{solve_kernel_spread, BondZSpreadPricingKernel};
-use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
+use crate::bond::pricing::quote_conversions::{BondZSpreadPricingKernel, solve_kernel_spread};
+use crate::bond::pricing::settlement::QuoteDateContext;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Z-spread solver tolerance on the spread axis (decimal, not bp).

@@ -4,10 +4,10 @@ use std::str::FromStr;
 
 use crate::bindings::macros::{typed_or_label, wire_methods};
 use finstack_quant_core::currency::Currency;
+use pyo3::IntoPyObjectExt;
 use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
-use pyo3::IntoPyObjectExt;
 use strum::IntoEnumIterator;
 
 /// Wrapper for [`Currency`] exposed to Python as `finstack_quant.core.currency.Currency`.

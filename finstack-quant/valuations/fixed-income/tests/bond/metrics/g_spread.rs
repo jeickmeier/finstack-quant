@@ -270,13 +270,14 @@ fn a_named_curve_is_a_dependency_with_no_dv01_of_its_own() {
         .insert(flat_curve("USD-OIS", 0.04))
         .insert(flat_curve("UST", 0.035));
     let bond = named(bullet(), "UST");
-    assert!(bond
-        .market_dependencies()
-        .expect("dependencies")
-        .curves
-        .discount_curves
-        .iter()
-        .any(|id| id.as_str() == "UST"));
+    assert!(
+        bond.market_dependencies()
+            .expect("dependencies")
+            .curves
+            .discount_curves
+            .iter()
+            .any(|id| id.as_str() == "UST")
+    );
     let bucketed = bond
         .price_with_metrics(
             &market,

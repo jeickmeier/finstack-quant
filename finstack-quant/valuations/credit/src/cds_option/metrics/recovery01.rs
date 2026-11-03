@@ -10,12 +10,12 @@
 //! ([`finstack_quant_valuations_core::metrics::sensitivities::recovery01`]).
 
 use crate::cds::metrics::market_doc_clause;
-use crate::cds_option::pricer::synthetic_underlying_cds;
 use crate::cds_option::CdsOption;
+use crate::cds_option::pricer::synthetic_underlying_cds;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::sensitivities::recovery01::{
-    market_with_recovery, recovery01_fd, RecoveryReplayTerms,
+    RecoveryReplayTerms, market_with_recovery, recovery01_fd,
 };
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

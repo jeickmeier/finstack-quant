@@ -9,7 +9,7 @@ use super::{HullWhiteCalibrationParams, SwaptionSchedule};
 use finstack_quant_core::math::integration::gauss_legendre_integrate_adaptive;
 use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_models::rates::hull_white::{hw1f_delayed_coupon_adjustment, hw_b};
+use finstack_quant_models::rates::hull_white::{hw_b, hw1f_delayed_coupon_adjustment};
 
 struct GaussianTerm {
     sign: f64,

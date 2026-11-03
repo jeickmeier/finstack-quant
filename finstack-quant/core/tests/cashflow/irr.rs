@@ -13,9 +13,9 @@
 //! - Hull - *Options, Futures, and Other Derivatives* (10th ed), Chapter 4
 //! - Microsoft Excel XIRR function specification
 
+use finstack_quant_core::Error;
 use finstack_quant_core::cashflow::{irr, xirr};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-use finstack_quant_core::Error;
 use time::Month;
 
 // Constants and Helpers

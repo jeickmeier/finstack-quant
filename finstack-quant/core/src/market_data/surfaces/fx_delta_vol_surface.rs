@@ -231,15 +231,15 @@ impl FxDeltaVolSurface {
         if atm_vols.len() != n || rr_25d.len() != n || bf_25d.len() != n {
             return Err(InputError::DimensionMismatch.into());
         }
-        if let Some(rr) = rr_10d {
-            if rr.len() != n {
-                return Err(InputError::DimensionMismatch.into());
-            }
+        if let Some(rr) = rr_10d
+            && rr.len() != n
+        {
+            return Err(InputError::DimensionMismatch.into());
         }
-        if let Some(bf) = bf_10d {
-            if bf.len() != n {
-                return Err(InputError::DimensionMismatch.into());
-            }
+        if let Some(bf) = bf_10d
+            && bf.len() != n
+        {
+            return Err(InputError::DimensionMismatch.into());
         }
 
         // Expiries: positive, finite, strictly increasing

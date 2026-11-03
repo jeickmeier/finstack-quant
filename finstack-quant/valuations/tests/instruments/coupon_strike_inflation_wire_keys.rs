@@ -21,8 +21,8 @@
 
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use finstack_quant_valuations::instruments::PricingOptions;
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
 use serde_json::Value;
 use std::path::PathBuf;
@@ -128,14 +128,14 @@ fn contractual_rate_reference(
     as_of: finstack_quant_core::dates::Date,
 ) -> f64 {
     use finstack_quant_cashflows::builder::RollRule;
-    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
     use finstack_quant_core::dates::{DayCount, DayCountContext};
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::types::IndexId;
     use finstack_quant_models::closed_form::black_call;
+    use finstack_quant_valuations::instruments::PayReceive;
     use finstack_quant_valuations::instruments::rates::cap_floor::CapFloor;
     use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
-    use finstack_quant_valuations::instruments::PayReceive;
     use finstack_quant_valuations::market::conventions::ConventionRegistry;
     use rust_decimal::prelude::ToPrimitive;
 

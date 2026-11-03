@@ -349,7 +349,12 @@ impl PyBond {
             self.inner.issue_date,
             self.inner.maturity,
             self.inner.discount_curve_id.as_str(),
-            opt_repr(self.inner.credit_curve_id.as_ref().map(|c| format!("{:?}", c.as_str()))),
+            opt_repr(
+                self.inner
+                    .credit_curve_id
+                    .as_ref()
+                    .map(|c| format!("{:?}", c.as_str()))
+            ),
         )
     }
 

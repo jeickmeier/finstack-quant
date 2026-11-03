@@ -757,13 +757,13 @@ impl YoYInflationSwap {
         as_of: Date,
         date: Date,
     ) -> finstack_quant_core::Result<f64> {
-        if date == self.start_date {
-            if let Some(base) = self.base_cpi {
-                if !base.is_finite() || base <= 0.0 {
-                    return Err(finstack_quant_core::InputError::NonPositiveValue.into());
-                }
-                return Ok(base);
+        if date == self.start_date
+            && let Some(base) = self.base_cpi
+        {
+            if !base.is_finite() || base <= 0.0 {
+                return Err(finstack_quant_core::InputError::NonPositiveValue.into());
             }
+            return Ok(base);
         }
         let interpolation = self
             .interpolation
@@ -1374,10 +1374,12 @@ mod tests {
         );
         assert_eq!(schedule.get_flows()[0].kind, CFKind::Fixed);
         assert_eq!(schedule.get_flows()[1].kind, CFKind::InflationCoupon);
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .all(|flow| flow.accrual.is_some()));
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .all(|flow| flow.accrual.is_some())
+        );
     }
 
     /// YoY `npv_raw` must discount with DF(as_of → pay) = DF(pay)/DF(as_of)
@@ -1574,9 +1576,11 @@ mod tests {
                 .count(),
             2
         );
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .all(|flow| flow.accrual.is_some()));
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .all(|flow| flow.accrual.is_some())
+        );
     }
 }

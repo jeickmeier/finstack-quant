@@ -21,7 +21,7 @@ pub use annuity::{
 pub use compute::compute_quotes;
 pub use spread_price::{price_from_dm, price_from_oas, price_from_z_spread};
 pub use types::{BondQuoteSet, YieldCompounding};
-pub use workout_ladder::{bond_workout_ladder, BondWorkoutLadder, BondWorkoutRow, WorkoutExitKind};
+pub use workout_ladder::{BondWorkoutLadder, BondWorkoutRow, WorkoutExitKind, bond_workout_ladder};
 pub use yield_price::{
     df_from_yield, price_from_ytm, price_from_ytm_compounded_params, price_from_ytw,
 };
@@ -31,13 +31,13 @@ pub(crate) use annuity::{
 };
 pub(crate) use compute::{clear_price_driving_overrides, settlement_dirty_from_quote_overrides};
 pub(crate) use spread_price::{
-    quoted_workout_path, solve_kernel_spread, BondZSpreadPricingKernel, WorkoutPath,
+    BondZSpreadPricingKernel, WorkoutPath, quoted_workout_path, solve_kernel_spread,
 };
 pub(crate) use workout_ladder::workout_dirty_target;
 pub(crate) use yield_price::{
-    act365l_flow_times, bond_flow_times, clean_price_from_japanese_simple_yield,
+    RedemptionBasis, act365l_flow_times, bond_flow_times, clean_price_from_japanese_simple_yield,
     enumerate_exit_paths, exercise_redemption_amount, flow_times, japanese_simple_yield,
-    price_from_ytm_timed, solve_ytw_from_flows, RedemptionBasis,
+    price_from_ytm_timed, solve_ytw_from_flows,
 };
 
 /// One candidate early-exit for yield-to-worst enumeration.

@@ -175,30 +175,34 @@ fn from_balances_discards_declared_points_and_missing_points_are_filled() {
     ])
     .expect("mixed");
     assert_eq!(points(&mixed)[1], ("B".to_string(), 10.0, 40.0));
-    assert!(TrancheStructure::new(vec![
-        declared(
-            "A",
-            45.0,
-            100.0,
-            TrancheSeniority::Senior,
-            60_000_000.0,
-            0.05
-        ),
-        note("B", TrancheSeniority::Mezzanine, 30_000_000.0, 0.07),
-        note("E", TrancheSeniority::Equity, 10_000_000.0, 0.0),
-    ])
-    .is_err());
+    assert!(
+        TrancheStructure::new(vec![
+            declared(
+                "A",
+                45.0,
+                100.0,
+                TrancheSeniority::Senior,
+                60_000_000.0,
+                0.05
+            ),
+            note("B", TrancheSeniority::Mezzanine, 30_000_000.0, 0.07),
+            note("E", TrancheSeniority::Equity, 10_000_000.0, 0.0),
+        ])
+        .is_err()
+    );
 
     // A builder with only one of the two points is rejected.
-    assert!(Tranche::builder()
-        .id("X")
-        .attach_detach(0.0, 10.0)
-        .seniority(TrancheSeniority::Equity)
-        .balance(usd(1.0))
-        .coupon(RateSpec::Fixed { rate: 0.0 })
-        .maturity(maturity())
-        .build()
-        .is_ok());
+    assert!(
+        Tranche::builder()
+            .id("X")
+            .attach_detach(0.0, 10.0)
+            .seniority(TrancheSeniority::Equity)
+            .balance(usd(1.0))
+            .coupon(RateSpec::Fixed { rate: 0.0 })
+            .maturity(maturity())
+            .build()
+            .is_ok()
+    );
     let alone = Tranche::builder()
         .id("X")
         .seniority(TrancheSeniority::Equity)

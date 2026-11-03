@@ -1,12 +1,12 @@
 //! Economic regressions for compiled coupon and principal programs.
 
-use finstack_quant_cashflows::{builder::CashFlowSchedule, CashflowScheduleBuildSpec};
+use finstack_quant_cashflows::{CashflowScheduleBuildSpec, builder::CashFlowSchedule};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::{
-    dates::{parse_iso_date, DayCount},
+    dates::{DayCount, parse_iso_date},
     market_data::{context::MarketContext, term_structures::ForwardCurve},
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn date(value: &str) -> finstack_quant_core::dates::Date {
     parse_iso_date(value).expect("valid date")
@@ -82,9 +82,11 @@ fn fixed_coupon_decimal_overflow_returns_an_error() {
         .expect("representable principal and decimal rate")
         .build(None)
         .expect_err("coupon product exceeds the decimal amount range");
-    assert!(error
-        .to_string()
-        .contains("fixed coupon amount exceeds Decimal range"));
+    assert!(
+        error
+            .to_string()
+            .contains("fixed coupon amount exceeds Decimal range")
+    );
 }
 
 #[test]
@@ -237,9 +239,11 @@ fn principal_events_after_adjusted_terminal_boundary_are_rejected() {
             .expect("valid spec")
             .build(None)
             .expect_err("event after final economic boundary");
-        assert!(error
-            .to_string()
-            .contains("effective terminal accrual date 2025-03-28"));
+        assert!(
+            error
+                .to_string()
+                .contains("effective terminal accrual date 2025-03-28")
+        );
         value["coupon_program"][0]["spec"]["adjust_accrual_dates"] = json!(false);
         let schedule = build(value, None);
         close(
@@ -304,14 +308,18 @@ fn linear_between_full_payoff_includes_final_pik_and_principal_movements() {
         .expect("full payoff boundary")
         .1;
     close(remaining.amount(), 0.0);
-    assert!(!schedule
-        .get_flows()
-        .iter()
-        .any(|flow| flow.kind == CFKind::Pik && flow.date > date("2025-07-15")));
-    assert!(!schedule
-        .get_flows()
-        .iter()
-        .any(|flow| flow.kind == CFKind::Notional && flow.amount.amount() > 0.0));
+    assert!(
+        !schedule
+            .get_flows()
+            .iter()
+            .any(|flow| flow.kind == CFKind::Pik && flow.date > date("2025-07-15"))
+    );
+    assert!(
+        !schedule
+            .get_flows()
+            .iter()
+            .any(|flow| flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+    );
     let principal_paid: f64 = schedule
         .get_flows()
         .iter()
@@ -527,15 +535,19 @@ fn bounded_split_pik_capitalizes_net_coupon_on_one_contractual_boundary() {
             .map(|flow| flow.amount.amount())
             .sum();
         close(cash + pik, expected_interest);
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .filter(|flow| flow.kind == CFKind::Pik)
-            .all(|flow| flow.principal_date == Some(date("2025-01-08"))));
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .any(|flow| flow.kind == CFKind::Pik && flow.amount.amount() < 0.0));
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .filter(|flow| flow.kind == CFKind::Pik)
+                .all(|flow| flow.principal_date == Some(date("2025-01-08")))
+        );
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .any(|flow| flow.kind == CFKind::Pik && flow.amount.amount() < 0.0)
+        );
         let repayment = schedule
             .get_flows()
             .iter()
@@ -581,9 +593,11 @@ fn overnight_zero_daycount_segment_keeps_replay_clock_and_emits_zero() {
         .expect("zero-daycount segment");
     close(zero.accrual_factor, 0.0);
     close(zero.amount.amount(), 0.0);
-    assert!(schedule
-        .coupons()
-        .all(|flow| flow.amount.amount().is_finite()));
+    assert!(
+        schedule
+            .coupons()
+            .all(|flow| flow.amount.amount().is_finite())
+    );
 }
 
 #[test]

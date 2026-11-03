@@ -20,7 +20,7 @@ use finstack_quant_statements::schema::STATEMENTS_SCHEMA_BASE;
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::NodeValueType;
 use indexmap::IndexMap;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use time::Month;
 
 const CANONICAL_DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";

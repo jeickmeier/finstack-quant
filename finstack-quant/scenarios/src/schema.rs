@@ -4,8 +4,7 @@ use crate::{ApplicationEnvelope, HorizonResult, HorizonSummary, ScenarioSpec, Te
 /// Canonical title of the published scenario envelope schema.
 pub const SCENARIO_SCHEMA_TITLE: &str = "Finstack Quant Scenario Specification";
 /// Canonical description of the published scenario envelope schema.
-pub const SCENARIO_SCHEMA_DESCRIPTION: &str =
-    "Versioned scenario specification with typed market, instrument, statement, and time-roll operations.";
+pub const SCENARIO_SCHEMA_DESCRIPTION: &str = "Versioned scenario specification with typed market, instrument, statement, and time-roll operations.";
 
 /// The canonical single-operation scenario every scenario example describes:
 /// a 50 bp parallel shock to the USD discount curve.

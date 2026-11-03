@@ -2,7 +2,7 @@
 
 use time::Date;
 
-use crate::dates::{calendar_by_id_strict, canonical_calendar_id, HolidayCalendar, Tenor};
+use crate::dates::{HolidayCalendar, Tenor, calendar_by_id_strict, canonical_calendar_id};
 
 /// Optional context for day-count year-fraction calculations.
 ///
@@ -215,7 +215,7 @@ impl<'a> TryFrom<DayCountContext<'a>> for DayCountContextState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{calendar_by_id_strict, HolidayCalendar};
+    use crate::dates::{HolidayCalendar, calendar_by_id_strict};
     use time::macros::date;
 
     #[test]
@@ -273,18 +273,21 @@ mod tests {
             false,
         )
         .expect_err("inverted");
-        assert!(err
-            .to_string()
-            .contains("coupon period start must be before end"));
+        assert!(
+            err.to_string()
+                .contains("coupon period start must be before end")
+        );
         assert!(err.to_string().contains("2025-07-01"));
-        assert!(DayCountContextState::try_new(
-            None,
-            None,
-            None,
-            Some((date!(2025 - 01 - 01), date!(2025 - 07 - 01))),
-            false,
-        )
-        .is_ok());
+        assert!(
+            DayCountContextState::try_new(
+                None,
+                None,
+                None,
+                Some((date!(2025 - 01 - 01), date!(2025 - 07 - 01))),
+                false,
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -314,9 +317,10 @@ mod tests {
         period.swap(0, 1);
         let err = serde_json::from_value::<DayCountContextState>(json.clone())
             .expect_err("inverted coupon period is rejected at load time");
-        assert!(err
-            .to_string()
-            .contains("coupon period start must be before end"));
+        assert!(
+            err.to_string()
+                .contains("coupon period start must be before end")
+        );
         json["coupon_period"] = serde_json::Value::Null;
         json["bus_basis"] = serde_json::json!(0);
         assert!(serde_json::from_value::<DayCountContextState>(json).is_err());

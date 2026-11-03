@@ -4,10 +4,10 @@ use crate::utils::input::js_opt_uint;
 
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_portfolio::{
-    materialization::InstrumentArtifactCache, Portfolio as RustPortfolio,
+    Portfolio as RustPortfolio, materialization::InstrumentArtifactCache,
 };
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 
 use super::JsPortfolio;
 use crate::utils::{materialization_to_js_error, to_js_value};

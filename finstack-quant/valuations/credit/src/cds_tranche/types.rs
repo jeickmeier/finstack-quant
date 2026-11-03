@@ -3,7 +3,7 @@
 use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::dates::{
-    is_cds_date, BusinessDayConvention, Date, DayCount, StubKind, Tenor,
+    BusinessDayConvention, Date, DayCount, StubKind, Tenor, is_cds_date,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -194,14 +194,14 @@ impl CdsTranche {
             )));
         }
         let currency = self.notional.currency();
-        if let Some((_, upfront)) = self.upfront {
-            if upfront.currency() != currency {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CDS tranche upfront currency {} must match notional currency {}",
-                    upfront.currency(),
-                    currency
-                )));
-            }
+        if let Some((_, upfront)) = self.upfront
+            && upfront.currency() != currency
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS tranche upfront currency {} must match notional currency {}",
+                upfront.currency(),
+                currency
+            )));
         }
         if self.roll_rule == RollRule::Imm {
             return Err(finstack_quant_core::Error::Validation(

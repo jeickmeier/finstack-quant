@@ -156,19 +156,19 @@ impl CardPortfolioSpec {
                 self.portfolio_yield
             )));
         }
-        if let Some(seller) = self.seller_interest {
-            if !seller.amount().is_finite() || seller.amount() < 0.0 {
-                return Err(invalid(format!(
-                    "card seller_interest ({seller}) must be finite and non-negative"
-                )));
-            }
+        if let Some(seller) = self.seller_interest
+            && (!seller.amount().is_finite() || seller.amount() < 0.0)
+        {
+            return Err(invalid(format!(
+                "card seller_interest ({seller}) must be finite and non-negative"
+            )));
         }
-        if let Some(pct) = self.fixed_allocation_decimal {
-            if !pct.is_finite() || pct <= 0.0 || pct > 1.0 {
-                return Err(invalid(format!(
-                    "card fixed_allocation_decimal ({pct}) must be a decimal in (0, 1]"
-                )));
-            }
+        if let Some(pct) = self.fixed_allocation_decimal
+            && (!pct.is_finite() || pct <= 0.0 || pct > 1.0)
+        {
+            return Err(invalid(format!(
+                "card fixed_allocation_decimal ({pct}) must be a decimal in (0, 1]"
+            )));
         }
         Ok(())
     }

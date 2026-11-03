@@ -6,7 +6,7 @@
 //! - Hazard curve operations
 //! - Curve building and bumping
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve, HazardCurve};
 use finstack_quant_core::math::interp::InterpStyle;

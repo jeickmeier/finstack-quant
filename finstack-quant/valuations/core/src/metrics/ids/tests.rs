@@ -123,9 +123,11 @@ fn test_carry_decomposition_metrics_are_standard_and_parseable() {
         "roll_down",
         "funding_cost",
     ] {
-        assert!(MetricId::get_standard()
-            .iter()
-            .any(|metric| metric.as_str() == name));
+        assert!(
+            MetricId::get_standard()
+                .iter()
+                .any(|metric| metric.as_str() == name)
+        );
 
         let parsed = MetricId::parse_strict(name).unwrap();
         assert_eq!(parsed.as_str(), name);
@@ -354,9 +356,11 @@ fn recovery01_key_and_unit() {
         MetricId::Recovery01
     );
     assert_eq!(MetricId::Recovery01.unit(), MetricUnit::Currency);
-    assert!(MetricGroup::Credit
-        .metrics()
-        .contains(&MetricId::Recovery01));
+    assert!(
+        MetricGroup::Credit
+            .metrics()
+            .contains(&MetricId::Recovery01)
+    );
 }
 
 #[test]
@@ -417,9 +421,11 @@ fn expected_exercise_time_is_a_standard_rates_metric_in_years() {
         MetricId::ExpectedExerciseTime
     );
     assert_eq!(MetricId::ExpectedExerciseTime.unit(), MetricUnit::Years);
-    assert!(MetricGroup::Rates
-        .metrics()
-        .contains(&MetricId::ExpectedExerciseTime));
+    assert!(
+        MetricGroup::Rates
+            .metrics()
+            .contains(&MetricId::ExpectedExerciseTime)
+    );
 }
 
 #[test]

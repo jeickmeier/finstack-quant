@@ -10,20 +10,20 @@ use finstack_quant_valuations::instruments::rates::cap_floor::RateOptionType;
 
 use super::shifts::*;
 use super::*;
+use finstack_quant_core::Result;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::diff::{
-    measure_credit_curve_shift, measure_inflation_curve_shift, measure_inflation_index_shift,
-    TenorSamplingMethod,
+    TenorSamplingMethod, measure_credit_curve_shift, measure_inflation_curve_shift,
+    measure_inflation_index_shift,
 };
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::results::ValuationResult;
@@ -799,9 +799,9 @@ fn exact_credit_recipe_curve(
     base: Date,
     quotes: &[(Date, &str, f64)],
 ) -> finstack_quant_core::market_data::term_structures::HazardCurve {
+    use finstack_quant_calibration::CalibrationMethod;
     use finstack_quant_calibration::api::schema::HazardCurveParams;
     use finstack_quant_calibration::quotes::{CdsQuote, Pillar, QuoteId};
-    use finstack_quant_calibration::CalibrationMethod;
     use finstack_quant_core::dates::DayCountContext;
     use finstack_quant_core::market_data::term_structures::{
         HazardCalibrationInput, HazardCalibrationRecipe, HazardCurve, ParInterp, Seniority,
@@ -1142,8 +1142,8 @@ fn hw1f_cap_surface_shock_does_not_affect_explicit_parameter_pricing() {
     };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations::instruments::rates::cap_floor::{CapFloor, CapFloorVolType};
     use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::instruments::rates::cap_floor::{CapFloor, CapFloorVolType};
     use finstack_quant_valuations::pricer::ModelKey;
 
     let as_of_t0 = date!(2024 - 01 - 01);

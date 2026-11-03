@@ -4,16 +4,16 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_margin::schema::MarginEnvelope;
 use finstack_quant_margin::schema::{
-    generated_margin_schema, MARGIN_SCHEMA_BASE, MARGIN_SCHEMA_DESCRIPTION, MARGIN_SCHEMA_FILENAME,
-    MARGIN_SCHEMA_TITLE,
+    MARGIN_SCHEMA_BASE, MARGIN_SCHEMA_DESCRIPTION, MARGIN_SCHEMA_FILENAME, MARGIN_SCHEMA_TITLE,
+    generated_margin_schema,
 };
 use finstack_quant_margin::types::{
     CollateralAssetClass, CollateralEligibility, CsaSpec, EligibleCollateralSchedule, ImParameters,
     MarginCall, MarginCallTiming, MaturityConstraints, OtcMarginSpec,
 };
-use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
 use std::fmt::Debug;
 use time::macros::date;
 
@@ -475,11 +475,11 @@ fn margin_schema_and_serde_reject_out_of_range_collateral_ratios() {
     excessive_fx_addon["csa_spec"]["eligible_collateral"]["eligible"][0]["fx_haircut_addon"] =
         json!(1.01);
     let mut negative_concentration = csa_fixture();
-    negative_concentration["csa_spec"]["eligible_collateral"]["eligible"][0]
-        ["concentration_limit"] = json!(-0.01);
+    negative_concentration["csa_spec"]["eligible_collateral"]["eligible"][0]["concentration_limit"] =
+        json!(-0.01);
     let mut excessive_concentration = csa_fixture();
-    excessive_concentration["csa_spec"]["eligible_collateral"]["eligible"][0]
-        ["concentration_limit"] = json!(1.01);
+    excessive_concentration["csa_spec"]["eligible_collateral"]["eligible"][0]["concentration_limit"] =
+        json!(1.01);
     let mut negative_default_haircut = csa_fixture();
     negative_default_haircut["csa_spec"]["eligible_collateral"]["default_haircut"] = json!(-0.01);
     let mut excessive_default_haircut = csa_fixture();
@@ -528,11 +528,11 @@ fn margin_schema_and_serde_reject_out_of_range_collateral_ratios() {
 fn margin_schema_and_serde_reject_negative_maturity_years_and_late_notification_hour() {
     let schema = margin_schema();
     let mut negative_minimum_maturity = csa_fixture();
-    negative_minimum_maturity["csa_spec"]["eligible_collateral"]["eligible"][0]
-        ["maturity_constraints"] = json!({"min_remaining_years": -0.01});
+    negative_minimum_maturity["csa_spec"]["eligible_collateral"]["eligible"][0]["maturity_constraints"] =
+        json!({"min_remaining_years": -0.01});
     let mut negative_maximum_maturity = csa_fixture();
-    negative_maximum_maturity["csa_spec"]["eligible_collateral"]["eligible"][0]
-        ["maturity_constraints"] = json!({"max_remaining_years": -0.01});
+    negative_maximum_maturity["csa_spec"]["eligible_collateral"]["eligible"][0]["maturity_constraints"] =
+        json!({"max_remaining_years": -0.01});
     let mut invalid_notification_hour = csa_fixture();
     invalid_notification_hour["csa_spec"]["call_timing"]["notification_deadline_hours"] = json!(24);
 

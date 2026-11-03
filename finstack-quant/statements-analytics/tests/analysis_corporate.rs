@@ -7,11 +7,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::checks::builtins::NonFiniteCheck;
 use finstack_quant_statements::checks::CheckSuite;
+use finstack_quant_statements::checks::builtins::NonFiniteCheck;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::AmountOrScalar;
-use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
+use finstack_quant_statements_analytics::analysis::{DcfOptions, evaluate_dcf};
 use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 use time::Month;
 

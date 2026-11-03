@@ -7,8 +7,8 @@
 use crate::utils::input::{js_bool, js_epoch_days, js_int, js_string, js_uint};
 use crate::utils::to_js_err;
 use finstack_quant_core::dates::{
-    self as rust_dates, days_since_epoch, Date, SifmaSettlementClass, TenorUnit,
-    Thirty360Convention,
+    self as rust_dates, Date, SifmaSettlementClass, TenorUnit, Thirty360Convention,
+    days_since_epoch,
 };
 use time::Month;
 use wasm_bindgen::prelude::*;

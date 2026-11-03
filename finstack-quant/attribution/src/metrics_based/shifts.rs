@@ -1,11 +1,11 @@
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::diff::{
-    measure_discount_curve_shift, measure_inflation_index_shift, TenorSamplingMethod,
+    TenorSamplingMethod, measure_discount_curve_shift, measure_inflation_index_shift,
 };
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations::metrics::{parse_key_rate_label, MetricId};
+use finstack_quant_valuations::metrics::{MetricId, parse_key_rate_label};
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
 
 /// Extract every supplied key-rate coordinate for the declared curves.
@@ -123,7 +123,8 @@ pub(crate) fn extract_credit_keyrates(
             if supplied.len() != replay_buckets.len() {
                 return Err(Error::Validation(format!(
                     "bucketed_cs01 for '{curve_id}' has {} buckets but the replay contract requires {}",
-                    supplied.len(), replay_buckets.len()
+                    supplied.len(),
+                    replay_buckets.len()
                 )));
             }
             let closing_quotes = closing_buckets

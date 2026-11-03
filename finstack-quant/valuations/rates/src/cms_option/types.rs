@@ -8,8 +8,8 @@ use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::impl_instrument_base;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 
 /// CMS option instrument (cap/floor on CMS rates).
 #[derive(

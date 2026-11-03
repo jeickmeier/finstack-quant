@@ -17,24 +17,24 @@
 //! ([`NamePeriod`]) — a period default probability, a recovery rate and, for
 //! revolvers with simulated utilization, the end-of-period utilization.
 
-use super::exercise::{worst_call_period, ExerciseTerms, ExerciseWindow, RateView};
+use super::exercise::{ExerciseTerms, ExerciseWindow, RateView, worst_call_period};
 use super::reserve::{fund_collateral_draws, replenish_reserve_from_repayments};
 use super::*;
 use crate::structured_credit::types::{
     CallExercisePolicy, CollateralInstrument, InstrumentCollateral, PutExercisePolicy,
 };
+use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{CashFlowSchedule, FloatingRateParams};
-use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_models::monte_carlo::process::cir::CirProcess;
 use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
 use finstack_quant_valuations_fixed_income::revolving_credit::{
-    build_credit_spread_params, CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit,
-    StochasticUtilizationSpec, UtilizationProcess, DEFAULT_CREDIT_SPREAD_IMPLIED_VOL,
-    DEFAULT_UTIL_CREDIT_CORR,
+    CreditSpreadProcessSpec, DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR,
+    DrawRepaySpec, McConfig, RevolvingCredit, StochasticUtilizationSpec, UtilizationProcess,
+    build_credit_spread_params,
 };
 use rust_decimal::prelude::ToPrimitive;
 
@@ -416,10 +416,11 @@ impl InstrumentSchedule {
             if let Some(rate) = self.periods.get(k + offset).and_then(recorded) {
                 return rate;
             }
-            if offset > 0 && offset <= k {
-                if let Some(rate) = self.periods.get(k - offset).and_then(recorded) {
-                    return rate;
-                }
+            if offset > 0
+                && offset <= k
+                && let Some(rate) = self.periods.get(k - offset).and_then(recorded)
+            {
+                return rate;
             }
         }
         match self.revolver.as_ref().map(|r| r.margin_at(k)) {
@@ -811,20 +812,21 @@ pub(super) fn run_period(
 
         // Loan-equivalent exposure: the defaulting fraction draws part of its
         // undrawn commitment, funded through the reserve and lost at once.
-        if let Some(terms) = &schedule.revolver {
-            if (terms.leq > 0.0 || terms.lc_exposure_at(k) > 0.0) && pd > 0.0 {
-                let undrawn = (terms.commitment_at(k) * scale_bop
-                    - terms.lc_outstanding_at(k) * scale_bop
-                    - balance)
-                    .max(0.0);
-                let leq_draw = (undrawn * terms.leq + terms.lc_exposure_at(k) * scale_bop) * pd;
-                if leq_draw > 0.0 {
-                    requests.push(DrawRequest {
-                        index: i,
-                        amount: leq_draw,
-                        destination: DrawUse::LossAtDefault { recovery_rate },
-                    });
-                }
+        if let Some(terms) = &schedule.revolver
+            && (terms.leq > 0.0 || terms.lc_exposure_at(k) > 0.0)
+            && pd > 0.0
+        {
+            let undrawn = (terms.commitment_at(k) * scale_bop
+                - terms.lc_outstanding_at(k) * scale_bop
+                - balance)
+                .max(0.0);
+            let leq_draw = (undrawn * terms.leq + terms.lc_exposure_at(k) * scale_bop) * pd;
+            if leq_draw > 0.0 {
+                requests.push(DrawRequest {
+                    index: i,
+                    amount: leq_draw,
+                    destination: DrawUse::LossAtDefault { recovery_rate },
+                });
             }
         }
 
@@ -869,31 +871,30 @@ pub(super) fn run_period(
 
         // Call or put exercise on whatever remains.
         let mut redeemed = 0.0;
-        if remaining > 0.0 {
-            if let Some(redemption) =
+        if remaining > 0.0
+            && let Some(redemption) =
                 schedule
                     .exercise
                     .evaluate(k, prev_date, pay_date, model.rate_view)?
-            {
-                let par = remaining;
-                let cash = par * redemption.price_pct.min(100.0) / 100.0;
-                let premium = par * (redemption.price_pct - 100.0).max(0.0) / 100.0;
-                total_premium += premium;
-                let discount_loss = (par - cash).max(0.0);
-                if discount_loss > 0.0 {
-                    total_default += discount_loss;
-                    let immediate_date = pay_date
-                        .add_months(-i32::try_from(state.recovery_lag_months).unwrap_or(0))?;
-                    flows.workout_claims.push((
-                        immediate_date,
-                        Money::from((0_i64, ccy)),
-                        Money::new(discount_loss, ccy)?,
-                    ));
-                }
-                redeemed = cash;
-                remaining = 0.0;
-                name.retired = true;
+        {
+            let par = remaining;
+            let cash = par * redemption.price_pct.min(100.0) / 100.0;
+            let premium = par * (redemption.price_pct - 100.0).max(0.0) / 100.0;
+            total_premium += premium;
+            let discount_loss = (par - cash).max(0.0);
+            if discount_loss > 0.0 {
+                total_default += discount_loss;
+                let immediate_date =
+                    pay_date.add_months(-i32::try_from(state.recovery_lag_months).unwrap_or(0))?;
+                flows.workout_claims.push((
+                    immediate_date,
+                    Money::from((0_i64, ccy)),
+                    Money::new(discount_loss, ccy)?,
+                ));
             }
+            redeemed = cash;
+            remaining = 0.0;
+            name.retired = true;
         }
         // A simulated revolver retires at its maturity period.
         if simulated.is_some() && pay_date >= schedule.maturity {

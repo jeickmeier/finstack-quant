@@ -11,8 +11,8 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CardPortfolioSpec, ExcessSpreadSpec, IncentiveFeeSpec, ReinvestmentCriteria,
     ShiftingInterestStep, StructuredCredit, TargetOcSpec,
 };
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 /// Rename the first object key `from` to `to` anywhere in `value`.

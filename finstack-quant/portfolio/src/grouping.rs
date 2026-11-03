@@ -8,9 +8,9 @@
 //! the caller: Python consumers get it from `pandas.DataFrame.groupby` over the
 //! position DataFrame, which is more flexible than any fixed Rust helper.
 
+use crate::Result;
 use crate::book::{Book, BookId};
 use crate::valuation::PortfolioValuation;
-use crate::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{FxHashMap, FxHashSet};

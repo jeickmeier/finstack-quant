@@ -3,8 +3,8 @@
 use time::{Date, Month};
 
 use super::DayCountContext;
-use crate::dates::tenor::TenorUnit;
 use crate::InputError;
+use crate::dates::tenor::TenorUnit;
 
 // ACT/365L helper
 /// Calculate year fraction for Act/365L convention per ICMA Rule 251.1(i)(c).
@@ -58,12 +58,12 @@ pub(super) fn year_fraction_act_365l(
 fn count_feb_29_in_interval(start: Date, end: Date) -> i64 {
     let mut leap_days: i64 = 0;
     for year in start.year()..=end.year() {
-        if time::util::is_leap_year(year) {
-            if let Ok(feb_29) = Date::from_calendar_date(year, Month::February, 29) {
-                if feb_29 > start && feb_29 <= end {
-                    leap_days += 1;
-                }
-            }
+        if time::util::is_leap_year(year)
+            && let Ok(feb_29) = Date::from_calendar_date(year, Month::February, 29)
+            && feb_29 > start
+            && feb_29 <= end
+        {
+            leap_days += 1;
         }
     }
     leap_days

@@ -18,8 +18,8 @@ use finstack_quant_valuations::instruments::rates::cms_option::CmsOption;
 use finstack_quant_valuations::instruments::rates::cms_spread_option::CmsSpreadOption;
 use finstack_quant_valuations::instruments::rates::cms_swap::CmsSwap;
 use finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 /// Serialize `instrument`, insert `retired` with `value` into the object at

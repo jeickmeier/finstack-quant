@@ -194,12 +194,14 @@ mod tests {
         assert!(MultiOuParams::new(vec![1.0, 1.0], vec![0.0], vec![0.1, 0.1], None).is_err());
         assert!(MultiOuParams::new(vec![1.0], vec![0.0], vec![-0.1], None).is_err());
         assert!(MultiOuParams::new(vec![f64::NAN], vec![0.0], vec![0.1], None).is_err());
-        assert!(MultiOuParams::new(
-            vec![1.0, 1.0],
-            vec![0.0, 0.0],
-            vec![0.1, 0.1],
-            Some(vec![1.0])
-        )
-        .is_err());
+        assert!(
+            MultiOuParams::new(
+                vec![1.0, 1.0],
+                vec![0.0, 0.0],
+                vec![0.1, 0.1],
+                Some(vec![1.0])
+            )
+            .is_err()
+        );
     }
 }

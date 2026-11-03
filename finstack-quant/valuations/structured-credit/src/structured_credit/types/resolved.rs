@@ -104,22 +104,21 @@ impl StructuredCredit {
                     Some(_) => {}
                 }
             }
-            if let Some(assumptions) = &period.assumptions {
-                if !assumptions.spread_bp.is_finite()
+            if let Some(assumptions) = &period.assumptions
+                && (!assumptions.spread_bp.is_finite()
                     || !assumptions.price_pct.is_finite()
                     || assumptions.price_pct <= 0.0
                     || assumptions.price_pct > period.criteria.max_price_pct
                     || assumptions.maturity_months == 0
                     || assumptions
                         .all_in_floor_bp
-                        .is_some_and(|floor| !floor.is_finite())
-                {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "reinvestment assumptions need a finite spread, a positive price within \
+                        .is_some_and(|floor| !floor.is_finite()))
+            {
+                return Err(finstack_quant_core::Error::Validation(
+                    "reinvestment assumptions need a finite spread, a positive price within \
                          the eligibility maximum, a positive maturity and a finite floor"
-                            .into(),
-                    ));
-                }
+                        .into(),
+                ));
             }
         }
         Ok(())

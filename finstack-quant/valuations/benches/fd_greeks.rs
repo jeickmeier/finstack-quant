@@ -7,7 +7,7 @@
 //! - Barrier option FD Greeks (analytical pricer repriced per bump)
 //! - Asian option FD Greeks (Monte Carlo pricer repriced per bump)
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -77,8 +77,8 @@ fn create_market() -> MarketContext {
         .insert_price("SPX_DIV", MarketScalar::Unitless(0.02))
 }
 
-fn create_equity_option(
-) -> finstack_quant_valuations::instruments::equity::equity_option::EquityOption {
+fn create_equity_option()
+-> finstack_quant_valuations::instruments::equity::equity_option::EquityOption {
     let expiry = as_of() + time::Duration::days(365);
     option_support::equity_option_european_call("GREEKS-EQ-CALL", "EQUITY", 100.0, expiry, 100.0)
         .expect("equity option should build in benchmarks")

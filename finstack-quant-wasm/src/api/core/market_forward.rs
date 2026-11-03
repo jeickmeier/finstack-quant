@@ -12,7 +12,7 @@ use js_sys::Float64Array;
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
-use crate::api::core::curve_args::{flat_pairs, js_time_point, TimePoint};
+use crate::api::core::curve_args::{TimePoint, flat_pairs, js_time_point};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

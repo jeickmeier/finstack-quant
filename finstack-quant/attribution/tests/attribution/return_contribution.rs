@@ -1,9 +1,9 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
 use finstack_quant_attribution::{
-    attribute_return_contribution_json, validate_return_contribution_json, ReturnContributionResult,
+    ReturnContributionResult, attribute_return_contribution_json, validate_return_contribution_json,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[test]
 fn return_contribution_rejects_derived_numeric_overflow() {
@@ -53,9 +53,11 @@ fn return_contribution_large_finite_results_roundtrip() {
     let output = attribute_return_contribution_json(&spec.to_string()).expect("finite results");
     let result: ReturnContributionResult = serde_json::from_str(&output).expect("result roundtrip");
     assert!((result.portfolio_return - 1.0).abs() < 1e-12);
-    assert!(result
-        .specific_return
-        .is_some_and(|value| value.abs() < 1e-12));
+    assert!(
+        result
+            .specific_return
+            .is_some_and(|value| value.abs() < 1e-12)
+    );
     assert_eq!(result.instrument_contribution[0].weight, 1e100);
 }
 

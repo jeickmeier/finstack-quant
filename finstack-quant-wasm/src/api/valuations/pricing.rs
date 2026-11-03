@@ -1024,13 +1024,13 @@ pub(super) mod tests {
         use finstack_quant_core::dates::{Date, DayCount};
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
+        use finstack_quant_valuations::instruments::BermudanCallProvision;
         use finstack_quant_valuations::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
         use finstack_quant_valuations::instruments::exotics::range_accrual::{
             BoundsType, RangeAccrualTerms,
         };
         use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
         use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-        use finstack_quant_valuations::instruments::BermudanCallProvision;
         use time::Month;
 
         let mut instrument_pricing_overrides = InstrumentPricingOverrides::default();
@@ -1261,11 +1261,13 @@ pub(super) mod tests {
 
     #[test]
     fn validate_revolving_credit_rejects_invalid_floating_rate_spec() {
-        assert!(finstack_quant_valuations::pricer::validate_instrument_json(
-            &revolving_credit_json(true, false),
-            None
-        )
-        .is_err());
+        assert!(
+            finstack_quant_valuations::pricer::validate_instrument_json(
+                &revolving_credit_json(true, false),
+                None
+            )
+            .is_err()
+        );
     }
 
     #[test]

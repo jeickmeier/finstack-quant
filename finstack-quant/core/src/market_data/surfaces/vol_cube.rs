@@ -39,8 +39,8 @@
 
 use crate::{error::InputError, types::CurveId};
 
-use super::vol_surface::VolInterpolationMode;
 use super::SabrParameterData;
+use super::vol_surface::VolInterpolationMode;
 
 /// SABR volatility cube on an expiry x tenor grid.
 ///

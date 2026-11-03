@@ -2,7 +2,7 @@
 //! DV01, expected loss, correlation delta, jump-to-default — and their helpers.
 
 use super::pricer::{
-    CdsTranchePricer, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION, NUMERICAL_TOLERANCE,
+    CORR_BOUNDARY_WIDTH, CdsTranchePricer, MAX_CORRELATION, MIN_CORRELATION, NUMERICAL_TOLERANCE,
     PAR_SPREAD_TOLERANCE,
 };
 use crate::cds_tranche::CdsTranche;
@@ -429,7 +429,9 @@ impl CdsTranchePricer {
         if npv.abs() < tolerance {
             Ok(spread)
         } else {
-            Err(Error::Validation(format!("CDS tranche par spread {spread:.4} bp leaves NPV {npv:.3e} (tolerance {tolerance:.3e}); no par coupon within [0, 100000] bp")))
+            Err(Error::Validation(format!(
+                "CDS tranche par spread {spread:.4} bp leaves NPV {npv:.3e} (tolerance {tolerance:.3e}); no par coupon within [0, 100000] bp"
+            )))
         }
     }
 

@@ -279,15 +279,15 @@ mod cds_market_edge {
 mod bond_market_edge {
     //! Bond market edge case tests.
 
-    use finstack_quant_cashflows::accrual::accrued_interest_amount;
     use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_cashflows::accrual::accrued_interest_amount;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
     use finstack_quant_valuations::instruments::Instrument;
+    use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
     use finstack_quant_valuations::metrics::{MetricContext, MetricId};
     use std::sync::Arc;
     use time::macros::date;
@@ -446,7 +446,10 @@ mod bond_market_edge {
             (accrued_after, annual_interest * 174.0 / 360.0 - coupon),
             (accrued_within, annual_interest * 175.0 / 360.0 - coupon),
         ] {
-            assert!((actual - expected).abs() < 1e-12, "Accrued should match the independent 30/360 coupon calculation: actual={actual}, expected={expected}");
+            assert!(
+                (actual - expected).abs() < 1e-12,
+                "Accrued should match the independent 30/360 coupon calculation: actual={actual}, expected={expected}"
+            );
         }
         assert!(
             accrued_record > accrued_before && accrued_before > 0.0,

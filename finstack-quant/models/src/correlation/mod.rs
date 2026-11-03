@@ -50,7 +50,7 @@ pub use latent_factor::{
     LatentFactorKind, LatentFactorSpec, LatentMultiFactor, LatentSingleFactor, LatentTwoFactor,
 };
 pub use portfolio_loss::{
-    simulate_portfolio_loss, CreditExposure, PortfolioLossConfig, PortfolioLossResult,
-    TrancheLossStatistics, MAX_PORTFOLIO_LOSS_PATHS,
+    CreditExposure, MAX_PORTFOLIO_LOSS_PATHS, PortfolioLossConfig, PortfolioLossResult,
+    TrancheLossStatistics, simulate_portfolio_loss,
 };
 pub use recovery::{ConstantRecovery, CorrelatedRecovery, RecoveryModel, RecoverySpec};

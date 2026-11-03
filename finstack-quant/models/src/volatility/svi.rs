@@ -469,11 +469,9 @@ pub fn calibrate_svi_with_solver(
         ));
     }
     if !forward.is_finite() || forward <= 0.0 || !expiry.is_finite() || expiry <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(
-            format!(
-                "forward and expiry must be finite and positive; got forward={forward}, expiry={expiry}"
-            ),
-        ));
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "forward and expiry must be finite and positive; got forward={forward}, expiry={expiry}"
+        )));
     }
     for (idx, &strike) in strikes.iter().enumerate() {
         if !strike.is_finite() || strike <= 0.0 {

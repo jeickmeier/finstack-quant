@@ -1,7 +1,7 @@
 //! Expiry-resolved volatility risk used by historical SIMM curvature.
 
-use super::{commodity_bucket_id, SimmCreditSector, SimmRiskClass, SIMM_TENORS};
-use finstack_quant_core::{currency::Currency, Error, Result};
+use super::{SIMM_TENORS, SimmCreditSector, SimmRiskClass, commodity_bucket_id};
+use finstack_quant_core::{Error, Result, currency::Currency};
 
 /// One volatility-weighted vega input before SIMM curvature scaling.
 ///
@@ -86,10 +86,10 @@ impl SimmCurvatureSensitivity {
                 }
                 match self.risk_class {
                     SimmRiskClass::Equity if self.bucket != "residual" => {
-                        return Err(invalid("unclassified equity requires the residual bucket"))
+                        return Err(invalid("unclassified equity requires the residual bucket"));
                     }
                     SimmRiskClass::Commodity if commodity_bucket_id(&self.bucket).is_none() => {
-                        return Err(invalid("unknown commodity bucket"))
+                        return Err(invalid("unknown commodity bucket"));
                     }
                     SimmRiskClass::Fx => {
                         if self.bucket != "fx" {

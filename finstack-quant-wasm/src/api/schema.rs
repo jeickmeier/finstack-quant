@@ -45,7 +45,7 @@ fn report(artifact: &SchemaArtifact, payload: &JsValue) -> Result<JsValue, JsVal
 /// its Rust name and its flat wasm-bindgen export name.
 macro_rules! schema_registry {
     (
-        $registry:expr,
+        $registry:expr_2021,
         $index:ident = $index_js:literal,
         $get:ident = $get_js:literal,
         $validate:ident = $validate_js:literal

@@ -8,7 +8,7 @@
 use crate::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{
-    calendar_by_id_strict, Date, DateExt, DayCount, DayCountContext, Tenor,
+    Date, DateExt, DayCount, DayCountContext, Tenor, calendar_by_id_strict,
 };
 use finstack_quant_core::money::Money;
 
@@ -1081,34 +1081,41 @@ mod tests {
         };
         let record = rule.ex_date(payment).expect("record date");
         assert_eq!(record, make_date(2025, 6, 20));
-        assert!(!rule
-            .is_ex_coupon(payment, record)
-            .expect("record entitlement"));
-        assert!(rule
-            .is_ex_coupon(payment, make_date(2025, 6, 23))
-            .expect("next business day"));
-        assert!(!rule
-            .is_ex_coupon(payment, payment)
-            .expect("payment boundary"));
+        assert!(
+            !rule
+                .is_ex_coupon(payment, record)
+                .expect("record entitlement")
+        );
+        assert!(
+            rule.is_ex_coupon(payment, make_date(2025, 6, 23))
+                .expect("next business day")
+        );
+        assert!(
+            !rule
+                .is_ex_coupon(payment, payment)
+                .expect("payment boundary")
+        );
 
         let schedule = CashFlowSchedule::from_flows_unchecked(
-            vec![CashFlow::new(
-                payment,
-                None,
-                Money::from((25_000_i64, Currency::GBP)),
-                CFKind::Fixed,
-                0.5,
-                Some(0.05),
-            )
-            .with_accrual(CashFlowAccrual {
-                start: issue,
-                end: payment,
-                day_count: DayCount::ActActIsma,
-                coupon_period: Some((issue, payment)),
-                calendar_id: None,
-                projected_index_rate: None,
-                end_is_termination_date: false,
-            })],
+            vec![
+                CashFlow::new(
+                    payment,
+                    None,
+                    Money::from((25_000_i64, Currency::GBP)),
+                    CFKind::Fixed,
+                    0.5,
+                    Some(0.05),
+                )
+                .with_accrual(CashFlowAccrual {
+                    start: issue,
+                    end: payment,
+                    day_count: DayCount::ActActIsma,
+                    coupon_period: Some((issue, payment)),
+                    calendar_id: None,
+                    projected_index_rate: None,
+                    end_is_termination_date: false,
+                }),
+            ],
             Notional::par(1_000_000.0, Currency::GBP).expect("notional"),
             DayCount::ActActIsma,
             crate::builder::CashFlowMeta {
@@ -1379,9 +1386,11 @@ mod tests {
         let error = index
             .accrued_at(make_date(2025, 6, 30))
             .expect_err("finite individual accruals must not produce a non-finite total");
-        assert!(error
-            .to_string()
-            .contains("non-finite total accrued interest"));
+        assert!(
+            error
+                .to_string()
+                .contains("non-finite total accrued interest")
+        );
     }
 
     #[test]

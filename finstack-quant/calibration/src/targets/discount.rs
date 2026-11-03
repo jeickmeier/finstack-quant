@@ -1,5 +1,6 @@
 //! Calibration target construction and shared input validation.
 //!
+use crate::CalibrationReport;
 use crate::api::schema::DiscountCurveParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::{CalibrationConfig, CalibrationMethod};
@@ -13,11 +14,11 @@ use crate::solver::traits::TimeGridAndGuesses;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::rate_recipe::rate_calibration_recipe;
 use crate::targets::util::{
-    discount_and_forward_curve_ids, prepare_rate_calibration_quotes, pv01_residual_weight,
-    sorted_knot_grid, validate_global_knot_grid, ContextScratch,
+    ContextScratch, discount_and_forward_curve_ids, prepare_rate_calibration_quotes,
+    pv01_residual_weight, sorted_knot_grid, validate_global_knot_grid,
 };
 use crate::validation::RateBoundsPolicy;
-use crate::CalibrationReport;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -27,7 +28,6 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 
 /// Parameters for constructing a [`DiscountCurveTarget`].
 ///
@@ -453,19 +453,16 @@ impl DiscountCurveTarget {
         // Prefer a high-quality bootstrap seed if it outperforms the global solve.
         if let (CalibrationMethod::GlobalSolve { .. }, Some(seed_rep)) =
             (&params.method, seed_report.as_ref())
+            && seed_rep.success
+            && seed_rep.max_residual <= config.discount_curve.validation_tolerance
+            && seed_rep.max_residual <= report.max_residual
+            && let Some(seed_curve) = target.initial_curve
         {
-            if seed_rep.success
-                && seed_rep.max_residual <= config.discount_curve.validation_tolerance
-                && seed_rep.max_residual <= report.max_residual
-            {
-                if let Some(seed_curve) = target.initial_curve {
-                    curve = seed_curve;
-                    report = seed_rep.clone();
-                    report
-                        .metadata
-                        .insert("adopted_bootstrap_seed".to_string(), "true".to_string());
-                }
-            }
+            curve = seed_curve;
+            report = seed_rep.clone();
+            report
+                .metadata
+                .insert("adopted_bootstrap_seed".to_string(), "true".to_string());
         }
 
         let id = curve.id().to_string();

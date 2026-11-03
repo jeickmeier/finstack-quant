@@ -2,9 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::Result;
 use crate::checks::{Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Severity};
 use crate::types::NodeId;
-use crate::Result;
 
 /// Flags values with unexpected signs (e.g., revenue < 0 or expense > 0).
 ///

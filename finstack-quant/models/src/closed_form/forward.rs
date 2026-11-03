@@ -525,15 +525,10 @@ mod tests {
                     assert!(
                         bachelier_greeks(100.0, invalid, vol, expiry, OptionType::Call).is_err()
                     );
-                    assert!(black_shifted_price(
-                        0.02,
-                        0.03,
-                        vol,
-                        expiry,
-                        invalid,
-                        OptionType::Call
-                    )
-                    .is_err());
+                    assert!(
+                        black_shifted_price(0.02, 0.03, vol, expiry, invalid, OptionType::Call)
+                            .is_err()
+                    );
                     assert!(black_shifted_vega(0.02, 0.03, vol, expiry, invalid).is_err());
                 }
             }

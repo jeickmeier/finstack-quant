@@ -50,8 +50,8 @@
 //! ```
 
 use crate::invalid_input;
-use finstack_quant_core::validation::validate_f64_non_negative;
 use finstack_quant_core::Result;
+use finstack_quant_core::validation::validate_f64_non_negative;
 
 /// Multiple of the hold-out present value that the tender consideration must
 /// exceed before tendering is recommended.

@@ -126,9 +126,11 @@ fn malformed_optional_forecast_parameters_fail_in_both_evaluation_modes() {
         let mut model = forecast_model(100.0, ForecastSpec::forward_fill());
         model.nodes.get_mut("x").unwrap().forecast = Some(invalid);
         assert!(Evaluator::new().evaluate(&model).is_err());
-        assert!(Evaluator::new()
-            .evaluate_monte_carlo(&model, &MonteCarloConfig::new(2, 7))
-            .is_err());
+        assert!(
+            Evaluator::new()
+                .evaluate_monte_carlo(&model, &MonteCarloConfig::new(2, 7))
+                .is_err()
+        );
     }
 }
 

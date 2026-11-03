@@ -260,7 +260,7 @@ mod matrix_tests {
 #[cfg(test)]
 mod generator_tests {
     use crate::credit::migration::{
-        project, GeneratorMatrix, MigrationError, RatingScale, TransitionMatrix,
+        GeneratorMatrix, MigrationError, RatingScale, TransitionMatrix, project,
     };
 
     fn two_state_scale() -> RatingScale {
@@ -273,10 +273,10 @@ mod generator_tests {
         // Q = [[ln(0.9), -ln(0.9)], [0, 0]]
         let scale = two_state_scale();
         let p = TransitionMatrix::new(scale, &[0.9, 0.1, 0.0, 1.0], 1.0).unwrap();
-        let gen = GeneratorMatrix::from_transition_matrix(&p, None)
+        let r#gen = GeneratorMatrix::from_transition_matrix(&p, None)
             .expect("generator extraction should succeed");
-        let q_00 = gen.intensity("IG", "IG").unwrap();
-        let q_01 = gen.intensity("IG", "D").unwrap();
+        let q_00 = r#gen.intensity("IG", "IG").unwrap();
+        let q_01 = r#gen.intensity("IG", "D").unwrap();
         let expected = 0.9_f64.ln();
         assert!(
             (q_00 - expected).abs() < 1e-8,
@@ -287,7 +287,7 @@ mod generator_tests {
             "q_01 = {q_01}, expected {}",
             -expected
         );
-        assert!(gen.intensity("D", "IG").unwrap().abs() < 1e-10);
+        assert!(r#gen.intensity("D", "IG").unwrap().abs() < 1e-10);
     }
 
     #[test]
@@ -317,9 +317,9 @@ mod generator_tests {
     fn direct_construction_and_accessors() {
         let scale = two_state_scale();
         let lambda = 0.05;
-        let gen = GeneratorMatrix::new(scale, &[-lambda, lambda, 0.0, 0.0]).unwrap();
-        assert!((gen.exit_rate("IG").unwrap() - lambda).abs() < 1e-12);
-        assert!(gen.exit_rate("D").unwrap().abs() < 1e-12);
+        let r#gen = GeneratorMatrix::new(scale, &[-lambda, lambda, 0.0, 0.0]).unwrap();
+        assert!((r#gen.exit_rate("IG").unwrap() - lambda).abs() < 1e-12);
+        assert!(r#gen.exit_rate("D").unwrap().abs() < 1e-12);
     }
 
     #[test]
@@ -526,19 +526,19 @@ mod generator_tests {
         // error (~0.022) exceeds the default 1e-2 tolerance — exactly the
         // distortion the stamps make visible. Use a loosened tolerance to
         // obtain the regularized generator and inspect the stamps.
-        let gen = GeneratorMatrix::from_transition_matrix(&p, Some(5e-2))
+        let r#gen = GeneratorMatrix::from_transition_matrix(&p, Some(5e-2))
             .expect("generator extraction should succeed");
 
         assert!(
-            gen.regularization_l1() > 0.0,
+            r#gen.regularization_l1() > 0.0,
             "K-S clamping occurred but regularization_l1 = {}",
-            gen.regularization_l1()
+            r#gen.regularization_l1()
         );
         assert!(
-            gen.round_trip_error() > 0.0 && gen.round_trip_error() <= 5e-2,
+            r#gen.round_trip_error() > 0.0 && r#gen.round_trip_error() <= 5e-2,
             "round-trip error must be stamped and within the requested \
              tolerance: {}",
-            gen.round_trip_error()
+            r#gen.round_trip_error()
         );
     }
 
@@ -546,27 +546,27 @@ mod generator_tests {
     #[test]
     fn direct_construction_stamps_zero_regularization() {
         let scale = two_state_scale();
-        let gen = GeneratorMatrix::new(scale, &[-0.05, 0.05, 0.0, 0.0]).unwrap();
-        assert_eq!(gen.regularization_l1(), 0.0);
-        assert_eq!(gen.round_trip_error(), 0.0);
+        let r#gen = GeneratorMatrix::new(scale, &[-0.05, 0.05, 0.0, 0.0]).unwrap();
+        assert_eq!(r#gen.regularization_l1(), 0.0);
+        assert_eq!(r#gen.round_trip_error(), 0.0);
     }
 }
 
 #[cfg(test)]
 mod projection_tests {
-    use crate::credit::migration::{project, GeneratorMatrix, RatingScale};
+    use crate::credit::migration::{GeneratorMatrix, RatingScale, project};
 
     fn two_state_gen() -> (RatingScale, GeneratorMatrix) {
         let scale = RatingScale::custom(vec!["IG".to_string(), "D".to_string()]).unwrap();
-        let gen = GeneratorMatrix::new(scale.clone(), &[-0.05, 0.05, 0.0, 0.0]).unwrap();
-        (scale, gen)
+        let r#gen = GeneratorMatrix::new(scale.clone(), &[-0.05, 0.05, 0.0, 0.0]).unwrap();
+        (scale, r#gen)
     }
 
     #[test]
     fn exp_at_zero_approaches_identity() {
         // Use a very small t instead of 0 (which is invalid).
-        let (_, gen) = two_state_gen();
-        let p = project(&gen, 1e-10).unwrap();
+        let (_, r#gen) = two_state_gen();
+        let p = project(&r#gen, 1e-10).unwrap();
         assert!((p.probability_by_index(0, 0).unwrap() - 1.0).abs() < 1e-6);
         assert!(p.probability_by_index(0, 1).unwrap() < 1e-6);
     }
@@ -574,10 +574,10 @@ mod projection_tests {
     #[test]
     fn semi_group_property() {
         // P(s+t) ≈ P(s) · P(t)
-        let (_, gen) = two_state_gen();
-        let ps = project(&gen, 1.0).unwrap();
-        let pt = project(&gen, 2.0).unwrap();
-        let p3 = project(&gen, 3.0).unwrap();
+        let (_, r#gen) = two_state_gen();
+        let ps = project(&r#gen, 1.0).unwrap();
+        let pt = project(&r#gen, 2.0).unwrap();
+        let p3 = project(&r#gen, 3.0).unwrap();
         let composed = ps.compose(&pt).unwrap();
         for i in 0..2 {
             for j in 0..2 {
@@ -594,8 +594,8 @@ mod projection_tests {
 
     #[test]
     fn row_stochastic_output() {
-        let (_, gen) = two_state_gen();
-        let p = project(&gen, 5.0).unwrap();
+        let (_, r#gen) = two_state_gen();
+        let p = project(&r#gen, 5.0).unwrap();
         for i in 0..2 {
             let sum: f64 = (0..2).map(|j| p.probability_by_index(i, j).unwrap()).sum();
             assert!((sum - 1.0).abs() < 1e-10);
@@ -604,8 +604,8 @@ mod projection_tests {
 
     #[test]
     fn all_entries_non_negative() {
-        let (_, gen) = two_state_gen();
-        let p = project(&gen, 10.0).unwrap();
+        let (_, r#gen) = two_state_gen();
+        let p = project(&r#gen, 10.0).unwrap();
         for i in 0..2 {
             for j in 0..2 {
                 assert!(p.probability_by_index(i, j).unwrap() >= 0.0);
@@ -632,8 +632,8 @@ mod simulation_tests {
 
     #[test]
     fn absorbing_state_stays_put() {
-        let gen = two_state_gen();
-        let sim = MigrationSimulator::new(gen, 10.0).unwrap();
+        let r#gen = two_state_gen();
+        let sim = MigrationSimulator::new(r#gen, 10.0).unwrap();
         // Start from D (index 1), which is absorbing.
         let paths = sim.simulate(1, 100, 42).unwrap();
         for path in &paths {
@@ -644,8 +644,8 @@ mod simulation_tests {
 
     #[test]
     fn deterministic_seed_reproducible() {
-        let gen = two_state_gen();
-        let sim = MigrationSimulator::new(gen, 5.0).unwrap();
+        let r#gen = two_state_gen();
+        let sim = MigrationSimulator::new(r#gen, 5.0).unwrap();
         let paths1 = sim.simulate(0, 10, 99).unwrap();
         let paths2 = sim.simulate(0, 10, 99).unwrap();
         for (p1, p2) in paths1.iter().zip(paths2.iter()) {
@@ -698,8 +698,8 @@ mod simulation_tests {
     #[test]
     fn convergence_to_analytical() {
         // P(1) for lambda=0.1: P(IG→D) = 1 - exp(-0.1) ≈ 0.09516
-        let gen = two_state_gen();
-        let sim = MigrationSimulator::new(gen, 1.0).unwrap();
+        let r#gen = two_state_gen();
+        let sim = MigrationSimulator::new(r#gen, 1.0).unwrap();
         let emp = sim.empirical_matrix(100_000, 12345).unwrap();
         let empirical_pd = emp.probability_by_index(0, 1).unwrap();
         let analytical_pd = 1.0 - (-0.1_f64).exp();
@@ -711,8 +711,8 @@ mod simulation_tests {
 
     #[test]
     fn default_time_recorded() {
-        let gen = two_state_gen();
-        let sim = MigrationSimulator::new(gen, 20.0).unwrap();
+        let r#gen = two_state_gen();
+        let sim = MigrationSimulator::new(r#gen, 20.0).unwrap();
         let paths = sim.simulate(0, 1000, 7).unwrap();
         let defaults: usize = paths.iter().filter(|p| p.defaulted()).count();
         // With lambda=0.1, P(default within 20y) = 1 - exp(-2) ≈ 0.865
@@ -725,7 +725,7 @@ mod simulation_tests {
 
 #[cfg(test)]
 mod reference_matrix_tests {
-    use crate::credit::migration::{project, GeneratorMatrix, RatingScale, TransitionMatrix};
+    use crate::credit::migration::{GeneratorMatrix, RatingScale, TransitionMatrix, project};
 
     /// 7×7 annual transition matrix from the design spec.
     fn reference_matrix() -> (RatingScale, TransitionMatrix) {
@@ -758,20 +758,20 @@ mod reference_matrix_tests {
     #[test]
     fn generator_extraction_succeeds() {
         let (_scale, p) = reference_matrix();
-        let gen = GeneratorMatrix::from_transition_matrix(&p, None)
+        let r#gen = GeneratorMatrix::from_transition_matrix(&p, None)
             .expect("generator extraction of reference matrix should succeed");
         // All diagonal entries should be ≤ 0 and off-diagonal ≥ 0.
         for i in 0..7 {
             assert!(
-                gen.as_matrix()[(i, i)] <= 0.0,
+                r#gen.as_matrix()[(i, i)] <= 0.0,
                 "diagonal ({i},{i}) must be ≤ 0"
             );
             for j in 0..7 {
                 if j != i {
                     assert!(
-                        gen.as_matrix()[(i, j)] >= -1e-10,
+                        r#gen.as_matrix()[(i, j)] >= -1e-10,
                         "off-diagonal ({i},{j}) = {} must be ≥ 0",
-                        gen.as_matrix()[(i, j)]
+                        r#gen.as_matrix()[(i, j)]
                     );
                 }
             }
@@ -781,8 +781,8 @@ mod reference_matrix_tests {
     #[test]
     fn six_month_projection() {
         let (_scale, p) = reference_matrix();
-        let gen = GeneratorMatrix::from_transition_matrix(&p, None).unwrap();
-        let p_half = project(&gen, 0.5).unwrap();
+        let r#gen = GeneratorMatrix::from_transition_matrix(&p, None).unwrap();
+        let p_half = project(&r#gen, 0.5).unwrap();
         // Row sums = 1, all entries ≥ 0.
         for i in 0..7 {
             let sum: f64 = (0..7)
@@ -800,8 +800,8 @@ mod reference_matrix_tests {
     #[test]
     fn five_year_projection() {
         let (_scale, p) = reference_matrix();
-        let gen = GeneratorMatrix::from_transition_matrix(&p, None).unwrap();
-        let p5 = project(&gen, 5.0).unwrap();
+        let r#gen = GeneratorMatrix::from_transition_matrix(&p, None).unwrap();
+        let p5 = project(&r#gen, 5.0).unwrap();
         // Cumulative default PD for BBB (index 3) over 5y should be material.
         let pd_bbb = p5.probability_by_index(3, 6).unwrap();
         assert!(pd_bbb > 0.01, "5y BBB PD = {pd_bbb:.4} is too low");
@@ -814,10 +814,10 @@ mod reference_matrix_tests {
     #[test]
     fn semi_group_7x7() {
         let (_scale, p) = reference_matrix();
-        let gen = GeneratorMatrix::from_transition_matrix(&p, None).unwrap();
-        let p1 = project(&gen, 1.0).unwrap();
-        let p2 = project(&gen, 2.0).unwrap();
-        let p3 = project(&gen, 3.0).unwrap();
+        let r#gen = GeneratorMatrix::from_transition_matrix(&p, None).unwrap();
+        let p1 = project(&r#gen, 1.0).unwrap();
+        let p2 = project(&r#gen, 2.0).unwrap();
+        let p3 = project(&r#gen, 3.0).unwrap();
         let composed = p1.compose(&p2).unwrap();
         for i in 0..7 {
             for j in 0..7 {

@@ -8,12 +8,12 @@
 //! Higher dividend yield reduces the forward price, making conversion less attractive.
 
 use crate::convertible::ConvertibleBond;
-use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{
-    replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width, MetricCalculator,
-    MetricContext,
+    MetricCalculator, MetricContext, replace_scalar_value, scalar_numeric_value,
+    scaled_central_diff_by_width,
 };
 
 /// Dividend risk calculator for convertible bonds.

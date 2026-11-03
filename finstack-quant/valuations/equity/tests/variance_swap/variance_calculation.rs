@@ -5,7 +5,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::stats::{realized_variance, RealizedVarMethod};
+use finstack_quant_core::math::stats::{RealizedVarMethod, realized_variance};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
@@ -75,9 +75,10 @@ fn first_ohlc_bar_contributes_to_realized_and_seasoned_variance() {
                 .unwrap(),
             0.0
         );
-        assert!(swap
-            .partial_realized_variance(&MarketContext::new(), as_of)
-            .is_err());
+        assert!(
+            swap.partial_realized_variance(&MarketContext::new(), as_of)
+                .is_err()
+        );
     }
 }
 

@@ -43,17 +43,17 @@
 //! ModelParameters), set `full_cross_attribution = true` on the
 //! [`crate::AttributionRequest`].
 
+use crate::AttributionRequest;
 use crate::credit_cascade::{
-    build_credit_factor_attribution, plan_credit_cascade, CreditCascadeStep,
+    CreditCascadeStep, build_credit_factor_attribution, plan_credit_cascade,
 };
 use crate::factors::*;
 use crate::helpers::*;
-use crate::AttributionRequest;
 use crate::{AttributionFactor, AttributionMethod, CrossFactorDetail, PnlAttribution};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use indexmap::IndexMap;
 
@@ -602,65 +602,62 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
     // instrument's T1 valuation (modulo non-issuer hazard curves) and the
     // telescope closes to `credit_curves_pnl` without any residual back-solve,
     // so cross-bp convexity never leaks into `curve_shape_pnl`.
-    if let Some(model) = credit_factor_model {
-        if let Some(cascade) = plan_credit_cascade(
+    if let Some(model) = credit_factor_model
+        && let Some(cascade) = plan_credit_cascade(
             model,
             instrument,
             market_t0,
             market_t1,
             &mut attribution.meta.notes,
-        )? {
-            // T1 market with T0 hazard for the issuer's curves.
-            let market_t0_credit = MarketSnapshot::restore_market(
-                market_t1,
-                &credit_snapshot,
-                MarketRestoreFlags::HAZARD,
-            );
+        )?
+    {
+        // T1 market with T0 hazard for the issuer's curves.
+        let market_t0_credit =
+            MarketSnapshot::restore_market(market_t1, &credit_snapshot, MarketRestoreFlags::HAZARD);
 
-            // Base value for the cascade: exactly the reference point
-            // `credit_curves_pnl` is measured against. Reuse the credit
-            // factor's reprice when present; otherwise reprice once here.
-            let base_credit_val = match val_with_t0_credit {
-                Some(v) => v,
-                None => {
-                    num_repricings += 1;
-                    instrument.value(&market_t0_credit, as_of_t1)?
-                }
-            };
-
-            // Reprice each step's end-state market. Standalone attribution
-            // can fan these out; portfolio callers pass `Serial` so the
-            // outer position loop owns Rayon.
-            let steps = cascade.steps_with_cumulative_bp();
-            let reprice_step = |(step, cumulative_bp): &(&CreditCascadeStep, f64)| {
-                let market_step = cascade.step_market(
-                    step,
-                    *cumulative_bp,
-                    market_t0,
-                    &market_t0_credit,
-                    market_t1,
-                    &recalibration_provider,
-                )?;
-                instrument.value(&market_step, as_of_t1)
-            };
-            let step_values: Vec<Money> = try_map_policy(execution_policy, &steps, reprice_step)?;
-            num_repricings += step_values.len();
-
-            // Telescope to per-step P&Ls: V_k − V_{k−1}, V_0 = base_credit_val.
-            let mut step_pnls: Vec<Money> = Vec::with_capacity(cascade.steps.len());
-            let mut prev = base_credit_val;
-            for v in &step_values {
-                step_pnls.push(compute_pnl(prev, *v, ccy, market_t1, as_of_t1)?);
-                prev = *v;
+        // Base value for the cascade: exactly the reference point
+        // `credit_curves_pnl` is measured against. Reuse the credit
+        // factor's reprice when present; otherwise reprice once here.
+        let base_credit_val = match val_with_t0_credit {
+            Some(v) => v,
+            None => {
+                num_repricings += 1;
+                instrument.value(&market_t0_credit, as_of_t1)?
             }
+        };
 
-            attribution.credit_factor_detail = Some(build_credit_factor_attribution(
-                model,
-                &cascade,
-                credit_factor_detail_options,
-                &step_pnls,
-            )?);
+        // Reprice each step's end-state market. Standalone attribution
+        // can fan these out; portfolio callers pass `Serial` so the
+        // outer position loop owns Rayon.
+        let steps = cascade.steps_with_cumulative_bp();
+        let reprice_step = |(step, cumulative_bp): &(&CreditCascadeStep, f64)| {
+            let market_step = cascade.step_market(
+                step,
+                *cumulative_bp,
+                market_t0,
+                &market_t0_credit,
+                market_t1,
+                &recalibration_provider,
+            )?;
+            instrument.value(&market_step, as_of_t1)
+        };
+        let step_values: Vec<Money> = try_map_policy(execution_policy, &steps, reprice_step)?;
+        num_repricings += step_values.len();
+
+        // Telescope to per-step P&Ls: V_k − V_{k−1}, V_0 = base_credit_val.
+        let mut step_pnls: Vec<Money> = Vec::with_capacity(cascade.steps.len());
+        let mut prev = base_credit_val;
+        for v in &step_values {
+            step_pnls.push(compute_pnl(prev, *v, ccy, market_t1, as_of_t1)?);
+            prev = *v;
         }
+
+        attribution.credit_factor_detail = Some(build_credit_factor_attribution(
+            model,
+            &cascade,
+            credit_factor_detail_options,
+            &step_pnls,
+        )?);
     }
 
     note_skipped_empty_t0_factors(

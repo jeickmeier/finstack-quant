@@ -727,9 +727,9 @@ fn every_registered_instrument_satisfies_persistence_contract() {
                 .market_dependencies()
                 .unwrap_or_else(|error| panic!("{tag}: dependency extraction failed: {error}"));
             assert!(
-            entry.no_market_dependencies || !dependencies_are_empty(&dependencies),
-            "{tag}: dependencies are empty; set no_market_dependencies=true with rationale only if intentional"
-        );
+                entry.no_market_dependencies || !dependencies_are_empty(&dependencies),
+                "{tag}: dependencies are empty; set no_market_dependencies=true with rationale only if intentional"
+            );
 
             let mut unknown_top = fixture.clone();
             unknown_top

@@ -4,7 +4,7 @@
 use crate::bindings::date_utils::extract_date_iso;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::{
-    labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
+    ColumnSchema, labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::errors::{display_to_py, serde_json_to_py, value_error};
 use finstack_quant_attribution::{ReturnContributionPosition, ReturnContributionSpec};
@@ -69,10 +69,10 @@ fn position_from_record(record: &Bound<'_, PyDict>) -> PyResult<ReturnContributi
             if value.is_none() {
                 continue;
             }
-            if let Ok(f) = value.extract::<f64>() {
-                if f.is_nan() {
-                    continue;
-                }
+            if let Ok(f) = value.extract::<f64>()
+                && f.is_nan()
+            {
+                continue;
             }
             groups.insert(dimension.to_owned(), value.str()?.extract()?);
         }
@@ -127,40 +127,51 @@ pub(crate) fn extract_return_contribution_spec(
     factors: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<ReturnContributionSpec> {
     let pd = py.import("pandas")?;
-    let value = if let Ok(json) = spec.extract::<String>() {
-        serde_json::from_str::<serde_json::Value>(&json)
-            .map_err(|e| serde_json_to_py(e, "invalid return contribution JSON"))?
-    } else if let Ok(dict) = spec.cast::<PyDict>() {
-        let dict = dict.copy()?;
-        if let Some(value) = dict.get_item("as_of")? {
-            if !value.is_instance_of::<pyo3::types::PyString>() {
-                dict.set_item("as_of", extract_date_iso(&value)?)?;
+    let value = match spec.extract::<String>() {
+        Ok(json) => serde_json::from_str::<serde_json::Value>(&json)
+            .map_err(|e| serde_json_to_py(e, "invalid return contribution JSON"))?,
+        _ => match spec.cast::<PyDict>() {
+            Ok(dict) => {
+                let dict = dict.copy()?;
+                if let Some(value) = dict.get_item("as_of")?
+                    && !value.is_instance_of::<pyo3::types::PyString>()
+                {
+                    dict.set_item("as_of", extract_date_iso(&value)?)?;
+                }
+                py_to_json_value(py, dict.as_any(), "spec")?
             }
-        }
-        py_to_json_value(py, dict.as_any(), "spec")?
-    } else if spec.is_instance(&pd.getattr("DataFrame")?)? {
-        let as_of = as_of
-            .ok_or_else(|| value_error("as_of is required when spec is a pandas DataFrame"))?;
-        return Ok(ReturnContributionSpec {
-            as_of: extract_date_iso(as_of)?,
-            positions: positions_from_dataframe(py, spec)?,
-            weighting: weighting
-                .map(|label| serde_json::from_value(serde_json::Value::String(label.to_owned())))
-                .transpose()
-                .map_err(|e| serde_json_to_py(e, "invalid return contribution spec"))?
-                .unwrap_or_default(),
-            factors: factors
-                .map(|value| {
-                    serde_json::from_value(py_to_json_value(py, value, "factors")?)
-                        .map_err(|e| serde_json_to_py(e, "invalid return contribution spec"))
-                })
-                .transpose()?
-                .unwrap_or_default(),
-        });
-    } else {
-        return Err(PyTypeError::new_err(
-            "spec must be a dict, a JSON str, or a pandas DataFrame of positions",
-        ));
+            _ => {
+                if spec.is_instance(&pd.getattr("DataFrame")?)? {
+                    let as_of = as_of.ok_or_else(|| {
+                        value_error("as_of is required when spec is a pandas DataFrame")
+                    })?;
+                    return Ok(ReturnContributionSpec {
+                        as_of: extract_date_iso(as_of)?,
+                        positions: positions_from_dataframe(py, spec)?,
+                        weighting: weighting
+                            .map(|label| {
+                                serde_json::from_value(serde_json::Value::String(label.to_owned()))
+                            })
+                            .transpose()
+                            .map_err(|e| serde_json_to_py(e, "invalid return contribution spec"))?
+                            .unwrap_or_default(),
+                        factors: factors
+                            .map(|value| {
+                                serde_json::from_value(py_to_json_value(py, value, "factors")?)
+                                    .map_err(|e| {
+                                        serde_json_to_py(e, "invalid return contribution spec")
+                                    })
+                            })
+                            .transpose()?
+                            .unwrap_or_default(),
+                    });
+                } else {
+                    return Err(PyTypeError::new_err(
+                        "spec must be a dict, a JSON str, or a pandas DataFrame of positions",
+                    ));
+                }
+            }
+        },
     };
     let serde_json::Value::Object(mut fields) = value else {
         return Err(value_error(

@@ -75,10 +75,10 @@ pub(in crate::builder) fn emit_fees_on(
                 period.accrual_end,
                 outstanding,
             );
-            if pf.accrual_basis == FeeAccrualBasis::PointInTime {
-                if let Some(first) = segments.first().copied() {
-                    segments = vec![(period.accrual_start, period.accrual_end, first.2)];
-                }
+            if pf.accrual_basis == FeeAccrualBasis::PointInTime
+                && let Some(first) = segments.first().copied()
+            {
+                segments = vec![(period.accrual_start, period.accrual_end, first.2)];
             }
             for (accrual_start, accrual_end, effective_outstanding) in segments {
                 let is_termination_date = pf.terminal_accrual_end == Some(accrual_end);

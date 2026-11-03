@@ -4,11 +4,11 @@
 //! threshold, MTA, and rounding rules.
 
 use crate::types::{CsaSpec, MarginCall, MarginTenor};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{
-    adjust, calendar_by_id_strict, BusinessDayConvention, Date, DateExt,
+    BusinessDayConvention, Date, DateExt, adjust, calendar_by_id_strict,
 };
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use tracing::{debug, warn};
 
 /// Variation margin calculation result.
@@ -701,8 +701,9 @@ mod tests {
         let mut csa = CsaSpec::usd_regulatory().expect("registry should load");
         csa.calendar_id = "missing-calendar".to_string();
         let calc = VmCalculator::new(csa);
-        assert!(calc
-            .margin_call_dates(test_date(2025, 1, 17), test_date(2025, 1, 24))
-            .is_err());
+        assert!(
+            calc.margin_call_dates(test_date(2025, 1, 17), test_date(2025, 1, 24))
+                .is_err()
+        );
     }
 }

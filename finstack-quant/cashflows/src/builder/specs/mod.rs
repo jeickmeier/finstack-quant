@@ -85,7 +85,7 @@ pub use coupon::{
     FloatingRateSpec, OvernightIndexConstraintApplication, StepUpCouponSpec,
 };
 pub use default::DefaultModelSpec;
-pub use fees::{evaluate_fee_tiers, FeeAccrualBasis, FeeBase, FeeSpec, FeeTier};
+pub use fees::{FeeAccrualBasis, FeeBase, FeeSpec, FeeTier, evaluate_fee_tiers};
 pub use prepayment::PrepaymentModelSpec;
 pub use principal::{PrincipalEventSpec, PrincipalExchange};
 pub use rate::RateSpec;

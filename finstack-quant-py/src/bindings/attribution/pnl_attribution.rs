@@ -2,8 +2,8 @@
 
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    serde_to_py, ColumnSchema,
+    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
+    serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::errors::{display_to_py, serde_json_to_py};
 use finstack_quant_attribution::long_rows::{

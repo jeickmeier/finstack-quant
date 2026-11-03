@@ -282,26 +282,26 @@ impl CmsSwap {
                 )));
             }
         }
-        if let Some(cap) = self.cms_cap {
-            if !cap.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CmsSwap cms_cap must be finite, got {cap}"
-                )));
-            }
+        if let Some(cap) = self.cms_cap
+            && !cap.is_finite()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CmsSwap cms_cap must be finite, got {cap}"
+            )));
         }
-        if let Some(floor) = self.cms_floor {
-            if !floor.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CmsSwap cms_floor must be finite, got {floor}"
-                )));
-            }
+        if let Some(floor) = self.cms_floor
+            && !floor.is_finite()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CmsSwap cms_floor must be finite, got {floor}"
+            )));
         }
-        if let (Some(floor), Some(cap)) = (self.cms_floor, self.cms_cap) {
-            if floor > cap {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CmsSwap cms_floor ({floor}) must not exceed cms_cap ({cap})"
-                )));
-            }
+        if let (Some(floor), Some(cap)) = (self.cms_floor, self.cms_cap)
+            && floor > cap
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CmsSwap cms_floor ({floor}) must not exceed cms_cap ({cap})"
+            )));
         }
 
         let (FundingLeg::Fixed { periods, .. } | FundingLeg::Floating { periods, .. }) =
@@ -365,7 +365,7 @@ impl CmsSwap {
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
-        use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+        use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
         use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
 
         let reference_conventions =
@@ -955,10 +955,12 @@ mod tests {
                 .count(),
             swap.payment_dates.len()
         );
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .all(|flow| flow.accrual.is_some()));
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .all(|flow| flow.accrual.is_some())
+        );
     }
 
     /// Build a shared market context for reconciliation tests: flat 3% OIS,

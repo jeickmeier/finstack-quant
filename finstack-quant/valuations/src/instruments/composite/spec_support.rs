@@ -1,20 +1,20 @@
 //! Leg specifications, rebalance policy, weighting methods, resolved state,
 //! and shared numeric helpers for composite instruments.
 
-use crate::instruments::json_loader::InstrumentJson;
 use crate::instruments::Instrument;
+use crate::instruments::json_loader::InstrumentJson;
 use crate::metrics::MetricId;
 use crate::results::composite::ResolvedCompositeLeg;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    adjust, calendar_by_id_strict, BusinessDayConvention, Date, DateExt, HolidayCalendar, Tenor,
-    TenorUnit,
+    BusinessDayConvention, Date, DateExt, HolidayCalendar, Tenor, TenorUnit, adjust,
+    calendar_by_id_strict,
 };
 use finstack_quant_core::expr::Expr;
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
 use finstack_quant_core::math::stats::variance;
 use finstack_quant_core::math::summation::neumaier_sum;
-use finstack_quant_core::money::{fx::FxQuery, Money};
+use finstack_quant_core::money::{Money, fx::FxQuery};
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::{Error, Result};
 use indexmap::IndexMap;

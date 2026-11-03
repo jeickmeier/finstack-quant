@@ -555,14 +555,14 @@ pub fn js_f64_seq(value: &JsValue, label: &str) -> Result<Vec<f64>, JsValue> {
     if let Some(typed) = value.dyn_ref::<js_sys::Float64Array>() {
         return Ok(typed.to_vec());
     }
-    if let Some(array) = value.dyn_ref::<Array>() {
-        if all_finite_numbers(array) {
-            let values = js_sys::Float64Array::new(array).to_vec();
-            // `every` skips holes, which the copy turns into NaN; those arrays
-            // take the per-item path and throw there.
-            if !values.iter().any(|v| v.is_nan()) {
-                return Ok(values);
-            }
+    if let Some(array) = value.dyn_ref::<Array>()
+        && all_finite_numbers(array)
+    {
+        let values = js_sys::Float64Array::new(array).to_vec();
+        // `every` skips holes, which the copy turns into NaN; those arrays
+        // take the per-item path and throw there.
+        if !values.iter().any(|v| v.is_nan()) {
+            return Ok(values);
         }
     }
     sequence(value, label, "numbers")?

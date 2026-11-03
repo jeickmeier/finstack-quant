@@ -6,7 +6,7 @@
 use finstack_quant_core::ErrorKind;
 use finstack_quant_models::correlation::LatentMultiFactor;
 use finstack_quant_models::credit::migration::{
-    default_rate, GeneratorMatrix, MigrationSimulator, RatingScale, TransitionMatrix,
+    GeneratorMatrix, MigrationSimulator, RatingScale, TransitionMatrix, default_rate,
 };
 use finstack_quant_models::credit::pd::{MasterScale, MasterScaleGrade, PdCalibrationError};
 use finstack_quant_models::credit::scoring::CreditScoringError;

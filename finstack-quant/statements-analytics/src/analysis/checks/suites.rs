@@ -103,7 +103,7 @@ pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
     }
 
     // Depreciation reconciliation (requires ppe + depreciation + capex).
-    if let (Some(ref ppe), Some(ref dep), Some(ref capex)) = (
+    if let (Some(ppe), Some(dep), Some(capex)) = (
         &mapping.ppe_node,
         &mapping.depreciation_node,
         &mapping.capex_node,
@@ -120,21 +120,20 @@ pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
 
     // Capex reconciliation (requires capex plus at least one addition node —
     // the check is inert without a component to reconcile against).
-    if let Some(ref capex) = mapping.capex_node {
-        if mapping.ppe_additions_node.is_some() || mapping.intangible_additions_node.is_some() {
-            builder = builder.add_check(CapexReconciliation {
-                capex_cf_node: capex.clone(),
-                ppe_additions_node: mapping.ppe_additions_node.clone(),
-                intangible_additions_node: mapping.intangible_additions_node.clone(),
-                tolerance: None,
-                sign_convention: SignConventionPolicy::default(),
-            });
-        }
+    if let Some(ref capex) = mapping.capex_node
+        && (mapping.ppe_additions_node.is_some() || mapping.intangible_additions_node.is_some())
+    {
+        builder = builder.add_check(CapexReconciliation {
+            capex_cf_node: capex.clone(),
+            ppe_additions_node: mapping.ppe_additions_node.clone(),
+            intangible_additions_node: mapping.intangible_additions_node.clone(),
+            tolerance: None,
+            sign_convention: SignConventionPolicy::default(),
+        });
     }
 
     // Dividend reconciliation (cash-flow dividends vs the equity roll-forward).
-    if let (Some(ref div_cf), Some(ref div_eq)) =
-        (&mapping.dividends_node, &mapping.dividends_equity_node)
+    if let (Some(div_cf), Some(div_eq)) = (&mapping.dividends_node, &mapping.dividends_equity_node)
     {
         builder = builder.add_check(DividendReconciliation {
             dividends_cf_node: div_cf.clone(),
@@ -146,34 +145,32 @@ pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
 
     // Interest reconciliation (needs either a capital-structure interest node
     // to compare against, or debt balances to imply a rate from).
-    if let Some(ref interest) = mapping.interest_expense_node {
-        if mapping.cs_interest_node.is_some() || !mapping.debt_balance_nodes.is_empty() {
-            builder = builder.add_check(InterestExpenseReconciliation {
-                interest_expense_node: interest.clone(),
-                debt_balance_nodes: mapping.debt_balance_nodes.clone(),
-                cs_interest_node: mapping.cs_interest_node.clone(),
-                tolerance_pct: None,
-            });
-        }
+    if let Some(ref interest) = mapping.interest_expense_node
+        && (mapping.cs_interest_node.is_some() || !mapping.debt_balance_nodes.is_empty())
+    {
+        builder = builder.add_check(InterestExpenseReconciliation {
+            interest_expense_node: interest.clone(),
+            debt_balance_nodes: mapping.debt_balance_nodes.clone(),
+            cs_interest_node: mapping.cs_interest_node.clone(),
+            tolerance_pct: None,
+        });
     }
 
     // Working-capital consistency (CFS movement vs the balance-sheet delta).
-    if let Some(ref wc_cf) = mapping.wc_change_cf_node {
-        if !mapping.current_assets_nodes.is_empty() || !mapping.current_liabilities_nodes.is_empty()
-        {
-            builder = builder.add_check(WorkingCapitalConsistency {
-                wc_change_cf_node: wc_cf.clone(),
-                current_assets_nodes: mapping.current_assets_nodes.clone(),
-                current_liabilities_nodes: mapping.current_liabilities_nodes.clone(),
-                tolerance: None,
-            });
-        }
+    if let Some(ref wc_cf) = mapping.wc_change_cf_node
+        && (!mapping.current_assets_nodes.is_empty()
+            || !mapping.current_liabilities_nodes.is_empty())
+    {
+        builder = builder.add_check(WorkingCapitalConsistency {
+            wc_change_cf_node: wc_cf.clone(),
+            current_assets_nodes: mapping.current_assets_nodes.clone(),
+            current_liabilities_nodes: mapping.current_liabilities_nodes.clone(),
+            tolerance: None,
+        });
     }
 
     // Effective tax rate plausibility (informational only).
-    if let (Some(ref tax), Some(ref pretax)) =
-        (&mapping.tax_expense_node, &mapping.pretax_income_node)
-    {
+    if let (Some(tax), Some(pretax)) = (&mapping.tax_expense_node, &mapping.pretax_income_node) {
         builder = builder.add_check(EffectiveTaxRateCheck {
             tax_expense_node: tax.clone(),
             pretax_income_node: pretax.clone(),
@@ -271,7 +268,7 @@ pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
     }
 
     // Liquidity runway (requires both a cash balance and a burn rate).
-    if let (Some(ref cash), Some(ref burn)) = (&mapping.cash_node, &mapping.cash_burn_node) {
+    if let (Some(cash), Some(burn)) = (&mapping.cash_node, &mapping.cash_burn_node) {
         builder = builder.add_check(LiquidityRunwayCheck {
             cash_node: cash.clone(),
             cash_burn_node: burn.clone(),

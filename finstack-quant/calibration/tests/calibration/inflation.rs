@@ -8,6 +8,7 @@ use finstack_quant_calibration::quotes::InflationQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::QuoteId;
 use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -17,7 +18,6 @@ use finstack_quant_core::market_data::scalars::{
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
 use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
@@ -457,8 +457,10 @@ fn inflation_params_reject_unsupported_seasonal_factors() {
         // schema-rejection-test
         let error = serde_json::from_value::<InflationCurveParams>(payload)
             .expect_err("unsupported seasonal adjustment must not be silently ignored");
-        assert!(error
-            .to_string()
-            .contains("unknown field `seasonal_factors`"));
+        assert!(
+            error
+                .to_string()
+                .contains("unknown field `seasonal_factors`")
+        );
     }
 }

@@ -5,9 +5,9 @@ use crate::error::{Error, Result};
 use crate::types::{AttributeValue, EntityId, PositionId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
-use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -384,14 +384,14 @@ impl Position {
     /// # }
     /// ```
     pub fn scale_value(&self, value: Money) -> finstack_quant_core::Result<Money> {
-        if let PositionUnit::Notional(Some(notional_currency)) = self.unit {
-            if notional_currency != value.currency() {
-                tracing::warn!(
-                    position_id = %self.position_id,
-                    "Notional currency {} differs from instrument currency {}",
-                    notional_currency, value.currency()
-                );
-            }
+        if let PositionUnit::Notional(Some(notional_currency)) = self.unit
+            && notional_currency != value.currency()
+        {
+            tracing::warn!(
+                position_id = %self.position_id,
+                "Notional currency {} differs from instrument currency {}",
+                notional_currency, value.currency()
+            );
         }
         Money::new(value.amount() * self.scale_factor(), value.currency())
     }

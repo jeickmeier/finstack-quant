@@ -10,7 +10,7 @@ mod balances;
 mod coupons;
 mod fees;
 
-pub(crate) use coupons::{emit_fixed_coupons_on, emit_float_coupons_on, ResolvedFloatMarket};
+pub(crate) use coupons::{ResolvedFloatMarket, emit_fixed_coupons_on, emit_float_coupons_on};
 
 pub(super) use amortization::emit_amortization_on;
 

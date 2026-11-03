@@ -4,13 +4,13 @@
 use super::instrument::CompositeInstrument;
 use super::reporting::CompositeRebalanceResult;
 use super::spec_support::{
-    convert_amount, leg_index, normalized_scores, sample_std_dev, unit_pnl_series,
-    validate_history, CompositeLegSpec, CompositeMarketObservation, CompositeState, RebalanceRule,
-    WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS, MIN_ABS_INPUT,
+    CompositeLegSpec, CompositeMarketObservation, CompositeState, MAX_COMPOSITE_DEPTH,
+    MAX_COMPOSITE_LEGS, MIN_ABS_INPUT, RebalanceRule, WeightingMethod, convert_amount, leg_index,
+    normalized_scores, sample_std_dev, unit_pnl_series, validate_history,
 };
-use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use crate::instruments::PricingOptions;
-use crate::metrics::{is_additive_metric, MetricId};
+use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use crate::metrics::{MetricId, is_additive_metric};
 use crate::results::composite::ResolvedCompositeLeg;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;

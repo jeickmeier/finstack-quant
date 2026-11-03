@@ -377,7 +377,11 @@ impl PyApplicationResult {
             self.report.user_operations,
             self.report.expanded_operations,
             self.report.warnings.len(),
-            if self.model.is_some() { "True" } else { "False" },
+            if self.model.is_some() {
+                "True"
+            } else {
+                "False"
+            },
         )
     }
 }
