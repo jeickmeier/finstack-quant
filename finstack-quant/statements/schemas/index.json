@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
-      "bytes": 23140,
+      "bytes": 23682,
       "kind": "output",
       "path": "schemas/statements/1/normalization_result.schema.json",
       "summary": "Per-period normalization outcome: base value, applied adjustments and final value.",
