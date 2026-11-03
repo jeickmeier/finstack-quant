@@ -63,6 +63,7 @@ const sources = {
   portfolioWorkbench: "tests/portfolio/workbench/cases.json",
   portfolioAttribution: "tests/portfolio/attribution/cases.json",
   portfolioReturns: "tests/portfolio/returns/cases.json",
+  portfolioBrinson: "tests/portfolio/brinson/cases.json",
   details: "tests/valuations/details/cases.json",
   irsInstrument:
     "../finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",

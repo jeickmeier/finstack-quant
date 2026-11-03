@@ -174,10 +174,10 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the thirty-six native fixture generators under
+`mise run ui-fixtures` runs the thirty-seven native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
-portfolio → portfolio margin → portfolio workbench; portfolio returns; curves → market-browser → curve-query; cubes, calibration,
+portfolio → portfolio margin → portfolio workbench; portfolio returns; Brinson; curves → market-browser → curve-query; cubes, calibration,
 scenario-table; statements → covenants, normalizations, capital structures, relative value; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
@@ -957,7 +957,7 @@ the book and its context as props: `defaultSpecJson` (a complete
 (`MarketContextState`), `asOf` (the ISO margin date, never read from the
 spec), and optionally `metrics` (omitted is Rust's standard set),
 `seriesBase` (the base metric id charted by bucket), `scenarioJsons`
-(`ScenarioSpec` texts, never parsed), `attribution`, `returns` and
+(`ScenarioSpec` texts, never parsed), `attribution`, `returns`, `brinson` and
 `currentImCollateral` (omitted is none held). `attribution` is the host's
 closing snapshot for the Attribution tab: `marketT1Json`
 (`MarketContextState`), `asOfT1` (ISO date) and `reconciliationTolerance`
@@ -967,6 +967,9 @@ past a seasoned floating leg's fixing needs that index's `FIXING:` series in
 `returns` is the host's performance data for the Returns tab: `linked`
 (sub-period decimal returns and `horizonYears` in 365-day years), `dietz` (one
 `TwrrPeriod`) and `xirr` (dated investor flows); none is derived from the book.
+`brinson` is the host's sector data for the Brinson tab: `periods` (one array of
+`SectorPeriod` rows per period, oldest first) and optionally `periodLabels`;
+none is derived from the book.
 
 | Tab         | Shows                                                                                                                                                                                                  |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -975,11 +978,12 @@ past a seasoned floating leg's fixing needs that index's `FIXING:` series in
 | Scenarios   | `ScenarioPnlTable` of `useScenarioPnlBatch`; the tab is shown only when `scenarioJsons` are supplied                                                                                                   |
 | Attribution | `PortfolioAttributionReport` of `useAttributePortfolioPnl` from `marketJson` on `asOf` to the `attribution` market and date under the method the user picks; shown only when `attribution` is supplied |
 | Returns     | `PortfolioReturns` of `useTwrrLinked`, `useTwrrModifiedDietz` and `useMwrXirr` over the `returns` data, each form resubmittable; shown only when `returns` is supplied                                 |
+| Brinson     | `BrinsonReport` of `useBrinsonLinked` over the `brinson` periods; shown only when `brinson` is supplied                                                                                                |
 | Margin      | `PortfolioMarginReport` of `usePortfolioMargin` on `asOf`                                                                                                                                              |
 | Book        | `PortfolioSpec` JSON that `usePortfolioSpecValidator` validates natively before every tab values it                                                                                                    |
 
-The Scenarios, Attribution, Returns and Margin calls run when their tab first opens.
-Later portfolio panels (Brinson, exposures, correlation) add their
+The Scenarios, Attribution, Returns, Brinson and Margin calls run when their tab first opens.
+Later portfolio panels (exposures, correlation) add their
 own tabs when they land. The fixture (`tests/portfolio/workbench/`) is the
 margined rates book from `tests/portfolio/margin/` over the pricing market
 under the host-parity USD-OIS scenarios.
@@ -1030,6 +1034,26 @@ holds three annual and three monthly returns, the GIPS Handbook period, a
 withdrawal period, a conventional XIRR stream and the native errors of a
 complete loss, a fraction above one, a non-positive Dietz denominator, a stream
 with two sign changes and a single flow.
+
+## Brinson attribution
+
+`BrinsonReport` (`@finstack/brinson-report`) presents one native
+`portfolio.brinsonLinked` result (`CarinoLinkedAttribution`) of the host's
+sector data through `@finstack/use-brinson-linked`: chronological periods of
+`SectorPeriod` rows (each side's start-of-period weights summing to one and
+decimal period returns, the same sectors in the same order every period). It
+shows the compounded portfolio and benchmark returns, each sector's
+Carino-linked allocation, selection, interaction and total with Rust's linked
+total of each effect as the footer, a bar chart of the sectors' linked totals
+(plotted, never stacked), and every period's portfolio, benchmark and excess
+returns with its sector effects and returned totals. Every figure is a
+decimal of return as returned; the compounded active return is not shown,
+because Rust returns only its two sides. `periodLabels` are the host's names
+of the periods; omitted shows each period's position. A rejected input (no
+periods, weights not summing to one, which Rust names by zero-based period,
+or a reordered period) is the native error. The fixture
+(`tests/portfolio/brinson/`) is the portfolio host-parity golden's three
+periods with those three errors.
 
 ## Returned rating migration
 

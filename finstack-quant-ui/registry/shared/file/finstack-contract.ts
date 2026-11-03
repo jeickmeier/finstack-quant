@@ -1125,6 +1125,15 @@ export type LinkedReturn = portfolioWire.LinkedReturn;
 export type TwrrPeriod = portfolioWire.TwrrPeriod;
 /** A dated flow from the investor's cash account (contributions negative, distributions and terminal value positive). */
 export type DatedCashflow = portfolioWire.DatedCashflow;
+/** One sector's start-of-period weights and period returns on both sides, as decimals; weights sum to one on each side. */
+export type SectorPeriod = portfolioWire.SectorPeriod;
+/** Chronological periods of SectorPeriod rows, every period listing the same sectors in the same order; host-supplied, never defaulted. */
+export interface BrinsonLinkedRequest {
+  /** One array of SectorPeriod rows per period, oldest first. */
+  readonly periods: readonly (readonly SectorPeriod[])[];
+}
+/** portfolio.brinsonLinked, as returned: each period's Brinson-Fachler effects, the Carino-linked effects by sector and by effect, and the compounded portfolio and benchmark returns. */
+export type CarinoLinkedAttribution = portfolioWire.CarinoLinkedAttribution;
 /** Scenario name to its native statement result. */
 export type StatementScenarioResults = ScenarioResults;
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
@@ -1528,6 +1537,10 @@ export interface PortfolioApi {
   twrrModifiedDietz(period: TwrrPeriod): Promise<Envelope<number>>;
   /** portfolio.mwrXirr: the annualised money-weighted return of dated investor flows, a decimal on Act/365F. */
   mwrXirr(cashflows: readonly DatedCashflow[]): Promise<Envelope<number>>;
+  /** portfolio.brinsonLinked: every period's Brinson-Fachler attribution of host-supplied sector rows, Carino-linked. */
+  brinsonLinked(
+    request: BrinsonLinkedRequest,
+  ): Promise<Envelope<CarinoLinkedAttribution>>;
   /** portfolio.computeFactorSensitivities over the cached Portfolio and MarketContext handles: the position-by-factor sensitivity matrix in the base currency. */
   computeFactorSensitivities(
     request: FactorSensitivitiesRequest,

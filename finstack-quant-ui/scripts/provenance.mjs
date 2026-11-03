@@ -495,6 +495,13 @@ const displays = [
       "Returned twrrLinked LinkedReturn: cumulative, annualised, is_annualised and num_periods as returned, the annualised figure labelled per year only when Rust's is_annualised says so; the twrrModifiedDietz period return as a decimal for the period, not annualised; the mwrXirr return as an annualised decimal on Act/365F. Inputs are the host's returns, horizon in 365-day years, one period's values and flows with their fractions of the period remaining (contributions positive) and dated investor flows (contributions negative); nothing is defaulted, derived from dates, sign-flipped, summed or compared, and each form shows its native error.",
   },
   {
+    id: "brinson-report",
+    api: ["portfolio.brinsonLinked", "PortfolioNamespace", "brinsonLinked"],
+    route: "returned-report",
+    convention:
+      "Returned brinsonLinked CarinoLinkedAttribution: portfolio_return_compounded and benchmark_return_compounded, each linked sector's allocation, selection, interaction and total with linked_allocation, linked_selection and linked_interaction as the footer, and every period's portfolio, benchmark and excess returns, sector effects and returned totals, all decimals of return in returned order. Inputs are the host's chronological SectorPeriod rows with any period names; nothing is defaulted, summed, differenced, linked or stacked, and the compounded active return is not shown because Rust returns only its two sides.",
+  },
+  {
     id: "scenario-pnl-table",
     schema: `${base}portfolio/1/scenario_pnl_batch_item.schema.json`,
     pointer: "#",

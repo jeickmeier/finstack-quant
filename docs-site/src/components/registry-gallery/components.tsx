@@ -94,6 +94,7 @@ import { Example as Example70 } from "./examples/covenant-breach-forecast";
 import { Example as ExamplePortfolioWorkbench } from "./examples/portfolio-workbench";
 import { Example as ExamplePortfolioAttributionReport } from "./examples/portfolio-attribution-report";
 import { Example as ExamplePortfolioReturns } from "./examples/portfolio-returns";
+import { Example as ExampleBrinsonReport } from "./examples/brinson-report";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -189,6 +190,7 @@ const examples = {
   "portfolio-workbench": ExamplePortfolioWorkbench,
   "portfolio-attribution-report": ExamplePortfolioAttributionReport,
   "portfolio-returns": ExamplePortfolioReturns,
+  "brinson-report": ExampleBrinsonReport,
 };
 export function ComponentDemo({
   name,
