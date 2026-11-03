@@ -62,27 +62,26 @@ pub(super) fn fit_make_whole_policies(
     bond: &Bond,
     config: &BondLsmcConfig,
     seed: u64,
-    estimators: usize,
     simulated_paths: usize,
+    terms: &ReplayTerms,
 ) -> Result<Vec<RegressionPolicy>> {
     if template.make_whole_claims.is_empty() {
         return Ok(Vec::new());
     }
-    let boundaries = training_boundaries(template)?;
+    let boundaries = training_boundaries(template, simulated_paths)?;
     let checkpoints = build_training_checkpoints(
         tree,
         template,
         bond,
         config,
         seed,
-        estimators,
         simulated_paths,
         &boundaries,
+        terms,
     )?;
     let mut policies = vec![None; template.make_whole_claims.len()];
     let mut carried_reference_values =
         vec![vec![0.0; simulated_paths]; template.make_whole_bases.len()];
-    let mut sampled = Vec::new();
     for block_index in (0..boundaries.len() - 1).rev() {
         let low = boundaries[block_index];
         let high = boundaries[block_index + 1];
@@ -108,7 +107,18 @@ pub(super) fn fit_make_whole_policies(
             buffers_by_local[local].push(buffer_index);
         }
 
-        for physical in 0..simulated_paths {
+        let low_step = template.decision_steps[low];
+        let high_step = template.decision_steps[high];
+        let mut local_at_step = vec![None; high_step - low_step];
+        for local in 0..owned {
+            local_at_step[template.decision_steps[low + local] - low_step] = Some(local);
+        }
+        let carried = &carried_reference_values;
+        let claim_indices = claim_indices.as_slice();
+        let buffers_by_local = buffers_by_local.as_slice();
+        let local_at_step = local_at_step.as_slice();
+        let block_checkpoints = &checkpoints[block_index];
+        let paths = map_paths(simulated_paths, Vec::new, |sampled, physical| {
             let (path_index, antithetic) = physical_path_identity(physical, config.antithetic);
             let record = template.replay_block(
                 tree,
@@ -117,28 +127,25 @@ pub(super) fn fit_make_whole_policies(
                 seed,
                 path_index,
                 antithetic,
-                &checkpoints[block_index][physical],
+                &block_checkpoints[physical],
                 low,
                 high,
                 None,
-                &mut sampled,
+                terms,
+                sampled,
             )?;
-            let low_step = template.decision_steps[low];
-            let high_step = template.decision_steps[high];
-            let mut local_at_step = vec![None; high_step - low_step];
-            for local in 0..owned {
-                local_at_step[template.decision_steps[low + local] - low_step] = Some(local);
-            }
+            let mut values = Vec::with_capacity(template.make_whole_bases.len());
+            let mut samples = Vec::new();
             for (basis_index, basis) in template.make_whole_bases.iter().enumerate() {
-                let mut value = carried_reference_values[basis_index][physical];
+                let mut value = carried[basis_index][physical];
                 for step in (low_step..high_step).rev() {
-                    let next_state = record.step_states[step + 1 - low_step];
+                    let next_state = terms.step_state(&record.step_states, low_step, step + 1);
                     let redemption = if template.redemption_step == Some(step + 1) {
                         next_state.outstanding
                     } else {
                         0.0
                     };
-                    let factor = path_state(&sampled, step)?;
+                    let factor = path_state(sampled, step)?;
                     value = factor.discount_to_next
                         * basis.interval_adjustments[step]
                         * (next_state.reference_cash + redemption + value);
@@ -150,12 +157,21 @@ pub(super) fn fit_make_whole_policies(
                             }
                             let mut reference_features = record.snapshots[local].features;
                             reference_features[1] = 0.0;
-                            features[buffer_index].push(reference_features);
-                            responses[buffer_index].push(value);
+                            samples.push((buffer_index, reference_features, value));
                         }
                     }
                 }
+                values.push(value);
+            }
+            Ok((values, samples))
+        })?;
+        for (physical, (values, samples)) in paths.into_iter().enumerate() {
+            for (basis_index, value) in values.into_iter().enumerate() {
                 carried_reference_values[basis_index][physical] = value;
+            }
+            for (buffer_index, reference_features, value) in samples {
+                features[buffer_index].push(reference_features);
+                responses[buffer_index].push(value);
             }
         }
         for (buffer_index, &claim_index) in claim_indices.iter().enumerate() {
@@ -185,28 +201,27 @@ pub(super) fn fit_policies(
     bond: &Bond,
     config: &BondLsmcConfig,
     seed: u64,
-    estimators: usize,
     simulated_paths: usize,
     make_whole_policies: &[RegressionPolicy],
+    terms: &ReplayTerms,
 ) -> Result<Vec<Option<RegressionPolicy>>> {
     let decisions = template.decision_steps.len();
     let last = decisions.checked_sub(1).ok_or_else(|| {
         Error::Internal("bond hazard LSMC replay produced no decision snapshots".into())
     })?;
-    let boundaries = training_boundaries(template)?;
+    let boundaries = training_boundaries(template, simulated_paths)?;
     let checkpoints = build_training_checkpoints(
         tree,
         template,
         bond,
         config,
         seed,
-        estimators,
         simulated_paths,
         &boundaries,
+        terms,
     )?;
     let mut policies = vec![None; decisions];
     let mut values = vec![0.0; simulated_paths];
-    let mut sampled = Vec::new();
     for block_index in (0..boundaries.len() - 1).rev() {
         let low = boundaries[block_index];
         let high = boundaries[block_index + 1];
@@ -223,21 +238,24 @@ pub(super) fn fit_policies(
                 "bond hazard LSMC block checkpoint count is inconsistent".into(),
             ));
         }
-        for (physical, checkpoint) in block_checkpoints.iter().enumerate() {
+        let records = map_paths(simulated_paths, Vec::new, |sampled, physical| {
             let (path_index, antithetic) = physical_path_identity(physical, config.antithetic);
-            let record = template.replay_block(
+            template.replay_block(
                 tree,
                 bond,
                 config,
                 seed,
                 path_index,
                 antithetic,
-                checkpoint,
+                &block_checkpoints[physical],
                 low,
                 high,
                 Some(make_whole_policies),
-                &mut sampled,
-            )?;
+                terms,
+                sampled,
+            )
+        })?;
+        for (physical, record) in records.into_iter().enumerate() {
             if record.snapshots.len() != owned {
                 return Err(Error::Internal(
                     "bond hazard LSMC block snapshot count is inconsistent".into(),

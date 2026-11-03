@@ -39,6 +39,7 @@ Sampling is tunable through `FQ_BENCH_SAMPLE_SIZE`, `FQ_BENCH_WARM_UP_TIME`,
 | Bench | Focus |
 |-------|--------|
 | `bond_pricing` | PV, YTM, duration, DV01, tree/OAS, spreads |
+| `bond_rates_credit` | Callable bond with a credit curve on the `rates_credit` model: one PV and one OAS solve |
 | `bond_future_bench` | Bond future conversion factor, NPV, invoice, and risk examples |
 | `swap_pricing` | IRS PV, DV01, par rate |
 | `option_pricing` | Equity option PV and Greeks |

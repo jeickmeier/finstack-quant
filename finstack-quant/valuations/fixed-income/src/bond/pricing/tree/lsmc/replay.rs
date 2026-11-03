@@ -1250,6 +1250,7 @@ impl ReplayTemplate {
         low_decision: usize,
         high_decision: usize,
         make_whole_policies: Option<&[RegressionPolicy]>,
+        terms: &ReplayTerms,
         path: &mut Vec<RatesCreditPathState>,
     ) -> Result<BlockPathRecord> {
         let low_step = self.decision_steps[low_decision];
@@ -1263,12 +1264,18 @@ impl ReplayTemplate {
             path,
         )?;
         let mut cursor = ReplayCursor::from_checkpoint(self, &checkpoint.product)?;
-        let mut step_states = Vec::with_capacity(high_step - low_step + 1);
+        let mut step_states = Vec::with_capacity(if terms.product_is_static() {
+            0
+        } else {
+            high_step - low_step + 1
+        });
         let mut decision_snapshots = Vec::with_capacity(high_decision - low_decision + 1);
         let mut next_decision = low_decision;
         for step in low_step..=high_step {
-            let state = cursor.advance_step(self, bond, path, config, step)?;
-            step_states.push(state);
+            let state = terms.advance(&mut cursor, self, bond, path, config, step)?;
+            if !terms.product_is_static() {
+                step_states.push(state);
+            }
             if next_decision <= high_decision && self.decision_steps[next_decision] == step {
                 decision_snapshots.push(self.decision_snapshot(
                     bond,
@@ -1286,7 +1293,6 @@ impl ReplayTemplate {
                 "bond hazard LSMC block replay missed a decision snapshot".into(),
             ));
         }
-        let oas = config.oas_bp / 10_000.0;
         for (local, snapshot) in decision_snapshots
             .iter_mut()
             .take(high_decision - low_decision)
@@ -1298,15 +1304,12 @@ impl ReplayTemplate {
             let mut b = 0.0;
             for step in from..to {
                 let factor = path_state(path, step)?;
-                let state = step_states[step - low_step];
-                let dt = self.times[step + 1] - self.times[step];
-                let interval_df = factor.discount_to_next * (-oas * dt).exp();
-                let recovery = self.recovery_rate
-                    * state.outstanding
-                    * continuous_frp_weight(interval_df, factor.survival_to_next)?;
+                let state = terms.step_state(&step_states, low_step, step);
+                let interval = terms.interval(factor)?;
+                let recovery = self.recovery_rate * state.outstanding * interval.frp_weight;
                 let cash = if step > from { state.current_cash } else { 0.0 };
                 b += a * (recovery + cash);
-                a *= interval_df * factor.survival_to_next;
+                a *= interval.risky_df;
             }
             snapshot.a_to_next = a;
             snapshot.b_to_next = b;
@@ -1330,6 +1333,7 @@ impl ReplayTemplate {
         path: &[RatesCreditPathState],
         config: &BondLsmcConfig,
         make_whole_policies: Option<&[RegressionPolicy]>,
+        terms: &ReplayTerms,
         buffers: &mut ReplayBuffers,
     ) -> Result<PathRecord> {
         if path.len() != self.times.len() {
@@ -1339,7 +1343,6 @@ impl ReplayTemplate {
                 self.times.len()
             )));
         }
-        let oas = config.oas_bp / 10_000.0;
         let mut cursor = ReplayCursor::new(self)?;
         let ReplayBuffers {
             step_cash,
@@ -1353,7 +1356,7 @@ impl ReplayTemplate {
         let mut next_decision = 0_usize;
 
         for step in 0..self.times.len() {
-            let state = cursor.advance_step(self, bond, path, config, step)?;
+            let state = terms.advance(&mut cursor, self, bond, path, config, step)?;
             step_cash[step] = state.current_cash;
             outstanding_after_events[step] = state.outstanding;
             if next_decision < self.decision_steps.len()
@@ -1383,12 +1386,10 @@ impl ReplayTemplate {
             let mut a = 1.0;
             let mut b = 0.0;
             for step in (from..to).rev() {
-                let dt = self.times[step + 1] - self.times[step];
-                let interval_df = path[step].discount_to_next * (-oas * dt).exp();
-                let q = interval_df * path[step].survival_to_next;
-                let recovery = self.recovery_rate
-                    * outstanding_after_events[step]
-                    * continuous_frp_weight(interval_df, path[step].survival_to_next)?;
+                let interval = terms.interval(&path[step])?;
+                let q = interval.risky_df;
+                let recovery =
+                    self.recovery_rate * outstanding_after_events[step] * interval.frp_weight;
                 a *= q;
                 b = q * b + recovery;
                 if step > from {
