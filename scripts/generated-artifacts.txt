@@ -185,6 +185,8 @@ finstack-quant-ui/src/generated/meta/bridge_chart.ts
 finstack-quant-ui/src/generated/meta/calibration.ts
 finstack-quant-ui/src/generated/meta/callable_range_accrual.ts
 finstack-quant-ui/src/generated/meta/cap_floor.ts
+finstack-quant-ui/src/generated/meta/capital_structure_summary.ts
+finstack-quant-ui/src/generated/meta/capital_structure_summary_config.ts
 finstack-quant-ui/src/generated/meta/cds_index.ts
 finstack-quant-ui/src/generated/meta/cds_option.ts
 finstack-quant-ui/src/generated/meta/cds_tranche.ts
@@ -252,6 +254,8 @@ finstack-quant-ui/src/generated/meta/merton_model.ts
 finstack-quant-ui/src/generated/meta/monte_carlo_config.ts
 finstack-quant-ui/src/generated/meta/monte_carlo_results.ts
 finstack-quant-ui/src/generated/meta/ndf.ts
+finstack-quant-ui/src/generated/meta/normalization_config.ts
+finstack-quant-ui/src/generated/meta/normalization_result.ts
 finstack-quant-ui/src/generated/meta/oas_config.ts
 finstack-quant-ui/src/generated/meta/ohlson_o_score_input.ts
 finstack-quant-ui/src/generated/meta/portfolio_margin_result.ts
@@ -260,6 +264,9 @@ finstack-quant-ui/src/generated/meta/private_markets_fund.ts
 finstack-quant-ui/src/generated/meta/quanto_option.ts
 finstack-quant-ui/src/generated/meta/range_accrual.ts
 finstack-quant-ui/src/generated/meta/real_estate_asset.ts
+finstack-quant-ui/src/generated/meta/recovery_claim.ts
+finstack-quant-ui/src/generated/meta/relative_value_report.ts
+finstack-quant-ui/src/generated/meta/relative_value_report_config.ts
 finstack-quant-ui/src/generated/meta/repo.ts
 finstack-quant-ui/src/generated/meta/revolving_credit.ts
 finstack-quant-ui/src/generated/meta/rollup_spec.ts
@@ -269,6 +276,7 @@ finstack-quant-ui/src/generated/meta/scenario_pnl_batch_item.ts
 finstack-quant-ui/src/generated/meta/scenario_revalue_view.ts
 finstack-quant-ui/src/generated/meta/scenario_set.ts
 finstack-quant-ui/src/generated/meta/scenario_spec.ts
+finstack-quant-ui/src/generated/meta/seniority_calibration.ts
 finstack-quant-ui/src/generated/meta/sensitivity_result.ts
 finstack-quant-ui/src/generated/meta/shared.ts
 finstack-quant-ui/src/generated/meta/simm_sensitivities_json.ts
@@ -288,6 +296,7 @@ finstack-quant-ui/src/generated/meta/variance_swap.ts
 finstack-quant-ui/src/generated/meta/vm_result.ts
 finstack-quant-ui/src/generated/meta/volatility_index_future.ts
 finstack-quant-ui/src/generated/meta/volatility_index_future_option.ts
+finstack-quant-ui/src/generated/meta/workout_lgd.ts
 finstack-quant-ui/src/generated/meta/xccy_swap.ts
 finstack-quant-ui/src/generated/meta/yoy_inflation_swap.ts
 finstack-quant-ui/src/generated/meta/zmijewski_input.ts
@@ -313,6 +322,8 @@ finstack-quant-ui/src/generated/schemas/bridge_chart.json
 finstack-quant-ui/src/generated/schemas/calibration.json
 finstack-quant-ui/src/generated/schemas/callable_range_accrual.json
 finstack-quant-ui/src/generated/schemas/cap_floor.json
+finstack-quant-ui/src/generated/schemas/capital_structure_summary.json
+finstack-quant-ui/src/generated/schemas/capital_structure_summary_config.json
 finstack-quant-ui/src/generated/schemas/cds_index.json
 finstack-quant-ui/src/generated/schemas/cds_option.json
 finstack-quant-ui/src/generated/schemas/cds_tranche.json
@@ -380,6 +391,8 @@ finstack-quant-ui/src/generated/schemas/merton_model.json
 finstack-quant-ui/src/generated/schemas/monte_carlo_config.json
 finstack-quant-ui/src/generated/schemas/monte_carlo_results.json
 finstack-quant-ui/src/generated/schemas/ndf.json
+finstack-quant-ui/src/generated/schemas/normalization_config.json
+finstack-quant-ui/src/generated/schemas/normalization_result.json
 finstack-quant-ui/src/generated/schemas/oas_config.json
 finstack-quant-ui/src/generated/schemas/ohlson_o_score_input.json
 finstack-quant-ui/src/generated/schemas/portfolio_margin_result.json
@@ -388,6 +401,9 @@ finstack-quant-ui/src/generated/schemas/private_markets_fund.json
 finstack-quant-ui/src/generated/schemas/quanto_option.json
 finstack-quant-ui/src/generated/schemas/range_accrual.json
 finstack-quant-ui/src/generated/schemas/real_estate_asset.json
+finstack-quant-ui/src/generated/schemas/recovery_claim.json
+finstack-quant-ui/src/generated/schemas/relative_value_report.json
+finstack-quant-ui/src/generated/schemas/relative_value_report_config.json
 finstack-quant-ui/src/generated/schemas/repo.json
 finstack-quant-ui/src/generated/schemas/revolving_credit.json
 finstack-quant-ui/src/generated/schemas/rollup_spec.json
@@ -397,6 +413,7 @@ finstack-quant-ui/src/generated/schemas/scenario_pnl_batch_item.json
 finstack-quant-ui/src/generated/schemas/scenario_revalue_view.json
 finstack-quant-ui/src/generated/schemas/scenario_set.json
 finstack-quant-ui/src/generated/schemas/scenario_spec.json
+finstack-quant-ui/src/generated/schemas/seniority_calibration.json
 finstack-quant-ui/src/generated/schemas/sensitivity_result.json
 finstack-quant-ui/src/generated/schemas/simm_sensitivities_json.json
 finstack-quant-ui/src/generated/schemas/snowball.json
@@ -415,6 +432,7 @@ finstack-quant-ui/src/generated/schemas/variance_swap.json
 finstack-quant-ui/src/generated/schemas/vm_result.json
 finstack-quant-ui/src/generated/schemas/volatility_index_future.json
 finstack-quant-ui/src/generated/schemas/volatility_index_future_option.json
+finstack-quant-ui/src/generated/schemas/workout_lgd.json
 finstack-quant-ui/src/generated/schemas/xccy_swap.json
 finstack-quant-ui/src/generated/schemas/yoy_inflation_swap.json
 finstack-quant-ui/src/generated/schemas/zmijewski_input.json
@@ -438,6 +456,8 @@ finstack-quant-ui/src/generated/types/bridge_chart.ts
 finstack-quant-ui/src/generated/types/calibration.ts
 finstack-quant-ui/src/generated/types/callable_range_accrual.ts
 finstack-quant-ui/src/generated/types/cap_floor.ts
+finstack-quant-ui/src/generated/types/capital_structure_summary.ts
+finstack-quant-ui/src/generated/types/capital_structure_summary_config.ts
 finstack-quant-ui/src/generated/types/cds_index.ts
 finstack-quant-ui/src/generated/types/cds_option.ts
 finstack-quant-ui/src/generated/types/cds_tranche.ts
@@ -505,6 +525,8 @@ finstack-quant-ui/src/generated/types/merton_model.ts
 finstack-quant-ui/src/generated/types/monte_carlo_config.ts
 finstack-quant-ui/src/generated/types/monte_carlo_results.ts
 finstack-quant-ui/src/generated/types/ndf.ts
+finstack-quant-ui/src/generated/types/normalization_config.ts
+finstack-quant-ui/src/generated/types/normalization_result.ts
 finstack-quant-ui/src/generated/types/oas_config.ts
 finstack-quant-ui/src/generated/types/ohlson_o_score_input.ts
 finstack-quant-ui/src/generated/types/portfolio_margin_result.ts
@@ -513,6 +535,9 @@ finstack-quant-ui/src/generated/types/private_markets_fund.ts
 finstack-quant-ui/src/generated/types/quanto_option.ts
 finstack-quant-ui/src/generated/types/range_accrual.ts
 finstack-quant-ui/src/generated/types/real_estate_asset.ts
+finstack-quant-ui/src/generated/types/recovery_claim.ts
+finstack-quant-ui/src/generated/types/relative_value_report.ts
+finstack-quant-ui/src/generated/types/relative_value_report_config.ts
 finstack-quant-ui/src/generated/types/repo.ts
 finstack-quant-ui/src/generated/types/revolving_credit.ts
 finstack-quant-ui/src/generated/types/rollup_spec.ts
@@ -522,6 +547,7 @@ finstack-quant-ui/src/generated/types/scenario_pnl_batch_item.ts
 finstack-quant-ui/src/generated/types/scenario_revalue_view.ts
 finstack-quant-ui/src/generated/types/scenario_set.ts
 finstack-quant-ui/src/generated/types/scenario_spec.ts
+finstack-quant-ui/src/generated/types/seniority_calibration.ts
 finstack-quant-ui/src/generated/types/sensitivity_result.ts
 finstack-quant-ui/src/generated/types/shared.ts
 finstack-quant-ui/src/generated/types/simm_sensitivities_json.ts
@@ -541,6 +567,7 @@ finstack-quant-ui/src/generated/types/variance_swap.ts
 finstack-quant-ui/src/generated/types/vm_result.ts
 finstack-quant-ui/src/generated/types/volatility_index_future.ts
 finstack-quant-ui/src/generated/types/volatility_index_future_option.ts
+finstack-quant-ui/src/generated/types/workout_lgd.ts
 finstack-quant-ui/src/generated/types/xccy_swap.ts
 finstack-quant-ui/src/generated/types/yoy_inflation_swap.ts
 finstack-quant-ui/src/generated/types/zmijewski_input.ts

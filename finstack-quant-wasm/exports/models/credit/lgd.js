@@ -7,6 +7,7 @@ export const lgd = {
   WorkoutLgdBuilder: wasm.WorkoutLgdBuilder,
   DownturnLgd: wasm.DownturnLgd,
   EadCalculator: wasm.EadCalculator,
+  seniorityCalibrationIds: wasm.seniorityCalibrationIds,
   seniorityRecoveryStats: wasm.seniorityRecoveryStats,
   workoutLgd: wasm.workoutLgd,
   collateralPieceLiquidationValue: wasm.collateralPieceLiquidationValue,

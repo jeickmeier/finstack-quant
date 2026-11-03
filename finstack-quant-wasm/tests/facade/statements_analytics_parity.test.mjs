@@ -34,11 +34,30 @@ function evaluate(model) {
   }
 }
 
+/** The shared capital-structure model and its evaluation on the shared market. */
+function evaluatedCapitalStructure() {
+  const evaluator = new statements.Evaluator();
+  try {
+    const model = INPUTS.capital_structure_model;
+    return {
+      model,
+      results: evaluator.evaluateWithMarket(
+        model,
+        INPUTS.capital_structure_market,
+        INPUTS.capital_structure_as_of
+      ),
+    };
+  } finally {
+    evaluator.free();
+  }
+}
+
 const valueOf = (model, node, period) =>
   orNull(statements.statementResultGet(evaluate(model), node, period));
 
 test('statements_analytics matches the cross-host golden', () => {
   const result = evaluate(MODEL);
+  const capitalStructure = evaluatedCapitalStructure();
   const tracer = new sa.DependencyTracer(MODEL);
 
   const corkBuilder = new statements.ModelBuilder('cork');
@@ -198,6 +217,34 @@ test('statements_analytics matches the cross-host golden', () => {
         check_mappings: INPUTS.lbo_check_mappings,
       }),
     },
+    capital_structure_summary: {
+      full_year: sa.capitalStructureSummary(capitalStructure.results, capitalStructure.model, {
+        period: '2025Q4',
+        ebitda_node: 'ebitda',
+        cash_node: 'cash',
+      }),
+      short_window: sa.capitalStructureSummary(capitalStructure.results, capitalStructure.model, {
+        period: '2025Q3',
+        ebitda_node: 'ebitda',
+      }),
+    },
+    relative_value_report: {
+      full: sa.relativeValueReport(
+        INPUTS.relative_value_subject,
+        INPUTS.relative_value_universe,
+        INPUTS.relative_value_config
+      ),
+      table_only: sa.relativeValueReport(
+        INPUTS.relative_value_subject,
+        INPUTS.relative_value_universe,
+        INPUTS.relative_value_table_only_config
+      ),
+      partial_filter: sa.relativeValueReport(
+        INPUTS.relative_value_subject,
+        INPUTS.relative_value_universe,
+        INPUTS.relative_value_partial_filter_config
+      ),
+    },
     dcf_sensitivity: {
       gordon_growth: sa.dcfSensitivity(
         INPUTS.dcf_model,
@@ -220,6 +267,115 @@ test('statements_analytics matches the cross-host golden', () => {
   corkscrew.free();
   scorecard.free();
   assertMatches(plain(actual), EXPECTED.statements_analytics, 'statements_analytics');
+});
+
+test('capitalStructureSummary reads the LTM window and rejects a bad request', () => {
+  const { model, results } = evaluatedCapitalStructure();
+  const summary = sa.capitalStructureSummary(results, model, {
+    period: '2025Q4',
+    ebitda_node: 'ebitda',
+    cash_node: 'cash',
+  });
+  assert.deepEqual(
+    summary.tranches.map((tranche) => [tranche.id, tranche.rank, tranche.payment_class]),
+    [
+      ['SR-A', 0, '1L'],
+      ['SR-B', 0, '1L'],
+      ['SUB', 1, '2L'],
+    ]
+  );
+  // 920,000 of debt over 100,000 + 110,000 + 120,000 + 130,000 of EBITDA.
+  assert.equal(summary.total_leverage, 2);
+  assert.deepEqual(
+    summary.maturity_wall.map((bucket) => [bucket.year, bucket.amount.amount]),
+    [
+      [2029, '500000'],
+      [2031, '420000'],
+    ]
+  );
+  const short = sa.capitalStructureSummary(results, model, {
+    period: '2025Q3',
+    ebitda_node: 'ebitda',
+  });
+  assert.deepEqual(
+    [short.ltm_periods_required, short.ltm_periods_found, short.total_leverage],
+    [4, 3, null]
+  );
+  for (const request of [
+    { period: '2025Q4', ebitda_node: 'nope' },
+    { period: '2030Q1', ebitda_node: 'ebitda' },
+    { period: '2025Q4', ebitda_node: 'ebitda', guess: true },
+  ]) {
+    assert.throws(
+      () => sa.capitalStructureSummary(results, model, request),
+      (error) => error.kind === 'validation'
+    );
+  }
+});
+
+test('relativeValueReport hands over the table, the scatter and the score', () => {
+  const subject = INPUTS.relative_value_subject;
+  const universe = INPUTS.relative_value_universe;
+  const report = sa.relativeValueReport(subject, universe, INPUTS.relative_value_config);
+  assert.deepEqual(
+    report.companies.map((row) => [row.id, row.is_subject]),
+    [
+      ['SUBJ', true],
+      ['P1', false],
+      ['P2', false],
+      ['P3', false],
+      ['P4', false],
+      ['P5', false],
+    ]
+  );
+  assert.deepEqual([report.peer_count, report.excluded_count], [5, 1]);
+  // 300 / 2.5; 1000 / 100; no P/E inputs.
+  assert.deepEqual(report.companies[0].values, [120, 10, null]);
+  const [regression, , disabled, unavailable] = report.dimensions;
+  // y = 10 + 95x over the four pairs, so 105 at x = 1; P5 has no leverage and no point.
+  assert.deepEqual(
+    regression.points.map((point) => [point.company_id, point.is_subject]),
+    [
+      ['SUBJ', true],
+      ['P1', false],
+      ['P2', false],
+      ['P3', false],
+      ['P4', false],
+    ]
+  );
+  assert.ok(Math.abs(regression.points[1].fitted_y - 105) < 1e-9);
+  assert.equal(disabled.excluded_reason, 'zero_weight');
+  assert.equal(unavailable.excluded_reason, 'no_subject_value');
+
+  const tableOnly = sa.relativeValueReport(
+    subject,
+    universe,
+    INPUTS.relative_value_table_only_config
+  );
+  assert.equal(tableOnly.composite, null);
+  assert.equal(tableOnly.composite_excluded_reason, 'no_usable_dimension');
+  assert.deepEqual(tableOnly.period_basis, { custom: 'FY2025E' });
+
+  for (const config of [
+    { period_basis: 'ltm', dimensions: [], multiples: [] },
+    { period_basis: 'ltm', dimensions: [], multiples: ['ev_ebitda'], guess: true },
+    { filter: { gics_sector: ['energy'] }, period_basis: 'ltm', dimensions: [], multiples: ['pe'] },
+    {
+      period_basis: 'ltm',
+      dimensions: [{ label: 'bad', y_extractor: { named: 'oas_bp' }, weight: -1 }],
+      multiples: [],
+    },
+  ]) {
+    assert.throws(
+      () => sa.relativeValueReport(subject, universe, config),
+      (error) => error.kind === 'validation'
+    );
+  }
+  assert.throws(
+    () =>
+      sa.relativeValueReport(subject, [{ id: 'TYPO', ebidta: 100 }], INPUTS.relative_value_config),
+    (error) => error.kind === 'validation' && /ebidta/.test(error.message)
+  );
 });
 
 test('plSummaryReport returns the Rust table of the text report', () => {

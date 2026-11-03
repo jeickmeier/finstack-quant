@@ -75,6 +75,20 @@ impl CreditAssumptionRegistry {
         })
     }
 
+    /// Returns every seniority calibration id: the default first, then the
+    /// others in registry order.
+    pub(crate) fn seniority_calibration_ids(&self) -> Vec<String> {
+        let default = self.default_seniority_calibration_id.as_str();
+        std::iter::once(default.to_string())
+            .chain(
+                self.seniority_calibrations
+                    .iter()
+                    .filter(|record| record.id != default)
+                    .map(|record| record.id.clone()),
+            )
+            .collect()
+    }
+
     pub(crate) fn seniority_calibration(&self, id: &str) -> Result<SeniorityCalibration> {
         let record = self
             .seniority_calibrations

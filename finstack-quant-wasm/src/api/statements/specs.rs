@@ -57,7 +57,7 @@ pub fn validate_normalization_config_json(json: JsValue) -> Result<String, JsVal
 /// Twin of Python `normalize` (Rust `adjustments::normalize`).
 /// @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
 /// @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
-/// @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped) and the final value.
+/// @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped amounts and `adjusted_value`, the target through that step) and the final value.
 ///
 /// # Errors
 ///

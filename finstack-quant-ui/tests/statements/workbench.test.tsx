@@ -19,6 +19,8 @@ import covenantSeries from "../../src/fixtures/covenants/analyst-covenant-series
 import { StatementsWorkbench } from "@/components/finstack/statements/blocks/statements-workbench/statements-workbench";
 import { reportStatementCell } from "@/components/finstack/statements/components/statement-grid/projection";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
+import waccCases from "./wacc/cases.json";
+import capitalStructure from "./capital-structure/cases.json";
 import { budget } from "../shared/budget";
 import { formatRawMoney } from "../../src/format/format";
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
@@ -56,6 +58,22 @@ beforeEach(() => {
         return { state: "ready", worker: true };
       case "validateStatementModel":
         return native.validateFinancialModelJson(arg);
+      case "validateNormalizationConfig":
+        return native.validateNormalizationConfigJson(arg);
+      case "normalize":
+        return native.normalize(arg.resultJson, arg.configJson);
+      case "statementResultToTableWide":
+        return native.statementResultToTableWide(arg);
+      case "statementResultToTableLong":
+        return native.statementResultToTableLong(arg);
+      case "wacc":
+        return native.wacc(
+          arg.equityWeight,
+          arg.costOfEquity,
+          arg.debtWeight,
+          arg.costOfDebt,
+          arg.taxRate,
+        );
       case "evaluateStatement":
         return new native.Evaluator().evaluate(arg.modelJson);
       case "validateStatementFormula":
@@ -114,6 +132,12 @@ beforeEach(() => {
         );
       case "evaluateLbo":
         return native.evaluateLbo(arg.modelJson, arg.configJson);
+      case "capitalStructureSummary":
+        return native.capitalStructureSummary(
+          arg.resultJson,
+          arg.modelJson,
+          arg.configJson,
+        );
       case "runSensitivity": {
         const result = native.runSensitivity(
           arg.modelJson,
@@ -498,6 +522,253 @@ it("shows a native P&L summary error in Metrics & ratios instead of hiding the s
   );
 });
 
+it(
+  "exports the result the grids show, calling Rust only once opened",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+      </FinstackQueryProvider>,
+    );
+    const summary = await screen.findByText("Export table and CSV");
+    const tableCalls = () =>
+      call.mock.calls.filter(([method]) =>
+        String(method).startsWith("statementResultToTable"),
+      );
+    expect(tableCalls()).toHaveLength(0);
+    const details = summary.closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    const region = await screen.findByRole(
+      "region",
+      { name: "Statement export" },
+      { timeout: budget(10000) },
+    );
+    await within(region).findByText(
+      "Statement result, wide layout",
+      undefined,
+      {
+        timeout: budget(10000),
+      },
+    );
+    expect(tableCalls()).toHaveLength(1);
+    const quarterly = within(region).getAllByRole("row").length;
+    // Annual: the export follows the native rollup, as the grids do.
+    fireEvent.click(screen.getByRole("button", { name: "Annual" }));
+    await waitFor(
+      () => {
+        const annual = within(
+          screen.getByRole("region", { name: "Statement export" }),
+        ).getAllByRole("row").length;
+        expect(annual).toBeLessThan(quarterly);
+        expect(tableCalls().length).toBeGreaterThan(1);
+      },
+      { timeout: budget(10000) },
+    );
+  },
+  budget(30000),
+);
+
+it(
+  "normalizes the reported result in Metrics & ratios, calling Rust only once opened",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+      </FinstackQueryProvider>,
+    );
+    fireEvent.click(
+      await screen.findByRole("tab", { name: "Metrics & ratios" }),
+    );
+    const summary = await screen.findByText(
+      "Adjusted EBITDA and normalization",
+    );
+    const calls = (name: string) =>
+      call.mock.calls.filter(([method]) => method === name);
+    expect(calls("validateNormalizationConfig")).toHaveLength(0);
+    expect(calls("normalize")).toHaveLength(0);
+    const details = summary.closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    const region = await screen.findByRole(
+      "region",
+      { name: "Normalization" },
+      { timeout: budget(10000) },
+    );
+    fireEvent.change(
+      within(region).getByRole("combobox", { name: "Target node" }),
+      { target: { value: "ebitda" } },
+    );
+    await waitFor(
+      () =>
+        expect(
+          calls("validateNormalizationConfig").some(
+            ([, json]) => JSON.parse(json).target_node === "ebitda",
+          ),
+        ).toBe(true),
+      { timeout: budget(10000) },
+    );
+    expect(calls("normalize")).toHaveLength(0);
+    fireEvent.click(within(region).getByRole("button", { name: "Normalize" }));
+    const table = await within(region).findByRole(
+      "table",
+      { name: "Adjustments by period (USD)" },
+      { timeout: budget(10000) },
+    );
+    const request = lastCall("normalize");
+    expect(JSON.parse(request.configJson).target_node).toBe("ebitda");
+    const returned = native.normalize(request.resultJson, request.configJson);
+    // No adjustments: the base and final rows, one column per returned period.
+    const rows = within(table).getAllByRole("row");
+    expect(rows).toHaveLength(3);
+    expect(within(rows[0]!).getAllByRole("columnheader")).toHaveLength(
+      returned.length + 1,
+    );
+  },
+  budget(30000),
+);
+
+/** Opens Metrics & ratios and the capital structure disclosure; returns its region. */
+async function openCapitalStructure() {
+  fireEvent.click(await screen.findByRole("tab", { name: "Metrics & ratios" }));
+  const summary = await screen.findByText("Capital structure and debt stack");
+  expect(
+    call.mock.calls.filter(([method]) => method === "capitalStructureSummary"),
+  ).toHaveLength(0);
+  const details = summary.closest("details")!;
+  details.open = true;
+  fireEvent(details, new Event("toggle"));
+  return screen.findByRole(
+    "region",
+    { name: "Capital structure" },
+    { timeout: budget(10000) },
+  );
+}
+/** Picks the period and EBITDA node, then submits once the form accepts it. */
+async function summarize(region: HTMLElement, period: string) {
+  await userEvent.click(
+    within(region).getByRole("combobox", { name: "Period" }),
+  );
+  // The select's popup mounts its options after the trigger click resolves.
+  await userEvent.click(await screen.findByRole("option", { name: period }));
+  fireEvent.change(
+    within(region).getByRole("combobox", { name: "EBITDA node" }),
+    { target: { value: "ebitda" } },
+  );
+  const submit = within(region).getByRole("button", { name: "Summarize" });
+  const submitted = () =>
+    call.mock.calls.filter(([method]) => method === "capitalStructureSummary");
+  // No native validator runs in this loop: Rust validates the config on the call.
+  await waitFor(
+    () => {
+      fireEvent.click(submit);
+      expect(submitted().length).toBeGreaterThan(0);
+    },
+    { timeout: budget(10000) },
+  );
+}
+
+it(
+  "summarizes the debt stack in Metrics & ratios, calling Rust only once opened",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <StatementsWorkbench
+          defaultModelJson={JSON.stringify(capitalStructure.model)}
+        />
+      </FinstackQueryProvider>,
+    );
+    const region = await openCapitalStructure();
+    const expected = capitalStructure.cases.noCash.summary;
+    await summarize(region, expected.as_of);
+    const table = await within(region).findByRole(
+      "table",
+      { name: `Debt stack at ${expected.as_of} (${expected.currency})` },
+      { timeout: budget(10000) },
+    );
+    const request = lastCall("capitalStructureSummary");
+    expect(JSON.parse(request.configJson)).toEqual(
+      capitalStructure.cases.noCash.config,
+    );
+    expect(
+      within(table)
+        .getAllByRole("rowheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(expected.tranches.map((tranche) => tranche.id));
+    expect(
+      within(region).getByText("Cash", { selector: "dt" }).nextElementSibling!
+        .textContent,
+    ).toBe("Undefined");
+  },
+  budget(30000),
+);
+
+it(
+  "shows Rust's error for a model with no capital structure",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+      </FinstackQueryProvider>,
+    );
+    const region = await openCapitalStructure();
+    await summarize(region, "2025Q4");
+    expect(
+      (
+        await within(region).findByRole("alert", undefined, {
+          timeout: budget(10000),
+        })
+      ).textContent,
+    ).toBe(capitalStructure.errors.noCapitalStructure.message);
+  },
+  budget(30000),
+);
+
+it("sets the DCF WACC from the native calculator only on the user's click", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+    </FinstackQueryProvider>,
+  );
+  fireEvent.click(await screen.findByRole("tab", { name: "Valuation" }));
+  const form = await screen.findByRole("region", { name: "DCF assumptions" });
+  const waccField = within(form).getByRole("textbox", {
+    name: "WACC",
+  }) as HTMLInputElement;
+  const netDebt = within(form).getByRole("textbox", {
+    name: "Net debt override",
+  }) as HTMLInputElement;
+  fireEvent.change(netDebt, { target: { value: "5" } });
+  const calculator = screen.getByRole("region", { name: "WACC calculator" });
+  const { inputs, rate } = waccCases.cases.blended;
+  for (const [name, value] of [
+    ["Equity weight", inputs.equityWeight],
+    ["Cost of equity", inputs.costOfEquity],
+    ["Debt weight", inputs.debtWeight],
+    ["Cost of debt", inputs.costOfDebt],
+    ["Tax rate", inputs.taxRate],
+  ] as const)
+    fireEvent.change(within(calculator).getByRole("textbox", { name }), {
+      target: { value: String(value) },
+    });
+  fireEvent.click(
+    within(calculator).getByRole("button", { name: "Calculate" }),
+  );
+  const apply = await within(calculator).findByRole(
+    "button",
+    { name: "Use as WACC" },
+    { timeout: budget(10000) },
+  );
+  // Calculating fills nothing, and neither step values the model.
+  expect(waccField.value).toBe("");
+  fireEvent.click(apply);
+  expect(waccField.value).toBe(String(rate));
+  expect(netDebt.value).toBe("5");
+  expect(call.mock.calls.some(([method]) => method === "evaluateDcf")).toBe(
+    false,
+  );
+});
+
 it("values the current model with a native DCF, tornado and LBO in Valuation", async () => {
   render(
     <FinstackQueryProvider>
@@ -768,7 +1039,7 @@ it("reviews the variance, bridge and forecast backtest since the last roll forwa
     expect(lastCall("varianceBridge")?.drivers).toEqual(["revenue"]),
   );
   expect(
-    await within(review).findByRole("table", { name: "Ebitda bridge, 2025Q2" }),
+    await within(review).findByRole("table", { name: "EBITDA bridge, 2025Q2" }),
   ).toBeTruthy();
 });
 

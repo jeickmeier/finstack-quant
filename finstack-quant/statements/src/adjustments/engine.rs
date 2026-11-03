@@ -15,7 +15,8 @@ use indexmap::IndexMap;
 ///
 /// Each result starts with the reported target value, applies configured
 /// adjustments in their declaration order, then adds the capped adjustment
-/// total. Fixed adjustments default to zero for periods not listed. A
+/// total. Every [`AppliedAdjustment`] records the target value through that
+/// step (`adjusted_value`); the last one equals `final_value`. Fixed adjustments default to zero for periods not listed. A
 /// percentage adjustment uses its referenced node's value for the same
 /// period. Self-referential caps use either the reported base or the
 /// progressively adjusted base according to [`CapBaseMode`]. Referenced
@@ -120,15 +121,17 @@ pub fn normalize(
                 (raw_amount, false)
             };
 
+            total_acc.add(capped_amount);
+
             applied_adjustments.push(AppliedAdjustment {
                 adjustment_id: adjustment.id.clone(),
                 name: adjustment.name.clone(),
                 raw_amount,
                 capped_amount,
                 is_capped,
+                // Same expression as `final_value`, so the last step matches it exactly.
+                adjusted_value: base_value + total_acc.total(),
             });
-
-            total_acc.add(capped_amount);
         }
 
         if !(base_value + total_acc.total()).is_finite() {
@@ -482,6 +485,45 @@ mod tests {
         assert_eq!(q1.adjustments[0].capped_amount, 20.0);
         assert!(q1.adjustments[0].is_capped);
         assert_eq!(q1.final_value, 120.0); // 100 + 20
+    }
+
+    #[test]
+    fn adjusted_value_runs_from_base_to_final_value_in_declaration_order() {
+        let results = mock_results();
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        // Q1 EBITDA 100, revenue 1000: one-off +10, capped synergy 50 -> 20
+        // (20% of reported EBITDA), then a 1% of revenue deduction of -10.
+        let one_off = Adjustment::fixed("one_off", "One-off", IndexMap::from([(q1, 10.0)]));
+        let synergy = Adjustment::fixed("syn", "Synergies", IndexMap::from([(q1, 50.0)])).with_cap(
+            Some("EBITDA".to_string()),
+            0.20,
+            CapBaseMode::Reported,
+        );
+        let deduction = Adjustment::percentage("ded", "Deduction", "Revenue", -0.01);
+        let config = NormalizationConfig::new("EBITDA")
+            .add_adjustment(one_off)
+            .and_then(|config| config.add_adjustment(synergy))
+            .and_then(|config| config.add_adjustment(deduction))
+            .expect("unique adjustment ids");
+
+        let normalized = normalize(&results, &config).expect("normalization succeeds");
+
+        let steps: Vec<f64> = normalized[0]
+            .adjustments
+            .iter()
+            .map(|applied| applied.adjusted_value)
+            .collect();
+        assert_eq!(steps, vec![110.0, 130.0, 120.0]);
+        assert_eq!(normalized[0].final_value, 120.0);
+        for result in &normalized {
+            let last = result.adjustments.last().expect("three adjustments");
+            assert_eq!(last.adjusted_value.to_bits(), result.final_value.to_bits());
+        }
+        // Q2 has no fixed amounts: the first two steps stay at the reported 120.
+        assert_eq!(normalized[1].period, q2);
+        assert_eq!(normalized[1].adjustments[0].adjusted_value, 120.0);
+        assert_eq!(normalized[1].adjustments[1].adjusted_value, 120.0);
     }
 
     #[test]

@@ -60,7 +60,13 @@ import { Example as ExampleConvertibleCard } from "./examples/convertible-card";
 import { Example as Example82 } from "./examples/metric-values-table";
 import { Example as Example80 } from "./examples/yield-workout-ladder";
 import { Example as ExampleQuoteConverter } from "./examples/quote-converter";
+import { Example as ExampleWaccCalculator } from "./examples/wacc-calculator";
+import { Example as ExampleNormalizationEditor } from "./examples/normalization-editor";
+import { Example as ExampleCapitalStructureReport } from "./examples/capital-structure-report";
+import { Example as ExampleRelativeValueTable } from "./examples/relative-value-table";
+import { Example as ExampleStatementExport } from "./examples/statement-export";
 import { Example as Example74 } from "./examples/liability-management-card";
+import { Example as ExampleRecoveryWaterfall } from "./examples/recovery-waterfall";
 import { Example as Example75 } from "./examples/pool-report";
 import { Example as Example76 } from "./examples/waterfall-report";
 import { Example as Example77 } from "./examples/coverage-test-chart";
@@ -146,7 +152,13 @@ const examples = {
   "metric-values-table": Example82,
   "yield-workout-ladder": Example80,
   "quote-converter": ExampleQuoteConverter,
+  "wacc-calculator": ExampleWaccCalculator,
+  "normalization-editor": ExampleNormalizationEditor,
+  "capital-structure-report": ExampleCapitalStructureReport,
+  "relative-value-table": ExampleRelativeValueTable,
+  "statement-export": ExampleStatementExport,
   "liability-management-card": Example74,
+  "recovery-waterfall": ExampleRecoveryWaterfall,
   "waterfall-report": Example76,
   "coverage-test-chart": Example77,
   "credit-enhancement-chart": Example78,

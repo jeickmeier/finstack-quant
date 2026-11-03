@@ -131,6 +131,13 @@ fn seniority_recovery_stats(seniority: &str, calibration_id: &str) -> PyResult<P
         .map_err(core_to_py)
 }
 
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "seniority_calibration_ids")]
+#[pyfunction]
+#[pyo3(text_signature = "()")]
+fn seniority_calibration_ids() -> PyResult<Vec<String>> {
+    lgd::seniority_calibration_ids().map_err(core_to_py)
+}
+
 #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece")]
 #[pyclass(
     module = "finstack_quant.models.credit.lgd",
@@ -706,6 +713,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyWorkoutLgd>()?;
     m.add_class::<PyWorkoutLgdBuilder>()?;
     m.add_class::<PyWorkoutLgdResult>()?;
+    m.add_function(wrap_pyfunction!(seniority_calibration_ids, &m)?)?;
     m.add_function(wrap_pyfunction!(seniority_recovery_stats, &m)?)?;
     m.add_function(wrap_pyfunction!(workout_lgd, &m)?)?;
 
@@ -720,6 +728,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "WorkoutLgd",
             "WorkoutLgdBuilder",
             "WorkoutLgdResult",
+            "seniority_calibration_ids",
             "seniority_recovery_stats",
             "workout_lgd",
         ],

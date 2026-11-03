@@ -218,7 +218,8 @@ fn normalization_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
                 "name": "Restructuring charges",
                 "raw_amount": 1_500_000.0,
                 "capped_amount": 1_500_000.0,
-                "is_capped": false
+                "is_capped": false,
+                "adjusted_value": 13_500_000.0
             }],
             "final_value": 13_500_000.0
         }),

@@ -659,7 +659,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json",
-      "bytes": 1540,
+      "bytes": 1556,
       "kind": "component",
       "path": "schemas/models/1/recovery_claim.schema.json",
       "summary": "A claim participating in a recovery waterfall.",

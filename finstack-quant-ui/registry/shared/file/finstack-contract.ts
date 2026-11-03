@@ -290,6 +290,19 @@ export type TerminalValueSpec = Exclude<
   Parameters<typeof statements_analytics.evaluateDcf>[2],
   string
 >;
+/** The statements_analytics.wacc arguments, each a decimal as Rust takes it. */
+export interface WaccRequest {
+  /** Equity share of total capital (0.6 = 60%). */
+  readonly equityWeight: number;
+  /** Required return on equity (0.115 = 11.5%). */
+  readonly costOfEquity: number;
+  /** Debt share of total capital; Rust rejects weights that do not sum to one. */
+  readonly debtWeight: number;
+  /** Pre-tax borrowing yield (0.06 = 6%). */
+  readonly costOfDebt: number;
+  /** Marginal tax rate in [0, 1] (0.25 = 25%). */
+  readonly taxRate: number;
+}
 /** DCF assumptions for one statement model; an omitted optional argument stays unset so Rust applies its default. */
 export interface DcfSensitivityRequest {
   readonly modelJson: string;
@@ -316,6 +329,37 @@ export type CorporateValuationResult = ReturnType<
 export interface EvaluateLboRequest {
   readonly modelJson: string;
   /** Rust LboConfig JSON; Rust rejects unknown keys. */
+  readonly configJson: string;
+}
+/** Native CapitalStructureSummary (not a top-level package export). */
+export type CapitalStructureSummary = ReturnType<
+  typeof statements_analytics.capitalStructureSummary
+>;
+/** The debt stack of an evaluated model at one period. */
+export interface CapitalStructureSummaryRequest {
+  /** Host-serialized StatementResult holding cs_cashflows and the configured nodes. */
+  readonly resultJson: string;
+  /** Canonical FinancialModelSpec JSON whose capital structure gives the instruments and payment classes. */
+  readonly modelJson: string;
+  /** Rust CapitalStructureSummaryConfig JSON; Rust rejects unknown keys. */
+  readonly configJson: string;
+}
+/** Native RelativeValueReport (not a top-level package export). */
+export type RelativeValueReport = ReturnType<
+  typeof statements_analytics.relativeValueReport
+>;
+/** One company's CompanyMetrics serde document, as the report takes it. */
+export type CompanyMetrics = Exclude<
+  Parameters<typeof statements_analytics.relativeValueReport>[0],
+  string
+>;
+/** One subject against a host-supplied universe of peers. */
+export interface RelativeValueReportRequest {
+  /** The subject's CompanyMetrics JSON; Rust rejects unknown keys. */
+  readonly subjectJson: string;
+  /** JSON array of the universe's CompanyMetrics, in the order the report returns peers. */
+  readonly universeJson: string;
+  /** Rust RelativeValueReportConfig JSON; Rust rejects unknown keys. */
   readonly configJson: string;
 }
 /** One sensitivity parameter: statements_analytics.parameterSpecWithPercentages arguments. */
@@ -379,6 +423,17 @@ export interface VarianceBridgeRequest {
   readonly drivers: readonly string[];
   readonly baselineLabel: string;
   readonly comparisonLabel: string;
+}
+/** Native NormalizationResult of one period of the target node (not a top-level package export). */
+export type NormalizationResult = ReturnType<
+  typeof statements.normalize
+>[number];
+/** An evaluated result and the NormalizationConfig to apply to it, both as JSON. */
+export interface NormalizeRequest {
+  /** Host-serialized StatementResult holding the target and every referenced node. */
+  readonly resultJson: string;
+  /** Canonical NormalizationConfig JSON: the target node and its adjustments in order. */
+  readonly configJson: string;
 }
 /** Native BridgeChart (not a top-level package export). */
 export type BridgeChart = ReturnType<
@@ -783,6 +838,44 @@ export interface LmeRequest {
   readonly optAcceptancePct: number;
   /** Unset leaves the leverage block out. */
   readonly ebitda?: number | null;
+}
+/** One absolute-priority recovery waterfall; amounts in one caller-defined unit, no currency conversion. */
+export interface RecoveryWaterfallRequest {
+  /** Distributable estate, including pledged collateral. */
+  readonly estateValue: number;
+  /** The claims as Rust takes them; seniority is a caller-defined reporting label. */
+  readonly claims: readonly modelsWire.RecoveryClaim[];
+}
+/** One workout LGD in the facade's positional order; costs and rates are decimals. */
+export interface WorkoutLgdRequest {
+  /** Exposure at default, positive, in the collateral's unit. */
+  readonly ead: number;
+  /** Collateral pieces, highest priority first. */
+  readonly collateral: readonly (readonly [
+    collateralType: modelsWire.WorkoutCollateralType,
+    bookValue: number,
+    haircut: number,
+  ])[];
+  readonly directCostPct: number;
+  readonly indirectCostPct: number;
+  readonly timeToResolutionYears: number;
+  readonly discountRate: number;
+}
+/** One seniority class under one exact registry calibration id. */
+export interface SeniorityRecoveryRequest {
+  readonly seniority: modelsWire.SeniorityClass;
+  readonly calibrationId: string;
+}
+/** The getters of the BetaRecovery handle seniorityRecoveryStats returns, under their Rust names; rates are fractions. */
+export interface SeniorityRecoveryStats {
+  readonly mean: number;
+  readonly std_dev: number;
+  readonly variance: number;
+  readonly alpha: number;
+  readonly beta_param: number;
+  /** Undefined when the distribution has no interior mode. */
+  readonly mode: number | undefined;
+  readonly mean_lgd: number;
 }
 /** Terms of one European option; each model takes its own, as the facade function documents them. */
 export type OptionTerms =
@@ -1439,6 +1532,20 @@ export interface ModelsApi {
   analyzeLme(request: LmeRequest): Promise<Envelope<modelsWire.LmeAnalysis>>;
   /** models.credit.liabilityManagement.tenderRecommendationHurdle. */
   tenderRecommendationHurdle(): Promise<Envelope<number>>;
+  /** models.credit.recoveryWaterfall.allocateRecovery: per-claim allocations, totals and the undistributed estate. */
+  allocateRecovery(
+    request: RecoveryWaterfallRequest,
+  ): Promise<Envelope<modelsWire.RecoveryWaterfallResult>>;
+  /** models.credit.lgd.workoutLgd: net recovery, LGD and recovery rate. */
+  workoutLgd(
+    request: WorkoutLgdRequest,
+  ): Promise<Envelope<modelsWire.WorkoutLgdResult>>;
+  /** models.credit.lgd.seniorityRecoveryStats, read into plain data; the handle is freed. */
+  seniorityRecoveryStats(
+    request: SeniorityRecoveryRequest,
+  ): Promise<Envelope<SeniorityRecoveryStats>>;
+  /** models.credit.lgd.seniorityCalibrationIds: the registry's calibration ids, default first. */
+  seniorityCalibrationIds(): Promise<Envelope<string[]>>;
   /** One closed-form price (bsPrice, black76Price, bachelierPrice) or implied-volatility solve (bsImpliedVol, black76ImpliedVol, models.volatility.impliedVolBachelier) in the facade's positional order, then the model's Greeks at that volatility, kept as an envelope. */
   optionCalculator(
     request: OptionCalculatorRequest,
@@ -1458,6 +1565,12 @@ export interface StatementsApi {
   validateStatementFormula(formula: string): Promise<Envelope<string>>;
   /** statements.validateCheckSuiteSpecJson: validate and canonicalize CheckSuiteSpec JSON. */
   validateCheckSuiteSpec(json: string): Promise<Envelope<string>>;
+  /** statements.validateNormalizationConfigJson: validate and canonicalize NormalizationConfig JSON. */
+  validateNormalizationConfig(json: string): Promise<Envelope<string>>;
+  /** statements.normalize: one NormalizationResult per period of the target node, in period order. */
+  normalize(
+    request: NormalizeRequest,
+  ): Promise<Envelope<NormalizationResult[]>>;
   /** statements.Evaluator evaluate, or evaluateWithMarket when market and date are supplied. */
   evaluateStatement(
     request: StatementRequest,
@@ -1498,6 +1611,16 @@ export interface StatementsApi {
   creditAssessment(
     request: CreditAssessmentRequest,
   ): Promise<Envelope<CreditAssessment>>;
+  /** statements.statementResultToTableWide: one row per period, one column per node; a node with no value holds NaN. */
+  statementResultToTableWide(
+    resultJson: string,
+  ): Promise<Envelope<TableEnvelope>>;
+  /** statements.statementResultToTableLong: one row per node and period. */
+  statementResultToTableLong(
+    resultJson: string,
+  ): Promise<Envelope<TableEnvelope>>;
+  /** statements_analytics.wacc: the blended rate as a decimal. */
+  wacc(request: WaccRequest): Promise<Envelope<number>>;
   /** statements_analytics.plSummaryReport: the P&L summary TableEnvelope over the line items and periods. */
   plSummaryReport(
     request: PlSummaryReportRequest,
@@ -1512,6 +1635,14 @@ export interface StatementsApi {
   ): Promise<Envelope<DcfSensitivityResult>>;
   /** statements_analytics.evaluateLbo: entry and exit values, sources and uses, MOIC and the optional LBO check report. */
   evaluateLbo(request: EvaluateLboRequest): Promise<Envelope<LboResult>>;
+  /** statements_analytics.capitalStructureSummary: the debt stack by seniority, leverage and coverage through each class, and the maturity wall. */
+  capitalStructureSummary(
+    request: CapitalStructureSummaryRequest,
+  ): Promise<Envelope<CapitalStructureSummary>>;
+  /** statements_analytics.relativeValueReport: the comps table, peer statistics, regression scatter and composite score of one subject against its filtered peers. */
+  relativeValueReport(
+    request: RelativeValueReportRequest,
+  ): Promise<Envelope<RelativeValueReport>>;
   /** statements_analytics.parameterSpecWithPercentages per parameter, runSensitivity, then generateTornadoEntries at the target metric and period (skipped for full_grid). */
   runSensitivity(
     request: RunSensitivityRequest,

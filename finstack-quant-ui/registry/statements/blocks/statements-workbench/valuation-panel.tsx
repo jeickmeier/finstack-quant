@@ -5,6 +5,11 @@ import {
   type DcfAssumptionsSubmission,
 } from "@/components/finstack/statements/components/dcf-assumptions-form/dcf-assumptions-form";
 import { DcfReport } from "@/components/finstack/statements/components/dcf-report/dcf-report";
+import {
+  WaccCalculator,
+  type WaccInputs,
+} from "@/components/finstack/statements/components/wacc-calculator/wacc-calculator";
+import { useWacc } from "@/hooks/statements/use-wacc/use-wacc";
 import { useEvaluateDcf } from "@/hooks/statements/use-evaluate-dcf/use-evaluate-dcf";
 import { useDcfSensitivity } from "@/hooks/statements/use-dcf-sensitivity/use-dcf-sensitivity";
 import { LboReport } from "@/components/finstack/statements/components/lbo-report/lbo-report";
@@ -14,7 +19,8 @@ import { useEvaluateLbo } from "@/hooks/statements/use-evaluate-lbo/use-evaluate
  * The workbench Valuation tab: a native DCF of the current canonical model
  * with its enterprise-value tornado, and a native LBO. Assumptions and the
  * LBO config start empty (Rust supplies no defaults for them) and both rerun
- * natively when the model changes.
+ * natively when the model changes. The WACC calculator sets the form's WACC
+ * only on the user's click, and valuing stays a separate action.
  */
 export function ValuationPanel({
   modelJson,
@@ -40,6 +46,11 @@ export function ValuationPanel({
   const sensitivity = useDcfSensitivity(
     assumptions ? { modelJson, ...assumptions } : null,
   );
+  // Undefined until the calculator or an edit sets it, so the form holds the
+  // WACC field until then (an empty string would hide a default WACC).
+  const [waccText, setWaccText] = useState<string | undefined>(undefined);
+  const [waccInputs, setWaccInputs] = useState<WaccInputs | null>(null);
+  const calculated = useWacc(waccInputs);
   const [lboConfigJson, setLboConfigJson] = useState<string | null>(null);
   const lbo = useEvaluateLbo(
     lboConfigJson ? { modelJson, configJson: lboConfigJson } : null,
@@ -55,8 +66,26 @@ export function ValuationPanel({
             assumptions by enterprise-value impact (dcfSensitivity).
           </p>
         </div>
+        <details className="rounded-md border border-border p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            WACC calculator
+          </summary>
+          <div className="pt-3">
+            <WaccCalculator
+              onSubmit={setWaccInputs}
+              rate={calculated.data ?? null}
+              loading={calculated.isFetching}
+              error={calculated.error?.message}
+              onApply={(rate) => setWaccText(String(rate))}
+              disabled={calculated.workerStatus !== "ready"}
+              density={density}
+            />
+          </div>
+        </details>
         <DcfAssumptionsForm
           nodeIds={nodeIds}
+          wacc={waccText}
+          onWaccChange={setWaccText}
           onSubmit={setAssumptions}
           disabled={dcf.workerStatus !== "ready"}
           density={density}

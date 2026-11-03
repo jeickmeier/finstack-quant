@@ -116,9 +116,21 @@ try {
     () =>
       document.querySelector('input[role="combobox"]')?.value === "ID-09999",
   );
+  // Typed free text is the value, and closing the suggestions keeps it.
+  const accepted = page.getByLabel("Accepted ID");
   await id.fill("CUSTOM-ID");
-  assert.equal(await page.getByLabel("Accepted ID").textContent(), "CUSTOM-ID");
+  assert.equal(await accepted.textContent(), "CUSTOM-ID");
   await id.press("Escape");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+  await expect(accepted).toHaveText("CUSTOM-ID");
+  await expect(id).toHaveValue("CUSTOM-ID");
+  // A prefix of supplied IDs that is not one itself, with suggestions open.
+  await id.fill("ID-0001");
+  await page.getByRole("option", { name: "ID-00010", exact: true }).waitFor();
+  await id.press("Tab");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+  await expect(accepted).toHaveText("ID-0001");
+  await expect(id).toHaveValue("ID-0001");
   const model = page.getByRole("combobox", { name: "Supplied model" });
   await model.click();
   await page.getByRole("option", { name: "Beta" }).waitFor();

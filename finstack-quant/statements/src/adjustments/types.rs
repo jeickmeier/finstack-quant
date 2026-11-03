@@ -144,6 +144,12 @@ pub struct AppliedAdjustment {
 
     /// Whether the amount was capped
     pub is_capped: bool,
+    /// Target value through this adjustment: the period's `base_value` plus
+    /// the capped amounts of this and every earlier adjustment, in declaration
+    /// order and the target's units. The last adjustment's value equals the
+    /// period's `final_value`, so a base-to-adjusted bridge reads each step's
+    /// span from the previous step's value (or `base_value`) to this one.
+    pub adjusted_value: f64,
 }
 
 impl NormalizationConfig {

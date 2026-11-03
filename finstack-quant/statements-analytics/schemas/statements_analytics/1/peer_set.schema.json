@@ -27,7 +27,8 @@
       "type": "string"
     },
     "CompanyMetrics": {
-      "description": "Metrics for a single company in a peer set.\n\nAll monetary values should be in the same currency before constructing\na `PeerSet`. Currency normalization is the caller's responsibility.\nRatios are plain scalars (e.g., `6.5` means 6.5x leverage).",
+      "additionalProperties": false,
+      "description": "Metrics for a single company in a peer set.\n\nAll monetary values should be in the same currency before constructing\na `PeerSet`. Currency normalization is the caller's responsibility.\nRatios are plain scalars (e.g., `6.5` means 6.5x leverage).\n\nThe serde document rejects unknown keys: a metric outside the named fields\nbelongs in `custom`, so a misspelt named metric is an error rather than a\nsilently missing value.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",

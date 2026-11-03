@@ -4192,6 +4192,105 @@
       }
     },
     {
+      "name": "contract-recovery-claim",
+      "type": "registry:lib",
+      "title": "Recovery claim contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust recovery_claim contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/recovery_claim.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/recovery_claim.json"
+        },
+        {
+          "path": "src/generated/types/recovery_claim.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/recovery_claim.ts"
+        },
+        {
+          "path": "src/generated/meta/recovery_claim.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/recovery_claim.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-seniority-calibration",
+      "type": "registry:lib",
+      "title": "Seniority calibration contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust seniority_calibration contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/seniority_calibration.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/seniority_calibration.json"
+        },
+        {
+          "path": "src/generated/types/seniority_calibration.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/seniority_calibration.ts"
+        },
+        {
+          "path": "src/generated/meta/seniority_calibration.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/seniority_calibration.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/seniority_calibration.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-workout-lgd",
+      "type": "registry:lib",
+      "title": "Workout LGD contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust workout_lgd contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/workout_lgd.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/workout_lgd.json"
+        },
+        {
+          "path": "src/generated/types/workout_lgd.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/workout_lgd.ts"
+        },
+        {
+          "path": "src/generated/meta/workout_lgd.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/workout_lgd.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/workout_lgd.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-zmijewski-input",
       "type": "registry:lib",
       "title": "Zmijewski input contract",
@@ -4489,6 +4588,72 @@
       }
     },
     {
+      "name": "contract-capital-structure-summary-config",
+      "type": "registry:lib",
+      "title": "Capital structure summary config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust capital_structure_summary_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/capital_structure_summary_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/capital_structure_summary_config.json"
+        },
+        {
+          "path": "src/generated/types/capital_structure_summary_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/capital_structure_summary_config.ts"
+        },
+        {
+          "path": "src/generated/meta/capital_structure_summary_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/capital_structure_summary_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-capital-structure-summary",
+      "type": "registry:lib",
+      "title": "Capital structure summary contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust capital_structure_summary contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/capital_structure_summary.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/capital_structure_summary.json"
+        },
+        {
+          "path": "src/generated/types/capital_structure_summary.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/capital_structure_summary.ts"
+        },
+        {
+          "path": "src/generated/meta/capital_structure_summary.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/capital_structure_summary.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-credit-assessment",
       "type": "registry:lib",
       "title": "Credit assessment contract",
@@ -4683,6 +4848,72 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-relative-value-report-config",
+      "type": "registry:lib",
+      "title": "Relative value report config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust relative_value_report_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/relative_value_report_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/relative_value_report_config.json"
+        },
+        {
+          "path": "src/generated/types/relative_value_report_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/relative_value_report_config.ts"
+        },
+        {
+          "path": "src/generated/meta/relative_value_report_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/relative_value_report_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-relative-value-report",
+      "type": "registry:lib",
+      "title": "Relative value report contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust relative_value_report contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/relative_value_report.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/relative_value_report.json"
+        },
+        {
+          "path": "src/generated/types/relative_value_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/relative_value_report.ts"
+        },
+        {
+          "path": "src/generated/meta/relative_value_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/relative_value_report.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report.schema.json"
         ]
       }
     },
@@ -4985,6 +5216,72 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-normalization-config",
+      "type": "registry:lib",
+      "title": "Normalization config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust normalization_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/normalization_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/normalization_config.json"
+        },
+        {
+          "path": "src/generated/types/normalization_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/normalization_config.ts"
+        },
+        {
+          "path": "src/generated/meta/normalization_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/normalization_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-normalization-result",
+      "type": "registry:lib",
+      "title": "Normalization result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust normalization_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/normalization_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/normalization_result.json"
+        },
+        {
+          "path": "src/generated/types/normalization_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/normalization_result.ts"
+        },
+        {
+          "path": "src/generated/meta/normalization_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/normalization_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json"
         ]
       }
     },

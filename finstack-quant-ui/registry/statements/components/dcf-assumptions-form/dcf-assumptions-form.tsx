@@ -58,6 +58,10 @@ export interface DcfAssumptionsFormProps {
   defaultAssumptions?: DcfAssumptions;
   /** Model node ids offered for the UFCF and exit-multiple metric nodes. */
   nodeIds: readonly string[];
+  /** WACC field text when the host holds it, so a rate can be set without remounting the rest of the form; undefined, the form holds it and shows `defaultAssumptions.wacc`. Pass undefined, not `""`, until the host has text: `""` is an empty field. */
+  wacc?: string;
+  /** Receives each edit of a host-held WACC field. */
+  onWaccChange?: (wacc: string) => void;
   /** Receives the assumptions on Calculate; Rust validates them when it values the model. */
   onSubmit(submission: DcfAssumptionsSubmission): void;
   submitLabel?: string;
@@ -85,13 +89,16 @@ const typed = (value: string) =>
 export function DcfAssumptionsForm({
   defaultAssumptions,
   nodeIds,
+  wacc: hostWacc,
+  onWaccChange,
   onSubmit,
   submitLabel = "Value",
   disabled,
   density = "compact",
 }: DcfAssumptionsFormProps) {
   const initial = defaultAssumptions;
-  const [wacc, setWacc] = useState(text(initial?.wacc));
+  const [ownWacc, setOwnWacc] = useState(text(initial?.wacc));
+  const wacc = hostWacc ?? ownWacc;
   const [type, setType] = useState<TerminalType>(
     initial?.terminalValue.type ?? "gordon_growth",
   );
@@ -155,7 +162,10 @@ export function DcfAssumptionsForm({
           label="WACC"
           help="Weighted average cost of capital, decimal (0.10 = 10%)."
           value={wacc}
-          onValueChange={setWacc}
+          onValueChange={(value) => {
+            setOwnWacc(value);
+            onWaccChange?.(value);
+          }}
         />
         <IdCombobox
           label="UFCF node"

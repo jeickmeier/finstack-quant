@@ -616,5 +616,545 @@
         "formula_text": "cash / revenue"
       }
     }
+  },
+  "capital_structure_model": {
+    "id": "capital-structure",
+    "periods": [
+      {
+        "id": "2025Q1",
+        "start": "2025-01-01",
+        "end": "2025-04-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q2",
+        "start": "2025-04-01",
+        "end": "2025-07-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q3",
+        "start": "2025-07-01",
+        "end": "2025-10-01",
+        "is_actual": false
+      },
+      {
+        "id": "2025Q4",
+        "start": "2025-10-01",
+        "end": "2026-01-01",
+        "is_actual": false
+      }
+    ],
+    "nodes": {
+      "ebitda": {
+        "node_id": "ebitda",
+        "node_type": "value",
+        "values": {
+          "2025Q1": 100000.0,
+          "2025Q2": 110000.0,
+          "2025Q3": 120000.0,
+          "2025Q4": 130000.0
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "cash": {
+        "node_id": "cash",
+        "node_type": "value",
+        "values": {
+          "2025Q1": 150000.0,
+          "2025Q2": 150000.0,
+          "2025Q3": 150000.0,
+          "2025Q4": 150000.0
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      }
+    },
+    "capital_structure": {
+      "debt_instruments": [
+        {
+          "id": "SUB",
+          "spec": {
+            "type": "bond",
+            "spec": {
+              "id": "SUB",
+              "notional": {
+                "amount": "420000",
+                "currency": "USD"
+              },
+              "issue_date": "2024-01-01",
+              "maturity": "2031-03-01",
+              "cashflow_spec": {
+                "fixed": {
+                  "coupon_type": "cash",
+                  "rate": "0.08",
+                  "frequency": {
+                    "count": 6,
+                    "unit": "months"
+                  },
+                  "day_count": "30_360",
+                  "business_day_convention": "modified_following",
+                  "calendar_id": "usny",
+                  "stub": "short_front",
+                  "end_of_month": false,
+                  "payment_lag_days": 0
+                }
+              },
+              "discount_curve_id": "USD-OIS",
+              "credit_curve_id": null,
+              "call_put": null,
+              "attributes": {},
+              "settlement_days": 1,
+              "ex_coupon_days": 0,
+              "ex_coupon_calendar_id": "usny"
+            }
+          }
+        },
+        {
+          "id": "SR-A",
+          "spec": {
+            "type": "bond",
+            "spec": {
+              "id": "SR-A",
+              "notional": {
+                "amount": "400000",
+                "currency": "USD"
+              },
+              "issue_date": "2024-01-01",
+              "maturity": "2029-06-01",
+              "cashflow_spec": {
+                "fixed": {
+                  "coupon_type": "cash",
+                  "rate": "0.05",
+                  "frequency": {
+                    "count": 6,
+                    "unit": "months"
+                  },
+                  "day_count": "30_360",
+                  "business_day_convention": "modified_following",
+                  "calendar_id": "usny",
+                  "stub": "short_front",
+                  "end_of_month": false,
+                  "payment_lag_days": 0
+                }
+              },
+              "discount_curve_id": "USD-OIS",
+              "credit_curve_id": null,
+              "call_put": null,
+              "attributes": {},
+              "settlement_days": 1,
+              "ex_coupon_days": 0,
+              "ex_coupon_calendar_id": "usny"
+            }
+          }
+        },
+        {
+          "id": "SR-B",
+          "spec": {
+            "type": "bond",
+            "spec": {
+              "id": "SR-B",
+              "notional": {
+                "amount": "100000",
+                "currency": "USD"
+              },
+              "issue_date": "2024-01-15",
+              "maturity": "2029-01-15",
+              "cashflow_spec": {
+                "fixed": {
+                  "coupon_type": "cash",
+                  "rate": "0.05",
+                  "frequency": {
+                    "count": 6,
+                    "unit": "months"
+                  },
+                  "day_count": "30_360",
+                  "business_day_convention": "modified_following",
+                  "calendar_id": "usny",
+                  "stub": "short_front",
+                  "end_of_month": false,
+                  "payment_lag_days": 0
+                }
+              },
+              "discount_curve_id": "USD-OIS",
+              "credit_curve_id": null,
+              "call_put": null,
+              "attributes": {},
+              "settlement_days": 1,
+              "ex_coupon_days": 0,
+              "ex_coupon_calendar_id": "usny"
+            }
+          }
+        },
+        {
+          "id": "HEDGE",
+          "spec": {
+            "type": "interest_rate_swap",
+            "spec": {
+              "id": "HEDGE",
+              "notional": {
+                "amount": "200000",
+                "currency": "USD"
+              },
+              "side": "pay",
+              "fixed_leg": {
+                "discount_curve_id": "USD-OIS",
+                "rate": "0.04",
+                "frequency": {
+                  "count": 6,
+                  "unit": "months"
+                },
+                "day_count": "30_360",
+                "business_day_convention": "modified_following",
+                "calendar_id": "usny",
+                "stub": "none",
+                "start": "2025-01-01",
+                "end": "2029-01-01",
+                "payment_lag_days": 0,
+                "end_of_month": false
+              },
+              "float_leg": {
+                "discount_curve_id": "USD-OIS",
+                "forward_curve_id": "USD-SOFR-3M",
+                "spread_bp": "0",
+                "frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "day_count": "act_360",
+                "business_day_convention": "modified_following",
+                "calendar_id": "usny",
+                "stub": "none",
+                "reset_lag_days": 0,
+                "fixing_calendar_id": null,
+                "start": "2025-01-01",
+                "end": "2029-01-01",
+                "compounding": "simple",
+                "payment_lag_days": 0,
+                "end_of_month": false
+              },
+              "adjust_fixed_accrual_dates": false,
+              "adjust_float_accrual_dates": false,
+              "attributes": {}
+            }
+          }
+        }
+      ],
+      "waterfall": {
+        "available_cash_node": "cash",
+        "priority_of_payments": [
+          "fees",
+          "interest",
+          "amortization"
+        ],
+        "payment_classes": [
+          {
+            "id": "2L",
+            "rank": 1,
+            "instrument_ids": [
+              "SUB"
+            ]
+          },
+          {
+            "id": "1L",
+            "rank": 0,
+            "instrument_ids": [
+              "SR-A",
+              "HEDGE",
+              "SR-B"
+            ]
+          }
+        ]
+      }
+    },
+    "schema_version": 1
+  },
+  "capital_structure_market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-01-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            1.0,
+            0.9607894391523232
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "fx_policy": null
+      },
+      {
+        "type": "forward",
+        "id": "USD-SOFR-3M",
+        "base": "2025-01-01",
+        "reset_lag": 2,
+        "day_count": "act_360",
+        "tenor": 0.25,
+        "knot_points": [
+          [
+            0.0,
+            0.045
+          ],
+          [
+            1.0,
+            0.045
+          ]
+        ],
+        "projection_grid": null,
+        "interp_style": "linear",
+        "extrapolation": "flat_zero",
+        "rate_calibration": null,
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {},
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "hierarchy": null
+  },
+  "capital_structure_as_of": "2025-01-01",
+  "relative_value_subject": {
+    "id": "SUBJ",
+    "attributes": {
+      "tags": [],
+      "meta": {
+        "gics_sector": "energy"
+      }
+    },
+    "leverage": 2.5,
+    "oas_bp": 300.0,
+    "enterprise_value": 1000.0,
+    "ebitda": 100.0
+  },
+  "relative_value_universe": [
+    {
+      "id": "P1",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "leverage": 1.0,
+      "oas_bp": 100.0,
+      "enterprise_value": 800.0,
+      "ebitda": 100.0
+    },
+    {
+      "id": "OUT",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "tech"
+        }
+      },
+      "leverage": 1.0,
+      "oas_bp": 9999.0
+    },
+    {
+      "id": "P2",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "leverage": 2.0,
+      "oas_bp": 200.0,
+      "enterprise_value": 900.0,
+      "ebitda": 100.0
+    },
+    {
+      "id": "SUBJ",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "leverage": 2.5,
+      "oas_bp": 300.0,
+      "enterprise_value": 1000.0,
+      "ebitda": 100.0
+    },
+    {
+      "id": "P3",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "leverage": 3.0,
+      "oas_bp": 310.0,
+      "enterprise_value": 1200.0,
+      "ebitda": 100.0
+    },
+    {
+      "id": "P4",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "leverage": 4.0,
+      "oas_bp": 380.0,
+      "enterprise_value": 500.0
+    },
+    {
+      "id": "P5",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "oas_bp": 250.0,
+      "enterprise_value": 1100.0,
+      "ebitda": 100.0
+    }
+  ],
+  "relative_value_config": {
+    "filter": {
+      "gics_sectors": [
+        "energy"
+      ],
+      "gics_industries": [],
+      "countries": [],
+      "market_cap_min": null,
+      "market_cap_max": null,
+      "ratings": [],
+      "required_tags": [],
+      "excluded_tags": [],
+      "selectors": []
+    },
+    "period_basis": "ltm",
+    "dimensions": [
+      {
+        "label": "Spread vs Leverage",
+        "y_extractor": {
+          "named": "oas_bp"
+        },
+        "x_extractor": {
+          "named": "leverage"
+        },
+        "weight": 0.7,
+        "direction": "higher_is_cheap"
+      },
+      {
+        "label": "EV/EBITDA",
+        "y_extractor": {
+          "multiple": "ev_ebitda"
+        },
+        "weight": 0.3,
+        "direction": "higher_is_rich"
+      },
+      {
+        "label": "Disabled",
+        "y_extractor": {
+          "named": "oas_bp"
+        },
+        "weight": 0.0
+      },
+      {
+        "label": "Nobody has it",
+        "y_extractor": {
+          "custom": "missing"
+        },
+        "weight": 1.0
+      }
+    ],
+    "multiples": [
+      "spread_per_turn",
+      "ev_ebitda",
+      "pe"
+    ]
+  },
+  "relative_value_table_only_config": {
+    "period_basis": {
+      "custom": "FY2025E"
+    },
+    "dimensions": [
+      {
+        "label": "Nobody has it",
+        "y_extractor": {
+          "custom": "missing"
+        },
+        "weight": 1.0
+      }
+    ],
+    "multiples": [
+      "ev_ebitda"
+    ]
+  },
+  "relative_value_partial_filter_config": {
+    "filter": {
+      "gics_sectors": [
+        "energy"
+      ]
+    },
+    "period_basis": "ltm",
+    "dimensions": [
+      {
+        "label": "Spread vs Leverage",
+        "y_extractor": {
+          "named": "oas_bp"
+        },
+        "x_extractor": {
+          "named": "leverage"
+        },
+        "weight": 0.7,
+        "direction": "higher_is_cheap"
+      },
+      {
+        "label": "EV/EBITDA",
+        "y_extractor": {
+          "multiple": "ev_ebitda"
+        },
+        "weight": 0.3,
+        "direction": "higher_is_rich"
+      },
+      {
+        "label": "Disabled",
+        "y_extractor": {
+          "named": "oas_bp"
+        },
+        "weight": 0.0
+      },
+      {
+        "label": "Nobody has it",
+        "y_extractor": {
+          "custom": "missing"
+        },
+        "weight": 1.0
+      }
+    ],
+    "multiples": [
+      "spread_per_turn",
+      "ev_ebitda",
+      "pe"
+    ]
   }
 }
