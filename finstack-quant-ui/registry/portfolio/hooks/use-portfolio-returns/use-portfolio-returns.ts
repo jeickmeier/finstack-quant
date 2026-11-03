@@ -1,4 +1,5 @@
 "use client";
+import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
   useWorkerQuery,
   workerQueryOptions,
@@ -15,16 +16,16 @@ export type {
   TwrrLinkedRequest,
   TwrrPeriod,
 } from "@/workers/finstack-contract";
-/** Key the link on the snapshotted returns and horizon; nothing is defaulted. */
+/** Key the link on the snapshotted returns and horizon, keeping NaN and Infinity distinct; nothing is defaulted. */
 export function twrrLinkedOptions(
   client: FinstackClient | null,
   session: number,
   request: TwrrLinkedRequest | null,
 ) {
-  const snapshot = request === null ? null : structuredClone(request);
+  const { snapshot, key } = requestSnapshot(request);
   return workerQueryOptions({
     client,
-    queryKey: ["finstack", session, "twrrLinked", snapshot] as const,
+    queryKey: ["finstack", session, "twrrLinked", key] as const,
     ready: snapshot !== null,
     missing: "No sub-period returns supplied",
     queryFn: (ready) => ready.call("twrrLinked", snapshot!),
@@ -36,10 +37,10 @@ export function twrrModifiedDietzOptions(
   session: number,
   period: TwrrPeriod | null,
 ) {
-  const snapshot = period === null ? null : structuredClone(period);
+  const { snapshot, key } = requestSnapshot(period);
   return workerQueryOptions({
     client,
-    queryKey: ["finstack", session, "twrrModifiedDietz", snapshot] as const,
+    queryKey: ["finstack", session, "twrrModifiedDietz", key] as const,
     ready: snapshot !== null,
     missing: "No period supplied",
     queryFn: (ready) => ready.call("twrrModifiedDietz", snapshot!),
@@ -51,10 +52,10 @@ export function mwrXirrOptions(
   session: number,
   cashflows: readonly DatedCashflow[] | null,
 ) {
-  const snapshot = cashflows === null ? null : structuredClone(cashflows);
+  const { snapshot, key } = requestSnapshot(cashflows);
   return workerQueryOptions({
     client,
-    queryKey: ["finstack", session, "mwrXirr", snapshot] as const,
+    queryKey: ["finstack", session, "mwrXirr", key] as const,
     ready: snapshot !== null,
     missing: "No cash flows supplied",
     queryFn: (ready) => ready.call("mwrXirr", snapshot!),
