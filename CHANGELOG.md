@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: facade-coverage ledger lists what a screen never wires
+
+`finstack-quant-ui/facade-coverage.json` now excludes 108 more facade units, each with a reason from a closed set in `scripts/coverage.mjs` that `coverage --check` enforces: constructors and label parsers (`data-constructor`), enum-variant constructors (`schema-form`), copy-with-field setters (`setter`), stored-field lookups (`getter`), shape validators (`validator`) and the four `analytics` series functions that repeat a `Performance` method (`performance-duplicate`). The six covenant `with_*` setters move from `schema-form` to `setter`. Coverage reads 176 of 636 units instead of 176 of 744; computations, numeric checks, presets and later-phase targets stay counted.
+
 ### UI: correlation heatmap on the workbench Risk tab
 
 `@finstack/correlation-heatmap` draws the Pearson correlation matrix of a host return panel, one native `analytics.Performance` `correlationMatrix` chain through `@finstack/use-correlation-matrix`, as a heatmap and a table in Rust's ticker order, stamped Repaired only when Rust's `repaired` flag says it projected the estimate to the nearest valid correlation matrix. `portfolio-workbench` shows it on the Risk tab when the host supplies a `correlation` panel.
