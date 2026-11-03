@@ -34,6 +34,7 @@ export type StatementsNative = {
     | "evaluateDcf"
     | "dcfSensitivity"
     | "evaluateLbo"
+    | "capitalStructureSummary"
     | "parameterSpecWithPercentages"
     | "runSensitivity"
     | "generateTornadoEntries"
@@ -253,6 +254,15 @@ export function createStatementsService(
     evaluateLbo(request) {
       return context.result(() =>
         native.statements_analytics.evaluateLbo(
+          request.modelJson,
+          request.configJson,
+        ),
+      );
+    },
+    capitalStructureSummary(request) {
+      return context.result(() =>
+        native.statements_analytics.capitalStructureSummary(
+          request.resultJson,
           request.modelJson,
           request.configJson,
         ),

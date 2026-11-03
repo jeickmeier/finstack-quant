@@ -537,6 +537,17 @@ const displays = [
       "Returned NormalizationResult per period of the target node, in Rust's period order, in the target's units (its currency when monetary). Each adjustment carries its raw amount, its capped amount, Rust's is_capped and adjusted_value, the target through that step; the bridge draws each step from the previous step's adjusted_value (base_value for the first) to its own, and the base and final value from zero. Nothing is summed, capped or classified here; a duplicate id, a missing node or a non-finite base shows the native error.",
   },
   {
+    id: "capital-structure-report",
+    api: [
+      "statements_analytics.capitalStructureSummary",
+      "StatementsAnalyticsNamespace",
+      "capitalStructureSummary",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned CapitalStructureSummary at the configured period, in its currency: money as Rust's exact decimal strings, ratios in turns and shares of debt as decimal fractions (shown as percent digits). Tranches in Rust's rank-then-declaration order with cumulative debt, leverage and interest coverage through each payment class; the maturity wall in Rust's year order, each bar drawn from zero to its returned amount. A null ratio (short LTM window, non-positive EBITDA or debt) or a live NaN shows as undefined beside Rust's ltm_periods_found and ltm_periods_required; negative net debt and net leverage show as returned. Nothing is summed, netted or divided here; a model with no capital structure or a missing node shows the native error.",
+  },
+  {
     id: "wacc-calculator",
     api: ["statements_analytics.wacc", "StatementsAnalyticsNamespace", "wacc"],
     route: "returned-report",

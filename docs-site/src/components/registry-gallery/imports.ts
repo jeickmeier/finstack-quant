@@ -552,6 +552,13 @@ export const importHarnesses = {
     Promise.all([
       import("@/hooks/statements/use-normalize/use-normalize"),
     ]).then((modules) => ({ name: "use-normalize", modules: modules.length })),
+  "use-capital-structure-summary": () =>
+    Promise.all([
+      import("@/hooks/statements/use-capital-structure-summary/use-capital-structure-summary"),
+    ]).then((modules) => ({
+      name: "use-capital-structure-summary",
+      modules: modules.length,
+    })),
   "use-normalization-config-validator": () =>
     Promise.all([
       import("@/hooks/statements/use-normalization-config-validator/use-normalization-config-validator"),

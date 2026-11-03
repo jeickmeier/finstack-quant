@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Statements: capital structure report in the UI
+
+The `capital-structure-report` registry component, with the `use-capital-structure-summary` hook, edits a `CapitalStructureSummaryConfig` (period, EBITDA node, optional cash node) with a schema form and draws `statements_analytics.capitalStructureSummary` as returned: headline debt, cash, net debt, LTM EBITDA with the LTM periods found, leverage and coverage; the debt stack in Rust's tranche order with the figures through each payment class; and the maturity wall by year. Ratios Rust leaves undefined show as Undefined. In the statements workbench's Metrics & ratios tab it sits in a capital structure disclosure. `labelFor` upper-cases `ebitda` and `ltm`, so labels such as "EBITDA bridge" and "LTM EBITDA" change case.
+
 ### Statements: normalization editor in the UI
 
 The `normalization-editor` registry component, with the `use-normalize` and `use-normalization-config-validator` hooks, edits a `NormalizationConfig` (add-backs, deductions and caps) with a schema form validated by `statements.validateNormalizationConfigJson`, and draws `statements.normalize` as returned: a base-to-adjusted bridge for a chosen period, each step between Rust's `adjusted_value`s, and a table of the adjustments by period. In the statements workbench's Metrics & ratios tab it sits in an Adjusted EBITDA disclosure over the reported result.

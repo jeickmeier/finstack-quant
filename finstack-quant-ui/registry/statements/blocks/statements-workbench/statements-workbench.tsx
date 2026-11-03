@@ -10,6 +10,7 @@ import { ScenarioPanel } from "./scenario-panel";
 import { ValuationPanel } from "./valuation-panel";
 import { ExportPanel } from "./export-panel";
 import { NormalizationPanel } from "./normalization-panel";
+import { CapitalStructurePanel } from "./capital-structure-panel";
 import { SensitivityPanel } from "./sensitivity-panel";
 import { MonteCarloPanel } from "./monte-carlo-panel";
 import { CovenantsPanel } from "./covenants-panel";
@@ -1032,6 +1033,19 @@ export function StatementsWorkbench({
                       nodeIds={
                         nodeIds.length ? nodeIds : Object.keys(model.nodes)
                       }
+                      density={density}
+                    />
+                  </div>
+                )}
+                {resultJson && request && (
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <CapitalStructurePanel
+                      resultJson={resultJson}
+                      modelJson={request.modelJson}
+                      nodeIds={
+                        nodeIds.length ? nodeIds : Object.keys(model.nodes)
+                      }
+                      periodIds={model.periods.map((period) => period.id)}
                       density={density}
                     />
                   </div>

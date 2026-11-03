@@ -331,6 +331,19 @@ export interface EvaluateLboRequest {
   /** Rust LboConfig JSON; Rust rejects unknown keys. */
   readonly configJson: string;
 }
+/** Native CapitalStructureSummary (not a top-level package export). */
+export type CapitalStructureSummary = ReturnType<
+  typeof statements_analytics.capitalStructureSummary
+>;
+/** The debt stack of an evaluated model at one period. */
+export interface CapitalStructureSummaryRequest {
+  /** Host-serialized StatementResult holding cs_cashflows and the configured nodes. */
+  readonly resultJson: string;
+  /** Canonical FinancialModelSpec JSON whose capital structure gives the instruments and payment classes. */
+  readonly modelJson: string;
+  /** Rust CapitalStructureSummaryConfig JSON; Rust rejects unknown keys. */
+  readonly configJson: string;
+}
 /** One sensitivity parameter: statements_analytics.parameterSpecWithPercentages arguments. */
 export interface SensitivityParameterRequest {
   readonly nodeId: string;
@@ -1604,6 +1617,10 @@ export interface StatementsApi {
   ): Promise<Envelope<DcfSensitivityResult>>;
   /** statements_analytics.evaluateLbo: entry and exit values, sources and uses, MOIC and the optional LBO check report. */
   evaluateLbo(request: EvaluateLboRequest): Promise<Envelope<LboResult>>;
+  /** statements_analytics.capitalStructureSummary: the debt stack by seniority, leverage and coverage through each class, and the maturity wall. */
+  capitalStructureSummary(
+    request: CapitalStructureSummaryRequest,
+  ): Promise<Envelope<CapitalStructureSummary>>;
   /** statements_analytics.parameterSpecWithPercentages per parameter, runSensitivity, then generateTornadoEntries at the target metric and period (skipped for full_grid). */
   runSensitivity(
     request: RunSensitivityRequest,

@@ -62,6 +62,7 @@ import { Example as Example80 } from "./examples/yield-workout-ladder";
 import { Example as ExampleQuoteConverter } from "./examples/quote-converter";
 import { Example as ExampleWaccCalculator } from "./examples/wacc-calculator";
 import { Example as ExampleNormalizationEditor } from "./examples/normalization-editor";
+import { Example as ExampleCapitalStructureReport } from "./examples/capital-structure-report";
 import { Example as ExampleStatementExport } from "./examples/statement-export";
 import { Example as Example74 } from "./examples/liability-management-card";
 import { Example as ExampleRecoveryWaterfall } from "./examples/recovery-waterfall";
@@ -152,6 +153,7 @@ const examples = {
   "quote-converter": ExampleQuoteConverter,
   "wacc-calculator": ExampleWaccCalculator,
   "normalization-editor": ExampleNormalizationEditor,
+  "capital-structure-report": ExampleCapitalStructureReport,
   "statement-export": ExampleStatementExport,
   "liability-management-card": Example74,
   "recovery-waterfall": ExampleRecoveryWaterfall,

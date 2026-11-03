@@ -20,6 +20,7 @@ import { StatementsWorkbench } from "@/components/finstack/statements/blocks/sta
 import { reportStatementCell } from "@/components/finstack/statements/components/statement-grid/projection";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
 import waccCases from "./wacc/cases.json";
+import capitalStructure from "./capital-structure/cases.json";
 import { budget } from "../shared/budget";
 import { formatRawMoney } from "../../src/format/format";
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
@@ -131,6 +132,12 @@ beforeEach(() => {
         );
       case "evaluateLbo":
         return native.evaluateLbo(arg.modelJson, arg.configJson);
+      case "capitalStructureSummary":
+        return native.capitalStructureSummary(
+          arg.resultJson,
+          arg.modelJson,
+          arg.configJson,
+        );
       case "runSensitivity": {
         const result = native.runSensitivity(
           arg.modelJson,
@@ -621,6 +628,101 @@ it(
   budget(30000),
 );
 
+/** Opens Metrics & ratios and the capital structure disclosure; returns its region. */
+async function openCapitalStructure() {
+  fireEvent.click(await screen.findByRole("tab", { name: "Metrics & ratios" }));
+  const summary = await screen.findByText("Capital structure and debt stack");
+  expect(
+    call.mock.calls.filter(([method]) => method === "capitalStructureSummary"),
+  ).toHaveLength(0);
+  const details = summary.closest("details")!;
+  details.open = true;
+  fireEvent(details, new Event("toggle"));
+  return screen.findByRole(
+    "region",
+    { name: "Capital structure" },
+    { timeout: budget(10000) },
+  );
+}
+/** Picks the period and EBITDA node, then submits once the form accepts it. */
+async function summarize(region: HTMLElement, period: string) {
+  await userEvent.click(
+    within(region).getByRole("combobox", { name: "Period" }),
+  );
+  await userEvent.click(screen.getByRole("option", { name: period }));
+  fireEvent.change(
+    within(region).getByRole("combobox", { name: "EBITDA node" }),
+    { target: { value: "ebitda" } },
+  );
+  const submit = within(region).getByRole("button", { name: "Summarize" });
+  const submitted = () =>
+    call.mock.calls.filter(([method]) => method === "capitalStructureSummary");
+  // No native validator runs in this loop: Rust validates the config on the call.
+  await waitFor(
+    () => {
+      fireEvent.click(submit);
+      expect(submitted().length).toBeGreaterThan(0);
+    },
+    { timeout: budget(10000) },
+  );
+}
+
+it(
+  "summarizes the debt stack in Metrics & ratios, calling Rust only once opened",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <StatementsWorkbench
+          defaultModelJson={JSON.stringify(capitalStructure.model)}
+        />
+      </FinstackQueryProvider>,
+    );
+    const region = await openCapitalStructure();
+    const expected = capitalStructure.cases.noCash.summary;
+    await summarize(region, expected.as_of);
+    const table = await within(region).findByRole(
+      "table",
+      { name: `Debt stack at ${expected.as_of}` },
+      { timeout: budget(10000) },
+    );
+    const request = lastCall("capitalStructureSummary");
+    expect(JSON.parse(request.configJson)).toEqual(
+      capitalStructure.cases.noCash.config,
+    );
+    expect(
+      within(table)
+        .getAllByRole("rowheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(expected.tranches.map((tranche) => tranche.id));
+    expect(
+      within(region).getByText("Cash", { selector: "dt" }).nextElementSibling!
+        .textContent,
+    ).toBe("Undefined");
+  },
+  budget(30000),
+);
+
+it(
+  "shows Rust's error for a model with no capital structure",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+      </FinstackQueryProvider>,
+    );
+    const region = await openCapitalStructure();
+    await summarize(region, "2025Q4");
+    expect(
+      (
+        await within(region).findByRole("alert", undefined, {
+          timeout: budget(10000),
+        })
+      ).textContent,
+    ).toBe(capitalStructure.errors.noCapitalStructure.message);
+  },
+  budget(30000),
+);
+
 it("sets the DCF WACC from the native calculator only on the user's click", async () => {
   render(
     <FinstackQueryProvider>
@@ -936,7 +1038,7 @@ it("reviews the variance, bridge and forecast backtest since the last roll forwa
     expect(lastCall("varianceBridge")?.drivers).toEqual(["revenue"]),
   );
   expect(
-    await within(review).findByRole("table", { name: "Ebitda bridge, 2025Q2" }),
+    await within(review).findByRole("table", { name: "EBITDA bridge, 2025Q2" }),
   ).toBeTruthy();
 });
 
