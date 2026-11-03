@@ -211,6 +211,67 @@ mod tests {
         }
     }
 
+    /// The default 1 vol point bump floors a 1% rate vol at 1e-8. On a stepped
+    /// log-linear forward curve that saturates the rate marginal at exactly 1, so
+    /// with mean reversion and a nonzero correlation the lattice reaches nodes
+    /// whose Fréchet interval rounds to inverted. Pricing them must not panic.
+    #[test]
+    fn rates_credit_vega_survives_a_saturated_rate_marginal() {
+        let as_of = date!(2024 - 07 - 15);
+        let mut bond = Bond::fixed(
+            "RATES-CREDIT-VEGA-SATURATED",
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.0425).expect("valid rate fixture"),
+            date!(2024 - 01 - 15),
+            date!(2029 - 01 - 15),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond should build");
+        bond.credit_curve_id = Some(CurveId::new("ACME-HAZARD"));
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start: date!(2026 - 01 - 15),
+                end: date!(2026 - 01 - 15),
+                price_pct_of_par: 102.0,
+                make_whole: None,
+            }],
+            puts: vec![],
+        });
+        bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
+            .with_hw1f_sigma(0.01)
+            .with_hw1f_mean_reversion(0.03)
+            .with_hazard_sigma(0.01)
+            .with_mc_paths(64);
+        let model_config = &mut bond.instrument_pricing_overrides.model_config;
+        model_config.hazard_mean_reversion = Some(0.02);
+        model_config.rate_credit_correlation = Some(0.1);
+
+        let base = date!(2023 - 12 - 28);
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(base)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .knots([(0.0, 1.0), (1.0, 0.97), (40.0, 0.3)])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .build()
+                    .expect("discount curve should build"),
+            )
+            .insert(HazardCurve::flat("ACME-HAZARD", base, 0.02, 0.4).expect("hazard curve"));
+        let mut context = MetricContext::new(
+            Arc::new(bond),
+            Arc::new(market),
+            as_of,
+            Money::from((1_000_000_i64, Currency::USD)),
+            MetricContext::default_config(),
+        );
+        let vega = BondVegaCalculator
+            .calculate(&mut context)
+            .expect("vega should price");
+        assert!(vega.is_finite(), "vega must be finite, got {vega}");
+    }
+
     #[test]
     fn standalone_vega_normalizes_equivalent_clean_and_dirty_quotes() {
         let as_of = date!(2025 - 01 - 01);

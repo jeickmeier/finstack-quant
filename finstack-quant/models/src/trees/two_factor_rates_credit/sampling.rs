@@ -355,8 +355,13 @@ impl RatesCreditTree {
     /// `[max(0, p_r + p_h − 1), min(p_r, p_h)]` purely as a numerical guard:
     /// [`Self::validate_correlation_feasibility`] has already proved at
     /// calibration time that the configured `ρ` is attainable at every node,
-    /// so the clamp is unreachable in a calibrated tree and is asserted as
-    /// such in debug builds.
+    /// so in a calibrated tree the clamp only absorbs rounding, and a target
+    /// further outside is asserted against in debug builds.
+    ///
+    /// Rounding can invert the interval. With a marginal saturated at exactly
+    /// 1 the two bounds are the same number in exact arithmetic, but
+    /// `1 + p − 1` can round one ulp above `p`. The upper bound wins, since it
+    /// keeps `p_ud` and `p_du` non-negative.
     #[inline]
     pub(super) fn joint_probabilities(&self, p_r: f64, p_h: f64) -> (f64, f64, f64, f64) {
         let a_target = if self.config.correlation == 0.0 {
@@ -367,8 +372,8 @@ impl RatesCreditTree {
             p_r * p_h + self.config.correlation * (var_r * var_h).sqrt()
         };
 
-        let a_lo = (p_r + p_h - 1.0).max(0.0);
         let a_hi = p_r.min(p_h);
+        let a_lo = (p_r + p_h - 1.0).max(0.0).min(a_hi);
         debug_assert!(
             a_target >= a_lo - 1e-9 && a_target <= a_hi + 1e-9,
             "calibration must have rejected an infeasible correlation before \
