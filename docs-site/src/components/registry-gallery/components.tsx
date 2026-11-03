@@ -91,6 +91,7 @@ import { Example as Example67 } from "./examples/statement-monte-carlo";
 import { Example as Example68 } from "./examples/surface-arbitrage-badge";
 import { Example as Example69 } from "./examples/covenant-engine-editor";
 import { Example as Example70 } from "./examples/covenant-breach-forecast";
+import { Example as ExamplePortfolioWorkbench } from "./examples/portfolio-workbench";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -183,6 +184,7 @@ const examples = {
   "surface-arbitrage-badge": Example68,
   "covenant-engine-editor": Example69,
   "covenant-breach-forecast": Example70,
+  "portfolio-workbench": ExamplePortfolioWorkbench,
 };
 export function ComponentDemo({
   name,

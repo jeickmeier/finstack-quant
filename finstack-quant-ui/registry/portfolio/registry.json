@@ -335,6 +335,63 @@
           "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
+    },
+    {
+      "name": "portfolio-workbench",
+      "type": "registry:block",
+      "title": "Portfolio workbench",
+      "description": "Portfolio workbench: a host-supplied book valued over a host-supplied market, with positions, aggregated risk, scenario P&L, margin and a natively validated book editor.",
+      "docs": "Tabs over the portfolio components, with no native call of its own. Positions: portfolio-summary and positions-table of useValuePortfolio (portfolio.valuePortfolio, then aggregateMetrics) with Rust metricMetadata of every returned measure id. Risk: portfolio-metrics of the same report, charting the usePortfolioMetricsSeries series of seriesBase when one is supplied. Scenarios (only when scenarioJsons are supplied): scenario-pnl-table of useScenarioPnlBatch (portfolio.scenarioPnlBatch). Margin: portfolio-margin-report of usePortfolioMargin (portfolio.portfolioMargin) on asOf with any currentImCollateral. Book: PortfolioSpec JSON that usePortfolioSpecValidator validates natively before every tab values it. The Scenarios and Margin calls run only when their tab first opens. Host-supplied props: defaultSpecJson (PortfolioSpec; remount for a different book), marketJson (MarketContextState), asOf (ISO margin date, never read from the spec), metrics (omitted is Rust's standard set), seriesBase, scenarioJsons (never parsed), currentImCollateral (omitted is none held) and density. Nothing is summed, netted or converted; native errors show as returned. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "blocks/portfolio-workbench/portfolio-workbench.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/portfolio/blocks/portfolio-workbench/portfolio-workbench.tsx"
+        },
+        {
+          "path": "blocks/portfolio-workbench/scenario-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/portfolio/blocks/portfolio-workbench/scenario-panel.tsx"
+        },
+        {
+          "path": "blocks/portfolio-workbench/margin-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/portfolio/blocks/portfolio-workbench/margin-panel.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/portfolio-summary",
+        "@finstack/positions-table",
+        "@finstack/portfolio-metrics",
+        "@finstack/scenario-pnl-table",
+        "@finstack/portfolio-margin-report",
+        "@finstack/use-value-portfolio",
+        "@finstack/use-portfolio-metrics-series",
+        "@finstack/use-portfolio-spec-validator",
+        "@finstack/use-scenario-pnl-batch",
+        "@finstack/use-portfolio-margin",
+        "@finstack/use-price-instrument",
+        "@finstack/use-finstack",
+        "@finstack/finstack-surface",
+        "@finstack/field-frame",
+        "button",
+        "tabs",
+        "textarea"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Blocks"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
+          "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
     }
   ]
 }

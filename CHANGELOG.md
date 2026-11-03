@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: portfolio workbench
+
+`@finstack/portfolio-workbench` puts the portfolio components under tabs over a host-supplied book, market and margin date: Positions (summary and positions), Risk (aggregated metrics and a bucketed series), Scenarios (scenario P&L, shown when the host supplies scenarios), Margin and Book (a `PortfolioSpec` validated natively before it is valued). It adds no native call; the Scenarios and Margin runs start when their tab opens. No value moves.
+
 ### Portfolio: multi-period Brinson in one call
 
 `brinson_linked(periods)` attributes each period with Brinson-Fachler and Carino-links the results, returning the existing `CarinoLinkedAttribution`: every period's sector allocation, selection and interaction, the linked effects by sector and by effect, and the compounded portfolio and benchmark returns, whose difference the linked effects sum to. It is identical to `carino_link` over each period's `brinson_fachler` result, so a host no longer loops over periods; a period that fails Brinson-Fachler is named by its zero-based index. Bound in Python (`brinson_linked`) and WASM (`portfolio.brinsonLinked`). No value moves.
