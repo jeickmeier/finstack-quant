@@ -16,8 +16,14 @@ import { useMetricMetadata } from "@/hooks/valuations/use-price-instrument/use-p
 import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
 import { ScenarioPanel } from "./scenario-panel";
 import { MarginPanel } from "./margin-panel";
+import {
+  AttributionPanel,
+  type PortfolioAttributionInputs,
+} from "./attribution-panel";
+export type { PortfolioAttributionInputs } from "./attribution-panel";
 
-type Tab = "positions" | "risk" | "scenarios" | "margin" | "book";
+type Tab =
+  "positions" | "risk" | "scenarios" | "attribution" | "margin" | "book";
 
 export interface PortfolioWorkbenchProps {
   /** Complete PortfolioSpec JSON supplied by the host (positions with their instrument specs, entities, base currency). Remount for a different book; the Book tab replaces it after native validation. */
@@ -32,6 +38,8 @@ export interface PortfolioWorkbenchProps {
   seriesBase?: string;
   /** ScenarioSpec JSON texts in batch order, never parsed here; the Scenarios tab appears only when some are supplied. */
   scenarioJsons?: readonly string[];
+  /** The closing (T1) market and date and the reconciliation tolerance of the Attribution tab, which attributes the book from marketJson on asOf to them; the tab appears only when supplied. */
+  attribution?: PortfolioAttributionInputs | null;
   /** IM collateral already held by CSA id, in that CSA's currency; omitted is none held. */
   currentImCollateral?: Readonly<Record<string, MoneyValue>> | null;
   /** Row and text density of the workbench surface; compact by default. Sets SurfaceContext and data-density on the root, while data-theme is inherited from the host. */
@@ -46,6 +54,7 @@ export function PortfolioWorkbench({
   metrics,
   seriesBase,
   scenarioJsons,
+  attribution,
   currentImCollateral,
   density = "compact",
 }: PortfolioWorkbenchProps) {
@@ -80,6 +89,9 @@ export function PortfolioWorkbench({
     { id: "positions", label: "Positions" },
     { id: "risk", label: "Risk" },
     ...(hasScenarios ? [{ id: "scenarios" as const, label: "Scenarios" }] : []),
+    ...(attribution
+      ? [{ id: "attribution" as const, label: "Attribution" }]
+      : []),
     { id: "margin", label: "Margin" },
     { id: "book", label: "Book" },
   ];
@@ -106,7 +118,7 @@ export function PortfolioWorkbench({
       >
         <header className="border-b border-border pb-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Portfolio · positions, risk and margin
+            Portfolio · positions, risk, attribution and margin
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Book valued natively over the supplied market; margin as of {asOf}.
@@ -161,6 +173,17 @@ export function PortfolioWorkbench({
                 specJson={specJson}
                 marketJson={marketJson}
                 scenarioJsons={scenarioJsons!}
+                density={density}
+              />
+            </TabsContent>
+          )}
+          {attribution && (
+            <TabsContent value="attribution">
+              <AttributionPanel
+                specJson={specJson}
+                marketJson={marketJson}
+                asOf={asOf}
+                {...attribution}
                 density={density}
               />
             </TabsContent>

@@ -477,6 +477,17 @@ const displays = [
       "Returned PortfolioMarginResult: every total as exact base-currency money (including a -0 variation margin, as returned), total_positions and positions_without_margin as returned counts, netting sets in returned order with the returned is_approximate flag beside an always-shown Indicative badge, by_csa collateral in the netting sets' CSA order, degraded positions, and the selected set's im_breakdown and SIMM sensitivities. Omitted collateral is left to Rust; nothing summed, netted or converted.",
   },
   {
+    id: "portfolio-attribution-report",
+    api: [
+      "portfolio.attributePortfolioPnl",
+      "PortfolioNamespace",
+      "attributePortfolioPnl",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned PortfolioAttribution: total_pnl and every base-currency bucket as exact money with shares only from portfolioAttributionPctOfTotalByBucket, the reconciliation verdict, gap and tolerance only from portfolioAttributionReconciliationCheck at the host's tolerance, explain only from portfolioAttributionExplainText, and result_invalid as returned; by_position rows in returned order in each instrument's currency, one column per book bucket filled from that position's pnlAttributionPctOfTotalByBucket, and the selected position through pnl-attribution-report. The method is required and chosen by the user; nothing is summed, differenced or converted.",
+  },
+  {
     id: "scenario-pnl-table",
     schema: `${base}portfolio/1/scenario_pnl_batch_item.schema.json`,
     pointer: "#",

@@ -1,4 +1,4 @@
-import type { portfolio } from "finstack-quant-wasm";
+import type { attribution, portfolio } from "finstack-quant-wasm";
 import type { PortfolioApi } from "../finstack-contract";
 import type { ServiceContext } from "./context";
 /** portfolio facade members this slice reads; the Portfolio handle comes from the context cache. */
@@ -13,6 +13,16 @@ export type PortfolioNative = {
     | "applyScenarioAndRevalue"
     | "portfolioMargin"
     | "computeFactorSensitivities"
+    | "attributePortfolioPnl"
+    | "portfolioAttributionExplainText"
+    | "portfolioAttributionReconciliationCheck"
+    | "portfolioAttributionPctOfTotalByBucket"
+  >;
+  attribution: Pick<
+    typeof attribution,
+    | "pnlAttributionExplainText"
+    | "pnlAttributionResidualWithinTolerance"
+    | "pnlAttributionPctOfTotalByBucket"
   >;
 };
 /** PortfolioApi over the portfolio facade namespace and the shared handle caches. */
@@ -92,6 +102,41 @@ export function createPortfolioService(
           request.currentImCollateral ?? undefined,
         ),
       );
+    },
+    attributePortfolioPnl(request) {
+      return context.result(() => {
+        const api = native.portfolio;
+        const single = native.attribution;
+        // Omitted config stays unset so Rust applies its default configuration.
+        const attribution = api.attributePortfolioPnl(
+          context.portfolio(request.specJson).handle,
+          context.market(request.marketT0Json).handle,
+          context.market(request.marketT1Json).handle,
+          request.asOfT0,
+          request.asOfT1,
+          request.method,
+        );
+        return {
+          attribution,
+          explain: api.portfolioAttributionExplainText(attribution),
+          reconciliation: api.portfolioAttributionReconciliationCheck(
+            attribution,
+            request.reconciliationTolerance,
+          ),
+          buckets: api.portfolioAttributionPctOfTotalByBucket(attribution),
+          // finstack-compose: Rust's own text, check and shares per returned position attribution
+          positions: Object.entries(attribution.by_position).map(
+            ([positionId, position]) => ({
+              positionId,
+              attribution: position,
+              explain: single.pnlAttributionExplainText(position),
+              residualWithinTolerance:
+                single.pnlAttributionResidualWithinTolerance(position),
+              buckets: single.pnlAttributionPctOfTotalByBucket(position),
+            }),
+          ),
+        };
+      });
     },
     computeFactorSensitivities(request) {
       return context.result(() =>

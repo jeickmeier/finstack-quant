@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: portfolio attribution report and the workbench Attribution tab
+
+`@finstack/portfolio-attribution-report` shows why the book moved between two snapshots as Rust returns it: the book total, the reconciliation verdict, gap and tolerance from `portfolioAttributionReconciliationCheck`, the base-currency buckets with their shares from `portfolioAttributionPctOfTotalByBucket` as a table and a signed chart, a row per position with one column per bucket from that position's own Rust buckets, the selected position through `pnl-attribution-report` (which now exports its factor table and chart as `PnlFactorBuckets`), and `portfolioAttributionExplainText`. `@finstack/use-attribute-portfolio-pnl` makes the one `attributePortfolioPnl` call. `portfolio-workbench` adds an Attribution tab when the host supplies `attribution` (closing market, closing date and reconciliation tolerance, none defaulted); every Rust method is offered with none preselected, and a failing method shows the native error.
+
 ### Portfolio: attribution buckets and their shares from Rust
 
 `PortfolioAttribution::pct_of_total_by_bucket()` lists the book's eleven base-currency factor buckets (`fx_translation_pnl` included) and `residual`, the amounts `reconciliation_check` adds up, as `PnlBucketShare` records with each share of `total_pnl` (`None` when the total is effectively zero), so a report reads the buckets from Rust instead of naming them. Bound as Python `PortfolioAttribution.pct_of_total_by_bucket` and WASM `portfolio.portfolioAttributionPctOfTotalByBucket`; the host parity fixture pins both. No existing value moves.

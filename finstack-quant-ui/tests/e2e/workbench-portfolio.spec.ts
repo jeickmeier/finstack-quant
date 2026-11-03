@@ -2,6 +2,9 @@ import { test, expect } from "playwright/test";
 import data from "../../../docs-site/src/components/registry-gallery/data.json" with { type: "json" };
 
 const fixture = data.portfolioWorkbench;
+const attribution = data.portfolioAttribution.cases.find(
+  (entry) => entry.scenario === "usd-ois-50bp" && entry.name === "taylor",
+)!;
 
 test("portfolio-workbench opens each tab on the native result, in a real worker", async ({
   page,
@@ -26,6 +29,14 @@ test("portfolio-workbench opens each tab on the native result, in a real worker"
   const pnl = workbench.getByRole("region", { name: "Portfolio scenario P&L" });
   for (const item of fixture.batch.items)
     await expect(pnl.getByTitle(item.pnl.total.amount).first()).toBeVisible();
+  await workbench.getByRole("tab", { name: "Attribution" }).click();
+  await workbench.getByRole("radio", { name: "taylor" }).click();
+  await expect(
+    workbench
+      .getByRole("region", { name: "Portfolio attribution" })
+      .getByTitle(attribution.report!.attribution.total_pnl.amount)
+      .first(),
+  ).toBeVisible();
   await workbench.getByRole("tab", { name: "Margin" }).click();
   await expect(
     workbench

@@ -153,6 +153,45 @@ function factorChart(rows: readonly PnlBucketShare[], currency: string) {
   });
 }
 
+/**
+ * Rust's factor buckets of one attribution as a table and a signed bar chart,
+ * in the order supplied; shared by the instrument and portfolio reports.
+ */
+export function PnlFactorBuckets({
+  buckets,
+  currency,
+  caption = "P&L by factor",
+  density,
+}: {
+  /** Rust's buckets (pnlAttributionPctOfTotalByBucket or portfolioAttributionPctOfTotalByBucket), in its order. */
+  buckets: readonly PnlBucketShare[];
+  /** Currency code of the amounts, for the axis label. */
+  currency: string;
+  /** Accessible name of the table and chart. */
+  caption?: string;
+  density?: "compact" | "comfortable";
+}) {
+  const factors = useMemo(
+    () => factorChart(buckets, currency),
+    [buckets, currency],
+  );
+  return (
+    <>
+      <FinstackTable
+        caption={caption}
+        captionVisibility="sr-only"
+        data={buckets as PnlBucketShare[]}
+        columns={factorColumns}
+        getRowId={(row) => row.field}
+        density={density}
+      />
+      <figure className="min-w-0">
+        <FinstackChart definition={factors} ariaLabel={caption} height={220} />
+      </figure>
+    </>
+  );
+}
+
 /** Step label: Rust's step index and factor. */
 const stepLabel = (step: Step) => `${step.step_index} ${labelFor(step.factor)}`;
 
@@ -269,10 +308,6 @@ function AttributionView({
 }) {
   const currency = attribution.total_pnl.currency;
   const steps = useMemo(() => attribution.waterfall_steps ?? [], [attribution]);
-  const factors = useMemo(
-    () => factorChart(buckets, currency),
-    [buckets, currency],
-  );
   const waterfall = useMemo(
     () => (steps.length ? waterfallChart(steps, currency) : null),
     [steps, currency],
@@ -317,21 +352,11 @@ function AttributionView({
         within={residualWithinTolerance}
       />
       <Section title="Factors">
-        <FinstackTable
-          caption="P&L by factor"
-          captionVisibility="sr-only"
-          data={buckets as PnlBucketShare[]}
-          columns={factorColumns}
-          getRowId={(row) => row.field}
+        <PnlFactorBuckets
+          buckets={buckets}
+          currency={currency}
           density={density}
         />
-        <figure className="min-w-0">
-          <FinstackChart
-            definition={factors}
-            ariaLabel="P&L by factor"
-            height={220}
-          />
-        </figure>
       </Section>
       {waterfall && (
         <Section title="Waterfall">
