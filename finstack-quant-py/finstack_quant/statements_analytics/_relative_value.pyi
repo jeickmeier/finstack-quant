@@ -532,7 +532,7 @@ class RelativeValueDimension:
     ...     ' "excluded_reason": "zero_weight", "points": []}'
     ... )
     >>> dimension.label, dimension.weight, dimension.direction, dimension.y, dimension.x
-    ('Spread vs Leverage', 0.0, 'higher_is_cheap', 'oas_bp', 'multiple:ev_ebitda')
+    ('Spread vs Leverage', 0.0, 'higher_is_cheap', {'named': 'oas_bp'}, {'multiple': 'ev_ebitda'})
     >>> dimension.subject_y, dimension.subject_x, dimension.peer_stats, dimension.percentile, dimension.z_score
     (300.0, None, None, None, None)
     >>> dimension.regression, dimension.signal, dimension.excluded_reason, dimension.points
