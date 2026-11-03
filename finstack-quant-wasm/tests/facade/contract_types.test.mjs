@@ -410,6 +410,11 @@ test('namespace results match their published result types', () => {
   ]);
   declarations.push(['brinson', 'fq.BrinsonPeriodResult', portfolio.brinsonFachler(sectors)]);
   declarations.push([
+    'brinsonLinked',
+    'fq.CarinoLinkedAttribution',
+    portfolio.brinsonLinked([JSON.parse(sectors), JSON.parse(sectors)]),
+  ]);
+  declarations.push([
     'twrr',
     'fq.LinkedReturn',
     portfolio.twrrLinked(JSON.stringify([0.05, 0.03]), 1.0),

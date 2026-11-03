@@ -367,3 +367,7 @@ test('optimizePortfolio validates constraint objects and requires a UnitScaling 
     (error) => error.kind === 'validation' && /MO-9/.test(error.message)
   );
 });
+
+test('brinsonLinked matches Python', () => {
+  assertClose(wire(portfolio.brinsonLinked(inputs.brinson_periods)), expected.brinson_linked);
+});

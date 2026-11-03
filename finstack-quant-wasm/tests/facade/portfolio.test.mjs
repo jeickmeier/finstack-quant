@@ -38,6 +38,7 @@ const EXPORTED_KEYS = [
   'applyScenarioAndRevalue',
   'attributePortfolioPnl',
   'brinsonFachler',
+  'brinsonLinked',
   'buildCreditVolReport',
   'campisiAttribution',
   'campisiCarinoLink',
@@ -224,6 +225,64 @@ const CAMPISI_BENCHMARK = JSON.stringify([
   campisiSnapshot('CORP', 0.5, 0.011, 0.055, 4.5),
 ]);
 const campisiConfig = (periodYears) => JSON.stringify({ period_years: periodYears });
+
+const brinsonPeriod = (wpA, wbA, rpA, rbA, rpB, rbB) => [
+  {
+    sector: 'A',
+    portfolio_weight: wpA,
+    benchmark_weight: wbA,
+    portfolio_return: rpA,
+    benchmark_return: rbA,
+  },
+  {
+    sector: 'B',
+    portfolio_weight: 1 - wpA,
+    benchmark_weight: 1 - wbA,
+    portfolio_return: rpB,
+    benchmark_return: rbB,
+  },
+];
+
+test('portfolio.brinsonLinked links raw sector periods to the compounded active return', () => {
+  assert.equal(portfolio.brinsonLinked.length, 1);
+  const periods = [
+    brinsonPeriod(0.7, 0.5, 0.1, 0.06, 0.04, 0.05),
+    brinsonPeriod(0.6, 0.5, 0.02, 0.03, -0.01, 0.0),
+  ];
+  const report = assertStructured(portfolio.brinsonLinked(periods), 'brinsonLinked result');
+  const active = report.portfolio_return_compounded - report.benchmark_return_compounded;
+  const linked = report.linked_allocation + report.linked_selection + report.linked_interaction;
+  assert.ok(Math.abs(linked - active) < 1e-12, `${linked} vs ${active}`);
+  assert.equal(report.periods.length, 2);
+  assert.deepEqual(
+    report.linked_sectors.map((row) => row.sector),
+    ['A', 'B']
+  );
+  // Identical to linking each period's brinsonFachler result.
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(report)),
+    JSON.parse(
+      JSON.stringify(portfolio.carinoLink(periods.map((p) => portfolio.brinsonFachler(p))))
+    )
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(portfolio.brinsonLinked(JSON.stringify(periods)))),
+    JSON.parse(JSON.stringify(report))
+  );
+
+  const bad = brinsonPeriod(0.6, 0.5, 0.02, 0.03, -0.01, 0.0);
+  bad[0].portfolio_weight = 0.9;
+  assert.throws(
+    () => portfolio.brinsonLinked([periods[0], bad]),
+    (error) => error.kind === 'validation' && /period 1/.test(error.message)
+  );
+  assert.throws(
+    () => portfolio.brinsonLinked([]),
+    (error) => error.kind === 'validation'
+  );
+  assert.throws(() => portfolio.brinsonLinked([[{ ...periods[0][0], bogus: 1 }]]));
+  assert.throws(() => portfolio.brinsonLinked(7), TypeError);
+});
 
 test('portfolio.campisiAttribution reconciles the five effects to active return', () => {
   const result = assertStructured(
