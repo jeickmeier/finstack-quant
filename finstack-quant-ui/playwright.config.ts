@@ -5,7 +5,8 @@ const baseURL =
 export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: "**/*.spec.ts",
-  workers: 1,
+  // One gallery server serves every worker; raise REGISTRY_E2E_WORKERS once baselines are verified.
+  workers: Number(process.env.REGISTRY_E2E_WORKERS ?? 1),
   retries: 0,
   timeout: 90000,
   forbidOnly: !!process.env.CI,

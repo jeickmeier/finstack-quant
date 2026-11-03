@@ -187,6 +187,11 @@ if [ "${usage_doctest:-false}" = "true" ]; then
     echo "--doctest cannot be combined with --slow or --coverage" >&2
     exit 2
   fi
+  # DOCTEST_PACKAGES (space-separated) narrows the run to those crates; phase-gate sets it from the diff.
+  if [ -n "${DOCTEST_PACKAGES:-}" ]; then
+    scope=""; for pkg in $DOCTEST_PACKAGES; do scope="$scope -p $pkg"; done
+    exec cargo test $scope --doc --no-fail-fast
+  fi
   exec cargo test --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --doc --no-fail-fast
 fi
 ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only --no-tests pass"
@@ -565,9 +570,23 @@ run = [
   "uv run --no-sync python scripts/check_pyo3_doc_placeholders.py",
 ]
 
+[tasks.phase-gate]
+description = "Run the phase-end gates in two overlapping lanes (--full ignores the diff, --base REF picks the diff base)"
+usage = '''
+flag "--full" help="Run every gate regardless of the diff"
+flag "--dry-run" help="Print the plan without running gates"
+flag "--base <ref>" default="master" help="Diff base used to select gates"
+'''
+run = '''
+set --
+[ "${usage_full:-false}" = "true" ] && set -- "$@" --full
+[ "${usage_dry_run:-false}" = "true" ] && set -- "$@" --dry-run
+exec scripts/phase_gate.sh "$@" --base "${usage_base:-master}"
+'''
+
 [tasks.python-examples]
 description = "Run every example notebook; fail on errors, warnings or stderr"
-run = "uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py"
+run = "uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py --jobs 4"
 
 [tasks.python-bench]
 description = "Release-build the bindings, then run the Python benchmarks"
@@ -725,7 +744,8 @@ description = "Install every registry item in isolation, then verify composed co
 depends = ["ui-build"]
 run = [
   "node finstack-quant-ui/scripts/require-wasm.mjs pkg pkg-node",
-  "REGISTRY_INSTALL_COMPLETE=1 node finstack-quant-ui/scripts/install-matrix.mjs",
+  # Items install into separate temp consumers on ephemeral ports, so six run at once.
+  "REGISTRY_INSTALL_COMPLETE=1 REGISTRY_INSTALL_CONCURRENCY=${REGISTRY_INSTALL_CONCURRENCY:-6} node finstack-quant-ui/scripts/install-matrix.mjs",
   "mise run ui-docs-install",
   "REGISTRY_INSTALL_COMPOSITION=1 node finstack-quant-ui/tests/browser/install-smoke.mjs",
 ]

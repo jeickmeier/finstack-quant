@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { loadRegistry } from "shadcn/registry";
 import { chromium } from "playwright";
@@ -48,12 +49,20 @@ const requested = process.env.REGISTRY_INSTALL_ITEMS?.split(",");
 if (requested && process.env.REGISTRY_INSTALL_COMPLETE === "1")
   throw Error("The complete ui-install gate cannot use a subset");
 const concurrency = Number(process.env.REGISTRY_INSTALL_CONCURRENCY ?? 1);
-if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4)
-  throw Error("Install concurrency must be an integer from 1 to 4");
+if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 8)
+  throw Error("Install concurrency must be an integer from 1 to 8");
+// REGISTRY_INSTALL_SHARD=i/n runs every n-th item starting at the i-th, so CI can split the catalogue.
+const shard = process.env.REGISTRY_INSTALL_SHARD?.match(
+  /^([1-9]\d*)\/([1-9]\d*)$/,
+);
+if (process.env.REGISTRY_INSTALL_SHARD && (!shard || +shard[1] > +shard[2]))
+  throw Error("REGISTRY_INSTALL_SHARD must be i/n with 1 <= i <= n");
 if (requested?.some((name) => !graph.byName.has(name)))
   throw Error("Unknown matrix item");
 const items = registry.items.filter(
-  (item) => !requested || requested.includes(item.name),
+  (item, index) =>
+    (!requested || requested.includes(item.name)) &&
+    (!shard || index % +shard[2] === +shard[1] - 1),
 );
 const evidence =
   process.env.REGISTRY_INSTALL_EVIDENCE ??
@@ -95,11 +104,211 @@ const run = (args, cwd, log) =>
   });
 const json = (file, value) =>
   writeFile(file, JSON.stringify(value, null, 2) + "\n");
-let reportWrite = Promise.resolve();
-async function installItem(index, item) {
-  const consumer = await mkdtemp(
-    path.join(tmpdir(), `finstack-item-${item.name}-`),
+// A passing item is a pure function of its inputs, so a recorded pass is reused
+// until an installed file, the installer, the toolchain or the WASM package changes.
+// REGISTRY_INSTALL_CACHE=0 reruns everything; subset and publishing runs never use it.
+const cacheFile = path.join(root, "test-results/install-cache.json");
+const cacheOn =
+  process.env.REGISTRY_INSTALL_CACHE !== "0" &&
+  process.env.REGISTRY_INSTALL_COMPLETE === "1" &&
+  process.env.REGISTRY_INSTALL_PUBLISHING !== "1";
+let cache = { entries: {} };
+if (cacheOn)
+  try {
+    cache = JSON.parse(await readFile(cacheFile, "utf8"));
+  } catch {}
+const digest = (...parts) => {
+  const hash = createHash("sha256");
+  for (const part of parts) hash.update(part).update("\0");
+  return hash.digest("hex");
+};
+const installerKey = async () =>
+  digest(
+    process.version,
+    process.platform,
+    JSON.stringify(scaffold),
+    ...(await Promise.all(
+      [
+        "scripts/install-matrix.mjs",
+        "scripts/local-registry.mjs",
+        "scripts/check-registry.mjs",
+        "tests/install/harness.mjs",
+        "tests/install/browser.mjs",
+        "tests/browser/static-server.mjs",
+        "package-lock.json",
+        "../docs-site/postcss.config.mjs",
+        "../docs-site/src/components/registry-gallery/data.json",
+      ].map((file) => readFile(path.join(root, file)).catch(() => "")),
+    )),
   );
+let wasmKeyPromise;
+const wasmKey = () =>
+  (wasmKeyPromise ??= (async () => {
+    const dir = path.join(repo, "finstack-quant-wasm/pkg");
+    const names = (await readdir(dir)).sort();
+    return digest(
+      ...(await Promise.all(
+        names.map(
+          async (name) =>
+            name + (await readFile(path.join(dir, name)).catch(() => "")),
+        ),
+      )),
+    );
+  })());
+const baseKey = await (cacheOn ? installerKey() : "");
+async function itemKey(item, closure, needsWasm) {
+  const harness = visualTypes.has(item.type)
+    ? await visualHarness(repo, item, graph)
+    : {};
+  return digest(
+    baseKey,
+    needsWasm ? await wasmKey() : "",
+    JSON.stringify(closure.map((name) => graph.byName.get(name))),
+    JSON.stringify(harness),
+    ...(await Promise.all(
+      closure
+        .flatMap((name) => graph.byName.get(name).files ?? [])
+        .map((file) => readFile(path.resolve(root, file.path))),
+    )),
+  );
+}
+let cacheWrite = Promise.resolve();
+const remember = (name, key, result) => {
+  cache.entries[name] = { key, result };
+  cacheWrite = cacheWrite.then(() => json(cacheFile, cache).catch(() => {}));
+};
+const layout =
+  'import "./globals.css";export default function Layout({children}:{children:React.ReactNode}){return <html lang="en" data-theme="light" data-density="compact"><body>{children}</body></html>}';
+// Scaffolding, `npm install` and `shadcn init` do not depend on the item, so each
+// is done once per WASM variant and every item starts from a copy-on-write clone.
+const templates = new Map();
+const templateDirs = [];
+const template = (needsWasm) => {
+  if (!templates.has(needsWasm))
+    templates.set(needsWasm, buildTemplate(needsWasm));
+  return templates.get(needsWasm);
+};
+const clone = (from, to) =>
+  run(
+    process.platform === "darwin"
+      ? ["cp", "-cR", `${from}/.`, to]
+      : ["cp", "-a", "--reflink=auto", `${from}/.`, to],
+    tmpdir(),
+    path.join(evidence, "clone.log"),
+  );
+async function buildTemplate(needsWasm) {
+  const consumer = await mkdtemp(path.join(tmpdir(), "finstack-template-"));
+  templateDirs.push(consumer);
+  const log = path.join(
+    evidence,
+    needsWasm ? "template-wasm.log" : "template.log",
+  );
+  await mkdir(path.join(consumer, "app"));
+  await json(path.join(consumer, "package.json"), {
+    name: "installed-template",
+    private: true,
+    type: "module",
+    dependencies: {
+      ...scaffold,
+      ...(needsWasm ? { "finstack-quant-wasm": `file:${transport.wasm}` } : {}),
+    },
+    devDependencies: {
+      typescript: "5.9.3",
+      "@types/node": "24.10.1",
+      "@types/react": "19.2.14",
+      "@types/react-dom": "19.2.3",
+      tailwindcss: "4.3.3",
+      "@tailwindcss/postcss": "4.3.3",
+    },
+  });
+  await json(path.join(consumer, "tsconfig.json"), {
+    compilerOptions: {
+      target: "ES2022",
+      lib: ["dom", "dom.iterable", "esnext"],
+      allowJs: true,
+      skipLibCheck: true,
+      strict: true,
+      noEmit: true,
+      esModuleInterop: true,
+      module: "esnext",
+      moduleResolution: "bundler",
+      resolveJsonModule: true,
+      isolatedModules: true,
+      jsx: "react-jsx",
+      paths: { "@/*": ["./*"] },
+    },
+    include: ["**/*.ts", "**/*.tsx"],
+    exclude: ["node_modules", "out"],
+  });
+  await writeFile(
+    path.join(consumer, "app/globals.css"),
+    '@import "tailwindcss";\n',
+  );
+  await writeFile(
+    path.join(consumer, "app/page.tsx"),
+    "export default function Page(){return <main>Initializing Base UI</main>}",
+  );
+  await writeFile(path.join(consumer, "app/layout.tsx"), layout);
+  await writeFile(
+    path.join(consumer, "next.config.mjs"),
+    'export default {output:"export",trailingSlash:true,productionBrowserSourceMaps:true,basePath:process.env.NEXT_PUBLIC_BASE_PATH||"",turbopack:{root:import.meta.dirname}};\n',
+  );
+  await cp(
+    path.join(repo, "docs-site/postcss.config.mjs"),
+    path.join(consumer, "postcss.config.mjs"),
+  );
+  await run(
+    ["npm", "install", "--ignore-scripts", "--install-links"],
+    consumer,
+    log,
+  );
+  const cli = path.join(root, "node_modules/shadcn/dist/index.js");
+  await run(
+    [
+      process.execPath,
+      cli,
+      "init",
+      "--base",
+      "base",
+      "--preset",
+      "nova",
+      "--yes",
+      "--no-monorepo",
+      "--no-rtl",
+      "--no-pointer",
+      "--cwd",
+      consumer,
+    ],
+    consumer,
+    log,
+  );
+  const config = JSON.parse(
+    await readFile(path.join(consumer, "components.json"), "utf8"),
+  );
+  config.registries = { "@finstack": `${transport.url}/{name}.json` };
+  await json(path.join(consumer, "components.json"), config);
+  return consumer;
+}
+let reportWrite = Promise.resolve();
+async function writeReport() {
+  const report = {
+    scope: requested || shard ? "subset" : "complete catalogue",
+    concurrency,
+    catalogueCount: registry.items.length,
+    requestedCount: items.length,
+    completedCount: results.length,
+    results: [...results].sort(
+      (a, b) =>
+        items.findIndex((item) => item.name === a.name) -
+        items.findIndex((item) => item.name === b.name),
+    ),
+  };
+  reportWrite = reportWrite.then(() =>
+    json(path.join(evidence, "results.json"), report),
+  );
+  await reportWrite;
+}
+async function installItem(index, item) {
   const log = path.join(evidence, `${item.name}.log`),
     started = Date.now(),
     closure = [...graph.closures.get(item.name)];
@@ -107,99 +316,28 @@ async function installItem(index, item) {
   const needsWasm = closure
     .flatMap((name) => graph.byName.get(name).dependencies ?? [])
     .some((name) => name.startsWith("finstack-quant-wasm@"));
+  const key = cacheOn ? await itemKey(item, closure, needsWasm) : undefined;
+  const hit = cacheOn && cache.entries[item.name];
+  if (hit?.key === key) {
+    console.log(`[${index + 1}/${items.length}] ${item.name}: cached pass`);
+    results.push({ ...hit.result, cached: true, durationMs: 0 });
+    return;
+  }
+  const consumer = await mkdtemp(
+    path.join(tmpdir(), `finstack-item-${item.name}-`),
+  );
   let server, context, harness;
   console.log(
     `[${index + 1}/${items.length}] ${item.name}: fresh scaffold and one-item CLI install`,
   );
   try {
-    await mkdir(path.join(consumer, "app"));
-    await json(path.join(consumer, "package.json"), {
-      name: `installed-${item.name}`,
-      private: true,
-      type: "module",
-      dependencies: {
-        ...scaffold,
-        ...(needsWasm
-          ? { "finstack-quant-wasm": `file:${transport.wasm}` }
-          : {}),
-      },
-      devDependencies: {
-        typescript: "5.9.3",
-        "@types/node": "24.10.1",
-        "@types/react": "19.2.14",
-        "@types/react-dom": "19.2.3",
-        tailwindcss: "4.3.3",
-        "@tailwindcss/postcss": "4.3.3",
-      },
-    });
-    await json(path.join(consumer, "tsconfig.json"), {
-      compilerOptions: {
-        target: "ES2022",
-        lib: ["dom", "dom.iterable", "esnext"],
-        allowJs: true,
-        skipLibCheck: true,
-        strict: true,
-        noEmit: true,
-        esModuleInterop: true,
-        module: "esnext",
-        moduleResolution: "bundler",
-        resolveJsonModule: true,
-        isolatedModules: true,
-        jsx: "react-jsx",
-        paths: { "@/*": ["./*"] },
-      },
-      include: ["**/*.ts", "**/*.tsx"],
-      exclude: ["node_modules", "out"],
-    });
-    await writeFile(
-      path.join(consumer, "app/globals.css"),
-      '@import "tailwindcss";\n',
+    await clone(await template(needsWasm), consumer);
+    const manifest = JSON.parse(
+      await readFile(path.join(consumer, "package.json"), "utf8"),
     );
-    await writeFile(
-      path.join(consumer, "app/page.tsx"),
-      "export default function Page(){return <main>Initializing Base UI</main>}",
-    );
-    const layout =
-      'import "./globals.css";export default function Layout({children}:{children:React.ReactNode}){return <html lang="en" data-theme="light" data-density="compact"><body>{children}</body></html>}';
-    await writeFile(path.join(consumer, "app/layout.tsx"), layout);
-    await writeFile(
-      path.join(consumer, "next.config.mjs"),
-      'export default {output:"export",trailingSlash:true,productionBrowserSourceMaps:true,basePath:process.env.NEXT_PUBLIC_BASE_PATH||"",turbopack:{root:import.meta.dirname}};\n',
-    );
-    await cp(
-      path.join(repo, "docs-site/postcss.config.mjs"),
-      path.join(consumer, "postcss.config.mjs"),
-    );
-    await run(
-      ["npm", "install", "--ignore-scripts", "--install-links"],
-      consumer,
-      log,
-    );
+    manifest.name = `installed-${item.name}`;
+    await json(path.join(consumer, "package.json"), manifest);
     const cli = path.join(root, "node_modules/shadcn/dist/index.js");
-    await run(
-      [
-        process.execPath,
-        cli,
-        "init",
-        "--base",
-        "base",
-        "--preset",
-        "nova",
-        "--yes",
-        "--no-monorepo",
-        "--no-rtl",
-        "--no-pointer",
-        "--cwd",
-        consumer,
-      ],
-      consumer,
-      log,
-    );
-    const config = JSON.parse(
-      await readFile(path.join(consumer, "components.json"), "utf8"),
-    );
-    config.registries = { "@finstack": `${transport.url}/{name}.json` };
-    await json(path.join(consumer, "components.json"), config);
     await run(
       [
         process.execPath,
@@ -284,6 +422,29 @@ async function installItem(index, item) {
       consumer,
       log,
     );
+    // A hook or library with no page, WASM or lazy-catalogue role has nothing a
+    // bundle or browser adds: the page above imports every module it installs, so
+    // the type-check already proves its closure resolves.
+    if (
+      !visual &&
+      !needsWasm &&
+      !lazyCatalogueTargets(graph, item.name).length &&
+      !files.some((file) => file.target.endsWith(".worker.ts"))
+    ) {
+      const result = {
+        name: item.name,
+        verdict: "pass",
+        mode: "typecheck",
+        durationMs: Date.now() - started,
+        closure,
+        targets,
+        checks: [],
+      };
+      results.push(result);
+      if (key) remember(item.name, key, result);
+      await rm(consumer, { recursive: true, force: true });
+      return;
+    }
     await run(
       [
         process.execPath,
@@ -422,7 +583,7 @@ async function installItem(index, item) {
           /\/generated\/(?:instrument|schemas|examples)\//.test(source),
         )
         .sort();
-    results.push({
+    const passed = {
       name: item.name,
       verdict: "pass",
       durationMs: Date.now() - started,
@@ -439,7 +600,9 @@ async function installItem(index, item) {
       },
       loadedPackages: [...packages].sort(),
       checks,
-    });
+    };
+    results.push(passed);
+    if (key) remember(item.name, key, passed);
     await context.close();
     context = undefined;
     await server.close();
@@ -459,22 +622,7 @@ async function installItem(index, item) {
   } finally {
     await context?.close();
     await server?.close();
-    const report = {
-      scope: requested ? "subset" : "complete catalogue",
-      concurrency,
-      catalogueCount: registry.items.length,
-      requestedCount: items.length,
-      completedCount: results.length,
-      results: [...results].sort(
-        (a, b) =>
-          items.findIndex((item) => item.name === a.name) -
-          items.findIndex((item) => item.name === b.name),
-      ),
-    };
-    reportWrite = reportWrite.then(() =>
-      json(path.join(evidence, "results.json"), report),
-    );
-    await reportWrite;
+    await writeReport();
   }
 }
 let next = 0,
@@ -491,7 +639,11 @@ try {
 } finally {
   await browser.close();
   await transport.close();
+  await writeReport();
+  await cacheWrite;
   await rm(npmCache, { recursive: true, force: true });
+  for (const dir of templateDirs)
+    await rm(dir, { recursive: true, force: true });
 }
 const failures = results.filter((result) => result.verdict !== "pass");
 console.log(

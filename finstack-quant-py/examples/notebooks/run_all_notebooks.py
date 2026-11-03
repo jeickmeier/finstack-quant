@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import hashlib
 import importlib
 import json
@@ -337,7 +338,15 @@ def main() -> int:
         action="store_true",
         help="Write each successfully executed notebook back with fresh outputs",
     )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help="Notebooks to execute at once, each in its own process",
+    )
     args = parser.parse_args()
+    if args.jobs < 1:
+        parser.error("--jobs must be at least 1")
 
     base_dir = args.notebook_root.resolve()
     if not base_dir.is_dir():
@@ -360,25 +369,39 @@ def main() -> int:
     failed: list[Path] = []
     t0 = time.time()
 
-    for i, nb_path in enumerate(notebooks, 1):
+    def timeout_for(nb_path: Path) -> int:
         rel = nb_path.relative_to(base_dir)
-        print(f"[{i}/{len(notebooks)}] Running {rel}...", end=" ", flush=True)
+        return max(args.timeout, 900) if "08_capstone" in rel.parts else args.timeout
 
-        timeout = args.timeout
-        if "08_capstone" in rel.parts:
-            timeout = max(timeout, 900)
-        ok, msg, elapsed = run_notebook(nb_path, timeout, args.save_outputs, base_dir)
-        results[nb_path] = (ok, msg, elapsed)
+    def record(i: int, nb_path: Path, outcome: tuple[bool, str, float]) -> bool:
+        """Store one outcome and print its line; return True when it passed."""
+        ok, _, elapsed = outcome
+        results[nb_path] = outcome
+        (successful if ok else failed).append(nb_path)
+        verdict = "PASS" if ok else "FAIL"
+        rel = nb_path.relative_to(base_dir)
+        print(f"[{i}/{len(notebooks)}] {rel}: {verdict} ({_fmt(elapsed)})", flush=True)
+        return ok
 
-        if ok:
-            successful.append(nb_path)
-            print(f"PASS ({_fmt(elapsed)})")
-        else:
-            failed.append(nb_path)
-            print(f"FAIL ({_fmt(elapsed)})")
-            if args.fail_fast:
+    if args.jobs == 1:
+        for i, nb_path in enumerate(notebooks, 1):
+            outcome = run_notebook(nb_path, timeout_for(nb_path), args.save_outputs, base_dir)
+            if not record(i, nb_path, outcome) and args.fail_fast:
                 print("\nStopped early (--fail-fast).")
                 break
+    else:
+        # Processes, not threads: run_notebook sets IPYTHONDIR and sys.path per notebook.
+        with ProcessPoolExecutor(max_workers=args.jobs) as pool:
+            futures = {
+                pool.submit(run_notebook, nb, timeout_for(nb), args.save_outputs, base_dir): nb for nb in notebooks
+            }
+            for i, future in enumerate(as_completed(futures), 1):
+                nb_path = futures[future]
+                if not record(i, nb_path, future.result()) and args.fail_fast:
+                    print("\nStopped early (--fail-fast).")
+                    for pending in futures:
+                        pending.cancel()
+                    break
 
     total = time.time() - t0
     executed = len(successful) + len(failed)

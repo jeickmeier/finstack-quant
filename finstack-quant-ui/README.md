@@ -1601,8 +1601,14 @@ download, without computing financial values.
 
 Set `REGISTRY_INSTALL_EVIDENCE` and `REGISTRY_SMOKE_DIR` to retain matrix and
 composition reports, logs, screenshots and exports. Failed applications are kept
-at the paths in the report. `REGISTRY_INSTALL_CONCURRENCY` accepts 1–4 independent
-consumers (default 1). A focused diagnostic run can invoke
+at the paths in the report. `REGISTRY_INSTALL_CONCURRENCY` accepts 1–8 independent
+consumers (default 1; `ui-install` uses 6). Each consumer is a copy-on-write clone
+of a scaffold that `npm install` and `shadcn init` built once. A hook or library
+with no WASM, worker or lazy-catalogue role is type-checked only, without a bundle
+or browser load. A passing item is cached in `test-results/install-cache.json`
+keyed on its closure files, harness, installer, toolchain and WASM package;
+`REGISTRY_INSTALL_CACHE=0` reruns everything. `REGISTRY_INSTALL_SHARD=i/n` runs
+every n-th item so CI can split the catalogue; its report is a subset. A focused diagnostic run can invoke
 `node finstack-quant-ui/scripts/install-matrix.mjs` with
 `REGISTRY_INSTALL_ITEMS=finstack-chart,cashflow-viewer`; its report is explicitly a
 subset and cannot satisfy `ui-install`. The faster workbench check,
