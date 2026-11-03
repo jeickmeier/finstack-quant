@@ -125,20 +125,19 @@ const summary = (config, evaluated = { modelJson, resultJson }) => ({
 });
 // Cash above total debt: net debt and net leverage are negative.
 const netCash = evaluate(modelWithCash([980000, 980000, 980000, 980000]));
-const analystModel = await readFile(
-  new URL(
-    "../../../src/fixtures/statements/analyst-model.json",
-    import.meta.url,
+// The statements workbench's analyst model with its debt stack removed.
+const noCapitalStructure = evaluate({
+  ...JSON.parse(
+    await readFile(
+      new URL(
+        "../../../src/fixtures/statements/analyst-model.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ),
-  "utf8",
-);
-const analystResult = await readFile(
-  new URL(
-    "../../../src/fixtures/statements/analyst-result.json",
-    import.meta.url,
-  ),
-  "utf8",
-);
+  capital_structure: null,
+});
 const full = { period: "2025Q4", ebitda_node: "ebitda", cash_node: "cash" };
 const cases = {
   // A full trailing year: every ratio is returned.
@@ -160,13 +159,15 @@ const errors = {
       ),
     ),
   },
-  // The analyst model of the statements workbench declares no capital structure.
+  // The analyst model with `capital_structure: null`.
   noCapitalStructure: {
     config: full,
+    model: JSON.parse(noCapitalStructure.modelJson),
+    result: JSON.parse(noCapitalStructure.resultJson),
     message: rejection(() =>
       native.capitalStructureSummary(
-        analystResult,
-        analystModel,
+        noCapitalStructure.resultJson,
+        noCapitalStructure.modelJson,
         JSON.stringify(full),
       ),
     ),
