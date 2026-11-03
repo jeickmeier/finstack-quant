@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: attribution fixture with a book Rust does not reconcile
+
+The portfolio attribution fixture adds a native `metrics_based` attribution at a host tolerance of zero, where `portfolioAttributionReconciliationCheck` reports the book not reconciled (the bucket sum leaves about 5e-13 USD). Tests now render the "Not reconciled" badge and a position whose residual is outside Rust's tolerance. At the host's one-cent tolerance the book always reconciles, because Rust's buckets include the residual.
+
 ### UI: portfolio returns keep NaN and Infinity apart
 
 `@finstack/use-portfolio-returns` keys its three queries with `requestSnapshot`, as `use-correlation-matrix` does, instead of putting the cloned request in the TanStack key, whose JSON hashing turns NaN and Infinity both into `null`. A blank horizon followed by an overflowing one now makes two native `twrrLinked` calls and shows each native error.
