@@ -37,6 +37,7 @@ export type StatementsNative = {
     | "runVariance"
     | "varianceBridge"
     | "backtestForecast"
+    | "wacc"
   >;
 };
 /** StatementsApi over the statements and statements_analytics facade namespaces. */
@@ -185,6 +186,17 @@ export function createStatementsService(
           request.resultsJson,
           [...request.lineItems],
           [...request.periods],
+        ),
+      );
+    },
+    wacc(request) {
+      return context.result(() =>
+        native.statements_analytics.wacc(
+          request.equityWeight,
+          request.costOfEquity,
+          request.debtWeight,
+          request.costOfDebt,
+          request.taxRate,
         ),
       );
     },

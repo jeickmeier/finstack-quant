@@ -83455,6 +83455,55 @@
       "frequency": "quarterly"
     }
   },
+  "waccCalculator": {
+    "cases": {
+      "blended": {
+        "inputs": {
+          "equityWeight": 0.6,
+          "costOfEquity": 0.115,
+          "debtWeight": 0.4,
+          "costOfDebt": 0.06,
+          "taxRate": 0.25
+        },
+        "rate": 0.08700000000000001
+      },
+      "zero": {
+        "inputs": {
+          "equityWeight": 1,
+          "costOfEquity": 0,
+          "debtWeight": 0,
+          "costOfDebt": 0,
+          "taxRate": 0
+        },
+        "rate": 0
+      }
+    },
+    "errors": {
+      "weights": {
+        "inputs": {
+          "equityWeight": 0.6,
+          "costOfEquity": 0.115,
+          "debtWeight": 0.5,
+          "costOfDebt": 0.06,
+          "taxRate": 0.25
+        },
+        "message": "Evaluation error: WACC requires capital weights summing to 1.0 within 1e-6, got equity_weight=0.600000 + debt_weight=0.500000 = 1.100000"
+      },
+      "tax": {
+        "inputs": {
+          "equityWeight": 0.6,
+          "costOfEquity": 0.115,
+          "debtWeight": 0.4,
+          "costOfDebt": 0.06,
+          "taxRate": 1.5
+        },
+        "message": "Evaluation error: WACC requires a tax_rate in [0, 1] (decimal form), got 1.500000"
+      },
+      "empty": {
+        "message": "Evaluation error: WACC requires a finite 'equity_weight', got NaN"
+      }
+    }
+  },
   "covenantSeries": [
     {
       "as_of": "2024-03-31",

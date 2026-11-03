@@ -290,6 +290,19 @@ export type TerminalValueSpec = Exclude<
   Parameters<typeof statements_analytics.evaluateDcf>[2],
   string
 >;
+/** The statements_analytics.wacc arguments, each a decimal as Rust takes it. */
+export interface WaccRequest {
+  /** Equity share of total capital (0.6 = 60%). */
+  readonly equityWeight: number;
+  /** Required return on equity (0.115 = 11.5%). */
+  readonly costOfEquity: number;
+  /** Debt share of total capital; Rust rejects weights that do not sum to one. */
+  readonly debtWeight: number;
+  /** Pre-tax borrowing yield (0.06 = 6%). */
+  readonly costOfDebt: number;
+  /** Marginal tax rate in [0, 1] (0.25 = 25%). */
+  readonly taxRate: number;
+}
 /** DCF assumptions for one statement model; an omitted optional argument stays unset so Rust applies its default. */
 export interface DcfSensitivityRequest {
   readonly modelJson: string;
@@ -1498,6 +1511,8 @@ export interface StatementsApi {
   creditAssessment(
     request: CreditAssessmentRequest,
   ): Promise<Envelope<CreditAssessment>>;
+  /** statements_analytics.wacc: the blended rate as a decimal. */
+  wacc(request: WaccRequest): Promise<Envelope<number>>;
   /** statements_analytics.plSummaryReport: the P&L summary TableEnvelope over the line items and periods. */
   plSummaryReport(
     request: PlSummaryReportRequest,

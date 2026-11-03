@@ -114,8 +114,9 @@ describe("discovered canonical fixtures", () => {
     // CovenantReport, DatedCovenantReports, FutureBreach,
     // the five credit-scoring inputs, ArbitrageReport, MertonModel, CreditAssessment,
     // DcfOptions, DcfSensitivityResult, LboConfig, LboResult, ScenarioSet,
-    // ScenarioDiff, SensitivityResult, BridgeChart, ForecastMetrics or
-    // VarianceConfig; every other root carries one.
+    // ScenarioDiff, SensitivityResult, BridgeChart, ForecastMetrics,
+    // VarianceConfig, CapitalStructureSummary or RelativeValueReport, nor their
+    // configs; every other root carries one.
     expect(withoutExamples).toEqual([
       "schemas/covenant_engine.json",
       "schemas/covenant_forecast_config.json",
@@ -130,12 +131,16 @@ describe("discovered canonical fixtures", () => {
       "schemas/ohlson_o_score_input.json",
       "schemas/zmijewski_input.json",
       "schemas/bridge_chart.json",
+      "schemas/capital_structure_summary_config.json",
+      "schemas/capital_structure_summary.json",
       "schemas/credit_assessment.json",
       "schemas/dcf_options.json",
       "schemas/dcf_sensitivity_result.json",
       "schemas/forecast_metrics.json",
       "schemas/lbo_config.json",
       "schemas/lbo_result.json",
+      "schemas/relative_value_report_config.json",
+      "schemas/relative_value_report.json",
       "schemas/scenario_diff.json",
       "schemas/scenario_set.json",
       "schemas/sensitivity_result.json",

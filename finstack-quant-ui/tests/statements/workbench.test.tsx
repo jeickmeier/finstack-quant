@@ -19,6 +19,7 @@ import covenantSeries from "../../src/fixtures/covenants/analyst-covenant-series
 import { StatementsWorkbench } from "@/components/finstack/statements/blocks/statements-workbench/statements-workbench";
 import { reportStatementCell } from "@/components/finstack/statements/components/statement-grid/projection";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
+import waccCases from "./wacc/cases.json";
 import { budget } from "../shared/budget";
 import { formatRawMoney } from "../../src/format/format";
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
@@ -56,6 +57,14 @@ beforeEach(() => {
         return { state: "ready", worker: true };
       case "validateStatementModel":
         return native.validateFinancialModelJson(arg);
+      case "wacc":
+        return native.wacc(
+          arg.equityWeight,
+          arg.costOfEquity,
+          arg.debtWeight,
+          arg.costOfDebt,
+          arg.taxRate,
+        );
       case "evaluateStatement":
         return new native.Evaluator().evaluate(arg.modelJson);
       case "validateStatementFormula":
@@ -495,6 +504,51 @@ it("shows a native P&L summary error in Metrics & ratios instead of hiding the s
     expect(within(summary).getByRole("alert").textContent).toBe(
       "Validation error: bad line item",
     ),
+  );
+});
+
+it("sets the DCF WACC from the native calculator only on the user's click", async () => {
+  render(
+    <FinstackQueryProvider>
+      <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+    </FinstackQueryProvider>,
+  );
+  fireEvent.click(await screen.findByRole("tab", { name: "Valuation" }));
+  const form = await screen.findByRole("region", { name: "DCF assumptions" });
+  const waccField = within(form).getByRole("textbox", {
+    name: "WACC",
+  }) as HTMLInputElement;
+  const netDebt = within(form).getByRole("textbox", {
+    name: "Net debt override",
+  }) as HTMLInputElement;
+  fireEvent.change(netDebt, { target: { value: "5" } });
+  const calculator = screen.getByRole("region", { name: "WACC calculator" });
+  const { inputs, rate } = waccCases.cases.blended;
+  for (const [name, value] of [
+    ["Equity weight", inputs.equityWeight],
+    ["Cost of equity", inputs.costOfEquity],
+    ["Debt weight", inputs.debtWeight],
+    ["Cost of debt", inputs.costOfDebt],
+    ["Tax rate", inputs.taxRate],
+  ] as const)
+    fireEvent.change(within(calculator).getByRole("textbox", { name }), {
+      target: { value: String(value) },
+    });
+  fireEvent.click(
+    within(calculator).getByRole("button", { name: "Calculate" }),
+  );
+  const apply = await within(calculator).findByRole(
+    "button",
+    { name: "Use as WACC" },
+    { timeout: budget(10000) },
+  );
+  // Calculating fills nothing, and neither step values the model.
+  expect(waccField.value).toBe("");
+  fireEvent.click(apply);
+  expect(waccField.value).toBe(String(rate));
+  expect(netDebt.value).toBe("5");
+  expect(call.mock.calls.some(([method]) => method === "evaluateDcf")).toBe(
+    false,
   );
 });
 

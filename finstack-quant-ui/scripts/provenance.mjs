@@ -519,6 +519,13 @@ const displays = [
       "Returned BondWorkoutLadder of one bond: one row per call, put and maturity exit in Rust's date order, every yield solved at the one price shown. The worst row is the one is_worst marks, the exit the ytw metric selects; no yield is compared here. Yield and I-spread units are what metricMetadata declares for ytw and i_spread, and a null yield is shown as no yield, never zero. Z-spread is not reported per exit.",
   },
   {
+    id: "wacc-calculator",
+    api: ["statements_analytics.wacc", "StatementsAnalyticsNamespace", "wacc"],
+    route: "returned-report",
+    convention:
+      "Returned WACC of the five entered decimals, itself a decimal. The two capital weights are separate inputs; nothing is blended, defaulted or checked here, and weights that do not sum to one or a tax rate outside [0, 1] show the native error. Applying the rate to a DCF is an explicit user action that passes the returned number unchanged.",
+  },
+  {
     id: "quote-converter",
     api: [
       "valuations.instruments.computeQuotes",

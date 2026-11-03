@@ -188,6 +188,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "defaultRollupSpec",
     "creditAssessment",
     "plSummaryReport",
+    "wacc",
     "evaluateDcf",
     "dcfSensitivity",
     "evaluateLbo",
