@@ -328,6 +328,33 @@ pub fn score_relative_value(
     peer_set: &PeerSet,
     dimensions: &[ScoringDimension],
 ) -> Result<RelativeValueResult> {
+    let result = score_relative_value_unchecked(peer_set, dimensions)?;
+    if !is_finite_score(&result) {
+        return Err(Error::Validation(
+            "relative value score must be finite".into(),
+        ));
+    }
+    Ok(result)
+}
+
+/// Whether a score's composite and confidence are both finite, the one
+/// condition [`score_relative_value`] adds to [`score_relative_value_unchecked`].
+pub(super) fn is_finite_score(result: &RelativeValueResult) -> bool {
+    result.composite_score.is_finite() && result.confidence.is_finite()
+}
+
+/// [`score_relative_value`] without its final finiteness check: the composite
+/// and confidence may be non-finite. Every other error is the same.
+///
+/// # Arguments
+///
+/// * `peer_set` - Peer universe containing the subject and its peers.
+/// * `dimensions` - Non-empty scoring dimensions with finite, non-negative
+///   weights.
+pub(super) fn score_relative_value_unchecked(
+    peer_set: &PeerSet,
+    dimensions: &[ScoringDimension],
+) -> Result<RelativeValueResult> {
     if dimensions.is_empty() {
         return Err(Error::Validation(
             "at least one scoring dimension is required".into(),
@@ -405,12 +432,6 @@ pub fn score_relative_value(
     } else {
         0.0
     };
-    if !composite.is_finite() || !confidence.is_finite() {
-        return Err(Error::Validation(
-            "relative value score must be finite".into(),
-        ));
-    }
-
     Ok(RelativeValueResult {
         company_id: peer_set.subject.id.clone(),
         composite_score: composite,
@@ -632,5 +653,43 @@ mod tests {
             .expect("regression confidence");
         assert!(regression_r_squared > 0.9);
         assert_eq!(result.confidence, regression_r_squared);
+    }
+
+    #[test]
+    fn unchecked_score_differs_from_the_checked_one_only_on_a_non_finite_composite() {
+        // Each z-score is about 1.4e308; their weighted sum overflows.
+        let set = PeerSet::new(
+            company("subject", None, Some(1e308)),
+            vec![company("a", None, Some(1.0)), company("b", None, Some(2.0))],
+            PeriodBasis::Ltm,
+        );
+        let dimensions = [dimension(false, 1.0), dimension(false, 1.0)];
+        let unchecked =
+            score_relative_value_unchecked(&set, &dimensions).expect("only the composite fails");
+        assert!(!is_finite_score(&unchecked));
+        assert!(score_relative_value(&set, &dimensions).is_err());
+
+        // Every other rejection is an error of both, never a non-finite score.
+        for dimensions in [
+            vec![],
+            vec![dimension(false, 0.0)],
+            vec![dimension(true, 1.0)],
+        ] {
+            assert!(score_relative_value_unchecked(&set, &dimensions).is_err());
+            assert!(score_relative_value(&set, &dimensions).is_err());
+        }
+
+        let finite = PeerSet::new(
+            company("subject", None, Some(3.0)),
+            vec![company("a", None, Some(1.0)), company("b", None, Some(2.0))],
+            PeriodBasis::Ltm,
+        );
+        let dimensions = [dimension(false, 1.0)];
+        let unchecked = score_relative_value_unchecked(&finite, &dimensions).expect("finite");
+        assert!(is_finite_score(&unchecked));
+        assert_eq!(
+            Some(unchecked),
+            score_relative_value(&finite, &dimensions).ok()
+        );
     }
 }

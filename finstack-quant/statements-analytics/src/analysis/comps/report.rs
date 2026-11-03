@@ -4,9 +4,12 @@
 
 use super::multiples::compute_multiple;
 use super::peer_set::{PeerFilter, PeerSet};
+#[cfg(doc)]
+use super::scoring::score_relative_value;
 use super::scoring::{
-    evaluate_dimension, score_relative_value, validate_dimension_weights, DimensionExclusion,
-    MetricExtractor, RelativeValueResult, ScoreDirection, ScoringDimension,
+    evaluate_dimension, is_finite_score, score_relative_value_unchecked,
+    validate_dimension_weights, DimensionExclusion, MetricExtractor, RelativeValueResult,
+    ScoreDirection, ScoringDimension,
 };
 use super::stats::{peer_stats, percentile_rank, z_score, PeerStats, RegressionResult};
 use super::types::{CompanyId, CompanyMetrics, Multiple, PeriodBasis};
@@ -300,11 +303,13 @@ pub fn relative_value_report(
     } else if dimensions.iter().all(|dim| dim.excluded_reason.is_some()) {
         (None, Some(CompositeExclusion::NoUsableDimension))
     } else {
-        // The weights are validated and a dimension is usable, so all that is
-        // left for the score to reject is a non-finite composite.
-        match score_relative_value(&peer_set, &config.dimensions) {
-            Ok(result) => (Some(result), None),
-            Err(_) => (None, Some(CompositeExclusion::NonFiniteScore)),
+        // Only a non-finite composite becomes a reason; any other score error
+        // is returned.
+        let result = score_relative_value_unchecked(&peer_set, &config.dimensions)?;
+        if is_finite_score(&result) {
+            (Some(result), None)
+        } else {
+            (None, Some(CompositeExclusion::NonFiniteScore))
         }
     };
 
@@ -381,6 +386,7 @@ fn dimension_row(peer_set: &PeerSet, dim: &ScoringDimension) -> RelativeValueDim
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analysis::comps::scoring::score_relative_value;
     use finstack_quant_core::types::Attributes;
 
     fn company(id: &str, leverage: Option<f64>, oas_bp: Option<f64>) -> CompanyMetrics {
