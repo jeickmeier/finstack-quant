@@ -311,6 +311,77 @@
         "tag_taxonomy": {}
       }
     },
+    "brinson_periods": [
+      [
+        {
+          "sector": "Tech",
+          "portfolio_weight": 0.7,
+          "benchmark_weight": 0.5,
+          "portfolio_return": 0.1,
+          "benchmark_return": 0.06
+        },
+        {
+          "sector": "Energy",
+          "portfolio_weight": 0.3,
+          "benchmark_weight": 0.4,
+          "portfolio_return": 0.04,
+          "benchmark_return": 0.05
+        },
+        {
+          "sector": "Cash",
+          "portfolio_weight": 0.0,
+          "benchmark_weight": 0.1,
+          "portfolio_return": 0.0,
+          "benchmark_return": 0.01
+        }
+      ],
+      [
+        {
+          "sector": "Tech",
+          "portfolio_weight": 0.6,
+          "benchmark_weight": 0.5,
+          "portfolio_return": 0.02,
+          "benchmark_return": 0.03
+        },
+        {
+          "sector": "Energy",
+          "portfolio_weight": 0.4,
+          "benchmark_weight": 0.4,
+          "portfolio_return": -0.01,
+          "benchmark_return": 0.0
+        },
+        {
+          "sector": "Cash",
+          "portfolio_weight": 0.0,
+          "benchmark_weight": 0.1,
+          "portfolio_return": 0.0,
+          "benchmark_return": 0.01
+        }
+      ],
+      [
+        {
+          "sector": "Tech",
+          "portfolio_weight": 0.4,
+          "benchmark_weight": 0.5,
+          "portfolio_return": -0.03,
+          "benchmark_return": -0.02
+        },
+        {
+          "sector": "Energy",
+          "portfolio_weight": 0.5,
+          "benchmark_weight": 0.4,
+          "portfolio_return": 0.05,
+          "benchmark_return": 0.01
+        },
+        {
+          "sector": "Cash",
+          "portfolio_weight": 0.1,
+          "benchmark_weight": 0.1,
+          "portfolio_return": 0.01,
+          "benchmark_return": 0.01
+        }
+      ]
+    ],
     "credit_decomposition": {
       "total_risk": 1.0,
       "measure": "variance",
@@ -1014,6 +1085,131 @@
           "team": "rates"
         }
       }
+    },
+    "brinson_linked": {
+      "periods": [
+        {
+          "sectors": [
+            {
+              "sector": "Tech",
+              "allocation": 0.0017999999999999984,
+              "selection": 0.020000000000000004,
+              "interaction": 0.008,
+              "total": 0.029800000000000004
+            },
+            {
+              "sector": "Energy",
+              "allocation": 0.00010000000000000013,
+              "selection": -0.004000000000000001,
+              "interaction": 0.0010000000000000005,
+              "total": -0.0029000000000000002
+            },
+            {
+              "sector": "Cash",
+              "allocation": 0.0041,
+              "selection": -0.001,
+              "interaction": 0.001,
+              "total": 0.0041
+            }
+          ],
+          "total_allocation": 0.005999999999999999,
+          "total_selection": 0.015000000000000003,
+          "total_interaction": 0.01,
+          "portfolio_return": 0.08199999999999999,
+          "benchmark_return": 0.051000000000000004,
+          "total_excess_return": 0.030999999999999986
+        },
+        {
+          "sectors": [
+            {
+              "sector": "Tech",
+              "allocation": 0.0013999999999999996,
+              "selection": -0.004999999999999999,
+              "interaction": -0.0009999999999999996,
+              "total": -0.0046
+            },
+            {
+              "sector": "Energy",
+              "allocation": -0.0,
+              "selection": -0.004,
+              "interaction": -0.0,
+              "total": -0.004
+            },
+            {
+              "sector": "Cash",
+              "allocation": 0.0006000000000000001,
+              "selection": -0.001,
+              "interaction": 0.001,
+              "total": 0.0006000000000000001
+            }
+          ],
+          "total_allocation": 0.0019999999999999996,
+          "total_selection": -0.009999999999999998,
+          "total_interaction": 4.336808689942018e-19,
+          "portfolio_return": 0.008,
+          "benchmark_return": 0.016,
+          "total_excess_return": -0.008
+        },
+        {
+          "sectors": [
+            {
+              "sector": "Tech",
+              "allocation": 0.0014999999999999996,
+              "selection": -0.004999999999999999,
+              "interaction": 0.0009999999999999996,
+              "total": -0.0025
+            },
+            {
+              "sector": "Energy",
+              "allocation": 0.0014999999999999996,
+              "selection": 0.016,
+              "interaction": 0.003999999999999999,
+              "total": 0.021500000000000002
+            },
+            {
+              "sector": "Cash",
+              "allocation": 0.0,
+              "selection": 0.0,
+              "interaction": 0.0,
+              "total": 0.0
+            }
+          ],
+          "total_allocation": 0.002999999999999999,
+          "total_selection": 0.011000000000000001,
+          "total_interaction": 0.004999999999999999,
+          "portfolio_return": 0.014000000000000002,
+          "benchmark_return": -0.005,
+          "total_excess_return": 0.019000000000000003
+        }
+      ],
+      "portfolio_return_compounded": 0.10592518400000017,
+      "benchmark_return_compounded": 0.062476919999999936,
+      "linked_sectors": [
+        {
+          "sector": "Tech",
+          "allocation": 0.0049482966390457924,
+          "selection": 0.009578462743438322,
+          "interaction": 0.008140287360013921,
+          "total": 0.022667046742498035
+        },
+        {
+          "sector": "Energy",
+          "allocation": 0.0017205008649860245,
+          "selection": 0.00891674775266147,
+          "interaction": 0.005333459724528143,
+          "total": 0.015970708342175635
+        },
+        {
+          "sector": "Cash",
+          "allocation": 0.004810508915326334,
+          "selection": -0.00208773994377358,
+          "interaction": 0.00208773994377358,
+          "total": 0.004810508915326334
+        }
+      ],
+      "linked_allocation": 0.01147930641935815,
+      "linked_selection": 0.016407470552326213,
+      "linked_interaction": 0.015561487028315644
     }
   }
 }

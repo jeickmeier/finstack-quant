@@ -1564,7 +1564,7 @@ status = "exists"
 [crates.portfolio.modules]
 attribution  = { python = "finstack_quant.portfolio.attribution",  status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
 book         = { python = "finstack_quant.portfolio.book",         status = "missing", note = "Book hierarchy types (Book, BookId, ...) are bound in no host; Rust-only. The Python root does NOT carry them." }
-brinson      = { python = "finstack_quant.portfolio",              status = "flattened", note = "Brinson-Fachler and Carino attribution helpers are exported flat on finstack_quant.portfolio" }
+brinson      = { python = "finstack_quant.portfolio",              status = "flattened", note = "Brinson-Fachler and Carino attribution helpers (brinson_fachler, carino_link, and brinson_linked, which attributes raw sector periods and links them in one call) are exported flat on finstack_quant.portfolio" }
 builder      = { python = "finstack_quant.portfolio",              status = "flattened", note = "PortfolioBuilder is bound flat on finstack_quant.portfolio behind Portfolio.builder(id, base_currency, as_of) (fluent name/entity/position/tag/meta/build); Portfolio.from_spec remains the JSON path" }
 cashflows    = { python = "finstack_quant.portfolio.cashflows",    status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
 dataframe    = { python = "finstack_quant.portfolio.dataframe",    status = "missing", note = "Python does not bind the Rust dataframe free functions (positions_to_table, metrics_to_table, aggregated_metrics_to_table); they back the typed exits (PortfolioValuation.to_dataframe/to_arrow_positions, PortfolioMetrics.to_position_dataframe/to_dataframe)." }
@@ -1678,6 +1678,7 @@ public = [
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
     "brinson_fachler",
+    "brinson_linked",
     "build_credit_vol_report",
 
     "campisi_attribution",

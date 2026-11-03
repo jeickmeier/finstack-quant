@@ -34040,6 +34040,21 @@ export interface PortfolioNamespace {
    */
   carinoLink(periodsJson: JsonInput): CarinoLinkedAttribution;
   /**
+   * Attribute each period with Brinson-Fachler and Carino-link the results.
+   *
+   * Binds Rust `brinson_linked`: the multi-period Brinson-Fachler report in one
+   * call, identical to `carinoLink(periods.map(brinsonFachler))`. Returns a
+   * structured `CarinoLinkedAttribution` object with every period's sector
+   * allocation, selection and interaction (`periods`), the linked effects by
+   * sector (`linked_sectors`) and by effect (`linked_allocation`,
+   * `linked_selection`, `linked_interaction`), and the compounded portfolio and
+   * benchmark returns; the linked effects sum to the compounded active return.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+   * @param periods - Chronological array of periods (or its JSON text), each an array of `SectorPeriod` objects (`sector`, `portfolio_weight`, `benchmark_weight`, `portfolio_return`, `benchmark_return`). Weights are decimal fractions summing to one on each side; returns are decimal period returns (`0.015` is +1.5 %). Every period lists the same sectors in the same order; a sector absent on one side keeps a zero weight.
+   * @throws Error - Throws a JavaScript exception if `periods` is malformed or a row has an unknown field, there are no periods, a period fails Brinson-Fachler (no sectors, a non-finite input, or weights not summing to one; the message names the zero-based period), the sector ordering changes between periods, or a period return is at most `-1` (kind `validation`).
+   */
+  brinsonLinked(periods: generated.portfolio.SectorPeriod[][] | string): CarinoLinkedAttribution;
+  /**
    * Compute a single-period Campisi fixed-income attribution from JSON.
    *
    * Decomposes both sides into carry / treasury / spread / selection and

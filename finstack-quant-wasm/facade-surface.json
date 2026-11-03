@@ -3559,6 +3559,7 @@
       "applyScenarioAndRevalue",
       "attributePortfolioPnl",
       "brinsonFachler",
+      "brinsonLinked",
       "buildCreditVolReport",
       "campisiAttribution",
       "campisiCarinoLink",
@@ -3646,6 +3647,9 @@
     "kind": "function"
   },
   "portfolio.carinoLink": {
+    "kind": "function"
+  },
+  "portfolio.brinsonLinked": {
     "kind": "function"
   },
   "portfolio.campisiAttribution": {

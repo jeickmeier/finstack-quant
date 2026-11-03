@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Portfolio: multi-period Brinson in one call
+
+`brinson_linked(periods)` attributes each period with Brinson-Fachler and Carino-links the results, returning the existing `CarinoLinkedAttribution`: every period's sector allocation, selection and interaction, the linked effects by sector and by effect, and the compounded portfolio and benchmark returns, whose difference the linked effects sum to. It is identical to `carino_link` over each period's `brinson_fachler` result, so a host no longer loops over periods; a period that fails Brinson-Fachler is named by its zero-based index. Bound in Python (`brinson_linked`) and WASM (`portfolio.brinsonLinked`). No value moves.
+
 ### UI: recovery-waterfall fields from the contracts; DCF WACC default
 
 `recovery-waterfall` labels its claim, collateral and workout fields through `labelFor` and takes their help from the generated contracts (the new `recovery_claim` contract root, and `workout_lgd`), so "Direct costs" reads "Direct cost rate", "Time to resolution" reads "Workout years" and "Exposure at default" reads "EAD" (`labelFor` upper-cases `ead`). "Add claim" starts the accrued, penalties and haircut fields empty instead of at 0, so an untyped amount is rejected by Rust rather than sent as zero. The statements workbench's valuation panel leaves the DCF form's WACC unset until the calculator or an edit sets it, so a form given `defaultAssumptions` shows its WACC instead of an empty field.

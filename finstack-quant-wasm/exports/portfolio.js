@@ -38,6 +38,7 @@ export const portfolio = {
   parsePortfolioSpecJson: wasm.parsePortfolioSpecJson,
   brinsonFachler: wasm.brinsonFachler,
   carinoLink: wasm.carinoLink,
+  brinsonLinked: wasm.brinsonLinked,
   campisiAttribution: wasm.campisiAttribution,
   campisiCarinoLink: wasm.campisiCarinoLink,
   fiAttributionResultReconciliationCheck: wasm.fiAttributionResultReconciliationCheck,
