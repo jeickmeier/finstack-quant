@@ -1007,6 +1007,56 @@
       }
     },
     {
+      "name": "normalization-editor",
+      "type": "registry:component",
+      "title": "Normalization editor",
+      "description": "Edit the add-backs and deductions to a statement metric such as EBITDA and see Rust's base-to-adjusted bridge and the adjustments by period.",
+      "docs": "Answers what adjusted EBITDA is and how each add-back gets there. Edits a NormalizationConfig with the schema form over the generated normalization_config contract (target, percentage and cap-base nodes as id-comboboxes over the supplied node ids; fixed per-period amounts, percentages of a node and caps as Rust declares them), validated natively (useNormalizationConfigValidator; a duplicate id is Rust's error). Normalize passes the canonical config to the caller (usually the useNormalize request). The native statements.normalize results are shown as returned, above the form: for a chosen period, a bridge from the reported base through each adjustment in declaration order to the final value, each step drawn from the previous step's adjusted_value (the base for the first) to its own, coloured by Rust's is_capped, and a table of every adjustment's capped amount by period with the raw amount beside a capped one. A missing node, a non-finite base or a negative cap shows the native error. Nothing is summed, capped or classified here. Accepts defaultConfig, nodeIds, validate, onSubmit, results, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/normalization-editor/normalization-editor.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/normalization-editor/normalization-editor.tsx"
+        },
+        {
+          "path": "components/normalization-editor/normalization-config.ts",
+          "type": "registry:lib",
+          "target": "components/finstack/statements/components/normalization-editor/normalization-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-codec",
+        "@finstack/finstack-worker",
+        "@finstack/schema-form",
+        "@finstack/enum-field",
+        "@finstack/id-combobox",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/contract-normalization-config",
+        "@finstack/contract-normalization-result"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "statement-export",
       "type": "registry:component",
       "title": "Statement export",
@@ -1080,6 +1130,58 @@
       ],
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-normalize",
+      "type": "registry:hook",
+      "title": "useNormalize",
+      "description": "Normalizes a statement metric with a NormalizationConfig through the WASM worker.",
+      "docs": "Native statements.normalize of the host-serialized StatementResult and canonical NormalizationConfig JSON: one NormalizationResult per period of the target node, in period order, each adjustment with its raw and capped amounts and the adjusted_value through it. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-normalize/use-normalize.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-normalize/use-normalize.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-normalization-config-validator",
+      "type": "registry:hook",
+      "title": "useNormalizationConfigValidator",
+      "description": "Validates and canonicalizes NormalizationConfig JSON through the WASM worker, for schema-form.",
+      "docs": "Native NormalizationConfig validation (statements.validateNormalizationConfigJson; rejects a duplicate adjustment id) using the existing FinstackProvider worker. Returns canonical JSON and rejects superseded revisions.",
+      "files": [
+        {
+          "path": "hooks/use-normalization-config-validator/use-normalization-config-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-normalization-config-validator/use-normalization-config-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
       "categories": [],
       "meta": {
         "version": "0.2.0",
@@ -1382,7 +1484,7 @@
       "type": "registry:block",
       "title": "Statements workbench",
       "description": "Financial statements workbench: inline editing, forecasts, scenarios, annual roll-up, roll forward, calculated metrics and checks.",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, a table and CSV export of the shown result, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary, a native DCF valuation with its enterprise-value tornado, a native WACC calculator that sets the DCF WACC field on the user's click, and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error, and a native breach forecast, statements_analytics.forecastBreaches, under a submitted CovenantForecastConfig), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, a table and CSV export of the shown result, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary and, in a disclosure, a native normalization of the reported result (adjusted EBITDA: a NormalizationConfig editor and statements.normalize's base-to-adjusted bridge), a native DCF valuation with its enterprise-value tornado, a native WACC calculator that sets the DCF WACC field on the user's click, and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error, and a native breach forecast, statements_analytics.forecastBreaches, under a submitted CovenantForecastConfig), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "blocks/statements-workbench/statements-workbench.tsx",
@@ -1443,6 +1545,11 @@
           "path": "blocks/statements-workbench/covenants-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/statements/blocks/statements-workbench/covenants-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/normalization-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/normalization-panel.tsx"
         }
       ],
       "registryDependencies": [
@@ -1454,6 +1561,7 @@
         "@finstack/statement-checks",
         "@finstack/variance-table",
         "@finstack/credit-assessment-report",
+        "@finstack/normalization-editor",
         "@finstack/dcf-assumptions-form",
         "@finstack/wacc-calculator",
         "@finstack/dcf-report",
@@ -1475,6 +1583,8 @@
         "@finstack/use-trace-statement-scenario",
         "@finstack/use-credit-assessment",
         "@finstack/use-pl-summary-report",
+        "@finstack/use-normalize",
+        "@finstack/use-normalization-config-validator",
         "@finstack/use-wacc",
         "@finstack/use-statement-result-table",
         "@finstack/use-evaluate-dcf",
@@ -1528,6 +1638,8 @@
           "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
+          "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
           "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json",

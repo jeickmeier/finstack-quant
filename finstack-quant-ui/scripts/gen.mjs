@@ -141,6 +141,8 @@ export async function generate(repo = repoRoot) {
           "forecast_metrics",
           "monte_carlo_config",
           "monte_carlo_results",
+          "normalization_config",
+          "normalization_result",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )
     .sort((a, b) => a.$id.localeCompare(b.$id));

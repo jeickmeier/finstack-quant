@@ -11,6 +11,7 @@ export function useNativeValidator<
     | "validateStatementModel"
     | "validateStatementFormula"
     | "validateCheckSuiteSpec"
+    | "validateNormalizationConfig"
     | "validatePortfolio"
     | "validateSimmSensitivities"
     | "validateCsa"

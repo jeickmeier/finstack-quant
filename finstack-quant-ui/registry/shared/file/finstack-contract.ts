@@ -393,6 +393,17 @@ export interface VarianceBridgeRequest {
   readonly baselineLabel: string;
   readonly comparisonLabel: string;
 }
+/** Native NormalizationResult of one period of the target node (not a top-level package export). */
+export type NormalizationResult = ReturnType<
+  typeof statements.normalize
+>[number];
+/** An evaluated result and the NormalizationConfig to apply to it, both as JSON. */
+export interface NormalizeRequest {
+  /** Host-serialized StatementResult holding the target and every referenced node. */
+  readonly resultJson: string;
+  /** Canonical NormalizationConfig JSON: the target node and its adjustments in order. */
+  readonly configJson: string;
+}
 /** Native BridgeChart (not a top-level package export). */
 export type BridgeChart = ReturnType<
   typeof statements_analytics.varianceBridge
@@ -1523,6 +1534,12 @@ export interface StatementsApi {
   validateStatementFormula(formula: string): Promise<Envelope<string>>;
   /** statements.validateCheckSuiteSpecJson: validate and canonicalize CheckSuiteSpec JSON. */
   validateCheckSuiteSpec(json: string): Promise<Envelope<string>>;
+  /** statements.validateNormalizationConfigJson: validate and canonicalize NormalizationConfig JSON. */
+  validateNormalizationConfig(json: string): Promise<Envelope<string>>;
+  /** statements.normalize: one NormalizationResult per period of the target node, in period order. */
+  normalize(
+    request: NormalizeRequest,
+  ): Promise<Envelope<NormalizationResult[]>>;
   /** statements.Evaluator evaluate, or evaluateWithMarket when market and date are supplied. */
   evaluateStatement(
     request: StatementRequest,

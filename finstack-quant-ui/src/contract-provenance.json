@@ -2251,6 +2251,32 @@
       }
     },
     {
+      "id": "normalization-editor",
+      "route": "returned-report",
+      "convention": "Returned NormalizationResult per period of the target node, in Rust's period order, in the target's units (its currency when monetary). Each adjustment carries its raw amount, its capped amount, Rust's is_capped and adjusted_value, the target through that step; the bridge draws each step from the previous step's adjusted_value (base_value for the first) to its own, and the base and final value from zero. Nothing is summed, capped or classified here; a duplicate id, a missing node or a non-finite base shows the native error.",
+      "api": {
+        "name": "statements.normalize",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StatementsNamespace",
+        "member": "normalize",
+        "inputs": [
+          {
+            "name": "results",
+            "type": "StatementResult | string",
+            "optional": false
+          },
+          {
+            "name": "config",
+            "type": "generated.statements.NormalizationConfig | string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.statements.NormalizationResult[]",
+        "declaration": "/**\n   * Normalize a target metric by applying an adjustment catalog period by period.\n   *\n   * Twin of Python `normalize` (Rust `adjustments::normalize`).\n   * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).\n   * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).\n   * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped amounts and `adjusted_value`, the target through that step) and the final value.\n   * @throws Error - Throws with kind `validation` if an input is malformed, the target node or a referenced node is absent from the results, the configuration is invalid, or the target and a reference node have incompatible units.\n   */\n  normalize(\n    results: StatementResult | string,\n    config: generated.statements.NormalizationConfig | string\n  ): generated.statements.NormalizationResult[];",
+        "sha256": "265294c694d86770be407c35707a6aa450dadf99c72e595e81d84f0796842457"
+      }
+    },
+    {
       "id": "wacc-calculator",
       "route": "returned-report",
       "convention": "Returned WACC of the five entered decimals, itself a decimal. The two capital weights are separate inputs; nothing is blended, defaulted or checked here, and weights that do not sum to one or a tax rate outside [0, 1] show the native error. Applying the rate to a DCF is an explicit user action that passes the returned number unchanged.",

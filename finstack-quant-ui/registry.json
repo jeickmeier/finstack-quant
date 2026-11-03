@@ -5187,6 +5187,72 @@
       }
     },
     {
+      "name": "contract-normalization-config",
+      "type": "registry:lib",
+      "title": "Normalization config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust normalization_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/normalization_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/normalization_config.json"
+        },
+        {
+          "path": "src/generated/types/normalization_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/normalization_config.ts"
+        },
+        {
+          "path": "src/generated/meta/normalization_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/normalization_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-normalization-result",
+      "type": "registry:lib",
+      "title": "Normalization result contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust normalization_result contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/normalization_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/normalization_result.json"
+        },
+        {
+          "path": "src/generated/types/normalization_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/normalization_result.ts"
+        },
+        {
+          "path": "src/generated/meta/normalization_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/normalization_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-rollup-spec",
       "type": "registry:lib",
       "title": "Rollup spec contract",

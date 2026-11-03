@@ -640,6 +640,16 @@
     "schema": "schemas/monte_carlo_results.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
+    "source": "finstack-quant/statements/schemas/statements/1/normalization_config.schema.json",
+    "schema": "schemas/normalization_config.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
+    "source": "finstack-quant/statements/schemas/statements/1/normalization_result.schema.json",
+    "schema": "schemas/normalization_result.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
     "source": "finstack-quant/statements/schemas/statements/1/rollup_spec.schema.json",
     "schema": "schemas/rollup_spec.json"

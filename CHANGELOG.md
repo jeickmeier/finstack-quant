@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Statements: normalization editor in the UI
+
+The `normalization-editor` registry component, with the `use-normalize` and `use-normalization-config-validator` hooks, edits a `NormalizationConfig` (add-backs, deductions and caps) with a schema form validated by `statements.validateNormalizationConfigJson`, and draws `statements.normalize` as returned: a base-to-adjusted bridge for a chosen period, each step between Rust's `adjusted_value`s, and a table of the adjustments by period. In the statements workbench's Metrics & ratios tab it sits in an Adjusted EBITDA disclosure over the reported result.
+
 ### Statements: adjusted value through each normalization step
 
 `AppliedAdjustment` gains `adjusted_value` (Python `AppliedAdjustment.adjusted_value`, WASM and JSON `adjusted_value`): the target's value through that adjustment, the period's `base_value` plus the capped amounts of this and every earlier adjustment in declaration order. The last step equals `final_value` exactly, so a base-to-adjusted bridge reads each step's position from the result instead of summing. The field is required in `NormalizationResult` JSON; no existing value moves.
