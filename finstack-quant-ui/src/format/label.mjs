@@ -25,6 +25,7 @@ const acronyms = new Set([
   "dpi",
   "dscr",
   "dv01",
+  "ead",
   "ebitda",
   "eir",
   "ev",

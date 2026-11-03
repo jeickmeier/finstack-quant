@@ -46,7 +46,9 @@ export function ValuationPanel({
   const sensitivity = useDcfSensitivity(
     assumptions ? { modelJson, ...assumptions } : null,
   );
-  const [waccText, setWaccText] = useState("");
+  // Undefined until the calculator or an edit sets it, so the form holds the
+  // WACC field until then (an empty string would hide a default WACC).
+  const [waccText, setWaccText] = useState<string | undefined>(undefined);
   const [waccInputs, setWaccInputs] = useState<WaccInputs | null>(null);
   const calculated = useWacc(waccInputs);
   const [lboConfigJson, setLboConfigJson] = useState<string | null>(null);

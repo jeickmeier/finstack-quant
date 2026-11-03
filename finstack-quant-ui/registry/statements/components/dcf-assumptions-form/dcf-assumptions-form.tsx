@@ -58,7 +58,7 @@ export interface DcfAssumptionsFormProps {
   defaultAssumptions?: DcfAssumptions;
   /** Model node ids offered for the UFCF and exit-multiple metric nodes. */
   nodeIds: readonly string[];
-  /** WACC field text when the host holds it, so a rate can be set without remounting the rest of the form; omitted, the form holds it. */
+  /** WACC field text when the host holds it, so a rate can be set without remounting the rest of the form; undefined, the form holds it and shows `defaultAssumptions.wacc`. Pass undefined, not `""`, until the host has text: `""` is an empty field. */
   wacc?: string;
   /** Receives each edit of a host-held WACC field. */
   onWaccChange?: (wacc: string) => void;

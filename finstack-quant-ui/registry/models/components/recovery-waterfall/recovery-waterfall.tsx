@@ -10,7 +10,14 @@ import { DecimalInput } from "@/components/finstack/core/primitives/decimal-inpu
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/field-frame";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
-import { collateralTypes, seniorityClasses } from "./recovery-contracts";
+import {
+  claimHelp,
+  collateralHelp,
+  collateralTypes,
+  costHelp,
+  seniorityClasses,
+  workoutHelp,
+} from "./recovery-contracts";
 
 /** The estate and claims the waterfall form submits; the worker's RecoveryWaterfallRequest. */
 export interface WaterfallTerms {
@@ -137,20 +144,25 @@ function TextField({
     </FieldFrame>
   );
 }
+/** The RecoveryClaim amounts, by wire name; each labelled and described from the contract. */
 const claimFields = [
-  ["principal", "Principal", "Allowed principal, in the estate's unit."],
-  ["accrued", "Accrued", "Accrued interest allowed in the claim."],
-  ["penalties", "Penalties", "Allowed penalties or fees."],
-  [
-    "collateral_value",
-    "Collateral value",
-    "Gross value pledged to this claim alone; empty means unsecured.",
-  ],
-  [
-    "collateral_haircut",
-    "Collateral haircut",
-    "Fraction of the collateral value lost, from 0 to 1.",
-  ],
+  "principal",
+  "accrued",
+  "penalties",
+  "collateral_value",
+  "collateral_haircut",
+] as const;
+/**
+ * The workout arguments, each with the WorkoutLgd field it fills and that
+ * field's contract description. `ead` is an argument of workoutLgd with no
+ * contract field, so its help is the binding's own.
+ */
+const costFields = [
+  ["ead", "ead", "Exposure at default in monetary units; positive."],
+  ["directCostPct", "direct_cost_rate", costHelp("direct_cost_rate")],
+  ["indirectCostPct", "indirect_cost_rate", costHelp("indirect_cost_rate")],
+  ["timeToResolutionYears", "workout_years", workoutHelp("workout_years")],
+  ["discountRate", "discount_rate", workoutHelp("discount_rate")],
 ] as const;
 /**
  * A credit analyst's view of recovery, as Rust returned it: how an estate is
@@ -205,10 +217,10 @@ export function RecoveryWaterfall({
   );
   // Rust lists its default calibration first.
   const calibrationId = chosenCalibration ?? calibrationIds?.[0] ?? "";
-  const costField = (key: string, label: string, help: string) => (
+  const costField = (key: string, wire: string, help: string | undefined) => (
     <DecimalInput
       key={key}
-      label={label}
+      label={labelFor(wire)}
       help={help}
       value={costs[key] ?? ""}
       onValueChange={(value) =>
@@ -262,31 +274,32 @@ export function RecoveryWaterfall({
               className="grid gap-4 border-t border-border pt-4 @lg:grid-cols-4"
             >
               <TextField
-                label="Claim id"
+                label={labelFor("id")}
+                help={claimHelp("id")}
                 value={claim.id ?? ""}
                 onValueChange={(value) => claims.set(claim.key, "id", value)}
               />
               <TextField
-                label="Seniority"
-                help="Your reporting label for the claim; priority decides the order."
+                label={labelFor("seniority")}
+                help={claimHelp("seniority")}
                 value={claim.seniority ?? ""}
                 onValueChange={(value) =>
                   claims.set(claim.key, "seniority", value)
                 }
               />
               <DecimalInput
-                label="Priority"
-                help="Whole number; lower recovers first, equal ranks share pro rata."
+                label={labelFor("priority")}
+                help={claimHelp("priority")}
                 value={claim.priority ?? ""}
                 onValueChange={(value) =>
                   claims.set(claim.key, "priority", value)
                 }
               />
-              {claimFields.map(([field, label, help]) => (
+              {claimFields.map((field) => (
                 <DecimalInput
                   key={field}
-                  label={label}
-                  help={help}
+                  label={labelFor(field)}
+                  help={claimHelp(field)}
                   value={claim[field] ?? ""}
                   onValueChange={(value) => claims.set(claim.key, field, value)}
                 />
@@ -312,10 +325,10 @@ export function RecoveryWaterfall({
                   seniority: "",
                   priority: "",
                   principal: "",
-                  accrued: "0",
-                  penalties: "0",
+                  accrued: "",
+                  penalties: "",
                   collateral_value: "",
-                  collateral_haircut: "0",
+                  collateral_haircut: "",
                 })
               }
             >
@@ -373,31 +386,7 @@ export function RecoveryWaterfall({
           }}
         >
           <div className="grid gap-4 @lg:grid-cols-3">
-            {costField(
-              "ead",
-              "Exposure at default",
-              "Positive, in the collateral's monetary unit.",
-            )}
-            {costField(
-              "directCostPct",
-              "Direct costs",
-              "Direct workout costs as a fraction of EAD.",
-            )}
-            {costField(
-              "indirectCostPct",
-              "Indirect costs",
-              "Indirect workout costs as a fraction of EAD.",
-            )}
-            {costField(
-              "timeToResolutionYears",
-              "Time to resolution",
-              "Expected workout duration in years.",
-            )}
-            {costField(
-              "discountRate",
-              "Discount rate",
-              "Annual rate over the workout, as a decimal.",
-            )}
+            {costFields.map(([key, wire, help]) => costField(key, wire, help))}
           </div>
           {pieces.rows.map((piece, index) => (
             <fieldset
@@ -406,23 +395,24 @@ export function RecoveryWaterfall({
               className="grid gap-4 border-t border-border pt-4 @lg:grid-cols-4"
             >
               <EnumField
-                label="Collateral type"
+                label={labelFor("collateral_type")}
+                help={collateralHelp("collateral_type")}
                 layout="select"
                 value={piece.type ?? ""}
                 onValueChange={(value) => pieces.set(piece.key, "type", value)}
                 options={options(collateralTypes)}
               />
               <DecimalInput
-                label="Book value"
-                help="Book value of the piece, same unit as EAD."
+                label={labelFor("book_value")}
+                help={collateralHelp("book_value")}
                 value={piece.bookValue ?? ""}
                 onValueChange={(value) =>
                   pieces.set(piece.key, "bookValue", value)
                 }
               />
               <DecimalInput
-                label="Haircut"
-                help="Fraction of book value lost in liquidation, from 0 to 1."
+                label={labelFor("haircut")}
+                help={collateralHelp("haircut")}
                 value={piece.haircut ?? ""}
                 onValueChange={(value) =>
                   pieces.set(piece.key, "haircut", value)

@@ -1467,6 +1467,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-recovery-claim",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-seniority-calibration",
       "type": "registry:lib"
     },

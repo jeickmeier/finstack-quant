@@ -1707,6 +1707,15 @@ export const importHarnesses = {
       name: "contract-ohlson-o-score-input",
       modules: modules.length,
     })),
+  "contract-recovery-claim": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/recovery_claim.json"),
+      import("@/lib/finstack/generated/types/recovery_claim"),
+      import("@/lib/finstack/generated/meta/recovery_claim"),
+    ]).then((modules) => ({
+      name: "contract-recovery-claim",
+      modules: modules.length,
+    })),
   "contract-seniority-calibration": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/seniority_calibration.json"),
