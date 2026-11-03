@@ -135,16 +135,18 @@ impl AttributionFactor {
     }
 }
 
-/// One money bucket of a [`PnlAttribution`] with its share of total P&L.
+/// One money bucket of an attribution result with its share of total P&L.
 ///
-/// Returned by [`PnlAttribution::pct_of_total_by_bucket`], one record per bucket
-/// in the struct's field order.
+/// Returned by [`PnlAttribution::pct_of_total_by_bucket`] and by the portfolio
+/// crate's `PortfolioAttribution::pct_of_total_by_bucket`, one record per bucket
+/// in the result struct's field order.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PnlBucketShare {
-    /// Wire name of the [`PnlAttribution`] field holding this bucket (`carry`,
-    /// `rates_curves_pnl`, ..., `residual`).
+    /// Wire name of the result field holding this bucket (`carry`,
+    /// `rates_curves_pnl`, ..., `residual`); the instrument and portfolio
+    /// results use the same names.
     pub field: String,
     /// The bucket's P&L as attributed, in the `total_pnl` currency.
     pub amount: Money,

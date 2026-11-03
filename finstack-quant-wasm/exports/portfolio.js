@@ -77,6 +77,7 @@ export const portfolio = {
   // Rust methods on result types; WASM results are plain objects, so each
   // takes the object (or its JSON) as the first argument.
   portfolioAttributionExplainText: wasm.portfolioAttributionExplainText,
+  portfolioAttributionPctOfTotalByBucket: wasm.portfolioAttributionPctOfTotalByBucket,
   portfolioAttributionReconciliationCheck: wasm.portfolioAttributionReconciliationCheck,
   portfolioValuationGetPositionValue: wasm.portfolioValuationGetPositionValue,
   portfolioValuationGetEntityValue: wasm.portfolioValuationGetEntityValue,

@@ -875,6 +875,104 @@
       "result_invalid": false
     },
     "attribution_explain": "Portfolio P&L: USD -1150.55\n  \u251c\u2500 Carry: USD 328.81 (-28.6%)\n  \u251c\u2500 Rates Curves: USD -1479.36 (128.6%)\n  \u251c\u2500 Credit Curves: USD 0.00 (-0.0%)\n  \u251c\u2500 Inflation: USD 0.00 (-0.0%)\n  \u251c\u2500 Correlations: USD 0.00 (-0.0%)\n  \u251c\u2500 FX: USD 0.00 (-0.0%)\n  \u251c\u2500 FX Translation: USD 0.00 (-0.0%)\n  \u251c\u2500 Cross Factor: USD 0.00 (-0.0%)\n  \u251c\u2500 Vol: USD 0.00 (-0.0%)\n  \u251c\u2500 Model Params: USD 0.00 (-0.0%)\n  \u251c\u2500 Market Scalars: USD 0.00 (-0.0%)\n  \u2514\u2500 Residual: USD 0.00 (-0.0%)",
+    "attribution_pct_of_total_by_bucket": [
+      {
+        "field": "carry",
+        "amount": {
+          "amount": "328.8101066154542975191402",
+          "currency": "USD"
+        },
+        "pct_of_total": -28.57847428904853
+      },
+      {
+        "field": "rates_curves_pnl",
+        "amount": {
+          "amount": "-1479.3617535991305055337014",
+          "currency": "USD"
+        },
+        "pct_of_total": 128.57847428904853
+      },
+      {
+        "field": "credit_curves_pnl",
+        "amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "pct_of_total": -0.0
+      },
+      {
+        "field": "inflation_curves_pnl",
+        "amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "pct_of_total": -0.0
+      },
+      {
+        "field": "correlations_pnl",
+        "amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "pct_of_total": -0.0
+      },
+      {
+        "field": "fx_pnl",
+        "amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "pct_of_total": -0.0
+      },
+      {
+        "field": "fx_translation_pnl",
+        "amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "pct_of_total": -0.0
+      },
+      {
+        "field": "cross_factor_pnl",
+        "amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "pct_of_total": -0.0
+      },
+      {
+        "field": "vol_pnl",
+        "amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "pct_of_total": -0.0
+      },
+      {
+        "field": "model_params_pnl",
+        "amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "pct_of_total": -0.0
+      },
+      {
+        "field": "market_scalars_pnl",
+        "amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "pct_of_total": -0.0
+      },
+      {
+        "field": "residual",
+        "amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "pct_of_total": -0.0
+      }
+    ],
     "attribution_reconciliation_check": {
       "total_residual": 6.821210263296962e-13,
       "is_reconciled": true,

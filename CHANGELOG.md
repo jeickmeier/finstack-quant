@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Portfolio: attribution buckets and their shares from Rust
+
+`PortfolioAttribution::pct_of_total_by_bucket()` lists the book's eleven base-currency factor buckets (`fx_translation_pnl` included) and `residual`, the amounts `reconciliation_check` adds up, as `PnlBucketShare` records with each share of `total_pnl` (`None` when the total is effectively zero), so a report reads the buckets from Rust instead of naming them. Bound as Python `PortfolioAttribution.pct_of_total_by_bucket` and WASM `portfolio.portfolioAttributionPctOfTotalByBucket`; the host parity fixture pins both. No existing value moves.
+
 ### UI: portfolio workbench
 
 `@finstack/portfolio-workbench` puts the portfolio components under tabs over a host-supplied book, market and margin date: Positions (summary and positions), Risk (aggregated metrics and a bucketed series), Scenarios (scenario P&L, shown when the host supplies scenarios), Margin and Book (a `PortfolioSpec` validated natively before it is valued). It adds no native call; the Scenarios and Margin runs start when their tab opens. No value moves.
