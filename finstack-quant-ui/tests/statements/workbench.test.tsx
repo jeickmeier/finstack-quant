@@ -704,11 +704,40 @@ it(
 );
 
 it(
-  "shows Rust's error for a model with no capital structure",
+  "summarizes the sample model's TLB and RCF in their first-lien class",
   async () => {
     render(
       <FinstackQueryProvider>
         <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+      </FinstackQueryProvider>,
+    );
+    const region = await openCapitalStructure();
+    await summarize(region, "2025Q4");
+    const table = await within(region).findByRole(
+      "table",
+      { name: "Debt stack at 2025Q4 (USD)" },
+      { timeout: budget(10000) },
+    );
+    expect(
+      within(table)
+        .getAllByRole("rowheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["TLB", "RCF"]);
+    expect(within(region).queryByRole("alert")).toBeNull();
+  },
+  budget(30000),
+);
+
+it(
+  "shows Rust's error for a model with no capital structure",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <StatementsWorkbench
+          defaultModelJson={JSON.stringify(
+            capitalStructure.errors.noCapitalStructure.model,
+          )}
+        />
       </FinstackQueryProvider>,
     );
     const region = await openCapitalStructure();

@@ -1785,6 +1785,2012 @@
         "ebitda_node": "ebitda",
         "cash_node": "cash"
       },
+      "model": {
+        "id": "ACME-SOFTWARE-3STMT",
+        "periods": [
+          {
+            "id": "2024Q1",
+            "start": "2024-01-01",
+            "end": "2024-04-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q2",
+            "start": "2024-04-01",
+            "end": "2024-07-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q3",
+            "start": "2024-07-01",
+            "end": "2024-10-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q4",
+            "start": "2024-10-01",
+            "end": "2025-01-01",
+            "is_actual": true
+          },
+          {
+            "id": "2025Q1",
+            "start": "2025-01-01",
+            "end": "2025-04-01",
+            "is_actual": true
+          },
+          {
+            "id": "2025Q2",
+            "start": "2025-04-01",
+            "end": "2025-07-01",
+            "is_actual": false
+          },
+          {
+            "id": "2025Q3",
+            "start": "2025-07-01",
+            "end": "2025-10-01",
+            "is_actual": false
+          },
+          {
+            "id": "2025Q4",
+            "start": "2025-10-01",
+            "end": "2026-01-01",
+            "is_actual": false
+          }
+        ],
+        "nodes": {
+          "revenue": {
+            "node_id": "revenue",
+            "name": "Revenue",
+            "node_type": "mixed",
+            "values": {
+              "2024Q1": {
+                "amount": "182400000",
+                "currency": "USD"
+              },
+              "2024Q2": {
+                "amount": "191600000",
+                "currency": "USD"
+              },
+              "2024Q3": {
+                "amount": "199800000",
+                "currency": "USD"
+              },
+              "2024Q4": {
+                "amount": "214500000",
+                "currency": "USD"
+              },
+              "2025Q1": {
+                "amount": "208300000",
+                "currency": "USD"
+              }
+            },
+            "forecast": {
+              "method": "curve_pct",
+              "params": {
+                "curve": [0.03, 0.035, 0.042]
+              }
+            },
+            "tags": ["income_statement", "driver"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "revenue_growth_qoq": {
+            "node_id": "revenue_growth_qoq",
+            "name": "Revenue growth, QoQ",
+            "node_type": "calculated",
+            "formula_text": "pct_change(revenue, 1)",
+            "tags": ["driver", "ratio"],
+            "value_type": {
+              "type": "scalar"
+            },
+            "rollup": "formula"
+          },
+          "cogs": {
+            "node_id": "cogs",
+            "name": "Cost of revenue",
+            "node_type": "mixed",
+            "values": {
+              "2024Q1": {
+                "amount": "63840000",
+                "currency": "USD"
+              },
+              "2024Q2": {
+                "amount": "66100000",
+                "currency": "USD"
+              },
+              "2024Q3": {
+                "amount": "68130000",
+                "currency": "USD"
+              },
+              "2024Q4": {
+                "amount": "72930000",
+                "currency": "USD"
+              },
+              "2025Q1": {
+                "amount": "70820000",
+                "currency": "USD"
+              }
+            },
+            "formula_text": "revenue * 0.3375",
+            "tags": ["income_statement"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "gross_profit": {
+            "node_id": "gross_profit",
+            "name": "Gross profit",
+            "node_type": "calculated",
+            "formula_text": "revenue - cogs",
+            "tags": ["income_statement"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "gross_margin_pct": {
+            "node_id": "gross_margin_pct",
+            "name": "Gross margin",
+            "node_type": "calculated",
+            "formula_text": "gross_profit / revenue",
+            "tags": ["ratio"],
+            "value_type": {
+              "type": "scalar"
+            },
+            "rollup": "formula"
+          },
+          "opex": {
+            "node_id": "opex",
+            "name": "Operating expenses, ex D&A",
+            "node_type": "mixed",
+            "values": {
+              "2024Q1": {
+                "amount": "78400000",
+                "currency": "USD"
+              },
+              "2024Q2": {
+                "amount": "80500000",
+                "currency": "USD"
+              },
+              "2024Q3": {
+                "amount": "83900000",
+                "currency": "USD"
+              },
+              "2024Q4": {
+                "amount": "87200000",
+                "currency": "USD"
+              },
+              "2025Q1": {
+                "amount": "86100000",
+                "currency": "USD"
+              }
+            },
+            "forecast": {
+              "method": "growth_pct",
+              "params": {
+                "rate": 0.022
+              }
+            },
+            "tags": ["income_statement"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "ebitda": {
+            "node_id": "ebitda",
+            "name": "EBITDA",
+            "node_type": "calculated",
+            "formula_text": "gross_profit - opex",
+            "tags": ["income_statement", "headline"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "ebitda_margin_pct": {
+            "node_id": "ebitda_margin_pct",
+            "name": "EBITDA margin",
+            "node_type": "calculated",
+            "formula_text": "ebitda / revenue",
+            "tags": ["ratio"],
+            "value_type": {
+              "type": "scalar"
+            },
+            "rollup": "formula"
+          },
+          "d_and_a": {
+            "node_id": "d_and_a",
+            "name": "Depreciation & amortisation",
+            "node_type": "mixed",
+            "values": {
+              "2024Q1": {
+                "amount": "11200000",
+                "currency": "USD"
+              },
+              "2024Q2": {
+                "amount": "11400000",
+                "currency": "USD"
+              },
+              "2024Q3": {
+                "amount": "11650000",
+                "currency": "USD"
+              },
+              "2024Q4": {
+                "amount": "11900000",
+                "currency": "USD"
+              },
+              "2025Q1": {
+                "amount": "12100000",
+                "currency": "USD"
+              }
+            },
+            "forecast": {
+              "method": "growth_pct",
+              "params": {
+                "rate": 0.018
+              }
+            },
+            "tags": ["income_statement"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "ebit": {
+            "node_id": "ebit",
+            "name": "EBIT",
+            "node_type": "calculated",
+            "formula_text": "ebitda - d_and_a",
+            "tags": ["income_statement"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "interest_expense": {
+            "node_id": "interest_expense",
+            "name": "Interest expense",
+            "node_type": "calculated",
+            "formula_text": "(debt_opening + total_debt) * 0.01075",
+            "tags": ["income_statement"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "pretax_income": {
+            "node_id": "pretax_income",
+            "name": "Pre-tax income",
+            "node_type": "calculated",
+            "formula_text": "ebit - interest_expense",
+            "tags": ["income_statement"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "taxes": {
+            "node_id": "taxes",
+            "name": "Income tax expense",
+            "node_type": "calculated",
+            "formula_text": "pretax_income * 0.235",
+            "tags": ["income_statement"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "net_income": {
+            "node_id": "net_income",
+            "name": "Net income",
+            "node_type": "calculated",
+            "formula_text": "pretax_income - taxes",
+            "tags": ["income_statement", "headline"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "debt_at_inception": {
+            "node_id": "debt_at_inception",
+            "name": "Debt at 2024Q1 opening",
+            "node_type": "value",
+            "values": {
+              "2024Q1": {
+                "amount": "420000000",
+                "currency": "USD"
+              },
+              "2024Q2": {
+                "amount": "420000000",
+                "currency": "USD"
+              },
+              "2024Q3": {
+                "amount": "420000000",
+                "currency": "USD"
+              },
+              "2024Q4": {
+                "amount": "420000000",
+                "currency": "USD"
+              },
+              "2025Q1": {
+                "amount": "420000000",
+                "currency": "USD"
+              },
+              "2025Q2": {
+                "amount": "420000000",
+                "currency": "USD"
+              },
+              "2025Q3": {
+                "amount": "420000000",
+                "currency": "USD"
+              },
+              "2025Q4": {
+                "amount": "420000000",
+                "currency": "USD"
+              }
+            },
+            "tags": ["debt"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            },
+            "rollup": "period_end"
+          },
+          "debt_draws": {
+            "node_id": "debt_draws",
+            "name": "Debt drawn",
+            "node_type": "mixed",
+            "values": {
+              "2024Q1": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "2024Q2": {
+                "amount": "40000000",
+                "currency": "USD"
+              },
+              "2024Q3": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "2024Q4": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "2025Q1": {
+                "amount": "25000000",
+                "currency": "USD"
+              }
+            },
+            "forecast": {
+              "method": "override",
+              "params": {
+                "overrides": {
+                  "2025Q2": 0,
+                  "2025Q3": 0,
+                  "2025Q4": 30000000
+                }
+              }
+            },
+            "tags": ["debt"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "debt_repayments": {
+            "node_id": "debt_repayments",
+            "name": "Debt repaid",
+            "node_type": "mixed",
+            "values": {
+              "2024Q1": {
+                "amount": "10000000",
+                "currency": "USD"
+              },
+              "2024Q2": {
+                "amount": "10000000",
+                "currency": "USD"
+              },
+              "2024Q3": {
+                "amount": "10000000",
+                "currency": "USD"
+              },
+              "2024Q4": {
+                "amount": "15000000",
+                "currency": "USD"
+              },
+              "2025Q1": {
+                "amount": "10000000",
+                "currency": "USD"
+              }
+            },
+            "forecast": {
+              "method": "forward_fill"
+            },
+            "tags": ["debt"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "total_debt": {
+            "node_id": "total_debt",
+            "name": "Debt, closing balance",
+            "node_type": "calculated",
+            "formula_text": "debt_at_inception + cumsum(debt_draws) - cumsum(debt_repayments)",
+            "tags": ["debt", "balance_sheet"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            },
+            "rollup": "period_end"
+          },
+          "debt_opening": {
+            "node_id": "debt_opening",
+            "name": "Debt, opening balance",
+            "node_type": "calculated",
+            "formula_text": "total_debt - debt_draws + debt_repayments",
+            "tags": ["debt", "balance_sheet"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            },
+            "rollup": "formula"
+          },
+          "cash": {
+            "node_id": "cash",
+            "name": "Cash and equivalents",
+            "node_type": "mixed",
+            "values": {
+              "2024Q1": {
+                "amount": "86500000",
+                "currency": "USD"
+              },
+              "2024Q2": {
+                "amount": "94200000",
+                "currency": "USD"
+              },
+              "2024Q3": {
+                "amount": "101800000",
+                "currency": "USD"
+              },
+              "2024Q4": {
+                "amount": "108300000",
+                "currency": "USD"
+              },
+              "2025Q1": {
+                "amount": "113600000",
+                "currency": "USD"
+              }
+            },
+            "forecast": {
+              "method": "forward_fill"
+            },
+            "tags": ["balance_sheet"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            },
+            "rollup": "period_end"
+          },
+          "ltm_ebitda": {
+            "node_id": "ltm_ebitda",
+            "name": "LTM EBITDA",
+            "node_type": "calculated",
+            "formula_text": "ttm(ebitda)",
+            "tags": ["ratio"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            },
+            "rollup": "formula"
+          },
+          "leverage": {
+            "node_id": "leverage",
+            "name": "Gross leverage (Debt / LTM EBITDA)",
+            "node_type": "calculated",
+            "formula_text": "total_debt / ltm_ebitda",
+            "tags": ["ratio", "covenant"],
+            "value_type": {
+              "type": "scalar"
+            },
+            "rollup": "formula"
+          },
+          "interest_coverage": {
+            "node_id": "interest_coverage",
+            "name": "Interest coverage (EBITDA / interest)",
+            "node_type": "calculated",
+            "formula_text": "ebitda / interest_expense",
+            "tags": ["ratio", "covenant"],
+            "value_type": {
+              "type": "scalar"
+            },
+            "rollup": "formula"
+          },
+          "capex": {
+            "node_id": "capex",
+            "name": "Capital expenditure",
+            "node_type": "calculated",
+            "formula_text": "revenue * 0.055",
+            "tags": ["cash_flow"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "free_cash_flow": {
+            "node_id": "free_cash_flow",
+            "name": "Free cash flow, pre-financing",
+            "node_type": "calculated",
+            "formula_text": "ebitda - taxes - capex",
+            "tags": ["cash_flow", "headline"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          },
+          "ufcf": {
+            "node_id": "ufcf",
+            "name": "Unlevered free cash flow",
+            "node_type": "calculated",
+            "formula_text": "ebitda - ebit * 0.235 - capex",
+            "tags": ["cash_flow"],
+            "value_type": {
+              "type": "monetary",
+              "currency": "USD"
+            }
+          }
+        },
+        "meta": {
+          "entity": "Acme Software Holdings",
+          "currency": "USD",
+          "frequency": "quarterly"
+        },
+        "schema_version": 1
+      },
+      "result": {
+        "schema_version": 1,
+        "periods": [
+          {
+            "id": "2024Q1",
+            "start": "2024-01-01",
+            "end": "2024-04-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q2",
+            "start": "2024-04-01",
+            "end": "2024-07-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q3",
+            "start": "2024-07-01",
+            "end": "2024-10-01",
+            "is_actual": true
+          },
+          {
+            "id": "2024Q4",
+            "start": "2024-10-01",
+            "end": "2025-01-01",
+            "is_actual": true
+          },
+          {
+            "id": "2025Q1",
+            "start": "2025-01-01",
+            "end": "2025-04-01",
+            "is_actual": true
+          },
+          {
+            "id": "2025Q2",
+            "start": "2025-04-01",
+            "end": "2025-07-01",
+            "is_actual": false
+          },
+          {
+            "id": "2025Q3",
+            "start": "2025-07-01",
+            "end": "2025-10-01",
+            "is_actual": false
+          },
+          {
+            "id": "2025Q4",
+            "start": "2025-10-01",
+            "end": "2026-01-01",
+            "is_actual": false
+          }
+        ],
+        "nodes": {
+          "cash": {
+            "2024Q1": 86500000,
+            "2024Q2": 94200000,
+            "2024Q3": 101800000,
+            "2024Q4": 108300000,
+            "2025Q1": 113600000,
+            "2025Q2": 113600000,
+            "2025Q3": 113600000,
+            "2025Q4": 113600000
+          },
+          "debt_repayments": {
+            "2024Q1": 10000000,
+            "2024Q2": 10000000,
+            "2024Q3": 10000000,
+            "2024Q4": 15000000,
+            "2025Q1": 10000000,
+            "2025Q2": 10000000,
+            "2025Q3": 10000000,
+            "2025Q4": 10000000
+          },
+          "debt_draws": {
+            "2024Q1": 0,
+            "2024Q2": 40000000,
+            "2024Q3": 0,
+            "2024Q4": 0,
+            "2025Q1": 25000000,
+            "2025Q2": 0,
+            "2025Q3": 0,
+            "2025Q4": 30000000
+          },
+          "debt_at_inception": {
+            "2024Q1": 420000000,
+            "2024Q2": 420000000,
+            "2024Q3": 420000000,
+            "2024Q4": 420000000,
+            "2025Q1": 420000000,
+            "2025Q2": 420000000,
+            "2025Q3": 420000000,
+            "2025Q4": 420000000
+          },
+          "total_debt": {
+            "2024Q1": 410000000,
+            "2024Q2": 440000000,
+            "2024Q3": 430000000,
+            "2024Q4": 415000000,
+            "2025Q1": 430000000,
+            "2025Q2": 420000000,
+            "2025Q3": 410000000,
+            "2025Q4": 430000000
+          },
+          "debt_opening": {
+            "2024Q1": 420000000,
+            "2024Q2": 410000000,
+            "2024Q3": 440000000,
+            "2024Q4": 430000000,
+            "2025Q1": 415000000,
+            "2025Q2": 430000000,
+            "2025Q3": 420000000,
+            "2025Q4": 410000000
+          },
+          "interest_expense": {
+            "2024Q1": 8922500,
+            "2024Q2": 9137500,
+            "2024Q3": 9352500,
+            "2024Q4": 9083750,
+            "2025Q1": 9083750,
+            "2025Q2": 9137500,
+            "2025Q3": 8922500,
+            "2025Q4": 9030000
+          },
+          "d_and_a": {
+            "2024Q1": 11200000,
+            "2024Q2": 11400000,
+            "2024Q3": 11650000,
+            "2024Q4": 11900000,
+            "2025Q1": 12100000,
+            "2025Q2": 12317800,
+            "2025Q3": 12539520.4,
+            "2025Q4": 12765231.7672
+          },
+          "opex": {
+            "2024Q1": 78400000,
+            "2024Q2": 80500000,
+            "2024Q3": 83900000,
+            "2024Q4": 87200000,
+            "2025Q1": 86100000,
+            "2025Q2": 87994200,
+            "2025Q3": 89930072.4,
+            "2025Q4": 91908533.99280001
+          },
+          "revenue": {
+            "2024Q1": 182400000,
+            "2024Q2": 191600000,
+            "2024Q3": 199800000,
+            "2024Q4": 214500000,
+            "2025Q1": 208300000,
+            "2025Q2": 214549000,
+            "2025Q3": 222058214.99999997,
+            "2025Q4": 231384660.02999997
+          },
+          "capex": {
+            "2024Q1": 10032000,
+            "2024Q2": 10538000,
+            "2024Q3": 10989000,
+            "2024Q4": 11797500,
+            "2025Q1": 11456500,
+            "2025Q2": 11800195,
+            "2025Q3": 12213201.825,
+            "2025Q4": 12726156.301649999
+          },
+          "cogs": {
+            "2024Q1": 63840000,
+            "2024Q2": 66100000,
+            "2024Q3": 68130000,
+            "2024Q4": 72930000,
+            "2025Q1": 70820000,
+            "2025Q2": 72410287.5,
+            "2025Q3": 74944647.5625,
+            "2025Q4": 78092322.760125
+          },
+          "gross_profit": {
+            "2024Q1": 118560000,
+            "2024Q2": 125500000,
+            "2024Q3": 131670000,
+            "2024Q4": 141570000,
+            "2025Q1": 137480000,
+            "2025Q2": 142138712.5,
+            "2025Q3": 147113567.43749997,
+            "2025Q4": 153292337.269875
+          },
+          "ebitda": {
+            "2024Q1": 40160000,
+            "2024Q2": 45000000,
+            "2024Q3": 47770000,
+            "2024Q4": 54370000,
+            "2025Q1": 51380000,
+            "2025Q2": 54144512.5,
+            "2025Q3": 57183495.037499964,
+            "2025Q4": 61383803.27707498
+          },
+          "interest_coverage": {
+            "2024Q1": 4.500980666853461,
+            "2024Q2": 4.924760601915184,
+            "2024Q3": 5.10772520716386,
+            "2024Q4": 5.985413513141599,
+            "2025Q1": 5.656254300261456,
+            "2025Q2": 5.92552804377565,
+            "2025Q3": 6.408909502661806,
+            "2025Q4": 6.7977633750913595
+          },
+          "ltm_ebitda": {
+            "2024Q1": "nan",
+            "2024Q2": "nan",
+            "2024Q3": "nan",
+            "2024Q4": 187300000,
+            "2025Q1": 198520000,
+            "2025Q2": 207664512.5,
+            "2025Q3": 217078007.53749996,
+            "2025Q4": 224091810.81457496
+          },
+          "leverage": {
+            "2024Q1": "nan",
+            "2024Q2": "nan",
+            "2024Q3": "nan",
+            "2024Q4": 2.215696743192739,
+            "2025Q1": 2.166028611726778,
+            "2025Q2": 2.0224928898239174,
+            "2025Q3": 1.888721960602909,
+            "2025Q4": 1.9188563760404616
+          },
+          "ebit": {
+            "2024Q1": 28960000,
+            "2024Q2": 33600000,
+            "2024Q3": 36120000,
+            "2024Q4": 42470000,
+            "2025Q1": 39280000,
+            "2025Q2": 41826712.5,
+            "2025Q3": 44643974.637499966,
+            "2025Q4": 48618571.50987498
+          },
+          "ufcf": {
+            "2024Q1": 23322400,
+            "2024Q2": 26566000,
+            "2024Q3": 28292800,
+            "2024Q4": 32592050,
+            "2025Q1": 30692700,
+            "2025Q2": 32515040.0625,
+            "2025Q3": 34478959.17268747,
+            "2025Q4": 37232282.67060436
+          },
+          "pretax_income": {
+            "2024Q1": 20037500,
+            "2024Q2": 24462500,
+            "2024Q3": 26767500,
+            "2024Q4": 33386250,
+            "2025Q1": 30196250,
+            "2025Q2": 32689212.5,
+            "2025Q3": 35721474.637499966,
+            "2025Q4": 39588571.50987498
+          },
+          "taxes": {
+            "2024Q1": 4708812.5,
+            "2024Q2": 5748687.5,
+            "2024Q3": 6290362.5,
+            "2024Q4": 7845768.75,
+            "2025Q1": 7096118.75,
+            "2025Q2": 7681964.9375,
+            "2025Q3": 8394546.539812492,
+            "2025Q4": 9303314.30482062
+          },
+          "free_cash_flow": {
+            "2024Q1": 25419187.5,
+            "2024Q2": 28713312.5,
+            "2024Q3": 30490637.5,
+            "2024Q4": 34726731.25,
+            "2025Q1": 32827381.25,
+            "2025Q2": 34662352.5625,
+            "2025Q3": 36575746.67268747,
+            "2025Q4": 39354332.67060436
+          },
+          "net_income": {
+            "2024Q1": 15328687.5,
+            "2024Q2": 18713812.5,
+            "2024Q3": 20477137.5,
+            "2024Q4": 25540481.25,
+            "2025Q1": 23100131.25,
+            "2025Q2": 25007247.5625,
+            "2025Q3": 27326928.097687475,
+            "2025Q4": 30285257.205054358
+          },
+          "ebitda_margin_pct": {
+            "2024Q1": 0.22017543859649122,
+            "2024Q2": 0.2348643006263048,
+            "2024Q3": 0.2390890890890891,
+            "2024Q4": 0.25347319347319347,
+            "2025Q1": 0.24666346615458473,
+            "2025Q2": 0.252364320038779,
+            "2025Q3": 0.2575157826856348,
+            "2025Q4": 0.26528899223101615
+          },
+          "gross_margin_pct": {
+            "2024Q1": 0.65,
+            "2024Q2": 0.6550104384133612,
+            "2024Q3": 0.659009009009009,
+            "2024Q4": 0.66,
+            "2025Q1": 0.6600096015362458,
+            "2025Q2": 0.6625,
+            "2025Q3": 0.6625,
+            "2025Q4": 0.6625000000000001
+          },
+          "revenue_growth_qoq": {
+            "2024Q1": "nan",
+            "2024Q2": 0.05043859649122807,
+            "2024Q3": 0.04279749478079332,
+            "2024Q4": 0.07357357357357357,
+            "2025Q1": -0.028904428904428906,
+            "2025Q2": 0.03,
+            "2025Q3": 0.034999999999999865,
+            "2025Q4": 0.04200000000000001
+          }
+        },
+        "monetary_nodes": {
+          "revenue": {
+            "2024Q1": {
+              "amount": "182400000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "191600000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "199800000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "214500000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "208300000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "214549000",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "222058215",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "231384660.03",
+              "currency": "USD"
+            }
+          },
+          "cogs": {
+            "2024Q1": {
+              "amount": "63840000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "66100000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "68130000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "72930000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "70820000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "72410287.5",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "74944647.5625",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "78092322.760125",
+              "currency": "USD"
+            }
+          },
+          "gross_profit": {
+            "2024Q1": {
+              "amount": "118560000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "125500000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "131670000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "141570000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "137480000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "142138712.5",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "147113567.4375",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "153292337.269875",
+              "currency": "USD"
+            }
+          },
+          "opex": {
+            "2024Q1": {
+              "amount": "78400000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "80500000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "83900000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "87200000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "86100000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "87994200",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "89930072.4",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "91908533.9928",
+              "currency": "USD"
+            }
+          },
+          "ebitda": {
+            "2024Q1": {
+              "amount": "40160000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "45000000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "47770000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "54370000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "51380000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "54144512.5",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "57183495.0375",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "61383803.277075",
+              "currency": "USD"
+            }
+          },
+          "d_and_a": {
+            "2024Q1": {
+              "amount": "11200000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "11400000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "11650000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "11900000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "12100000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "12317800",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "12539520.4",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "12765231.7672",
+              "currency": "USD"
+            }
+          },
+          "ebit": {
+            "2024Q1": {
+              "amount": "28960000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "33600000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "36120000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "42470000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "39280000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "41826712.5",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "44643974.63749997",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "48618571.509875",
+              "currency": "USD"
+            }
+          },
+          "interest_expense": {
+            "2024Q1": {
+              "amount": "8922500",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "9137500",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "9352500",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "9083750",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "9083750",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "9137500",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "8922500",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "9030000",
+              "currency": "USD"
+            }
+          },
+          "pretax_income": {
+            "2024Q1": {
+              "amount": "20037500",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "24462500",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "26767500",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "33386250",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "30196250",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "32689212.5",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "35721474.63749997",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "39588571.50987498",
+              "currency": "USD"
+            }
+          },
+          "taxes": {
+            "2024Q1": {
+              "amount": "4708812.5",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "5748687.5",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "6290362.5",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "7845768.75",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "7096118.75",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "7681964.9375",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "8394546.53981249",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "9303314.30482062",
+              "currency": "USD"
+            }
+          },
+          "net_income": {
+            "2024Q1": {
+              "amount": "15328687.5",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "18713812.5",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "20477137.5",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "25540481.25",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "23100131.25",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "25007247.5625",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "27326928.09768748",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "30285257.20505436",
+              "currency": "USD"
+            }
+          },
+          "debt_at_inception": {
+            "2024Q1": {
+              "amount": "420000000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "420000000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "420000000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "420000000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "420000000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "420000000",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "420000000",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "420000000",
+              "currency": "USD"
+            }
+          },
+          "debt_draws": {
+            "2024Q1": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "40000000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "25000000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "30000000",
+              "currency": "USD"
+            }
+          },
+          "debt_repayments": {
+            "2024Q1": {
+              "amount": "10000000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "10000000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "10000000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "15000000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "10000000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "10000000",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "10000000",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "10000000",
+              "currency": "USD"
+            }
+          },
+          "total_debt": {
+            "2024Q1": {
+              "amount": "410000000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "440000000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "430000000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "415000000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "430000000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "420000000",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "410000000",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "430000000",
+              "currency": "USD"
+            }
+          },
+          "debt_opening": {
+            "2024Q1": {
+              "amount": "420000000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "410000000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "440000000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "430000000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "415000000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "430000000",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "420000000",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "410000000",
+              "currency": "USD"
+            }
+          },
+          "cash": {
+            "2024Q1": {
+              "amount": "86500000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "94200000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "101800000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "108300000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "113600000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "113600000",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "113600000",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "113600000",
+              "currency": "USD"
+            }
+          },
+          "ltm_ebitda": {
+            "2024Q4": {
+              "amount": "187300000",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "198520000",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "207664512.5",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "217078007.5375",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "224091810.814575",
+              "currency": "USD"
+            }
+          },
+          "capex": {
+            "2024Q1": {
+              "amount": "10032000",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "10538000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "10989000",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "11797500",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "11456500",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "11800195",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "12213201.825",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "12726156.30165",
+              "currency": "USD"
+            }
+          },
+          "free_cash_flow": {
+            "2024Q1": {
+              "amount": "25419187.5",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "28713312.5",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "30490637.5",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "34726731.25",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "32827381.25",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "34662352.5625",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "36575746.67268747",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "39354332.67060436",
+              "currency": "USD"
+            }
+          },
+          "ufcf": {
+            "2024Q1": {
+              "amount": "23322400",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "26566000",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "28292800",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "32592050",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "30692700",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "32515040.0625",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "34478959.17268747",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "37232282.67060436",
+              "currency": "USD"
+            }
+          }
+        },
+        "node_value_types": {
+          "revenue": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "revenue_growth_qoq": {
+            "type": "scalar"
+          },
+          "cogs": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "gross_profit": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "gross_margin_pct": {
+            "type": "scalar"
+          },
+          "opex": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "ebitda": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "ebitda_margin_pct": {
+            "type": "scalar"
+          },
+          "d_and_a": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "ebit": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "interest_expense": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "pretax_income": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "taxes": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "net_income": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "debt_at_inception": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "debt_draws": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "debt_repayments": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "total_debt": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "debt_opening": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "cash": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "ltm_ebitda": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "leverage": {
+            "type": "scalar"
+          },
+          "interest_coverage": {
+            "type": "scalar"
+          },
+          "capex": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "free_cash_flow": {
+            "type": "monetary",
+            "currency": "USD"
+          },
+          "ufcf": {
+            "type": "monetary",
+            "currency": "USD"
+          }
+        },
+        "node_sources": {
+          "cash": {
+            "2024Q1": "value",
+            "2024Q2": "value",
+            "2024Q3": "value",
+            "2024Q4": "value",
+            "2025Q1": "value",
+            "2025Q2": "forecast",
+            "2025Q3": "forecast",
+            "2025Q4": "forecast"
+          },
+          "debt_repayments": {
+            "2024Q1": "value",
+            "2024Q2": "value",
+            "2024Q3": "value",
+            "2024Q4": "value",
+            "2025Q1": "value",
+            "2025Q2": "forecast",
+            "2025Q3": "forecast",
+            "2025Q4": "forecast"
+          },
+          "debt_draws": {
+            "2024Q1": "value",
+            "2024Q2": "value",
+            "2024Q3": "value",
+            "2024Q4": "value",
+            "2025Q1": "value",
+            "2025Q2": "forecast",
+            "2025Q3": "forecast",
+            "2025Q4": "forecast"
+          },
+          "debt_at_inception": {
+            "2024Q1": "value",
+            "2024Q2": "value",
+            "2024Q3": "value",
+            "2024Q4": "value",
+            "2025Q1": "value",
+            "2025Q2": "value",
+            "2025Q3": "value",
+            "2025Q4": "value"
+          },
+          "total_debt": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "debt_opening": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "interest_expense": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "d_and_a": {
+            "2024Q1": "value",
+            "2024Q2": "value",
+            "2024Q3": "value",
+            "2024Q4": "value",
+            "2025Q1": "value",
+            "2025Q2": "forecast",
+            "2025Q3": "forecast",
+            "2025Q4": "forecast"
+          },
+          "opex": {
+            "2024Q1": "value",
+            "2024Q2": "value",
+            "2024Q3": "value",
+            "2024Q4": "value",
+            "2025Q1": "value",
+            "2025Q2": "forecast",
+            "2025Q3": "forecast",
+            "2025Q4": "forecast"
+          },
+          "revenue": {
+            "2024Q1": "value",
+            "2024Q2": "value",
+            "2024Q3": "value",
+            "2024Q4": "value",
+            "2025Q1": "value",
+            "2025Q2": "forecast",
+            "2025Q3": "forecast",
+            "2025Q4": "forecast"
+          },
+          "capex": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "cogs": {
+            "2024Q1": "value",
+            "2024Q2": "value",
+            "2024Q3": "value",
+            "2024Q4": "value",
+            "2025Q1": "value",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "gross_profit": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "ebitda": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "interest_coverage": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "ltm_ebitda": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "leverage": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "ebit": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "ufcf": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "pretax_income": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "taxes": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "free_cash_flow": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "net_income": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "ebitda_margin_pct": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "gross_margin_pct": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          },
+          "revenue_growth_qoq": {
+            "2024Q1": "formula",
+            "2024Q2": "formula",
+            "2024Q3": "formula",
+            "2024Q4": "formula",
+            "2025Q1": "formula",
+            "2025Q2": "formula",
+            "2025Q3": "formula",
+            "2025Q4": "formula"
+          }
+        },
+        "meta": {
+          "num_nodes": 26,
+          "num_periods": 8,
+          "numeric_mode": "float64",
+          "parallel": false,
+          "warnings": [
+            {
+              "non_finite_value": {
+                "node_id": "ltm_ebitda",
+                "period": "2024Q1",
+                "value": "nan"
+              }
+            },
+            {
+              "non_finite_value": {
+                "node_id": "leverage",
+                "period": "2024Q1",
+                "value": "nan"
+              }
+            },
+            {
+              "non_finite_value": {
+                "node_id": "revenue_growth_qoq",
+                "period": "2024Q1",
+                "value": "nan"
+              }
+            },
+            {
+              "non_finite_value": {
+                "node_id": "ltm_ebitda",
+                "period": "2024Q2",
+                "value": "nan"
+              }
+            },
+            {
+              "non_finite_value": {
+                "node_id": "leverage",
+                "period": "2024Q2",
+                "value": "nan"
+              }
+            },
+            {
+              "non_finite_value": {
+                "node_id": "ltm_ebitda",
+                "period": "2024Q3",
+                "value": "nan"
+              }
+            },
+            {
+              "non_finite_value": {
+                "node_id": "leverage",
+                "period": "2024Q3",
+                "value": "nan"
+              }
+            }
+          ]
+        }
+      },
       "message": "Invalid input: Capital structure summary: model 'ACME-SOFTWARE-3STMT' has no capital structure"
     }
   }
