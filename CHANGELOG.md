@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: portfolio returns keep NaN and Infinity apart
+
+`@finstack/use-portfolio-returns` keys its three queries with `requestSnapshot`, as `use-correlation-matrix` does, instead of putting the cloned request in the TanStack key, whose JSON hashing turns NaN and Infinity both into `null`. A blank horizon followed by an overflowing one now makes two native `twrrLinked` calls and shows each native error.
+
 ### UI: correlation heatmap always draws Rust's matrix
 
 `@finstack/correlation-heatmap` no longer checks coefficients against [-1, 1] and drops its chart for one outside; Rust now returns every coefficient inside the bound, so the heatmap and the table always show. The Repaired-stamp test says plainly that no native panel reaches Rust's repair today.

@@ -308,20 +308,24 @@ it("the hooks are disabled without a request and key on the whole request", () =
     "finstack",
     1,
     "twrrLinked",
-    inputs.linked,
+    JSON.stringify(inputs.linked),
   ]);
   expect(twrrModifiedDietzOptions(client, 1, inputs.dietz).queryKey).toEqual([
     "finstack",
     1,
     "twrrModifiedDietz",
-    inputs.dietz,
+    JSON.stringify(inputs.dietz),
   ]);
   expect(mwrXirrOptions(client, 1, inputs.xirr).queryKey).toEqual([
     "finstack",
     1,
     "mwrXirr",
-    inputs.xirr,
+    JSON.stringify(inputs.xirr),
   ]);
+  // JSON alone would key NaN and Infinity both as null.
+  const horizon = (horizonYears: number) =>
+    twrrLinkedOptions(client, 1, { ...inputs.linked, horizonYears }).queryKey;
+  expect(horizon(Number.NaN)).not.toEqual(horizon(Infinity));
 });
 const props: PortfolioWorkbenchProps = {
   defaultSpecJson: workbench.specJson,
@@ -385,6 +389,41 @@ it(
     expect(
       mock.calls.filter((name) => name === "twrrModifiedDietz"),
     ).toHaveLength(2);
+  },
+  budget(30000),
+);
+it(
+  "links a blank horizon and then an overflowing one natively, once each",
+  async () => {
+    const user = userEvent.setup();
+    renderWorkbench();
+    await user.click(screen.getByRole("tab", { name: "Returns" }));
+    await screen.findByTitle(
+      String(cases.linked.annual.result.cumulative),
+      {},
+      { timeout: budget(10000) },
+    );
+    const linked = card("Linked time-weighted return");
+    const horizon = linked.getByRole("textbox", { name: /^Horizon/ });
+    const submit = linked.getByRole("button", { name: "Link returns" });
+    fireEvent.change(horizon, { target: { value: "" } });
+    fireEvent.click(submit);
+    expect(
+      (await linked.findByRole("alert", {}, { timeout: budget(10000) }))
+        .textContent,
+    ).toBe(fixture.nonFiniteHorizon.blank.message);
+    fireEvent.change(horizon, { target: { value: "1e999" } });
+    fireEvent.click(submit);
+    expect(
+      (
+        await linked.findByText(
+          fixture.nonFiniteHorizon.overflow.message,
+          {},
+          { timeout: budget(10000) },
+        )
+      ).getAttribute("role"),
+    ).toBe("alert");
+    expect(mock.calls.filter((name) => name === "twrrLinked")).toHaveLength(3);
   },
   budget(30000),
 );
