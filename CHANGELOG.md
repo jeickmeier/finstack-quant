@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Models: seniority calibration ids
+
+`seniority_calibration_ids()` (Python `models.credit.lgd.seniority_calibration_ids`, WASM `models.credit.lgd.seniorityCalibrationIds`) lists the seniority recovery calibrations of the embedded credit registry, the default first, so a host can offer the exact ids `seniority_recovery_stats` accepts without holding its own list.
+
 ### Statements: table and CSV export in the UI
 
 The `statement-export` registry component and `useStatementResultTable` hook draw `statements.statementResultToTableWide` and `statementResultToTableLong`, with a CSV download of exactly those cells (RFC 4180; a cell with no value is an empty field; numbers are unrounded). The statements workbench offers it below the grids, over the reported or annual result they show. `TableEnvelope` gains an optional `missingCell`.

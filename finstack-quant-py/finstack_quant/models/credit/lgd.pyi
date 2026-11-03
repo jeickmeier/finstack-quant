@@ -27,6 +27,7 @@ __all__ = [
     "WorkoutLgd",
     "WorkoutLgdBuilder",
     "WorkoutLgdResult",
+    "seniority_calibration_ids",
     "seniority_recovery_stats",
     "workout_lgd",
 ]
@@ -1682,6 +1683,33 @@ class EadCalculator:
         This method does not raise.
         """
         ...
+
+def seniority_calibration_ids() -> list[str]:
+    """
+    Seniority recovery calibration IDs held by the embedded credit registry.
+
+    Each ID is accepted unchanged as the ``calibration_id`` of
+    :func:`seniority_recovery_stats`. The registry's default calibration comes
+    first, followed by the others in registry order.
+
+    Returns
+    -------
+    list[str]
+        Exact calibration IDs, default first.
+
+    Raises
+    ------
+    ValueError
+        If the embedded registry is malformed.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.credit import lgd
+    >>> lgd.seniority_calibration_ids()
+    ['moodys_recovery_1982_2023', 'sp_recovery_historical']
+
+    """
+    ...
 
 def seniority_recovery_stats(
     seniority: str,

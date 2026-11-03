@@ -388,6 +388,7 @@ const CASES = {
     list(new credit.lgd.BetaRecovery(0.4, 0.2).sampleSeeded(4, 42)),
     list(new credit.lgd.BetaRecovery(0.4, 0.2).sampleSeeded(4, 42)),
   ],
+  'lgd.seniority_calibration_ids': () => credit.lgd.seniorityCalibrationIds(),
   'lgd.seniority_recovery_stats': () => [
     credit.lgd.seniorityRecoveryStats('senior_unsecured', 'moodys_recovery_1982_2023').mean,
     credit.lgd.seniorityRecoveryStats('senior_unsecured', 'moodys_recovery_1982_2023').stdDev,
