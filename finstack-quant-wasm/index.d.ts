@@ -9080,7 +9080,7 @@ declare class Performance {
    * two overlapping points; otherwise pairwise intersecting spans. A raw
    * estimate that is not a valid correlation matrix is Higham-repaired to
    * the nearest valid correlation matrix.
-   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, and `true` when Higham repair was applied.
+   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, with a diagonal of exactly 1 and every coefficient inside [-1, 1], and `true` when Higham repair was applied.
    * @throws Error - Rejects a degenerate pair or a matrix that cannot be repaired to a valid correlation matrix.
    */
   correlationMatrix(): { matrix: Float64Array[]; repaired: boolean };

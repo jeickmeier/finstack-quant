@@ -1950,8 +1950,8 @@
         "member": "correlationMatrix",
         "inputs": [],
         "returns": "{ matrix: Float64Array[]; repaired: boolean }",
-        "declaration": "/**\n   * Return the correlation matrix across assets and whether it was repaired.\n   *\n   * Uses the complete-case common window when every ticker has at least\n   * two overlapping points; otherwise pairwise intersecting spans. A raw\n   * estimate that is not a valid correlation matrix is Higham-repaired to\n   * the nearest valid correlation matrix.\n   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, and `true` when Higham repair was applied.\n   * @throws Error - Rejects a degenerate pair or a matrix that cannot be repaired to a valid correlation matrix.\n   */\n  correlationMatrix(): { matrix: Float64Array[]; repaired: boolean };",
-        "sha256": "e2cb9a611e0f42cf955f43401779b326ae3a08ec4de17815c8f427d4541b6fce"
+        "declaration": "/**\n   * Return the correlation matrix across assets and whether it was repaired.\n   *\n   * Uses the complete-case common window when every ticker has at least\n   * two overlapping points; otherwise pairwise intersecting spans. A raw\n   * estimate that is not a valid correlation matrix is Higham-repaired to\n   * the nearest valid correlation matrix.\n   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, with a diagonal of exactly 1 and every coefficient inside [-1, 1], and `true` when Higham repair was applied.\n   * @throws Error - Rejects a degenerate pair or a matrix that cannot be repaired to a valid correlation matrix.\n   */\n  correlationMatrix(): { matrix: Float64Array[]; repaired: boolean };",
+        "sha256": "d19ad76621bb1a2bc4c98584b9064009094d14c4033ef4f2eb81f1d766ddf162"
       }
     },
     {
