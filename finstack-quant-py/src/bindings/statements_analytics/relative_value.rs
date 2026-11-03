@@ -3,20 +3,21 @@
 //! is the Rust serde form, a dict or JSON text, the same document WASM takes.
 
 use super::comps::{
-    extract_company_metrics, extractor_label, period_basis_label, PyPeerStats, PyRegressionResult,
+    extract_company_metrics, period_basis_label, PyPeerStats, PyRegressionResult,
     PyRelativeValueResult,
 };
 use super::{extract_serde_any, py_bool};
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
+use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::valuations::convert::enum_to_py_string;
 use crate::errors::core_to_py;
 use finstack_quant_statements_analytics::analysis::{
-    self, RelativeValueCompany, RelativeValueDimension, RelativeValueMultiple, RelativeValuePoint,
-    RelativeValueReport, RelativeValueReportConfig,
+    self, CompanyMetrics, RelativeValueCompany, RelativeValueDimension, RelativeValueMultiple,
+    RelativeValuePoint, RelativeValueReport, RelativeValueReportConfig,
 };
 use pyo3::prelude::*;
+use pyo3::types::PyString;
 
 #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValueCompany")]
 #[pyclass(
@@ -191,6 +192,22 @@ wire_methods!(
 
 #[pymethods]
 impl PyRelativeValueDimension {
+    #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValueDimension.y")]
+    #[getter]
+    fn y<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.y)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValueDimension.x")]
+    #[getter]
+    fn x<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .x
+            .as_ref()
+            .map(|x| serde_to_py(py, x))
+            .transpose()
+    }
+
     #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValueDimension.direction")]
     #[getter]
     fn direction(&self) -> PyResult<String> {
@@ -222,12 +239,6 @@ crate::bindings::macros::py_getters!(PyRelativeValueDimension |s| {
 
     #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValueDimension.weight")]
     weight -> f64 = s.inner.weight;
-
-    #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValueDimension.y")]
-    y -> String = extractor_label(&s.inner.y);
-
-    #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValueDimension.x")]
-    x -> Option<String> = s.inner.x.as_ref().map(extractor_label);
 
     #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValueDimension.subject_y")]
     subject_y -> Option<f64> = s.inner.subject_y;
@@ -379,14 +390,18 @@ crate::bindings::macros::py_getters!(PyRelativeValueReport |s| {
 fn relative_value_report<'py>(
     py: Python<'py>,
     subject: &Bound<'py, PyAny>,
-    universe: Vec<Bound<'py, PyAny>>,
+    universe: &Bound<'py, PyAny>,
     config: &Bound<'py, PyAny>,
 ) -> PyResult<PyRelativeValueReport> {
     let subject = extract_company_metrics(py, subject)?;
-    let universe = universe
-        .iter()
-        .map(|company| extract_company_metrics(py, company))
-        .collect::<PyResult<Vec<_>>>()?;
+    let universe: Vec<CompanyMetrics> = if universe.is_instance_of::<PyString>() {
+        extract_serde_any(py, universe, "universe")?
+    } else {
+        universe
+            .try_iter()?
+            .map(|company| extract_company_metrics(py, &company?))
+            .collect::<PyResult<_>>()?
+    };
     let config: RelativeValueReportConfig = extract_serde_any(py, config, "config")?;
     let inner =
         analysis::relative_value_report(&subject, &universe, &config).map_err(core_to_py)?;
