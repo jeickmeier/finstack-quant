@@ -82,8 +82,10 @@ test("statements-workbench normalizes EBITDA and bridges it from the native step
     .click();
   const editor = page.getByRole("region", { name: "Normalization" });
   const target = editor.getByRole("combobox", { name: "Target node" });
+  // Typed, not picked: Tab closes the suggestions and keeps the text.
   await target.fill("ebitda");
-  await page.getByRole("option", { name: "ebitda", exact: true }).click();
+  await target.press("Tab");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
   await expect(target).toHaveValue("ebitda");
   await editor.getByRole("button", { name: "Normalize" }).click();
   const table = editor.getByRole("table", {

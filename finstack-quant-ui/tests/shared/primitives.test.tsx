@@ -236,6 +236,38 @@ it("accepts free-text IDs without requiring a suggestion", async () => {
   await user.type(screen.getByRole("combobox"), "NEW-CURVE");
   expect(change).toHaveBeenLastCalledWith("NEW-CURVE");
 });
+it.each([
+  ["Tab", "{Tab}"],
+  ["Escape", "{Escape}"],
+])(
+  "keeps typed free text as the ID when %s closes the suggestions",
+  async (_, key) => {
+    const user = userEvent.setup();
+    function Example() {
+      const [value, setValue] = useState("");
+      return (
+        <>
+          <IdCombobox
+            label="Target ID"
+            value={value}
+            options={["revenue", "ebitda"]}
+            onValueChange={setValue}
+          />
+          <output aria-label="Accepted ID">{value}</output>
+        </>
+      );
+    }
+    render(<Example />);
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    await user.type(input, "ebit-adj");
+    screen.getByRole("listbox");
+    await user.keyboard(key);
+    // Base UI resets the input to the selection once the popup has unmounted.
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(input.value).toBe("ebit-adj");
+    expect(screen.getByLabelText("Accepted ID").textContent).toBe("ebit-adj");
+  },
+);
 it("date text preserves invalid edits and calendar selection emits ISO", async () => {
   const user = userEvent.setup();
   const change = vi.fn();
