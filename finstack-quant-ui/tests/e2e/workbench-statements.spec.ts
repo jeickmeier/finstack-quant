@@ -95,3 +95,60 @@ test("statements-workbench normalizes EBITDA and bridges it from the native step
   ).toBeAttached();
   expect(errors).toEqual([]);
 });
+
+test("capital-structure-report summarizes the debt stack and leaves a short window's ratios undefined, in a real worker", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=capital-structure-report&theme=light&density=compact&focus=1",
+  );
+  const report = page.getByRole("region", { name: "Capital structure" });
+  const stack = report.getByRole("table", { name: "Debt stack at 2025Q4" });
+  await expect(stack.getByRole("rowheader")).toHaveText([
+    "SR-A",
+    "SR-B",
+    "SUB",
+  ]);
+  await expect(
+    report.getByRole("img", { name: "Maturity wall at 2025Q4" }),
+  ).toBeAttached();
+  await report.getByRole("combobox", { name: "Period" }).click();
+  await page.getByRole("option", { name: "2025Q3", exact: true }).click();
+  await report.getByRole("button", { name: "Summarize" }).click();
+  await expect(
+    report.getByRole("table", { name: "Debt stack at 2025Q3" }),
+  ).toBeVisible();
+  // Rust returns no LTM EBITDA or ratio for three of four quarters.
+  await expect(report.getByText("3 of 4 periods found")).toBeVisible();
+  await expect(report.getByText("Undefined").first()).toBeVisible();
+  await expect(report.getByText("NaN", { exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("statements-workbench shows Rust's error for a model with no capital structure, in a real worker", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=statements-workbench&theme=light&density=compact&focus=1",
+  );
+  await page.getByRole("tab", { name: "Metrics & ratios" }).click();
+  await page
+    .getByText("Capital structure and debt stack", { exact: true })
+    .click();
+  const report = page.getByRole("region", { name: "Capital structure" });
+  await report.getByRole("combobox", { name: "Period" }).click();
+  await page.getByRole("option", { name: "2025Q4", exact: true }).click();
+  const node = report.getByRole("combobox", { name: "EBITDA node" });
+  await node.fill("ebitda");
+  await page.getByRole("option", { name: "ebitda", exact: true }).click();
+  await expect(node).toHaveValue("ebitda");
+  await report.getByRole("button", { name: "Summarize" }).click();
+  await expect(report.getByRole("alert")).toContainText(
+    "has no capital structure",
+  );
+  expect(errors).toEqual([]);
+});

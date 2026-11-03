@@ -2277,6 +2277,37 @@
       }
     },
     {
+      "id": "capital-structure-report",
+      "route": "returned-report",
+      "convention": "Returned CapitalStructureSummary at the configured period, in its currency: money as Rust's exact decimal strings, ratios in turns and shares of debt as decimal fractions (shown as percent digits). Tranches in Rust's rank-then-declaration order with cumulative debt, leverage and interest coverage through each payment class; the maturity wall in Rust's year order, each bar drawn from zero to its returned amount. A null ratio (short LTM window, non-positive EBITDA or debt) or a live NaN shows as undefined beside Rust's ltm_periods_found and ltm_periods_required; negative net debt and net leverage show as returned. Nothing is summed, netted or divided here; a model with no capital structure or a missing node shows the native error.",
+      "api": {
+        "name": "statements_analytics.capitalStructureSummary",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StatementsAnalyticsNamespace",
+        "member": "capitalStructureSummary",
+        "inputs": [
+          {
+            "name": "results",
+            "type": "StatementResult | string",
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "config",
+            "type": "generated.statements_analytics.CapitalStructureSummaryConfig | string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.statements_analytics.CapitalStructureSummary",
+        "declaration": "/**\n   * Summarize the debt stack by seniority at one period (mirrors Rust `capital_structure_summary`).\n   * @param results - Evaluated `StatementResult` (object or JSON) holding `cs_cashflows` and both configured nodes. A scalar EBITDA or cash node is read as an amount in the debt currency.\n   * @param model - `FinancialModelSpec` (object or JSON) whose capital structure gives the instruments, their declaration order and the payment classes, and whose periods bound the LTM window.\n   * @param config - `CapitalStructureSummaryConfig` (object or JSON): `period` (the reporting period, such as `\"2025Q4\"`), `ebitda_node` (required; the node holding EBITDA for each single period, never inferred from a conventional name) and `cash_node` (optional; the node holding the period-end cash balance, omitted means null cash, net debt and net leverage).\n   * @returns `CapitalStructureSummary` plain object: `as_of`, `currency`, `total_debt`, `cash`, `net_debt` and `ltm_ebitda` as money, `ltm_periods_required`, `ltm_periods_found`, `total_leverage`, `net_leverage` and `total_coverage` in turns, `tranches` by rank then declaration order (`id`, `kind`, `rank`, `payment_class`, `balance` with a revolver at its drawn balance, `share_of_debt` as a decimal, `maturity`, `cumulative_debt`, `leverage` and `interest_coverage` through the class, `ltm_interest`) and `maturity_wall` by calendar year of final maturity, ascending (`year`, `amount`, `share_of_debt`), using the balance at the period and ignoring any scheduled amortization after it.\n   * @throws If an argument is malformed, the model has no capital structure or no debt instruments once hedges are excluded, `cs_cashflows` is absent, the period is not in the model, a configured node is not in the results or the cash node has no value at the period, an instrument has no cashflows at the period or is in no class while payment classes are declared, a consumed value or ratio is non-finite, tranches are in more than one currency (no FX is applied), or the EBITDA or cash node is monetary in another currency (kind `validation`).\n   */\n  capitalStructureSummary(\n    results: StatementResult | string,\n    model: JsonInput,\n    config: generated.statements_analytics.CapitalStructureSummaryConfig | string\n  ): generated.statements_analytics.CapitalStructureSummary;",
+        "sha256": "2063524c18646e2d31c830bfe290d01bed077866cf8adaa1cc1308b7bf0582d1"
+      }
+    },
+    {
       "id": "wacc-calculator",
       "route": "returned-report",
       "convention": "Returned WACC of the five entered decimals, itself a decimal. The two capital weights are separate inputs; nothing is blended, defaulted or checked here, and weights that do not sum to one or a tax rate outside [0, 1] show the native error. Applying the rate to a DCF is an explicit user action that passes the returned number unchanged.",

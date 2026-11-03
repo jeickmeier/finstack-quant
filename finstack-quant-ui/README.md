@@ -174,11 +174,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the thirty-two native fixture generators under
+`mise run ui-fixtures` runs the thirty-three native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
-scenario-table; statements → covenants, normalizations; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
+scenario-table; statements → covenants, normalizations, capital structures; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -522,6 +522,23 @@ a capped one. Rust returns every position, so nothing is summed. In the
 workbench it sits in Metrics & ratios, in a disclosure that calls Rust when
 first opened, over the reported result. The native fixture is
 `tests/statements/normalization/cases.json`.
+`CapitalStructureReport` (`@finstack/capital-structure-report`), fetched with
+`useCapitalStructureSummary` (`@finstack/use-capital-structure-summary`),
+answers how much debt sits ahead of each tranche and what leverage and coverage
+look like through it. It edits a `CapitalStructureSummaryConfig` with a schema
+form over the generated `capital_structure_summary_config` contract (the period
+over the model's periods, the EBITDA and cash nodes as id-comboboxes; Rust
+validates it on the call) and shows `statements_analytics.capitalStructureSummary`
+as returned: total debt, cash, net debt, LTM EBITDA with the LTM periods Rust
+found of those it requires, total and net leverage and total coverage; the debt
+stack in Rust's rank-then-declaration order with cumulative debt, leverage and
+interest coverage through each payment class; and the maturity wall by year. A
+ratio Rust returns as null (a short LTM window, non-positive EBITDA or debt), or
+a live NaN, shows as Undefined; negative net debt shows as returned. In the
+workbench it sits in Metrics & ratios, in a disclosure that calls Rust when
+first opened; a model with no capital structure shows Rust's error. The native
+fixture is `tests/statements/capital-structure/cases.json`, a quarterly model
+with two first-lien bonds and a second-lien bond.
 `useEvaluateDcf` (`use-evaluate-dcf`) and `useDcfSensitivity`
 (`use-dcf-sensitivity`) pass the model, WACC, `TerminalValueSpec` and the
 optional UFCF node, net-debt override and `DcfOptions` JSON to

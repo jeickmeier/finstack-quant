@@ -649,6 +649,12 @@
       "worker": "none"
     },
     {
+      "name": "capital-structure-report",
+      "type": "registry:component",
+      "docs": "Answers how much debt sits ahead of each tranche and what leverage and coverage look like through it. Edits a CapitalStructureSummaryConfig with the schema form over the generated capital_structure_summary_config contract (the reporting period as a select over the supplied periodIds; the EBITDA and optional cash nodes as id-comboboxes over the supplied nodeIds); Summarize passes the structurally valid config to the caller (usually the useCapitalStructureSummary request) and Rust validates it. The native statements_analytics.capitalStructureSummary result is shown as returned, above the form: total debt, cash, net debt, LTM EBITDA with the LTM periods Rust found of those it requires, and total and net leverage and total coverage; the debt stack in Rust's rank-then-declaration order (kind, payment class, rank, balance, share of debt, cumulative debt, leverage and interest coverage through the class, LTM interest, maturity); and the maturity wall by year of final maturity as a bar chart. A ratio Rust returns as null (a short LTM window, non-positive EBITDA or debt), or a live NaN, shows as Undefined; a negative net debt or net leverage shows as returned. A model with no capital structure or a node the results lack shows the native error. Nothing is summed, netted or divided here. Accepts defaultConfig, nodeIds, periodIds, onSubmit, summary, loading, error, formatRatio, formatShare and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "statement-export",
       "type": "registry:component",
       "docs": "Answers what the statement numbers are as a file a spreadsheet can open. Presents a native statements.statementResultToTableWide or statementResultToTableLong TableEnvelope (useStatementResultTable) in Rust's order, with a wide or long switch the host follows. Download CSV writes exactly those cells: RFC 4180 quoting, native column names as the header, every number as its plain String form. A cell Rust holds with no value shows as undefined and is an empty field. Nothing is computed. Accepts layout, onLayoutChange, table, loading, error and density props; no worker or query provider required.",
@@ -657,7 +663,7 @@
     {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, a table and CSV export of the shown result, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary and, in a disclosure, a native normalization of the reported result (adjusted EBITDA: a NormalizationConfig editor and statements.normalize's base-to-adjusted bridge), a native DCF valuation with its enterprise-value tornado, a native WACC calculator that sets the DCF WACC field on the user's click, and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error, and a native breach forecast, statements_analytics.forecastBreaches, under a submitted CovenantForecastConfig), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, a table and CSV export of the shown result, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary and, in a disclosure, a native normalization of the reported result (adjusted EBITDA: a NormalizationConfig editor and statements.normalize's base-to-adjusted bridge) and, in another, the native debt stack (statements_analytics.capitalStructureSummary: leverage and coverage through each payment class and the maturity wall; a model with no capital structure shows Rust's error), a native DCF valuation with its enterprise-value tornado, a native WACC calculator that sets the DCF WACC field on the user's click, and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error, and a native breach forecast, statements_analytics.forecastBreaches, under a submitted CovenantForecastConfig), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -984,6 +990,10 @@
     },
     {
       "name": "use-normalize",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-capital-structure-summary",
       "type": "registry:hook"
     },
     {
@@ -1863,6 +1873,10 @@
     {
       "path": "finstack-quant-ui/tests/statements/normalization/cases.json",
       "sha256": "95b78aca6e160a2ad11a82bfd0795bd3bfaf46c1b2acab3fcb144ad3dd601cac"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
+      "sha256": "965ec88a37428138f17d1dc8d4edb8d0bb5375cddaf50c269462b96fb4709051"
     },
     {
       "path": "finstack-quant-ui/tests/statements/export/cases.json",
