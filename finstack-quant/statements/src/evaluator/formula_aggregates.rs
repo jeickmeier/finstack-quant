@@ -271,17 +271,26 @@ pub(crate) fn evaluate_period_aggregate_function(
         }
         Function::Ttm => {
             require_args("ttm", args, 1, node_id)?;
-            let window = context.period_kind.periods_per_year() as usize;
-            // Evaluate precisely the calendar slots, excluding intervening
-            // observations at other frequencies and refusing missing periods.
-            let mut values = Vec::with_capacity(window);
-            for offset in (0..window).rev() {
-                let Some(period) =
-                    super::formula_timeseries::offset_period(context, -(offset as i32))
-                else {
-                    return Ok(f64::NAN);
-                };
-                let value = if offset == 0 {
+            // The window is twelve calendar months of model periods; see
+            // `ltm_window` for the daily (calendar- or business-day) rule.
+            let fallback;
+            let periods = if context.history.model_periods().is_empty() {
+                fallback = gregorian_periods(context);
+                fallback.as_slice()
+            } else {
+                context.history.model_periods()
+            };
+            let Ok(window) = finstack_quant_core::dates::ltm_window(context.period_id, periods)
+            else {
+                return Ok(f64::NAN);
+            };
+            if !window.is_complete() {
+                return Ok(f64::NAN);
+            }
+            // Evaluate precisely the window's slots and refuse unevaluated ones.
+            let mut values = Vec::with_capacity(window.slots.len());
+            for period in window.slots {
+                let value = if period == context.period_id {
                     super::formula::evaluate_formula(&args[0], context, node_id)?
                 } else {
                     if !context.history.contains_key(&period)
@@ -306,4 +315,30 @@ pub(crate) fn evaluate_period_aggregate_function(
             format!("Function {:?} is not a period aggregate", func),
         )),
     }
+}
+
+/// Gregorian periods of a context built without model dates: the current
+/// period, every history row and every period with capital-structure flows.
+/// Only daily windows read their dates; fiscal ids have none and are dropped.
+fn gregorian_periods(context: &EvaluationContext) -> Vec<finstack_quant_core::dates::Period> {
+    let mut ids: Vec<PeriodId> = context
+        .history
+        .keys()
+        .chain(context.historical_capital_structure_cashflows.keys())
+        .copied()
+        .chain(std::iter::once(context.period_id))
+        .collect();
+    ids.sort();
+    ids.dedup();
+    ids.into_iter()
+        .filter_map(|id| {
+            let (start, end) = id.bounds().ok()?;
+            Some(finstack_quant_core::dates::Period {
+                id,
+                start,
+                end,
+                is_actual: false,
+            })
+        })
+        .collect()
 }

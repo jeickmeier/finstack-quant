@@ -94,7 +94,7 @@ def test_regression_dimension_matches_the_hand_calculation() -> None:
     dimension = relative_value_report(SUBJECT, UNIVERSE, CONFIG).dimensions[0]
 
     assert (dimension.label, dimension.weight, dimension.direction) == ("Spread vs Leverage", 0.7, "higher_is_cheap")
-    assert (dimension.y, dimension.x) == ("oas_bp", "leverage")
+    assert (dimension.y, dimension.x) == ({"named": "oas_bp"}, {"named": "leverage"})
     assert (dimension.subject_y, dimension.subject_x) == (300.0, 2.5)
     # Y over all five peers: 100, 200, 310, 380, 250. Mean 248; three at or below 300.
     assert dimension.peer_stats is not None
@@ -189,6 +189,26 @@ def test_accepts_serde_documents_and_json_text() -> None:
     universe = [json.loads(company.to_json()) for company in UNIVERSE]
     from_documents = relative_value_report(subject, universe, json.dumps(CONFIG))
     assert from_documents.to_json() == relative_value_report(SUBJECT, UNIVERSE, CONFIG).to_json()
+
+
+def test_extractors_keep_their_kind_as_wasm_does() -> None:
+    custom = {"label": "Custom", "y_extractor": {"custom": "leverage"}, "weight": 0.1}
+    config = {**CONFIG, "dimensions": [*CONFIG["dimensions"], custom]}
+    report = relative_value_report(SUBJECT, UNIVERSE, config)
+    _, ev_ebitda, _, by_custom = report.dimensions
+    assert (ev_ebitda.y, ev_ebitda.x) == ({"multiple": "ev_ebitda"}, None)
+    # A custom key named like a canonical metric stays custom, not "leverage".
+    assert by_custom.y == {"custom": "leverage"}
+    wire = report.to_dict()["dimensions"]
+    assert [(d.y, d.x) for d in report.dimensions] == [(w["y"], w["x"]) for w in wire]
+
+
+def test_universe_accepts_one_json_array_text() -> None:
+    universe = json.dumps([json.loads(company.to_json()) for company in UNIVERSE])
+    from_text = relative_value_report(SUBJECT, universe, CONFIG)
+    assert from_text.to_json() == relative_value_report(SUBJECT, UNIVERSE, CONFIG).to_json()
+    with pytest.raises(ValueError, match="universe"):
+        relative_value_report(SUBJECT, "[{]", CONFIG)
 
 
 def test_to_dataframe_has_one_row_per_company() -> None:

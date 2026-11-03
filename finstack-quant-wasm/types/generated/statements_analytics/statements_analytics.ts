@@ -1042,8 +1042,9 @@ export interface CapitalStructureSummary {
    */
   ltm_periods_found: number;
   /**
-   * Periods a full LTM window holds at the reporting period's frequency (4
-   * for quarters, 12 for months).
+   * Periods a full LTM window holds: 4 for quarters, 12 for months, and for a
+   * daily model the model's days in the trailing twelve months plus any
+   * calendar days of that year before the model's first day.
    */
   ltm_periods_required: number;
   /**

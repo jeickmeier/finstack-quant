@@ -559,6 +559,119 @@
       "formula_text": "ebitda - ebit * 0.235 - capex"
     }
   },
+  "capital_structure": {
+    "debt_instruments": [
+      {
+        "id": "TLB",
+        "spec": {
+          "type": "term_loan",
+          "spec": {
+            "amortization": {
+              "percent_of_original_per_period": {
+                "pct": 0.0025
+              }
+            },
+            "attributes": {},
+            "business_day_convention": "modified_following",
+            "calendar_id": null,
+            "call_schedule": null,
+            "coupon_type": "cash",
+            "covenants": null,
+            "credit_curve_id": null,
+            "currency": "USD",
+            "day_count": "act_360",
+            "ddtl": null,
+            "discount_curve_id": "USD-OIS",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "id": "TLB",
+            "issue_date": "2024-01-01",
+            "maturity": "2030-01-01",
+            "notional_limit": {
+              "amount": "360000000",
+              "currency": "USD"
+            },
+            "oid_eir": null,
+            "rate": {
+              "fixed": {
+                "rate": 0.0725
+              }
+            },
+            "settlement_days": 2,
+            "stub": "none",
+            "upfront_fee": null
+          }
+        }
+      },
+      {
+        "id": "RCF",
+        "spec": {
+          "type": "revolving_credit",
+          "spec": {
+            "attributes": {},
+            "business_day_convention": "modified_following",
+            "calendar_id": null,
+            "commitment": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "commitment_steps": [],
+            "credit_curve_id": null,
+            "day_count": "act_360",
+            "discount_curve_id": "USD-OIS",
+            "draw_repay_spec": {
+              "deterministic": []
+            },
+            "drawn": {
+              "amount": "60000000",
+              "currency": "USD"
+            },
+            "fees": {
+              "commitment_fee_tiers": [],
+              "facility_fee_bp": 0.0,
+              "steps": [],
+              "upfront_fee": null,
+              "usage_fee_tiers": []
+            },
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "id": "RCF",
+            "issue_date": "2024-01-01",
+            "lc": null,
+            "leq": 0.0,
+            "margin_steps": [],
+            "maturity": "2028-01-01",
+            "oid_eir": null,
+            "payment_lag_days": 0,
+            "rate": {
+              "fixed": {
+                "rate": 0.065
+              }
+            },
+            "recovery_rate": 0.0,
+            "scheduled_fees": [],
+            "settlement_days": 0,
+            "stub": "none"
+          }
+        }
+      }
+    ],
+    "waterfall": {
+      "available_cash_node": "cash",
+      "priority_of_payments": ["fees", "interest", "amortization"],
+      "payment_classes": [
+        {
+          "id": "1L",
+          "rank": 0,
+          "instrument_ids": ["TLB", "RCF"]
+        }
+      ]
+    }
+  },
   "meta": {
     "entity": "Acme Software Holdings",
     "currency": "USD",

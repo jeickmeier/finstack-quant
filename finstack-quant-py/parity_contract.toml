@@ -1383,7 +1383,10 @@ templates                   = { python = "finstack_quant.statements_analytics", 
 #   WASM returns DatedCovenantReports rows and FutureBreach wire objects.
 #   capital_structure_summary / capitalStructureSummary are bound in both hosts
 #   with their result types; the request is the Rust serde document in each.
-#   relative_value_report / relativeValueReport likewise.
+#   relative_value_report / relativeValueReport likewise: both take the
+#   universe as a list or one JSON array text, and both report a dimension's
+#   `y` / `x` as the typed MetricExtractor document ({"named": ...},
+#   {"custom": ...}, {"multiple": ...}), never a flattened label.
 # - compute_peer_multiples, and
 #   the comps/scenarios/reports/valuation typed result surfaces beyond the
 #   bound entry points. lbo_model_checks is reached in both hosts through the

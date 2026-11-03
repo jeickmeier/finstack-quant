@@ -532,7 +532,7 @@ class RelativeValueDimension:
     ...     ' "excluded_reason": "zero_weight", "points": []}'
     ... )
     >>> dimension.label, dimension.weight, dimension.direction, dimension.y, dimension.x
-    ('Spread vs Leverage', 0.0, 'higher_is_cheap', 'oas_bp', 'multiple:ev_ebitda')
+    ('Spread vs Leverage', 0.0, 'higher_is_cheap', {'named': 'oas_bp'}, {'multiple': 'ev_ebitda'})
     >>> dimension.subject_y, dimension.subject_x, dimension.peer_stats, dimension.percentile, dimension.z_score
     (300.0, None, None, None, None)
     >>> dimension.regression, dimension.signal, dimension.excluded_reason, dimension.points
@@ -675,14 +675,18 @@ class RelativeValueDimension:
         ...
 
     @property
-    def y(self) -> str:
+    def y(self) -> dict[str, str]:
         """
-        Y metric in ``name`` or ``multiple:<name>`` notation.
+        Y metric extractor, as the ``MetricExtractor`` serde document.
 
         Returns
         -------
-        str
-            The canonical name or custom key, or ``"multiple:<name>"``.
+        dict[str, str]
+            One-key dict naming the extractor kind and its metric:
+            ``{"named": "oas_bp"}`` for a canonical metric, ``{"custom": "<key>"}``
+            for a ``custom`` metric and ``{"multiple": "ev_ebitda"}`` for a
+            valuation multiple. It is the ``y_extractor`` the dimension was
+            configured with, and matches the WASM report's ``y``.
         Notes
         -----
         This accessor does not raise; it returns the stored value.
@@ -690,14 +694,15 @@ class RelativeValueDimension:
         ...
 
     @property
-    def x(self) -> str | None:
+    def x(self) -> dict[str, str] | None:
         """
-        X metric in ``name`` or ``multiple:<name>`` notation.
+        X metric extractor, as the ``MetricExtractor`` serde document.
 
         Returns
         -------
-        str | None
-            The canonical name or custom key, or ``"multiple:<name>"``; ``None`` for a dimension scored on its peer distribution.
+        dict[str, str] | None
+            One-key dict in the form :attr:`y` uses, the dimension's configured
+            ``x_extractor``; ``None`` for a dimension scored on its peer distribution.
         Notes
         -----
         This accessor does not raise; it returns the stored value.
@@ -1117,7 +1122,7 @@ class RelativeValueReport:
 
 def relative_value_report(
     subject: CompanyMetrics | dict[str, Any] | str,
-    universe: Sequence[CompanyMetrics | dict[str, Any] | str],
+    universe: Sequence[CompanyMetrics | dict[str, Any] | str] | str,
     config: dict[str, Any] | str,
 ) -> RelativeValueReport:
     """
@@ -1139,9 +1144,11 @@ def relative_value_report(
     subject : CompanyMetrics or dict or str
         Company being evaluated, typed or as its serde document. It need not be in
         ``universe``.
-    universe : sequence of CompanyMetrics or dict or str
-        Candidate peers in the order the report returns them. A member with the
-        subject's id is never a peer and does not count as excluded.
+    universe : sequence of CompanyMetrics or dict or str, or str
+        Candidate peers in the order the report returns them: a sequence whose
+        members are typed, serde documents or JSON text, or the whole list as one
+        JSON array text, as WASM accepts. A member with the subject's id is never a
+        peer and does not count as excluded.
     config : dict or str
         ``RelativeValueReportConfig`` document, a dict or JSON text: ``filter``
         (optional; a ``PeerFilter`` document in which every field is optional, an
@@ -1183,6 +1190,8 @@ def relative_value_report(
     ... )
     >>> report.companies[0].values
     [120.0]
+    >>> report.dimensions[0].y, report.dimensions[0].x
+    ({'named': 'oas_bp'}, {'named': 'leverage'})
     >>> round(report.dimensions[0].points[1].fitted_y, 6)
     105.0
     >>> report.composite.composite_score > 0
