@@ -164,12 +164,6 @@ impl PeriodHistory {
         self.period_index.contains_key(period)
     }
 
-    /// Interned column layout shared with the evaluator.
-    #[must_use]
-    pub fn node_to_column(&self) -> &IndexMap<NodeId, usize> {
-        &self.node_to_column
-    }
-
     /// Shared interned column layout used by every stored row.
     #[must_use]
     pub fn shared_node_to_column(&self) -> Arc<IndexMap<NodeId, usize>> {

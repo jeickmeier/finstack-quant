@@ -844,6 +844,11 @@ class Evaluator:
         """
         Run a Monte Carlo simulation of ``model`` under this evaluator.
 
+        Each path evaluates the model as ``evaluate`` does on that path's
+        sampled forecasts, so a capital structure (built from an empty market
+        as of the first period's start) and its waterfall run per path and
+        ``cs.*`` references see that path's debt service and balances.
+
         Parameters
         ----------
         model : FinancialModelSpec
