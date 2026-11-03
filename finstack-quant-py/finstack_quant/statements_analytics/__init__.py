@@ -106,6 +106,14 @@ CapitalStructureSummary = _sa.CapitalStructureSummary
 CapitalStructureTranche = _sa.CapitalStructureTranche
 MaturityWallBucket = _sa.MaturityWallBucket
 
+# Comps table, regression scatter and composite score
+relative_value_report = _sa.relative_value_report
+RelativeValueCompany = _sa.RelativeValueCompany
+RelativeValueDimension = _sa.RelativeValueDimension
+RelativeValueMultiple = _sa.RelativeValueMultiple
+RelativeValuePoint = _sa.RelativeValuePoint
+RelativeValueReport = _sa.RelativeValueReport
+
 # Typed results, specs and mappings
 CompanyMetrics = _sa.CompanyMetrics
 CorporateAnalysis = _sa.CorporateAnalysis
@@ -187,6 +195,11 @@ __all__: list[str] = [
     "PropertyTemplateNodes",
     "QualitativeFlags",
     "RegressionResult",
+    "RelativeValueCompany",
+    "RelativeValueDimension",
+    "RelativeValueMultiple",
+    "RelativeValuePoint",
+    "RelativeValueReport",
     "RelativeValueResult",
     "RenewalSpec",
     "RentRollOutputNodes",
@@ -240,6 +253,7 @@ __all__: list[str] = [
     "percentile_rank",
     "pl_summary_report",
     "regression_fair_value",
+    "relative_value_report",
     "render_check_report_html",
     "render_check_report_text",
     "run_checks",

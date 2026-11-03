@@ -933,5 +933,180 @@
     "vol_cubes": [],
     "hierarchy": null
   },
-  "capital_structure_as_of": "2025-01-01"
+  "capital_structure_as_of": "2025-01-01",
+  "relative_value_subject": {
+    "id": "SUBJ",
+    "attributes": {
+      "tags": [],
+      "meta": {
+        "gics_sector": "energy"
+      }
+    },
+    "leverage": 2.5,
+    "oas_bp": 300.0,
+    "enterprise_value": 1000.0,
+    "ebitda": 100.0
+  },
+  "relative_value_universe": [
+    {
+      "id": "P1",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "leverage": 1.0,
+      "oas_bp": 100.0,
+      "enterprise_value": 800.0,
+      "ebitda": 100.0
+    },
+    {
+      "id": "OUT",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "tech"
+        }
+      },
+      "leverage": 1.0,
+      "oas_bp": 9999.0
+    },
+    {
+      "id": "P2",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "leverage": 2.0,
+      "oas_bp": 200.0,
+      "enterprise_value": 900.0,
+      "ebitda": 100.0
+    },
+    {
+      "id": "SUBJ",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "leverage": 2.5,
+      "oas_bp": 300.0,
+      "enterprise_value": 1000.0,
+      "ebitda": 100.0
+    },
+    {
+      "id": "P3",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "leverage": 3.0,
+      "oas_bp": 310.0,
+      "enterprise_value": 1200.0,
+      "ebitda": 100.0
+    },
+    {
+      "id": "P4",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "leverage": 4.0,
+      "oas_bp": 380.0,
+      "enterprise_value": 500.0
+    },
+    {
+      "id": "P5",
+      "attributes": {
+        "tags": [],
+        "meta": {
+          "gics_sector": "energy"
+        }
+      },
+      "oas_bp": 250.0,
+      "enterprise_value": 1100.0,
+      "ebitda": 100.0
+    }
+  ],
+  "relative_value_config": {
+    "filter": {
+      "gics_sectors": [
+        "energy"
+      ],
+      "gics_industries": [],
+      "countries": [],
+      "market_cap_min": null,
+      "market_cap_max": null,
+      "ratings": [],
+      "required_tags": [],
+      "excluded_tags": [],
+      "selectors": []
+    },
+    "period_basis": "ltm",
+    "dimensions": [
+      {
+        "label": "Spread vs Leverage",
+        "y_extractor": {
+          "named": "oas_bp"
+        },
+        "x_extractor": {
+          "named": "leverage"
+        },
+        "weight": 0.7,
+        "direction": "higher_is_cheap"
+      },
+      {
+        "label": "EV/EBITDA",
+        "y_extractor": {
+          "multiple": "ev_ebitda"
+        },
+        "weight": 0.3,
+        "direction": "higher_is_rich"
+      },
+      {
+        "label": "Disabled",
+        "y_extractor": {
+          "named": "oas_bp"
+        },
+        "weight": 0.0
+      },
+      {
+        "label": "Nobody has it",
+        "y_extractor": {
+          "custom": "missing"
+        },
+        "weight": 1.0
+      }
+    ],
+    "multiples": [
+      "spread_per_turn",
+      "ev_ebitda",
+      "pe"
+    ]
+  },
+  "relative_value_table_only_config": {
+    "period_basis": {
+      "custom": "FY2025E"
+    },
+    "dimensions": [
+      {
+        "label": "Nobody has it",
+        "y_extractor": {
+          "custom": "missing"
+        },
+        "weight": 1.0
+      }
+    ],
+    "multiples": [
+      "ev_ebitda"
+    ]
+  }
 }

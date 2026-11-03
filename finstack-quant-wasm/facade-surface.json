@@ -4196,6 +4196,7 @@
       "plSummaryReport",
       "plSummaryReportText",
       "regressionFairValue",
+      "relativeValueReport",
       "renderCheckReportHtml",
       "renderCheckReportText",
       "runChecks",
@@ -4339,6 +4340,9 @@
     "kind": "function"
   },
   "statements_analytics.scoreRelativeValue": {
+    "kind": "function"
+  },
+  "statements_analytics.relativeValueReport": {
     "kind": "function"
   },
   "statements_analytics.validateScorecardConfig": {

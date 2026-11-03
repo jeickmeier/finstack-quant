@@ -228,6 +228,18 @@ test('statements_analytics matches the cross-host golden', () => {
         ebitda_node: 'ebitda',
       }),
     },
+    relative_value_report: {
+      full: sa.relativeValueReport(
+        INPUTS.relative_value_subject,
+        INPUTS.relative_value_universe,
+        INPUTS.relative_value_config
+      ),
+      table_only: sa.relativeValueReport(
+        INPUTS.relative_value_subject,
+        INPUTS.relative_value_universe,
+        INPUTS.relative_value_table_only_config
+      ),
+    },
     dcf_sensitivity: {
       gordon_growth: sa.dcfSensitivity(
         INPUTS.dcf_model,
@@ -291,6 +303,59 @@ test('capitalStructureSummary reads the LTM window and rejects a bad request', (
   ]) {
     assert.throws(
       () => sa.capitalStructureSummary(results, model, request),
+      (error) => error.kind === 'validation'
+    );
+  }
+});
+
+test('relativeValueReport hands over the table, the scatter and the score', () => {
+  const subject = INPUTS.relative_value_subject;
+  const universe = INPUTS.relative_value_universe;
+  const report = sa.relativeValueReport(subject, universe, INPUTS.relative_value_config);
+  assert.deepEqual(
+    report.companies.map((row) => [row.id, row.is_subject]),
+    [
+      ['SUBJ', true],
+      ['P1', false],
+      ['P2', false],
+      ['P3', false],
+      ['P4', false],
+      ['P5', false],
+    ]
+  );
+  assert.deepEqual([report.peer_count, report.excluded_count], [5, 1]);
+  // 300 / 2.5; 1000 / 100; no P/E inputs.
+  assert.deepEqual(report.companies[0].values, [120, 10, null]);
+  const [regression, , disabled, unavailable] = report.dimensions;
+  // y = 10 + 95x over the four pairs, so 105 at x = 1; P5 has no leverage and no point.
+  assert.deepEqual(
+    regression.points.map((point) => point.company_id),
+    ['SUBJ', 'P1', 'P2', 'P3', 'P4']
+  );
+  assert.ok(Math.abs(regression.points[1].fitted_y - 105) < 1e-9);
+  assert.equal(disabled.excluded_reason, 'zero_weight');
+  assert.equal(unavailable.excluded_reason, 'no_subject_value');
+
+  const tableOnly = sa.relativeValueReport(
+    subject,
+    universe,
+    INPUTS.relative_value_table_only_config
+  );
+  assert.equal(tableOnly.composite, null);
+  assert.equal(tableOnly.composite_excluded_reason, 'no_usable_dimension');
+  assert.deepEqual(tableOnly.period_basis, { custom: 'FY2025E' });
+
+  for (const config of [
+    { period_basis: 'ltm', dimensions: [], multiples: [] },
+    { period_basis: 'ltm', dimensions: [], multiples: ['ev_ebitda'], guess: true },
+    {
+      period_basis: 'ltm',
+      dimensions: [{ label: 'bad', y_extractor: { named: 'oas_bp' }, weight: -1 }],
+      multiples: [],
+    },
+  ]) {
+    assert.throws(
+      () => sa.relativeValueReport(subject, universe, config),
       (error) => error.kind === 'validation'
     );
   }

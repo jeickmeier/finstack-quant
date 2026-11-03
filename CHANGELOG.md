@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Comps: relative value report
+
+`relative_value_report(subject, universe, config)` filters the universe and returns what a comps screen draws, so a host computes nothing: `companies` (the subject first, then peers in universe order, with one value per configured multiple), `multiples` (each with the subject's value, peer statistics, percentile and z-score) and `dimensions` (one per configured dimension in config order, excluded ones included, with subject values, peer statistics, percentile, z-score, regression, the direction-adjusted `signal`, `excluded_reason`, and scatter `points` that carry their fitted Y). `composite` is the result of `score_relative_value` on the same peers and dimensions, which now shares one per-dimension evaluation with the report; when it cannot be produced it is null, `composite_excluded_reason` says why and the table still renders. Empty `dimensions` and `multiples` together, or a negative or non-finite weight, are errors. Metrics carry no currency, so normalizing them is the caller's job.
+
+Bound in Python (`relative_value_report`, `RelativeValueReport`, `RelativeValueCompany`, `RelativeValueMultiple`, `RelativeValueDimension`, `RelativeValuePoint`) and WASM (`statements_analytics.relativeValueReport`), with schemas for the request and the result. No value moves.
+
 ### Statements: debt stack by seniority
 
 `capital_structure_summary(results, model, config)` answers how much debt sits ahead of each tranche and what leverage and coverage look like through it. It gives one row per bond, convertible, term loan and revolver at its balance at `config.period`, with a revolver at its drawn balance and swaps, cap/floors and swaptions left out; rank and class come from the waterfall's payment classes, or one implicit class when there are none. Tranches in a class are pari passu, so cumulative debt, leverage and coverage are figures through the whole class. It also gives total debt, cash, net debt, LTM EBITDA, total and net leverage, total coverage, and a maturity wall by calendar year of final maturity, which uses the balance at the period and ignores later amortization.

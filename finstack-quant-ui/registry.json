@@ -4753,6 +4753,72 @@
       }
     },
     {
+      "name": "contract-relative-value-report-config",
+      "type": "registry:lib",
+      "title": "Relative value report config contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust relative_value_report_config contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/relative_value_report_config.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/relative_value_report_config.json"
+        },
+        {
+          "path": "src/generated/types/relative_value_report_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/relative_value_report_config.ts"
+        },
+        {
+          "path": "src/generated/meta/relative_value_report_config.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/relative_value_report_config.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-relative-value-report",
+      "type": "registry:lib",
+      "title": "Relative value report contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust relative_value_report contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/relative_value_report.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/relative_value_report.json"
+        },
+        {
+          "path": "src/generated/types/relative_value_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/relative_value_report.ts"
+        },
+        {
+          "path": "src/generated/meta/relative_value_report.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/relative_value_report.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-scenario-diff",
       "type": "registry:lib",
       "title": "Scenario diff contract",

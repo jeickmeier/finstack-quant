@@ -69,6 +69,7 @@ use crate::{
     analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboResult,
     analysis::LeverageRangeCheck, analysis::LiquidityRunwayCheck, analysis::PeerFilter,
     analysis::PeerSet, analysis::PeerStats, analysis::RatingPdMap, analysis::RegressionResult,
+    analysis::RelativeValueReport, analysis::RelativeValueReportConfig,
     analysis::RelativeValueResult, analysis::ScenarioDiff, analysis::ScenarioResults,
     analysis::ScenarioSet, analysis::ScoringDimension, analysis::SensitivityResult,
     analysis::StageResult, analysis::TrendCheck, analysis::VarianceConfig,
@@ -382,6 +383,22 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "regression_result",
         Output,
         "OLS regression result for fair-value estimation."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        RelativeValueReport,
+        "statements_analytics",
+        "relative_value_report",
+        Output,
+        "Comps table, peer statistics, regression scatter and composite rich/cheap score of a subject against its filtered peers."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        RelativeValueReportConfig,
+        "statements_analytics",
+        "relative_value_report_config",
+        Input,
+        "Peer filter, period basis, scoring dimensions and multiple columns for a relative value report."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

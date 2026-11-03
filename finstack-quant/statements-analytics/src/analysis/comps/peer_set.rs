@@ -126,6 +126,15 @@ impl PeerSet {
     ///
     /// Applies `filter` to the universe. The subject is never included
     /// in the peer list even if it passes the filter.
+    ///
+    /// # Arguments
+    ///
+    /// * `subject` - Company being evaluated, stored apart from the peers.
+    /// * `universe` - Candidate companies; accepted ones are cloned into the
+    ///   peer list in this order, and a member with the subject's id is skipped.
+    /// * `filter` - Criteria a candidate must satisfy to become a peer.
+    /// * `period_basis` - Period basis recorded on the set; it labels the
+    ///   metrics and changes no value.
     pub fn from_universe(
         subject: CompanyMetrics,
         universe: &[CompanyMetrics],

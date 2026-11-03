@@ -13,6 +13,7 @@ mod comps;
 mod corkscrew;
 mod covenants;
 mod ecl;
+mod relative_value;
 mod reports;
 mod scorecards;
 mod templates_common;
@@ -84,6 +85,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     valuation::register(py, &m)?;
     checks::register(py, &m)?;
     capital_structure::register(py, &m)?;
+    relative_value::register(py, &m)?;
     covenants::register(py, &m)?;
     reports::register(py, &m)?;
     ecl::register(py, &m)?;
@@ -141,6 +143,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "PropertyTemplateNodes",
             "QualitativeFlags",
             "RegressionResult",
+            "RelativeValueCompany",
+            "RelativeValueDimension",
+            "RelativeValueMultiple",
+            "RelativeValuePoint",
+            "RelativeValueReport",
             "RelativeValueResult",
             "RenewalSpec",
             "RentRollOutputNodes",
@@ -194,6 +201,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "percentile_rank",
             "pl_summary_report",
             "regression_fair_value",
+            "relative_value_report",
             "render_check_report_html",
             "render_check_report_text",
             "run_checks",
