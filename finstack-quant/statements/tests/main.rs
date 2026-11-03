@@ -47,6 +47,8 @@ mod functions_all;
 mod integration_all;
 #[path = "market_standards_tests.rs"]
 mod market_standards_tests;
+#[path = "monte_carlo_capital_structure.rs"]
+mod monte_carlo_capital_structure;
 #[path = "production_reporting_audit.rs"]
 mod production_reporting_audit;
 #[path = "proptest_evaluator.rs"]
