@@ -5228,8 +5228,7 @@ export interface RecoveryClaim {
    */
   accrued: number;
   /**
-   * Collateral haircut as a decimal fraction between 0 and 1 inclusive
-   * (0.25 removes a quarter of the collateral value).
+   * Collateral haircut as a decimal fraction between 0 and 1 inclusive.
    */
   collateral_haircut: number;
   /**

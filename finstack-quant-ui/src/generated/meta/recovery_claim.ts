@@ -15,7 +15,7 @@ export default [
   {
     "path": "#/properties/collateral_haircut",
     "source": "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json#/properties/collateral_haircut",
-    "description": "Collateral haircut as a decimal fraction between 0 and 1 inclusive\n(0.25 removes a quarter of the collateral value).",
+    "description": "Collateral haircut as a decimal fraction between 0 and 1 inclusive.",
     "format": "double"
   },
   {
