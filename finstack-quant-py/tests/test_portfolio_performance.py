@@ -36,6 +36,7 @@ def test_twrr_linked_binding_geometrically_links_returns() -> None:
 
     assert result["cumulative"] == pytest.approx(0.0815, abs=1e-12)
     assert result["annualised"] == pytest.approx(0.0815, abs=1e-12)
+    assert result["is_annualised"] is True
     assert result["num_periods"] == 2
 
 

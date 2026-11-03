@@ -419,7 +419,16 @@
         }
       ],
       "position_residual_contributions": []
-    }
+    },
+    "twrr_returns": [
+      0.05,
+      0.03,
+      -0.02
+    ],
+    "twrr_horizons": [
+      2.0,
+      0.5
+    ]
   },
   "expected": {
     "allocate_weights": {
@@ -1308,6 +1317,20 @@
       "linked_allocation": 0.01147930641935815,
       "linked_selection": 0.016407470552326213,
       "linked_interaction": 0.015561487028315644
-    }
+    },
+    "twrr_linked": [
+      {
+        "cumulative": 0.05987000000000009,
+        "annualised": 0.029499878581828787,
+        "is_annualised": true,
+        "num_periods": 3
+      },
+      {
+        "cumulative": 0.05987000000000009,
+        "annualised": 0.05987000000000009,
+        "is_annualised": false,
+        "num_periods": 3
+      }
+    ]
   }
 }

@@ -1772,7 +1772,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/linked_return.schema.json",
             "type_name": "LinkedReturn",
             "kind": "output",
-            "bytes": 994
+            "bytes": 1382
           },
           {
             "path": "schemas/portfolio/1/market_factor_key.schema.json",
@@ -4407,7 +4407,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/linked_return.schema.json",
             "type_name": "LinkedReturn",
             "kind": "output",
-            "bytes": 994
+            "bytes": 1382
           },
           {
             "domain": "portfolio",

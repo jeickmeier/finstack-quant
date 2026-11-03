@@ -177,8 +177,13 @@ pub struct LinkedReturn {
     /// Cumulative return over the full horizon: `Π(1 + r_i) − 1`.
     pub cumulative: f64,
     /// Annualised return assuming the supplied `horizon_years` covers
-    /// the full sequence of periods.
+    /// the full sequence of periods; equal to `cumulative` when
+    /// `is_annualised` is false.
     pub annualised: f64,
+    /// Whether `annualised` was annualised: true when `horizon_years` is at
+    /// least one year. Shorter (or non-positive) horizons are reported
+    /// cumulatively per GIPS 2020, so `annualised` then mirrors `cumulative`.
+    pub is_annualised: bool,
     /// Number of sub-periods linked.
     pub num_periods: usize,
 }
@@ -218,7 +223,8 @@ pub struct DatedCashflow {
 /// comparable across calendar regimes. Pass `0.0` (or any non-positive
 /// value) to skip annualization and return only the cumulative figure. Per GIPS
 /// 2020, horizons shorter than one year are also reported as cumulative rather
-/// than annualized. In those cases the `annualised` field mirrors `cumulative`.
+/// than annualized. In those cases the `annualised` field mirrors `cumulative`
+/// and `is_annualised` is false, so a report can say which figure it shows.
 ///
 /// # Arguments
 ///
@@ -255,7 +261,8 @@ pub fn twrr_linked(
         )));
     }
     let cumulative = growth - 1.0;
-    let annualised = if horizon_years >= 1.0 {
+    let is_annualised = horizon_years >= 1.0;
+    let annualised = if is_annualised {
         growth.powf(1.0 / horizon_years) - 1.0
     } else {
         cumulative
@@ -263,6 +270,7 @@ pub fn twrr_linked(
     Ok(LinkedReturn {
         cumulative,
         annualised,
+        is_annualised,
         num_periods: periods.len(),
     })
 }
@@ -393,6 +401,7 @@ mod tests {
         let linked = twrr_linked(&[0.05, 0.03], 1.0).expect("finite");
         assert!((linked.cumulative - 0.0815).abs() < 1e-12);
         assert!((linked.annualised - 0.0815).abs() < 1e-12);
+        assert!(linked.is_annualised, "a one-year horizon is annualised");
         assert_eq!(linked.num_periods, 2);
     }
 
@@ -402,6 +411,7 @@ mod tests {
         let linked = twrr_linked(&[0.10], 2.0).expect("finite");
         // annualised = (1.10)^(1/2) − 1 ≈ 4.88088%
         assert!((linked.annualised - 0.04880884817015154).abs() < 1e-12);
+        assert!(linked.is_annualised);
     }
 
     #[test]
@@ -412,6 +422,16 @@ mod tests {
             linked.annualised, linked.cumulative,
             "minor 7: sub-one-year horizons should report cumulative return"
         );
+        assert!(
+            !linked.is_annualised,
+            "the flag says the figure is cumulative"
+        );
+        let skipped = twrr_linked(&[0.10], 0.0).expect("finite");
+        assert!(
+            !skipped.is_annualised,
+            "a non-positive horizon skips annualization"
+        );
+        assert_eq!(skipped.annualised, skipped.cumulative);
     }
 
     /// Non-finite period → validation error.

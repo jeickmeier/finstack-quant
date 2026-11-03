@@ -45,6 +45,12 @@ impl PyLinkedReturn {
         self.inner.annualised
     }
 
+    /// Whether ``annualised`` was annualised: true for horizons of at least one year.
+    #[getter]
+    fn is_annualised(&self) -> bool {
+        self.inner.is_annualised
+    }
+
     /// Number of sub-periods linked.
     #[getter]
     fn num_periods(&self) -> usize {
@@ -53,19 +59,22 @@ impl PyLinkedReturn {
 
     /// Single-row :class:`pandas.DataFrame` view of the linked return.
     ///
-    /// Columns: ``cumulative``, ``annualised``, ``num_periods``.
+    /// Columns: ``cumulative``, ``annualised``, ``is_annualised``, ``num_periods``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe_with_schema(
             py,
             &self.inner,
-            &["cumulative", "annualised", "num_periods"],
+            &["cumulative", "annualised", "is_annualised", "num_periods"],
         )
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "LinkedReturn(cumulative={}, annualised={}, num_periods={})",
-            self.inner.cumulative, self.inner.annualised, self.inner.num_periods,
+            "LinkedReturn(cumulative={}, annualised={}, is_annualised={}, num_periods={})",
+            self.inner.cumulative,
+            self.inner.annualised,
+            self.inner.is_annualised,
+            self.inner.num_periods,
         )
     }
 }
@@ -118,7 +127,8 @@ fn twrr_modified_dietz(py: Python<'_>, period: &Bound<'_, PyAny>) -> PyResult<f6
 /// Returns
 /// -------
 /// LinkedReturn
-///     Typed result with ``cumulative``, ``annualised`` and ``num_periods``.
+///     Typed result with ``cumulative``, ``annualised``, ``is_annualised``
+///     and ``num_periods``.
 ///     Use :meth:`to_json` for the raw wire string.
 ///
 /// Raises

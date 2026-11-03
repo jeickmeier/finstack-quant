@@ -38,6 +38,7 @@ from finstack_quant.portfolio import (
     brinson_linked,
     build_credit_vol_report,
     scenario_pnl_batch,
+    twrr_linked,
     value_portfolio,
 )
 
@@ -203,6 +204,8 @@ def _inputs() -> dict[str, Any]:
             ],
             "position_residual_contributions": [],
         },
+        "twrr_returns": [0.05, 0.03, -0.02],
+        "twrr_horizons": [2.0, 0.5],
     }
 
 
@@ -249,6 +252,10 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
         "metrics_position_dv01": None if position_metrics is None else position_metrics["metrics"]["dv01"],
         "builder_spec": json.loads(_built_portfolio(inputs).to_json()),
         "brinson_linked": json.loads(brinson_linked(inputs["brinson_periods"]).to_json()),
+        "twrr_linked": [
+            json.loads(twrr_linked(json.dumps(inputs["twrr_returns"]), horizon).to_json())
+            for horizon in inputs["twrr_horizons"]
+        ],
     }
 
 
