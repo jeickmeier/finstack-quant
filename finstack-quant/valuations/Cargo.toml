@@ -82,6 +82,10 @@ name = "bond_pricing"
 harness = false
 
 [[bench]]
+name = "bond_rates_credit"
+harness = false
+
+[[bench]]
 name = "bond_future_bench"
 harness = false
 

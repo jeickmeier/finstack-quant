@@ -342,6 +342,172 @@ pub(super) struct StepReplay {
     pub(super) cumulative_distribution_target_pv: f64,
 }
 
+/// Weights of one lattice interval under the run's OAS.
+#[derive(Clone, Copy)]
+pub(super) struct IntervalTerms {
+    /// Risk-free-plus-OAS discount factor times interval survival.
+    pub(super) risky_df: f64,
+    /// Discounted default weight of the interval (`continuous_frp_weight`).
+    pub(super) frp_weight: f64,
+}
+
+/// [`IntervalTerms`] of the rate nodes paths usually visit, when survival over
+/// each interval does not depend on the path. Each interval pays two logarithms
+/// and an `expm1`, and tens of thousands of paths cross the same few nodes.
+pub(super) struct IntervalTable {
+    starts: Vec<usize>,
+    lows: Vec<usize>,
+    terms: Vec<IntervalTerms>,
+}
+
+impl IntervalTable {
+    #[inline]
+    fn get(&self, step: usize, rate_node: usize) -> Option<IntervalTerms> {
+        let offset = rate_node.checked_sub(*self.lows.get(step)?)?;
+        let end = self
+            .starts
+            .get(step + 1)
+            .copied()
+            .unwrap_or(self.terms.len());
+        let index = self.starts[step] + offset;
+        // A NaN weight marks a node whose weight failed; recomputing it on
+        // demand reports that failure only if a path reaches the node.
+        (index < end)
+            .then(|| self.terms[index])
+            .filter(|terms| !terms.frp_weight.is_nan())
+    }
+}
+
+/// Everything one pricing run reuses across paths: the replay's arithmetic with
+/// the run's OAS, minus whatever depends on the sampled path.
+pub(super) struct ReplayTerms {
+    /// `exp(-oas * dt)` per interval.
+    oas_df: Vec<f64>,
+    /// Product state per step, when no coupon re-fixes on the path: a fixed
+    /// coupon bond's balance and cash are the same on every path.
+    static_steps: Option<Vec<StepReplay>>,
+    /// Tabulated interval weights, when hazard is deterministic and rates are
+    /// not.
+    intervals: Option<IntervalTable>,
+}
+
+impl ReplayTerms {
+    pub(super) fn new(
+        template: &ReplayTemplate,
+        tree: &RatesCreditTree,
+        bond: &Bond,
+        config: &BondLsmcConfig,
+    ) -> Result<Self> {
+        let oas = config.oas_bp / 10_000.0;
+        let oas_df = template
+            .times
+            .windows(2)
+            .map(|pair| (-oas * (pair[1] - pair[0])).exp())
+            .collect::<Vec<_>>();
+        let static_steps = if template.floating.is_empty() {
+            let mut cursor = ReplayCursor::new(template)?;
+            Some(
+                (0..template.times.len())
+                    .map(|step| cursor.advance_step(template, bond, &[], config, step))
+                    .collect::<Result<Vec<_>>>()?,
+            )
+        } else {
+            None
+        };
+        let model = tree.get_config();
+        let intervals = if model.hazard_vol == 0.0 && model.rate_vol > 0.0 {
+            let mut table = IntervalTable {
+                starts: Vec::with_capacity(oas_df.len()),
+                lows: Vec::with_capacity(oas_df.len()),
+                terms: Vec::new(),
+            };
+            for (step, &oas_df) in oas_df.iter().enumerate() {
+                let nodes = tree.usual_rate_nodes(step);
+                table.starts.push(table.terms.len());
+                table.lows.push(nodes.start);
+                for node in nodes {
+                    let factor = tree.state_at(step, node, 0)?;
+                    let interval_df = factor.discount_to_next * oas_df;
+                    table.terms.push(IntervalTerms {
+                        risky_df: interval_df * factor.survival_to_next,
+                        frp_weight: continuous_frp_weight(interval_df, factor.survival_to_next)
+                            .unwrap_or(f64::NAN),
+                    });
+                }
+            }
+            Some(table)
+        } else {
+            None
+        };
+        Ok(Self {
+            oas_df,
+            static_steps,
+            intervals,
+        })
+    }
+
+    /// The same terms with every table off, as a reference for tests.
+    #[cfg(test)]
+    pub(super) fn without_tables(mut self) -> Self {
+        self.static_steps = None;
+        self.intervals = None;
+        self
+    }
+
+    /// Product state at `step`, advancing `cursor` when it depends on the path.
+    #[inline]
+    pub(super) fn advance(
+        &self,
+        cursor: &mut ReplayCursor,
+        template: &ReplayTemplate,
+        bond: &Bond,
+        path: &[RatesCreditPathState],
+        config: &BondLsmcConfig,
+        step: usize,
+    ) -> Result<StepReplay> {
+        match &self.static_steps {
+            Some(steps) => Ok(steps[step]),
+            None => cursor.advance_step(template, bond, path, config, step),
+        }
+    }
+
+    /// Whether the replay keeps no per-path step states.
+    pub(super) fn product_is_static(&self) -> bool {
+        self.static_steps.is_some()
+    }
+
+    /// State of `step` from the static table, or from a path's own record.
+    #[inline]
+    pub(super) fn step_state(
+        &self,
+        recorded: &[StepReplay],
+        low_step: usize,
+        step: usize,
+    ) -> StepReplay {
+        match &self.static_steps {
+            Some(steps) => steps[step],
+            None => recorded[step - low_step],
+        }
+    }
+
+    /// Weights of the interval starting at `factor`.
+    #[inline]
+    pub(super) fn interval(&self, factor: &RatesCreditPathState) -> Result<IntervalTerms> {
+        if let Some(terms) = self
+            .intervals
+            .as_ref()
+            .and_then(|table| table.get(factor.step, factor.rate_node))
+        {
+            return Ok(terms);
+        }
+        let interval_df = factor.discount_to_next * self.oas_df[factor.step];
+        Ok(IntervalTerms {
+            risky_df: interval_df * factor.survival_to_next,
+            frp_weight: continuous_frp_weight(interval_df, factor.survival_to_next)?,
+        })
+    }
+}
+
 pub(super) struct ExerciseInputs<'a> {
     pub(super) bond: &'a Bond,
     pub(super) step: usize,

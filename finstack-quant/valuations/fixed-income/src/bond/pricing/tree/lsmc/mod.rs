@@ -63,6 +63,10 @@ const TRAINING_DOMAIN: &str = "bond_hazard_lsmc_training";
 const MAKE_WHOLE_TRAINING_DOMAIN: &str = "bond_hazard_lsmc_make_whole_training";
 const PRICING_DOMAIN: &str = "bond_hazard_lsmc_pricing";
 const FEATURE_COUNT: usize = 8;
+/// Decision snapshots one training block may hold before training is split into
+/// checkpointed blocks. A few exercise dates fit in one block, which needs no
+/// checkpoint pass and so samples every training path once instead of twice.
+const MAX_BLOCK_SNAPSHOTS: usize = 1 << 20;
 
 /// Runtime controls for bond LSMC.
 #[derive(Debug, Clone, Copy)]
@@ -215,14 +219,15 @@ pub(crate) fn price_bond_lsmc(
     } else {
         0
     };
+    let terms = ReplayTerms::new(&template, tree, bond, config)?;
     let make_whole_policies = fit_make_whole_policies(
         tree,
         &template,
         bond,
         config,
         make_whole_seed,
-        make_whole_training_paths,
         make_whole_training_simulated_paths,
+        &terms,
     )?;
     let policies = if needs_training {
         fit_policies(
@@ -231,57 +236,58 @@ pub(crate) fn price_bond_lsmc(
             bond,
             config,
             train_seed,
-            training_estimators,
             training_simulated_paths,
             &make_whole_policies,
+            &terms,
         )?
     } else {
         vec![None; template.decision_steps.len()]
     };
 
     // Pricing estimators are independent: each draws its own factor path
-    // stream. They run in parallel and are folded into the statistics in
-    // path order, so the estimate is bit-identical to a serial run.
+    // stream, and they are folded into the statistics in path order, so the
+    // estimate is bit-identical to a serial run.
     let make_whole_policies = make_whole_policies.as_slice();
     let policies = policies.as_slice();
     let template = &template;
-    let price_estimator = |(sampled, buffers): &mut (Vec<RatesCreditPathState>, ReplayBuffers),
-                           path_index: usize|
-     -> Result<f64> {
-        tree.sample_path_into(pricing_seed, path_index as u64, false, sampled)?;
-        let primary = value_with_policy(
-            &template.replay(bond, sampled, config, Some(make_whole_policies), buffers)?,
-            policies,
-        )?;
-        if !config.antithetic {
-            return Ok(primary);
-        }
-        tree.sample_path_into(pricing_seed, path_index as u64, true, sampled)?;
-        let antithetic = value_with_policy(
-            &template.replay(bond, sampled, config, Some(make_whole_policies), buffers)?,
-            policies,
-        )?;
-        Ok(0.5 * (primary + antithetic))
-    };
-    let init_buffers = || (Vec::new(), ReplayBuffers::default());
-    #[cfg(not(target_arch = "wasm32"))]
-    let estimators: Vec<Result<f64>> = {
-        use rayon::prelude::*;
-        (0..pricing_estimators)
-            .into_par_iter()
-            .map_init(init_buffers, price_estimator)
-            .collect()
-    };
-    #[cfg(target_arch = "wasm32")]
-    let estimators: Vec<Result<f64>> = {
-        let mut buffers = init_buffers();
-        (0..pricing_estimators)
-            .map(|path_index| price_estimator(&mut buffers, path_index))
-            .collect()
-    };
+    let terms = &terms;
+    let estimators = map_paths(
+        pricing_estimators,
+        || (Vec::new(), ReplayBuffers::default()),
+        |(sampled, buffers), path_index| {
+            tree.sample_path_into(pricing_seed, path_index as u64, false, sampled)?;
+            let primary = value_with_policy(
+                &template.replay(
+                    bond,
+                    sampled,
+                    config,
+                    Some(make_whole_policies),
+                    terms,
+                    buffers,
+                )?,
+                policies,
+            )?;
+            if !config.antithetic {
+                return Ok(primary);
+            }
+            tree.sample_path_into(pricing_seed, path_index as u64, true, sampled)?;
+            let antithetic = value_with_policy(
+                &template.replay(
+                    bond,
+                    sampled,
+                    config,
+                    Some(make_whole_policies),
+                    terms,
+                    buffers,
+                )?,
+                policies,
+            )?;
+            Ok(0.5 * (primary + antithetic))
+        },
+    )?;
     let mut stats = OnlineStats::new();
     for estimator in estimators {
-        stats.update(estimator?);
+        stats.update(estimator);
     }
 
     if let Some(target) = config.target_ci_half_width {
@@ -308,6 +314,30 @@ pub(crate) fn price_bond_lsmc(
     })
 }
 
+/// Run `work` for each path index, in parallel where the target allows, and
+/// return the results in path order, so consumers fold them exactly as a serial
+/// loop would. The lowest-indexed failure is the one reported.
+fn map_paths<T: Send, S>(
+    paths: usize,
+    init: impl Fn() -> S + Send + Sync,
+    work: impl Fn(&mut S, usize) -> Result<T> + Send + Sync,
+) -> Result<Vec<T>> {
+    #[cfg(not(target_arch = "wasm32"))]
+    let results: Vec<Result<T>> = {
+        use rayon::prelude::*;
+        (0..paths)
+            .into_par_iter()
+            .map_init(init, |state, path| work(state, path))
+            .collect()
+    };
+    #[cfg(target_arch = "wasm32")]
+    let results: Vec<Result<T>> = {
+        let mut state = init();
+        (0..paths).map(|path| work(&mut state, path)).collect()
+    };
+    results.into_iter().collect()
+}
+
 fn simulated_path_count(estimators: usize, antithetic: bool) -> Result<usize> {
     if antithetic {
         estimators.checked_mul(2).ok_or_else(|| {
@@ -327,7 +357,7 @@ fn training_block_len(decision_count: usize) -> usize {
     ((decision_count.max(1) as f64).sqrt().ceil() as usize).max(1)
 }
 
-fn training_boundaries(template: &ReplayTemplate) -> Result<Vec<usize>> {
+fn training_boundaries(template: &ReplayTemplate, simulated_paths: usize) -> Result<Vec<usize>> {
     let transitions = template
         .decision_steps
         .len()
@@ -335,7 +365,11 @@ fn training_boundaries(template: &ReplayTemplate) -> Result<Vec<usize>> {
         .ok_or_else(|| {
             Error::Internal("bond hazard LSMC requires at least one decision transition".into())
         })?;
-    let block_len = training_block_len(transitions);
+    let block_len = if transitions.saturating_mul(simulated_paths) <= MAX_BLOCK_SNAPSHOTS {
+        transitions.max(1)
+    } else {
+        training_block_len(transitions)
+    };
     let mut boundaries = Vec::with_capacity(transitions.div_ceil(block_len) + 1);
     boundaries.push(0);
     let mut decision = 0;
@@ -353,55 +387,64 @@ fn build_training_checkpoints(
     bond: &Bond,
     config: &BondLsmcConfig,
     seed: u64,
-    estimators: usize,
     simulated_paths: usize,
     boundaries: &[usize],
+    terms: &ReplayTerms,
 ) -> Result<Vec<Vec<TrainingCheckpoint>>> {
+    let origin = || -> Result<TrainingCheckpoint> {
+        Ok(TrainingCheckpoint {
+            factor: RatesCreditPathCheckpoint {
+                step: 0,
+                rate_node: 0,
+                hazard_node: 0,
+            },
+            product: ReplayCursor::new(template)?.checkpoint(),
+        })
+    };
+    // One block starts at the origin, where every path stands in the same
+    // state, and its end boundary is never replayed from.
+    if let [0, _] = boundaries {
+        return Ok(vec![vec![origin()?; simulated_paths], Vec::new()]);
+    }
+    let per_path = map_paths(simulated_paths, Vec::new, |sampled, physical| {
+        let (path_index, antithetic) = physical_path_identity(physical, config.antithetic);
+        tree.sample_path_into(seed, path_index, antithetic, sampled)?;
+        let mut cursor = ReplayCursor::new(template)?;
+        let mut captured = Vec::with_capacity(boundaries.len());
+        let mut boundary_index = 0_usize;
+        for step in 0..template.times.len() {
+            while boundary_index < boundaries.len()
+                && template.decision_steps[boundaries[boundary_index]] == step
+            {
+                let prefix_step = step.saturating_sub(template.max_rate_history_steps);
+                let factor = sampled.get(prefix_step).ok_or_else(|| {
+                    Error::Internal(
+                        "bond hazard LSMC checkpoint prefix is outside sampled path".into(),
+                    )
+                })?;
+                captured.push(TrainingCheckpoint {
+                    factor: RatesCreditPathCheckpoint::from(factor),
+                    product: cursor.checkpoint(),
+                });
+                boundary_index += 1;
+            }
+            terms.advance(&mut cursor, template, bond, sampled, config, step)?;
+        }
+        if boundary_index != boundaries.len() {
+            return Err(Error::Internal(
+                "bond hazard LSMC failed to capture every training boundary".into(),
+            ));
+        }
+        Ok(captured)
+    })?;
     let mut checkpoints = boundaries
         .iter()
         .map(|_| Vec::with_capacity(simulated_paths))
         .collect::<Vec<_>>();
-    let mut sampled = Vec::new();
-    for path_index in 0..estimators {
-        for antithetic in [false, true]
-            .into_iter()
-            .take(if config.antithetic { 2 } else { 1 })
-        {
-            tree.sample_path_into(seed, path_index as u64, antithetic, &mut sampled)?;
-            let mut cursor = ReplayCursor::new(template)?;
-            let mut boundary_index = 0_usize;
-            for step in 0..template.times.len() {
-                while boundary_index < boundaries.len()
-                    && template.decision_steps[boundaries[boundary_index]] == step
-                {
-                    let prefix_step = step.saturating_sub(template.max_rate_history_steps);
-                    let factor = sampled.get(prefix_step).ok_or_else(|| {
-                        Error::Internal(
-                            "bond hazard LSMC checkpoint prefix is outside sampled path".into(),
-                        )
-                    })?;
-                    checkpoints[boundary_index].push(TrainingCheckpoint {
-                        factor: RatesCreditPathCheckpoint::from(factor),
-                        product: cursor.checkpoint(),
-                    });
-                    boundary_index += 1;
-                }
-                cursor.advance_step(template, bond, &sampled, config, step)?;
-            }
-            if boundary_index != boundaries.len() {
-                return Err(Error::Internal(
-                    "bond hazard LSMC failed to capture every training boundary".into(),
-                ));
-            }
+    for captured in per_path {
+        for (boundary, checkpoint) in checkpoints.iter_mut().zip(captured) {
+            boundary.push(checkpoint);
         }
-    }
-    if checkpoints
-        .iter()
-        .any(|boundary| boundary.len() != simulated_paths)
-    {
-        return Err(Error::Internal(
-            "bond hazard LSMC checkpoint count does not match physical path count".into(),
-        ));
     }
     Ok(checkpoints)
 }
