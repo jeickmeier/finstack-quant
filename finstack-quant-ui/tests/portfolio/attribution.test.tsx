@@ -178,6 +178,49 @@ it("shows the book total, Rust's reconciliation and every Rust bucket as returne
   ).toContain(data.explain);
   expect(screen.queryAllByRole("alert")).toEqual([]);
 });
+it(
+  "returns through the real worker Rust's verdict at an exact host tolerance",
+  async () => {
+    const { exact } = fixture;
+    const result = await proxy().attributePortfolioPnl({
+      ...requestFor("usd-ois-50bp", "metrics_based"),
+      reconciliationTolerance: exact.reconciliationTolerance,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok)
+      expect(serializeHost(result.value)).toBe(serializeHost(exact.report));
+  },
+  budget(30000),
+);
+it("says when Rust does not reconcile the book, and which positions' residuals fail", async () => {
+  const data = fixture.exact.report as unknown as PortfolioAttributionData;
+  expect(data.reconciliation.is_reconciled).toBe(false);
+  render(<PortfolioAttributionReport report={data} />);
+  const view = screen.getByRole("region", { name: "Portfolio attribution" });
+  const reconciliation = within(view).getByLabelText("Reconciliation");
+  expect(within(reconciliation).getByText("Not reconciled")).toBeTruthy();
+  expect(within(reconciliation).queryByText("Reconciled")).toBeNull();
+  const failing = data.positions.findIndex(
+    (position) => !position.residualWithinTolerance,
+  );
+  expect(failing).toBeGreaterThanOrEqual(0);
+  if (failing > 0)
+    await userEvent.click(
+      rowsOf(
+        within(screen.getByRole("region", { name: "Positions" })).getByRole(
+          "table",
+        ),
+      )[failing]!.cells[0]!,
+    );
+  const detail = screen.getByRole("region", {
+    name: `Position ${data.positions[failing]!.positionId}`,
+  });
+  expect(
+    within(within(detail).getByLabelText("Residual")).getByText(
+      "Residual outside tolerance",
+    ),
+  ).toBeTruthy();
+});
 it("draws each position by the book's buckets from its own Rust buckets and drills into one", async () => {
   const data = report("waterfall");
   render(<PortfolioAttributionReport report={data} />);

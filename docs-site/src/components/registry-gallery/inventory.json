@@ -1838,7 +1838,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/attribution/cases.json",
-      "sha256": "9200e89d0a14c0c1ddcd84477f6061c7e6fde3ba4b74dddefff87cc41051603a"
+      "sha256": "ba2e1619d959df22fa4f12776a96861f05117c1f415799fb3d43772566910747"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",
