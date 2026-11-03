@@ -106,7 +106,8 @@ To add an item (the gate that catches each omission is in brackets):
    `planned` to `covered` in `facade-coverage.json`. That file also lists
    each excluded key with one reason from the closed set `listedReasons` in
    `scripts/coverage.mjs`, which defines each: `data-constructor` (builds a
-   plain value from fields or a label), `schema-form` (an enum variant or
+   plain value from fields or a label, or is a handle class whose other
+   members only read back what it was built from), `schema-form` (an enum variant or
    preset a schema form builds), `setter` (a copy with fields set), `getter`
    (reads one stored field or entry), `validator` (a shape check returning
    nothing or canonical JSON) and `performance-duplicate` (an `analytics`
