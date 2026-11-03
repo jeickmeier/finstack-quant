@@ -592,6 +592,17 @@ const displays = [
       "Returned models.credit.liabilityManagement.analyzeExchangeOffer and analyzeLme results as Rust returned them. The tender recommendation is Rust's tender_recommended field; tenderRecommendationHurdle shows beside it as supplied and is never compared here. Amounts are in one caller-defined unit with no currency conversion; percentages are fractions and leverage a multiple. The LME price input is a price, an extension fee or a transferred-asset fraction by structure, as the facade documents.",
   },
   {
+    id: "recovery-waterfall",
+    api: [
+      "models.credit.recoveryWaterfall.allocateRecovery",
+      "CreditRecoveryWaterfallNamespace",
+      "allocateRecovery",
+    ],
+    route: "returned-model",
+    convention:
+      "Returned models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.workoutLgd and seniorityRecoveryStats results as Rust returned them. Allocations are in Rust's priority-then-entry order; each claim's total, collateral and general recovery, recovery rate and deficiency, and the estate's distributed and undistributed totals, are Rust's fields, never summed or divided here. Amounts are in one caller-defined unit with no currency conversion; rates are fractions. Seniority classes and collateral types are the generated SeniorityClass and WorkoutCollateralType contracts; calibration ids are seniorityCalibrationIds, default first. A class a calibration lacks shows Rust's error.",
+  },
+  {
     id: "option-calculator",
     api: ["models.bsPrice", "ModelsNamespace", "bsPrice"],
     route: "returned-model",

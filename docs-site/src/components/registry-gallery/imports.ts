@@ -354,6 +354,13 @@ export const importHarnesses = {
       name: "use-liability-management",
       modules: modules.length,
     })),
+  "use-recovery-waterfall": () =>
+    Promise.all([
+      import("@/hooks/models/use-recovery-waterfall/use-recovery-waterfall"),
+    ]).then((modules) => ({
+      name: "use-recovery-waterfall",
+      modules: modules.length,
+    })),
   "use-option-calculator": () =>
     Promise.all([
       import("@/hooks/models/use-option-calculator/use-option-calculator"),
@@ -1673,6 +1680,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/ohlson_o_score_input"),
     ]).then((modules) => ({
       name: "contract-ohlson-o-score-input",
+      modules: modules.length,
+    })),
+  "contract-seniority-calibration": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/seniority_calibration.json"),
+      import("@/lib/finstack/generated/types/seniority_calibration"),
+      import("@/lib/finstack/generated/meta/seniority_calibration"),
+    ]).then((modules) => ({
+      name: "contract-seniority-calibration",
+      modules: modules.length,
+    })),
+  "contract-workout-lgd": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/workout_lgd.json"),
+      import("@/lib/finstack/generated/types/workout_lgd"),
+      import("@/lib/finstack/generated/meta/workout_lgd"),
+    ]).then((modules) => ({
+      name: "contract-workout-lgd",
       modules: modules.length,
     })),
   "contract-zmijewski-input": () =>

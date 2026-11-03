@@ -54,6 +54,7 @@ const sources = {
   positionRisk: "tests/models/risk/cases.json",
   options: "tests/models/options/cases.json",
   liabilityManagement: "tests/models/liability-management/cases.json",
+  recovery: "tests/models/recovery/cases.json",
   simm: "src/fixtures/margin/simm.json",
   vm: "src/fixtures/margin/vm.json",
   portfolioValuation: "tests/portfolio/gallery.json",

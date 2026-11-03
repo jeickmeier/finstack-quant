@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Models: recovery waterfall in the UI
+
+The `recovery-waterfall` registry component and `use-recovery-waterfall` hooks draw `models.credit.recoveryWaterfall.allocateRecovery` (Rust's per-claim allocations with recovery rates and deficiencies, and the estate's distributed and undistributed totals), `models.credit.lgd.workoutLgd` and `seniorityRecoveryStats`. Collateral types and seniority classes come from the generated `workout_lgd` and `seniority_calibration` contracts, now UI schema roots, and the calibration choice from `seniorityCalibrationIds`.
+
 ### Models: seniority calibration ids
 
 `seniority_calibration_ids()` (Python `models.credit.lgd.seniority_calibration_ids`, WASM `models.credit.lgd.seniorityCalibrationIds`) lists the seniority recovery calibrations of the embedded credit registry, the default first, so a host can offer the exact ids `seniority_recovery_stats` accepts without holding its own list.

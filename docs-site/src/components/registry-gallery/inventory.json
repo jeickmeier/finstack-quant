@@ -469,6 +469,12 @@
       "worker": "none"
     },
     {
+      "name": "recovery-waterfall",
+      "type": "registry:component",
+      "docs": "Three forms. Recovery waterfall: an estate value and claims (id, a free-text seniority label, integer priority, principal, accrued, penalties, an optional collateral value and its haircut), with Rust's allocations in its priority-then-entry order (total claim, collateral and general recovery, total recovery, recovery rate and deficiency per claim) and the estate's total distributed, undistributed estate and apr_satisfied. Workout LGD: EAD, direct and indirect cost fractions, years to resolution, a discount rate and collateral pieces whose types come from the generated WorkoutCollateralType contract, with the returned net recovery, LGD and recovery rate. Recovery by seniority: a class from the generated SeniorityClass contract and a calibration from the supplied calibrationIds (Rust's seniorityCalibrationIds, default first), with the Beta distribution's mean, standard deviation, variance, shape parameters, mode and mean LGD. Nothing is summed, divided or ranked here; amounts use one unit you choose and rates are fractions. An empty amount is sent as NaN for Rust to reject, an empty collateral value is an unsecured claim, and each analysis shows its own native error, including a class a calibration lacks. Accepts defaultWaterfall, defaultWorkout, defaultSeniority, onWaterfallSubmit, onWorkoutSubmit, onStatsSubmit, waterfall, workout, stats, calibrationIds, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "option-calculator",
       "type": "registry:component",
       "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. A price Rust cannot invert is the whole error; Greeks Rust rejects (at zero volatility under Black-Scholes) show their native error beside the price. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
@@ -852,6 +858,10 @@
     },
     {
       "name": "use-liability-management",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-recovery-waterfall",
       "type": "registry:hook"
     },
     {
@@ -1423,6 +1433,14 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-seniority-calibration",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-workout-lgd",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-zmijewski-input",
       "type": "registry:lib"
     },
@@ -1679,6 +1697,10 @@
     {
       "path": "finstack-quant-ui/tests/models/liability-management/cases.json",
       "sha256": "6f51a7c35d8889becbb50185a69a67e4a744c692a82d85d261b9594cc9a872bf"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/recovery/cases.json",
+      "sha256": "eb71abd4d2a7034f9fc9559312fccc4c68a2f775a066e38eeb364924ba7bfda5"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/margin/simm.json",

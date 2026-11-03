@@ -490,6 +490,16 @@
     "schema": "schemas/ohlson_o_score_input.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/models/1/seniority_calibration.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/seniority_calibration.schema.json",
+    "schema": "schemas/seniority_calibration.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/models/1/workout_lgd.schema.json",
+    "source": "finstack-quant/models/schemas/models/1/workout_lgd.schema.json",
+    "schema": "schemas/workout_lgd.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/models/1/zmijewski_input.schema.json",
     "source": "finstack-quant/models/schemas/models/1/zmijewski_input.schema.json",
     "schema": "schemas/zmijewski_input.json"

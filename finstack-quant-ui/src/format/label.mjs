@@ -8,6 +8,7 @@
 const acronyms = new Set([
   "abf",
   "abs",
+  "apr",
   "asw",
   "atm",
   "bf",
@@ -37,6 +38,7 @@ const acronyms = new Set([
   "irr",
   "irs",
   "isda",
+  "lgd",
   "libor",
   "lme",
   "lp",

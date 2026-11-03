@@ -4192,6 +4192,72 @@
       }
     },
     {
+      "name": "contract-seniority-calibration",
+      "type": "registry:lib",
+      "title": "Seniority calibration contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust seniority_calibration contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/seniority_calibration.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/seniority_calibration.json"
+        },
+        {
+          "path": "src/generated/types/seniority_calibration.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/seniority_calibration.ts"
+        },
+        {
+          "path": "src/generated/meta/seniority_calibration.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/seniority_calibration.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/seniority_calibration.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-workout-lgd",
+      "type": "registry:lib",
+      "title": "Workout LGD contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust workout_lgd contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/workout_lgd.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/workout_lgd.json"
+        },
+        {
+          "path": "src/generated/types/workout_lgd.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/workout_lgd.ts"
+        },
+        {
+          "path": "src/generated/meta/workout_lgd.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/workout_lgd.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/workout_lgd.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-zmijewski-input",
       "type": "registry:lib",
       "title": "Zmijewski input contract",
