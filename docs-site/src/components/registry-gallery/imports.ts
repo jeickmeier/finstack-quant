@@ -313,6 +313,13 @@ export const importHarnesses = {
       name: "use-attribute-portfolio-pnl",
       modules: modules.length,
     })),
+  "use-portfolio-returns": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-portfolio-returns/use-portfolio-returns"),
+    ]).then((modules) => ({
+      name: "use-portfolio-returns",
+      modules: modules.length,
+    })),
   "use-simm-im": () =>
     Promise.all([import("@/hooks/margin/use-simm-im/use-simm-im")]).then(
       (modules) => ({ name: "use-simm-im", modules: modules.length }),

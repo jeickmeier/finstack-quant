@@ -174,10 +174,10 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the thirty-five native fixture generators under
+`mise run ui-fixtures` runs the thirty-six native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
-portfolio → portfolio margin → portfolio workbench; curves → market-browser → curve-query; cubes, calibration,
+portfolio → portfolio margin → portfolio workbench; portfolio returns; curves → market-browser → curve-query; cubes, calibration,
 scenario-table; statements → covenants, normalizations, capital structures, relative value; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
@@ -957,13 +957,16 @@ the book and its context as props: `defaultSpecJson` (a complete
 (`MarketContextState`), `asOf` (the ISO margin date, never read from the
 spec), and optionally `metrics` (omitted is Rust's standard set),
 `seriesBase` (the base metric id charted by bucket), `scenarioJsons`
-(`ScenarioSpec` texts, never parsed), `attribution` and
+(`ScenarioSpec` texts, never parsed), `attribution`, `returns` and
 `currentImCollateral` (omitted is none held). `attribution` is the host's
 closing snapshot for the Attribution tab: `marketT1Json`
 (`MarketContextState`), `asOfT1` (ISO date) and `reconciliationTolerance`
 (base-currency units). Rust has no default for any of them. A closing date
 past a seasoned floating leg's fixing needs that index's `FIXING:` series in
 `marketT1Json`; without it every method returns Rust's missing-fixing error.
+`returns` is the host's performance data for the Returns tab: `linked`
+(sub-period decimal returns and `horizonYears` in 365-day years), `dietz` (one
+`TwrrPeriod`) and `xirr` (dated investor flows); none is derived from the book.
 
 | Tab         | Shows                                                                                                                                                                                                  |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -971,11 +974,12 @@ past a seasoned floating leg's fixing needs that index's `FIXING:` series in
 | Risk        | `PortfolioMetrics` of the same report and, when `seriesBase` is supplied, its `usePortfolioMetricsSeries` series                                                                                       |
 | Scenarios   | `ScenarioPnlTable` of `useScenarioPnlBatch`; the tab is shown only when `scenarioJsons` are supplied                                                                                                   |
 | Attribution | `PortfolioAttributionReport` of `useAttributePortfolioPnl` from `marketJson` on `asOf` to the `attribution` market and date under the method the user picks; shown only when `attribution` is supplied |
+| Returns     | `PortfolioReturns` of `useTwrrLinked`, `useTwrrModifiedDietz` and `useMwrXirr` over the `returns` data, each form resubmittable; shown only when `returns` is supplied                                 |
 | Margin      | `PortfolioMarginReport` of `usePortfolioMargin` on `asOf`                                                                                                                                              |
 | Book        | `PortfolioSpec` JSON that `usePortfolioSpecValidator` validates natively before every tab values it                                                                                                    |
 
-The Scenarios, Attribution and Margin calls run when their tab first opens.
-Later portfolio panels (returns, Brinson, exposures, correlation) add their
+The Scenarios, Attribution, Returns and Margin calls run when their tab first opens.
+Later portfolio panels (Brinson, exposures, correlation) add their
 own tabs when they land. The fixture (`tests/portfolio/workbench/`) is the
 margined rates book from `tests/portfolio/margin/` over the pricing market
 under the host-parity USD-OIS scenarios.
@@ -1001,6 +1005,31 @@ the workbench book to two closing markets the market-scenario cases return: a
 50bp USD-OIS shock on the same date, where all four methods reconcile, and a
 one-month roll with a 25bp shock, where every method returns Rust's
 missing-fixing error for the swaps' SOFR fixing.
+
+## Portfolio returns
+
+`PortfolioReturns` (`@finstack/portfolio-returns`) answers how the book has
+performed from the host's performance data, in three forms, each one native
+call through `@finstack/use-portfolio-returns`. `useTwrrLinked` links
+sub-period decimal returns geometrically over a horizon in 365-day years
+(`portfolio.twrrLinked`) and shows `cumulative`, `annualised`, `is_annualised`
+and `num_periods` as returned; when Rust's `is_annualised` is false (a horizon
+under one year, reported cumulatively per GIPS 2020) the annualised figure is
+the cumulative one and the form says so. `useTwrrModifiedDietz` returns one
+period's Modified-Dietz return (`portfolio.twrrModifiedDietz`, a decimal for
+the period, not annualised) from its beginning and ending values and its
+flows, each with the fraction of the period remaining after it; a
+contribution is positive. `useMwrXirr` returns the annualised money-weighted
+return of dated investor flows (`portfolio.mwrXirr`, a decimal on Act/365F); a
+contribution is negative, and the net flows must change sign exactly once. The
+two flow forms keep their own signs and nothing flips them. The horizon and
+the flow fractions are the host's numbers, never derived from dates in
+JavaScript. An empty field is submitted as NaN, which Rust rejects, and each
+form shows its own native error. The fixture (`tests/portfolio/returns/`)
+holds three annual and three monthly returns, the GIPS Handbook period, a
+withdrawal period, a conventional XIRR stream and the native errors of a
+complete loss, a fraction above one, a non-positive Dietz denominator, a stream
+with two sign changes and a single flow.
 
 ## Returned rating migration
 

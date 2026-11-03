@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: portfolio returns and the workbench Returns tab
+
+`@finstack/portfolio-returns` answers how the book has performed from the host's performance data in three forms, each one native call through `@finstack/use-portfolio-returns`: `twrrLinked` of sub-period decimal returns over a horizon in 365-day years (cumulative, annualised, `is_annualised` and the period count as returned, saying when Rust did not annualise), `twrrModifiedDietz` of one period's values and flows (a decimal for the period; contributions positive) and `mwrXirr` of dated investor flows (an annualised decimal on Act/365F; contributions negative). Nothing is defaulted, derived from dates or sign-flipped, and each form shows its native error. `portfolio-workbench` adds a Returns tab when the host supplies `returns`.
+
 ### Portfolio: linked returns say whether they were annualised
 
 `LinkedReturn` gains `is_annualised`: true when `twrr_linked`'s `horizon_years` is at least one year, false for shorter or non-positive horizons, where `annualised` mirrors `cumulative` (GIPS 2020 reports them cumulatively). A report can now say which figure it shows without restating that rule. Python `LinkedReturn.is_annualised` (and a `to_dataframe` column); WASM `portfolio.twrrLinked` returns the field. The host parity fixture pins a two-year and a half-year link for both hosts. No existing value moves.

@@ -77,6 +77,7 @@ import type {
   core as wire,
   covenants as covenantsWire,
   models as modelsWire,
+  portfolio as portfolioWire,
   scenarios as scenarioWire,
 } from "finstack-quant-wasm/types";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
@@ -1111,6 +1112,19 @@ export interface PortfolioAttributionReport {
   /** Each by_position entry with Rust's explain text, residual check and buckets, in by_position order. */
   readonly positions: readonly PortfolioPositionAttribution[];
 }
+/** Sub-period returns to link geometrically over a horizon; both host-supplied, neither defaulted. */
+export interface TwrrLinkedRequest {
+  /** Sequential sub-period returns as decimal fractions (0.02 is 2%), each finite and above -1. */
+  readonly returns: readonly number[];
+  /** Full elapsed horizon in 365-day calendar years; below one, Rust reports the linked return cumulatively. */
+  readonly horizonYears: number;
+}
+/** portfolio.twrrLinked, as returned: cumulative, annualised, is_annualised and num_periods. */
+export type LinkedReturn = portfolioWire.LinkedReturn;
+/** One period's beginning and ending values and its external flows, with the portfolio's signs (contributions positive). */
+export type TwrrPeriod = portfolioWire.TwrrPeriod;
+/** A dated flow from the investor's cash account (contributions negative, distributions and terminal value positive). */
+export type DatedCashflow = portfolioWire.DatedCashflow;
 /** Scenario name to its native statement result. */
 export type StatementScenarioResults = ScenarioResults;
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
@@ -1508,6 +1522,12 @@ export interface PortfolioApi {
   attributePortfolioPnl(
     request: PortfolioAttributionRequest,
   ): Promise<Envelope<PortfolioAttributionReport>>;
+  /** portfolio.twrrLinked: the geometric link of host-supplied sub-period returns over a horizon. */
+  twrrLinked(request: TwrrLinkedRequest): Promise<Envelope<LinkedReturn>>;
+  /** portfolio.twrrModifiedDietz: one period's Modified-Dietz return, a decimal, not annualised. */
+  twrrModifiedDietz(period: TwrrPeriod): Promise<Envelope<number>>;
+  /** portfolio.mwrXirr: the annualised money-weighted return of dated investor flows, a decimal on Act/365F. */
+  mwrXirr(cashflows: readonly DatedCashflow[]): Promise<Envelope<number>>;
   /** portfolio.computeFactorSensitivities over the cached Portfolio and MarketContext handles: the position-by-factor sensitivity matrix in the base currency. */
   computeFactorSensitivities(
     request: FactorSensitivitiesRequest,
