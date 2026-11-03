@@ -174,11 +174,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the thirty-one native fixture generators under
+`mise run ui-fixtures` runs the thirty-two native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
-scenario-table; statements → covenants; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
+scenario-table; statements → covenants, normalizations; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -508,6 +508,20 @@ in JSON; both show as Undefined and write an empty field, never zero. In the
 workbench it sits below the statement grids in a disclosure that calls Rust when
 first opened, over the result the grids show, reported or annual. The native
 fixture is `tests/statements/export/cases.json`.
+`NormalizationEditor` (`@finstack/normalization-editor`), fetched with
+`useNormalize` (`@finstack/use-normalize`) and validated with
+`useNormalizationConfigValidator`
+(`@finstack/use-normalization-config-validator`), answers what adjusted EBITDA
+is. It edits a `NormalizationConfig` with a schema form over the generated
+`normalization_config` contract (node fields as id-comboboxes) and shows
+`statements.normalize` as returned: a bridge for a chosen period from the
+reported base through each adjustment to the final value, each step drawn from
+the previous step's `adjusted_value` (the base for the first) to its own, and a
+table of every adjustment's capped amount by period, with the raw amount beside
+a capped one. Rust returns every position, so nothing is summed. In the
+workbench it sits in Metrics & ratios, in a disclosure that calls Rust when
+first opened, over the reported result. The native fixture is
+`tests/statements/normalization/cases.json`.
 `useEvaluateDcf` (`use-evaluate-dcf`) and `useDcfSensitivity`
 (`use-dcf-sensitivity`) pass the model, WACC, `TerminalValueSpec` and the
 optional UFCF node, net-debt override and `DcfOptions` JSON to

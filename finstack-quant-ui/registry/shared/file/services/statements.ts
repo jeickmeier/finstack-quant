@@ -15,6 +15,8 @@ export type StatementsNative = {
     | "monteCarloBreachProbability"
     | "statementResultToTableWide"
     | "statementResultToTableLong"
+    | "validateNormalizationConfigJson"
+    | "normalize"
   >;
   statements_analytics: Pick<
     typeof statements_analytics,
@@ -189,6 +191,16 @@ export function createStatementsService(
           [...request.lineItems],
           [...request.periods],
         ),
+      );
+    },
+    validateNormalizationConfig(json) {
+      return context.result(() =>
+        native.statements.validateNormalizationConfigJson(json),
+      );
+    },
+    normalize(request) {
+      return context.result(() =>
+        native.statements.normalize(request.resultJson, request.configJson),
       );
     },
     statementResultToTableWide(resultJson) {

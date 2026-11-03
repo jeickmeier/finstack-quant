@@ -254,6 +254,8 @@ finstack-quant-ui/src/generated/meta/merton_model.ts
 finstack-quant-ui/src/generated/meta/monte_carlo_config.ts
 finstack-quant-ui/src/generated/meta/monte_carlo_results.ts
 finstack-quant-ui/src/generated/meta/ndf.ts
+finstack-quant-ui/src/generated/meta/normalization_config.ts
+finstack-quant-ui/src/generated/meta/normalization_result.ts
 finstack-quant-ui/src/generated/meta/oas_config.ts
 finstack-quant-ui/src/generated/meta/ohlson_o_score_input.ts
 finstack-quant-ui/src/generated/meta/portfolio_margin_result.ts
@@ -388,6 +390,8 @@ finstack-quant-ui/src/generated/schemas/merton_model.json
 finstack-quant-ui/src/generated/schemas/monte_carlo_config.json
 finstack-quant-ui/src/generated/schemas/monte_carlo_results.json
 finstack-quant-ui/src/generated/schemas/ndf.json
+finstack-quant-ui/src/generated/schemas/normalization_config.json
+finstack-quant-ui/src/generated/schemas/normalization_result.json
 finstack-quant-ui/src/generated/schemas/oas_config.json
 finstack-quant-ui/src/generated/schemas/ohlson_o_score_input.json
 finstack-quant-ui/src/generated/schemas/portfolio_margin_result.json
@@ -519,6 +523,8 @@ finstack-quant-ui/src/generated/types/merton_model.ts
 finstack-quant-ui/src/generated/types/monte_carlo_config.ts
 finstack-quant-ui/src/generated/types/monte_carlo_results.ts
 finstack-quant-ui/src/generated/types/ndf.ts
+finstack-quant-ui/src/generated/types/normalization_config.ts
+finstack-quant-ui/src/generated/types/normalization_result.ts
 finstack-quant-ui/src/generated/types/oas_config.ts
 finstack-quant-ui/src/generated/types/ohlson_o_score_input.ts
 finstack-quant-ui/src/generated/types/portfolio_margin_result.ts

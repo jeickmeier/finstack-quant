@@ -67,3 +67,31 @@ test("statements-workbench WACC calculator sets the DCF field on the click, in a
   await expect(waccField).toHaveValue(/^0\.08[0-9]*$/);
   expect(errors).toEqual([]);
 });
+
+test("statements-workbench normalizes EBITDA and bridges it from the native steps, in a real worker", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=statements-workbench&theme=light&density=compact&focus=1",
+  );
+  await page.getByRole("tab", { name: "Metrics & ratios" }).click();
+  await page
+    .getByText("Adjusted EBITDA and normalization", { exact: true })
+    .click();
+  const editor = page.getByRole("region", { name: "Normalization" });
+  const target = editor.getByRole("combobox", { name: "Target node" });
+  await target.fill("ebitda");
+  await page.getByRole("option", { name: "ebitda", exact: true }).click();
+  await expect(target).toHaveValue("ebitda");
+  await editor.getByRole("button", { name: "Normalize" }).click();
+  const table = editor.getByRole("table", {
+    name: "Adjustments by period (USD)",
+  });
+  await expect(table.getByRole("row")).toHaveCount(3);
+  await expect(
+    editor.getByRole("img", { name: /^Base to adjusted, / }),
+  ).toBeAttached();
+  expect(errors).toEqual([]);
+});

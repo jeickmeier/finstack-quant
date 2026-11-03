@@ -530,6 +530,13 @@ const displays = [
       "Returned TableEnvelope of one StatementResult in the wide or long layout the user picks, statementResultToTableLong for long, in Rust's row and column order. The CSV holds exactly those cells: RFC 4180 quoting, the native column names as its header, and each number as String(value), unrounded. A cell Rust holds with no value (NaN, null in JSON) shows as undefined and is an empty field, never zero. Nothing is computed here.",
   },
   {
+    id: "normalization-editor",
+    api: ["statements.normalize", "StatementsNamespace", "normalize"],
+    route: "returned-report",
+    convention:
+      "Returned NormalizationResult per period of the target node, in Rust's period order, in the target's units (its currency when monetary). Each adjustment carries its raw amount, its capped amount, Rust's is_capped and adjusted_value, the target through that step; the bridge draws each step from the previous step's adjusted_value (base_value for the first) to its own, and the base and final value from zero. Nothing is summed, capped or classified here; a duplicate id, a missing node or a non-finite base shows the native error.",
+  },
+  {
     id: "wacc-calculator",
     api: ["statements_analytics.wacc", "StatementsAnalyticsNamespace", "wacc"],
     route: "returned-report",

@@ -548,6 +548,17 @@ export const importHarnesses = {
     Promise.all([import("@/hooks/statements/use-wacc/use-wacc")]).then(
       (modules) => ({ name: "use-wacc", modules: modules.length }),
     ),
+  "use-normalize": () =>
+    Promise.all([
+      import("@/hooks/statements/use-normalize/use-normalize"),
+    ]).then((modules) => ({ name: "use-normalize", modules: modules.length })),
+  "use-normalization-config-validator": () =>
+    Promise.all([
+      import("@/hooks/statements/use-normalization-config-validator/use-normalization-config-validator"),
+    ]).then((modules) => ({
+      name: "use-normalization-config-validator",
+      modules: modules.length,
+    })),
   "use-pl-summary-report": () =>
     Promise.all([
       import("@/hooks/statements/use-pl-summary-report/use-pl-summary-report"),
@@ -1951,6 +1962,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/monte_carlo_results"),
     ]).then((modules) => ({
       name: "contract-monte-carlo-results",
+      modules: modules.length,
+    })),
+  "contract-normalization-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/normalization_config.json"),
+      import("@/lib/finstack/generated/types/normalization_config"),
+      import("@/lib/finstack/generated/meta/normalization_config"),
+    ]).then((modules) => ({
+      name: "contract-normalization-config",
+      modules: modules.length,
+    })),
+  "contract-normalization-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/normalization_result.json"),
+      import("@/lib/finstack/generated/types/normalization_result"),
+      import("@/lib/finstack/generated/meta/normalization_result"),
+    ]).then((modules) => ({
+      name: "contract-normalization-result",
       modules: modules.length,
     })),
   "contract-rollup-spec": () =>

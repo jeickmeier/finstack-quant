@@ -57,6 +57,10 @@ beforeEach(() => {
         return { state: "ready", worker: true };
       case "validateStatementModel":
         return native.validateFinancialModelJson(arg);
+      case "validateNormalizationConfig":
+        return native.validateNormalizationConfigJson(arg);
+      case "normalize":
+        return native.normalize(arg.resultJson, arg.configJson);
       case "statementResultToTableWide":
         return native.statementResultToTableWide(arg);
       case "statementResultToTableLong":
@@ -553,6 +557,65 @@ it(
         expect(tableCalls().length).toBeGreaterThan(1);
       },
       { timeout: budget(10000) },
+    );
+  },
+  budget(30000),
+);
+
+it(
+  "normalizes the reported result in Metrics & ratios, calling Rust only once opened",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+      </FinstackQueryProvider>,
+    );
+    fireEvent.click(
+      await screen.findByRole("tab", { name: "Metrics & ratios" }),
+    );
+    const summary = await screen.findByText(
+      "Adjusted EBITDA and normalization",
+    );
+    const calls = (name: string) =>
+      call.mock.calls.filter(([method]) => method === name);
+    expect(calls("validateNormalizationConfig")).toHaveLength(0);
+    expect(calls("normalize")).toHaveLength(0);
+    const details = summary.closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    const region = await screen.findByRole(
+      "region",
+      { name: "Normalization" },
+      { timeout: budget(10000) },
+    );
+    fireEvent.change(
+      within(region).getByRole("combobox", { name: "Target node" }),
+      { target: { value: "ebitda" } },
+    );
+    await waitFor(
+      () =>
+        expect(
+          calls("validateNormalizationConfig").some(
+            ([, json]) => JSON.parse(json).target_node === "ebitda",
+          ),
+        ).toBe(true),
+      { timeout: budget(10000) },
+    );
+    expect(calls("normalize")).toHaveLength(0);
+    fireEvent.click(within(region).getByRole("button", { name: "Normalize" }));
+    const table = await within(region).findByRole(
+      "table",
+      { name: "Adjustments by period (USD)" },
+      { timeout: budget(10000) },
+    );
+    const request = lastCall("normalize");
+    expect(JSON.parse(request.configJson).target_node).toBe("ebitda");
+    const returned = native.normalize(request.resultJson, request.configJson);
+    // No adjustments: the base and final rows, one column per returned period.
+    const rows = within(table).getAllByRole("row");
+    expect(rows).toHaveLength(3);
+    expect(within(rows[0]!).getAllByRole("columnheader")).toHaveLength(
+      returned.length + 1,
     );
   },
   budget(30000),
