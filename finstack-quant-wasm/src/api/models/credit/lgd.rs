@@ -111,6 +111,17 @@ impl JsBetaRecovery {
     }
 }
 
+/// Seniority recovery calibration IDs held by the embedded credit registry.
+/// @returns Exact calibration IDs, each accepted unchanged by `seniorityRecoveryStats`: the registry's default calibration first, then the others in registry order.
+///
+/// # Errors
+///
+/// Throws a `validation` error if the embedded registry is malformed.
+#[wasm_bindgen(js_name = seniorityCalibrationIds)]
+pub fn seniority_calibration_ids() -> Result<Vec<String>, JsValue> {
+    lgd::seniority_calibration_ids().map_err(to_js_err)
+}
+
 /// Historical Beta recovery distribution for a debt seniority class.
 /// @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
 /// @param calibration_id - Exact registry methodology ID, such as `"moodys_recovery_1982_2023"` or `"sp_recovery_historical"`; aliases are rejected.

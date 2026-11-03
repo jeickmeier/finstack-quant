@@ -2700,6 +2700,7 @@
       "WorkoutLgd",
       "WorkoutLgdBuilder",
       "collateralPieceLiquidationValue",
+      "seniorityCalibrationIds",
       "seniorityRecoveryStats",
       "workoutLgd"
     ]
@@ -2753,6 +2754,9 @@
     "statics": ["fromJson", "revolver", "termLoan"],
     "methods": ["free", "leqFromObservedEad", "toJson"],
     "getters": ["ead", "totalCommitment", "utilization"]
+  },
+  "models.credit.lgd.seniorityCalibrationIds": {
+    "kind": "function"
   },
   "models.credit.lgd.seniorityRecoveryStats": {
     "kind": "function"

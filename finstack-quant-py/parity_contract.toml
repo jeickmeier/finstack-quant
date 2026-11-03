@@ -1129,6 +1129,7 @@ public = [
     "WorkoutLgd",
     "WorkoutLgdBuilder",
     "WorkoutLgdResult",
+    "seniority_calibration_ids",
     "seniority_recovery_stats",
     "workout_lgd",
 ]

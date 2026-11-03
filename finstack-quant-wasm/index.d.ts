@@ -27283,6 +27283,12 @@ export interface CreditLgdNamespace {
    */
   EadCalculator: EadCalculatorConstructor;
   /**
+   * Seniority recovery calibration IDs held by the embedded credit registry.
+   * @returns Exact calibration IDs, each accepted unchanged by `seniorityRecoveryStats`: the registry's default calibration first, then the others in registry order.
+   * @throws Error - Throws a `validation` error if the embedded registry is malformed.
+   */
+  seniorityCalibrationIds(): string[];
+  /**
    * Historical Beta recovery distribution for a debt seniority class.
    * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
    * @param calibrationId - Exact registry methodology ID, such as `"moodys_recovery_1982_2023"` or `"sp_recovery_historical"`; aliases are rejected.

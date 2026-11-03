@@ -52,6 +52,30 @@ pub fn seniority_recovery_stats(
     })
 }
 
+/// List the seniority recovery calibration IDs the embedded credit registry holds.
+///
+/// Each ID is accepted unchanged as the `calibration_id` of
+/// [`seniority_recovery_stats`] and [`SeniorityCalibration::from_registry_id`].
+/// The registry's default calibration comes first, followed by the others in
+/// registry order, so a caller that offers a choice can start from the first.
+///
+/// # Errors
+///
+/// Returns a validation error if the embedded registry is malformed.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_models::credit::lgd::seniority_calibration_ids;
+///
+/// let ids = seniority_calibration_ids()?;
+/// assert_eq!(ids[0], "moodys_recovery_1982_2023");
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn seniority_calibration_ids() -> finstack_quant_core::Result<Vec<String>> {
+    Ok(crate::credit::registry::embedded_registry()?.seniority_calibration_ids())
+}
+
 /// Compute workout net recovery, LGD, and recovery rate from collateral specs.
 ///
 /// Each collateral tuple is `(type_name, book_value, haircut)`.
@@ -105,6 +129,15 @@ mod tests {
     fn seniority_recovery_stats_accepts_binding_strings() {
         let stats = seniority_recovery_stats("senior_secured", "sp_recovery_historical").unwrap();
         assert!((stats.mean() - 0.53).abs() < 1e-12);
+    }
+
+    #[test]
+    fn seniority_calibration_ids_lists_the_default_first_and_each_resolves() {
+        let ids = seniority_calibration_ids().unwrap();
+        assert_eq!(ids, ["moodys_recovery_1982_2023", "sp_recovery_historical"]);
+        for id in &ids {
+            assert!(seniority_recovery_stats("senior_secured", id).is_ok());
+        }
     }
 
     #[test]

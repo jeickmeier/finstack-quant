@@ -407,6 +407,7 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             list(beta().sample_seeded(4, 42)),
             list(lgd.BetaRecovery(0.4, 0.2).sample_seeded(4, 42)),
         ],
+        "lgd.seniority_calibration_ids": lgd.seniority_calibration_ids,
         "lgd.seniority_recovery_stats": lambda: [
             lgd.seniority_recovery_stats("senior_unsecured", "moodys_recovery_1982_2023").mean,
             lgd.seniority_recovery_stats("senior_unsecured", "moodys_recovery_1982_2023").std_dev,
