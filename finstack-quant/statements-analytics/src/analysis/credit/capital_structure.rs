@@ -13,6 +13,7 @@ use finstack_quant_statements::types::{
     FinancialModelSpec, FinancialStatementInstrument, NodeValueType,
 };
 use finstack_quant_statements::{Error, Result};
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use serde::{Deserialize, Serialize};
 
 /// Request for [`capital_structure_summary`].
@@ -199,7 +200,8 @@ struct StackEntry<'a> {
 /// # Errors
 ///
 /// Returns [`Error::InvalidInput`] when the model has no capital structure, or no
-/// debt instruments once hedges are excluded; `cs_cashflows` is absent; `period`
+/// debt instruments once hedges are excluded; an instrument is neither one of the
+/// four debt kinds nor a hedge; `cs_cashflows` is absent; `period`
 /// is not in the model; a configured node is not in `results`, or the cash node
 /// has no value at `period`; an instrument has no cashflows at `period` or is in
 /// no class while payment classes are declared; a consumed value or ratio is
@@ -438,8 +440,10 @@ fn debt_stack(model: &FinancialModelSpec) -> Result<Vec<StackEntry<'_>>> {
     let mut stack = Vec::with_capacity(capital_structure.debt_instruments.len());
     for debt in &capital_structure.debt_instruments {
         // `Instrument::expiry` is `None` for loans, revolvers and convertibles,
-        // so the maturity comes from each contract. The enum is non-exhaustive:
-        // anything but these four is not borrowed debt.
+        // so the maturity comes from each contract. The hedges are not borrowed
+        // debt; the enum is non-exhaustive, so a variant added later is an error
+        // here until it is classified, as in the statements crate's
+        // `is_debt_kind`.
         let (kind, maturity) = match &debt.spec {
             FinancialStatementInstrument::Bond(bond) => (DebtInstrumentKind::Bond, bond.maturity),
             FinancialStatementInstrument::ConvertibleBond(bond) => {
@@ -451,7 +455,17 @@ fn debt_stack(model: &FinancialModelSpec) -> Result<Vec<StackEntry<'_>>> {
             FinancialStatementInstrument::RevolvingCredit(revolver) => {
                 (DebtInstrumentKind::RevolvingCredit, revolver.maturity)
             }
-            _ => continue,
+            FinancialStatementInstrument::InterestRateSwap(_)
+            | FinancialStatementInstrument::CapFloor(_)
+            | FinancialStatementInstrument::Swaption(_) => continue,
+            other => {
+                return Err(Error::invalid_input(format!(
+                    "Capital structure summary: instrument '{}' is a '{}', which is neither \
+                     debt nor a hedge",
+                    debt.id,
+                    InstrumentJson::from(other.clone()).type_tag()
+                )))
+            }
         };
         let (rank, payment_class) = if classes.is_empty() {
             (0, None)
