@@ -101,6 +101,8 @@
     "statements.parseFormula",
     "statements.rollupSpecDefaultFor",
     "statements.statementResultRollup",
+    "statements.statementResultToTableLong",
+    "statements.statementResultToTableWide",
     "statements.validateCheckSuiteSpecJson",
     "statements.validateFinancialModelJson",
     "statements_analytics.DependencyTracer",

@@ -30,6 +30,7 @@ function formatCell(value: EnvelopeCell, numeric: boolean): string {
 }
 function envelopeColumns(
   columns: readonly EnvelopeColumn[],
+  missingCell: ReactNode,
 ): ColumnDef<{}, EnvelopeRow, any>[] {
   return columns.map((column) => {
     const numeric = numericTypes.has(column.data.type);
@@ -41,8 +42,13 @@ function envelopeColumns(
       meta: {
         className: numeric ? "text-right finstack-numeric" : "text-left",
       },
-      cell: (context) =>
-        formatCell(context.getValue() as EnvelopeCell, numeric),
+      cell: (context) => {
+        const value = context.getValue() as EnvelopeCell;
+        return missingCell !== undefined &&
+          (value == null || Number.isNaN(value))
+          ? missingCell
+          : formatCell(value, numeric);
+      },
     };
   });
 }
@@ -55,6 +61,8 @@ export interface TableEnvelopeProps {
   loading?: boolean;
   error?: string;
   emptyState?: ReactNode;
+  /** Shown for a null or NaN cell, for a table where Rust holds a missing value as NaN; omitted shows an em dash and the digits text. */
+  missingCell?: ReactNode;
 }
 /**
  * Presents a native column-oriented `TableEnvelope`: one row per envelope row
@@ -70,6 +78,7 @@ export function TableEnvelope({
   loading,
   error,
   emptyState,
+  missingCell,
 }: TableEnvelopeProps) {
   const rows = Array.from(
     { length: envelope.row_count },
@@ -78,7 +87,7 @@ export function TableEnvelope({
   return (
     <FinstackTable
       data={rows}
-      columns={envelopeColumns(envelope.columns)}
+      columns={envelopeColumns(envelope.columns, missingCell)}
       getRowId={(row) => String(row.index)}
       caption={caption}
       captionVisibility={captionVisibility}

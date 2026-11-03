@@ -174,11 +174,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twenty-nine native fixture generators under
+`mise run ui-fixtures` runs the thirty native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
-scenario-table; statements → covenants; WACC rates; analytics; models credit, risk, options and liability management;
+scenario-table; statements → covenants; WACC rates; statement tables; analytics; models credit, risk, options and liability management;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -498,6 +498,16 @@ reported period, and shows both in `CreditAssessmentReport`: the returned
 values, the two ratios charted over Rust's series with the periods Rust leaves
 without a value listed instead of plotted, and the summary through
 `TableEnvelope`.
+`StatementExport` (`@finstack/statement-export`), fetched with
+`useStatementResultTable` (`@finstack/use-statement-result-table`), draws one
+`statements.statementResultToTableWide` or `statementResultToTableLong` result
+through `TableEnvelope`, with a wide or long switch, and Download CSV writes
+exactly those cells: RFC 4180 quoting, native column names as the header and each
+number as `String(value)`. A node with no value is `NaN` in a live table and null
+in JSON; both show as Undefined and write an empty field, never zero. In the
+workbench it sits below the statement grids in a disclosure that calls Rust when
+first opened, over the result the grids show, reported or annual. The native
+fixture is `tests/statements/export/cases.json`.
 `useEvaluateDcf` (`use-evaluate-dcf`) and `useDcfSensitivity`
 (`use-dcf-sensitivity`) pass the model, WACC, `TerminalValueSpec` and the
 optional UFCF node, net-debt override and `DcfOptions` JSON to

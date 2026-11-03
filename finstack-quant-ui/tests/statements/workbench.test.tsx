@@ -57,6 +57,10 @@ beforeEach(() => {
         return { state: "ready", worker: true };
       case "validateStatementModel":
         return native.validateFinancialModelJson(arg);
+      case "statementResultToTableWide":
+        return native.statementResultToTableWide(arg);
+      case "statementResultToTableLong":
+        return native.statementResultToTableLong(arg);
       case "wacc":
         return native.wacc(
           arg.equityWeight,
@@ -506,6 +510,53 @@ it("shows a native P&L summary error in Metrics & ratios instead of hiding the s
     ),
   );
 });
+
+it(
+  "exports the result the grids show, calling Rust only once opened",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <StatementsWorkbench defaultModelJson={JSON.stringify(model)} />
+      </FinstackQueryProvider>,
+    );
+    const summary = await screen.findByText("Export table and CSV");
+    const tableCalls = () =>
+      call.mock.calls.filter(([method]) =>
+        String(method).startsWith("statementResultToTable"),
+      );
+    expect(tableCalls()).toHaveLength(0);
+    const details = summary.closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    const region = await screen.findByRole(
+      "region",
+      { name: "Statement export" },
+      { timeout: budget(10000) },
+    );
+    await within(region).findByText(
+      "Statement result, wide layout",
+      undefined,
+      {
+        timeout: budget(10000),
+      },
+    );
+    expect(tableCalls()).toHaveLength(1);
+    const quarterly = within(region).getAllByRole("row").length;
+    // Annual: the export follows the native rollup, as the grids do.
+    fireEvent.click(screen.getByRole("button", { name: "Annual" }));
+    await waitFor(
+      () => {
+        const annual = within(
+          screen.getByRole("region", { name: "Statement export" }),
+        ).getAllByRole("row").length;
+        expect(annual).toBeLessThan(quarterly);
+        expect(tableCalls().length).toBeGreaterThan(1);
+      },
+      { timeout: budget(10000) },
+    );
+  },
+  budget(30000),
+);
 
 it("sets the DCF WACC from the native calculator only on the user's click", async () => {
   render(

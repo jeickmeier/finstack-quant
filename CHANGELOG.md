@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Statements: table and CSV export in the UI
+
+The `statement-export` registry component and `useStatementResultTable` hook draw `statements.statementResultToTableWide` and `statementResultToTableLong`, with a CSV download of exactly those cells (RFC 4180; a cell with no value is an empty field; numbers are unrounded). The statements workbench offers it below the grids, over the reported or annual result they show. `TableEnvelope` gains an optional `missingCell`.
+
 ### Statements: WACC calculator in the UI
 
 The `wacc-calculator` registry component and `useWacc` hook draw `statements_analytics.wacc`: five decimal inputs, the two capital weights separate, and the rate Rust returns or its rejection. In the statements workbench's Valuation tab, Use as WACC sets the DCF form's WACC field on the user's click; `DcfAssumptionsForm` gains optional `wacc` and `onWaccChange` props for that.

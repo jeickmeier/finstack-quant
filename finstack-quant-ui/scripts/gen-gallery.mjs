@@ -98,6 +98,7 @@ const sources = {
   statementRollForward2025Q4:
     "src/fixtures/statements/roll-forward-2025Q4.json",
   waccCalculator: "tests/statements/wacc/cases.json",
+  statementExport: "tests/statements/export/cases.json",
   covenantSeries: "src/fixtures/covenants/analyst-covenant-series.json",
   covenantEngine: "src/fixtures/covenants/analyst-covenants.json",
   covenantForecastConfig: "src/fixtures/covenants/analyst-forecast-config.json",

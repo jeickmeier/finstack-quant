@@ -1,5 +1,39 @@
 import { test, expect } from "playwright/test";
 
+test("statements-workbench exports the result as a table and a CSV of those cells, in a real worker", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=statements-workbench&theme=light&density=compact&focus=1",
+  );
+  await page.getByText("Export table and CSV", { exact: true }).click();
+  const region = page.getByRole("region", { name: "Statement export" });
+  // A real worker delivers a missing value as NaN; it never shows as NaN.
+  await expect(region.getByText("Undefined").first()).toBeVisible();
+  await expect(region.getByText("NaN", { exact: true })).toHaveCount(0);
+  const saved = page.waitForEvent("download");
+  await region.getByRole("button", { name: "Download CSV" }).click();
+  const file = await saved;
+  expect(file.suggestedFilename()).toBe("statement-wide.csv");
+  const stream = await file.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  const csv = Buffer.concat(chunks).toString("utf8");
+  const [header, first] = csv.split("\r\n");
+  const names = header!.split(",");
+  const cells = first!.split(",");
+  expect(names[0]).toBe("period_id");
+  expect(cells[names.indexOf("revenue_growth_qoq")]).toBe("");
+  expect(csv).not.toContain("NaN");
+  await region.getByRole("radio", { name: "Long" }).click();
+  await expect(
+    region.getByText("Statement result, long layout"),
+  ).toBeAttached();
+  expect(errors).toEqual([]);
+});
+
 test("statements-workbench WACC calculator sets the DCF field on the click, in a real worker", async ({
   page,
 }) => {
