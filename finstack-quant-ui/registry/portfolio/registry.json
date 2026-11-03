@@ -311,6 +311,145 @@
       }
     },
     {
+      "name": "portfolio-attribution-report",
+      "type": "registry:component",
+      "title": "Portfolio attribution report",
+      "description": "Display of a native portfolio P&L attribution: book total, Rust's reconciliation, base-currency factor buckets, P&L by position and factor, the selected position's attribution and the explain text.",
+      "docs": "Display-only view of what useAttributePortfolioPnl returns (portfolio.attributePortfolioPnl with Rust's helpers): total_pnl as exact base-currency money; the reconciliation verdict, the gap between total_pnl and its buckets and the tolerance only from portfolioAttributionReconciliationCheck, with result_invalid as returned; every bucket from portfolioAttributionPctOfTotalByBucket as a table with its share and a signed bar chart (pnl-attribution-report's PnlFactorBuckets); a row per by_position entry in returned order with its currency, total P&L and one column per book bucket filled from that position's own pnlAttributionPctOfTotalByBucket; the selected row's PnlAttribution through pnl-attribution-report with its explain text and residual check; portfolioAttributionExplainText and the JSON. Positions are in each instrument's currency and exclude FX translation, so they do not add up to the book; nothing is summed, differenced or converted. Accepts report, loading, error and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/portfolio-attribution-report/portfolio-attribution-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/portfolio/components/portfolio-attribution-report/portfolio-attribution-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/money-value",
+        "@finstack/json-viewer",
+        "@finstack/pnl-attribution-report",
+        "badge"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "portfolio-returns",
+      "type": "registry:component",
+      "title": "Portfolio returns",
+      "description": "Three return calculations over host-supplied data: linked time-weighted return, one period's Modified-Dietz return and the money-weighted return (XIRR) of dated flows.",
+      "docs": "Three forms, each presenting one native result: the geometric link of sub-period returns over a horizon (portfolio.twrrLinked: cumulative, annualised, is_annualised and num_periods as returned; when Rust's is_annualised is false the annualised figure is the cumulative one and the form says so), one period's Modified-Dietz return from its beginning and ending values and flows weighted by the fraction of the period remaining (portfolio.twrrModifiedDietz, a decimal for the period, not annualised; a contribution is positive) and the money-weighted return of dated investor flows (portfolio.mwrXirr, an annualised decimal on Act/365F; a contribution is negative, and the net flows must change sign once). Connect useTwrrLinked, useTwrrModifiedDietz and useMwrXirr. The forms start from defaultInputs and edit their own copies; nothing is defaulted, and the horizon and flow fractions are the host's numbers, never derived from dates here. An empty field is submitted as NaN, which Rust rejects. Each form shows its own native error. Accepts defaultInputs, onSubmitLinked, onSubmitDietz, onSubmitXirr, linked, dietz, xirr, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/portfolio-returns/portfolio-returns.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/portfolio/components/portfolio-returns/portfolio-returns.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/decimal-input",
+        "@finstack/date-input",
+        "button"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "brinson-report",
+      "type": "registry:component",
+      "title": "Brinson report",
+      "description": "Multi-period Brinson-Fachler attribution of host-supplied sector weights and returns: each period's allocation, selection and interaction by sector, the Carino-linked effects and the compounded portfolio and benchmark returns.",
+      "docs": "Presents one native portfolio.brinsonLinked result as returned: the compounded portfolio and benchmark returns, a table of each sector's Carino-linked allocation, selection, interaction and total with Rust's linked total of each effect in the footer, a bar chart of the sectors' returned linked totals (never stacked) and, for every period in order, its portfolio, benchmark and excess returns and its sector effects with the returned period totals. Every figure is a decimal of return; nothing is summed, differenced or linked here, and the compounded active return is not shown because Rust returns only its two sides. Connect useBrinsonLinked. periodLabels are the host's names of the periods in order; omitted shows each period's position. Accepts report, periodLabels, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/brinson-report/brinson-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/portfolio/components/brinson-report/brinson-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/finstack-chart"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "exposure-report",
+      "type": "registry:component",
+      "title": "Exposure report",
+      "description": "A book's primitive exposures: each primitive's net and gross quantity, value and additive risk across every position and path, and the book's factor sensitivity matrix when supplied.",
+      "docs": "Presents one native portfolio.primitiveExposures result (PortfolioPrimitiveExposureReport) as returned: a table of each primitive's net and gross quantity and value in the base currency, ordered by primitive id as Rust returns them, with a grouped bar chart of the two values (plotted, never stacked); each requested additive metric's net and gross amount per primitive, metric ids shown as returned; and the position-aware primitive paths with their position-scaled quantity and value. With sensitivities it adds a Factor sensitivities section: the portfolio.computeFactorSensitivities matrix (positions by factors, in the base currency) as returned, with its own loading and native error. Rust returns both net and gross; nothing is summed, netted, converted or re-sorted here. Connect usePrimitiveExposures and useFactorSensitivities. Accepts report, loading, error, sensitivities, sensitivitiesLoading, sensitivitiesError, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/exposure-report/exposure-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/portfolio/components/exposure-report/exposure-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/finstack-chart",
+        "@finstack/money-value"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-portfolio-margin",
       "type": "registry:hook",
       "title": "usePortfolioMargin",
@@ -331,6 +470,208 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-attribute-portfolio-pnl",
+      "type": "registry:hook",
+      "title": "useAttributePortfolioPnl",
+      "description": "Attributes a host-supplied portfolio's P&L between two host-supplied markets through the WASM worker.",
+      "docs": "portfolio.attributePortfolioPnl over the shared cached Portfolio (Portfolio.fromSpec, keyed on canonical Portfolio#toJson) and both MarketContext handles, from asOfT0 to asOfT1 under the requested AttributionMethod wire value (Rust requires one; the config stays unset for Rust's default), then portfolioAttributionExplainText, portfolioAttributionReconciliationCheck at the requested reconciliationTolerance (base-currency units; Rust has no default) and portfolioAttributionPctOfTotalByBucket, and for each by_position entry in returned order attribution.pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotalByBucket. A position Rust cannot attribute, such as a seasoned swap without its FIXING: series in the closing market, fails the call with the native error. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-attribute-portfolio-pnl/use-attribute-portfolio-pnl.ts",
+          "type": "registry:hook",
+          "target": "hooks/portfolio/use-attribute-portfolio-pnl/use-attribute-portfolio-pnl.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-portfolio-returns",
+      "type": "registry:hook",
+      "title": "usePortfolioReturns",
+      "description": "Linked TWRR, Modified-Dietz and XIRR returns of host-supplied data through the WASM worker.",
+      "docs": "useTwrrLinked (portfolio.twrrLinked of returns and horizonYears), useTwrrModifiedDietz (portfolio.twrrModifiedDietz of one TwrrPeriod) and useMwrXirr (portfolio.mwrXirr of DatedCashflow records), each one native call keyed on the complete snapshotted request and worker session; null means no request. An input Rust rejects (a return at most -1, a flow fraction outside [0, 1], a non-positive Dietz denominator, flows that do not change sign exactly once) is the hook error. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "hooks/use-portfolio-returns/use-portfolio-returns.ts",
+          "type": "registry:hook",
+          "target": "hooks/portfolio/use-portfolio-returns/use-portfolio-returns.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-brinson-linked",
+      "type": "registry:hook",
+      "title": "useBrinsonLinked",
+      "description": "Multi-period Brinson-Fachler attribution, Carino-linked, of host-supplied sector periods through the WASM worker.",
+      "docs": "useBrinsonLinked (portfolio.brinsonLinked of chronological periods of SectorPeriod rows) makes one native call keyed on the snapshotted periods and worker session; null means no request. Input Rust rejects (no periods, a period whose weights do not sum to one on a side or with a non-finite value, named by its zero-based index, sectors reordered between periods, a period return at most minus one) is the hook error. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "hooks/use-brinson-linked/use-brinson-linked.ts",
+          "type": "registry:hook",
+          "target": "hooks/portfolio/use-brinson-linked/use-brinson-linked.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-exposure-report",
+      "type": "registry:hook",
+      "title": "usePrimitiveExposures",
+      "description": "A host-supplied book's primitive exposures and its factor sensitivity matrix through the WASM worker.",
+      "docs": "usePrimitiveExposures (portfolio.primitiveExposures of a PortfolioSpec over a MarketContextState with the host's additive metric ids; an empty list reports quantity and value only) and useFactorSensitivities (portfolio.computeFactorSensitivities of the same book against FactorDefinition JSON on an ISO date, an omitted BumpSizeConfig left to Rust) each make one native call over the worker's cached Portfolio and MarketContext handles, keyed on the snapshotted request and worker session; null means no request. Input Rust rejects (a non-additive or unknown metric, a metric a position cannot compute, which Rust names by position, or a factor mapped to market data the context lacks) is the hook error. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "hooks/use-exposure-report/use-exposure-report.ts",
+          "type": "registry:hook",
+          "target": "hooks/portfolio/use-exposure-report/use-exposure-report.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": [
+        "@tanstack/react-query@5.103.1",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "portfolio-workbench",
+      "type": "registry:block",
+      "title": "Portfolio workbench",
+      "description": "Portfolio workbench: a host-supplied book valued over a host-supplied market, with positions, aggregated risk, primitive exposures, correlation of host-supplied returns, scenario P&L, P&L attribution to a host-supplied closing market, returns of host-supplied performance data, Brinson attribution of host-supplied sector data, margin and a natively validated book editor.",
+      "docs": "Tabs over the portfolio components, with no native call of its own. Positions: portfolio-summary and positions-table of useValuePortfolio (portfolio.valuePortfolio, then aggregateMetrics) with Rust metricMetadata of every returned measure id. Risk: portfolio-metrics of the same report, charting the usePortfolioMetricsSeries series of seriesBase when one is supplied, then exposure-report of usePrimitiveExposures (portfolio.primitiveExposures of the book over marketJson with exposures.metrics, omitted being quantity and value only) and, when exposures.factorsJson is supplied, useFactorSensitivities (portfolio.computeFactorSensitivities on asOf with any exposures.bumpConfigJson), then, when correlation is supplied, correlation-heatmap of useCorrelationMatrix (analytics.Performance correlationMatrix of the host's return panel, with Rust's repaired stamp). Scenarios (only when scenarioJsons are supplied): scenario-pnl-table of useScenarioPnlBatch (portfolio.scenarioPnlBatch). Attribution (only when attribution is supplied): portfolio-attribution-report of useAttributePortfolioPnl (portfolio.attributePortfolioPnl from marketJson on asOf to attribution.marketT1Json on attribution.asOfT1, with Rust's explain, reconciliation at attribution.reconciliationTolerance and buckets) under the method the user picks; every Rust method is offered, none preselected, waterfall in useDefaultWaterfallOrder's order, and a method that fails on the book shows its native error. Returns (only when returns is supplied): portfolio-returns of useTwrrLinked, useTwrrModifiedDietz and useMwrXirr (portfolio.twrrLinked, twrrModifiedDietz and mwrXirr) over the host's returns.linked (sub-period decimal returns and horizonYears in 365-day years), returns.dietz (one TwrrPeriod) and returns.xirr (dated investor flows), computed when the tab opens and again for each form the user resubmits. Brinson (only when brinson is supplied): brinson-report of useBrinsonLinked (portfolio.brinsonLinked) over the host's brinson.periods (chronological SectorPeriod rows, each side's weights summing to one) named by any brinson.periodLabels, computed when the tab opens. Margin: portfolio-margin-report of usePortfolioMargin (portfolio.portfolioMargin) on asOf with any currentImCollateral. Book: PortfolioSpec JSON that usePortfolioSpecValidator validates natively before every tab values it. The exposure, Scenarios, Attribution, Returns, Brinson and Margin calls run only when their tab first opens. Host-supplied props: defaultSpecJson (PortfolioSpec; remount for a different book), marketJson (MarketContextState), asOf (ISO margin date, never read from the spec), metrics (omitted is Rust's standard set), seriesBase, exposures (additive metric ids and factor definitions, none of them defaulted), correlation (a return or price panel, never derived from the book), scenarioJsons (never parsed), attribution (the closing MarketContextState marketT1Json, which needs any FIXING: series a seasoned floating leg fixes before its asOfT1, that ISO date and a base-currency reconciliationTolerance; Rust has no default for any of them), returns (performance data, none of it defaulted or derived from the book), brinson (sector weights and returns per period, none of them defaulted or derived from the book), currentImCollateral (omitted is none held) and density. Nothing is summed, netted or converted; native errors show as returned. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "blocks/portfolio-workbench/portfolio-workbench.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/portfolio/blocks/portfolio-workbench/portfolio-workbench.tsx"
+        },
+        {
+          "path": "blocks/portfolio-workbench/scenario-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/portfolio/blocks/portfolio-workbench/scenario-panel.tsx"
+        },
+        {
+          "path": "blocks/portfolio-workbench/margin-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/portfolio/blocks/portfolio-workbench/margin-panel.tsx"
+        },
+        {
+          "path": "blocks/portfolio-workbench/attribution-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/portfolio/blocks/portfolio-workbench/attribution-panel.tsx"
+        },
+        {
+          "path": "blocks/portfolio-workbench/returns-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/portfolio/blocks/portfolio-workbench/returns-panel.tsx"
+        },
+        {
+          "path": "blocks/portfolio-workbench/brinson-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/portfolio/blocks/portfolio-workbench/brinson-panel.tsx"
+        },
+        {
+          "path": "blocks/portfolio-workbench/exposure-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/portfolio/blocks/portfolio-workbench/exposure-panel.tsx"
+        },
+        {
+          "path": "blocks/portfolio-workbench/correlation-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/portfolio/blocks/portfolio-workbench/correlation-panel.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/portfolio-summary",
+        "@finstack/positions-table",
+        "@finstack/portfolio-metrics",
+        "@finstack/scenario-pnl-table",
+        "@finstack/portfolio-margin-report",
+        "@finstack/portfolio-attribution-report",
+        "@finstack/portfolio-returns",
+        "@finstack/brinson-report",
+        "@finstack/exposure-report",
+        "@finstack/correlation-heatmap",
+        "@finstack/use-value-portfolio",
+        "@finstack/use-portfolio-metrics-series",
+        "@finstack/use-portfolio-spec-validator",
+        "@finstack/use-scenario-pnl-batch",
+        "@finstack/use-portfolio-margin",
+        "@finstack/use-attribute-portfolio-pnl",
+        "@finstack/use-portfolio-returns",
+        "@finstack/use-brinson-linked",
+        "@finstack/use-exposure-report",
+        "@finstack/use-correlation-matrix",
+        "@finstack/use-default-waterfall-order",
+        "@finstack/enum-field",
+        "@finstack/use-price-instrument",
+        "@finstack/use-finstack",
+        "@finstack/finstack-surface",
+        "@finstack/field-frame",
+        "button",
+        "tabs",
+        "textarea"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Blocks"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities_json.schema.json",
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
+          "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
           "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]

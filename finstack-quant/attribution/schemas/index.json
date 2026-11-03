@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/attribution/1/pnl_bucket_share.schema.json",
-      "bytes": 21888,
+      "bytes": 21934,
       "kind": "output",
       "path": "schemas/attribution/1/pnl_bucket_share.schema.json",
       "summary": "A P&L bucket's field name, amount and share of total.",

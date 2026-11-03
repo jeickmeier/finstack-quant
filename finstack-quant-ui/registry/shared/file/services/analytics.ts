@@ -8,6 +8,7 @@ import type {
   AnalyticsApi,
   BenchmarkReport,
   BenchmarkReportRequest,
+  CorrelationMatrixReport,
   PerformanceReport,
   PerformanceReportRequest,
   PerformanceSeries,
@@ -119,6 +120,22 @@ export function createAnalyticsService(
         } finally {
           performance?.free();
           fiscal?.free();
+        }
+      });
+    },
+    correlationMatrix(request) {
+      return context.result((): CorrelationMatrixReport => {
+        const performance = build(request);
+        try {
+          const correlation = performance.correlationMatrix();
+          return {
+            tickerNames: performance.getTickerNames(),
+            // finstack-compose: copies each typed-array row out for structured clone
+            matrix: correlation.matrix.map((row) => Array.from(row)),
+            repaired: correlation.repaired,
+          };
+        } finally {
+          performance.free();
         }
       });
     },

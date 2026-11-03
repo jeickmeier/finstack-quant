@@ -146,7 +146,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/linked_return.schema.json",
-      "bytes": 994,
+      "bytes": 1382,
       "kind": "output",
       "path": "schemas/portfolio/1/linked_return.schema.json",
       "summary": "Result of geometrically linking sub-period returns.",

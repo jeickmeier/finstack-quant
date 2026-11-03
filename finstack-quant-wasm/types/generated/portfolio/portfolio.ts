@@ -3664,13 +3664,20 @@ export interface VolatilityDependency {
 export interface LinkedReturn {
   /**
    * Annualised return assuming the supplied `horizon_years` covers
-   * the full sequence of periods.
+   * the full sequence of periods; equal to `cumulative` when
+   * `is_annualised` is false.
    */
   annualised: number;
   /**
    * Cumulative return over the full horizon: `Π(1 + r_i) − 1`.
    */
   cumulative: number;
+  /**
+   * Whether `annualised` was annualised: true when `horizon_years` is at
+   * least one year. Shorter (or non-positive) horizons are reported
+   * cumulatively per GIPS 2020, so `annualised` then mirrors `cumulative`.
+   */
+  is_annualised: boolean;
   /**
    * Number of sub-periods linked.
    */

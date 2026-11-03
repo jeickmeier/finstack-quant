@@ -64,6 +64,7 @@ from finstack_quant.portfolio._brinson import (
     BrinsonPeriodResult as BrinsonPeriodResult,
     CarinoLinkedAttribution as CarinoLinkedAttribution,
     brinson_fachler as brinson_fachler,
+    brinson_linked as brinson_linked,
     carino_link as carino_link,
 )
 from finstack_quant.portfolio._fi_attribution import (
@@ -222,6 +223,7 @@ __all__ = [
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
     "brinson_fachler",
+    "brinson_linked",
     "build_credit_vol_report",
     "campisi_attribution",
     "campisi_carino_link",

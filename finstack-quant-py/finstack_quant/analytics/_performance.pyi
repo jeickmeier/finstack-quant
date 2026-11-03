@@ -1318,7 +1318,8 @@ class Performance:
         -------
         tuple[list[list[float]], bool]
             ``(matrix, repaired)``. ``matrix`` is the symmetric correlation
-            matrix indexed by ticker column order. ``repaired`` is ``True``
+            matrix indexed by ticker column order, with a diagonal of exactly
+            ``1.0`` and every coefficient inside ``[-1, 1]``. ``repaired`` is ``True``
             when the raw pairwise estimate was projected to the nearest
             correlation matrix and ``False`` for a clean estimate.
 

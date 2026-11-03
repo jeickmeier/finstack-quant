@@ -21461,8 +21461,9 @@ export interface PnlBucketShare {
    */
   amount: Money;
   /**
-   * Wire name of the [`PnlAttribution`] field holding this bucket (`carry`,
-   * `rates_curves_pnl`, ..., `residual`).
+   * Wire name of the result field holding this bucket (`carry`,
+   * `rates_curves_pnl`, ..., `residual`); the instrument and portfolio
+   * results use the same names.
    */
   field: string;
   /**

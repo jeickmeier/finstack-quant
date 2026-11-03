@@ -1940,6 +1940,21 @@
       }
     },
     {
+      "id": "correlation-heatmap",
+      "route": "returned-analytics",
+      "convention": "Returned analytics.Performance correlationMatrix of a host-supplied panel: Pearson coefficients in Rust's ticker order as a diverging heatmap over the fixed correlation range [-1, 0, 1] (presentation only) and a table, with the Repaired stamp shown only when Rust's repaired flag is true. Nothing is estimated, clamped, reordered or inferred here; Rust returns a unit diagonal and every coefficient inside [-1, 1].",
+      "api": {
+        "name": "analytics.Performance#correlationMatrix",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "Performance",
+        "member": "correlationMatrix",
+        "inputs": [],
+        "returns": "{ matrix: Float64Array[]; repaired: boolean }",
+        "declaration": "/**\n   * Return the correlation matrix across assets and whether it was repaired.\n   *\n   * Uses the complete-case common window when every ticker has at least\n   * two overlapping points; otherwise pairwise intersecting spans. A raw\n   * estimate that is not a valid correlation matrix is Higham-repaired to\n   * the nearest valid correlation matrix.\n   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, with a diagonal of exactly 1 and every coefficient inside [-1, 1], and `true` when Higham repair was applied.\n   * @throws Error - Rejects a degenerate pair or a matrix that cannot be repaired to a valid correlation matrix.\n   */\n  correlationMatrix(): { matrix: Float64Array[]; repaired: boolean };",
+        "sha256": "d19ad76621bb1a2bc4c98584b9064009094d14c4033ef4f2eb81f1d766ddf162"
+      }
+    },
+    {
       "id": "benchmark-report",
       "route": "returned-analytics",
       "deferred": "machine-readable-units",
@@ -2105,6 +2120,135 @@
           "description": "Portfolio-wide margin calculation results."
         }
       ]
+    },
+    {
+      "id": "portfolio-attribution-report",
+      "route": "returned-report",
+      "convention": "Returned PortfolioAttribution: total_pnl and every base-currency bucket as exact money with shares only from portfolioAttributionPctOfTotalByBucket, the reconciliation verdict, gap and tolerance only from portfolioAttributionReconciliationCheck at the host's tolerance, explain only from portfolioAttributionExplainText, and result_invalid as returned; by_position rows in returned order in each instrument's currency, one column per book bucket filled from that position's pnlAttributionPctOfTotalByBucket, and the selected position through pnl-attribution-report. The method is required and chosen by the user; nothing is summed, differenced or converted.",
+      "api": {
+        "name": "portfolio.attributePortfolioPnl",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "attributePortfolioPnl",
+        "inputs": [
+          {
+            "name": "portfolio",
+            "type": "Portfolio",
+            "optional": false
+          },
+          {
+            "name": "marketT0",
+            "type": "MarketContext",
+            "optional": false
+          },
+          {
+            "name": "marketT1",
+            "type": "MarketContext",
+            "optional": false
+          },
+          {
+            "name": "asOfT0",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "asOfT1",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "method",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "config",
+            "type": "JsonInput",
+            "optional": true
+          }
+        ],
+        "returns": "PortfolioAttribution",
+        "declaration": "/**\n   * Attribute portfolio P&L between two market snapshots.\n   *\n   * Returns the `PortfolioAttribution`: base-currency `total_pnl`, one bucket\n   * per factor (`carry`, `rates_curves_pnl`, `credit_curves_pnl`, `fx_pnl`,\n   * `vol_pnl`, ..., `residual`) and the per-position `by_position` detail.\n   * @param portfolio - Built portfolio whose positions are attributed.\n   * @param marketT0 - `core.MarketContext` handle for the opening snapshot.\n   * @param marketT1 - `core.MarketContext` handle for the closing snapshot.\n   * @param asOfT0 - ISO-8601 date of the opening snapshot.\n   * @param asOfT1 - ISO-8601 date of the closing snapshot.\n   * @param method - `AttributionMethod` wire value: a unit variant name such as `\"parallel\"` or `\"metrics_based\"`, an object such as `{ waterfall: [\"carry\", \"rates_curves\"] }`, or the same value as JSON text.\n   * @param config - Optional `FinstackConfig` object or JSON; omit for the Rust default configuration.\n   * @returns The `PortfolioAttribution`.\n   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a `FinstackError` if a date is not an ISO date or `method` / `config` is malformed (kind `validation`), a required FX rate or market datum is missing (kind `not_found`), or a position valuation or attribution fails.\n   */\n  attributePortfolioPnl(\n    portfolio: Portfolio,\n    marketT0: MarketContext,\n    marketT1: MarketContext,\n    asOfT0: string,\n    asOfT1: string,\n    method: JsonInput,\n    config?: JsonInput\n  ): PortfolioAttribution;",
+        "sha256": "a49e7fb3fcc3f9d91e9047d39c53a6b8b47a421d075891596c7a4c5875a13735"
+      }
+    },
+    {
+      "id": "portfolio-returns",
+      "route": "returned-report",
+      "convention": "Returned twrrLinked LinkedReturn: cumulative, annualised, is_annualised and num_periods as returned, the annualised figure labelled per year only when Rust's is_annualised says so; the twrrModifiedDietz period return as a decimal for the period, not annualised; the mwrXirr return as an annualised decimal on Act/365F. Inputs are the host's returns, horizon in 365-day years, one period's values and flows with their fractions of the period remaining (contributions positive) and dated investor flows (contributions negative); nothing is defaulted, derived from dates, sign-flipped, summed or compared, and each form shows its native error.",
+      "api": {
+        "name": "portfolio.twrrLinked",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "twrrLinked",
+        "inputs": [
+          {
+            "name": "returnsJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "horizonYears",
+            "type": "number",
+            "optional": false
+          }
+        ],
+        "returns": "LinkedReturn",
+        "declaration": "/**\n   * Geometrically link TWRR sub-period returns from returns JSON.\n   * @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.\n   * @param returnsJson - Numeric return-series JSON.\n   * @param horizonYears - Full elapsed horizon in 365-day calendar years; must be finite (`NaN` or `Infinity` throws). Below one year, including zero and negative values, the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).\n   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, `horizonYears` is `NaN` or infinite, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.\n   */\n  twrrLinked(returnsJson: JsonInput, horizonYears: number): LinkedReturn;",
+        "sha256": "0f960e8d69e9afea6046b7ee43b4f99e2eaabe03e69a82c278071be169cb7ef4"
+      }
+    },
+    {
+      "id": "brinson-report",
+      "route": "returned-report",
+      "convention": "Returned brinsonLinked CarinoLinkedAttribution: portfolio_return_compounded and benchmark_return_compounded, each linked sector's allocation, selection, interaction and total with linked_allocation, linked_selection and linked_interaction as the footer, and every period's portfolio, benchmark and excess returns, sector effects and returned totals, all decimals of return in returned order. Inputs are the host's chronological SectorPeriod rows with any period names; nothing is defaulted, summed, differenced, linked or stacked, and the compounded active return is not shown because Rust returns only its two sides.",
+      "api": {
+        "name": "portfolio.brinsonLinked",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "brinsonLinked",
+        "inputs": [
+          {
+            "name": "periods",
+            "type": "generated.portfolio.SectorPeriod[][] | string",
+            "optional": false
+          }
+        ],
+        "returns": "CarinoLinkedAttribution",
+        "declaration": "/**\n   * Attribute each period with Brinson-Fachler and Carino-link the results.\n   *\n   * Binds Rust `brinson_linked`: the multi-period Brinson-Fachler report in one\n   * call, identical to `carinoLink(periods.map(brinsonFachler))`. Returns a\n   * structured `CarinoLinkedAttribution` object with every period's sector\n   * allocation, selection and interaction (`periods`), the linked effects by\n   * sector (`linked_sectors`) and by effect (`linked_allocation`,\n   * `linked_selection`, `linked_interaction`), and the compounded portfolio and\n   * benchmark returns; the linked effects sum to the compounded active return.\n   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).\n   * @param periods - Chronological array of periods (or its JSON text), each an array of `SectorPeriod` objects (`sector`, `portfolio_weight`, `benchmark_weight`, `portfolio_return`, `benchmark_return`). Weights are decimal fractions summing to one on each side; returns are decimal period returns (`0.015` is +1.5 %). Every period lists the same sectors in the same order; a sector absent on one side keeps a zero weight.\n   * @throws Error - Throws a JavaScript exception if `periods` is malformed or a row has an unknown field, there are no periods, a period fails Brinson-Fachler (no sectors, a non-finite input, or weights not summing to one; the message names the zero-based period), the sector ordering changes between periods, or a period return is at most `-1` (kind `validation`).\n   */\n  brinsonLinked(periods: generated.portfolio.SectorPeriod[][] | string): CarinoLinkedAttribution;",
+        "sha256": "8249c3b9e85923ee6605e08c096e061bc00b85441b65f1aca0a80e82f18411da"
+      }
+    },
+    {
+      "id": "exposure-report",
+      "route": "returned-report",
+      "convention": "Returned primitiveExposures PortfolioPrimitiveExposureReport: each aggregate's net and gross quantity and value in base_currency, ordered by primitive id as returned and charted side by side (never stacked); each requested additive metric's net_measures and gross_measures entry per primitive under its returned id; and the position-aware paths with their position-scaled quantity and value. The optional sensitivity section shows computeFactorSensitivities (positions by factor ids, base currency) as returned. Inputs are the host's book, market, additive metric ids (omitted is none: quantity and value only) and any factor definitions and bump config; nothing is summed, netted, converted or re-sorted.",
+      "api": {
+        "name": "portfolio.primitiveExposures",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "primitiveExposures",
+        "inputs": [
+          {
+            "name": "portfolio",
+            "type": "Portfolio",
+            "optional": false
+          },
+          {
+            "name": "market",
+            "type": "MarketContext",
+            "optional": false
+          },
+          {
+            "name": "metrics",
+            "type": "string[] | string",
+            "optional": false
+          }
+        ],
+        "returns": "PortfolioPrimitiveExposureReport",
+        "declaration": "/**\n   * Decompose every portfolio position into primitive economic exposures.\n   *\n   * Direct instruments yield one primitive path; composite positions recurse\n   * through their frozen resolved leg quantities. The position quantity scales\n   * every primitive quantity, value and additive risk amount. Returns the\n   * `PortfolioPrimitiveExposureReport`: `base_currency`, position-aware\n   * `paths` and per-instrument net/gross `aggregates`, all in the portfolio\n   * base currency.\n   * @param portfolio - Built portfolio whose direct and composite positions are decomposed.\n   * @param market - `core.MarketContext` handle with the complete valuation and FX market.\n   * @param metrics - Array of additive metric ids (e.g. `\"dv01\"`); pass `[]` for quantity and value only.\n   * @returns The `PortfolioPrimitiveExposureReport`.\n   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `metrics` is not an array or JSON string, and a `FinstackError` if a metric id is not canonical or is non-additive, primitive definitions conflict across positions, a composite is invalid, or market data or FX is missing.\n   */\n  primitiveExposures(\n    portfolio: Portfolio,\n    market: MarketContext,\n    metrics: string[] | string\n  ): PortfolioPrimitiveExposureReport;",
+        "sha256": "c12c1e0f77ada735cb96d2da39ec493f7ec2bebe892831c0f9a66d244a9746eb"
+      }
     },
     {
       "id": "scenario-pnl-table",

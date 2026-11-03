@@ -104,9 +104,18 @@ To add an item (the gate that catches each omission is in brackets):
    leaf in its `<Crate>Native` (never a whole sub-namespace) and run
    `npm --prefix finstack-quant-ui run coverage`, which moves the key from
    `planned` to `covered` in `facade-coverage.json`. That file also lists
-   each excluded key with its reason (`data-constructor` or `schema-form`);
-   `schema.*` keys, `*Json` wire twins and builders are excluded by rule, and
-   a dropped slice deletes its `planned` keys [`ui-check`: `coverage --check`].
+   each excluded key with one reason from the closed set `listedReasons` in
+   `scripts/coverage.mjs`, which defines each: `data-constructor` (builds a
+   plain value from fields or a label, or is a handle class whose other
+   members only read back what it was built from), `schema-form` (an enum variant or
+   preset a schema form builds), `setter` (a copy with fields set), `getter`
+   (reads one stored field or entry), `validator` (a shape check returning
+   nothing or canonical JSON) and `performance-duplicate` (an `analytics`
+   series function with the same kernel as the `Performance` method).
+   `coverage --check` rejects any other reason, and picking an excluded key
+   fails until its entry is deleted. `schema.*` keys, `*Json` wire twins and
+   builders are excluded by rule, and a dropped slice deletes its `planned`
+   keys [`ui-check`: `coverage --check`].
 
 CI runs only `ui-check` (the Test UI job); the other gates are local.
 
@@ -174,11 +183,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the thirty-four native fixture generators under
+`mise run ui-fixtures` runs the thirty-nine native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
-portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
-scenario-table; statements → covenants, normalizations, capital structures, relative value; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
+portfolio → portfolio margin → portfolio workbench → primitive exposures; portfolio returns; Brinson; curves → market-browser → curve-query; cubes, calibration,
+scenario-table; statements → covenants, normalizations, capital structures, relative value; WACC rates; statement tables; analytics → correlation; models credit, risk, options, liability management and recovery;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -947,6 +956,162 @@ variation margin as `-0`, and the report shows it as returned. Nothing is
 summed, netted or converted. The fixture (`tests/portfolio/margin/`: two swaps
 under the Rust USD regulatory CSA and a regulatory CSA-B, plus an unmargined
 deposit, over the pricing market) also pins collateral held and an unknown CSA.
+
+## Portfolio workbench
+
+`PortfolioWorkbench` (`@finstack/portfolio-workbench`) puts the portfolio
+components under tabs and adds no native call of its own. The host supplies
+the book and its context as props: `defaultSpecJson` (a complete
+`PortfolioSpec`; remount for a different book), `marketJson`
+(`MarketContextState`), `asOf` (the ISO margin date, never read from the
+spec), and optionally `metrics` (omitted is Rust's standard set),
+`seriesBase` (the base metric id charted by bucket), `exposures`, `correlation`, `scenarioJsons`
+(`ScenarioSpec` texts, never parsed), `attribution`, `returns`, `brinson` and
+`currentImCollateral` (omitted is none held). `attribution` is the host's
+closing snapshot for the Attribution tab: `marketT1Json`
+(`MarketContextState`), `asOfT1` (ISO date) and `reconciliationTolerance`
+(base-currency units). Rust has no default for any of them. A closing date
+past a seasoned floating leg's fixing needs that index's `FIXING:` series in
+`marketT1Json`; without it every method returns Rust's missing-fixing error.
+`returns` is the host's performance data for the Returns tab: `linked`
+(sub-period decimal returns and `horizonYears` in 365-day years), `dietz` (one
+`TwrrPeriod`) and `xirr` (dated investor flows); none is derived from the book.
+`brinson` is the host's sector data for the Brinson tab: `periods` (one array of
+`SectorPeriod` rows per period, oldest first) and optionally `periodLabels`;
+none is derived from the book. `exposures` is the host's choice for the Risk
+tab's exposure report: `metrics` (additive metric ids reported per primitive;
+omitted is quantity and value only) and `factorsJson` (`FactorDefinition`
+array) with an optional `bumpConfigJson` for the sensitivity matrix (omitted
+shows no matrix). The book's primitive exposures show whether or not it is
+supplied. `correlation` is the host's return (or price) panel for the Risk
+tab's correlation heatmap: ISO `dates`, ticker-major `values`, their `kind`,
+`tickerNames` and an optional `frequency`; it is never derived from the book.
+
+| Tab         | Shows                                                                                                                                                                                                                                           |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Positions   | `PortfolioSummary` and `PositionsTable` of `useValuePortfolio`, with Rust `metricMetadata` of every returned measure id                                                                                                                         |
+| Risk        | `PortfolioMetrics` of the same report and, when `seriesBase` is supplied, its `usePortfolioMetricsSeries` series; `ExposureReport` of `usePrimitiveExposures` and, when `exposures.factorsJson` is supplied, `useFactorSensitivities` on `asOf` |
+| Scenarios   | `ScenarioPnlTable` of `useScenarioPnlBatch`; the tab is shown only when `scenarioJsons` are supplied                                                                                                                                            |
+| Attribution | `PortfolioAttributionReport` of `useAttributePortfolioPnl` from `marketJson` on `asOf` to the `attribution` market and date under the method the user picks; shown only when `attribution` is supplied                                          |
+| Returns     | `PortfolioReturns` of `useTwrrLinked`, `useTwrrModifiedDietz` and `useMwrXirr` over the `returns` data, each form resubmittable; shown only when `returns` is supplied                                                                          |
+| Brinson     | `BrinsonReport` of `useBrinsonLinked` over the `brinson` periods; shown only when `brinson` is supplied                                                                                                                                         |
+| Margin      | `PortfolioMarginReport` of `usePortfolioMargin` on `asOf`                                                                                                                                                                                       |
+| Book        | `PortfolioSpec` JSON that `usePortfolioSpecValidator` validates natively before every tab values it                                                                                                                                             |
+
+The Risk tab's exposure calls and the Scenarios, Attribution, Returns, Brinson
+and Margin calls run when their tab first opens. The Risk tab adds
+`CorrelationHeatmap` of `useCorrelationMatrix` only when `correlation` is
+supplied. The fixture (`tests/portfolio/workbench/`) is the
+margined rates book from `tests/portfolio/margin/` over the pricing market
+under the host-parity USD-OIS scenarios.
+
+`useAttributePortfolioPnl` (`@finstack/use-attribute-portfolio-pnl`) calls
+`portfolio.attributePortfolioPnl` over the cached `Portfolio` and both
+`MarketContext` handles with the required `AttributionMethod` wire value (the
+config stays unset), then `portfolioAttributionExplainText`,
+`portfolioAttributionReconciliationCheck` at the requested tolerance and
+`portfolioAttributionPctOfTotalByBucket`, and for every `by_position` entry
+`pnlAttributionExplainText`, `pnlAttributionResidualWithinTolerance` and
+`pnlAttributionPctOfTotalByBucket`. The display-only
+`PortfolioAttributionReport` shows the book total, Rust's reconciliation
+verdict, gap and tolerance, the base-currency buckets through
+`PnlFactorBuckets` (the factor table and chart `PnlAttributionReport` exports),
+a row per position with one column per book bucket filled from that
+position's own buckets, the selected position through `PnlAttributionReport`,
+and the explain text. Positions are in each instrument's currency and exclude
+FX translation, so they do not add up to the book. The Attribution tab offers
+every Rust method with none preselected, and a method that fails on the book
+shows its native error. The fixture (`tests/portfolio/attribution/`) attributes
+the workbench book to two closing markets the market-scenario cases return: a
+50bp USD-OIS shock on the same date, where all four methods reconcile, and a
+one-month roll with a 25bp shock, where every method returns Rust's
+missing-fixing error for the swaps' SOFR fixing.
+
+## Portfolio returns
+
+`PortfolioReturns` (`@finstack/portfolio-returns`) answers how the book has
+performed from the host's performance data, in three forms, each one native
+call through `@finstack/use-portfolio-returns`. `useTwrrLinked` links
+sub-period decimal returns geometrically over a horizon in 365-day years
+(`portfolio.twrrLinked`) and shows `cumulative`, `annualised`, `is_annualised`
+and `num_periods` as returned; when Rust's `is_annualised` is false (a horizon
+under one year, reported cumulatively per GIPS 2020) the annualised figure is
+the cumulative one and the form says so. `useTwrrModifiedDietz` returns one
+period's Modified-Dietz return (`portfolio.twrrModifiedDietz`, a decimal for
+the period, not annualised) from its beginning and ending values and its
+flows, each with the fraction of the period remaining after it; a
+contribution is positive. `useMwrXirr` returns the annualised money-weighted
+return of dated investor flows (`portfolio.mwrXirr`, a decimal on Act/365F); a
+contribution is negative, and the net flows must change sign exactly once. The
+two flow forms keep their own signs and nothing flips them. The horizon and
+the flow fractions are the host's numbers, never derived from dates in
+JavaScript. An empty field is submitted as NaN, which Rust rejects, and each
+form shows its own native error. The fixture (`tests/portfolio/returns/`)
+holds three annual and three monthly returns, the GIPS Handbook period, a
+withdrawal period, a conventional XIRR stream and the native errors of a
+complete loss, a fraction above one, a non-positive Dietz denominator, a stream
+with two sign changes and a single flow.
+
+## Brinson attribution
+
+`BrinsonReport` (`@finstack/brinson-report`) presents one native
+`portfolio.brinsonLinked` result (`CarinoLinkedAttribution`) of the host's
+sector data through `@finstack/use-brinson-linked`: chronological periods of
+`SectorPeriod` rows (each side's start-of-period weights summing to one and
+decimal period returns, the same sectors in the same order every period). It
+shows the compounded portfolio and benchmark returns, each sector's
+Carino-linked allocation, selection, interaction and total with Rust's linked
+total of each effect as the footer, a bar chart of the sectors' linked totals
+(plotted, never stacked), and every period's portfolio, benchmark and excess
+returns with its sector effects and returned totals. Every figure is a
+decimal of return as returned; the compounded active return is not shown,
+because Rust returns only its two sides. `periodLabels` are the host's names
+of the periods; omitted shows each period's position. A rejected input (no
+periods, weights not summing to one, which Rust names by zero-based period,
+or a reordered period) is the native error. The fixture
+(`tests/portfolio/brinson/`) is the portfolio host-parity golden's three
+periods with those three errors.
+
+## Primitive exposures
+
+`ExposureReport` (`@finstack/exposure-report`) presents one native
+`portfolio.primitiveExposures` result (`PortfolioPrimitiveExposureReport`) of
+the host's book over the host's market through `usePrimitiveExposures`
+(`@finstack/use-exposure-report`): each primitive's net (algebraic) and gross
+(absolute) quantity and value in the base currency, ordered by primitive id as
+Rust returns them, with a grouped bar chart of the two values; each requested
+additive metric's net and gross amount per primitive under its returned id;
+and the position-aware primitive paths. Rust returns both net and gross;
+nothing is summed, netted, converted or re-sorted. The metric ids are the
+host's: an empty list reports quantity and value only, and Rust rejects a
+non-additive id or one a position cannot compute (naming the position). With
+`sensitivities` (from `useFactorSensitivities`, one native
+`portfolio.computeFactorSensitivities` against host `FactorDefinition` JSON on
+an ISO date, an omitted bump config left to Rust) it adds the position-by-factor
+matrix in the base currency, with its own native error. The fixture
+(`tests/portfolio/exposures/`) is the workbench book over the pricing market
+with dv01 and theta and with no metric, the host-parity `usd_rates` factor, and
+the native errors of a non-additive metric, a metric the deposit cannot compute
+and a factor on a curve the market lacks.
+
+## Return correlation
+
+`CorrelationHeatmap` (`@finstack/correlation-heatmap`) draws one native
+`analytics.Performance` `correlationMatrix` result of a host return or price
+panel through `useCorrelationMatrix` (`@finstack/use-correlation-matrix`,
+which builds the `Performance`, reads `getTickerNames` and `correlationMatrix`
+and frees the handle): a diverging heatmap over the fixed correlation range
+`[-1, 0, 1]` and a table of every coefficient, in Rust's ticker order. A
+Repaired stamp appears only when Rust's `repaired` flag says it projected the
+raw estimate to the nearest valid correlation matrix (Higham); nothing is
+estimated, clamped or inferred here, and a coefficient outside `[-1, 1]` keeps
+the table and drops the heatmap. Rust estimates over the complete-case common
+window whenever every pair overlaps by two observations, so a panel Rust
+accepts does not reach the repair today; the stamp is tested with the
+supplied flag. The fixture (`tests/analytics/correlation/`) is four sleeves'
+daily returns over 60 business days, with the native errors of a
+zero-variance series, an interior missing return and two series with no
+overlap, rebuilt from `panels.mjs` because JSON cannot carry their gaps.
 
 ## Returned rating migration
 

@@ -10,8 +10,32 @@ import { emit } from "./fixture-output.mjs";
 // closure reaches any of its members through a `<Crate>Native` Pick leaf.
 // Default mode rewrites facade-coverage.json; `--check` verifies it.
 
-/** Reasons a listed exclusion may give; rule exclusions are computed. */
-export const listedReasons = new Set(["data-constructor", "schema-form"]);
+/**
+ * Reasons a listed exclusion may give; rule exclusions are computed. A unit
+ * a worker later picks leaves `excluded` (the check says so).
+ * - `data-constructor`: builds a plain value from its fields or a label
+ *   (`::new`, `from_str`, `parse`), or is a handle class whose members beyond
+ *   its constructors only read back what it was built from (stored-field
+ *   getters, a constant, the lengths of stored arrays, `toJson`). A member
+ *   that classifies, derives or presets a value (`fromAgencyTerm`,
+ *   `totalRate`, `standard`) keeps the class counted.
+ * - `schema-form`: an enum-variant or preset value a schema form builds.
+ * - `setter`: returns a copy of its input with fields set (`with_*`, `add_*`).
+ * - `getter`: reads one stored field, row or entry of a value (`get_*`,
+ *   `node_ids`), or is a result handle class whose only members are getters.
+ * - `validator`: a shape check returning nothing or the canonical JSON of its
+ *   input; one returning a boolean, number or report stays counted.
+ * - `performance-duplicate`: an `analytics` free function on one series that
+ *   runs the same kernel as the `Performance` method of the same name.
+ */
+export const listedReasons = new Set([
+  "data-constructor",
+  "getter",
+  "performance-duplicate",
+  "schema-form",
+  "setter",
+  "validator",
+]);
 const unitKinds = new Set(["function", "class"]);
 const leafName = (key) => key.split(".").at(-1);
 const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0);

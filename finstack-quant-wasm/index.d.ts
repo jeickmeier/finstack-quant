@@ -9080,7 +9080,7 @@ declare class Performance {
    * two overlapping points; otherwise pairwise intersecting spans. A raw
    * estimate that is not a valid correlation matrix is Higham-repaired to
    * the nearest valid correlation matrix.
-   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, and `true` when Higham repair was applied.
+   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, with a diagonal of exactly 1 and every coefficient inside [-1, 1], and `true` when Higham repair was applied.
    * @throws Error - Rejects a degenerate pair or a matrix that cannot be repaired to a valid correlation matrix.
    */
   correlationMatrix(): { matrix: Float64Array[]; repaired: boolean };
@@ -34040,6 +34040,21 @@ export interface PortfolioNamespace {
    */
   carinoLink(periodsJson: JsonInput): CarinoLinkedAttribution;
   /**
+   * Attribute each period with Brinson-Fachler and Carino-link the results.
+   *
+   * Binds Rust `brinson_linked`: the multi-period Brinson-Fachler report in one
+   * call, identical to `carinoLink(periods.map(brinsonFachler))`. Returns a
+   * structured `CarinoLinkedAttribution` object with every period's sector
+   * allocation, selection and interaction (`periods`), the linked effects by
+   * sector (`linked_sectors`) and by effect (`linked_allocation`,
+   * `linked_selection`, `linked_interaction`), and the compounded portfolio and
+   * benchmark returns; the linked effects sum to the compounded active return.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+   * @param periods - Chronological array of periods (or its JSON text), each an array of `SectorPeriod` objects (`sector`, `portfolio_weight`, `benchmark_weight`, `portfolio_return`, `benchmark_return`). Weights are decimal fractions summing to one on each side; returns are decimal period returns (`0.015` is +1.5 %). Every period lists the same sectors in the same order; a sector absent on one side keeps a zero weight.
+   * @throws Error - Throws a JavaScript exception if `periods` is malformed or a row has an unknown field, there are no periods, a period fails Brinson-Fachler (no sectors, a non-finite input, or weights not summing to one; the message names the zero-based period), the sector ordering changes between periods, or a period return is at most `-1` (kind `validation`).
+   */
+  brinsonLinked(periods: generated.portfolio.SectorPeriod[][] | string): CarinoLinkedAttribution;
+  /**
    * Compute a single-period Campisi fixed-income attribution from JSON.
    *
    * Decomposes both sides into carry / treasury / spread / selection and
@@ -34246,8 +34261,8 @@ export interface PortfolioNamespace {
    * Geometrically link TWRR sub-period returns from returns JSON.
    * @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.
    * @param returnsJson - Numeric return-series JSON.
-   * @param horizonYears - Return-linking horizon measured in years for annualization.
-   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.
+   * @param horizonYears - Full elapsed horizon in 365-day calendar years; must be finite (`NaN` or `Infinity` throws). Below one year, including zero and negative values, the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).
+   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, `horizonYears` is `NaN` or infinite, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.
    */
   twrrLinked(returnsJson: JsonInput, horizonYears: number): LinkedReturn;
   /**
@@ -34575,6 +34590,13 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `attribution` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `PortfolioAttribution` schema.
    */
   portfolioAttributionExplainText(attribution: PortfolioAttribution | string): string;
+  /**
+   * Every base-currency money bucket of a portfolio attribution with its share of total P&L.
+   * @param attribution - `PortfolioAttribution` object or JSON from `attributePortfolioPnl`.
+   * @returns One `PnlBucketShare` per bucket: the attribute's wire `field`, its `amount` in the base currency and `pct_of_total` in signed percentage points, `null` when `total_pnl` is effectively zero.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `attribution` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `PortfolioAttribution` schema.
+   */
+  portfolioAttributionPctOfTotalByBucket(attribution: PortfolioAttribution | string): PnlBucketShare[];
   /**
    * Check that a portfolio attribution's factor buckets sum to its total P&L.
    *

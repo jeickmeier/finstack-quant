@@ -1,5 +1,8 @@
 "use client";
-import type { SimulationFieldUnits, StructuredCredit } from "finstack-quant-wasm";
+import type {
+  SimulationFieldUnits,
+  StructuredCredit,
+} from "finstack-quant-wasm";
 import type { ExampleProps } from "./props";
 import { CreditEnhancementChart } from "@/components/finstack/valuations/components/credit-enhancement-chart/credit-enhancement-chart";
 import data from "../data.json";
