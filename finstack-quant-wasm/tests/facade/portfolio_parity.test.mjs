@@ -375,3 +375,12 @@ test('optimizePortfolio validates constraint objects and requires a UnitScaling 
 test('brinsonLinked matches Python', () => {
   assertClose(wire(portfolio.brinsonLinked(inputs.brinson_periods)), expected.brinson_linked);
 });
+
+test('twrrLinked matches Python, annualised flag included', () => {
+  assertClose(
+    inputs.twrr_horizons.map((horizon) =>
+      wire(portfolio.twrrLinked(JSON.stringify(inputs.twrr_returns), horizon))
+    ),
+    expected.twrr_linked
+  );
+});

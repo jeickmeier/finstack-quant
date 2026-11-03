@@ -6,12 +6,13 @@
     {
       "annualised": 0.0515731520675,
       "cumulative": 0.162836,
+      "is_annualised": true,
       "num_periods": 3
     }
   ],
   "properties": {
     "annualised": {
-      "description": "Annualised return assuming the supplied `horizon_years` covers\nthe full sequence of periods.",
+      "description": "Annualised return assuming the supplied `horizon_years` covers\nthe full sequence of periods; equal to `cumulative` when\n`is_annualised` is false.",
       "format": "double",
       "type": "number"
     },
@@ -19,6 +20,10 @@
       "description": "Cumulative return over the full horizon: `Π(1 + r_i) − 1`.",
       "format": "double",
       "type": "number"
+    },
+    "is_annualised": {
+      "description": "Whether `annualised` was annualised: true when `horizon_years` is at\nleast one year. Shorter (or non-positive) horizons are reported\ncumulatively per GIPS 2020, so `annualised` then mirrors `cumulative`.",
+      "type": "boolean"
     },
     "num_periods": {
       "description": "Number of sub-periods linked.",
@@ -30,6 +35,7 @@
   "required": [
     "cumulative",
     "annualised",
+    "is_annualised",
     "num_periods"
   ],
   "title": "LinkedReturn",

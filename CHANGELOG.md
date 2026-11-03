@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Portfolio: linked returns say whether they were annualised
+
+`LinkedReturn` gains `is_annualised`: true when `twrr_linked`'s `horizon_years` is at least one year, false for shorter or non-positive horizons, where `annualised` mirrors `cumulative` (GIPS 2020 reports them cumulatively). A report can now say which figure it shows without restating that rule. Python `LinkedReturn.is_annualised` (and a `to_dataframe` column); WASM `portfolio.twrrLinked` returns the field. The host parity fixture pins a two-year and a half-year link for both hosts. No existing value moves.
+
 ### UI: portfolio attribution report and the workbench Attribution tab
 
 `@finstack/portfolio-attribution-report` shows why the book moved between two snapshots as Rust returns it: the book total, the reconciliation verdict, gap and tolerance from `portfolioAttributionReconciliationCheck`, the base-currency buckets with their shares from `portfolioAttributionPctOfTotalByBucket` as a table and a signed chart, a row per position with one column per bucket from that position's own Rust buckets, the selected position through `pnl-attribution-report` (which now exports its factor table and chart as `PnlFactorBuckets`), and `portfolioAttributionExplainText`. `@finstack/use-attribute-portfolio-pnl` makes the one `attributePortfolioPnl` call. `portfolio-workbench` adds an Attribution tab when the host supplies `attribution` (closing market, closing date and reconciliation tolerance, none defaulted); every Rust method is offered with none preselected, and a failing method shows the native error.

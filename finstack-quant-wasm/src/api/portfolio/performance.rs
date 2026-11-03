@@ -23,7 +23,7 @@ pub fn twrr_modified_dietz(period_json: JsValue) -> Result<f64, JsValue> {
 
 /// Geometrically link TWRR sub-period returns from returns JSON.
 /// @param returns_json - Numeric return-series JSON.
-/// @param horizon_years - Return-linking horizon measured in years for annualization.
+/// @param horizon_years - Full elapsed horizon in 365-day calendar years; below one year the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).
 ///
 /// # Errors
 ///

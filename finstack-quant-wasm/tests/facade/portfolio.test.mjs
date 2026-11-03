@@ -1082,7 +1082,9 @@ test('portfolio.twrrLinked returns a structured linked return', () => {
     'twrrLinked result'
   );
   assert.ok(Math.abs(linked.cumulative - 0.0815) < 1e-12);
+  assert.equal(linked.is_annualised, true);
   assert.equal(linked.num_periods, 2);
+  assert.equal(portfolio.twrrLinked([0.05, 0.03], 0.5).is_annualised, false);
 });
 
 // Position ids / weights / covariance are all shared by the three

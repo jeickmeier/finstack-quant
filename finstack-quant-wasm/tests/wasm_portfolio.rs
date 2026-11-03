@@ -243,6 +243,7 @@ fn twrr_linked_geometrically_links_returns() {
     .unwrap();
     assert!((get_f64(&result, "cumulative") - 0.0815).abs() < 1e-12);
     assert!((get_f64(&result, "annualised") - 0.0815).abs() < 1e-12);
+    assert_eq!(as_json(&result)["is_annualised"], serde_json::json!(true));
     assert_eq!(as_json(&result)["num_periods"], serde_json::json!(2));
 }
 
