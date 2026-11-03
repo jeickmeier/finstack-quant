@@ -86,6 +86,35 @@
       }
     },
     {
+      "name": "correlation-heatmap",
+      "type": "registry:component",
+      "title": "Correlation heatmap",
+      "description": "Pearson correlation matrix of host-supplied return series as a heatmap and a table, stamped when Rust repaired it to the nearest valid correlation matrix.",
+      "docs": "Presents one native analytics.Performance correlationMatrix result as returned: a diverging heatmap over the fixed correlation range [-1, 0, 1] and a table of every coefficient, rows and columns in Rust's ticker order, with a Repaired stamp shown only when Rust's repaired flag says it projected the raw estimate to the nearest valid correlation matrix (Higham); the flag is Rust's, never inferred here. A coefficient outside [-1, 1] leaves the heatmap out and keeps the table. Connect useCorrelationMatrix. Accepts report, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/correlation-heatmap/correlation-heatmap.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/analytics/components/correlation-heatmap/correlation-heatmap.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "use-performance-report",
       "type": "registry:hook",
       "title": "usePerformanceReport",
@@ -122,6 +151,32 @@
           "path": "hooks/use-benchmark-report/use-benchmark-report.ts",
           "type": "registry:hook",
           "target": "hooks/analytics/use-benchmark-report/use-benchmark-report.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-correlation-matrix",
+      "type": "registry:hook",
+      "title": "useCorrelationMatrix",
+      "description": "Pearson correlation matrix of a host-supplied return or price panel, with Rust's repaired flag, through the WASM worker.",
+      "docs": "useCorrelationMatrix builds analytics.Performance from the host panel (Performance.fromReturns for kind \"returns\", the price constructor for \"prices\"), then getTickerNames and correlationMatrix, freeing the handle: one native chain keyed on the snapshotted panel and worker session; null means no request. Returns { tickerNames, matrix, repaired } as Rust returned them. A panel Rust rejects (a zero-variance series, an interior missing value, a pair with fewer than two overlapping observations) is the hook error. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "hooks/use-correlation-matrix/use-correlation-matrix.ts",
+          "type": "registry:hook",
+          "target": "hooks/analytics/use-correlation-matrix/use-correlation-matrix.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],

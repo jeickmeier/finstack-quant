@@ -250,6 +250,13 @@ export const importHarnesses = {
       name: "use-benchmark-report",
       modules: modules.length,
     })),
+  "use-correlation-matrix": () =>
+    Promise.all([
+      import("@/hooks/analytics/use-correlation-matrix/use-correlation-matrix"),
+    ]).then((modules) => ({
+      name: "use-correlation-matrix",
+      modules: modules.length,
+    })),
   "analytics-report-presentation": () =>
     Promise.all([
       import("@/components/finstack/analytics/lib/analytics-report-presentation"),

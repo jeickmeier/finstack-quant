@@ -96,6 +96,7 @@ import { Example as ExamplePortfolioAttributionReport } from "./examples/portfol
 import { Example as ExamplePortfolioReturns } from "./examples/portfolio-returns";
 import { Example as ExampleBrinsonReport } from "./examples/brinson-report";
 import { Example as ExampleExposureReport } from "./examples/exposure-report";
+import { Example as ExampleCorrelationHeatmap } from "./examples/correlation-heatmap";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -193,6 +194,7 @@ const examples = {
   "portfolio-returns": ExamplePortfolioReturns,
   "brinson-report": ExampleBrinsonReport,
   "exposure-report": ExampleExposureReport,
+  "correlation-heatmap": ExampleCorrelationHeatmap,
 };
 export function ComponentDemo({
   name,

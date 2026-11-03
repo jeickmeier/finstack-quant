@@ -30,6 +30,9 @@ export type { BrinsonReportInputs } from "@/components/finstack/portfolio/compon
 import { ExposurePanel } from "./exposure-panel";
 import type { ExposureReportInputs } from "@/components/finstack/portfolio/components/exposure-report/exposure-report";
 export type { ExposureReportInputs } from "@/components/finstack/portfolio/components/exposure-report/exposure-report";
+import { CorrelationPanel } from "./correlation-panel";
+import type { CorrelationMatrixRequest } from "@/hooks/analytics/use-correlation-matrix/use-correlation-matrix";
+export type { CorrelationMatrixRequest } from "@/hooks/analytics/use-correlation-matrix/use-correlation-matrix";
 
 type Tab =
   | "positions"
@@ -54,6 +57,8 @@ export interface PortfolioWorkbenchProps {
   seriesBase?: string;
   /** The host's exposure choices for the Risk tab: additive metric ids per primitive (omitted is quantity and value only) and FactorDefinition JSON with an optional BumpSizeConfig for the sensitivity matrix (omitted shows none). The book's primitive exposures show on the Risk tab whether or not this is supplied. */
   exposures?: ExposureReportInputs | null;
+  /** The host's return (or price) panel for the Risk tab's correlation heatmap: ISO dates, ticker-major values, their kind, ticker names and an optional frequency; the heatmap appears only when supplied. */
+  correlation?: CorrelationMatrixRequest | null;
   /** ScenarioSpec JSON texts in batch order, never parsed here; the Scenarios tab appears only when some are supplied. */
   scenarioJsons?: readonly string[];
   /** The closing (T1) market and date and the reconciliation tolerance of the Attribution tab, which attributes the book from marketJson on asOf to them; the tab appears only when supplied. */
@@ -76,6 +81,7 @@ export function PortfolioWorkbench({
   metrics,
   seriesBase,
   exposures,
+  correlation,
   scenarioJsons,
   attribution,
   returns,
@@ -202,6 +208,9 @@ export function PortfolioWorkbench({
                 inputs={exposures}
                 density={density}
               />
+              {correlation && (
+                <CorrelationPanel panel={correlation} density={density} />
+              )}
             </div>
           </TabsContent>
           {hasScenarios && (

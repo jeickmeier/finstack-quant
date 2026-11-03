@@ -134,6 +134,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "defaultWaterfallOrder",
     // AnalyticsApi
     "performanceReport",
+    "correlationMatrix",
     "benchmarkReport",
     // PortfolioApi
     "valuePortfolio",

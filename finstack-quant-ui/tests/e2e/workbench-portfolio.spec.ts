@@ -5,6 +5,7 @@ const fixture = data.portfolioWorkbench;
 const returns = data.portfolioReturns.cases;
 const brinson = data.portfolioBrinson.result;
 const exposures = data.portfolioExposures;
+const correlation = data.correlation.result;
 const attribution = data.portfolioAttribution.cases.find(
   (entry) => entry.scenario === "usd-ois-50bp" && entry.name === "taylor",
 )!;
@@ -39,6 +40,15 @@ test("portfolio-workbench opens each tab on the native result, in a real worker"
     await expect(primitives.getByTitle(String(value)).first()).toBeVisible();
   await expect(
     primitives.getByRole("img", { name: "Net and gross value by primitive" }),
+  ).toBeVisible();
+  const correlations = workbench.getByRole("region", {
+    name: "Return correlation",
+  });
+  await expect(
+    correlations.getByRole("img", { name: "Correlation heatmap" }),
+  ).toBeVisible();
+  await expect(
+    correlations.getByTitle(String(correlation.matrix[0]![2])).first(),
   ).toBeVisible();
   await workbench.getByRole("tab", { name: "Scenarios" }).click();
   const pnl = workbench.getByRole("region", { name: "Portfolio scenario P&L" });
