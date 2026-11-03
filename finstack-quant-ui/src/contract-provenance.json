@@ -2230,6 +2230,47 @@
       }
     },
     {
+      "id": "wacc-calculator",
+      "route": "returned-report",
+      "convention": "Returned WACC of the five entered decimals, itself a decimal. The two capital weights are separate inputs; nothing is blended, defaulted or checked here, and weights that do not sum to one or a tax rate outside [0, 1] show the native error. Applying the rate to a DCF is an explicit user action that passes the returned number unchanged.",
+      "api": {
+        "name": "statements_analytics.wacc",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StatementsAnalyticsNamespace",
+        "member": "wacc",
+        "inputs": [
+          {
+            "name": "equityWeight",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "costOfEquity",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "debtWeight",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "costOfDebt",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "taxRate",
+            "type": "number",
+            "optional": false
+          }
+        ],
+        "returns": "number",
+        "declaration": "/**\n   * Weighted-average cost of capital (WACC).\n   *\n   * Blends the required return on equity with the after-tax cost of debt:\n   * `WACC = w_E * r_E + w_D * r_D * (1 - T)`.\n   * @returns Returns the blended discount rate as a decimal fraction.\n   * @param equityWeight - Equity share of total capital as a decimal fraction (0.6 = 60% equity-funded).\n   * @param costOfEquity - Required return on equity in decimal form, typically from CAPM (0.115 = 11.5%).\n   * @param debtWeight - Debt share of total capital as a decimal fraction; must sum with the equity weight to 1.0.\n   * @param costOfDebt - Pre-tax marginal borrowing yield in decimal form, before the interest tax shield (0.06 = 6%).\n   * @param taxRate - Marginal corporate tax rate as a decimal fraction in [0, 1] (0.25 = 25%).\n   * @throws Error - Rejects any non-finite input, negative capital weights, weights that do not sum to one within tolerance, or a `tax_rate` outside `[0, 1]`.\n   */\n  wacc(\n    equityWeight: number,\n    costOfEquity: number,\n    debtWeight: number,\n    costOfDebt: number,\n    taxRate: number\n  ): number;",
+        "sha256": "978a242a765fbbb5f68b7765919fe7a45648c492179d4a682a52ebf635fecdd3"
+      }
+    },
+    {
       "id": "quote-converter",
       "route": "returned-report",
       "convention": "Returned BondQuoteSet of one bond from the one quote entered: every price, yield and spread in Rust's field order, each the metric of the same name at that clean price. Quote kinds are the branches of the BondQuoteInput schema. Units are the labels bondQuoteSetFieldUnits returns for each field, which Rust tests against metricMetadata. A null field is shown as no value, never zero, and a quote that cannot be solved shows the native error. Nothing is converted or compared here.",

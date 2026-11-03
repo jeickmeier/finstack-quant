@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Statements: WACC calculator in the UI
+
+The `wacc-calculator` registry component and `useWacc` hook draw `statements_analytics.wacc`: five decimal inputs, the two capital weights separate, and the rate Rust returns or its rejection. In the statements workbench's Valuation tab, Use as WACC sets the DCF form's WACC field on the user's click; `DcfAssumptionsForm` gains optional `wacc` and `onWaccChange` props for that.
+
 ### Comps: relative value report
 
 `relative_value_report(subject, universe, config)` filters the universe and returns what a comps screen draws, so a host computes nothing: `companies` (the subject first, then peers in universe order, with one value per configured multiple), `multiples` (each with the subject's value, peer statistics, percentile and z-score) and `dimensions` (one per configured dimension in config order, excluded ones included, with subject values, peer statistics, percentile, z-score, regression, the direction-adjusted `signal`, `excluded_reason`, and scatter `points` that carry their fitted Y). `composite` is the result of `score_relative_value` on the same peers and dimensions, which now shares one per-dimension evaluation with the report; when it cannot be produced it is null, `composite_excluded_reason` says why and the table still renders. Empty `dimensions` and `multiples` together, or a negative or non-finite weight, are errors. Metrics carry no currency, so normalizing them is the caller's job.

@@ -174,11 +174,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the twenty-six native fixture generators under
+`mise run ui-fixtures` runs the twenty-nine native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
-scenario-table; statements → covenants; analytics; models credit, risk, options and liability management;
+scenario-table; statements → covenants; WACC rates; analytics; models credit, risk, options and liability management;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -511,6 +511,16 @@ model is valued, because the facade has no standalone `DcfOptions` parse) and
 `DcfReport`, which shows the valuation, bridge fields, per-period present
 values, terminal value and the native tornado through `TornadoChart` as
 returned.
+`WaccCalculator` (`@finstack/wacc-calculator`), fetched with `useWacc`
+(`@finstack/use-wacc`), takes five decimals, the two capital weights separate,
+and shows the one `statements_analytics.wacc` rate as returned. Weights that do
+not sum to one, a tax rate outside [0, 1] or an empty field show the native
+error; nothing is blended or checked in JavaScript. In the Valuation tab its
+Use as WACC button sets the form's WACC field, through the form's optional
+`wacc` and `onWaccChange` props so the other fields keep what was typed. It
+passes the returned number on the user's click only, never after an edit since
+the rate was calculated, and valuing stays the form's own action. The native
+fixture is `tests/statements/wacc/cases.json`.
 `useEvaluateLbo` (`use-evaluate-lbo`) passes the model and `LboConfig` JSON
 to `statements_analytics.evaluateLbo`. The Valuation tab's `LboReport` edits
 the config with a schema form over the generated `lbo_config` contract (string

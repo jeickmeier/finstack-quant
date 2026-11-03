@@ -126,6 +126,7 @@
     "statements_analytics.scenarioDiff",
     "statements_analytics.scenarioSetTrace",
     "statements_analytics.varianceBridge",
+    "statements_analytics.wacc",
     "valuations.instruments.Bond",
     "valuations.instruments.ConvertibleBond",
     "valuations.instruments.StructuredCredit",
