@@ -649,7 +649,8 @@ async function summarize(region: HTMLElement, period: string) {
   await userEvent.click(
     within(region).getByRole("combobox", { name: "Period" }),
   );
-  await userEvent.click(screen.getByRole("option", { name: period }));
+  // The select's popup mounts its options after the trigger click resolves.
+  await userEvent.click(await screen.findByRole("option", { name: period }));
   fireEvent.change(
     within(region).getByRole("combobox", { name: "EBITDA node" }),
     { target: { value: "ebitda" } },
