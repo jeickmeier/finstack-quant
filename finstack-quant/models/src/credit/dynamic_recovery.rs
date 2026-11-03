@@ -132,12 +132,11 @@ impl DynamicRecoverySpec {
         }
         if let DynamicRecoveryModel::FlooredInverse { floor }
         | DynamicRecoveryModel::LinearDecline { floor, .. } = model
+            && (!floor.is_finite() || !(0.0..=base_recovery).contains(&floor))
         {
-            if !floor.is_finite() || !(0.0..=base_recovery).contains(&floor) {
-                return Err(Error::Validation(format!(
-                    "recovery floor must be finite and in [0, {base_recovery}], got {floor}"
-                )));
-            }
+            return Err(Error::Validation(format!(
+                "recovery floor must be finite and in [0, {base_recovery}], got {floor}"
+            )));
         }
         Ok(Self {
             base_recovery,

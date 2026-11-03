@@ -8,13 +8,13 @@ mod materialization_gate;
 use std::collections::HashSet;
 
 use finstack_quant_core::contract::LoadLimits;
-use finstack_quant_portfolio::{materialization::InstrumentArtifactCache, Portfolio};
+use finstack_quant_portfolio::{Portfolio, materialization::InstrumentArtifactCache};
 use serde_json::Value;
 
-use materialization_fixtures::{build_fixture, fixture_a, fixture_b, FixtureKind};
+use materialization_fixtures::{FixtureKind, build_fixture, fixture_a, fixture_b};
 use materialization_gate::{
-    evaluate_latency_gates, p95_millis, parse_sample_count, COLD_ENGINEERING_TARGET_MILLIS,
-    COLD_HARD_LIMIT_MILLIS, WARM_ENGINEERING_TARGET_MILLIS,
+    COLD_ENGINEERING_TARGET_MILLIS, COLD_HARD_LIMIT_MILLIS, WARM_ENGINEERING_TARGET_MILLIS,
+    evaluate_latency_gates, p95_millis, parse_sample_count,
 };
 
 #[test]
@@ -54,10 +54,10 @@ fn shared_fixtures_are_deterministic_and_have_required_shapes() {
     for (index, instrument) in instruments.iter().enumerate() {
         let spec = &instrument["envelope"]["instrument"]["spec"];
         if index % 2 == 0 {
-            let schedule = spec["cashflow_spec"]["amortizing"]["schedule"]["step_remaining"]
-                ["schedule"]
-                .as_array()
-                .expect("bond serialized amortization schedule");
+            let schedule =
+                spec["cashflow_spec"]["amortizing"]["schedule"]["step_remaining"]["schedule"]
+                    .as_array()
+                    .expect("bond serialized amortization schedule");
             assert_eq!(schedule.len(), 20);
             assert_eq!(schedule[0][0], "2025-07-01");
             assert_eq!(schedule[19][0], "2035-01-01");
@@ -185,15 +185,17 @@ fn validation_only_checks_semantics_without_building_positions_or_indices() {
             Portfolio::validate_materialization(&bytes, &cache, &LoadLimits::default()).is_err()
         );
     }
-    assert!(Portfolio::validate_materialization(
-        &fixture.bytes,
-        &cache,
-        &LoadLimits {
-            max_positions: 7,
-            ..LoadLimits::default()
-        },
-    )
-    .is_err());
+    assert!(
+        Portfolio::validate_materialization(
+            &fixture.bytes,
+            &cache,
+            &LoadLimits {
+                max_positions: 7,
+                ..LoadLimits::default()
+            },
+        )
+        .is_err()
+    );
 }
 
 #[test]

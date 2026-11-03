@@ -5,7 +5,7 @@
 //! partition `carry_total`.
 
 use finstack_quant_attribution::{
-    attribute_pnl, AttributionMethod, AttributionRequest, ExecutionPolicy,
+    AttributionMethod, AttributionRequest, ExecutionPolicy, attribute_pnl,
 };
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;

@@ -1,21 +1,21 @@
 //! Tests for complex multi-operation integration scenarios.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{build_periods, Date, DayCount};
+use finstack_quant_core::dates::{Date, DayCount, build_periods};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::Compounding;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::money::fx::SimpleFxProvider;
-use finstack_quant_core::money::Money;
 use finstack_quant_scenarios::{
     CurveKind, ExecutionContext, OperationSpec, RateBindingSpec, ScenarioEngine, ScenarioSpec,
     TimeRollMode,
 };
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
-use indexmap::{indexmap, IndexMap};
+use indexmap::{IndexMap, indexmap};
 use std::sync::Arc;
 use time::Month;
 

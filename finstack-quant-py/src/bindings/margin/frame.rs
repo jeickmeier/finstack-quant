@@ -34,10 +34,10 @@ pub(super) fn opt_str(row: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<Str
             if let Ok(text) = value.extract::<String>() {
                 return Ok(Some(text));
             }
-            if let Ok(number) = value.extract::<f64>() {
-                if number.fract() == 0.0 {
-                    return Ok(Some(format!("{}", number as i64)));
-                }
+            if let Ok(number) = value.extract::<f64>()
+                && number.fract() == 0.0
+            {
+                return Ok(Some(format!("{}", number as i64)));
             }
             Ok(Some(value.str()?.to_string()))
         }

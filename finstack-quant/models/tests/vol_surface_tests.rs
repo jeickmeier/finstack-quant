@@ -72,12 +72,10 @@ fn value_clamped_handles_nan_and_singleton_axes() {
         finstack_quant_models::volatility::get_surface_vol_clamped(&one_by_one, 2.0, 120.0),
         0.25
     );
-    assert!(finstack_quant_models::volatility::get_surface_vol_clamped(
-        &one_by_one,
-        f64::NAN,
-        100.0
-    )
-    .is_nan());
+    assert!(
+        finstack_quant_models::volatility::get_surface_vol_clamped(&one_by_one, f64::NAN, 100.0)
+            .is_nan()
+    );
     assert!(
         finstack_quant_models::volatility::get_surface_vol_clamped(&one_by_one, 1.0, f64::NAN)
             .is_nan()

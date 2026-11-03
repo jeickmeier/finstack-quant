@@ -11,20 +11,20 @@ use crate::bindings::extract::{extract_instrument, extract_market};
 use crate::bindings::json_bridge::{deserialize_json_with_context, serialize_json_with_context};
 use crate::bindings::module_utils::opt_spec_from_py;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
-use crate::bindings::pandas_utils::{serde_to_py, ColumnSchema};
+use crate::bindings::pandas_utils::{ColumnSchema, serde_to_py};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::valuations::convert::{
     parse_typed_instrument_json, serialize_typed_instrument_json,
 };
 use crate::errors::core_to_py;
 use finstack_quant_core::types::InstrumentId;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::composite::{
-    history, history_from_spec, CompositeHistoryRow, CompositeInstrument, CompositeLegSpec,
-    CompositeMarketObservation, CompositeRebalanceResult, CompositeSpec, CompositeState,
-    RebalanceRule, WeightingMethod,
+    CompositeHistoryRow, CompositeInstrument, CompositeLegSpec, CompositeMarketObservation,
+    CompositeRebalanceResult, CompositeSpec, CompositeState, RebalanceRule, WeightingMethod,
+    history, history_from_spec,
 };
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::results::composite::CompositeExposureReport;
 use pyo3::prelude::*;

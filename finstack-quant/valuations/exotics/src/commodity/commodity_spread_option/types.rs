@@ -15,13 +15,13 @@
 //! - Kirk, E. (1995). "Correlation in the Energy Markets." Managing Energy
 //!   Price Risk, Risk Publications. `docs/REFERENCES.md#kirk-1995`
 
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::Result;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::Instrument;

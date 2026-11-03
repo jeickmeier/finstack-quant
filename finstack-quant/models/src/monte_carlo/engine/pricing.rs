@@ -1,17 +1,17 @@
 //! Execution, configuration, and diagnostics for Monte Carlo pricing.
 //!
-use super::config::{McEngineConfig, MAX_CAPTURED_PATHS, MAX_NUM_PATHS};
+use super::config::{MAX_CAPTURED_PATHS, MAX_NUM_PATHS, McEngineConfig};
 use super::path_capture::PathCaptureMode;
-use super::simulation::{run_path_loop, NoiseHook};
+use super::simulation::{NoiseHook, run_path_loop};
 use crate::monte_carlo::captured_path_stats::apply_captured_path_statistics;
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::paths::{PathDataset, PathSamplingMethod, ProcessParams, SimulatedPath};
 use crate::monte_carlo::results::{MoneyEstimate, MonteCarloResult};
 use crate::monte_carlo::traits::{Discretization, Payoff, RandomStream, StochasticProcess};
-use finstack_quant_core::currency::Currency;
-use finstack_quant_core::math::linalg::{cholesky_correlation, CorrelationFactor};
-use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::Result;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::linalg::{CorrelationFactor, cholesky_correlation};
+use finstack_quant_core::math::stats::OnlineStats;
 
 use std::ops::Range;
 
@@ -285,12 +285,12 @@ impl McEngine {
                 )));
             }
 
-            if let PathCaptureMode::Sample { count, .. } = self.config.path_capture.capture_mode {
-                if count == 0 || count > self.config.num_paths {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Path capture sample count must be between 1 and num_paths (got {count})"
-                    )));
-                }
+            if let PathCaptureMode::Sample { count, .. } = self.config.path_capture.capture_mode
+                && (count == 0 || count > self.config.num_paths)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Path capture sample count must be between 1 and num_paths (got {count})"
+                )));
             }
         }
 
@@ -851,10 +851,11 @@ impl McEngine {
             };
             stats.update(discounted_value);
 
-            if let Some(target) = self.config.target_ci_half_width {
-                if stats.count() >= AUTO_STOP_MIN_SAMPLES && stats.ci_half_width() < target {
-                    return Ok((stats, true));
-                }
+            if let Some(target) = self.config.target_ci_half_width
+                && stats.count() >= AUTO_STOP_MIN_SAMPLES
+                && stats.ci_half_width() < target
+            {
+                return Ok((stats, true));
             }
         }
         Ok((stats, false))

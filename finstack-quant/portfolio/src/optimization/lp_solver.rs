@@ -2,14 +2,14 @@
 //!
 use super::constraints::{Constraint, Inequality};
 use super::decision::{
-    build_decision_space, DecisionFeatures, DecisionItem, OptimizationDenominators,
+    DecisionFeatures, DecisionItem, OptimizationDenominators, build_decision_space,
 };
 use super::problem::PortfolioOptimizationProblem;
 use super::result::{
-    binding_constraint_names, trade_list, OptimizationStatus, PortfolioOptimizationResult,
+    OptimizationStatus, PortfolioOptimizationResult, binding_constraint_names, trade_list,
 };
 use super::types::{
-    MetricExpr, MissingMetricPolicy, PerPositionMetric, WeightingScheme, PV_PER_UNIT_TOL,
+    MetricExpr, MissingMetricPolicy, PV_PER_UNIT_TOL, PerPositionMetric, WeightingScheme,
 };
 use crate::error::{Error, Result};
 use crate::types::PositionId;
@@ -18,7 +18,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::wire::SchemaVersion;
 use finstack_quant_valuations::metrics::MetricId;
-use good_lp::{constraint, default_solver, variable, Expression, Solution, SolverModel};
+use good_lp::{Expression, Solution, SolverModel, constraint, default_solver, variable};
 use indexmap::IndexMap;
 
 /// Filtered weight sums with absolute value at or below this are treated as
@@ -64,10 +64,10 @@ fn required_metrics(problem: &PortfolioOptimizationProblem) -> Vec<MetricId> {
     let mut metrics = Vec::new();
 
     let mut add_metric = |ppm: &PerPositionMetric| {
-        if let PerPositionMetric::Metric(id) = ppm {
-            if !metrics.contains(id) {
-                metrics.push(id.clone());
-            }
+        if let PerPositionMetric::Metric(id) = ppm
+            && !metrics.contains(id)
+        {
+            metrics.push(id.clone());
         }
     };
 
@@ -122,7 +122,10 @@ fn expression_value(
         return Ok(None);
     }
     if matches!(metric, PerPositionMetric::PvBase) && !item.is_existing {
-        return Err(Error::invalid_input(format!("PvBase is not valid in aggregated expressions when candidate positions are in scope: candidate '{}' has no held base value (pv_base = 0). Filter candidates out or use a per-position metric/attribute.", item.position_id)));
+        return Err(Error::invalid_input(format!(
+            "PvBase is not valid in aggregated expressions when candidate positions are in scope: candidate '{}' has no held base value (pv_base = 0). Filter candidates out or use a per-position metric/attribute.",
+            item.position_id
+        )));
     }
     per_position_metric_value(metric, feat, missing_policy).map(Some)
 }
@@ -266,21 +269,19 @@ fn build_lp_rows(
                 ..
             })
     );
-    if objective_is_unfiltered_vwa {
-        if let Some(&rhs) = budget_constraints.first() {
-            // Exact comparison is deliberate: the Σw = 1 guarantee holds
-            // only for a budget rhs that is exactly 1.0 (a caller-typed
-            // literal); any other value — however close — scales the
-            // lowered objective.
-            #[allow(clippy::float_cmp)]
-            if rhs != 1.0 {
-                return Err(Error::invalid_input(format!(
-                    "MO-19: a ValueWeightedAverage objective is lowered to Σ wᵢ·mᵢ, which \
+    if objective_is_unfiltered_vwa && let Some(&rhs) = budget_constraints.first() {
+        // Exact comparison is deliberate: the Σw = 1 guarantee holds
+        // only for a budget rhs that is exactly 1.0 (a caller-typed
+        // literal); any other value — however close — scales the
+        // lowered objective.
+        #[allow(clippy::float_cmp)]
+        if rhs != 1.0 {
+            return Err(Error::invalid_input(format!(
+                "MO-19: a ValueWeightedAverage objective is lowered to Σ wᵢ·mᵢ, which \
                          equals the true average only when the weights sum to 1; the explicit \
                          Budget rhs is {rhs}, so the reported objective would be scaled by \
                          Σw = {rhs}. Use Budget {{ rhs: 1.0 }} or a WeightedSum objective."
-                )));
-            }
+            )));
         }
     }
 

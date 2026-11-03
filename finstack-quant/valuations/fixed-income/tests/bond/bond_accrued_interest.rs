@@ -7,9 +7,9 @@
 //! directly. For metrics-interface tests (via `MetricId::Accrued`), see
 //! `metrics/accrued.rs` which validates the integration with the metrics framework.
 
-use finstack_quant_cashflows::accrual::accrued_interest_amount;
-use finstack_quant_cashflows::accrual::AccrualMethod;
 use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_cashflows::accrual::AccrualMethod;
+use finstack_quant_cashflows::accrual::accrued_interest_amount;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -352,11 +352,11 @@ fn test_accrued_interest_amortizing_schedule_driven() {
     let mut coupon_dates: Vec<(Date, f64)> = Vec::new();
     for cf in schedule.get_flows() {
         if matches!(cf.kind, CFKind::Fixed | CFKind::Stub) {
-            if let Some((d, total)) = coupon_dates.last_mut() {
-                if *d == cf.date {
-                    *total += cf.amount.amount();
-                    continue;
-                }
+            if let Some((d, total)) = coupon_dates.last_mut()
+                && *d == cf.date
+            {
+                *total += cf.amount.amount();
+                continue;
             }
             coupon_dates.push((cf.date, cf.amount.amount()));
         }
@@ -392,13 +392,13 @@ fn test_accrued_interest_amortizing_schedule_driven() {
                 .accrual
                 .as_ref()
                 .map(|accrual| (accrual.start, accrual.end));
-            if let Some(last) = out.last_mut() {
-                if last.0 == cf.date {
-                    last.1 += cf.amount.amount();
-                    last.2 = last.2.or(af);
-                    last.3 = last.3.or(accrual_period);
-                    continue;
-                }
+            if let Some(last) = out.last_mut()
+                && last.0 == cf.date
+            {
+                last.1 += cf.amount.amount();
+                last.2 = last.2.or(af);
+                last.3 = last.3.or(accrual_period);
+                continue;
             }
             out.push((cf.date, cf.amount.amount(), af, accrual_period));
         }

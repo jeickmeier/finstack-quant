@@ -2,7 +2,7 @@
 //!
 use super::bond_valuator::BondValuator;
 use super::config::{TreeModelChoice, TreePricerConfig};
-use super::lsmc::{price_bond_lsmc, BondLsmcConfig};
+use super::lsmc::{BondLsmcConfig, price_bond_lsmc};
 use crate::bond::Bond;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;

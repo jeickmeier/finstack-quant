@@ -496,7 +496,7 @@ fn monthly_results_roll_up_to_quarters() {
 
 #[test]
 fn fiscal_quarters_roll_up_to_fiscal_years_and_halves() {
-    use finstack_quant_core::dates::{build_fiscal_periods, FiscalConfig};
+    use finstack_quant_core::dates::{FiscalConfig, build_fiscal_periods};
 
     let periods = build_fiscal_periods("FY2025Q1..FY2025Q4", FiscalConfig::us_federal(), None)
         .expect("fiscal quarters")

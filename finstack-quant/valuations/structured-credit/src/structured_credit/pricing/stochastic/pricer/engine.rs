@@ -6,9 +6,9 @@ use finstack_quant_models::monte_carlo::estimate::independent_estimator_stats;
 
 use super::config::StochasticPricerConfig;
 use crate::structured_credit::pricing::simulation_engine::{
-    prepare_deal_simulation, simulate_prepared, InstrumentPathFlowSource, PathShocks,
-    PerNameDefaultEngine, PerNamePeriodInput, PeriodPoolShock, PreparedDealSimulation,
-    PreparedInstrumentSchedules, StochasticPathFlowSource,
+    InstrumentPathFlowSource, PathShocks, PerNameDefaultEngine, PerNamePeriodInput,
+    PeriodPoolShock, PreparedDealSimulation, PreparedInstrumentSchedules, StochasticPathFlowSource,
+    prepare_deal_simulation, simulate_prepared,
 };
 use crate::structured_credit::types::{
     StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority,
@@ -753,11 +753,7 @@ impl StochasticPricer {
         let independent: Vec<f64> = (0..factor_path.len())
             .map(|_| {
                 let draw = rng.next_std_normal();
-                if negate {
-                    -draw
-                } else {
-                    draw
-                }
+                if negate { -draw } else { draw }
             })
             .collect();
         let evolved_independent = Self::evolved_factors(&independent, prepared.factor_kappa);

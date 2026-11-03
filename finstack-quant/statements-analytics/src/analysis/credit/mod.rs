@@ -9,8 +9,8 @@ pub(crate) mod covenants;
 pub(crate) mod credit_context;
 
 pub use capital_structure::{
-    capital_structure_summary, CapitalStructureSummary, CapitalStructureSummaryConfig,
-    CapitalStructureTranche, DebtInstrumentKind, MaturityWallBucket,
+    CapitalStructureSummary, CapitalStructureSummaryConfig, CapitalStructureTranche,
+    DebtInstrumentKind, MaturityWallBucket, capital_structure_summary,
 };
-pub use covenants::{evaluate_covenants, forecast_breaches, StatementsAdapter};
-pub use credit_context::{compute_credit_context, CreditContextMetrics, CreditNumeratorNodes};
+pub use covenants::{StatementsAdapter, evaluate_covenants, forecast_breaches};
+pub use credit_context::{CreditContextMetrics, CreditNumeratorNodes, compute_credit_context};

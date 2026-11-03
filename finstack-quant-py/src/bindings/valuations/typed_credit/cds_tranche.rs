@@ -11,9 +11,9 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 
 use super::super::convert::{
     attributes_from_py, bdc_from_py, date_repr, dated_money_from_py, day_count_from_py,

@@ -28,7 +28,7 @@
 //!   *Quantitative Finance*, 16(6), 887–904. `docs/REFERENCES.md#bayer-friz-gatheral-2016`
 
 use finstack_quant_core::math::fractional::{
-    fbm_increment_covariance, fbm_increment_covariance_matrix, HurstExponent,
+    HurstExponent, fbm_increment_covariance, fbm_increment_covariance_matrix,
 };
 use finstack_quant_core::{Error, Result};
 use nalgebra::DMatrix;
@@ -408,13 +408,13 @@ mod tests {
     #[test]
     fn cholesky_output_dimensions() {
         let times = uniform_grid(1.0, 10);
-        let gen = CholeskyFbm::new(&times, 0.3).unwrap();
-        assert_eq!(gen.num_steps(), 10);
-        assert!((gen.hurst() - 0.3).abs() < 1e-14);
+        let r#gen = CholeskyFbm::new(&times, 0.3).unwrap();
+        assert_eq!(r#gen.num_steps(), 10);
+        assert!((r#gen.hurst() - 0.3).abs() < 1e-14);
 
         let normals = vec![1.0; 10];
         let mut out = vec![0.0; 10];
-        gen.generate(&normals, &mut out);
+        r#gen.generate(&normals, &mut out);
 
         assert!(out.iter().all(|x| x.is_finite()));
     }
@@ -424,7 +424,7 @@ mod tests {
         // H = 0.5 means standard Brownian motion: increment covariance is diagonal.
         let n = 20;
         let times = uniform_grid(1.0, n);
-        let gen = CholeskyFbm::new(&times, 0.5).unwrap();
+        let r#gen = CholeskyFbm::new(&times, 0.5).unwrap();
 
         // When H = 0.5, L should be approximately diagonal (identity times sqrt(dt)).
         // A unit vector e_3 should produce output nonzero only in position 3.
@@ -432,7 +432,7 @@ mod tests {
             let mut normals = vec![0.0; n];
             normals[k] = 1.0;
             let mut out = vec![0.0; n];
-            gen.generate(&normals, &mut out);
+            r#gen.generate(&normals, &mut out);
 
             for (i, val) in out.iter().enumerate() {
                 if i == k {
@@ -507,13 +507,14 @@ mod tests {
     fn windowed_output_finite() {
         let n = 50;
         let times = uniform_grid(1.0, n);
-        let gen = WindowedConditionalFbm::new(&times, 0.1, WindowedConditionalFbmConfig::default())
-            .unwrap();
-        assert_eq!(gen.num_steps(), n);
+        let r#gen =
+            WindowedConditionalFbm::new(&times, 0.1, WindowedConditionalFbmConfig::default())
+                .unwrap();
+        assert_eq!(r#gen.num_steps(), n);
 
         let normals: Vec<f64> = (0..n).map(|i| (-1.0_f64).powi(i as i32) * 0.5).collect();
         let mut out = vec![0.0; n];
-        gen.generate(&normals, &mut out);
+        r#gen.generate(&normals, &mut out);
 
         assert!(out.iter().all(|x| x.is_finite()));
     }
@@ -575,7 +576,7 @@ mod tests {
             let n = 60;
             let b = 20;
             let times = uniform_grid(1.0, n);
-            let gen = WindowedConditionalFbm::new(
+            let r#gen = WindowedConditionalFbm::new(
                 &times,
                 h,
                 WindowedConditionalFbmConfig {
@@ -590,7 +591,7 @@ mod tests {
                 let mut normals = vec![0.0; n];
                 normals[k] = 1.0;
                 let mut out = vec![0.0; n];
-                gen.generate(&normals, &mut out);
+                r#gen.generate(&normals, &mut out);
                 for (i, &v) in out.iter().enumerate() {
                     l[i][k] = v;
                 }
@@ -633,8 +634,8 @@ mod tests {
     #[test]
     fn factory_auto_selects_cholesky_for_small_grid() {
         let times = uniform_grid(1.0, 50);
-        let gen = CholeskyFbm::new(&times, 0.3).unwrap();
-        assert_eq!(gen.num_steps(), 50);
+        let r#gen = CholeskyFbm::new(&times, 0.3).unwrap();
+        assert_eq!(r#gen.num_steps(), 50);
     }
 
     #[test]
@@ -644,7 +645,7 @@ mod tests {
         for n in [199, 200, 300] {
             for h in [0.1, 0.7] {
                 let times = uniform_grid(1.0, n);
-                let gen = CholeskyFbm::new(&times, h).unwrap();
+                let r#gen = CholeskyFbm::new(&times, h).unwrap();
                 let middle = n / 2;
                 let mut terminal_var = 0.0;
                 let mut middle_var = 0.0;
@@ -653,7 +654,7 @@ mod tests {
                 let mut out = vec![0.0; n];
                 for basis in 0..n {
                     normals[basis] = 1.0;
-                    gen.generate(&normals, &mut out);
+                    r#gen.generate(&normals, &mut out);
                     normals[basis] = 0.0;
                     let terminal: f64 = out.iter().sum();
                     let midway: f64 = out[..middle].iter().sum();
@@ -674,15 +675,15 @@ mod tests {
     #[test]
     fn explicit_cholesky_constructor() {
         let times = uniform_grid(1.0, 20);
-        let gen = CholeskyFbm::new(&times, 0.4).unwrap();
-        assert_eq!(gen.num_steps(), 20);
-        assert!((gen.hurst() - 0.4).abs() < 1e-14);
+        let r#gen = CholeskyFbm::new(&times, 0.4).unwrap();
+        assert_eq!(r#gen.num_steps(), 20);
+        assert!((r#gen.hurst() - 0.4).abs() < 1e-14);
     }
 
     #[test]
     fn explicit_windowed_constructor() {
         let times = uniform_grid(1.0, 100);
-        let gen = WindowedConditionalFbm::new(
+        let r#gen = WindowedConditionalFbm::new(
             &times,
             0.15,
             WindowedConditionalFbmConfig {
@@ -690,6 +691,6 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(gen.num_steps(), 100);
+        assert_eq!(r#gen.num_steps(), 100);
     }
 }

@@ -17,7 +17,7 @@
 mod bench_common;
 
 use bench_common::{base_date, create_institutional_portfolio, create_market_context, maturity_2y};
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
@@ -28,11 +28,11 @@ use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::valuation::{
-    revalue_affected, value_portfolio, PortfolioValuationOptions, RequestedMetrics,
+    PortfolioValuationOptions, RequestedMetrics, revalue_affected, value_portfolio,
 };
-use finstack_quant_portfolio::{dependencies::MarketFactorKey, Portfolio};
-use finstack_quant_valuations::instruments::rates::deposit::Deposit;
+use finstack_quant_portfolio::{Portfolio, dependencies::MarketFactorKey};
 use finstack_quant_valuations::instruments::RatesCurveKind;
+use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use rust_decimal_macros::dec;
 use std::hint::black_box;
 use std::sync::Arc;

@@ -5,12 +5,12 @@
 
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_fixed_income::bond::Bond;
 use finstack_quant_valuations_structured_credit::structured_credit::{
@@ -418,16 +418,18 @@ fn instrument_collateral_pools_cannot_reinvest() {
         bonds: vec![Bond::example().expect("fixed bond")],
         ..Default::default()
     });
-    let tranches = TrancheStructure::new(vec![Tranche::new(
-        "A",
-        0.0,
-        100.0,
-        TrancheSeniority::Senior,
-        usd(1_000_000.0),
-        RateSpec::Fixed { rate: 0.05 },
-        maturity,
-    )
-    .expect("tranche")])
+    let tranches = TrancheStructure::new(vec![
+        Tranche::new(
+            "A",
+            0.0,
+            100.0,
+            TrancheSeniority::Senior,
+            usd(1_000_000.0),
+            RateSpec::Fixed { rate: 0.05 },
+            maturity,
+        )
+        .expect("tranche"),
+    ])
     .expect("structure");
     let mut deal = StructuredCredit::new_standard(
         finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,

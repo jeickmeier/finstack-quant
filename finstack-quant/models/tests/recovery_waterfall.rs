@@ -1,6 +1,6 @@
 //! Behavioral tests for absolute-priority recovery allocation.
 
-use finstack_quant_models::credit::recovery_waterfall::{allocate_recovery, RecoveryClaim};
+use finstack_quant_models::credit::recovery_waterfall::{RecoveryClaim, allocate_recovery};
 
 fn claim(
     id: &str,
@@ -62,10 +62,12 @@ fn waterfall_conserves_estate_and_reports_excess_as_undistributed() {
 
     assert_eq!(result.total_distributed, 50.0);
     assert_eq!(result.undistributed_estate, 25.0);
-    assert!(result
-        .allocations
-        .iter()
-        .all(|allocation| allocation.total_recovery <= allocation.total_claim));
+    assert!(
+        result
+            .allocations
+            .iter()
+            .all(|allocation| allocation.total_recovery <= allocation.total_claim)
+    );
 }
 
 #[test]
@@ -105,10 +107,12 @@ fn collateral_rounding_residue_is_accepted_and_reconciled_conservatively() {
         .sum::<f64>();
 
     assert!((allocated + result.undistributed_estate - 0.3).abs() <= 1.0e-15);
-    assert!(result
-        .allocations
-        .iter()
-        .all(|allocation| allocation.total_recovery <= allocation.total_claim));
+    assert!(
+        result
+            .allocations
+            .iter()
+            .all(|allocation| allocation.total_recovery <= allocation.total_claim)
+    );
 }
 
 #[test]

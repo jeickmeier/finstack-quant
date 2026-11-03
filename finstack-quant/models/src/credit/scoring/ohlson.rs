@@ -12,7 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::types::{check_finite, CreditScoringError, ScoringResult, ScoringZone};
+use super::types::{CreditScoringError, ScoringResult, ScoringZone, check_finite};
 
 fn check_binary_indicator(field: &'static str, value: f64) -> Result<(), CreditScoringError> {
     check_finite(field, value)?;

@@ -22,7 +22,7 @@ pub use surfaces::{
     validate_butterfly_spread, validate_calendar_spread, validate_surface, validate_vol_bounds,
 };
 
-use crate::{config::CalibrationConfig, CalibrationReport};
+use crate::{CalibrationReport, config::CalibrationConfig};
 use finstack_quant_core::Result;
 
 pub(crate) fn attach_validation_result(

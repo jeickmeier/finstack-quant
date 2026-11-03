@@ -14,7 +14,7 @@ use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
     Dv01CalculatorConfig, UnifiedDv01Calculator,
 };
 use finstack_quant_valuations_core::metrics::{
-    quoted_z_spread, MetricCalculator, MetricContext, ZSpreadBucketedCs01, ZSpreadParallelCs01,
+    MetricCalculator, MetricContext, ZSpreadBucketedCs01, ZSpreadParallelCs01, quoted_z_spread,
 };
 use finstack_quant_valuations_core::pricer::ModelKey;
 use std::sync::Arc;

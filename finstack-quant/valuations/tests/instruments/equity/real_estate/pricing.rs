@@ -10,13 +10,13 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::equity::real_estate::RealEstateFinancing;
 use finstack_quant_valuations::instruments::equity::real_estate::{
     LeveredRealEstateEquity, RealEstateAsset, RealEstateValuationMethod,
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations_test_support::date::date;
 
 fn build_flat_discount_curve(
@@ -292,15 +292,21 @@ fn test_real_estate_custom_metrics_compute() {
         )
         .expect("price_with_metrics");
 
-    assert!(result
-        .measures
-        .contains_key(&MetricId::custom("real_estate::going_in_cap_rate")));
-    assert!(result
-        .measures
-        .contains_key(&MetricId::custom("real_estate::exit_cap_rate")));
-    assert!(result
-        .measures
-        .contains_key(&MetricId::custom("real_estate::unlevered_multiple")));
+    assert!(
+        result
+            .measures
+            .contains_key(&MetricId::custom("real_estate::going_in_cap_rate"))
+    );
+    assert!(
+        result
+            .measures
+            .contains_key(&MetricId::custom("real_estate::exit_cap_rate"))
+    );
+    assert!(
+        result
+            .measures
+            .contains_key(&MetricId::custom("real_estate::unlevered_multiple"))
+    );
 }
 
 #[test]
@@ -319,7 +325,7 @@ fn test_real_estate_unlevered_metrics_include_acquisition_cost_line_items() {
             Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
         ))
         .acquisition_costs(vec![
-            Money::new(100.0, Currency::USD).expect("valid money fixture")
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
         ])
         .discount_rate_opt(Some(0.0))
         .terminal_cap_rate_opt(Some(0.10))

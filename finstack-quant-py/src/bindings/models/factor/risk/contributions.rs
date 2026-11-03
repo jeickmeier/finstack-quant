@@ -748,7 +748,8 @@ impl PyPositionRiskDecomposition {
             self.inner.portfolio_es,
             self.inner.confidence,
             self.inner.n_positions,
-            finstack_quant_core::wire::serde_label(&self.inner.method).unwrap_or_else(|_| "?".to_string()),
+            finstack_quant_core::wire::serde_label(&self.inner.method)
+                .unwrap_or_else(|_| "?".to_string()),
             py_opt(self.inner.euler_residual),
         )
     }

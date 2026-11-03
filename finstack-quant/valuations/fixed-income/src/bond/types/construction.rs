@@ -1,17 +1,17 @@
 //! Bond constructors, factory methods, and schedule building.
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, StubKind};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{Bps, CurveId, InstrumentId, Rate};
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use time::macros::date;
 
+use super::CashflowSpec;
 use super::definitions::{Bond, BondSettlementConvention, CallPut, CallPutSchedule};
 use super::return_floor::ReturnFloorSpec;
-use super::CashflowSpec;
 
 impl Bond {
     /// Create a canonical example bond for testing and documentation.

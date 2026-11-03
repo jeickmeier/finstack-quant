@@ -21,8 +21,8 @@
 //! inputs compare against an independently constructed canonical rate spec.
 
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use finstack_quant_valuations::instruments::PricingOptions;
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
 use serde_json::Value;
 use std::path::PathBuf;
@@ -105,11 +105,13 @@ pub(crate) fn pricing_case_inputs(case: &Value) -> (Value, MarketContext) {
             .iter_mut()
             .find(|curve| curve["type"] == "forward" && curve["id"] == "USD-SOFR-3M")
             .expect("facility forward curve");
-        assert!(forward["knot_points"]
-            .as_array()
-            .expect("forward knots")
-            .iter()
-            .all(|knot| knot[1].as_f64() == Some(0.04)));
+        assert!(
+            forward["knot_points"]
+                .as_array()
+                .expect("forward knots")
+                .iter()
+                .all(|knot| knot[1].as_f64() == Some(0.04))
+        );
         forward["day_count"] = Value::String("act_360".to_string());
     }
     let market: MarketContext = serde_json::from_value(market).expect("market");
@@ -632,8 +634,8 @@ fn retired_utilization_keys_are_rejected() {
 #[test]
 // schema-rejection-test: ConvertibleBond `fixed_coupon`, `floating_coupon`; ConversionEvent price_trigger `threshold`, `lookback_days`
 fn retired_convertible_keys_are_rejected() {
-    use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
     use finstack_quant_valuations::instruments::ConversionEvent;
+    use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
     use serde_json::json;
     let cb = ConvertibleBond::example().expect("convertible");
     assert_rejects_at(&cb, "", "fixed_coupon", Value::Null);

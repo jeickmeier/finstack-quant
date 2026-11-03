@@ -238,7 +238,7 @@ fn schedule_spec_imm_setters_match_builder_semantics() {
 
 // Moved from phase2_strictness.rs: nested strictness.
 mod period_strictness {
-    use finstack_quant_core::dates::{build_periods, Period};
+    use finstack_quant_core::dates::{Period, build_periods};
 
     #[test]
     fn period_rejects_unknown_fields() {

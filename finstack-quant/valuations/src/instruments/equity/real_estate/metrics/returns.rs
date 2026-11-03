@@ -1,9 +1,9 @@
 //! Real estate return-style metrics (IRR, MOIC, cash-on-cash).
 
-use crate::instruments::equity::real_estate::{pricer, RealEstateAsset};
+use crate::instruments::equity::real_estate::{RealEstateAsset, pricer};
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::cashflow::xirr;
 use finstack_quant_core::Error;
+use finstack_quant_core::cashflow::xirr;
 use std::collections::BTreeMap;
 
 fn build_unlevered_cashflow_map(

@@ -1,13 +1,13 @@
 use super::helpers::{
-    headroom_for, is_covenant_breached, spec_metric_name, springing_condition_met, validate_metric,
-    validated_ratio_value, InstrumentMutator, SpecEvaluation,
+    InstrumentMutator, SpecEvaluation, headroom_for, is_covenant_breached, spec_metric_name,
+    springing_condition_met, validate_metric, validated_ratio_value,
 };
 use super::types::{
     ConsequenceApplication, CovenantBreach, CovenantConsequence, CovenantScope, CovenantSpec,
     CovenantWaiver, CovenantWindow,
 };
-use crate::metric::{CovenantMetricId, CovenantMetricSource};
 use crate::CovenantReport;
+use crate::metric::{CovenantMetricId, CovenantMetricSource};
 use finstack_quant_core::dates::Date;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -250,17 +250,17 @@ impl CovenantEngine {
                 continue;
             }
 
-            if let Some(waiver) = self.active_waiver(cid, test_date) {
-                if waiver.amended_threshold.is_none() {
-                    tracing::info!(covenant_id = cid, %test_date, "covenant waived by lender agreement");
-                    reports.insert(
-                        cid.to_string(),
-                        CovenantReport::passed(&description)
-                            .with_covenant_id(cid)
-                            .with_details("Waived by lender agreement"),
-                    );
-                    continue;
-                }
+            if let Some(waiver) = self.active_waiver(cid, test_date)
+                && waiver.amended_threshold.is_none()
+            {
+                tracing::info!(covenant_id = cid, %test_date, "covenant waived by lender agreement");
+                reports.insert(
+                    cid.to_string(),
+                    CovenantReport::passed(&description)
+                        .with_covenant_id(cid)
+                        .with_details("Waived by lender agreement"),
+                );
+                continue;
             }
 
             let evaluation = self.evaluate_spec(spec, context, test_date)?;
@@ -290,10 +290,10 @@ impl CovenantEngine {
                     %test_date,
                     "covenant breach detected",
                 );
-                if let Some(breach) = self.find_active_breach(cid, test_date) {
-                    if breach.cure_deadline.is_some_and(|d| test_date <= d) {
-                        report = report.with_details("In cure period");
-                    }
+                if let Some(breach) = self.find_active_breach(cid, test_date)
+                    && breach.cure_deadline.is_some_and(|d| test_date <= d)
+                {
+                    report = report.with_details("In cure period");
                 }
             }
 
@@ -387,13 +387,11 @@ impl CovenantEngine {
                 .iter_mut()
                 .filter(|b| b.covenant_id == *cid && !b.is_cured && b.breach_date <= test_date)
                 .max_by_key(|b| b.breach_date)
-            {
-                if breach
+                && breach
                     .cure_deadline
                     .is_some_and(|deadline| test_date <= deadline)
-                {
-                    breach.is_cured = true;
-                }
+            {
+                breach.is_cured = true;
             }
         }
         self.breach_history.extend(new_breaches);

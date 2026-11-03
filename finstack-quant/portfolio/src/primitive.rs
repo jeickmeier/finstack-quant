@@ -1,20 +1,20 @@
 //! Primitive exposure reporting across direct and composite positions.
 
+use crate::Portfolio;
 use crate::error::{Error, Result};
 use crate::evaluation::try_map_positions;
 use crate::fx::{convert_to_base, spot_rate_to_base};
 use crate::position::Position;
 use crate::types::PositionId;
-use crate::Portfolio;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_valuations::instruments::composite::CompositeInstrument;
-use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
-use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
 use finstack_quant_valuations::instruments::PricingOptions;
-use finstack_quant_valuations::metrics::{is_additive_metric, MetricId};
+use finstack_quant_valuations::instruments::composite::CompositeInstrument;
+use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
+use finstack_quant_valuations::metrics::{MetricId, is_additive_metric};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

@@ -733,11 +733,13 @@ fn test_equity_trs_all_metrics_together() {
 
     // Assert - All metrics should be present and finite
     assert!(result.measures.get("par_spread").unwrap().is_finite());
-    assert!(result
-        .measures
-        .get("financing_annuity")
-        .unwrap()
-        .is_finite());
+    assert!(
+        result
+            .measures
+            .get("financing_annuity")
+            .unwrap()
+            .is_finite()
+    );
     assert!(result.measures.get("dv01").unwrap().is_finite());
     assert!(result.measures.get("index_delta").unwrap().is_finite());
     assert!(result.measures.get("theta").unwrap().is_finite());
@@ -770,11 +772,13 @@ fn test_fi_index_trs_all_metrics_together() {
 
     // Assert - All metrics should be present and finite
     assert!(result.measures.get("par_spread").unwrap().is_finite());
-    assert!(result
-        .measures
-        .get("financing_annuity")
-        .unwrap()
-        .is_finite());
+    assert!(
+        result
+            .measures
+            .get("financing_annuity")
+            .unwrap()
+            .is_finite()
+    );
     assert!(result.measures.get("dv01").unwrap().is_finite());
     assert!(result.measures.get("duration_dv01").unwrap().is_finite());
     assert!(result.measures.get("theta").unwrap().is_finite());

@@ -10,6 +10,7 @@ use super::waterfall::execute_waterfall_with_principal_breakdown;
 use crate::structured_credit::assumptions::embedded_registry;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -17,7 +18,6 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_fixed_income::mbs_passthrough::pricer::generate_cashflows;
 use finstack_quant_valuations_fixed_income::mbs_passthrough::{AgencyMbsPassthrough, PoolType};
 
@@ -311,18 +311,24 @@ mod tests {
             .expect("reference tranche schedule should build");
 
         assert!(!schedule.get_flows().is_empty());
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .any(|cf| cf.kind == CFKind::Fixed));
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .any(|cf| cf.kind == CFKind::Amortization));
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .any(|cf| cf.kind == CFKind::PrePayment));
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .any(|cf| cf.kind == CFKind::Fixed)
+        );
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .any(|cf| cf.kind == CFKind::Amortization)
+        );
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .any(|cf| cf.kind == CFKind::PrePayment)
+        );
     }
 
     /// PAC/support schedule classification.

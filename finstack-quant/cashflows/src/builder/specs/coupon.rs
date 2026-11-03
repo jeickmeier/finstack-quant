@@ -645,22 +645,22 @@ impl FloatingRateSpec {
             )));
         }
 
-        if let (Some(floor), Some(cap)) = (self.index_floor_bp, self.index_cap_bp) {
-            if floor > cap {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "index_floor_bp ({}) must not exceed index_cap_bp ({})",
-                    floor, cap
-                )));
-            }
+        if let (Some(floor), Some(cap)) = (self.index_floor_bp, self.index_cap_bp)
+            && floor > cap
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "index_floor_bp ({}) must not exceed index_cap_bp ({})",
+                floor, cap
+            )));
         }
 
-        if let (Some(floor), Some(cap)) = (self.all_in_floor_bp, self.all_in_cap_bp) {
-            if floor > cap {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "all_in_floor_bp ({}) must not exceed all_in_cap_bp ({})",
-                    floor, cap
-                )));
-            }
+        if let (Some(floor), Some(cap)) = (self.all_in_floor_bp, self.all_in_cap_bp)
+            && floor > cap
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "all_in_floor_bp ({}) must not exceed all_in_cap_bp ({})",
+                floor, cap
+            )));
         }
 
         Ok(())

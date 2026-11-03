@@ -174,10 +174,10 @@ pub(super) fn quote_fit_report(
     fit.model_version = report.model_version;
     fit.explanation = report.explanation;
     fit = fit.with_validation_result(report.validation_passed, report.validation_error);
-    if let Some(count) = fit.metadata.get("final_params_clamped") {
-        if count != "0" {
-            fit = fit.with_has_penalty_residuals(true);
-        }
+    if let Some(count) = fit.metadata.get("final_params_clamped")
+        && count != "0"
+    {
+        fit = fit.with_has_penalty_residuals(true);
     }
     fit
 }

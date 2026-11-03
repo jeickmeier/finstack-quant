@@ -170,7 +170,7 @@ fn instrument_copies_are_returned_and_missing_inventory_is_rejected() {
     use finstack_quant_scenarios::{OperationSpec, ScenarioSpec};
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::json_loader::{
-        instrument_json_of, InstrumentEnvelope,
+        InstrumentEnvelope, instrument_json_of,
     };
     use finstack_quant_valuations::pricer::InstrumentType;
     let bond = Bond::example().unwrap();
@@ -193,15 +193,17 @@ fn instrument_copies_are_returned_and_missing_inventory_is_rejected() {
         ..Default::default()
     };
     let scenario = serde_json::to_string(&scenario).unwrap();
-    assert!(apply_scenario(
-        JsValue::from(&scenario),
-        JsValue::from(&empty_market_json()),
-        JsValue::from("2025-01-15"),
-        None,
-        None,
-        None
-    )
-    .is_err());
+    assert!(
+        apply_scenario(
+            JsValue::from(&scenario),
+            JsValue::from(&empty_market_json()),
+            JsValue::from("2025-01-15"),
+            None,
+            None,
+            None
+        )
+        .is_err()
+    );
     for with_model in [false, true] {
         let result = if with_model {
             apply_scenario(

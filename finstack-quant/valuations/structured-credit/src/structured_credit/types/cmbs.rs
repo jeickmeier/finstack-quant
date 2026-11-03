@@ -99,12 +99,12 @@ impl BalloonSpec {
                 self.severity_pct
             )));
         }
-        if let Some(rate) = self.extension_rate {
-            if !rate.is_finite() || rate < 0.0 {
-                return Err(invalid(format!(
-                    "balloon extension_rate ({rate}) must be finite and non-negative"
-                )));
-            }
+        if let Some(rate) = self.extension_rate
+            && (!rate.is_finite() || rate < 0.0)
+        {
+            return Err(invalid(format!(
+                "balloon extension_rate ({rate}) must be finite and non-negative"
+            )));
         }
         Ok(())
     }
@@ -280,7 +280,7 @@ impl PrepaymentPenalty {
                     (Some(id), None) => {
                         return Err(finstack_quant_core::Error::Validation(format!(
                             "yield maintenance names discount curve '{id}' which was not supplied"
-                        )))
+                        )));
                     }
                     (Some(_), Some(curve)) => Some(curve),
                     (None, _) => None,
@@ -292,7 +292,7 @@ impl PrepaymentPenalty {
                         return Err(finstack_quant_core::Error::Validation(
                             "yield maintenance needs a reinvestment_rate or a discount_curve_id"
                                 .into(),
-                        ))
+                        ));
                     }
                 };
                 let lost_per_year = prepaid * (coupon - reinvestment).max(0.0);

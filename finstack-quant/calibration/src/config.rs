@@ -954,25 +954,31 @@ mod tests {
         assert!(fresh.is_verifiable());
 
         let stale = policy(Some("2020-01-01T01:00:01Z"));
-        assert!(stale
-            .validate()
-            .expect_err("one second past max age")
-            .to_string()
-            .contains("3601 seconds old"));
+        assert!(
+            stale
+                .validate()
+                .expect_err("one second past max age")
+                .to_string()
+                .contains("3601 seconds old")
+        );
 
         let future = policy(Some("2019-12-31T23:59:59Z"));
-        assert!(future
-            .validate()
-            .expect_err("snapshot after as-of")
-            .to_string()
-            .contains("after as_of_timestamp"));
+        assert!(
+            future
+                .validate()
+                .expect_err("snapshot after as-of")
+                .to_string()
+                .contains("after as_of_timestamp")
+        );
 
         let missing = policy(None);
-        assert!(missing
-            .validate()
-            .expect_err("age needs an as-of")
-            .to_string()
-            .contains("together"));
+        assert!(
+            missing
+                .validate()
+                .expect_err("age needs an as-of")
+                .to_string()
+                .contains("together")
+        );
         assert!(!missing.is_verifiable());
     }
 
@@ -1080,21 +1086,25 @@ mod fx_and_hierarchy_settings_tests {
     fn market_freshness_requires_complete_valid_policy() {
         let mut incomplete = CalibrationConfig::default();
         incomplete.market_freshness.snapshot_timestamp = Some("2026-01-01T00:00:00Z".to_string());
-        assert!(incomplete
-            .validate()
-            .expect_err("timestamp without max age")
-            .to_string()
-            .contains("together"));
+        assert!(
+            incomplete
+                .validate()
+                .expect_err("timestamp without max age")
+                .to_string()
+                .contains("together")
+        );
 
         let mut malformed = CalibrationConfig::default();
         malformed.market_freshness.snapshot_timestamp = Some("not-a-timestamp".to_string());
         malformed.market_freshness.max_age_seconds = Some(60);
         malformed.market_freshness.as_of_timestamp = Some("2026-01-01T00:00:00Z".to_string());
-        assert!(malformed
-            .validate()
-            .expect_err("malformed timestamp")
-            .to_string()
-            .contains("RFC3339"));
+        assert!(
+            malformed
+                .validate()
+                .expect_err("malformed timestamp")
+                .to_string()
+                .contains("RFC3339")
+        );
     }
 
     #[test]

@@ -1,11 +1,11 @@
 //! Unit tests for the CDS tranche pricing engine.
 
 use super::pricer::{
-    DiscountAt, PoolExposure, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION,
+    CORR_BOUNDARY_WIDTH, DiscountAt, MAX_CORRELATION, MIN_CORRELATION, PoolExposure,
 };
 use super::*;
-use crate::cds_tranche::parameters::CdsTrancheParams;
 use crate::cds_tranche::CdsTranche;
+use crate::cds_tranche::parameters::CdsTrancheParams;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
@@ -170,14 +170,18 @@ fn projected_schedule_contains_premium_and_default_rows() {
         .build_projected_schedule(&tranche, &market, as_of)
         .expect("projected tranche schedule");
 
-    assert!(schedule
-        .get_flows()
-        .iter()
-        .any(|cf| cf.kind == CFKind::Fixed));
-    assert!(schedule
-        .get_flows()
-        .iter()
-        .any(|cf| cf.kind == CFKind::DefaultedNotional));
+    assert!(
+        schedule
+            .get_flows()
+            .iter()
+            .any(|cf| cf.kind == CFKind::Fixed)
+    );
+    assert!(
+        schedule
+            .get_flows()
+            .iter()
+            .any(|cf| cf.kind == CFKind::DefaultedNotional)
+    );
 }
 
 /// The projected schedule carries exactly the discountable rows' cashflows and
@@ -2489,10 +2493,12 @@ fn expired_protection_keeps_rolled_coupon_and_later_upfront() {
         .expect("upfront only");
     assert_eq!(after_coupon.len(), 1);
     assert_eq!(after_coupon[0].cashflow.kind, CFKind::Fee);
-    assert!(pricer
-        .project_discountable_rows(&tranche, &market, date!(2025 - 07 - 03))
-        .expect("settled")
-        .is_empty());
+    assert!(
+        pricer
+            .project_discountable_rows(&tranche, &market, date!(2025 - 07 - 03))
+            .expect("settled")
+            .is_empty()
+    );
 }
 
 #[test]
@@ -2655,13 +2661,17 @@ fn heterogeneous_tail_loss_matches_independent_state_enumeration_and_factor_grid
                     reference += h / 3.0 * weight * conditional_loss * (-0.5 * z * z).exp()
                         / std::f64::consts::TAU.sqrt();
                 }
-                assert!((actual - reference).abs() < budget,
-                    "rho={rho}, cap={cap}, grid={steps}: production={actual}, exact-state reference={reference}, budget={budget}");
+                assert!(
+                    (actual - reference).abs() < budget,
+                    "rho={rho}, cap={cap}, grid={steps}: production={actual}, exact-state reference={reference}, budget={budget}"
+                );
                 references.push(reference);
             }
-            assert!(references
-                .windows(2)
-                .all(|pair| (pair[0] - pair[1]).abs() < budget));
+            assert!(
+                references
+                    .windows(2)
+                    .all(|pair| (pair[0] - pair[1]).abs() < budget)
+            );
         }
     }
 }

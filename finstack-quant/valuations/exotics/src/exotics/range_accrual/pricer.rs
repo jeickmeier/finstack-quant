@@ -15,20 +15,20 @@
 //! - Historical fixings for mid-life valuations (via `past_observations_in_range`)
 
 use crate::exotics::range_accrual::types::RangeAccrual;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::payoff::range_accrual::RangeAccrualPayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };
 use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
-use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
@@ -285,7 +285,10 @@ fn compute_known_value(
     as_of: Date,
     payment_date: Date,
 ) -> Result<Money> {
-    match (inst.terms.past_observations_in_range, inst.terms.total_past_observations) {
+    match (
+        inst.terms.past_observations_in_range,
+        inst.terms.total_past_observations,
+    ) {
         (Some(in_range), Some(total)) if total > 0 => {
             let accrual_fraction = in_range as f64 / total as f64;
             let fv = inst.terms.notional.amount()
@@ -295,7 +298,10 @@ fn compute_known_value(
             let discount_factor = curves
                 .get_discount(inst.terms.discount_curve_id.as_str())?
                 .df_between_dates(as_of, payment_date)?;
-            Ok(Money::new(fv * discount_factor, inst.terms.notional.currency())?)
+            Ok(Money::new(
+                fv * discount_factor,
+                inst.terms.notional.currency(),
+            )?)
         }
         _ => Err(finstack_quant_core::Error::Validation(format!(
             "RangeAccrual '{}' is fully observed but historical fixing counts are missing or invalid",
@@ -594,8 +600,8 @@ mod tests {
     }
 
     #[test]
-    fn analytic_range_accrual_returns_zero_when_all_observations_are_past_and_no_history_is_supplied(
-    ) {
+    fn analytic_range_accrual_returns_zero_when_all_observations_are_past_and_no_history_is_supplied()
+     {
         let as_of = date(2024, 4, 30);
         let mut inst = RangeAccrual::example().expect("example");
         inst.terms.start_date = date(2023, 12, 31);
@@ -1045,8 +1051,10 @@ mod tests {
                 .amount();
             let sampling_stderr =
                 full_coupon * (probability * (1.0 - probability) / 40_000.0).sqrt();
-            assert!((mc - expected).abs() < 5.0 * sampling_stderr,
-                "rho={correlation}: MC={mc}, expected={expected}, binomial stderr={sampling_stderr}");
+            assert!(
+                (mc - expected).abs() < 5.0 * sampling_stderr,
+                "rho={correlation}: MC={mc}, expected={expected}, binomial stderr={sampling_stderr}"
+            );
         }
     }
 
@@ -1086,7 +1094,7 @@ mod tests {
     #[test]
     fn rho_reprices_with_the_requested_model() {
         use finstack_quant_valuations_core::instruments::PricingOptions;
-        use finstack_quant_valuations_core::metrics::{bump_discount_curve_parallel, MetricId};
+        use finstack_quant_valuations_core::metrics::{MetricId, bump_discount_curve_parallel};
 
         let as_of = date(2024, 1, 1);
         let curves = market(as_of);

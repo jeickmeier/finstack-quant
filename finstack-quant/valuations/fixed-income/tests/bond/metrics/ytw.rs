@@ -2,8 +2,8 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fixed_income::bond::Bond;
 #[allow(unused_imports)]
@@ -121,13 +121,13 @@ fn test_ytw_tracks_quoted_price_not_model_pv() {
 
 #[test]
 fn test_ytw_off_cycle_call_uses_dirty_street_redemption() {
-    use finstack_quant_cashflows::accrual::accrued_interest_amount;
     use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_cashflows::accrual::accrued_interest_amount;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::YieldCompounding;
     use finstack_quant_valuations_fixed_income::bond::pricing::ytm_solver::{
-        solve_ytm, YtmPricingSpec,
+        YtmPricingSpec, solve_ytm,
     };
 
     let as_of = date!(2025 - 01 - 01);
@@ -398,8 +398,8 @@ fn test_ytw_characterization_example_callable() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::metrics::MetricId;
     use finstack_quant_valuations_fixed_income::bond::Bond;
     use time::macros::date;

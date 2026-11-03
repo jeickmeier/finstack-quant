@@ -70,15 +70,15 @@ pub(crate) mod staging;
 pub(crate) mod types;
 
 pub use types::{
-    Exposure, PdTermStructure, QualitativeFlags, RatingPdMap, RawPdCurve, Stage,
-    DEFAULT_REVOLVER_CCF,
+    DEFAULT_REVOLVER_CCF, Exposure, PdTermStructure, QualitativeFlags, RatingPdMap, RawPdCurve,
+    Stage,
 };
 
-pub use staging::{classify_stage_from_curves, StageResult, StagingConfig, StagingTrigger};
+pub use staging::{StageResult, StagingConfig, StagingTrigger, classify_stage_from_curves};
 
 pub use engine::{
-    compute_ecl_from_curve, compute_ecl_weighted_from_curves, EclBucket, EclConfig,
-    EclConfigBuilder, EclResult, LgdType, MacroScenario, WeightedEclResult,
+    EclBucket, EclConfig, EclConfigBuilder, EclResult, LgdType, MacroScenario, WeightedEclResult,
+    compute_ecl_from_curve, compute_ecl_weighted_from_curves,
 };
 
 pub use request::{classify_stage, compute_ecl, compute_ecl_weighted};

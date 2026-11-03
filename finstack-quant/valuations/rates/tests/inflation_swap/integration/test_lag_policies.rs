@@ -215,9 +215,11 @@ fn test_historical_observation_requires_fixing_or_explicit_contract_base() {
     );
     let mut explicitly_fixed = swap;
     explicitly_fixed.base_cpi = Some(300.0);
-    assert!(explicitly_fixed
-        .value(&ctx, as_of)
-        .expect("explicit start fixing")
-        .amount()
-        .is_finite());
+    assert!(
+        explicitly_fixed
+            .value(&ctx, as_of)
+            .expect("explicit start fixing")
+            .amount()
+            .is_finite()
+    );
 }

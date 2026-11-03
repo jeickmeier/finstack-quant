@@ -686,7 +686,9 @@ mod tests {
             let stderr = (sample_variance / num_paths as f64).sqrt() * (-r * t_end).exp();
             estimates.push((n, mc_price, stderr));
             rel_errs.push((mc_price - reference).abs() / reference);
-            eprintln!("rough Heston MC n={n}, paths={num_paths}: price={mc_price}, stderr={stderr}, Fourier={reference}");
+            eprintln!(
+                "rough Heston MC n={n}, paths={num_paths}: price={mc_price}, stderr={stderr}, Fourier={reference}"
+            );
         }
 
         assert!(

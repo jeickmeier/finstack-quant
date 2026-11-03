@@ -19,10 +19,10 @@ use crate::utils::input::{from_js_json, js_f64, js_opt_f64, js_opt_string_seq, j
 use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     self as sc, DealType, OasConfig, ScenarioGrid, StandardDealParams, StructuredCredit,
 };
-use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
 /// Z-spread-equivalent discount margin for a floating-rate tranche, returned in

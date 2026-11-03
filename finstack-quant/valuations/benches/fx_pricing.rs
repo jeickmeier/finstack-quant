@@ -2,15 +2,15 @@
 
 //! FX instrument pricing benchmarks.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
-use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;

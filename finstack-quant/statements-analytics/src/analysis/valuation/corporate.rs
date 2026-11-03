@@ -4,8 +4,8 @@
 //! DCF (Discounted Cash Flow) valuation, allowing direct valuation of companies
 //! from forecast models.
 
-use crate::analysis::scenarios::sensitivity::descending_f64;
 use crate::analysis::scenarios::TornadoEntry;
+use crate::analysis::scenarios::sensitivity::descending_f64;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -15,10 +15,10 @@ use finstack_quant_core::types::InstrumentId;
 use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
 use finstack_quant_statements::types::{FinancialModelSpec, NodeValueType};
 use finstack_quant_statements::{Error, Result};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
     DiscountedCashFlow, EquityBridge, TerminalValueSpec, ValuationDiscounts,
 };
-use finstack_quant_valuations::instruments::Instrument;
 
 /// Corporate valuation result containing DCF outputs.
 ///
@@ -1158,13 +1158,12 @@ fn resolve_exit_multiple_metric(
         if let TerminalValueSpec::ExitMultiple {
             terminal_metric, ..
         } = terminal_value
+            && !(terminal_metric.is_finite() && terminal_metric > 0.0)
         {
-            if !(terminal_metric.is_finite() && terminal_metric > 0.0) {
-                return Err(finstack_quant_statements::Error::InvalidInput(format!(
-                    "exit-multiple terminal_metric must be positive and finite unless \
+            return Err(finstack_quant_statements::Error::InvalidInput(format!(
+                "exit-multiple terminal_metric must be positive and finite unless \
                      exit_multiple_metric_node supplies it (got {terminal_metric})"
-                )));
-            }
+            )));
         }
         return Ok(terminal_value);
     };
@@ -1827,13 +1826,10 @@ mod tests {
             };
             assert_eq!(terminal_metric, 100.);
             model.periods.remove(0);
-            assert!(resolve_exit_multiple_metric(
-                &model,
-                &results,
-                terminal.clone(),
-                Some("ebitda")
-            )
-            .is_err());
+            assert!(
+                resolve_exit_multiple_metric(&model, &results, terminal.clone(), Some("ebitda"))
+                    .is_err()
+            );
             assert!(resolve_exit_multiple_metric(&model, &results, terminal, None).is_ok());
             for bad in [0.0, -5.0, f64::NAN] {
                 let unset = TerminalValueSpec::ExitMultiple {

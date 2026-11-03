@@ -2,8 +2,8 @@
 
 use super::common::{by_id, make_date};
 use finstack_quant_core::dates::{
-    adjust, available_calendars, calendar_by_id_strict, BusinessDayConvention, Date, DateExt,
-    HolidayCalendar,
+    BusinessDayConvention, Date, DateExt, HolidayCalendar, adjust, available_calendars,
+    calendar_by_id_strict,
 };
 use std::collections::HashSet;
 use time::Month;

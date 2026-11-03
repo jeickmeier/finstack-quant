@@ -1,17 +1,17 @@
 //! Builders for credit instruments from market quotes.
 
-use crate::build::helpers::resolve_spot_date;
 use crate::build::BuildCtx;
+use crate::build::helpers::resolve_spot_date;
 use crate::quotes::CdsQuote;
 use crate::quotes::Pillar;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{
-    is_cds_date, next_cds_date, next_semiannual_cds_maturity, prev_cds_date,
-    prev_cds_semiannual_roll, BusinessDayConvention, Date, DateExt, Tenor,
+    BusinessDayConvention, Date, DateExt, Tenor, is_cds_date, next_cds_date,
+    next_semiannual_cds_maturity, prev_cds_date, prev_cds_semiannual_roll,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 use finstack_quant_valuations_core::market::conventions::{CdsConventionSpec, ConventionRegistry};
 use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
@@ -227,9 +227,9 @@ mod tests {
     use super::*;
     use crate::quotes::CdsQuote;
     use crate::quotes::{Pillar, QuoteId};
+    use finstack_quant_core::FxHashMap;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
-    use finstack_quant_core::FxHashMap;
     use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause,
     };

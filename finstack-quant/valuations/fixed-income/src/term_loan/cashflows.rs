@@ -6,7 +6,7 @@
 
 use crate::term_loan::types::TermLoan;
 use finstack_quant_cashflows::builder::ScheduleParams;
-use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule};
+use finstack_quant_cashflows::builder::{CashFlowSchedule, merge_cashflow_schedules};
 use finstack_quant_cashflows::builder::{
     CouponType, FeeBase, FeeSpec, FloatingCouponSpec, FloatingRateSpec, PrincipalEventSpec,
     StepUpCouponSpec,
@@ -157,7 +157,7 @@ pub(crate) fn generate_cashflows(
     // accrual-period start grid used to snap floating margin steps to
     // whole-period boundaries.
     let (coupon_dates, accrual_starts): (Vec<(Date, Date)>, Vec<Date>) = {
-        use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+        use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
 
         let schedule = loan_schedule_params(loan);
         let periods = build_periods(BuildPeriodsParams::from_schedule(
@@ -408,46 +408,45 @@ pub(crate) fn generate_cashflows(
     for fee in fees {
         let _ = builder.fee(fee);
     }
-    if let Some(ddtl) = &loan.ddtl {
-        if !ddtl.usage_fee_bp.is_zero() {
-            let _ = builder.fee(FeeSpec::PeriodicBp {
-                base: FeeBase::Drawn,
-                bp: ddtl.usage_fee_bp,
-                frequency: loan.frequency,
-                day_count: loan.day_count,
-                business_day_convention: loan.business_day_convention,
-                calendar_id: loan
-                    .calendar_id
-                    .as_deref()
-                    .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID)
-                    .to_string(),
-                stub: loan.stub,
-                accrual_basis:
-                    finstack_quant_cashflows::builder::FeeAccrualBasis::TimeWeightedAverage,
-            });
-        }
+    if let Some(ddtl) = &loan.ddtl
+        && !ddtl.usage_fee_bp.is_zero()
+    {
+        let _ = builder.fee(FeeSpec::PeriodicBp {
+            base: FeeBase::Drawn,
+            bp: ddtl.usage_fee_bp,
+            frequency: loan.frequency,
+            day_count: loan.day_count,
+            business_day_convention: loan.business_day_convention,
+            calendar_id: loan
+                .calendar_id
+                .as_deref()
+                .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID)
+                .to_string(),
+            stub: loan.stub,
+            accrual_basis: finstack_quant_cashflows::builder::FeeAccrualBasis::TimeWeightedAverage,
+        });
     }
 
     // Build via shared builder (use market for forwards)
     let mut schedule = builder.build(Some(market))?;
 
-    if let Some(ddtl) = &loan.ddtl {
-        if !ddtl.commitment_fee_bp.is_zero() {
-            let commitment_fees = build_commitment_fee_flows(loan, ddtl, draw_stop, &schedule)?;
-            if !commitment_fees.is_empty() {
-                let notional = schedule.get_notional().clone();
-                let day_count = schedule.get_day_count();
-                let fee_schedule = finstack_quant_cashflows::schedule_from_classified_flows(
-                    commitment_fees,
-                    day_count,
-                    finstack_quant_cashflows::ScheduleBuildOpts {
-                        notional_hint: Some(notional.initial),
-                        meta: schedule.get_meta().clone(),
-                    },
-                )?
-                .with_notional(notional.clone());
-                schedule = merge_cashflow_schedules([schedule, fee_schedule], notional, day_count);
-            }
+    if let Some(ddtl) = &loan.ddtl
+        && !ddtl.commitment_fee_bp.is_zero()
+    {
+        let commitment_fees = build_commitment_fee_flows(loan, ddtl, draw_stop, &schedule)?;
+        if !commitment_fees.is_empty() {
+            let notional = schedule.get_notional().clone();
+            let day_count = schedule.get_day_count();
+            let fee_schedule = finstack_quant_cashflows::schedule_from_classified_flows(
+                commitment_fees,
+                day_count,
+                finstack_quant_cashflows::ScheduleBuildOpts {
+                    notional_hint: Some(notional.initial),
+                    meta: schedule.get_meta().clone(),
+                },
+            )?
+            .with_notional(notional.clone());
+            schedule = merge_cashflow_schedules([schedule, fee_schedule], notional, day_count);
         }
     }
 
@@ -470,16 +469,16 @@ fn build_commitment_fee_flows(
 ) -> finstack_quant_core::Result<Vec<CashFlow>> {
     let fee_start = ddtl.availability_start;
     let mut fee_end = ddtl.availability_end;
-    if let Some(ds) = draw_stop {
-        if ds < fee_end {
-            fee_end = ds;
-        }
+    if let Some(ds) = draw_stop
+        && ds < fee_end
+    {
+        fee_end = ds;
     }
     if fee_start >= fee_end {
         return Ok(Vec::new());
     }
 
-    use finstack_quant_cashflows::builder::{build_periods, period_accrual, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods, period_accrual};
 
     // Fees accrue on the loan's own period grid and are paid once per period
     // on its payment date; the availability window may start and end off it.
@@ -503,10 +502,10 @@ fn build_commitment_fee_flows(
     // when draws occur mid-period (the undrawn amount changes at each draw).
     for ev in &ddtl.draws {
         if ev.date > fee_start && ev.date < fee_end {
-            if let Some(ds) = draw_stop {
-                if ev.date >= ds {
-                    continue;
-                }
+            if let Some(ds) = draw_stop
+                && ev.date >= ds
+            {
+                continue;
             }
             dates.push(ev.date);
         }
@@ -591,10 +590,10 @@ fn cumulative_drawn_at(ddtl: &super::spec::DdtlSpec, draw_stop: Option<Date>, da
         if ev.date < ddtl.availability_start || ev.date > ddtl.availability_end {
             continue;
         }
-        if let Some(ds) = draw_stop {
-            if ev.date >= ds {
-                continue;
-            }
+        if let Some(ds) = draw_stop
+            && ev.date >= ds
+        {
+            continue;
         }
         if ev.date <= date {
             total += ev.amount.amount();

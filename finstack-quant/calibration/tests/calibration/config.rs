@@ -6,7 +6,7 @@ use finstack_quant_core::currency::Currency;
 
 #[test]
 fn calibration_engine_rejects_invalid_solver_controls_before_execution() {
-    use finstack_quant_calibration::api::engine::{calibrate_from_json, ExecutionStage};
+    use finstack_quant_calibration::api::engine::{ExecutionStage, calibrate_from_json};
 
     for solver in [
         serde_json::json!({"tolerance": 0.0}),
@@ -34,7 +34,7 @@ fn calibration_engine_rejects_invalid_solver_controls_before_execution() {
 
 #[test]
 fn calibration_engine_rejects_invalid_discount_controls_before_execution() {
-    use finstack_quant_calibration::api::engine::{calibrate_from_json, ExecutionStage};
+    use finstack_quant_calibration::api::engine::{ExecutionStage, calibrate_from_json};
 
     for discount_curve in [
         serde_json::json!({"df_hard_min": 2.0, "df_hard_max": 1.0}),

@@ -2,8 +2,8 @@
 
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use finstack_quant_valuations::instruments::PricingOptions;
+use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::ModelKey;
 use finstack_quant_valuations::pricer::STANDARD;
@@ -46,10 +46,11 @@ fn cs01_follows_the_selected_pricing_model() {
     let tree_cs01 = *tree.measures.get("cs01").expect("cs01");
     assert!(tree_cs01 < 0.0);
     assert!(tree.measures.contains_key("cs01::USD-CREDIT"));
-    assert!(tree
-        .measures
-        .keys()
-        .any(|key| key.as_str().starts_with("bucketed_cs01::USD-CREDIT::")));
+    assert!(
+        tree.measures
+            .keys()
+            .any(|key| key.as_str().starts_with("bucketed_cs01::USD-CREDIT::"))
+    );
 
     let discounting = finstack_quant_valuations::pricer::STANDARD
         .pricers()

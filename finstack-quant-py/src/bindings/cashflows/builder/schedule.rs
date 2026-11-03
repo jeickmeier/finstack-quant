@@ -2,8 +2,8 @@
 
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::{
-    merge_cashflow_schedules as rust_merge_cashflow_schedules, CashFlowMeta, CashFlowSchedule,
-    CashflowRepresentation,
+    CashFlowMeta, CashFlowSchedule, CashflowRepresentation,
+    merge_cashflow_schedules as rust_merge_cashflow_schedules,
 };
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::money::Money;
@@ -13,7 +13,7 @@ use pyo3::types::PyDict;
 
 use super::specs::date_money_to_py;
 use crate::bindings::cashflows::aggregation::PyPeriodAggregation;
-use crate::bindings::core::cashflow::{extract_cf_kind, PyCashFlow};
+use crate::bindings::core::cashflow::{PyCashFlow, extract_cf_kind};
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::periods::PyPeriod;

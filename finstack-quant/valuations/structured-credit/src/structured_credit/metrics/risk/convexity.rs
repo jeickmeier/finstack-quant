@@ -18,12 +18,12 @@
 //! are years².
 
 use crate::structured_credit::metrics::discounted_flows;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Default parallel rate bump for the central second difference: 10bp.

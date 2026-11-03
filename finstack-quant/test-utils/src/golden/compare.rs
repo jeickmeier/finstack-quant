@@ -3,8 +3,8 @@
 //! This module provides assertion helpers that produce actionable error
 //! messages including case identifiers, metric labels, and provenance.
 
-use crate::golden::types::{Expectation, SuiteMeta};
 use crate::Error;
+use crate::golden::types::{Expectation, SuiteMeta};
 
 /// Assertion context for golden test comparisons.
 ///

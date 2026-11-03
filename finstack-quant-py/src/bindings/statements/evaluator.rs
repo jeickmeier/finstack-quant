@@ -1,7 +1,7 @@
 //! Python wrappers for the statement evaluator and results.
 
 use super::capital_structure::PyCapitalStructureCashflows;
-use super::monte_carlo::{extract_config, PyMonteCarloResults};
+use super::monte_carlo::{PyMonteCarloResults, extract_config};
 use super::parse_period_id;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;

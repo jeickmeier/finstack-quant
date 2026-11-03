@@ -1,6 +1,6 @@
 //! `CalibrationResultEnvelope`: calibrated market plus plan-level and per-step reports.
 
-use super::report::{quote_quality_dataframe, PyCalibrationReport};
+use super::report::{PyCalibrationReport, quote_quality_dataframe};
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pickle_support::reduce_via_json;

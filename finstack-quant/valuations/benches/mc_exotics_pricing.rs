@@ -8,7 +8,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -21,9 +21,9 @@ use finstack_quant_core::types::{BarrierType, CurveId, InstrumentId, PriceId};
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
 use finstack_quant_models::types::OptionType;
+use finstack_quant_valuations::instruments::equity::EquityPathModel;
 use finstack_quant_valuations::instruments::equity::autocallable::Autocallable;
 use finstack_quant_valuations::instruments::equity::cliquet_option::CliquetOption;
-use finstack_quant_valuations::instruments::equity::EquityPathModel;
 use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
 use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
 use finstack_quant_valuations::instruments::exotics::lookback_option::{

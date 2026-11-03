@@ -1,6 +1,6 @@
 //! Liquidity estimator benchmarks.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use finstack_quant_models::liquidity::{amihud_illiquidity, roll_effective_spread};
 use std::hint::black_box;
 

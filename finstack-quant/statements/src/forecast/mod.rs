@@ -377,12 +377,12 @@ pub(crate) fn apply_bounds(
     let min = parse_bound(params, "min")?;
     let max = parse_bound(params, "max")?;
 
-    if let (Some(lo), Some(hi)) = (min, max) {
-        if lo > hi {
-            return Err(crate::error::Error::forecast(format!(
-                "Forecast bounds require min <= max, got min = {lo} and max = {hi}"
-            )));
-        }
+    if let (Some(lo), Some(hi)) = (min, max)
+        && lo > hi
+    {
+        return Err(crate::error::Error::forecast(format!(
+            "Forecast bounds require min <= max, got min = {lo} and max = {hi}"
+        )));
     }
     if min.is_none() && max.is_none() {
         return Ok(());
@@ -435,25 +435,25 @@ fn mix_node_seed(
     node_id: &str,
 ) -> indexmap::IndexMap<String, serde_json::Value> {
     let mut params = params.clone();
-    if let Some(seed_val) = params.get_mut("seed") {
-        if let Some(seed) = statistical::parse_seed_json(seed_val) {
-            // SplitMix64-style combine: a plain XOR can cancel bits when the
-            // user seed and node hash overlap (worst case yielding seed 0);
-            // multiply-add by the golden-ratio constant decorrelates them.
-            let effective_seed = seed
-                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-                .wrapping_add(statistical::stable_hash_u64(node_id));
-            *seed_val = serde_json::json!(effective_seed);
-        }
+    if let Some(seed_val) = params.get_mut("seed")
+        && let Some(seed) = statistical::parse_seed_json(seed_val)
+    {
+        // SplitMix64-style combine: a plain XOR can cancel bits when the
+        // user seed and node hash overlap (worst case yielding seed 0);
+        // multiply-add by the golden-ratio constant decorrelates them.
+        let effective_seed = seed
+            .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+            .wrapping_add(statistical::stable_hash_u64(node_id));
+        *seed_val = serde_json::json!(effective_seed);
     }
     params
 }
 
 #[cfg(test)]
 mod parameter_contract_tests {
-    use super::{allowed_params, param_shape, validate_params, ParamShape};
+    use super::{ParamShape, allowed_params, param_shape, validate_params};
     use crate::types::{ForecastMethod, ForecastParameters, ForecastSpec};
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     /// One valid wire document per method, with every optional parameter.
     fn documents() -> Vec<Value> {

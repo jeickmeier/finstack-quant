@@ -4,7 +4,7 @@
 //! markets funds, including return of capital, preferred IRR hurdles, catch-up
 //! provisions, promote splits, and clawback mechanisms.
 
-use finstack_quant_core::config::{results_meta, FinstackConfig, ResultsMeta};
+use finstack_quant_core::config::{FinstackConfig, ResultsMeta, results_meta};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
@@ -202,12 +202,12 @@ impl PeFundWaterfallSpec {
             }
         }
 
-        if let Some(holdback_decimal) = self.clawback.as_ref().and_then(|c| c.holdback_decimal) {
-            if !holdback_decimal.is_finite() || !(0.0..=1.0).contains(&holdback_decimal) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "clawback holdback percentage must be in [0, 1], got {holdback_decimal}"
-                )));
-            }
+        if let Some(holdback_decimal) = self.clawback.as_ref().and_then(|c| c.holdback_decimal)
+            && (!holdback_decimal.is_finite() || !(0.0..=1.0).contains(&holdback_decimal))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "clawback holdback percentage must be in [0, 1], got {holdback_decimal}"
+            )));
         }
 
         Ok(())
@@ -558,15 +558,15 @@ impl<'a> EquityWaterfallEngine<'a> {
             WaterfallStyle::American => self.run_american(&sorted_events, &mut ledger_rows)?,
         };
 
-        if self.spec.clawback.is_some() {
-            if let Some(last_event_date) = sorted_events.last().map(|event| event.date) {
-                self.settle_clawback_as_of(
-                    &sorted_events,
-                    &mut ledger_rows,
-                    last_event_date,
-                    lp_unreturned,
-                )?;
-            }
+        if self.spec.clawback.is_some()
+            && let Some(last_event_date) = sorted_events.last().map(|event| event.date)
+        {
+            self.settle_clawback_as_of(
+                &sorted_events,
+                &mut ledger_rows,
+                last_event_date,
+                lp_unreturned,
+            )?;
         }
 
         let config = FinstackConfig::default();
@@ -1750,11 +1750,13 @@ mod tests {
             let lp: f64 = ledger.rows.iter().map(|row| row.to_lp.amount()).sum();
             assert!((gp - 60_000.0).abs() < 1e-6, "holdback={holdback}, gp={gp}");
             assert!((lp - 1_240_000.0).abs() < 1e-6);
-            assert!(ledger
-                .rows
-                .iter()
-                .filter(|row| row.tranche.contains("Clawback"))
-                .all(|row| row.to_gp.amount() >= -1e-6));
+            assert!(
+                ledger
+                    .rows
+                    .iter()
+                    .filter(|row| row.tranche.contains("Clawback"))
+                    .all(|row| row.to_gp.amount() >= -1e-6)
+            );
         }
     }
 
@@ -1910,10 +1912,12 @@ mod tests {
         let ledger = EquityWaterfallEngine::new(&spec)
             .run(&events)
             .expect("deal allocation and fund clawback");
-        assert!(ledger
-            .rows
-            .iter()
-            .any(|row| row.deal_id.as_deref() == Some("A") && row.to_gp.amount() > 0.0));
+        assert!(
+            ledger
+                .rows
+                .iter()
+                .any(|row| row.deal_id.as_deref() == Some("A") && row.to_gp.amount() > 0.0)
+        );
         let gp: f64 = ledger.rows.iter().map(|row| row.to_gp.amount()).sum();
         let lp: f64 = ledger.rows.iter().map(|row| row.to_lp.amount()).sum();
         assert!(gp.abs() < 1e-12);

@@ -192,7 +192,7 @@ pub fn to_record_batch(table: &TableEnvelope) -> Result<RecordBatch> {
 
 #[cfg(test)]
 mod tests {
-    use super::{to_record_batch, METADATA_KEY, ROLE_METADATA_KEY};
+    use super::{METADATA_KEY, ROLE_METADATA_KEY, to_record_batch};
     use arrow::datatypes::DataType;
     use finstack_quant_core::table::{
         TableColumn, TableColumnData, TableColumnRole, TableEnvelope,

@@ -44,9 +44,9 @@ use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::fx::{FxConfig, FxMatrix, SimpleFxProvider};
-use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use std::sync::Arc;
 use time::Month;
@@ -90,13 +90,17 @@ fn market_context_snapshot_propagates_unstable_fx_revision_errors() {
     .expect("valid FX config");
     let market = MarketContext::new().insert_fx(matrix);
     let error = MarketContextState::try_from(&market).expect_err("unstable FX snapshot");
-    assert!(error
-        .to_string()
-        .contains("changed repeatedly during snapshot capture"));
+    assert!(
+        error
+            .to_string()
+            .contains("changed repeatedly during snapshot capture")
+    );
     let error = serde_json::to_string(&market).expect_err("serde must propagate snapshot failure");
-    assert!(error
-        .to_string()
-        .contains("changed repeatedly during snapshot capture"));
+    assert!(
+        error
+            .to_string()
+            .contains("changed repeatedly during snapshot capture")
+    );
 }
 
 // VolSurface Tests
@@ -210,9 +214,11 @@ fn market_context_roundtrip() {
     assert!(deserialized.get_discount("USD-OIS").is_ok());
     assert!(deserialized.get_forward("USD-SOFR").is_ok());
     assert!(deserialized.get_surface("VOL").is_ok());
-    assert!(deserialized
-        .dividends_iter()
-        .any(|(id, _)| id.as_str() == "AAPL-DIVS"));
+    assert!(
+        deserialized
+            .dividends_iter()
+            .any(|(id, _)| id.as_str() == "AAPL-DIVS")
+    );
     assert!(deserialized.fx().is_some());
 }
 
@@ -542,10 +548,11 @@ fn market_context_restore_reports_every_credit_index_reference_without_truncatio
     let report = restore_report(&state);
     assert!(!report.truncated);
     assert_eq!(report.diagnostics.len(), 3, "{report:?}");
-    assert!(report
-        .diagnostics
-        .iter()
-        .all(|diagnostic| { diagnostic.code == "market-context/missing-credit-index-reference" }));
+    assert!(
+        report.diagnostics.iter().all(|diagnostic| {
+            diagnostic.code == "market-context/missing-credit-index-reference"
+        })
+    );
     let pointers: std::collections::BTreeSet<&str> = report
         .diagnostics
         .iter()

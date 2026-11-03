@@ -17,8 +17,8 @@ use finstack_quant_core::market_data::scalars::{
 use finstack_quant_core::market_data::surfaces::SabrParameterData;
 use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, VolCube, VolSurface};
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::types::CurveId;
 use std::sync::Arc;
 use time::Month;
@@ -258,9 +258,10 @@ fn market_context_manages_fx_and_scalars() {
         Some(Currency::USD)
     );
     assert!(ctx.get_inflation_index("US-CPI").is_ok());
-    assert!(ctx
-        .dividends_iter()
-        .any(|(id, _)| id.as_str() == "AAPL-DIVS"));
+    assert!(
+        ctx.dividends_iter()
+            .any(|(id, _)| id.as_str() == "AAPL-DIVS")
+    );
     assert!(ctx.get_credit_index("CDX").is_ok());
 
     let ids: Vec<_> = ctx
@@ -562,9 +563,11 @@ fn credit_index_insert_rejects_missing_or_wrong_type_dependencies_atomically() {
             .insert(Arc::clone(&correlation)),
     ] {
         let before = serde_json::to_string(&context).expect("before");
-        assert!(context
-            .insert_credit_index_mut("INDEX", index.clone())
-            .is_err());
+        assert!(
+            context
+                .insert_credit_index_mut("INDEX", index.clone())
+                .is_err()
+        );
         assert_eq!(serde_json::to_string(&context).expect("after"), before);
     }
 
@@ -582,9 +585,11 @@ fn credit_index_insert_rejects_missing_or_wrong_type_dependencies_atomically() {
         )]))
         .build()
         .expect("valid index with issuer curve");
-    assert!(context
-        .insert_credit_index_mut("INDEX", missing_issuer)
-        .is_err());
+    assert!(
+        context
+            .insert_credit_index_mut("INDEX", missing_issuer)
+            .is_err()
+    );
     assert!(Arc::ptr_eq(
         &context.get_credit_index("INDEX").expect("unchanged index"),
         &original
@@ -616,21 +621,27 @@ fn credit_index_to_builder_revalidates_modified_fields() {
     assert!(index.to_builder().num_constituents(3).build().is_err());
     assert!(index.to_builder().recovery_rate(f64::NAN).build().is_err());
     assert!(index.to_builder().recovery_rate(-0.1).build().is_err());
-    assert!(index
-        .to_builder()
-        .issuer_curves(BTreeMap::from([("A".to_owned(), Arc::clone(&hazard))]))
-        .build()
-        .is_err());
-    assert!(index
-        .to_builder()
-        .issuer_weights(BTreeMap::from([("A".to_owned(), 1.0)]))
-        .build()
-        .is_err());
-    assert!(index
-        .to_builder()
-        .issuer_recovery_rates(BTreeMap::from([("UNKNOWN".to_owned(), 0.4)]))
-        .build()
-        .is_err());
+    assert!(
+        index
+            .to_builder()
+            .issuer_curves(BTreeMap::from([("A".to_owned(), Arc::clone(&hazard))]))
+            .build()
+            .is_err()
+    );
+    assert!(
+        index
+            .to_builder()
+            .issuer_weights(BTreeMap::from([("A".to_owned(), 1.0)]))
+            .build()
+            .is_err()
+    );
+    assert!(
+        index
+            .to_builder()
+            .issuer_recovery_rates(BTreeMap::from([("UNKNOWN".to_owned(), 0.4)]))
+            .build()
+            .is_err()
+    );
 }
 
 #[test]
@@ -802,12 +813,13 @@ fn market_context_update_and_bump_failures() {
         .insert(base_corr.as_ref().clone())
         .insert_credit_index("CDX", credit_index)
         .expect("canonical credit index");
-    assert!(ctx
-        .bump([MarketBump::Curve {
+    assert!(
+        ctx.bump([MarketBump::Curve {
             id: CurveId::new("MISSING"),
             spec: BumpSpec::parallel_bp(10.0),
         }])
-        .is_err());
+        .is_err()
+    );
 }
 
 #[test]
@@ -1098,14 +1110,15 @@ fn market_context_bump_fx_spot_error_and_success_paths() {
 
     // Error when no FX matrix is present
     let ctx = MarketContext::new();
-    assert!(ctx
-        .bump([MarketBump::FxPct {
+    assert!(
+        ctx.bump([MarketBump::FxPct {
             base: Currency::USD,
             quote: Currency::EUR,
             pct: 1.0,
             as_of: date,
         }])
-        .is_err());
+        .is_err()
+    );
 
     // Success path with a static provider
     let ctx = MarketContext::new().insert_fx(sample_fx_matrix());
@@ -1413,12 +1426,13 @@ fn market_context_bump_more_curve_types_and_error_paths() {
     );
 
     // Error path: attempting to apply a key-rate bump to a VolSurface via ctx.bump should fail
-    assert!(ctx
-        .bump([MarketBump::Curve {
+    assert!(
+        ctx.bump([MarketBump::Curve {
             id: CurveId::from("EQ-VOL"),
             spec: BumpSpec::triangular_key_rate_bp(0.25, 0.5, 1.0, 1.0),
         }])
-        .is_err());
+        .is_err()
+    );
 }
 
 #[test]
@@ -1490,14 +1504,15 @@ fn market_context_apply_bumps_additional_branches_and_errors() {
 
     // FxPct error branch (missing FX)
     let ctx = MarketContext::new().insert(sample_discount_curve("USD-OIS"));
-    assert!(ctx
-        .bump([MarketBump::FxPct {
+    assert!(
+        ctx.bump([MarketBump::FxPct {
             base: Currency::USD,
             quote: Currency::EUR,
             pct: 1.0,
             as_of: date,
         }])
-        .is_err());
+        .is_err()
+    );
 
     // VolBucketPct with no filters ("all buckets") path
     let surface = sample_vol_surface();
@@ -1520,14 +1535,15 @@ fn market_context_apply_bumps_additional_branches_and_errors() {
 
     // VolBucketPct missing surface error branch
     let ctx = MarketContext::new();
-    assert!(ctx
-        .bump([MarketBump::VolBucketPct {
+    assert!(
+        ctx.bump([MarketBump::VolBucketPct {
             vol_surface_id: CurveId::from("MISSING-VOL"),
             expiries: Some(vec![0.5]),
             strikes: Some(vec![1.0]),
             pct: 1.0,
         }])
-        .is_err());
+        .is_err()
+    );
 
     // BaseCorrBucketPts "all buckets" (detachments None) path
     let ctx = MarketContext::new().insert(sample_base_correlation_curve("CDX-BC"));
@@ -1547,13 +1563,14 @@ fn market_context_apply_bumps_additional_branches_and_errors() {
 
     // BaseCorrBucketPts missing curve error branch
     let ctx = MarketContext::new();
-    assert!(ctx
-        .bump([MarketBump::BaseCorrBucketPts {
+    assert!(
+        ctx.bump([MarketBump::BaseCorrBucketPts {
             surface_id: CurveId::from("MISSING-BC"),
             detachments: None,
             points: 0.01,
         }])
-        .is_err());
+        .is_err()
+    );
 }
 
 #[test]
@@ -1591,15 +1608,19 @@ fn discount_stress_and_invalid_bumps_preserve_scratch_restoration() {
             BumpSpec::parallel_bp(f64::NAN),
             BumpSpec::parallel_bp(-1e308),
         ] {
-            assert!(context
-                .bump([MarketBump::Curve {
-                    id: "OIS".into(),
-                    spec
-                }])
-                .is_err());
-            assert!(context
-                .apply_curve_bump_in_place(&"OIS".into(), spec)
-                .is_err());
+            assert!(
+                context
+                    .bump([MarketBump::Curve {
+                        id: "OIS".into(),
+                        spec
+                    }])
+                    .is_err()
+            );
+            assert!(
+                context
+                    .apply_curve_bump_in_place(&"OIS".into(), spec)
+                    .is_err()
+            );
             let unchanged = context.get_discount("OIS").unwrap();
             assert_eq!(unchanged.id(), curve.id());
             assert_eq!(unchanged.dfs(), curve.dfs());
@@ -1689,12 +1710,14 @@ fn inflation_bumps_match_direct_curve_and_context_entry_points() {
     }
     let spec = BumpSpec::triangular_key_rate_bp(6.0, 5.0, 10.0, 100.0);
     assert!(curve.apply_bump(spec).is_err());
-    assert!(context
-        .bump([MarketBump::Curve {
-            id: "CPI".into(),
-            spec
-        }])
-        .is_err());
+    assert!(
+        context
+            .bump([MarketBump::Curve {
+                id: "CPI".into(),
+                spec
+            }])
+            .is_err()
+    );
 }
 
 /// `len()` counts every store, including the FX matrix and dividend

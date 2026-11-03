@@ -468,7 +468,7 @@ fn debt_stack(model: &FinancialModelSpec) -> Result<Vec<StackEntry<'_>>> {
                      debt nor a hedge",
                     debt.id,
                     InstrumentJson::from(other.clone()).type_tag()
-                )))
+                )));
             }
         };
         let (rank, payment_class) = if classes.is_empty() {
@@ -571,13 +571,12 @@ fn require_node_currency(
 ) -> Result<()> {
     if let Some(NodeValueType::Monetary { currency: found }) =
         crate::analysis::units::node_unit_at(results, node, period)?
+        && found != currency
     {
-        if found != currency {
-            return Err(Error::invalid_input(format!(
-                "Capital structure summary node '{node}' is in {found} while the debt is in \
+        return Err(Error::invalid_input(format!(
+            "Capital structure summary node '{node}' is in {found} while the debt is in \
                  {currency}; no implicit FX is applied"
-            )));
-        }
+        )));
     }
     Ok(())
 }
@@ -720,7 +719,7 @@ fn share(part: Money, total: Money) -> Result<Option<f64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{build_periods, Period, PeriodKind};
+    use finstack_quant_core::dates::{Period, PeriodKind, build_periods};
     use finstack_quant_statements::capital_structure::{
         CashflowBreakdown, PaymentClassSpec, WaterfallSpec,
     };
@@ -1501,10 +1500,12 @@ mod tests {
                 .expect("valid config");
         assert_eq!(config.period, q(4));
         assert_eq!(config.cash_node, None);
-        assert!(serde_json::from_str::<CapitalStructureSummaryConfig>(
-            r#"{"period": "2025Q4", "ebitda_node": "ebitda", "cash": "cash"}"#
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<CapitalStructureSummaryConfig>(
+                r#"{"period": "2025Q4", "ebitda_node": "ebitda", "cash": "cash"}"#
+            )
+            .is_err()
+        );
     }
 
     #[test]

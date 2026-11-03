@@ -10,13 +10,13 @@
 //! - DV01 (interest rate sensitivity)
 
 use crate::commodity::commodity_swap::CommoditySwap;
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::bumps::BumpMode;
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::bumps::BumpType;
 use finstack_quant_core::market_data::bumps::BumpUnits;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;

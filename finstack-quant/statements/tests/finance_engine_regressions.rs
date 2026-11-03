@@ -83,11 +83,13 @@ fn direct_models_keep_inferred_currency_in_ordinary_and_prepared_results() {
         .as_mut()
         .unwrap()
         .insert(quarter(), Money::from((100_i64, Currency::EUR)).into());
-    assert!(evaluator
-        .evaluate_prepared(&model, &plan)
-        .unwrap_err()
-        .to_string()
-        .contains("prepared value type"));
+    assert!(
+        evaluator
+            .evaluate_prepared(&model, &plan)
+            .unwrap_err()
+            .to_string()
+            .contains("prepared value type")
+    );
 }
 
 #[test]
@@ -120,9 +122,11 @@ fn prepared_plan_rejects_calculated_overrides_and_orphaned_availability() {
     calculated_override.get_node_mut("total").unwrap().values = Some(indexmap::indexmap! {
         quarter() => Money::from((999_i64, Currency::USD)).into(),
     });
-    assert!(evaluator
-        .evaluate_prepared(&calculated_override, &plan)
-        .is_err());
+    assert!(
+        evaluator
+            .evaluate_prepared(&calculated_override, &plan)
+            .is_err()
+    );
     assert!(evaluator.evaluate(&calculated_override).is_err());
 
     model

@@ -5,14 +5,14 @@
 //! grid using the Modified Craig-Sneyd (MCS) ADI splitting scheme. Heston model
 //! parameters are sourced from required market scalars.
 
-use crate::equity_option::pricing::{stochastic_vol_inputs, ModelInputs};
+use crate::equity_option::pricing::{ModelInputs, stochastic_vol_inputs};
 use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
@@ -333,7 +333,7 @@ mod tests {
     }
 
     fn reference(v0: f64, sigma: f64) -> f64 {
-        use finstack_quant_models::closed_form::{heston_call_price_fourier, HestonPricingParams};
+        use finstack_quant_models::closed_form::{HestonPricingParams, heston_call_price_fourier};
         let params = HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, sigma, -0.7, v0)
             .expect("Heston parameters");
         heston_call_price_fourier(100.0, 100.0, 1.0, &params, None).expect("Fourier reference")
@@ -357,8 +357,10 @@ mod tests {
                 (actual - expected).abs() < 0.10 + 0.005 * expected,
                 "v0={v0}: PDE={actual}, Fourier={expected}"
             );
-            assert!(actual > previous + 1e-6,
-                "initial variance must not be silently clamped: v0={v0}, PV={actual}, previous={previous}");
+            assert!(
+                actual > previous + 1e-6,
+                "initial variance must not be silently clamped: v0={v0}, PV={actual}, previous={previous}"
+            );
             previous = actual;
         }
     }

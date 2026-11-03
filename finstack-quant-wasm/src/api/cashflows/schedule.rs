@@ -10,9 +10,9 @@ use crate::utils::input::{js_f64, js_f64_seq, js_string};
 use crate::utils::wire::{js_date, js_opt_wire, js_wire};
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::{
-    merge_cashflow_schedules as rust_merge_cashflow_schedules, CashFlowBuilder, CashFlowMeta,
-    CashFlowSchedule, CashflowRepresentation, CouponType, FixedCouponSpec, FloatingCouponSpec,
-    Notional,
+    CashFlowBuilder, CashFlowMeta, CashFlowSchedule, CashflowRepresentation, CouponType,
+    FixedCouponSpec, FloatingCouponSpec, Notional,
+    merge_cashflow_schedules as rust_merge_cashflow_schedules,
 };
 use finstack_quant_cashflows::{CashflowScheduleBuildSpec, DatedFlowJson, ScheduleBuildOpts};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};

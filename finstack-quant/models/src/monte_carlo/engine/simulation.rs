@@ -10,9 +10,9 @@ use crate::monte_carlo::paths::{PathPoint, SimulatedPath};
 use crate::monte_carlo::traits::{
     Discretization, PathState, Payoff, RandomStream, StochasticProcess,
 };
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::linalg::CorrelationFactor;
-use finstack_quant_core::Result;
 use smallvec::SmallVec;
 
 /// Strategy for filling the per-step shock vector `z`.

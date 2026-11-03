@@ -435,10 +435,10 @@ pub(crate) fn settlement_asw_components(
         .filter(|flow| flow.date > settlement && flow.kind != CFKind::Pik)
     {
         if flow.kind.is_interest_like() {
-            if let Some(rule) = &ex_coupon {
-                if rule.is_ex_coupon(flow.date, settlement)? {
-                    continue;
-                }
+            if let Some(rule) = &ex_coupon
+                && rule.is_ex_coupon(flow.date, settlement)?
+            {
+                continue;
             }
             coupon_pv += flow.amount.amount() * disc.df_on_date(flow.date)?
                 / df_settlement

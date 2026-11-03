@@ -747,8 +747,8 @@ impl Performance {
 #[cfg(test)]
 mod from_returns_cagr_tests {
 
-    use crate::risk_metrics::{self, cagr, CagrDayCount};
     use crate::Performance;
+    use crate::risk_metrics::{self, CagrDayCount, cagr};
     use finstack_quant_core::dates::{Date, PeriodKind};
     use time::Month;
 

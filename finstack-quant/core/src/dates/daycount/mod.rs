@@ -124,7 +124,7 @@ mod other;
 mod thirty360;
 
 pub use context::{DayCountContext, DayCountContextState};
-pub use thirty360::{days_30_360, days_30e_360_isda, Thirty360Convention};
+pub use thirty360::{Thirty360Convention, days_30_360, days_30e_360_isda};
 
 use time::Date;
 
@@ -713,8 +713,8 @@ mod parse_tests {
 }
 #[cfg(test)]
 mod tests {
-    use super::act_act::act_act_isma_year_fraction_with_reference_period;
     use super::DayCount;
+    use super::act_act::act_act_isma_year_fraction_with_reference_period;
     use time::macros::date;
 
     /// Per-year and bulk additions differ for a representative ISDA seed.
@@ -1046,7 +1046,7 @@ mod tests {
 
     #[test]
     fn thirty_e_360_isda_last_day_of_month_rules() {
-        use super::{days_30e_360_isda, DayCount, DayCountContext};
+        use super::{DayCount, DayCountContext, days_30e_360_isda};
 
         // Aug 31 → 30 (last day of month), Feb 29 → 30 (last day of Feb,
         // not termination): 360 + 30·(2-8) + (30-30) = 180.
@@ -1093,7 +1093,7 @@ mod tests {
 
     #[test]
     fn thirty_e_360_isda_differs_from_european_on_end_of_february() {
-        use super::{days_30_360, days_30e_360_isda, Thirty360Convention};
+        use super::{Thirty360Convention, days_30_360, days_30e_360_isda};
 
         // 30E/360 (European, §4.16(g)) has NO end-of-February rule;
         // 30E/360 (ISDA, §4.16(h)) adjusts end-of-Feb to 30.
@@ -1107,7 +1107,7 @@ mod tests {
 
     #[test]
     fn thirty_360_italian_feb_after_27_and_day_31() {
-        use super::{days_30_360, Thirty360Convention};
+        use super::{Thirty360Convention, days_30_360};
 
         // Jan 31 → Feb 28 2025: Italian D1=30, D2=30 → 30.
         // European D2 stays 28; US SIA D2 stays 28 (not both Feb EOM).

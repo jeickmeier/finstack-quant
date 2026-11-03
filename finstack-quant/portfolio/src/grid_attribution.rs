@@ -148,8 +148,8 @@
 //!   above. `docs/REFERENCES.md#dynkin-hyman-vankudre-1998`
 
 use crate::brinson::{
-    carino_link_effects, check_net_weight, check_weights_sum, validate_link_period, CarinoPeriod,
-    LinkPeriod,
+    CarinoPeriod, LinkPeriod, carino_link_effects, check_net_weight, check_weights_sum,
+    validate_link_period,
 };
 use crate::error::{Error, Result};
 use finstack_quant_core::math::summation::NeumaierAccumulator;

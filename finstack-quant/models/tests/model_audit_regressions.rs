@@ -3,7 +3,7 @@
 use finstack_quant_core::{currency::Currency, market_data::surfaces::VolSurface};
 use finstack_quant_models::closed_form::bs_price;
 use finstack_quant_models::correlation::PortfolioLossResult;
-use finstack_quant_models::fourier::cos::{bs_cos_price, CosMarketParams};
+use finstack_quant_models::fourier::cos::{CosMarketParams, bs_cos_price};
 use finstack_quant_models::monte_carlo::{
     pricer::{
         basis::PolynomialBasis,
@@ -14,8 +14,8 @@ use finstack_quant_models::monte_carlo::{
 use finstack_quant_models::pde::{BlackScholesPde, Grid1D, PdeProblem1D, Solver1D};
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::arbitrage::{
-    check_local_vol_density_grid, check_surface, check_surface_grid, ArbitrageCheckConfig,
-    ArbitrageSeverity, DEFAULT_ARBITRAGE_TOLERANCE,
+    ArbitrageCheckConfig, ArbitrageSeverity, DEFAULT_ARBITRAGE_TOLERANCE,
+    check_local_vol_density_grid, check_surface, check_surface_grid,
 };
 
 #[test]

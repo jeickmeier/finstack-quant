@@ -11,15 +11,15 @@
 //! [`CmsSpreadOption`]: crate::cms_spread_option::CmsSpreadOption
 //! [`CmsReferenceSwap`]: crate::cms_common::CmsReferenceSwap
 
-use crate::forward_swap_rate::{calculate_forward_swap_rate, ForwardSwapRateInputs};
+use crate::forward_swap_rate::{ForwardSwapRateInputs, calculate_forward_swap_rate};
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar_by_id_strict, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
+    Date, DateExt, DayCount, DayCountContext, StubKind, Tenor, calendar_by_id_strict,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::cms_fixing_series_id;
 use finstack_quant_core::types::{CurveId, IndexId};
-use finstack_quant_core::Result;
 
 /// Whole months of a CMS reference-swap tenor.
 ///
@@ -84,9 +84,10 @@ impl CmsReferenceSwap<'_> {
         let id = match self.currency {
             Currency::USD => {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "{} requires explicit index_id for USD CMS (for example USD-SOFR-OIS or a legacy index)", self.label
-                )))
-            },
+                    "{} requires explicit index_id for USD CMS (for example USD-SOFR-OIS or a legacy index)",
+                    self.label
+                )));
+            }
             Currency::EUR => "EUR-ESTR-OIS",
             Currency::GBP => "GBP-SONIA-OIS",
             Currency::JPY => "JPY-TONAR-OIS",
@@ -94,7 +95,7 @@ impl CmsReferenceSwap<'_> {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{} requires an explicit reference-swap convention for {}",
                     self.label, self.currency
-                )))
+                )));
             }
         };
         ConventionRegistry::try_global()?.require_rate_index(&IndexId::new(id))

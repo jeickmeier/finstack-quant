@@ -141,13 +141,13 @@ pub fn update_rate_from_binding(
             )
             .map_err(|e| Error::Internal(e.to_string()))?;
 
-        if let Some(&max_t) = curve.knots().last() {
-            if tenor_years > max_t + 1e-8 {
-                return Err(Error::Validation(format!(
-                    "Tenor {} ({tenor_years:.4}y) is out of range for discount curve {curve_id} (max {max_t:.4}y)",
-                    binding.tenor
-                )));
-            }
+        if let Some(&max_t) = curve.knots().last()
+            && tenor_years > max_t + 1e-8
+        {
+            return Err(Error::Validation(format!(
+                "Tenor {} ({tenor_years:.4}y) is out of range for discount curve {curve_id} (max {max_t:.4}y)",
+                binding.tenor
+            )));
         }
 
         let zero = curve.zero_rate(
@@ -180,13 +180,13 @@ pub fn update_rate_from_binding(
             )
             .map_err(|e| Error::Internal(e.to_string()))?;
 
-        if let Some(&max_t) = curve.knots().last() {
-            if start_years > max_t + 1e-8 {
-                return Err(Error::Validation(format!(
-                    "Tenor {} ({start_years:.4}y) is out of range for forward curve {curve_id} (max {max_t:.4}y)",
-                    binding.tenor
-                )));
-            }
+        if let Some(&max_t) = curve.knots().last()
+            && start_years > max_t + 1e-8
+        {
+            return Err(Error::Validation(format!(
+                "Tenor {} ({start_years:.4}y) is out of range for forward curve {curve_id} (max {max_t:.4}y)",
+                binding.tenor
+            )));
         }
 
         let forward_start = tenor.add_to_date(

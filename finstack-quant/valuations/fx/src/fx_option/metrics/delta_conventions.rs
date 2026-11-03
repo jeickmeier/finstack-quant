@@ -1,7 +1,7 @@
 //! FX option delta convention metrics.
 
-use crate::fx_option::pricer::FxOptionGreeks;
 use crate::fx_option::FxOption;
+use crate::fx_option::pricer::FxOptionGreeks;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
@@ -47,13 +47,13 @@ impl MetricCalculator for DeltaPremiumAdjustedForwardCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fx_option::pricer::{compute_greeks, COMPUTE_GREEKS_CALLS};
+    use crate::fx_option::pricer::{COMPUTE_GREEKS_CALLS, compute_greeks};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_valuations_core::metrics::{MetricId, MetricRegistry};
     use finstack_quant_valuations_core::pricer::InstrumentType;
     use std::sync::Arc;
@@ -178,9 +178,11 @@ mod tests {
                 values.get(&MetricId::DeltaPremiumAdjustedSpot),
                 Some(&123.0)
             );
-            assert!(!context
-                .computed
-                .contains_key(&MetricId::DeltaPremiumAdjustedForward));
+            assert!(
+                !context
+                    .computed
+                    .contains_key(&MetricId::DeltaPremiumAdjustedForward)
+            );
             COMPUTE_GREEKS_CALLS.with(|count| assert_eq!(count.get(), 1));
         }
     }

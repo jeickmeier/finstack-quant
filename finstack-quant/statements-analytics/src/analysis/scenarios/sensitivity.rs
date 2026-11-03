@@ -143,7 +143,9 @@ impl<'a> SensitivityAnalyzer<'a> {
                     .iter()
                     .any(|value| !value.is_finite())
             {
-                return Err(Error::invalid_input("Sensitivity base values and perturbations must be finite, with at least one perturbation per parameter"));
+                return Err(Error::invalid_input(
+                    "Sensitivity base values and perturbations must be finite, with at least one perturbation per parameter",
+                ));
             }
             count = if config.mode == SensitivityMode::FullGrid {
                 count.checked_mul(parameter.perturbations.len())
@@ -633,10 +635,12 @@ mod tests {
 
         let result = run_sensitivity(&model, &config).expect("full grid should succeed");
         assert_eq!(result.scenarios.len(), 4);
-        assert!(result
-            .scenarios
-            .iter()
-            .all(|scenario| scenario.parameter_values.len() == 2));
+        assert!(
+            result
+                .scenarios
+                .iter()
+                .all(|scenario| scenario.parameter_values.len() == 2)
+        );
     }
 
     #[test]
@@ -695,10 +699,12 @@ mod tests {
         let mut config = SensitivityConfig::new(SensitivityMode::Tornado);
         config.add_parameter(ParameterSpec::new("revenue", period, 100.0, vec![90.0]));
         config.add_target_metric("missing");
-        assert!(run_sensitivity(&model, &config)
-            .expect_err("missing target")
-            .to_string()
-            .contains("Missing tornado metric"));
+        assert!(
+            run_sensitivity(&model, &config)
+                .expect_err("missing target")
+                .to_string()
+                .contains("Missing tornado metric")
+        );
     }
 
     #[test]
@@ -720,10 +726,12 @@ mod tests {
             vec![f64::MAX],
         ));
         config.add_target_metric("revenue");
-        assert!(run_sensitivity(&model, &config)
-            .expect_err("overflowing impact")
-            .to_string()
-            .contains("impacts must be finite"));
+        assert!(
+            run_sensitivity(&model, &config)
+                .expect_err("overflowing impact")
+                .to_string()
+                .contains("impacts must be finite")
+        );
     }
 
     #[test]
@@ -1089,10 +1097,12 @@ mod tests {
                 100.0,
                 vec![100.0; MAX_SCENARIOS + 1],
             ));
-            assert!(run_sensitivity(&model, &config)
-                .expect_err("too many scenarios")
-                .to_string()
-                .contains("10000 scenarios"));
+            assert!(
+                run_sensitivity(&model, &config)
+                    .expect_err("too many scenarios")
+                    .to_string()
+                    .contains("10000 scenarios")
+            );
         }
     }
 
@@ -1120,10 +1130,12 @@ mod tests {
             1.0,
             vec![1.0; MAX_SCENARIOS],
         ));
-        assert!(run_sensitivity(&model, &config)
-            .expect_err("too many evaluation cells")
-            .to_string()
-            .contains("evaluation cells"));
+        assert!(
+            run_sensitivity(&model, &config)
+                .expect_err("too many evaluation cells")
+                .to_string()
+                .contains("evaluation cells")
+        );
     }
 
     #[test]
@@ -1184,9 +1196,11 @@ mod tests {
             .collect();
         assert_eq!(profits, vec![80.0, 60.0, 100.0, 80.0]);
         // Full-grid scenarios confound parameter impacts: a typed none, not an error.
-        assert!(generate_tornado_entries(&result, "profit", period)
-            .expect("full grid is not an error")
-            .is_none());
+        assert!(
+            generate_tornado_entries(&result, "profit", period)
+                .expect("full grid is not an error")
+                .is_none()
+        );
         // Public JSON results can mislabel joint shocks as one-at-a-time runs.
         result.config.mode = SensitivityMode::Diagonal;
         let error = generate_tornado_entries(&result, "profit", period)
@@ -1267,16 +1281,16 @@ mod tests {
             (-f64::MAX, f64::MAX, f64::MAX),
             (0.0, -f64::MAX, f64::MAX),
         ] {
-            assert!(generate_tornado_entries(
-                &make_result(base, minimum, maximum),
-                "profit",
-                period
-            )
-            .is_err());
+            assert!(
+                generate_tornado_entries(&make_result(base, minimum, maximum), "profit", period)
+                    .is_err()
+            );
         }
         result.scenarios.clear();
-        assert!(generate_tornado_entries(&result, "profit", period)
-            .expect("no varied parameter")
-            .is_some_and(|entries| entries.is_empty()));
+        assert!(
+            generate_tornado_entries(&result, "profit", period)
+                .expect("no varied parameter")
+                .is_some_and(|entries| entries.is_empty())
+        );
     }
 }

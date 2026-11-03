@@ -4,7 +4,7 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::extract::{label, parse_label};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
+use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyForecastSpec;
@@ -57,20 +57,26 @@ fn extract_overrides(value: &Bound<'_, PyAny>) -> PyResult<ScenarioDefinition> {
     let mut definition = ScenarioDefinition::default();
     for (node_id, value) in values.iter() {
         let node_id: String = node_id.extract()?;
-        if let Ok(forecast) = value.extract::<PyRef<'_, PyForecastSpec>>() {
-            definition
-                .forecast_overrides
-                .insert(node_id, forecast.inner.clone());
-        } else if let Ok(by_period) = value.cast::<PyDict>() {
-            let entry = definition.period_overrides.entry(node_id).or_default();
-            for (period, value) in by_period.iter() {
-                let period = parse_period_id(&period.extract::<String>()?)?;
-                entry.insert(period, extract_amount_or_scalar(&value)?);
+        match value.extract::<PyRef<'_, PyForecastSpec>>() {
+            Ok(forecast) => {
+                definition
+                    .forecast_overrides
+                    .insert(node_id, forecast.inner.clone());
             }
-        } else {
-            definition
-                .overrides
-                .insert(node_id, extract_amount_or_scalar(&value)?);
+            _ => match value.cast::<PyDict>() {
+                Ok(by_period) => {
+                    let entry = definition.period_overrides.entry(node_id).or_default();
+                    for (period, value) in by_period.iter() {
+                        let period = parse_period_id(&period.extract::<String>()?)?;
+                        entry.insert(period, extract_amount_or_scalar(&value)?);
+                    }
+                }
+                _ => {
+                    definition
+                        .overrides
+                        .insert(node_id, extract_amount_or_scalar(&value)?);
+                }
+            },
         }
     }
     Ok(definition)
@@ -312,7 +318,7 @@ impl PySensitivityConfig {
             _ => {
                 return Err(crate::errors::value_error(
                     "add_parameter takes exactly one of `perturbations` or `pct`",
-                ))
+                ));
             }
         };
         self.inner.add_parameter(spec);

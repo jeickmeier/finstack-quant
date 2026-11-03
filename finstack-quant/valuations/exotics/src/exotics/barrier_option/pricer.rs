@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
@@ -28,7 +28,7 @@ pub(crate) fn collect_barrier_inputs(
     finstack_quant_valuations_core::instruments::common_impl::helpers::BlackScholesInputsDf,
 > {
     use finstack_quant_valuations_core::instruments::common_impl::helpers::{
-        resolve_optional_dividend_yield, BlackScholesInputsDf,
+        BlackScholesInputsDf, resolve_optional_dividend_yield,
     };
     let t = inst.day_count.year_fraction(
         as_of,
@@ -338,7 +338,7 @@ pub(crate) fn price_expired_barrier(
     Money::new(pv, inst.currency)
 }
 
-use finstack_quant_models::closed_form::{barrier_price, barrier_rebate, BarrierParams};
+use finstack_quant_models::closed_form::{BarrierParams, barrier_price, barrier_rebate};
 /// Reiner-Rubinstein pricer for continuous contractual monitoring.
 /// Discrete observation dates require the Monte Carlo or PDE engine.
 pub(crate) struct BarrierOptionAnalyticalPricer;
@@ -466,7 +466,7 @@ mod tests {
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::InstrumentId;
     use finstack_quant_core::types::{BarrierType, PayoutTiming};
-    use finstack_quant_models::closed_form::{barrier_price, barrier_rebate, BarrierParams};
+    use finstack_quant_models::closed_form::{BarrierParams, barrier_price, barrier_rebate};
     use finstack_quant_models::types::OptionType;
     use time::Month;
 
@@ -913,11 +913,7 @@ mod tests {
                         + tt * (1.781_477_937 + tt * (-1.821_255_978 + tt * 1.330_274_429))));
             let phi = (-0.5 * x * x).exp() / (2.0 * std::f64::consts::PI).sqrt();
             let c = 1.0 - phi * poly;
-            if x >= 0.0 {
-                c
-            } else {
-                1.0 - c
-            }
+            if x >= 0.0 { c } else { 1.0 - c }
         }
         let d1 = ((spot / strike).ln() + (r - q + 0.5 * sigma * sigma) * t) / (sigma * t.sqrt());
         let d2 = d1 - sigma * t.sqrt();

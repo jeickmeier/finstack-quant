@@ -123,11 +123,11 @@ fn release_spread_account(
             }
         }
     }
-    if remaining > 0.0 {
-        if let Some(&i) = order.last() {
-            let id = state.tranches.tranches[i].id.to_string();
-            append_terminal_interest(state, &id, Money::new(remaining, state.currency)?, date)?;
-        }
+    if remaining > 0.0
+        && let Some(&i) = order.last()
+    {
+        let id = state.tranches.tranches[i].id.to_string();
+        append_terminal_interest(state, &id, Money::new(remaining, state.currency)?, date)?;
     }
     state.spread_account = Money::from((0_i64, state.currency));
     state.undistributed_interest = Money::from((0_i64, state.currency));
@@ -182,17 +182,17 @@ fn distribute_terminal_principal(
             remaining -= paid;
         }
     }
-    if remaining > 0.0 {
-        if let Some(&i) = order.last() {
-            let id = state.tranches.tranches[i].id.to_string();
-            append_residual_principal(
-                state,
-                &id,
-                Money::new(remaining, state.currency)?,
-                date,
-                source,
-            )?;
-        }
+    if remaining > 0.0
+        && let Some(&i) = order.last()
+    {
+        let id = state.tranches.tranches[i].id.to_string();
+        append_residual_principal(
+            state,
+            &id,
+            Money::new(remaining, state.currency)?,
+            date,
+            source,
+        )?;
     }
     Ok(())
 }
@@ -555,7 +555,7 @@ pub(crate) fn prepare_deal_simulation(
     // Re-anchoring the schedule at `as_of` would shift legal coupon dates for
     // seasoned deals valued between payment dates.
     use finstack_quant_cashflows::builder::{
-        build_periods, build_single_period, BuildPeriodsParams,
+        BuildPeriodsParams, build_periods, build_single_period,
     };
     let schedule_params = finstack_quant_cashflows::builder::ScheduleParams {
         frequency: instrument.frequency,

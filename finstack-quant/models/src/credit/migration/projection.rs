@@ -27,7 +27,7 @@ use nalgebra::DMatrix;
 use super::{
     error::MigrationError,
     generator::GeneratorMatrix,
-    matrix::{validate_transition_matrix, TransitionMatrix},
+    matrix::{TransitionMatrix, validate_transition_matrix},
 };
 
 /// Compute P(t) = exp(Q · t) using the default algorithm.
@@ -47,11 +47,11 @@ use super::{
 /// // 2-state generator: AAA→D at rate 0.1
 /// let scale = RatingScale::custom(vec!["AAA".to_string(), "D".to_string()])
 ///     .expect("valid scale");
-/// let gen = GeneratorMatrix::new(scale, &[-0.1, 0.1, 0.0, 0.0])
+/// let generator = GeneratorMatrix::new(scale, &[-0.1, 0.1, 0.0, 0.0])
 ///     .expect("valid generator");
 ///
 /// // 1-year projection
-/// let p1 = project(&gen, 1.0).expect("valid projection");
+/// let p1 = project(&generator, 1.0).expect("valid projection");
 /// assert!(p1.probability("AAA", "D").unwrap() > 0.0);
 /// ```
 ///

@@ -2,12 +2,12 @@
 
 use serde::{Deserialize, Serialize};
 
+use finstack_quant_statements::Result;
 use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
 };
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_statements::Result;
 
 /// Reconciles interest expense against debt balances or the capital-structure
 /// interest schedule.
@@ -125,11 +125,11 @@ impl Check for InterestExpenseReconciliation {
                     },
                     None => balance,
                 };
-                if let Some(rn) = rate_node {
-                    if let Some(rate) = get_finite_node_value(context.results, rn, pid) {
-                        total_implied_interest += effective_balance * rate;
-                        has_rate = true;
-                    }
+                if let Some(rn) = rate_node
+                    && let Some(rate) = get_finite_node_value(context.results, rn, pid)
+                {
+                    total_implied_interest += effective_balance * rate;
+                    has_rate = true;
                 }
             }
 

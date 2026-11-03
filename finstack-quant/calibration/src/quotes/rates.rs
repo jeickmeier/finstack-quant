@@ -1,10 +1,10 @@
 //! Interest rate market quote schema.
 
 use super::ids::{Pillar, QuoteId};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::validation::validate_f64_finite;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId;
 use serde::{Deserialize, Serialize};
 

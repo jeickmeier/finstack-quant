@@ -3,19 +3,19 @@
 use super::path_generator::generate_three_factor_paths;
 use super::results::EnhancedMonteCarloResult;
 use super::unified::{
-    RevolvingCreditPricer, DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR,
+    DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR, RevolvingCreditPricer,
 };
 use crate::revolving_credit::cashflow_engine::CashflowEngine;
 use crate::revolving_credit::types::{DrawRepaySpec, RevolvingCredit, RevolvingCreditMcRun};
 use crate::revolving_credit::utils::resolve_fixings;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
-use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
+use finstack_quant_cashflows::{ScheduleBuildOpts, schedule_from_classified_flows};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{FxHashMap, Result};
-use finstack_quant_models::monte_carlo::estimate::{independent_estimator_stats, Estimate};
+use finstack_quant_models::monte_carlo::estimate::{Estimate, independent_estimator_stats};
 use finstack_quant_models::monte_carlo::results::{MoneyEstimate, MonteCarloResult};
 
 /// Accumulator for one expected flow across Monte Carlo paths.
@@ -197,7 +197,7 @@ impl RevolvingCreditPricer {
             DrawRepaySpec::Deterministic(_) => {
                 return Err(finstack_quant_core::Error::Validation(
                     "Stochastic spec required for MC pricing".to_string(),
-                ))
+                ));
             }
         };
         if run.num_paths < 2 {

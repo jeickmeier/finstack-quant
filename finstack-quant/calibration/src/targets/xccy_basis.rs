@@ -23,6 +23,7 @@
 //! Today the `XccyBasisTarget` consumes generic `RateQuote::{Deposit, Fra, Swap}` to build
 //! a foreign discount curve.
 
+use crate::CalibrationReport;
 use crate::api::schema::XccyBasisParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
@@ -33,9 +34,9 @@ use crate::quotes::XccyQuote;
 use crate::solver::bootstrap;
 use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::{
-    discount_and_forward_curve_ids, prepare_rate_calibration_quotes, ContextScratch,
+    ContextScratch, discount_and_forward_curve_ids, prepare_rate_calibration_quotes,
 };
-use crate::CalibrationReport;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
@@ -44,7 +45,6 @@ use finstack_quant_core::market_data::term_structures::{
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use std::sync::Arc;
 
 /// Instrument notional and residual normalization divisor.

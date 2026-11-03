@@ -8,9 +8,9 @@ use crate::api::core::config::JsFinstackConfig;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::rating_scales::{
-    embedded_registry as rust_embedded_registry, registry_from_config as rust_registry_from_config,
-    RatingLevel, RatingScaleRegistry, ScorecardScale, UnknownScalePolicy,
-    RATING_SCALES_EXTENSION_KEY,
+    RATING_SCALES_EXTENSION_KEY, RatingLevel, RatingScaleRegistry, ScorecardScale,
+    UnknownScalePolicy, embedded_registry as rust_embedded_registry,
+    registry_from_config as rust_registry_from_config,
 };
 use wasm_bindgen::prelude::*;
 

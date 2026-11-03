@@ -13,15 +13,15 @@ mod fixtures;
 
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
 use finstack_quant_scenarios::{
     CurveKind, OperationSpec, ScenarioEngine, ScenarioSpec, TimeRollMode,
 };
 use finstack_quant_valuations::pricer::InstrumentType;
 use fixtures::{
-    apply_market, apply_with_instruments, compose_specs, hierarchy_hazard_market, hierarchy_market,
-    lean_market, sample_bonds, spec, USD_SOFR,
+    USD_SOFR, apply_market, apply_with_instruments, compose_specs, hierarchy_hazard_market,
+    hierarchy_market, lean_market, sample_bonds, spec,
 };
 
 fn scaling_same_curve_ops(c: &mut Criterion) {

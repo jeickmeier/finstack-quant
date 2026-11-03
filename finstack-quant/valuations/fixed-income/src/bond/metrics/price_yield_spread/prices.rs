@@ -1,8 +1,8 @@
 //! Settlement-anchored bond clean and dirty price metrics.
 
+use crate::bond::Bond;
 use crate::bond::pricing::quote_conversions::settlement_dirty_from_quote_overrides;
 use crate::bond::pricing::settlement::{model_dirty_at_quote_date, settlement_date};
-use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Full settlement dirty value in currency: the configured quote driver

@@ -5,7 +5,7 @@
 //! per-eval cost over a multi-node DAG and many-row columns — the path that
 //! reuses the pooled arena and node-id-indexed offsets.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::expr::{BinOp, CompiledExpr, Expr, SimpleContext};
 use std::hint::black_box;
 

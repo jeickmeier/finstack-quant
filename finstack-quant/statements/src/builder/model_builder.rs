@@ -3,7 +3,7 @@
 use crate::error::{Error, Result};
 use crate::registry::dynamic::StoredMetric;
 use crate::types::{AmountOrScalar, FinancialModelSpec, NodeId, NodeSpec, NodeType};
-use finstack_quant_core::dates::{build_periods, Period, PeriodId};
+use finstack_quant_core::dates::{Period, PeriodId, build_periods};
 use indexmap::{IndexMap, IndexSet};
 
 /// DSL keywords that must not be used as node IDs.
@@ -1416,9 +1416,11 @@ mod tests {
         };
 
         assert!(result.is_err());
-        assert!(result
-            .expect_err("cross-currency addition should fail")
-            .to_string()
-            .contains("Dimensional mismatch"));
+        assert!(
+            result
+                .expect_err("cross-currency addition should fail")
+                .to_string()
+                .contains("Dimensional mismatch")
+        );
     }
 }

@@ -5,10 +5,10 @@
 
 use super::DollarRoll;
 use crate::tba::pricer::price_tba;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 /// Price a dollar roll.
 ///

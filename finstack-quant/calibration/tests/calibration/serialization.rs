@@ -6,6 +6,7 @@
 //! - Domain quotes (`MarketQuote` + concrete quote enums)
 
 use crate::calibration::calibration_support as cal_utils;
+use finstack_quant_calibration::CalibrationMethod;
 use finstack_quant_calibration::api::market_datum::MarketDatum;
 use finstack_quant_calibration::api::schema::{
     BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationStep,
@@ -19,7 +20,7 @@ use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::RateQuote;
 use finstack_quant_calibration::quotes::VolQuote;
 use finstack_quant_calibration::quotes::{Pillar, QuoteId};
-use finstack_quant_calibration::CalibrationMethod;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
@@ -28,7 +29,6 @@ use finstack_quant_core::market_data::term_structures::Seniority;
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, SwaptionConventionId,
 };

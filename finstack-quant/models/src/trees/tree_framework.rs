@@ -16,8 +16,8 @@
 //! [`TreeDiscounting`] holds the per-node discount-factor conventions shared
 //! by the short-rate and Hull-White lattices.
 
-use finstack_quant_core::math::Compounding;
 use finstack_quant_core::Result;
+use finstack_quant_core::math::Compounding;
 
 /// Trait for instrument-specific valuation logic on a tree
 pub trait TreeValuator: Send + Sync {

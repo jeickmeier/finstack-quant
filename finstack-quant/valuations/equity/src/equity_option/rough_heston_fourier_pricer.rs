@@ -4,14 +4,14 @@
 //! to price European equity options under the rough Heston model (El Euch & Rosenbaum 2019).
 //! Model parameters are sourced from required market scalars.
 
-use super::pricing::{stochastic_vol_inputs, ModelInputs};
+use super::pricing::{ModelInputs, stochastic_vol_inputs};
 use super::types::EquityOption;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::pricer::expect_inst;
 use finstack_quant_valuations_core::pricer::PricingError;
+use finstack_quant_valuations_core::pricer::expect_inst;
 
 /// Equity option rough Heston semi-analytical pricer (Fourier inversion).
 ///

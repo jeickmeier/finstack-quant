@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use finstack_quant_core::schema::{run_schema_generator, SchemaGenerationCommand, ARTIFACTS};
+use finstack_quant_core::schema::{ARTIFACTS, SchemaGenerationCommand, run_schema_generator};
 
 /// Schema families owned by core; each is regenerated (and pruned) on its own.
 const ROOTS: [&str; 4] = [

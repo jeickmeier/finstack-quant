@@ -2,9 +2,9 @@
 
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_covenants::{
-    templates, Covenant, CovenantConsequence, CovenantEngine, CovenantMetricId, CovenantSpec,
-    CovenantType, CovenantWindow, HashMapMetricSource, InstrumentMutator, ThresholdSchedule,
-    ThresholdTest,
+    Covenant, CovenantConsequence, CovenantEngine, CovenantMetricId, CovenantSpec, CovenantType,
+    CovenantWindow, HashMapMetricSource, InstrumentMutator, ThresholdSchedule, ThresholdTest,
+    templates,
 };
 use time::Month;
 
@@ -174,10 +174,12 @@ fn negative_ebitda_leverage_breaches_max_ratio_covenant() {
         !report.passed,
         "negative leverage ratio (NM) must breach a max covenant"
     );
-    assert!(report
-        .details
-        .as_deref()
-        .is_some_and(|s| s.contains("not meaningful")));
+    assert!(
+        report
+            .details
+            .as_deref()
+            .is_some_and(|s| s.contains("not meaningful"))
+    );
 }
 
 #[test]

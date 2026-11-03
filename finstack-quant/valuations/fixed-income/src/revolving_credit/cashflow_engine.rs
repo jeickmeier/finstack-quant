@@ -16,13 +16,13 @@
 //! - **Short Rate**: Interest rate dynamics (fixed or floating)
 //! - **Credit Spread**: Default risk premium
 
+use finstack_quant_core::Result;
 use finstack_quant_core::config::{RoundingContext, ZeroKind};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 use finstack_quant_cashflows::builder::{CashFlowSchedule, SchedulePeriod};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
@@ -359,15 +359,13 @@ impl<'a> CashflowEngine<'a> {
                     timeline.push(event.date);
                 }
             }
-            if slice_on_resets {
-                if let Some(ref reset_grid) = self.reset_dates {
-                    timeline.extend(
-                        reset_grid
-                            .iter()
-                            .copied()
-                            .filter(|&reset| reset > period_start && reset < period_end),
-                    );
-                }
+            if slice_on_resets && let Some(ref reset_grid) = self.reset_dates {
+                timeline.extend(
+                    reset_grid
+                        .iter()
+                        .copied()
+                        .filter(|&reset| reset > period_start && reset < period_end),
+                );
             }
             // Commitment, margin and fee steps change the accrual inputs.
             timeline.extend(
@@ -1300,8 +1298,8 @@ mod tests {
     use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
-    use time::macros::date;
     use time::Month;
+    use time::macros::date;
 
     #[test]
     fn term_projection_converts_curve_basis_and_preserves_fixings_and_path_shocks() {

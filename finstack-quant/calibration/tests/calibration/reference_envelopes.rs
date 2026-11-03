@@ -432,9 +432,11 @@ fn example_08_equity_vol_surface_reports_fitted_sabr_slices() {
         report.metadata["calibrated_expiry_count"]
     );
     assert!(!slices.is_empty());
-    assert!(slices
-        .windows(2)
-        .all(|pair| pair[0].expiry < pair[1].expiry));
+    assert!(
+        slices
+            .windows(2)
+            .all(|pair| pair[0].expiry < pair[1].expiry)
+    );
     assert_eq!(
         slices.iter().map(|slice| slice.iterations).sum::<usize>(),
         report.iterations

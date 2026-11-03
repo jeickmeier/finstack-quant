@@ -59,7 +59,7 @@ mod pricing;
 mod tree;
 
 pub use config::{
-    ShortRateModel, ShortRateTreeConfig, DEFAULT_CURVE_FIT_TOLERANCE_BP, DEFAULT_NORMAL_VOL,
+    DEFAULT_CURVE_FIT_TOLERANCE_BP, DEFAULT_NORMAL_VOL, ShortRateModel, ShortRateTreeConfig,
 };
 pub use tree::{ShortRateTree, TreeCalibrationResult};
 

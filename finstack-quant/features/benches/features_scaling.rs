@@ -17,13 +17,13 @@ mod fixtures;
 
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_features::{
-    neutralize, rolling_regression_residual, transform_cross_sectional,
-    transform_cross_sectional_grouped, transform_timeseries, transform_timeseries_pairwise,
-    CrossSectionalOp, PairwiseOp, TimeSeriesOp,
+    CrossSectionalOp, PairwiseOp, TimeSeriesOp, neutralize, rolling_regression_residual,
+    transform_cross_sectional, transform_cross_sectional_grouped, transform_timeseries,
+    transform_timeseries_pairwise,
 };
-use fixtures::{feature_panel, window_params, HOT_FACTORS, HOT_OBS, HOT_WINDOW};
+use fixtures::{HOT_FACTORS, HOT_OBS, HOT_WINDOW, feature_panel, window_params};
 use serde_json::json;
 
 fn scaling_returns(c: &mut Criterion) {

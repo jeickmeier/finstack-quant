@@ -9,8 +9,8 @@ use crate::utils::input::{js_epoch_days, js_int, js_string};
 use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{
-    calendar_by_id_strict, canonical_calendar_id, days_since_epoch as rust_days_since_epoch,
-    DateExt, HolidayCalendar,
+    DateExt, HolidayCalendar, calendar_by_id_strict, canonical_calendar_id,
+    days_since_epoch as rust_days_since_epoch,
 };
 use wasm_bindgen::prelude::*;
 

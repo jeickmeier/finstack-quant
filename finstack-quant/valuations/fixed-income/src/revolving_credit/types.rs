@@ -13,7 +13,7 @@ use crate::loan_terms::{
     CommitmentStep, FeeStep, LetterOfCreditSpec, MarginStep, OidEirSpec, ScheduledFee, UpfrontFee,
 };
 use finstack_quant_cashflows::builder::RateSpec;
-use finstack_quant_cashflows::builder::{evaluate_fee_tiers, FeeTier, FloatingRateSpec};
+use finstack_quant_cashflows::builder::{FeeTier, FloatingRateSpec, evaluate_fee_tiers};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -1402,11 +1402,13 @@ mod dependency_tests {
             amount: Money::from((1_000_000_i64, Currency::USD)),
             is_draw: true,
         }]);
-        assert!(facility
-            .validate()
-            .expect_err("post-maturity draw must fail")
-            .to_string()
-            .contains("maturity"));
+        assert!(
+            facility
+                .validate()
+                .expect_err("post-maturity draw must fail")
+                .to_string()
+                .contains("maturity")
+        );
     }
 
     #[test]

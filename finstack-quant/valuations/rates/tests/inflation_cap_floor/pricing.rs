@@ -225,9 +225,10 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
     cap.interpolation = Some(SeriesInterpolation::Step);
     // Existing reference-date quotes cannot be silently reinterpreted after
     // that reference date has passed while the observation is still unknown.
-    assert!(cap
-        .npv_raw_with_model(&market, as_of, ModelKey::Normal)
-        .is_err());
+    assert!(
+        cap.npv_raw_with_model(&market, as_of, ModelKey::Normal)
+            .is_err()
+    );
     cap.volatility_expiry = InflationVolatilityExpiry::PublicationDate;
     let pv = cap
         .npv_raw_with_model(&market, as_of, ModelKey::Normal)
@@ -254,9 +255,10 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
     for valuation_date in [release, release + Duration::days(1)] {
         assert!(zc.value(&market, valuation_date).is_err());
         assert!(yoy.value(&market, valuation_date).is_err());
-        assert!(cap
-            .npv_raw_with_model(&market, valuation_date, ModelKey::Normal)
-            .is_err());
+        assert!(
+            cap.npv_raw_with_model(&market, valuation_date, ModelKey::Normal)
+                .is_err()
+        );
     }
     let mut observations = index.observations();
     observations.push((january, 306.0));

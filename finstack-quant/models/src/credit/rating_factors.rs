@@ -7,7 +7,7 @@ use finstack_quant_core::types::CreditRating;
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
-use super::registry::{embedded_registry, RatingFactorTableParts};
+use super::registry::{RatingFactorTableParts, embedded_registry};
 
 /// Rating factor table for a specific rating-agency methodology.
 ///

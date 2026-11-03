@@ -1,8 +1,8 @@
 //! Par inflation rate and configured carry breakeven tests for InflationSwap.
 
 use finstack_quant_core::dates::{Date, DayCount};
-use finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides;
 use finstack_quant_valuations_core::instruments::{
     BreakevenConfig, BreakevenMode, BreakevenTarget, PayReceive, PricingOptions,
 };

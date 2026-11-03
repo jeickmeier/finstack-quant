@@ -2,14 +2,14 @@
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{build_periods, Date};
+use finstack_quant_core::dates::{Date, build_periods};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_statements::capital_structure::build_instrument_from_spec;
 use finstack_quant_statements::types::{DebtInstrumentSpec, FinancialStatementInstrument};
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::{fixed_income::bond::Bond, PayReceive};
+use finstack_quant_valuations::instruments::{PayReceive, fixed_income::bond::Bond};
 use time::Month;
 
 use crate::rates_support;

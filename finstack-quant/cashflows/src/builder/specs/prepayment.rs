@@ -317,9 +317,11 @@ mod tests {
     fn lockout_validation_checks_the_post_lockout_cpr() {
         for lockout_months in [0, 30, 60, u32::MAX] {
             for cpr in [-0.1, 1.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-                assert!(PrepaymentModelSpec::cmbs_with_lockout(lockout_months, cpr)
-                    .validate()
-                    .is_err());
+                assert!(
+                    PrepaymentModelSpec::cmbs_with_lockout(lockout_months, cpr)
+                        .validate()
+                        .is_err()
+                );
             }
             for cpr in [0.0, 0.1, 1.0] {
                 PrepaymentModelSpec::cmbs_with_lockout(lockout_months, cpr)

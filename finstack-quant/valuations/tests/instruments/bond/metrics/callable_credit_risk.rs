@@ -186,10 +186,11 @@ fn test_unquoted_callable_explicit_models_skip_quote_spread_dependencies() {
     assert!(rates_credit.measures.iter().any(|(key, value)| {
         key.as_str().starts_with("bucketed_cs01::USD-CREDIT::") && value.abs() > 1e-6
     }));
-    assert!(rates_credit
-        .measures
-        .iter()
-        .any(|(key, value)| { key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6 }));
+    assert!(
+        rates_credit.measures.iter().any(|(key, value)| {
+            key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6
+        })
+    );
 
     // The rates-only tree requires a positive Hull-White pair.
     let mut tree_bond = bond;
@@ -217,8 +218,9 @@ fn test_unquoted_callable_explicit_models_skip_quote_spread_dependencies() {
     }
     let bucketed_dv01 = tree.measures["bucketed_dv01"];
     assert!(bucketed_dv01.is_finite() && bucketed_dv01.abs() > 1e-6);
-    assert!(tree
-        .measures
-        .iter()
-        .any(|(key, value)| key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6));
+    assert!(
+        tree.measures
+            .iter()
+            .any(|(key, value)| key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6)
+    );
 }

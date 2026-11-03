@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use finstack_quant_core::types::IssuerId;
 use finstack_quant_core::Result;
+use finstack_quant_core::types::IssuerId;
 
 use super::config::BucketSizeThresholds;
 use super::validation::validation_err;
 use crate::credit::hierarchy::{
-    dimension_key, CreditHierarchySpec, FoldUpRecord, IssuerBetaMode, IssuerTags,
+    CreditHierarchySpec, FoldUpRecord, IssuerBetaMode, IssuerTags, dimension_key,
 };
 
 /// Inventory built in step 3, before any fold-up.

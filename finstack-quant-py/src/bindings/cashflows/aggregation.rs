@@ -2,8 +2,9 @@
 
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::aggregation::{
-    aggregate_by_period, aggregate_cashflows_checked as rust_aggregate_cashflows_checked,
-    calendar_year_ladder as rust_calendar_year_ladder, PeriodAggregation,
+    PeriodAggregation, aggregate_by_period,
+    aggregate_cashflows_checked as rust_aggregate_cashflows_checked,
+    calendar_year_ladder as rust_calendar_year_ladder,
 };
 use finstack_quant_core::{dates::Date, money::Money};
 use pyo3::prelude::*;

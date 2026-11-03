@@ -6,9 +6,9 @@
 //! explicit validation and deterministic solver behavior.
 
 use crate::closed_form::{bachelier_call, black_call};
-use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::InputError;
 use finstack_quant_core::Result;
+use finstack_quant_core::math::solver::BrentSolver;
 
 /// Volatility quoting convention.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -135,19 +135,19 @@ pub fn convert_atm_volatility(
         ));
     }
 
-    if let VolatilityConvention::ShiftedLognormal { shift } = from_convention {
-        if !shift.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(
-                "shifted-lognormal shift of the source convention must be finite".to_string(),
-            ));
-        }
+    if let VolatilityConvention::ShiftedLognormal { shift } = from_convention
+        && !shift.is_finite()
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "shifted-lognormal shift of the source convention must be finite".to_string(),
+        ));
     }
-    if let VolatilityConvention::ShiftedLognormal { shift } = to_convention {
-        if !shift.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(
-                "shifted-lognormal shift of the target convention must be finite".to_string(),
-            ));
-        }
+    if let VolatilityConvention::ShiftedLognormal { shift } = to_convention
+        && !shift.is_finite()
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "shifted-lognormal shift of the target convention must be finite".to_string(),
+        ));
     }
 
     // At expiry, option value is intrinsic and independent of volatility.

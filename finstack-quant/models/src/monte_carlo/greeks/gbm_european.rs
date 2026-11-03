@@ -9,17 +9,17 @@ use crate::monte_carlo::discretization::exact::ExactGbm;
 use crate::monte_carlo::engine::{McEngine, McEngineConfig};
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::greeks::finite_diff::{
-    finite_diff_delta_from_inputs, finite_diff_gamma_from_inputs, FiniteDiffInputs,
+    FiniteDiffInputs, finite_diff_delta_from_inputs, finite_diff_gamma_from_inputs,
 };
 use crate::monte_carlo::payoff::vanilla::European;
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::registry;
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::types::OptionType;
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::flat_discount_factor;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
-use finstack_quant_core::Result;
 
 /// Two-sided 95% normal quantile used to turn `(value, stderr)` into a CI.
 const CI_95_Z: f64 = 1.96;

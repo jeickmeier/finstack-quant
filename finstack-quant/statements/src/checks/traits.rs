@@ -1,8 +1,8 @@
 //! Check trait and execution context.
 
+use crate::Result;
 use crate::evaluator::StatementResult;
 use crate::types::FinancialModelSpec;
-use crate::Result;
 
 use super::types::{CheckCategory, CheckConfig, CheckResult};
 

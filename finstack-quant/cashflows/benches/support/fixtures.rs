@@ -9,7 +9,7 @@ use finstack_quant_cashflows::builder::{
     FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
     FloatingRateSpec, Notional, OvernightIndexConstraintApplication, ScheduleParams,
 };
-use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
+use finstack_quant_cashflows::{ScheduleBuildOpts, schedule_from_classified_flows};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{

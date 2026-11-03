@@ -123,11 +123,11 @@ pub(super) fn apply(
             avg_shift
         } else {
             note_warning(
-                    attribution,
-                    "Rates attribution has DV01 but no measurable discount-curve shift; rates P&L set to zero",
-                    inputs.instrument.id(),
-                    "rates_curves",
-                );
+                attribution,
+                "Rates attribution has DV01 but no measurable discount-curve shift; rates P&L set to zero",
+                inputs.instrument.id(),
+                "rates_curves",
+            );
             0.0
         };
         let rates_pnl = dv01 * avg_shift;

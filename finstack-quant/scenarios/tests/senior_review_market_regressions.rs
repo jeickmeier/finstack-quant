@@ -15,11 +15,11 @@ use finstack_quant_scenarios::ScenarioMarketTarget;
 use finstack_quant_scenarios::{
     ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec, TenorMatchMode,
 };
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::composite::{
     CompositeInstrument, CompositeLegSpec, CompositeSpec, RebalanceRule, WeightingMethod,
 };
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::pricer::InstrumentType;
 use time::macros::date;
 

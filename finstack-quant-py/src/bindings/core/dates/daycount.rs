@@ -1,12 +1,12 @@
 //! Python bindings for day-count conventions from [`finstack_quant_core::dates`].
 
-use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
+use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{label_enum, typed_or_label, wire_methods};
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
-    days_30_360, days_30e_360_isda, DayCount, DayCountContext, DayCountContextState,
-    Thirty360Convention,
+    DayCount, DayCountContext, DayCountContextState, Thirty360Convention, days_30_360,
+    days_30e_360_isda,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyModule;

@@ -49,7 +49,7 @@ pub use coupon_event::CouponEvent;
 /// HW1F θ(t) preparation and term-forward bond reconstruction.
 mod curve;
 pub use curve::{
-    initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
+    Hw1fTermForward, PeriodForwardCoeffs, initial_short_rate_from_curve, prepare_hw1f_params,
 };
 
 /// Exercise-boundary protocol and regression basis for LSMC-priced rate exotics.
@@ -62,4 +62,4 @@ pub use lsmc::Hw1fLsmcPricer;
 
 /// Generic HW1F Monte Carlo orchestrator for path-dependent rate exotics.
 mod mc;
-pub use mc::{build_event_aligned_grid, money_estimate_from_pairs, Hw1fMcPricer};
+pub use mc::{Hw1fMcPricer, build_event_aligned_grid, money_estimate_from_pairs};

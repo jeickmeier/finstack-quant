@@ -6,7 +6,7 @@
 use super::calculators::PyImResult;
 use super::frame::sensitivity_rows;
 use super::im_curvature::PySimmCurvatureSensitivity;
-use super::types::{extract_asset_class, PyEligibleCollateralSchedule};
+use super::types::{PyEligibleCollateralSchedule, extract_asset_class};
 use crate::bindings::core::config::PyFinstackConfig;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::module_utils::parse_currency;

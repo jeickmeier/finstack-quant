@@ -22,18 +22,18 @@
 //! - Hull-White short-rate model: Hull & White (1990). `docs/REFERENCES.md#hull-white-1990-pricing-ird`
 //! - Templated on the agency-MBS Monte-Carlo OAS
 //!   ([`finstack_quant_valuations_fixed_income::mbs_passthrough`]).
-use crate::structured_credit::pricing::simulation_engine::{
-    prepare_deal_simulation, simulate_prepared, InstrumentPathFlowSource, OasPathFlowSource,
-    PreparedInstrumentSchedules,
-};
 use crate::structured_credit::StructuredCredit;
+use crate::structured_credit::pricing::simulation_engine::{
+    InstrumentPathFlowSource, OasPathFlowSource, PreparedInstrumentSchedules,
+    prepare_deal_simulation, simulate_prepared,
+};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::stats::mean_var;
-use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::RandomStream;
 use finstack_quant_valuations_core::instruments::Instrument;

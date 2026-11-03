@@ -15,9 +15,9 @@ use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, R
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    calculate_equity_metrics, CreditModelConfig, DealFees, DealType, LossAllocationPolicy,
-    LossRecognition, MarketConditions, Metadata, StructuredCredit, TrancheDraw, TrancheReadvance,
-    WaterfallRules,
+    CreditModelConfig, DealFees, DealType, LossAllocationPolicy, LossRecognition, MarketConditions,
+    Metadata, StructuredCredit, TrancheDraw, TrancheReadvance, WaterfallRules,
+    calculate_equity_metrics,
 };
 
 use super::super::convert::{enum_from_str, instrument_expiry};
@@ -655,12 +655,10 @@ impl PyStructuredCreditBuilder {
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let converted: PrepaymentModelSpec =
-            if let Ok(typed) = value.cast::<PyPrepaymentModelSpec>() {
-                typed.borrow().inner.clone()
-            } else {
-                crate::bindings::module_utils::py_to_serde(py, value, "prepayment_spec")?
-            };
+        let converted: PrepaymentModelSpec = match value.cast::<PyPrepaymentModelSpec>() {
+            Ok(typed) => typed.borrow().inner.clone(),
+            _ => crate::bindings::module_utils::py_to_serde(py, value, "prepayment_spec")?,
+        };
         builder_set!(slf, |b: StructuredCreditBuilder| b
             .prepayment_spec(converted))
     }
@@ -672,10 +670,9 @@ impl PyStructuredCreditBuilder {
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let converted: DefaultModelSpec = if let Ok(typed) = value.cast::<PyDefaultModelSpec>() {
-            typed.borrow().inner.clone()
-        } else {
-            crate::bindings::module_utils::py_to_serde(py, value, "default_spec")?
+        let converted: DefaultModelSpec = match value.cast::<PyDefaultModelSpec>() {
+            Ok(typed) => typed.borrow().inner.clone(),
+            _ => crate::bindings::module_utils::py_to_serde(py, value, "default_spec")?,
         };
         builder_set!(slf, |b: StructuredCreditBuilder| b.default_spec(converted))
     }
@@ -687,10 +684,9 @@ impl PyStructuredCreditBuilder {
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let converted: RecoveryModelSpec = if let Ok(typed) = value.cast::<PyRecoveryModelSpec>() {
-            typed.borrow().inner.clone()
-        } else {
-            crate::bindings::module_utils::py_to_serde(py, value, "recovery_spec")?
+        let converted: RecoveryModelSpec = match value.cast::<PyRecoveryModelSpec>() {
+            Ok(typed) => typed.borrow().inner.clone(),
+            _ => crate::bindings::module_utils::py_to_serde(py, value, "recovery_spec")?,
         };
         builder_set!(slf, |b: StructuredCreditBuilder| b.recovery_spec(converted))
     }
@@ -791,11 +787,11 @@ impl PyStructuredCreditBuilder {
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let converted: finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageRules = if let Ok(typed) = value.cast::<PyCoverageRules>() {
+        let converted: finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageRules = match value.cast::<PyCoverageRules>() { Ok(typed) => {
             typed.borrow().inner.clone()
-        } else {
+        } _ => {
             crate::bindings::module_utils::py_to_serde(py, value, "coverage_rules")?
-        };
+        }};
         builder_set!(slf, |b: StructuredCreditBuilder| b
             .coverage_rules(converted))
     }
@@ -807,11 +803,11 @@ impl PyStructuredCreditBuilder {
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let converted: finstack_quant_valuations::instruments::fixed_income::structured_credit::CallAssumption = if let Ok(typed) = value.cast::<PyCallAssumption>() {
+        let converted: finstack_quant_valuations::instruments::fixed_income::structured_credit::CallAssumption = match value.cast::<PyCallAssumption>() { Ok(typed) => {
             typed.borrow().inner.clone()
-        } else {
+        } _ => {
             crate::bindings::module_utils::py_to_serde(py, value, "call_assumption")?
-        };
+        }};
         builder_set!(slf, |b: StructuredCreditBuilder| b
             .call_assumption(converted))
     }
@@ -823,11 +819,11 @@ impl PyStructuredCreditBuilder {
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let converted: finstack_quant_valuations::instruments::fixed_income::structured_credit::Waterfall = if let Ok(typed) = value.cast::<PyWaterfall>() {
+        let converted: finstack_quant_valuations::instruments::fixed_income::structured_credit::Waterfall = match value.cast::<PyWaterfall>() { Ok(typed) => {
             typed.borrow().inner.clone()
-        } else {
+        } _ => {
             crate::bindings::module_utils::py_to_serde(py, value, "waterfall")?
-        };
+        }};
         builder_set!(slf, |b: StructuredCreditBuilder| b.waterfall(converted))
     }
 

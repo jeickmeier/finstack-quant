@@ -62,12 +62,12 @@
 //! - Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*.
 //!   Springer. Section 2.4 (Generating multivariate samples). `docs/REFERENCES.md#glasserman-2004-monte-carlo`
 
-use crate::{error, Result};
+use crate::{Result, error};
 use thiserror::Error;
 
 mod nearest_correlation;
 
-pub use nearest_correlation::{nearest_correlation, NearestCorrelationOpts};
+pub use nearest_correlation::{NearestCorrelationOpts, nearest_correlation};
 
 /// Relative singular threshold for Cholesky decomposition and substitution.
 ///
@@ -249,7 +249,9 @@ impl From<CorrelationError> for crate::Error {
 #[non_exhaustive]
 pub enum CholeskyError {
     /// Matrix is not positive semi-definite (diagonal element became negative).
-    #[error("Matrix is not positive semi-definite: diagonal element {diag} is negative (position [{row}, {row}])")]
+    #[error(
+        "Matrix is not positive semi-definite: diagonal element {diag} is negative (position [{row}, {row}])"
+    )]
     NotPositiveDefinite {
         /// The negative diagonal value
         diag: f64,
@@ -257,7 +259,9 @@ pub enum CholeskyError {
         row: usize,
     },
     /// Matrix is numerically singular (division by near-zero element).
-    #[error("Matrix is numerically singular: division by {value} (threshold {threshold}) at position [{row}, {col}])")]
+    #[error(
+        "Matrix is numerically singular: division by {value} (threshold {threshold}) at position [{row}, {col}])"
+    )]
     Singular {
         /// The near-zero value that caused the failure
         value: f64,
@@ -1541,11 +1545,7 @@ mod tests {
         let corr: Vec<f64> = (0..n * n)
             .map(|k| {
                 let (i, j) = (k / n, k % n);
-                if i == j {
-                    1.0
-                } else {
-                    rho
-                }
+                if i == j { 1.0 } else { rho }
             })
             .collect();
         let factor = cholesky_correlation(&corr, n).expect("valid");

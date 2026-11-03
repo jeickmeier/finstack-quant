@@ -14,7 +14,7 @@
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
-    labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
+    ColumnSchema, labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyFinancialModelSpec;

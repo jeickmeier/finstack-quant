@@ -6,8 +6,8 @@
 //! - ISMA vs ISDA ActAct variants
 //! - 30/360 family conventions
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor, calendar_by_id_strict};
 use std::hint::black_box;
 use time::Month;
 

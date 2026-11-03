@@ -9,7 +9,7 @@ use finstack_quant_valuations_core::instruments::BondQuoteInput;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 use std::sync::{Arc, Mutex};
@@ -319,9 +319,11 @@ fn z_spread_input_rejects_option_bond_without_quoted_workout_price() {
 
     let direct_error = price_from_z_spread(&bond, &market, as_of, 0.01)
         .expect_err("direct Z-spread pricing must not ignore callability");
-    assert!(direct_error
-        .to_string()
-        .contains("requires an explicit quoted clean price"));
+    assert!(
+        direct_error
+            .to_string()
+            .contains("requires an explicit quoted clean price")
+    );
 
     let quote_error = compute_quotes(
         &bond,
@@ -332,9 +334,11 @@ fn z_spread_input_rejects_option_bond_without_quoted_workout_price() {
             .with_model(finstack_quant_valuations_core::pricer::ModelKey::Tree),
     )
     .expect_err("Z-spread quote normalization must not ignore callability");
-    assert!(quote_error
-        .to_string()
-        .contains("requires an explicit quoted clean price"));
+    assert!(
+        quote_error
+            .to_string()
+            .contains("requires an explicit quoted clean price")
+    );
 }
 
 #[test]

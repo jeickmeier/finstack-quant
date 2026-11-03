@@ -1,5 +1,6 @@
 //! Forward curve calibration target.
 
+use crate::CalibrationReport;
 use crate::api::schema::ForwardCurveParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
@@ -12,17 +13,16 @@ use crate::solver::traits::GlobalSolveTarget;
 use crate::solver::traits::TimeGridAndGuesses;
 use crate::targets::rate_recipe::rate_calibration_recipe;
 use crate::targets::util::{
-    discount_and_forward_curve_ids, prepare_rate_calibration_quotes, pv01_residual_weight,
-    ContextScratch,
+    ContextScratch, discount_and_forward_curve_ids, prepare_rate_calibration_quotes,
+    pv01_residual_weight,
 };
-use crate::CalibrationReport;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{ForwardCurve, RateCalibrationCurveRole};
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_rates::deposit::Deposit;
 use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
 use finstack_quant_valuations_rates::ir_future::InterestRateFuture;
@@ -653,6 +653,7 @@ impl GlobalSolveTarget for ForwardCurveTarget {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ResidualWeightingScheme;
     use crate::build::prepared::PreparedQuote;
     use crate::constants::WEIGHT_MIN_FLOOR;
     use crate::quotes::MarketQuote;
@@ -661,7 +662,6 @@ mod tests {
     use crate::solver::traits::GlobalSolveTarget;
     use crate::targets::util::quote_annuity_proxy;
     use crate::validation::RateBounds;
-    use crate::ResidualWeightingScheme;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::BusinessDayConvention;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -1184,14 +1184,18 @@ mod tests {
         assert!((grid_360[1] - 90.0 / 360.0).abs() < 1e-12);
         assert!((grid_360[2] - 180.0 / 360.0).abs() < 1e-12);
 
-        assert!(act365f
-            .knots()
-            .iter()
-            .any(|time| (*time - 90.0 / 365.0).abs() < 1e-12));
-        assert!(act360
-            .knots()
-            .iter()
-            .any(|time| (*time - 90.0 / 360.0).abs() < 1e-12));
+        assert!(
+            act365f
+                .knots()
+                .iter()
+                .any(|time| (*time - 90.0 / 365.0).abs() < 1e-12)
+        );
+        assert!(
+            act360
+                .knots()
+                .iter()
+                .any(|time| (*time - 90.0 / 360.0).abs() < 1e-12)
+        );
     }
 
     #[test]

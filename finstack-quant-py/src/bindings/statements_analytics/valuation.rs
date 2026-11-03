@@ -12,21 +12,21 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::extract::{extract_market_opt, extract_model_ref};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    serde_to_py, ColumnSchema,
+    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
+    serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::bindings::statements::checks::PyCheckReport;
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements_analytics::checks::{
-    extract_check_suite_spec, extract_credit_mapping, extract_three_statement_mapping,
-    PyCreditMapping, PyThreeStatementMapping,
+    PyCreditMapping, PyThreeStatementMapping, extract_check_suite_spec, extract_credit_mapping,
+    extract_three_statement_mapping,
 };
 use crate::bindings::statements_analytics::extract_serde_any;
 use crate::bindings::statements_analytics::typed::PyTornadoEntry;
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::{
-    CorporateAnalysis, CorporateValuationResult, DcfOptions, DcfSensitivityResult,
-    LboCheckMappings, LboConfig, LboResult, DEFAULT_UFCF_NODE,
+    CorporateAnalysis, CorporateValuationResult, DEFAULT_UFCF_NODE, DcfOptions,
+    DcfSensitivityResult, LboCheckMappings, LboConfig, LboResult,
 };
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
     EquityBridge, TerminalValueSpec, ValuationDiscounts,

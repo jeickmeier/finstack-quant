@@ -122,7 +122,7 @@ fn test_all_flows_preserve_currency() {
 /// Bus/252 year fraction for a known date range using TARGET2 calendar.
 #[test]
 fn test_bus_252_year_fraction() {
-    use finstack_quant_core::dates::{calendar_by_id_strict, DayCount, DayCountContext};
+    use finstack_quant_core::dates::{DayCount, DayCountContext, calendar_by_id_strict};
 
     let start = d(2024, 1, 2); // First business day of 2024
     let end = d(2024, 7, 1);
@@ -165,7 +165,7 @@ fn test_bus_252_requires_calendar() {
 
 #[test]
 fn contractual_accrual_boundaries_are_not_business_day_adjusted() {
-    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
     let periods = build_periods(BuildPeriodsParams {
@@ -261,7 +261,7 @@ fn sofr_swap_preset_adjusts_accrual_boundaries() {
 #[test]
 fn preceding_adjusted_february_termination_matches_coupon_emission() {
     use finstack_quant_cashflows::builder::{
-        build_periods, build_single_period, period_accrual, BuildPeriodsParams,
+        BuildPeriodsParams, build_periods, build_single_period, period_accrual,
     };
     use finstack_quant_cashflows::builder::{
         CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
@@ -318,7 +318,7 @@ fn preceding_adjusted_february_termination_matches_coupon_emission() {
 fn public_period_builders_reject_negative_lags_without_panicking() {
     use finstack_quant_cashflows::builder::ScheduleParams;
     use finstack_quant_cashflows::builder::{
-        build_periods, build_single_period, BuildPeriodsParams,
+        BuildPeriodsParams, build_periods, build_single_period,
     };
 
     let schedule = ScheduleParams::quarterly_act360();
@@ -347,7 +347,7 @@ fn public_period_builders_reject_negative_lags_without_panicking() {
 #[test]
 fn icma_eom_requires_a_month_end_reference_anchor() {
     use finstack_quant_cashflows::builder::ScheduleParams;
-    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
     let mut schedule = ScheduleParams::quarterly_act360();

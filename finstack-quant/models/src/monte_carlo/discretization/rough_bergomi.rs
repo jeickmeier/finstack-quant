@@ -350,8 +350,8 @@ mod tests {
             let process = RoughBergomiProcess::new(params);
             let disc = RoughBergomiEuler::new();
 
-            let gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
-            let dt = gen.dt();
+            let r#gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
+            let dt = r#gen.dt();
             let mut rng = PhiloxRng::new(424242);
 
             let num_paths = 200_000usize;
@@ -364,8 +364,8 @@ mod tests {
             for _ in 0..num_paths {
                 rng.fill_std_normals(&mut vol_normals);
                 rng.fill_std_normals(&mut spot_normals);
-                gen.generate(&vol_normals, &mut increments);
-                gen.driving_normals_into(&vol_normals, &mut driving);
+                r#gen.generate(&vol_normals, &mut increments);
+                r#gen.driving_normals_into(&vol_normals, &mut driving);
 
                 let mut x = [s0];
                 let mut work = [0.0];
@@ -419,8 +419,8 @@ mod tests {
         let t_end = 1.0_f64;
         let n = 100usize;
 
-        let gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
-        let dt = gen.dt();
+        let r#gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
+        let dt = r#gen.dt();
         let mut rng = PhiloxRng::new(20240517);
 
         let num_paths = 200_000usize;
@@ -434,7 +434,7 @@ mod tests {
 
         for _ in 0..num_paths {
             rng.fill_std_normals(&mut normals);
-            gen.generate(&normals, &mut increments);
+            r#gen.generate(&normals, &mut increments);
 
             // Ỹ_{t_k} = Σ_{j<k} ΔỸ_j — the same accumulation RoughBergomiEuler does.
             let mut y = 0.0;
@@ -505,8 +505,8 @@ mod tests {
         let process = RoughBergomiProcess::new(params);
         let disc = RoughBergomiEuler::new();
 
-        let gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
-        let dt = gen.dt();
+        let r#gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
+        let dt = r#gen.dt();
         let mut rng = PhiloxRng::new(20240517);
 
         let num_paths = 200_000usize;
@@ -520,8 +520,8 @@ mod tests {
             // Single advancing stream: Volterra normals then spot normals.
             rng.fill_std_normals(&mut vol_normals);
             rng.fill_std_normals(&mut spot_normals);
-            gen.generate(&vol_normals, &mut increments);
-            gen.driving_normals_into(&vol_normals, &mut driving);
+            r#gen.generate(&vol_normals, &mut increments);
+            r#gen.driving_normals_into(&vol_normals, &mut driving);
 
             let mut x = [s0];
             let mut work = [0.0];

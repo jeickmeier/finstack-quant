@@ -13,15 +13,15 @@ mod fixtures;
 
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_factor::credit::calibration::{CovarianceStrategy, CreditCalibrator};
 use finstack_quant_factor::credit::decomposition::decompose_levels;
 use finstack_quant_factor::{CurveType, FactorCovarianceMatrix, MarketDependency};
 use finstack_quant_factor::{FactorMatcher, MappingTableMatcher, MatchingConfig};
 use fixtures::{
-    credit_dependency, credit_hierarchical_config, factor_ids, known_issuer_attrs, mapping_rules,
-    psd_matrix, zero_sensitivity_matrix, CreditBook,
+    CreditBook, credit_dependency, credit_hierarchical_config, factor_ids, known_issuer_attrs,
+    mapping_rules, psd_matrix, zero_sensitivity_matrix,
 };
 
 fn scaling_covariance_construction(c: &mut Criterion) {

@@ -438,7 +438,7 @@ impl LevenbergMarquardtSolver {
 
         // Builds the result from the loop state at the definition site (macro hygiene).
         macro_rules! finish {
-            ($reason:expr) => {
+            ($reason:expr_2021) => {
                 LmSolution {
                     params,
                     stats: LmStats {

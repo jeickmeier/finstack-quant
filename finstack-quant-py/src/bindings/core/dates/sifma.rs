@@ -1,8 +1,8 @@
 //! Python bindings for published and estimated SIFMA settlement dates.
 
 use finstack_quant_core::dates::{
-    estimated_sifma_settlement_date, next_sifma_settlement, sifma_settlement_date,
-    SifmaSettlementClass,
+    SifmaSettlementClass, estimated_sifma_settlement_date, next_sifma_settlement,
+    sifma_settlement_date,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyModule;

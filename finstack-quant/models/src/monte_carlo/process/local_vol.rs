@@ -180,10 +180,10 @@ impl ProcessMetadata for LocalVolProcess {
 mod tests {
     use super::*;
     use crate::monte_carlo::simulate::{
-        simulate_paths, PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec, TimeGridSpec,
+        PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec, TimeGridSpec, simulate_paths,
     };
     use crate::volatility::implied_vol_black;
-    use crate::volatility::local_vol::test_support::{forwards, linspace, SKEWED};
+    use crate::volatility::local_vol::test_support::{SKEWED, forwards, linspace};
     use finstack_quant_core::math::stats::OnlineStats;
 
     const SPOT: f64 = 100.0;

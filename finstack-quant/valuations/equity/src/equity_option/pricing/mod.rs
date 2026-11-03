@@ -9,10 +9,10 @@
 mod black;
 pub(crate) mod inputs;
 
-pub(crate) use black::{compute_greeks, compute_pv, SimpleEquityOptionBlackPricer};
+pub(crate) use black::{SimpleEquityOptionBlackPricer, compute_greeks, compute_pv};
 pub(crate) use inputs::{
-    collect_inputs, has_future_discrete_dividends, model_error, model_inputs,
-    stochastic_vol_inputs, ModelInputs,
+    ModelInputs, collect_inputs, has_future_discrete_dividends, model_error, model_inputs,
+    stochastic_vol_inputs,
 };
 
 use crate::equity_option::types::EquityOption;
@@ -21,8 +21,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::heston_price;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::pricer::expect_inst;
 use finstack_quant_valuations_core::pricer::PricingError;
+use finstack_quant_valuations_core::pricer::expect_inst;
 
 /// Equity option Heston semi-analytical pricer (Fourier inversion).
 pub(crate) struct EquityOptionHestonFourierPricer;
@@ -132,8 +132,8 @@ mod tests {
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
     use finstack_quant_models::closed_form::bs_greeks_unchecked;
     use finstack_quant_models::types::{ExerciseStyle, OptionType};
-    use finstack_quant_valuations_core::instruments::pricing_overrides::ThetaDayBasis;
     use finstack_quant_valuations_core::instruments::SettlementType;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::ThetaDayBasis;
     use finstack_quant_valuations_core::pricer::{ModelKey, Pricer};
     use time::Month;
 
@@ -350,9 +350,11 @@ mod tests {
     fn test_adjust_spot_for_discrete_dividends_rejects_nonpositive_result() {
         let error = adjust_spot_for_discrete_dividends(1.0, 0.01, &[(0.1, 50.0)])
             .expect_err("dividend PV above spot must fail");
-        assert!(error
-            .to_string()
-            .contains("escrowed-dividend model invalid"));
+        assert!(
+            error
+                .to_string()
+                .contains("escrowed-dividend model invalid")
+        );
     }
 
     #[test]

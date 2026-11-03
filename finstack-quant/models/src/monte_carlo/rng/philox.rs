@@ -221,11 +221,11 @@ impl RandomStream for PhiloxRng {
     #[inline]
     fn fill_std_normals(&mut self, out: &mut [f64]) {
         let mut i = 0;
-        if let Some(spare) = self.spare_normal.take() {
-            if let Some(first) = out.first_mut() {
-                *first = spare;
-                i = 1;
-            }
+        if let Some(spare) = self.spare_normal.take()
+            && let Some(first) = out.first_mut()
+        {
+            *first = spare;
+            i = 1;
         }
 
         while i < out.len() {

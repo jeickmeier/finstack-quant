@@ -5,7 +5,7 @@
 
 use super::{InstrumentType, ModelKey, PricerKey, PricingError, PricingErrorContext};
 use crate::instruments::Instrument;
-use finstack_quant_core::config::{results_meta, FinstackConfig};
+use finstack_quant_core::config::{FinstackConfig, results_meta};
 use finstack_quant_core::market_data::context::MarketContext;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -606,10 +606,11 @@ fn collect_fx_policy_from_curves(
     let deps = instrument.market_dependencies().ok()?;
     let mut policies: Vec<String> = Vec::new();
     let mut push = |policy: Option<&str>| {
-        if let Some(p) = policy {
-            if !p.is_empty() && !policies.iter().any(|existing| existing == p) {
-                policies.push(p.to_string());
-            }
+        if let Some(p) = policy
+            && !p.is_empty()
+            && !policies.iter().any(|existing| existing == p)
+        {
+            policies.push(p.to_string());
         }
     };
     for id in &deps.curves.discount_curves {

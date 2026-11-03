@@ -3,13 +3,13 @@
 //! Standard methodology for repos and securities financing transactions
 //! where IM is calculated as a percentage of collateral value.
 
+use crate::Marginable;
 use crate::calculators::traits::{ImCalculator, ImResult};
 use crate::types::{CollateralAssetClass, EligibleCollateralSchedule, ImMethodology};
-use crate::Marginable;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::{types::CreditRating, Result};
+use finstack_quant_core::{Result, types::CreditRating};
 
 /// Margin period of risk in business days used for haircut-based repo IM.
 pub const HAIRCUT_MPOR_DAYS: u32 = 2;
@@ -151,13 +151,12 @@ impl HaircutImCalculator {
             if &entry.asset_class != asset_class {
                 continue;
             }
-            if let Some(constraints) = &entry.maturity_constraints {
-                if !self
+            if let Some(constraints) = &entry.maturity_constraints
+                && !self
                     .remaining_years
                     .is_some_and(|years| constraints.is_satisfied(years))
-                {
-                    continue;
-                }
+            {
+                continue;
             }
             if let Some(min_rating) = &entry.min_rating {
                 let floor: CreditRating = min_rating.parse()?;

@@ -70,19 +70,19 @@ pub(crate) mod universal;
 // Core surface (supported)
 pub use aggregation::is_additive_metric;
 pub use buckets::{
-    format_bucket_label, format_key_rate_label, parse_key_rate_label, STANDARD_BUCKETS_YEARS,
-    STANDARD_BUCKET_LABELS,
+    STANDARD_BUCKET_LABELS, STANDARD_BUCKETS_YEARS, format_bucket_label, format_key_rate_label,
+    parse_key_rate_label,
 };
 pub use cross_factor_pair::CrossFactorPair;
 pub use finite_difference::bump_surface_vol_absolute;
 #[doc(hidden)]
 pub use ids::closest_metric_names;
 pub use ids::{MetricGroup, MetricId, MetricUnit};
-pub use period_cash::{collect_period_cash, PeriodCash};
+pub use period_cash::{PeriodCash, collect_period_cash};
 pub use registry::{MetricRegistry, MetricRegistryError};
 pub use traits::{MetricCalculator, MetricContext, MetricSeed};
 #[doc(hidden)]
-pub use universal::{register_universal_metrics, PricerPublishedMetric};
+pub use universal::{PricerPublishedMetric, register_universal_metrics};
 
 // Family-facing finite-difference helpers and calculators.
 //
@@ -91,14 +91,14 @@ pub use universal::{register_universal_metrics, PricerPublishedMetric};
 // calculators live at `metrics::sensitivities::<module>`.
 #[doc(hidden)]
 pub use finite_difference::{
-    bump_active_volatility, bump_discount_curve_parallel, bump_scalar_price,
-    central_diff_by_half_bump, central_diff_by_width, central_diff_scalar_relative,
-    replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width, CORRELATION_BUMP,
-    VOL_POINTS_PER_ABSOLUTE_VOL,
+    CORRELATION_BUMP, VOL_POINTS_PER_ABSOLUTE_VOL, bump_active_volatility,
+    bump_discount_curve_parallel, bump_scalar_price, central_diff_by_half_bump,
+    central_diff_by_width, central_diff_scalar_relative, replace_scalar_value,
+    scalar_numeric_value, scaled_central_diff_by_width,
 };
 #[doc(hidden)]
 pub use sensitivities::cs01_z_spread::{
-    quoted_z_spread, ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01,
+    ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01, quoted_z_spread,
 };
 #[doc(hidden)]
 pub use sensitivities::rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};

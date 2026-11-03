@@ -6,7 +6,7 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
-use finstack_quant_statements::adjustments::{normalize, Adjustment, NormalizationConfig};
+use finstack_quant_statements::adjustments::{Adjustment, NormalizationConfig, normalize};
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::checks::builtins::BalanceSheetArticulation;
@@ -97,9 +97,11 @@ fn formula_checks_recover_missing_type_metadata_from_the_model() {
     for node in model.nodes.values_mut() {
         node.value_type = None;
     }
-    assert!(formula_check("usd - eur", Some(0.01))
-        .execute(&CheckContext::new(&model, &results))
-        .is_err());
+    assert!(
+        formula_check("usd - eur", Some(0.01))
+            .execute(&CheckContext::new(&model, &results))
+            .is_err()
+    );
     for (formula, tolerance) in [("usd - usd", Some(0.01)), ("usd / usd == 1", None)] {
         assert!(
             formula_check(formula, tolerance)
@@ -127,9 +129,11 @@ fn formula_checks_validate_capital_structure_reporting_units() {
             .unwrap()
             .passed
     );
-    assert!(formula_check("cs.interest_expense.total == eur", None)
-        .execute(&CheckContext::new(&model, &results))
-        .is_err());
+    assert!(
+        formula_check("cs.interest_expense.total == eur", None)
+            .execute(&CheckContext::new(&model, &results))
+            .is_err()
+    );
 
     let mut usd_model = model;
     usd_model.nodes.shift_remove(&NodeId::new("eur"));
@@ -211,9 +215,11 @@ fn formula_checks_keep_native_instrument_units_distinct_from_reporting_totals() 
     let error = formula_check("cs.interest_expense.EUR_BOND == usd", None)
         .execute(&CheckContext::new(&model, &results))
         .unwrap_err();
-    assert!(error
-        .to_string()
-        .contains("instrument 'EUR_BOND' result currency"));
+    assert!(
+        error
+            .to_string()
+            .contains("instrument 'EUR_BOND' result currency")
+    );
 }
 
 fn checked_balance_sheet() -> (FinancialModelSpec, StatementResult, CheckSuite) {
@@ -270,12 +276,14 @@ fn failed_and_empty_normalization_merges_preserve_the_original_report_and_values
 
     let normalized = normalize(&results, &NormalizationConfig::new("assets")).unwrap();
     let duplicated = vec![normalized[0].clone(), normalized[0].clone()];
-    assert!(finstack_quant_statements::adjustments::merge_into_results(
-        &mut results,
-        &duplicated,
-        "assets"
-    )
-    .is_err());
+    assert!(
+        finstack_quant_statements::adjustments::merge_into_results(
+            &mut results,
+            &duplicated,
+            "assets"
+        )
+        .is_err()
+    );
     assert_eq!(results.nodes, original_values);
     assert_eq!(results.check_report, original_report);
 }
@@ -288,10 +296,12 @@ fn assert_arithmetic_failure(result: &finstack_quant_statements::checks::CheckRe
             && finding.materiality.is_none()
             && finding.comparison.is_none()
     }));
-    assert!(result
-        .comparisons
-        .iter()
-        .all(|c| c.actual.is_finite() && c.expected.is_finite() && c.tolerance.is_finite()));
+    assert!(
+        result
+            .comparisons
+            .iter()
+            .all(|c| c.actual.is_finite() && c.expected.is_finite() && c.tolerance.is_finite())
+    );
     serde_json::to_string(result).expect("all published numbers are finite");
 }
 

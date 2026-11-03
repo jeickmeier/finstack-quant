@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::BarrierType;
 use finstack_quant_core::types::{CurveId, InstrumentId};

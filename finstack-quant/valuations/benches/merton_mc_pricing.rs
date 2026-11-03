@@ -14,7 +14,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_models::credit::{MertonBarrierType, MertonModel};
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::merton_mc::{
     MertonMcEngine, MertonMcRun,

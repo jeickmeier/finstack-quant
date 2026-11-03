@@ -14,6 +14,7 @@ use crate::structured_credit::{
     CallAssumption, CallScope, StructuredCredit, TrancheAccrualPeriod, TrancheCashflows,
 };
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{
@@ -23,9 +24,8 @@ use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::ValidatedPricingLifecycle;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::common_impl::helpers::ValidatedPricingLifecycle;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use serde::{Deserialize, Serialize};

@@ -8,8 +8,8 @@ use crate::api::valuations::pricing::parse_market;
 use crate::utils::input::{from_js_json, js_opt_string, json_text};
 use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_valuations::metrics::risk::var_calculator::VarConfig;
 use finstack_quant_valuations::metrics::risk::MarketHistory;
+use finstack_quant_valuations::metrics::risk::var_calculator::VarConfig;
 use finstack_quant_valuations::pricer::PricingDispatch;
 use wasm_bindgen::prelude::*;
 

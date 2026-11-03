@@ -3,11 +3,11 @@
 //! Data model for `ConvertibleBond` and related enums used by pricing and
 //! metrics modules. Pricing logic is intentionally kept out of this file.
 
+use finstack_quant_core::Error;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_core::Error;
 
 use crate::bond::{CallPutSchedule, CashflowSpec};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
@@ -370,20 +370,20 @@ impl ConvertibleBond {
             ));
         }
 
-        if let Some(rate) = self.cashflow_spec.fixed_coupon_rate() {
-            if rate < 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "convertible bond cashflow_spec fixed coupon rate must be non-negative, got {rate}"
-                )));
-            }
+        if let Some(rate) = self.cashflow_spec.fixed_coupon_rate()
+            && rate < 0.0
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "convertible bond cashflow_spec fixed coupon rate must be non-negative, got {rate}"
+            )));
         }
-        if let Some(recovery_rate) = self.recovery_rate {
-            if !recovery_rate.is_finite() || !(0.0..=1.0).contains(&recovery_rate) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "convertible bond '{}' recovery_rate must be finite and in [0, 1], got {recovery_rate}",
-                    self.id.as_str()
-                )));
-            }
+        if let Some(recovery_rate) = self.recovery_rate
+            && (!recovery_rate.is_finite() || !(0.0..=1.0).contains(&recovery_rate))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "convertible bond '{}' recovery_rate must be finite and in [0, 1], got {recovery_rate}",
+                self.id.as_str()
+            )));
         }
         if self.credit_curve_id.is_some() && self.recovery_rate.is_none() {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -1042,11 +1042,12 @@ mod tests {
         let mut bond = ConvertibleBond::example().expect("example");
         bond.conversion.ratio = None;
         bond.conversion.price = None;
-        assert!(bond
-            .validate_for_pricing()
-            .expect_err("missing conversion terms must fail")
-            .to_string()
-            .contains("conversion.ratio"));
+        assert!(
+            bond.validate_for_pricing()
+                .expect_err("missing conversion terms must fail")
+                .to_string()
+                .contains("conversion.ratio")
+        );
 
         bond.conversion.ratio = Some(25.0);
         bond.soft_call_trigger = Some(PriceTrigger {
@@ -1054,11 +1055,12 @@ mod tests {
             observation_days: 30,
             required_days_above: 20,
         });
-        assert!(bond
-            .validate_for_pricing()
-            .expect_err("NaN soft-call trigger must fail")
-            .to_string()
-            .contains("finite"));
+        assert!(
+            bond.validate_for_pricing()
+                .expect_err("NaN soft-call trigger must fail")
+                .to_string()
+                .contains("finite")
+        );
     }
 
     /// Dividend protection is modeled by the pricer (continuous-yield ratio
@@ -1160,10 +1162,11 @@ mod tests {
     fn validation_rejects_inconsistent_conversion_quotes() {
         let mut bond = ConvertibleBond::example().expect("example");
         bond.conversion.price = Some(100.0);
-        assert!(bond
-            .validate_for_pricing()
-            .expect_err("inconsistent ratio and price must fail")
-            .to_string()
-            .contains("inconsistent"));
+        assert!(
+            bond.validate_for_pricing()
+                .expect_err("inconsistent ratio and price must fail")
+                .to_string()
+                .contains("inconsistent")
+        );
     }
 }

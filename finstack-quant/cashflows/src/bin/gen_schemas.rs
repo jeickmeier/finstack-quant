@@ -1,7 +1,7 @@
 //! Generate the JSON Schemas owned by `finstack-quant-cashflows`.
 
 use finstack_quant_cashflows::schema::ARTIFACTS;
-use finstack_quant_core::schema::{run_schema_generator, SchemaGenerationCommand};
+use finstack_quant_core::schema::{SchemaGenerationCommand, run_schema_generator};
 use std::path::Path;
 
 fn main() {

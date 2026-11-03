@@ -14,7 +14,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    price_convertible_bond, ConvertibleBond,
+    ConvertibleBond, price_convertible_bond,
 };
 use time::macros::date;
 

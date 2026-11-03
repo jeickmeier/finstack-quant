@@ -45,11 +45,7 @@ impl OptionType {
 
 impl From<bool> for OptionType {
     fn from(is_call: bool) -> Self {
-        if is_call {
-            Self::Call
-        } else {
-            Self::Put
-        }
+        if is_call { Self::Call } else { Self::Put }
     }
 }
 
@@ -180,87 +176,99 @@ mod tests {
     #[test]
     fn validate_rejects_non_positive_volatility() {
         for volatility in [0.0, -0.1, f64::NAN, f64::INFINITY] {
-            assert!(OptionMarketParams {
-                spot: 100.0,
-                strike: 95.0,
-                rate: 0.04,
-                volatility,
-                time_to_expiry: 1.5,
-                dividend_yield: 0.0,
-                option_type: crate::types::OptionType::Call
-            }
-            .validate()
-            .is_err());
+            assert!(
+                OptionMarketParams {
+                    spot: 100.0,
+                    strike: 95.0,
+                    rate: 0.04,
+                    volatility,
+                    time_to_expiry: 1.5,
+                    dividend_yield: 0.0,
+                    option_type: crate::types::OptionType::Call
+                }
+                .validate()
+                .is_err()
+            );
         }
     }
 
     #[test]
     fn validate_rejects_non_positive_spot_and_strike() {
-        assert!(OptionMarketParams {
-            spot: 0.0,
-            strike: 95.0,
-            rate: 0.04,
-            volatility: 0.20,
-            time_to_expiry: 1.5,
-            dividend_yield: 0.0,
-            option_type: crate::types::OptionType::Call
-        }
-        .validate()
-        .is_err());
-        assert!(OptionMarketParams {
-            spot: 100.0,
-            strike: -1.0,
-            rate: 0.04,
-            volatility: 0.20,
-            time_to_expiry: 1.5,
-            dividend_yield: 0.0,
-            option_type: crate::types::OptionType::Call
-        }
-        .validate()
-        .is_err());
+        assert!(
+            OptionMarketParams {
+                spot: 0.0,
+                strike: 95.0,
+                rate: 0.04,
+                volatility: 0.20,
+                time_to_expiry: 1.5,
+                dividend_yield: 0.0,
+                option_type: crate::types::OptionType::Call
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            OptionMarketParams {
+                spot: 100.0,
+                strike: -1.0,
+                rate: 0.04,
+                volatility: 0.20,
+                time_to_expiry: 1.5,
+                dividend_yield: 0.0,
+                option_type: crate::types::OptionType::Call
+            }
+            .validate()
+            .is_err()
+        );
     }
 
     #[test]
     fn validate_rejects_negative_or_non_finite_time_to_expiry() {
         for expiry in [-0.1, f64::NAN, f64::INFINITY] {
-            assert!(OptionMarketParams {
+            assert!(
+                OptionMarketParams {
+                    spot: 100.0,
+                    strike: 95.0,
+                    rate: 0.04,
+                    volatility: 0.20,
+                    time_to_expiry: expiry,
+                    dividend_yield: 0.0,
+                    option_type: crate::types::OptionType::Call
+                }
+                .validate()
+                .is_err()
+            );
+        }
+        assert!(
+            OptionMarketParams {
                 spot: 100.0,
                 strike: 95.0,
                 rate: 0.04,
                 volatility: 0.20,
-                time_to_expiry: expiry,
+                time_to_expiry: 0.0,
                 dividend_yield: 0.0,
                 option_type: crate::types::OptionType::Call
             }
             .validate()
-            .is_err());
-        }
-        assert!(OptionMarketParams {
-            spot: 100.0,
-            strike: 95.0,
-            rate: 0.04,
-            volatility: 0.20,
-            time_to_expiry: 0.0,
-            dividend_yield: 0.0,
-            option_type: crate::types::OptionType::Call
-        }
-        .validate()
-        .is_ok());
+            .is_ok()
+        );
     }
 
     #[test]
     fn validate_rejects_non_finite_rate_and_dividend_yield() {
-        assert!(OptionMarketParams {
-            spot: 100.0,
-            strike: 95.0,
-            rate: f64::NAN,
-            volatility: 0.20,
-            time_to_expiry: 1.5,
-            dividend_yield: 0.0,
-            option_type: crate::types::OptionType::Call
-        }
-        .validate()
-        .is_err());
+        assert!(
+            OptionMarketParams {
+                spot: 100.0,
+                strike: 95.0,
+                rate: f64::NAN,
+                volatility: 0.20,
+                time_to_expiry: 1.5,
+                dividend_yield: 0.0,
+                option_type: crate::types::OptionType::Call
+            }
+            .validate()
+            .is_err()
+        );
         let mut params = OptionMarketParams {
             spot: 100.0,
             strike: 95.0,

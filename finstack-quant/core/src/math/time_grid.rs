@@ -54,8 +54,8 @@
 //!
 //! See the Monte Carlo conventions doc in `finstack-quant-valuations` for detailed guidelines.
 
-use crate::dates::{Date, DayCount, DayCountContext};
 use crate::Result;
+use crate::dates::{Date, DayCount, DayCountContext};
 
 /// Time grid for Monte Carlo simulation.
 ///
@@ -300,12 +300,12 @@ impl TimeGrid {
         }
 
         const MIN_DT: f64 = 1e-10;
-        if let Some(&min_dt) = dts.iter().min_by(|a, b| a.total_cmp(b)) {
-            if min_dt < MIN_DT {
-                return Err(invalid(format!(
-                    "minimum time step {min_dt} is below the 1e-10 floor"
-                )));
-            }
+        if let Some(&min_dt) = dts.iter().min_by(|a, b| a.total_cmp(b))
+            && min_dt < MIN_DT
+        {
+            return Err(invalid(format!(
+                "minimum time step {min_dt} is below the 1e-10 floor"
+            )));
         }
 
         let t_max = times.last().copied().unwrap_or(0.0);
@@ -630,24 +630,28 @@ mod tests {
         let base = date!(2024 - 01 - 01);
         let maturity = date!(2025 - 01 - 01);
 
-        assert!(map_date_to_step(
-            base,
-            date!(2024 - 07 - 01),
-            maturity,
-            12,
-            DayCount::ActActIsma,
-            DayCountContext::default(),
-        )
-        .is_err());
-        assert!(map_date_to_step(
-            base,
-            date!(2024 - 07 - 01),
-            maturity,
-            12,
-            DayCount::Bus252,
-            DayCountContext::default(),
-        )
-        .is_err());
+        assert!(
+            map_date_to_step(
+                base,
+                date!(2024 - 07 - 01),
+                maturity,
+                12,
+                DayCount::ActActIsma,
+                DayCountContext::default(),
+            )
+            .is_err()
+        );
+        assert!(
+            map_date_to_step(
+                base,
+                date!(2024 - 07 - 01),
+                maturity,
+                12,
+                DayCount::Bus252,
+                DayCountContext::default(),
+            )
+            .is_err()
+        );
     }
 
     #[test]

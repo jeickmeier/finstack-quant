@@ -34,12 +34,12 @@ use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
 use finstack_quant_models::volatility as vol;
+use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_models::volatility::local_vol::LocalVolSurface;
 use finstack_quant_models::volatility::sabr::{
     SabrCalibrationOutcome, SabrCalibrator, SabrParameters, SabrShift, SabrSmile,
 };
-use finstack_quant_models::volatility::svi::{calibrate_svi as rust_calibrate_svi, SviParams};
-use finstack_quant_models::volatility::VolatilityConvention;
+use finstack_quant_models::volatility::svi::{SviParams, calibrate_svi as rust_calibrate_svi};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 

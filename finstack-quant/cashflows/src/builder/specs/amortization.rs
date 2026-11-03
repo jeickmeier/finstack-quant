@@ -224,13 +224,13 @@ impl Notional {
                         )));
                     }
 
-                    if let Some(pd) = prev_date {
-                        if *date <= pd {
-                            return Err(finstack_quant_core::Error::Validation(format!(
-                                "StepRemaining dates must be strictly increasing; found {} after {}",
-                                date, pd
-                            )));
-                        }
+                    if let Some(pd) = prev_date
+                        && *date <= pd
+                    {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "StepRemaining dates must be strictly increasing; found {} after {}",
+                            date, pd
+                        )));
                     }
 
                     if !remaining.amount().is_finite() || remaining.amount() < 0.0 {

@@ -6,7 +6,7 @@ use finstack_quant_core::expr::{Expr, Function};
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::dsl::parse_and_compile;
 use finstack_quant_statements::evaluator::Evaluator;
-use finstack_quant_statements::evaluator::{evaluate_formula, EvaluationContext};
+use finstack_quant_statements::evaluator::{EvaluationContext, evaluate_formula};
 use finstack_quant_statements::types::AmountOrScalar;
 use finstack_quant_statements::types::NodeValueType;
 use indexmap::IndexMap;
@@ -166,10 +166,12 @@ fn coalesce_skips_nan_and_both_infinities_and_retains_finite_zero() {
     ] {
         assert_eq!(result.get(node, &period), Some(expected), "{node}");
     }
-    assert!(result
-        .get("all_missing", &period)
-        .expect("NaN result")
-        .is_nan());
+    assert!(
+        result
+            .get("all_missing", &period)
+            .expect("NaN result")
+            .is_nan()
+    );
     assert!(!result.meta.warnings.iter().any(|warning| matches!(
         warning,
         finstack_quant_statements::evaluator::EvalWarning::DivisionByZero { node_id, .. }
@@ -220,10 +222,12 @@ fn ranks_honor_direction_and_minimum_ties_while_skipping_missing_history() {
         );
     }
     for node in ["default_rank", "ascending_rank", "descending_rank"] {
-        assert!(result
-            .get(node, &periods[2])
-            .expect("missing rank")
-            .is_nan());
+        assert!(
+            result
+                .get(node, &periods[2])
+                .expect("missing rank")
+                .is_nan()
+        );
     }
 }
 
@@ -231,9 +235,11 @@ fn ranks_honor_direction_and_minimum_ties_while_skipping_missing_history() {
 fn rank_rejects_invalid_arity_at_compilation_and_standalone_evaluation() {
     for formula in ["rank()", "rank(x, 1, 2)"] {
         let error = parse_and_compile(formula).expect_err("invalid arity");
-        assert!(error
-            .to_string()
-            .contains("rank() requires 1 or 2 arguments"));
+        assert!(
+            error
+                .to_string()
+                .contains("rank() requires 1 or 2 arguments")
+        );
     }
     for args in [Vec::new(), vec![Expr::literal(1.0); 3]] {
         let mut context = EvaluationContext::new(
@@ -247,9 +253,11 @@ fn rank_rejects_invalid_arity_at_compilation_and_standalone_evaluation() {
             Some("rank"),
         )
         .expect_err("direct expressions must also validate arity");
-        assert!(error
-            .to_string()
-            .contains("rank() requires 1 or 2 arguments"));
+        assert!(
+            error
+                .to_string()
+                .contains("rank() requires 1 or 2 arguments")
+        );
     }
 }
 
@@ -269,9 +277,11 @@ fn rank_rejects_nonfinite_and_monetary_direction_flags() {
         let error = Evaluator::new()
             .evaluate(&model)
             .expect_err("nonfinite direction");
-        assert!(error
-            .to_string()
-            .contains("rank() ascending flag must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("rank() ascending flag must be finite")
+        );
     }
     let error = {
         let mut model_builder = ModelBuilder::new("monetary_rank_direction");

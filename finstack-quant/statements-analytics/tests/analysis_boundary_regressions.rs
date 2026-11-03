@@ -66,22 +66,26 @@ fn variance_and_bridge_reject_currency_mismatch() {
         .evaluate(&monetary_model(Currency::EUR))
         .unwrap();
     let period = PeriodId::annual(2025);
-    assert!(run_variance(
-        &base,
-        &comparison,
-        &VarianceConfig::new("usd", "eur", vec!["revenue"], vec![period])
-    )
-    .is_err());
-    assert!(variance_bridge(
-        &base,
-        &comparison,
-        "revenue",
-        period,
-        &["profit"],
-        "usd",
-        "eur"
-    )
-    .is_err());
+    assert!(
+        run_variance(
+            &base,
+            &comparison,
+            &VarianceConfig::new("usd", "eur", vec!["revenue"], vec![period])
+        )
+        .is_err()
+    );
+    assert!(
+        variance_bridge(
+            &base,
+            &comparison,
+            "revenue",
+            period,
+            &["profit"],
+            "usd",
+            "eur"
+        )
+        .is_err()
+    );
 }
 
 #[test]

@@ -13,7 +13,7 @@ macro_rules! bounded_f64_wire {
         $(#[$doc:meta])*
         $name:ident,
         field: #[$field_attr:meta],
-        valid: |$v:ident| $check:expr,
+        valid: |$v:ident| $check:expr_2021,
         message: $msg:literal $(,)?
     ) => {
         $(#[$doc])*

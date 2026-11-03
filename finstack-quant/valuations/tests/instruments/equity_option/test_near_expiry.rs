@@ -7,11 +7,11 @@
 //! - Expired option handling
 
 use super::helpers::*;
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise;
 use finstack_quant_valuations::metrics::MetricId;
-use time::macros::date;
 use time::Duration;
+use time::macros::date;
 
 #[test]
 fn test_near_expiry_gamma_stability() {

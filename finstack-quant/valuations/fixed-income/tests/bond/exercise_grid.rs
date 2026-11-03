@@ -17,8 +17,8 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorSpec,
 };
@@ -164,10 +164,11 @@ fn with_daily_exercise(mut bond: Bond) -> Bond {
         // These fixtures have only synthetic return-floor calls. Adding par
         // calls cannot lower the floor (which is itself at least par), and
         // their endpoints force floor lowering to evaluate every day.
-        assert!(bond
-            .call_put
-            .as_ref()
-            .is_none_or(|schedule| schedule.calls.is_empty()));
+        assert!(
+            bond.call_put
+                .as_ref()
+                .is_none_or(|schedule| schedule.calls.is_empty())
+        );
         let first = bond.issue_date.next_day().expect("fixture issue date");
         let last = bond.maturity.previous_day().expect("fixture maturity");
         let (start, end) = match floor.window {

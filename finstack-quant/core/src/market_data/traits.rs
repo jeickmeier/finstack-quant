@@ -293,9 +293,11 @@ mod tests {
                 reverse,
             };
             let base = curve.base_date();
-            assert!(curve
-                .df_between_dates(base, base + time::Duration::days(365))
-                .is_err());
+            assert!(
+                curve
+                    .df_between_dates(base, base + time::Duration::days(365))
+                    .is_err()
+            );
         }
     }
 

@@ -1,18 +1,18 @@
 //! Portfolio-level factor assignment, decomposition, and what-if analysis.
 //!
 use super::model::FactorModel;
+use crate::Portfolio;
 use crate::error::{Error, Result};
 use crate::evaluation::{
-    evaluate_raw_portfolio, PositionExecution, RawEvaluationInput, RawSelectiveSeed,
+    PositionExecution, RawEvaluationInput, RawSelectiveSeed, evaluate_raw_portfolio,
 };
 use crate::types::PositionId;
-use crate::Portfolio;
+use finstack_quant_core::FxHashSet;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use finstack_quant_core::FxHashSet;
-use finstack_quant_factor::risk::{FactorContribution, RiskDecomposition};
 use finstack_quant_factor::FactorId;
+use finstack_quant_factor::risk::{FactorContribution, RiskDecomposition};
 
 /// Base/after delta for a single factor contribution.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -173,8 +173,8 @@ impl FactorModel {
                 PositionChange::Remove { position_id } => {
                     if !changed.insert(position_id) {
                         return Err(Error::invalid_input(format!(
-                        "Multiple what-if changes for position '{position_id}'; supply one final change per position"
-                    )));
+                            "Multiple what-if changes for position '{position_id}'; supply one final change per position"
+                        )));
                     }
                     let Some(position_idx) = position_index(position_id) else {
                         return Err(Error::invalid_input(format!(
@@ -193,14 +193,14 @@ impl FactorModel {
                 } => {
                     if !changed.insert(position_id) {
                         return Err(Error::invalid_input(format!(
-                        "Multiple what-if changes for position '{position_id}'; supply one final change per position"
-                    )));
+                            "Multiple what-if changes for position '{position_id}'; supply one final change per position"
+                        )));
                     }
                     if !new_quantity.is_finite() {
                         return Err(Error::invalid_input(format!(
-                        "PositionChange::Resize new_quantity must be finite for position '{}', got {}",
-                        position_id, new_quantity
-                    )));
+                            "PositionChange::Resize new_quantity must be finite for position '{}', got {}",
+                            position_id, new_quantity
+                        )));
                     }
                     let Some(position_idx) = position_index(position_id) else {
                         return Err(Error::invalid_input(format!(
@@ -413,12 +413,12 @@ fn factor_deltas(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Portfolio;
     use crate::factor_model::FactorModel;
     use crate::position::{Position, PositionUnit};
     use crate::sensitivity::FactorSensitivityEngine;
     use crate::test_utils::build_test_market_at;
-    use crate::types::{PositionId, DUMMY_ENTITY_ID};
-    use crate::Portfolio;
+    use crate::types::{DUMMY_ENTITY_ID, PositionId};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::bumps::BumpUnits;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -436,8 +436,8 @@ mod tests {
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     };
     use time::macros::date;
 

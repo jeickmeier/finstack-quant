@@ -12,8 +12,8 @@ use crate::api::schema::{CalibrationStep, StepParams};
 use crate::config::CalibrationConfig;
 use crate::quotes::CdsTrancheQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
+use finstack_quant_core::market_data::context::MarketContext;
 
 /// Perform "pre-flight" validation of a calibration step before execution.
 ///
@@ -126,12 +126,12 @@ fn validate_svi_surface_step(
             )));
         }
     }
-    if let Some(spot_override) = p.spot_override {
-        if !spot_override.is_finite() || spot_override <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "SVI surface step spot_override must be finite and positive; got {spot_override}"
-            )));
-        }
+    if let Some(spot_override) = p.spot_override
+        && (!spot_override.is_finite() || spot_override <= 0.0)
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "SVI surface step spot_override must be finite and positive; got {spot_override}"
+        )));
     }
     if let Some(discount_curve_id) = &p.discount_curve_id {
         let _ = context.get_discount(discount_curve_id)?;
@@ -274,7 +274,8 @@ fn validate_inflation_step(
         if index.currency() != p.currency {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Inflation step currency mismatch: params.currency='{}' but InflationIndex.currency='{}'",
-                p.currency, index.currency()
+                p.currency,
+                index.currency()
             )));
         }
 
@@ -325,13 +326,12 @@ fn validate_swaption_vol_step(
 ) -> Result<()> {
     let _ = context.get_discount(&p.discount_curve_id)?;
     if let crate::api::schema::SwaptionVolConvention::ShiftedLognormal { shift } = p.vol_convention
+        && (!shift.is_finite() || shift <= 0.0)
     {
-        if !shift.is_finite() || shift <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Shifted lognormal convention requires a finite, positive shift; got {}",
-                shift
-            )));
-        }
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Shifted lognormal convention requires a finite, positive shift; got {}",
+            shift
+        )));
     }
     Ok(())
 }

@@ -2,7 +2,7 @@
 
 use crate::attribution::attribution_support::TestInstrument;
 use finstack_quant_attribution::{
-    attribute_pnl, AttributionMethod, AttributionRequest, ExecutionPolicy, PnlAttribution,
+    AttributionMethod, AttributionRequest, ExecutionPolicy, PnlAttribution, attribute_pnl,
 };
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
@@ -59,8 +59,7 @@ fn parallel_stamps_configured_rounding_context() {
         "Output scale for USD should reflect configured rounding"
     );
     assert_eq!(
-        serde_json::to_value(&rounding).expect("rounding serializes")["ingest_scale_by_currency"]
-            ["USD"],
+        serde_json::to_value(&rounding).expect("rounding serializes")["ingest_scale_by_currency"]["USD"],
         serde_json::json!(4),
         "Ingest scale for USD should reflect configured rounding"
     );
@@ -104,7 +103,7 @@ fn explain_uses_stamped_rounding_context() {
 #[test]
 fn all_methods_stamp_configured_rounding_context() {
     use finstack_quant_attribution::{
-        attribute_pnl_metrics_based, default_waterfall_order, TaylorAttributionConfig,
+        TaylorAttributionConfig, attribute_pnl_metrics_based, default_waterfall_order,
     };
     use finstack_quant_valuations::instruments::PricingOptions;
 
@@ -135,8 +134,8 @@ fn all_methods_stamp_configured_rounding_context() {
             "{method}: output scale must reflect the configured rounding"
         );
         assert_eq!(
-            serde_json::to_value(&attr.meta.rounding).expect("rounding serializes")
-                ["ingest_scale_by_currency"]["USD"],
+            serde_json::to_value(&attr.meta.rounding).expect("rounding serializes")["ingest_scale_by_currency"]
+                ["USD"],
             serde_json::json!(4),
             "{method}: ingest scale must reflect the configured rounding"
         );

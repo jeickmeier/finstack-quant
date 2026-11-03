@@ -55,6 +55,6 @@ pub use utils::interp_knots_flat;
 
 pub(crate) use types::Interp;
 pub(crate) use utils::{
-    find_monotone_violation, validate_finite_series, validate_knot_spacing, validate_knots,
-    MIN_RELATIVE_KNOT_GAP,
+    MIN_RELATIVE_KNOT_GAP, find_monotone_violation, validate_finite_series, validate_knot_spacing,
+    validate_knots,
 };

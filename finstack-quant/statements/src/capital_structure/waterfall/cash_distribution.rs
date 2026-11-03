@@ -1,7 +1,7 @@
 //! Sweep capacity, pro-rata allocation, available-cash caps, and
 //! the [`StagedInstrumentFlow`] working struct.
 
-use crate::capital_structure::cashflows::{add_optional_money, CashflowBreakdown};
+use crate::capital_structure::cashflows::{CashflowBreakdown, add_optional_money};
 use crate::capital_structure::principal::PrincipalAllocation;
 use crate::error::Result;
 use crate::evaluator::{CapitalStructureClaimCategory, CapitalStructureWarning, EvalWarning};

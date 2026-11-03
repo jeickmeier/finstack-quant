@@ -96,12 +96,12 @@ impl WaterfallRules {
                     )));
                 }
             }
-            if let Some(bp) = afc.net_wac_fee_bp {
-                if !bp.is_finite() || bp < 0.0 {
-                    return Err(invalid(format!(
-                        "waterfall_rules: afc.net_wac_fee_bp must be finite and non-negative, got {bp}"
-                    )));
-                }
+            if let Some(bp) = afc.net_wac_fee_bp
+                && (!bp.is_finite() || bp < 0.0)
+            {
+                return Err(invalid(format!(
+                    "waterfall_rules: afc.net_wac_fee_bp must be finite and non-negative, got {bp}"
+                )));
             }
         }
 
@@ -166,14 +166,14 @@ impl WaterfallRules {
             let mut prev: Option<u32> = None;
             for step in &si.schedule {
                 unit(step.senior_decimal, "shifting_interest senior_decimal")?;
-                if let Some(p) = prev {
-                    if step.months_from_closing <= p {
-                        return Err(invalid(format!(
-                            "waterfall_rules: shifting_interest.schedule must be strictly ascending in \
+                if let Some(p) = prev
+                    && step.months_from_closing <= p
+                {
+                    return Err(invalid(format!(
+                        "waterfall_rules: shifting_interest.schedule must be strictly ascending in \
                              months_from_closing (found {} after {p})",
-                            step.months_from_closing
-                        )));
-                    }
+                        step.months_from_closing
+                    )));
                 }
                 prev = Some(step.months_from_closing);
             }
@@ -190,23 +190,23 @@ impl WaterfallRules {
             if let Some(max_loss) = ea.max_cumulative_loss {
                 unit(max_loss, "early_amortization.max_cumulative_loss")?;
             }
-            if let Some(floor) = ea.min_excess_spread_3m {
-                if !floor.is_finite() {
-                    return Err(invalid(format!(
-                        "waterfall_rules: early_amortization.min_excess_spread_3m must be finite, got {floor}"
-                    )));
-                }
+            if let Some(floor) = ea.min_excess_spread_3m
+                && !floor.is_finite()
+            {
+                return Err(invalid(format!(
+                    "waterfall_rules: early_amortization.min_excess_spread_3m must be finite, got {floor}"
+                )));
             }
         }
 
-        if let Some(ca) = &self.controlled_accumulation {
-            if ca.start > ca.bullet_date {
-                return Err(invalid(format!(
-                    "waterfall_rules: controlled_accumulation.start ({}) must be on or before \
+        if let Some(ca) = &self.controlled_accumulation
+            && ca.start > ca.bullet_date
+        {
+            return Err(invalid(format!(
+                "waterfall_rules: controlled_accumulation.start ({}) must be on or before \
                      bullet_date ({})",
-                    ca.start, ca.bullet_date
-                )));
-            }
+                ca.start, ca.bullet_date
+            )));
         }
 
         Ok(())

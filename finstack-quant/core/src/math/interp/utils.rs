@@ -51,10 +51,10 @@ where
     }
 
     // Right extrapolation
-    if let Some(&last_knot) = knots.last() {
-        if x > last_knot {
-            return Some(apply_extension(extrapolation, on_right));
-        }
+    if let Some(&last_knot) = knots.last()
+        && x > last_knot
+    {
+        return Some(apply_extension(extrapolation, on_right));
     }
 
     None
@@ -135,11 +135,7 @@ pub(crate) fn validate_knot_spacing(knots: &[f64], min_relative_gap: f64) -> cra
 #[inline(always)]
 pub(crate) fn locate_segment_unchecked(xs: &[f64], x: f64) -> usize {
     let idx = xs.partition_point(|k| *k < x);
-    if idx == 0 {
-        0
-    } else {
-        idx - 1
-    }
+    if idx == 0 { 0 } else { idx - 1 }
 }
 
 /// Validate that all values are strictly positive.

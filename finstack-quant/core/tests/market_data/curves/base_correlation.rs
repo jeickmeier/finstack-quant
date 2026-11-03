@@ -136,16 +136,20 @@ fn correlation_boundaries_are_supported_by_construction_bumps_and_serde() {
 #[test]
 fn constructors_and_bucket_bumps_reject_invalid_domains() {
     for detachment in [-1.0, 101.0, f64::NAN, f64::INFINITY] {
-        assert!(BaseCorrelationCurve::builder("INVALID")
-            .knots([(3.0, 0.25), (detachment, 0.45)])
-            .build()
-            .is_err());
+        assert!(
+            BaseCorrelationCurve::builder("INVALID")
+                .knots([(3.0, 0.25), (detachment, 0.45)])
+                .build()
+                .is_err()
+        );
     }
     for correlation in [-0.01, 1.01, f64::NAN, f64::INFINITY] {
-        assert!(BaseCorrelationCurve::builder("INVALID")
-            .knots([(3.0, 0.25), (7.0, correlation)])
-            .build()
-            .is_err());
+        assert!(
+            BaseCorrelationCurve::builder("INVALID")
+                .knots([(3.0, 0.25), (7.0, correlation)])
+                .build()
+                .is_err()
+        );
     }
     let curve = BaseCorrelationCurve::builder("CDX")
         .knots([(3.0, 0.25), (7.0, 0.45)])

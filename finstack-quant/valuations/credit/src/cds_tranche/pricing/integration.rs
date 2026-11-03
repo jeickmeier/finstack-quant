@@ -107,9 +107,11 @@ mod tests {
 
     #[test]
     fn production_credit_audit_non_finite_integrands_fail() {
-        assert!(CdsTranchePricer::new()
-            .integrate_factors(&|_| Ok(f64::NAN))
-            .is_err());
+        assert!(
+            CdsTranchePricer::new()
+                .integrate_factors(&|_| Ok(f64::NAN))
+                .is_err()
+        );
     }
 
     #[test]

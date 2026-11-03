@@ -46,8 +46,8 @@
 use super::super::results::MoneyEstimate;
 use super::lsq::regression_coefficients_with_basis;
 use crate::monte_carlo::discretization::exact::ExactGbm;
-use crate::monte_carlo::estimate::{independent_estimator_stats, Estimate};
-use crate::monte_carlo::pricer::basis::{build_lsmc_basis, BasisFunctions, BasisKind, LsmcBasis};
+use crate::monte_carlo::estimate::{Estimate, independent_estimator_stats};
+use crate::monte_carlo::pricer::basis::{BasisFunctions, BasisKind, LsmcBasis, build_lsmc_basis};
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, RandomStream};
@@ -1341,9 +1341,11 @@ mod tests {
         let process = crate::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.2)
             .map(GbmProcess::new)
             .expect("process");
-        assert!(pricer
-            .generate_paths_with_seed(&process, 100.0, 1.0, 1, pricer.config.seed)
-            .is_err());
+        assert!(
+            pricer
+                .generate_paths_with_seed(&process, 100.0, 1.0, 1, pricer.config.seed)
+                .is_err()
+        );
     }
 
     #[test]
@@ -1362,9 +1364,11 @@ mod tests {
                     .with_antithetic(antithetic);
                 config.num_paths = num_paths;
                 let seed = config.seed;
-                assert!(LsmcEngine::new(config)
-                    .generate_paths_with_seed(&process, 100.0, 1.0, 1, seed)
-                    .is_err());
+                assert!(
+                    LsmcEngine::new(config)
+                        .generate_paths_with_seed(&process, 100.0, 1.0, 1, seed)
+                        .is_err()
+                );
             }
             assert!(checked_path_values(2, 1, antithetic).is_ok());
         }

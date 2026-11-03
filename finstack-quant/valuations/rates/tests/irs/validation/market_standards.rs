@@ -12,11 +12,11 @@
 
 use crate::support::rates as test_utils;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
-use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar_by_id_strict, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext,
-    StubKind, Tenor,
+    BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
+    calendar_by_id_strict,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};

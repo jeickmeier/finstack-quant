@@ -127,7 +127,7 @@ pub fn ltm_window(period: PeriodId, periods: &[Period]) -> crate::Result<LtmWind
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{build_periods, create_date, Date};
+    use crate::dates::{Date, build_periods, create_date};
     use time::Month;
 
     fn day(date: Date, is_actual: bool) -> Period {

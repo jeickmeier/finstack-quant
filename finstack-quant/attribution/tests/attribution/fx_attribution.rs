@@ -4,21 +4,21 @@
 //! and waterfall attribution methodologies.
 
 use finstack_quant_attribution::{
-    attribute_pnl, default_waterfall_order, AttributionFactor, AttributionMethod,
-    AttributionRequest, ExecutionPolicy,
+    AttributionFactor, AttributionMethod, AttributionRequest, ExecutionPolicy, attribute_pnl,
+    default_waterfall_order,
 };
+use finstack_quant_core::Result;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{create_date, Date};
+use finstack_quant_core::dates::{Date, create_date};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider, FxQuery};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider, FxQuery};
 use finstack_quant_core::types::Attributes;
-use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::results::ValuationResult;
 use std::sync::Arc;

@@ -1,10 +1,10 @@
 //! Loader for swaption conventions embedded in JSON registries.
 
-use crate::market::conventions::ids::SwaptionConventionId;
 use crate::market::conventions::SwaptionConventions;
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+use crate::market::conventions::ids::SwaptionConventionId;
 use finstack_quant_core::Error;
 use finstack_quant_core::FxHashMap;
+use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]

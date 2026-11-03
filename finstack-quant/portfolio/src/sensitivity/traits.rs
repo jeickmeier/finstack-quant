@@ -1,12 +1,12 @@
 //! Sensitivity engine trait and the repricing helpers both engines share.
 //!
-use crate::dependencies::{resolved_dependencies, MarketFactorKey};
+use crate::dependencies::{MarketFactorKey, resolved_dependencies};
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::BumpUnits;
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use finstack_quant_factor::{BumpSizeConfig, FactorDefinition, MarketMapping, SensitivityMatrix};
 use finstack_quant_valuations::instruments::{Instrument, RatesCurveKind};
 
@@ -76,7 +76,7 @@ fn exact_curve_key(market: &MarketContext, curve_id: &CurveId) -> Option<MarketF
             return Some(MarketFactorKey::BaseCorrelation(curve_id.clone()));
         }
         CurveStorage::Price(_) | CurveStorage::BasisSpread(_) | CurveStorage::Parametric(_) => {
-            return None
+            return None;
         }
     };
     Some(MarketFactorKey::curve(curve_id.clone(), kind))

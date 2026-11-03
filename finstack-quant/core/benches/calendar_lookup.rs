@@ -6,7 +6,7 @@
 //! 50 (`sse`, `cnbe`), so this bench measures the spread across that range and
 //! the business-day-adjustment shape that consumes it.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::dates::calendar_by_id_strict;
 use std::hint::black_box;
 use time::{Date, Month};

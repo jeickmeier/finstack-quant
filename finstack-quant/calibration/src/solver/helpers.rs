@@ -1,7 +1,7 @@
 //! Solver helpers and common penalty/diagnostics utilities for calibration.
 
-use crate::constants::OBJECTIVE_VALID_ABS_MAX;
 use crate::CalibrationConfig;
+use crate::constants::OBJECTIVE_VALID_ABS_MAX;
 
 /// Finite-difference bump step used by both bootstrap and global diagnostics.
 ///
@@ -394,13 +394,14 @@ pub(crate) fn bracket_solve_1d(
     // root only when the grid evidences a zero crossing (`sign_change_observed`);
     // otherwise it is a below-tolerance |f|-minimum and is flagged approximate
     // via `is_sign_change_bracket = false` for the caller's opt-in gate.
-    if let (Some(best_point), Some(best_value)) = (diag.best_point, diag.best_value) {
-        if best_value.is_finite() && best_value.abs() < tol {
-            diag.bracket_found = true;
-            diag.is_sign_change_bracket = sign_change_observed
-                || certify_root_by_local_sign_change(objective, best_point, best_value, &mut diag);
-            return Ok((Some(best_point), diag));
-        }
+    if let (Some(best_point), Some(best_value)) = (diag.best_point, diag.best_value)
+        && best_value.is_finite()
+        && best_value.abs() < tol
+    {
+        diag.bracket_found = true;
+        diag.is_sign_change_bracket = sign_change_observed
+            || certify_root_by_local_sign_change(objective, best_point, best_value, &mut diag);
+        return Ok((Some(best_point), diag));
     }
 
     let Some(Bracket {
@@ -551,11 +552,12 @@ pub(crate) fn bracket_solve_1d(
     }
 
     // If we already met tolerance, return the best observed point.
-    if let (Some(best_point), Some(best_value)) = (diag.best_point, diag.best_value) {
-        if best_value.is_finite() && best_value.abs() < tol {
-            diag.bracket_found = true;
-            return Ok((Some(best_point), diag));
-        }
+    if let (Some(best_point), Some(best_value)) = (diag.best_point, diag.best_value)
+        && best_value.is_finite()
+        && best_value.abs() < tol
+    {
+        diag.bracket_found = true;
+        return Ok((Some(best_point), diag));
     }
 
     // The false-position fallback requires a valid sign-changing bracket. After bisection
@@ -757,7 +759,7 @@ mod tests {
         // Use the minimum accepted grid size to exercise the sparsest
         // supported search in both debug and release builds.
         let f = |x: f64| x.powi(3) - 2.0 * x + 1.0; // roots at 1, ~0.618, ~-1.618
-                                                    // Points that bracket the root at x=1 only via Newton-fallback secant.
+        // Points that bracket the root at x=1 only via Newton-fallback secant.
         let scan: Vec<f64> = (0..8).map(|i| -2.0 + 0.5 * (i as f64)).collect();
         // = [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5]
         let (root, _diag) = bracket_solve_1d(&f, 0.95, &scan, 1e-9, 100, ScanStrategy::Exhaustive)

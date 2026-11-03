@@ -8,12 +8,12 @@ use pyo3::prelude::*;
 
 use super::*;
 use crate::bindings::core::dates::calendar::{
-    extract_business_day_convention, PyBusinessDayConvention,
+    PyBusinessDayConvention, extract_business_day_convention,
 };
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
-use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
-use crate::bindings::core::money::{decimal_to_py, PyMoney};
+use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
+use crate::bindings::core::money::{PyMoney, decimal_to_py};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::repr_support::enum_repr_from_serde as enum_repr;
 use crate::errors::core_to_py;

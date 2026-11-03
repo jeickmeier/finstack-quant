@@ -35,7 +35,7 @@
 //! - Fujii, M., Shimada, Y., & Takahashi, A. (2011). "A Note on Construction of
 //!   Multiple Swap Curves with and without Collateral." *FSA Research Review*, 7. `docs/REFERENCES.md#fujii-shimada-takahashi-2010`
 
-use super::common::{roll_knots, InterpRollState};
+use super::common::{InterpRollState, roll_knots};
 use crate::dates::DateExt;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::{

@@ -4,16 +4,16 @@
 //! - Optional multi-start support to escape local minima (see [`MultiStartConfig`]).
 //! - Residual weighting is supported via per-quote weights (weighted least squares).
 
-use super::multi_start::{perturb_initial_guess, MultiStartConfig};
+use super::multi_start::{MultiStartConfig, perturb_initial_guess};
 use super::traits::GlobalSolveTarget;
 use crate::constants::PENALTY;
 use crate::report::{CalibrationDiagnostics, QuoteQuality};
 use crate::solver::traits::TimeGridAndGuesses;
 use crate::{CalibrationConfig, CalibrationReport};
-use finstack_quant_core::explain::{ExplanationTrace, TraceEntry};
 use finstack_quant_core::Result;
+use finstack_quant_core::explain::{ExplanationTrace, TraceEntry};
 use std::cell::{Cell, RefCell};
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::{BTreeMap, btree_map::Entry};
 
 /// Fill `resid` with a penalty term that gives LM a direction pointing back into the
 /// feasible bound box.
@@ -61,19 +61,17 @@ fn fill_penalty(
             return PENALTY;
         }
         let mut dist = 0.0_f64;
-        if let Some(lo) = lb {
-            if let Some(&b) = lo.get(idx) {
-                if p < b {
-                    dist += b - p;
-                }
-            }
+        if let Some(lo) = lb
+            && let Some(&b) = lo.get(idx)
+            && p < b
+        {
+            dist += b - p;
         }
-        if let Some(hi) = ub {
-            if let Some(&b) = hi.get(idx) {
-                if p > b {
-                    dist += p - b;
-                }
-            }
+        if let Some(hi) = ub
+            && let Some(&b) = hi.get(idx)
+            && p > b
+        {
+            dist += p - b;
         }
         if dist > 0.0 {
             PENALTY * (dist / (1.0 + dist))
@@ -969,17 +967,16 @@ fn validate_parameter_bounds(
             }
         }
     }
-    if let (Some(lower), Some(upper)) = (lower, upper) {
-        if let Some(index) = lower
+    if let (Some(lower), Some(upper)) = (lower, upper)
+        && let Some(index) = lower
             .iter()
             .zip(upper)
             .position(|(lower, upper)| lower > upper)
-        {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "global solver bounds are inverted at index {index}: lower={} > upper={}",
-                lower[index], upper[index]
-            )));
-        }
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "global solver bounds are inverted at index {index}: lower={} > upper={}",
+            lower[index], upper[index]
+        )));
     }
     Ok(())
 }
@@ -1355,14 +1352,12 @@ mod tests {
                 .to_string()
                 .contains("parameter count")
         );
-        assert!(validate_parameter_bounds(
-            &initials,
-            &Some(vec![0.0, f64::NAN]),
-            &Some(vec![1.0, 1.0])
-        )
-        .expect_err("non-finite lower bound")
-        .to_string()
-        .contains("must be finite"));
+        assert!(
+            validate_parameter_bounds(&initials, &Some(vec![0.0, f64::NAN]), &Some(vec![1.0, 1.0]))
+                .expect_err("non-finite lower bound")
+                .to_string()
+                .contains("must be finite")
+        );
         assert!(
             validate_parameter_bounds(&initials, &Some(vec![0.0, 2.0]), &Some(vec![1.0, 1.0]))
                 .expect_err("inverted bounds")

@@ -9,8 +9,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
 pub use finstack_quant_test_utils::assert::{approx_eq, in_range};
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::SettlementType;
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 
 /// Standard curve IDs
 pub const DISC_ID: &str = "USD_DISC";

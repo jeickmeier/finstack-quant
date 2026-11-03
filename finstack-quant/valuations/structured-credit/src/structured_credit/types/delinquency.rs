@@ -178,12 +178,11 @@ impl DelinquencyModel {
             recoverability_cap_pct,
             ..
         } = self.advancing
+            && (!recoverability_cap_pct.is_finite() || recoverability_cap_pct < 0.0)
         {
-            if !recoverability_cap_pct.is_finite() || recoverability_cap_pct < 0.0 {
-                return Err(invalid(format!(
-                    "advancing recoverability_cap_pct ({recoverability_cap_pct}) must be a finite non-negative percent"
-                )));
-            }
+            return Err(invalid(format!(
+                "advancing recoverability_cap_pct ({recoverability_cap_pct}) must be a finite non-negative percent"
+            )));
         }
         if let Some(modification) = self.modification {
             if !modification.rate_reduction_bp.is_finite() || modification.rate_reduction_bp < 0.0 {

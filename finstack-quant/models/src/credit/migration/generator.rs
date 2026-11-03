@@ -21,7 +21,7 @@
 //! - Higham, N. J. (2008). *Functions of Matrices: Theory and Computation*. SIAM.
 //!   Chapter 11 (Matrix Logarithm). `docs/REFERENCES.md#higham-accuracy-and-stability`
 
-use nalgebra::{linalg::Schur, DMatrix};
+use nalgebra::{DMatrix, linalg::Schur};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -200,7 +200,7 @@ impl GeneratorMatrix {
         let (q_corrected, regularization_l1) = kreinin_sidenius(q_data, &p.scale);
         validate_generator(&q_corrected, &p.scale)?;
 
-        let mut gen = GeneratorMatrix {
+        let mut r#gen = GeneratorMatrix {
             data: q_corrected,
             scale: p.scale.clone(),
             regularization_l1,
@@ -209,7 +209,7 @@ impl GeneratorMatrix {
 
         // Round-trip validation at the source matrix horizon:
         // ||exp(Q * h) - P(h)||_inf < tol.
-        let p_reconstructed = pade_expm(&gen.data.scale(p.horizon()))?;
+        let p_reconstructed = pade_expm(&r#gen.data.scale(p.horizon()))?;
         let inf_err = inf_norm_diff(&p_reconstructed, &p.data);
         if inf_err > round_trip_tol {
             return Err(MigrationError::RoundTripError {
@@ -217,9 +217,9 @@ impl GeneratorMatrix {
                 tolerance: round_trip_tol,
             });
         }
-        gen.round_trip_error = inf_err;
+        r#gen.round_trip_error = inf_err;
 
-        Ok(gen)
+        Ok(r#gen)
     }
 
     /// Transition intensity q_ij looked up by state labels.

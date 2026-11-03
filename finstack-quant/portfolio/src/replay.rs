@@ -9,11 +9,11 @@
 //! payments. A coupon or redemption therefore creates an expected difference
 //! between these explicitly distinct measures; cash is not reinvested here.
 
-use crate::attribution::{attribution_endpoint_profile, reduce_prepared, PortfolioAttribution};
+use crate::attribution::{PortfolioAttribution, attribution_endpoint_profile, reduce_prepared};
 use crate::error::{Error, Result};
 use crate::evaluation::{EvaluationMetricProfile, EvaluationProfile, PortfolioEvaluationPlan};
 use crate::valuation::{PortfolioValuation, RequestedMetrics};
-use finstack_quant_attribution::{default_attribution_metrics, AttributionMethod};
+use finstack_quant_attribution::{AttributionMethod, default_attribution_metrics};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;

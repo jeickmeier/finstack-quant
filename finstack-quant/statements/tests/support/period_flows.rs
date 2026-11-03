@@ -76,10 +76,10 @@ impl Instrument for ScheduleInstrument {
 use finstack_quant_core::dates::{Date, Period};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_statements::capital_structure::{
-    calculate_period_flows, CapitalStructureCashflows, CashflowBreakdown,
-};
 use finstack_quant_statements::Result;
+use finstack_quant_statements::capital_structure::{
+    CapitalStructureCashflows, CashflowBreakdown, calculate_period_flows,
+};
 use indexmap::IndexMap;
 use std::sync::Arc;
 

@@ -1,8 +1,8 @@
 //! Term loan cashflow generation tests.
 
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
-use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};

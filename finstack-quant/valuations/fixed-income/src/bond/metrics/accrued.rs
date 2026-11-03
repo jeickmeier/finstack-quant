@@ -1,7 +1,7 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
+use crate::bond::pricing::settlement::QuoteDateContext;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Calculates settlement-date accrued interest for bonds.
@@ -52,10 +52,10 @@ impl MetricCalculator for AccruedInterestCalculator {
         context.discount_curve_id = Some(discount_curve_id);
         context.day_count = Some(day_count);
         // Also cache full holder cashflows for downstream risk metrics
-        if context.cashflows.is_none() {
-            if let Some(flows) = maybe_flows {
-                context.cashflows = Some(flows);
-            }
+        if context.cashflows.is_none()
+            && let Some(flows) = maybe_flows
+        {
+            context.cashflows = Some(flows);
         }
 
         Ok(accrued_amt)

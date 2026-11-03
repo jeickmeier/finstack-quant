@@ -191,9 +191,9 @@ impl RatingPath {
 ///
 /// let scale = RatingScale::custom(vec!["AAA".to_string(), "D".to_string()])
 ///     .expect("valid scale");
-/// let gen = GeneratorMatrix::new(scale, &[-0.1, 0.1, 0.0, 0.0])
+/// let generator = GeneratorMatrix::new(scale, &[-0.1, 0.1, 0.0, 0.0])
 ///     .expect("valid generator");
-/// let sim = MigrationSimulator::new(gen, 5.0).expect("valid simulator");
+/// let sim = MigrationSimulator::new(generator, 5.0).expect("valid simulator");
 ///
 /// let paths = sim.simulate(0, 1000, 42).expect("valid simulation inputs");
 /// assert_eq!(paths.len(), 1000);
@@ -365,7 +365,7 @@ impl MigrationSimulator {
 /// `on_transition` receives each `(time, new_state)` transition. Both path
 /// recording and terminal-only simulation use this loop and RNG draw order.
 fn simulate_gillespie<R: RandomNumberGenerator + ?Sized>(
-    gen: &GeneratorMatrix,
+    r#gen: &GeneratorMatrix,
     initial_state: usize,
     horizon: f64,
     rng: &mut R,
@@ -374,13 +374,13 @@ fn simulate_gillespie<R: RandomNumberGenerator + ?Sized>(
     let mut t = 0.0;
     let mut state = initial_state;
 
-    while let Some((jump_time, next_state)) = next_jump(gen, state, t, horizon, rng) {
+    while let Some((jump_time, next_state)) = next_jump(r#gen, state, t, horizon, rng) {
         t = jump_time;
         state = next_state;
         on_transition(t, state);
 
         // Absorbing state (e.g., default): stop immediately.
-        if -gen.data[(state, state)] < 1e-15 {
+        if -r#gen.data[(state, state)] < 1e-15 {
             break;
         }
     }
@@ -395,16 +395,16 @@ fn simulate_gillespie<R: RandomNumberGenerator + ?Sized>(
 /// uniform for the holding time and, when the jump lands inside the horizon,
 /// one for the destination.
 fn next_jump<R: RandomNumberGenerator + ?Sized>(
-    gen: &GeneratorMatrix,
+    r#gen: &GeneratorMatrix,
     state: usize,
     t: f64,
     horizon: f64,
     rng: &mut R,
 ) -> Option<(f64, usize)> {
-    let n = gen.n_states();
+    let n = r#gen.n_states();
     let lambda: f64 = (0..n)
         .filter(|&j| j != state)
-        .map(|j| gen.data[(state, j)].max(0.0))
+        .map(|j| r#gen.data[(state, j)].max(0.0))
         .sum();
     if lambda < 1e-15 {
         return None;
@@ -424,13 +424,13 @@ fn next_jump<R: RandomNumberGenerator + ?Sized>(
     let next_state = (0..n)
         .filter(|&j| j != state)
         .find(|&j| {
-            cumulative += gen.data[(state, j)].max(0.0) / lambda;
+            cumulative += r#gen.data[(state, j)].max(0.0) / lambda;
             u2 < cumulative
         })
         .or_else(|| {
             (0..n)
                 .rev()
-                .find(|&j| j != state && gen.data[(state, j)] > 0.0)
+                .find(|&j| j != state && r#gen.data[(state, j)] > 0.0)
         })
         .unwrap_or(state);
     Some((t + holding, next_state))
@@ -438,7 +438,7 @@ fn next_jump<R: RandomNumberGenerator + ?Sized>(
 
 /// Simulate a single rating path using Gillespie's competing exponentials.
 fn simulate_path<R: RandomNumberGenerator + ?Sized>(
-    gen: &GeneratorMatrix,
+    r#gen: &GeneratorMatrix,
     scale: &Arc<RatingScale>,
     initial_state: usize,
     horizon: f64,
@@ -446,7 +446,7 @@ fn simulate_path<R: RandomNumberGenerator + ?Sized>(
 ) -> RatingPath {
     let mut transitions = Vec::with_capacity(8);
     transitions.push((0.0, initial_state));
-    simulate_gillespie(gen, initial_state, horizon, rng, |t, state| {
+    simulate_gillespie(r#gen, initial_state, horizon, rng, |t, state| {
         transitions.push((t, state));
     });
 
@@ -459,10 +459,10 @@ fn simulate_path<R: RandomNumberGenerator + ?Sized>(
 
 /// Simulate one path without allocating a transition history.
 fn simulate_terminal_state<R: RandomNumberGenerator + ?Sized>(
-    gen: &GeneratorMatrix,
+    r#gen: &GeneratorMatrix,
     initial_state: usize,
     horizon: f64,
     rng: &mut R,
 ) -> usize {
-    simulate_gillespie(gen, initial_state, horizon, rng, |_, _| {})
+    simulate_gillespie(r#gen, initial_state, horizon, rng, |_, _| {})
 }

@@ -132,7 +132,7 @@ pub fn compare_values(
 /// Expands to a [`ParityResult`] so callers can inspect the diagnostics.
 #[macro_export]
 macro_rules! assert_parity {
-    ($finstack:expr, $reference:expr, $config:expr, $msg:expr) => {{
+    ($finstack:expr_2021, $reference:expr_2021, $config:expr_2021, $msg:expr_2021) => {{
         let result = $crate::parity::compare_values($finstack, $reference, $config);
         assert!(
             result.passed,
@@ -236,9 +236,11 @@ mod tests {
                 assert!(!compare_values(calculated, reference, ParityConfig::default()).passed);
             }
         }
-        assert!(compare_values(f64::NAN, 0.0, ParityConfig::default())
-            .relative_diff
-            .is_nan());
+        assert!(
+            compare_values(f64::NAN, 0.0, ParityConfig::default())
+                .relative_diff
+                .is_nan()
+        );
         assert!(
             compare_values(f64::INFINITY, f64::INFINITY, ParityConfig::default())
                 .difference

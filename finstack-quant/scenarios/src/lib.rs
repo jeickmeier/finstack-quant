@@ -122,9 +122,9 @@ mod utils;
 mod warning;
 
 pub use engine::{
-    instrument_envelopes, ApplicationEnvelope, ApplicationReport, AppliedShock, AppliedShockTarget,
-    ExecutionContext, LevelChange, RollForwardReport, ScenarioChangeManifest, ScenarioEngine,
-    ScenarioMarketTarget, ShockMagnitude, ShockNode, ShockUnit,
+    ApplicationEnvelope, ApplicationReport, AppliedShock, AppliedShockTarget, ExecutionContext,
+    LevelChange, RollForwardReport, ScenarioChangeManifest, ScenarioEngine, ScenarioMarketTarget,
+    ShockMagnitude, ShockNode, ShockUnit, instrument_envelopes,
 };
 pub use envelope::{ScenarioEnvelope, ScenarioSchema};
 pub use error::{Error, Result};

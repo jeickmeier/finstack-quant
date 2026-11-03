@@ -34,11 +34,11 @@
 
 use crate::cms_common::annuity_weight;
 use crate::cms_option::types::CmsOption;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{black_call, black_put};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
@@ -329,7 +329,7 @@ pub fn convexity_adjustment_with_frequency(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cms_option::replication_pricer::{replicated_cms_optionlet, CmsOptionletInputs};
+    use crate::cms_option::replication_pricer::{CmsOptionletInputs, replicated_cms_optionlet};
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_models::types::OptionType;
 
@@ -447,13 +447,17 @@ mod tests {
                             steps,
                         );
                         let reference = 0.91 * numerator / denominator;
-                        assert!((actual - reference).abs() < budget,
-                            "vol={vol}, expiry={expiry}, tenor={tenor}, delay={delay}, strike={strike}, steps={steps}, tail={tail}: actual={actual}, reference={reference}");
+                        assert!(
+                            (actual - reference).abs() < budget,
+                            "vol={vol}, expiry={expiry}, tenor={tenor}, delay={delay}, strike={strike}, steps={steps}, tail={tail}: actual={actual}, reference={reference}"
+                        );
                         references.push(reference);
                     }
-                    assert!(references
-                        .windows(2)
-                        .all(|pair| (pair[1] - pair[0]).abs() < budget));
+                    assert!(
+                        references
+                            .windows(2)
+                            .all(|pair| (pair[1] - pair[0]).abs() < budget)
+                    );
                 }
             }
         }

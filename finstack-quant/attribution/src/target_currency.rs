@@ -30,12 +30,12 @@
 //! the new `fx_translation_pnl` as **reporting-currency** FX (the translation
 //! adjustment).
 
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxPolicyMeta};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxPolicyMeta};
 
 use crate::PnlAttribution;
 
@@ -185,8 +185,8 @@ pub fn translate_to_target_currency(
 mod tests {
     use super::*;
     use crate::{AttributionMethod, PnlAttribution};
-    use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
     use finstack_quant_core::Error;
+    use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
     use std::sync::Arc;
     use time::macros::date;
 

@@ -147,9 +147,11 @@ fn xccy_basis_is_invariant_to_domestic_curve_clock_and_base() {
             );
         }
     }
-    assert!(spreads
-        .iter()
-        .all(|spread| (spread - spreads[0]).abs() < 1e-12));
+    assert!(
+        spreads
+            .iter()
+            .all(|spread| (spread - spreads[0]).abs() < 1e-12)
+    );
 }
 
 #[test]

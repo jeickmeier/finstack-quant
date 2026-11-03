@@ -8,8 +8,8 @@
 //!
 //! Period return is `pnl / capital` for one composite unit. The chained
 //! `return_index` starts at `100` on the first output row.
-use super::{cashflows_between, validate_history};
 use super::{CompositeInstrument, CompositeMarketObservation, CompositeSpec, CompositeTrade};
+use super::{cashflows_between, validate_history};
 use crate::instruments::{Instrument, PricingOptions};
 use crate::metrics::MetricId;
 use crate::results::composite::CompositeExposureReport;
@@ -239,12 +239,12 @@ fn validate_output_history(
 ) -> Result<()> {
     validate_history(warmup, None)?;
     validate_history(observations, None)?;
-    if let (Some(warmup_last), Some(first)) = (warmup.last(), observations.first()) {
-        if warmup_last.date >= first.date {
-            return Err(Error::Validation(
-                "composite warmup observations must precede output observations".to_string(),
-            ));
-        }
+    if let (Some(warmup_last), Some(first)) = (warmup.last(), observations.first())
+        && warmup_last.date >= first.date
+    {
+        return Err(Error::Validation(
+            "composite warmup observations must precede output observations".to_string(),
+        ));
     }
     Ok(())
 }

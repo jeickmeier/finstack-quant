@@ -13,11 +13,11 @@
 mod bench_common;
 
 use bench_common::{create_institutional_portfolio, create_market_context};
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_portfolio::metrics::aggregate_metrics;
 use finstack_quant_portfolio::valuation::{
-    value_portfolio, PortfolioValuationOptions, RequestedMetrics,
+    PortfolioValuationOptions, RequestedMetrics, value_portfolio,
 };
 use finstack_quant_portfolio::{dataframe::metrics_to_table, dataframe::positions_to_table};
 use std::hint::black_box;

@@ -256,10 +256,12 @@ fn real_estate_rich_rent_roll_rejects_non_finite_growth_output() {
     );
 
     assert!(result.is_err());
-    assert!(result
-        .expect_err("overflowing rent growth should fail")
-        .to_string()
-        .contains("rent growth overflow"));
+    assert!(
+        result
+            .expect_err("overflowing rent growth should fail")
+            .to_string()
+            .contains("rent growth overflow")
+    );
 }
 
 #[test]

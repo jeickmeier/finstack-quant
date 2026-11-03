@@ -115,7 +115,7 @@
 use smallvec::SmallVec;
 use time::Date;
 
-use super::{adjust, prev_cds_date, BusinessDayConvention, DateExt, HolidayCalendar};
+use super::{BusinessDayConvention, DateExt, HolidayCalendar, adjust, prev_cds_date};
 use crate::InputError;
 
 use crate::dates::Tenor;

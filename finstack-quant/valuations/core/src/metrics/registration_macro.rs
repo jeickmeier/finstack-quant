@@ -17,13 +17,13 @@
 #[macro_export]
 macro_rules! register_metrics {
     (
-        registry: $registry:expr,
-        instrument: $instrument:expr,
+        registry: $registry:expr_2021,
+        instrument: $instrument:expr_2021,
         metrics: [
-            $(($metric_id:ident, $calculator:expr)),* $(,)?
+            $(($metric_id:ident, $calculator:expr_2021)),* $(,)?
         ]
         $(, custom: [
-            $(($custom_id:literal, $custom_calculator:expr)),* $(,)?
+            $(($custom_id:literal, $custom_calculator:expr_2021)),* $(,)?
         ])?
         $(,)?
     ) => {{

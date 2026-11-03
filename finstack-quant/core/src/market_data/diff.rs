@@ -39,10 +39,10 @@
 //! ```
 
 use super::context::{CurveStorage, MarketContext};
+use crate::Result;
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::math::units::BASIS_POINTS_PER_UNIT;
-use crate::Result;
 
 use serde::{Deserialize, Serialize};
 
@@ -389,7 +389,7 @@ pub fn measure_per_tenor_credit_curve_shift(
     let curve_id = curve_id.as_ref();
     match market_t0.get_curve(curve_id)? {
         CurveStorage::Hazard(_) => {
-            return measure_per_tenor_par_spread_shift(curve_id, market_t0, market_t1, tenors)
+            return measure_per_tenor_par_spread_shift(curve_id, market_t0, market_t1, tenors);
         }
         CurveStorage::Discount(_) => {}
         storage => return Err(unsupported_credit_curve(curve_id, storage)),

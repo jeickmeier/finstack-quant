@@ -174,7 +174,7 @@ macro_rules! instrument_pricing {
 /// `$i` binds the wrapped Rust instrument inside each expression.
 macro_rules! getters {
     ($ty:ident, $js:literal, |$i:ident| {
-        $( $(#[$doc:meta])* $name:ident as $js_name:ident => $conv:ident($value:expr) ),* $(,)?
+        $( $(#[$doc:meta])* $name:ident as $js_name:ident => $conv:ident($value:expr_2021) ),* $(,)?
     }) => {
         #[wasm_bindgen(js_class = $js)]
         impl $ty {
@@ -193,7 +193,7 @@ macro_rules! getters {
 /// Zero-argument accessor methods: `name as jsName => conversion(expression)`.
 macro_rules! accessors {
     ($ty:ident, $js:literal, |$i:ident| {
-        $( $(#[$doc:meta])* $name:ident as $js_name:ident => $conv:ident($value:expr) ),* $(,)?
+        $( $(#[$doc:meta])* $name:ident as $js_name:ident => $conv:ident($value:expr_2021) ),* $(,)?
     }) => {
         #[wasm_bindgen(js_class = $js)]
         impl $ty {
@@ -287,7 +287,7 @@ macro_rules! greek_methods {
 macro_rules! builder_class {
     // The builder struct and its empty constructor, staging `$empty`; a
     // builder whose `build()` is not a typed class writes `build` itself.
-    (@staged $(#[$doc:meta])* $bty:ident, $bjs:literal, $inner:ty, $empty:expr) => {
+    (@staged $(#[$doc:meta])* $bty:ident, $bjs:literal, $inner:ty, $empty:expr_2021) => {
         $(#[$doc])*
         #[wasm_bindgen(js_name = $bjs)]
         pub struct $bty {
@@ -303,7 +303,7 @@ macro_rules! builder_class {
             }
         }
     };
-    ($(#[$doc:meta])* $bty:ident, $bjs:literal, $inner:ty, $target:ident, |$b:ident| $finish:expr) => {
+    ($(#[$doc:meta])* $bty:ident, $bjs:literal, $inner:ty, $target:ident, |$b:ident| $finish:expr_2021) => {
         builder_class!(@staged $(#[$doc])* $bty, $bjs, $inner, <$inner>::default());
 
         #[wasm_bindgen(js_class = $bjs)]

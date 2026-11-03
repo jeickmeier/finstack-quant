@@ -458,21 +458,19 @@ impl InterestRateSwap {
         )?;
         if let FloatingLegCompounding::CompoundedWithObservationShift { shift_days } =
             self.float_leg.compounding
+            && shift_days > 31
         {
-            if shift_days > 31 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Invalid observation shift days: too large.".into(),
-                ));
-            }
+            return Err(finstack_quant_core::Error::Validation(
+                "Invalid observation shift days: too large.".into(),
+            ));
         }
         if let FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days } =
             self.float_leg.compounding
+            && cutoff_days > 31
         {
-            if cutoff_days > 31 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Invalid rate cut-off days: too large.".into(),
-                ));
-            }
+            return Err(finstack_quant_core::Error::Validation(
+                "Invalid rate cut-off days: too large.".into(),
+            ));
         }
 
         validation::require_with(self.fixed_leg.end > self.fixed_leg.start, || {

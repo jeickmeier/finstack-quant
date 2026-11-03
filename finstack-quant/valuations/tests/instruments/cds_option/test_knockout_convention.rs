@@ -3,8 +3,8 @@
 use super::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use time::macros::date;
 
 #[test]

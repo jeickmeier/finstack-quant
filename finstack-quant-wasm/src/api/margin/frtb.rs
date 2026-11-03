@@ -11,8 +11,8 @@ use crate::utils::input::{
 use crate::utils::wire::parse_label;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin::regulatory::frtb::{
-    frtb_sba_charge as frtb_sba_charge_rs, CorrelationScenario, DrcPosition, FrtbRiskClass,
-    FrtbSbaEngine, FrtbSensitivities,
+    CorrelationScenario, DrcPosition, FrtbRiskClass, FrtbSbaEngine, FrtbSensitivities,
+    frtb_sba_charge as frtb_sba_charge_rs,
 };
 use wasm_bindgen::prelude::*;
 

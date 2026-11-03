@@ -171,16 +171,16 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
     // reset date 2024-10-01 with fixing 5.1%).
     // Expected all-in rate: max(5.1%, 0%) + 2% = 7.1%
     // The actual rate stored is the time-weighted average for the period.
-    if let Some(first_cf) = float_flows_with.first() {
-        if let Some(rate) = first_cf.rate {
-            // The rate should reflect fixing + spread, not forward + spread.
-            // Forward-based would be ~4% + 2% = 6%. Fixing-based should be ~7%.
-            assert!(
-                rate > 0.065,
-                "Rate on past-reset period should reflect fixing ({:.4}%), expected > 6.5%",
-                rate * 100.0
-            );
-        }
+    if let Some(first_cf) = float_flows_with.first()
+        && let Some(rate) = first_cf.rate
+    {
+        // The rate should reflect fixing + spread, not forward + spread.
+        // Forward-based would be ~4% + 2% = 6%. Fixing-based should be ~7%.
+        assert!(
+            rate > 0.065,
+            "Rate on past-reset period should reflect fixing ({:.4}%), expected > 6.5%",
+            rate * 100.0
+        );
     }
 }
 
@@ -286,14 +286,14 @@ fn test_fixings_respect_floor() {
 
     // For past resets: floor(1%, 3%) = 3%, + 200bp spread = 5%
     // Check the rate is at least 5% (floor is binding)
-    if let Some(first_cf) = float_flows.first() {
-        if let Some(rate) = first_cf.rate {
-            assert!(
-                (rate - 0.05).abs() < 0.002,
-                "Rate should be near floor (3%) + spread (2%) = 5%, got {:.4}%",
-                rate * 100.0
-            );
-        }
+    if let Some(first_cf) = float_flows.first()
+        && let Some(rate) = first_cf.rate
+    {
+        assert!(
+            (rate - 0.05).abs() < 0.002,
+            "Rate should be near floor (3%) + spread (2%) = 5%, got {:.4}%",
+            rate * 100.0
+        );
     }
 }
 

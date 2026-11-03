@@ -96,15 +96,15 @@ pub(super) fn validate_calibration_inputs(
     // post-as_of history leak into betas, vols, and correlations
     // (look-ahead), silently invalidating any backtest built on the
     // artifact. Callers wanting an earlier anchor must truncate the panel.
-    if let Some(last) = inputs.history_panel.dates.last() {
-        if inputs.as_of != *last {
-            return Err(validation_err(format!(
-                "CreditCalibrator: as_of {:?} must equal the last panel date {:?}; \
+    if let Some(last) = inputs.history_panel.dates.last()
+        && inputs.as_of != *last
+    {
+        return Err(validation_err(format!(
+            "CreditCalibrator: as_of {:?} must equal the last panel date {:?}; \
                  calibrating with history after as_of is look-ahead — truncate \
                  history_panel (and generic_factor.values) at as_of instead",
-                inputs.as_of, last
-            )));
-        }
+            inputs.as_of, last
+        )));
     }
 
     // The anchor cross-section must cover exactly the calibrated universe.

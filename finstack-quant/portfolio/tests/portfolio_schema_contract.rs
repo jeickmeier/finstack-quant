@@ -7,15 +7,15 @@
 //! registry publishes for its type (a root artifact or a `$defs` entry of one)
 //! and read back.
 
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_margin::types::{ImMethodology, NettingSetId, SimmSensitivities};
 use finstack_quant_portfolio::optimization::TradeUniverse;
 use finstack_quant_portfolio::{margin::NettingSetMargin, margin::PortfolioMarginResult};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
 use time::macros::date;
 
 use crate::materialization_schema::external_schema_resources;

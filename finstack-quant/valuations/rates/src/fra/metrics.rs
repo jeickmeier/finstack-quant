@@ -10,13 +10,13 @@
 //! See unit tests and `examples/` for usage.
 
 use crate::fra::ForwardRateAgreement;
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::term_structures::{
     RateCalibrationQuote, RateCalibrationRecipe,
 };
-use finstack_quant_core::Result;
+use finstack_quant_valuations_core::metrics::MetricRegistry;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
-use finstack_quant_valuations_core::metrics::MetricRegistry;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Registers all FRA metrics to a registry.

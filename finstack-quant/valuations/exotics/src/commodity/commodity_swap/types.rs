@@ -5,16 +5,16 @@
 //! the other pays a floating price based on an index.
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{calendar_by_id_strict, BusinessDayConvention, Date, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor, calendar_by_id_strict};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::PayReceive;
@@ -774,10 +774,12 @@ mod tests {
                 .count(),
             3
         );
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .all(|flow| flow.accrual.is_some()));
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .all(|flow| flow.accrual.is_some())
+        );
 
         // The canonical contractual schedule emits both fixed and floating legs.
         assert_eq!(

@@ -4,8 +4,8 @@
 //! produce finite total P&L and omit credit-factor detail.
 
 use finstack_quant_attribution::{
-    default_waterfall_order, AttributionEnvelope, AttributionMethod, AttributionSpec,
-    PnlAttribution, TaylorAttributionConfig,
+    AttributionEnvelope, AttributionMethod, AttributionSpec, PnlAttribution,
+    TaylorAttributionConfig, default_waterfall_order,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::create_date;

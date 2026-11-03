@@ -33,7 +33,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::fx::fx_spot_date;
-use finstack_quant_core::dates::{create_date, resolve_calendar, resolve_joint_calendar, DateExt};
+use finstack_quant_core::dates::{DateExt, create_date, resolve_calendar, resolve_joint_calendar};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;

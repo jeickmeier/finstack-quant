@@ -17,11 +17,11 @@ use finstack_quant_core::{
     types::PriceId,
 };
 pub use finstack_quant_test_utils::assert::approx_eq;
-use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
-use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
 use finstack_quant_valuations::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations::instruments::FinancingLegSpec;
 use finstack_quant_valuations::instruments::IndexUnderlyingParams;
+use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
+use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
 use finstack_quant_valuations::instruments::{PayReceive, TrsScheduleSpec};
 use rust_decimal::Decimal;
 use time::Month;

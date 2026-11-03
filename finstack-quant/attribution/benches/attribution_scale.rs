@@ -22,31 +22,31 @@
 #[path = "support/fixtures.rs"]
 mod fixtures;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_attribution::{
-    attribute_pnl, attribute_pnl_metrics_based, attribute_return_contribution,
-    default_waterfall_order, pnl_bridge, AttributionMethod, AttributionRequest, ExecutionPolicy,
-    MarketRestoreFlags, MarketSnapshot, TaylorAttributionConfig,
+    AttributionMethod, AttributionRequest, ExecutionPolicy, MarketRestoreFlags, MarketSnapshot,
+    TaylorAttributionConfig, attribute_pnl, attribute_pnl_metrics_based,
+    attribute_return_contribution, default_waterfall_order, pnl_bridge,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::IssuerId;
+use finstack_quant_factor::MatchingConfig;
 use finstack_quant_factor::credit::hierarchy::{
     AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec,
     DateRange, FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
 };
-use finstack_quant_factor::MatchingConfig;
 use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig};
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PricingOptions;
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::metrics::MetricId;
 use fixtures::{
-    market_state, multi_curve_market, return_contribution_spec, sample_bond_idx, BondMarkets,
-    BASE_RATE, USD_OIS,
+    BASE_RATE, BondMarkets, USD_OIS, market_state, multi_curve_market, return_contribution_spec,
+    sample_bond_idx,
 };
 use std::collections::BTreeMap;
 use std::hint::black_box;

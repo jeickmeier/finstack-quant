@@ -5,13 +5,13 @@ use finstack_quant_core::market_data::traits::Discounting;
 
 use std::sync::Arc;
 
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::math::interp::InterpStyle;
-use finstack_quant_core::math::Compounding;
 use pyo3::prelude::*;
 
 use super::forward::PyForwardCurve;
-use super::helpers::{columns_to_dataframe, extract_time_point, TimePoint};
+use super::helpers::{TimePoint, columns_to_dataframe, extract_time_point};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};

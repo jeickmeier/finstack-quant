@@ -153,11 +153,7 @@ impl MonteCarloResults {
             }
         }
 
-        if out.is_empty() {
-            None
-        } else {
-            Some(out)
-        }
+        if out.is_empty() { None } else { Some(out) }
     }
 
     /// Export one metric's percentile bands as a wide table.
@@ -185,8 +181,10 @@ impl MonteCarloResults {
             return Ok(None);
         };
         let periods = series.values.keys().map(ToString::to_string).collect();
-        let mut columns = vec![TableColumn::new("period", TableColumnData::String(periods))
-            .with_role(TableColumnRole::Index)];
+        let mut columns = vec![
+            TableColumn::new("period", TableColumnData::String(periods))
+                .with_role(TableColumnRole::Index),
+        ];
         for &percentile in &self.percentiles {
             let values = series
                 .values
@@ -571,8 +569,8 @@ impl MonteCarloAccumulator {
 #[cfg(test)]
 mod tests {
     use super::{
-        normalize_percentiles, percentile_label, MonteCarloAccumulator, MonteCarloConfig,
-        MonteCarloResults, PathResult,
+        MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults, PathResult,
+        normalize_percentiles, percentile_label,
     };
     use crate::builder::ModelBuilder;
     use crate::error::Result;

@@ -21,12 +21,14 @@ fn fee_tier_lookup_rejects_non_finite_utilization() {
     let fees = RevolvingCreditFees::flat(25.0, 10.0, 0.0).expect("fees");
     assert!(fees.commitment_fee_bp(f64::NAN).is_err());
     assert!(fees.usage_fee_bp(f64::INFINITY).is_err());
-    assert!(fees
-        .commitment_fee_bp_at(f64::NAN, date!(2025 - 06 - 01))
-        .is_err());
-    assert!(fees
-        .usage_fee_bp_at(f64::NAN, date!(2025 - 06 - 01))
-        .is_err());
+    assert!(
+        fees.commitment_fee_bp_at(f64::NAN, date!(2025 - 06 - 01))
+            .is_err()
+    );
+    assert!(
+        fees.usage_fee_bp_at(f64::NAN, date!(2025 - 06 - 01))
+            .is_err()
+    );
     // A finite utilization selects the tier.
     assert_eq!(fees.commitment_fee_bp(0.4).expect("tier"), 25.0);
     assert_eq!(fees.usage_fee_bp(0.4).expect("tier"), 10.0);

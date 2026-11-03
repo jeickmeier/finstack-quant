@@ -29,7 +29,7 @@ pub(crate) mod tranches;
 pub(crate) mod waterfall;
 
 mod constructors;
-pub use constructors::{standard_deal_families, StandardDealFamily, StandardDealParams};
+pub use constructors::{StandardDealFamily, StandardDealParams, standard_deal_families};
 mod instrument;
 mod pricing_methods;
 mod resolved;
@@ -57,10 +57,10 @@ pub use collateral::{
 };
 pub use pool::AssetPool;
 pub use pool::{
-    calculate_pool_stats, PoolAsset, PoolStats, ReinvestmentAssumptions, ReinvestmentCriteria,
-    ReinvestmentPeriod, RepLine,
+    PoolAsset, PoolStats, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod,
+    RepLine, calculate_pool_stats,
 };
-pub use pool_report::{pool_report, PoolConcentrationEntry, PoolReport};
+pub use pool_report::{PoolConcentrationEntry, PoolReport, pool_report};
 pub(crate) use pool_state::PoolState;
 
 pub use tranches::{CoverageTrigger, Tranche, TrancheBuilder, TrancheStructure};

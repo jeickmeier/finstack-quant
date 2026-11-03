@@ -612,11 +612,7 @@ impl PerNameDefaultEngine {
     pub(super) fn sample_recovery(&mut self, recovery_factor: f64) -> Result<f64> {
         let eps = if self.recovery_model.has_idiosyncratic_dispersion() {
             let raw = self.rng.next_std_normal();
-            if self.antithetic {
-                -raw
-            } else {
-                raw
-            }
+            if self.antithetic { -raw } else { raw }
         } else {
             0.0
         };

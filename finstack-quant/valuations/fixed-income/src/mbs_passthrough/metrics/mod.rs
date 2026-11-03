@@ -27,7 +27,7 @@ pub(crate) mod mc_oas;
 /// price the prepayment option consistently.
 pub(crate) const PREPAY_RATE_SENSITIVITY: f64 = std::f64::consts::LN_2 / 0.01;
 
-pub(crate) use mc_oas::{calculate_mc_oas, McOasConfig};
+pub(crate) use mc_oas::{McOasConfig, calculate_mc_oas};
 
 use crate::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_valuations_core::metrics::{

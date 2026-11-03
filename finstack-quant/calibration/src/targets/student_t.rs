@@ -29,17 +29,17 @@
 //! - Hull, J., Predescu, M., & White, A. (2005). "The valuation of correlation-
 //!   dependent credit derivatives using a structural model."
 
+use crate::CalibrationReport;
 use crate::api::schema::StudentTParams;
-use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
 use crate::build::BuildCtx;
+use crate::build::cds_tranche::{CdsTrancheBuildOverrides, build_cds_tranche_instrument};
 use crate::config::CalibrationConfig;
 use crate::quotes::MarketQuote;
-use crate::solver::helpers::{bracket_solve_1d, ScanStrategy};
-use crate::CalibrationReport;
+use crate::solver::helpers::{ScanStrategy, bracket_solve_1d};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use finstack_quant_models::correlation::CopulaSpec;
 use finstack_quant_valuations_credit::cds_tranche::{CdsTranche, CdsTranchePricer};
 use std::collections::BTreeMap;
@@ -281,7 +281,9 @@ impl StudentTTarget {
                         return Err(finstack_quant_core::Error::Calibration {
                             message: format!(
                                 "Student-t df calibration failed: best df={:.4} but residual {:.2e} exceeds tolerance {:.2e}",
-                                df, residual.abs(), acceptance_tolerance
+                                df,
+                                residual.abs(),
+                                acceptance_tolerance
                             ),
                             category: "student_t_df".to_string(),
                         });
@@ -372,13 +374,13 @@ mod tests {
     use crate::api::schema::{CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepParams};
     use crate::quotes::CdsTrancheQuote;
     use crate::quotes::QuoteId;
+    use finstack_quant_core::FxHashMap;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::{
         BaseCorrelationCurve, CreditIndexData, DiscountCurve, HazardCurve,
     };
     use finstack_quant_core::market_data::traits::Discounting;
-    use finstack_quant_core::FxHashMap;
     use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause,
     };
@@ -523,9 +525,11 @@ mod tests {
         let error = crate::api::engine::calibrate(&envelope).expect_err(
             "an exact fit outside the requested domain must not be clamped and accepted",
         );
-        assert!(error
-            .to_string()
-            .contains("initial_df must lie inside df_bounds"));
+        assert!(
+            error
+                .to_string()
+                .contains("initial_df must lie inside df_bounds")
+        );
     }
 
     #[test]
@@ -554,9 +558,10 @@ mod tests {
                 .expect("valid target");
         for initial in [6.0, 20.0, f64::NAN] {
             let grid = target.build_scan_grid(2.5, 12.0, initial);
-            assert!(grid
-                .iter()
-                .all(|df| df.is_finite() && (2.5..=12.0).contains(df)));
+            assert!(
+                grid.iter()
+                    .all(|df| df.is_finite() && (2.5..=12.0).contains(df))
+            );
             assert_eq!(grid.first(), Some(&2.5));
             assert_eq!(grid.last(), Some(&12.0));
         }

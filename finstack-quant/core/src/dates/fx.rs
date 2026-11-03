@@ -29,8 +29,8 @@
 
 use crate::currency::Currency;
 use crate::dates::{
-    adjust, calendar_by_id_strict, resolve_calendar, BusinessDayConvention, CompositeCalendar,
-    Date, DateExt, HolidayCalendar,
+    BusinessDayConvention, CompositeCalendar, Date, DateExt, HolidayCalendar, adjust,
+    calendar_by_id_strict, resolve_calendar,
 };
 use crate::{Error, Result};
 
@@ -248,14 +248,16 @@ pub fn add_fx_standard_tenor(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{calendar_by_id_strict, create_date, resolve_joint_calendar, WEEKENDS_ONLY};
+    use crate::dates::{WEEKENDS_ONLY, calendar_by_id_strict, create_date, resolve_joint_calendar};
     use time::Month;
 
     #[test]
     fn fx_date_range_boundaries_return_errors() {
-        assert!(resolve_joint_calendar(None, None)
-            .and_then(|cal| Date::MAX.add_business_days(1, cal))
-            .is_err());
+        assert!(
+            resolve_joint_calendar(None, None)
+                .and_then(|cal| Date::MAX.add_business_days(1, cal))
+                .is_err()
+        );
         assert!(fx_spot_date(Date::MAX, 1, Currency::EUR, Currency::USD, None, None).is_err());
         assert_eq!(
             resolve_joint_calendar(None, None)

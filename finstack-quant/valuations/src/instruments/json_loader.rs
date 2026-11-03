@@ -79,10 +79,10 @@ use super::rates::repo::Repo;
 use super::rates::swaption::{BermudanSwaption, Swaption};
 use super::rates::xccy_swap::XccySwap;
 use super::*;
-use finstack_quant_core::contract::{
-    deserialize_json_value, parse_json_value, ContractError, LoadLimits, ValidationReport,
-};
 use finstack_quant_core::Result;
+use finstack_quant_core::contract::{
+    ContractError, LoadLimits, ValidationReport, deserialize_json_value, parse_json_value,
+};
 use serde::{Deserialize, Serialize};
 
 use finstack_quant_valuations_core::instruments::envelope::InstrumentSchema;
@@ -105,7 +105,7 @@ pub struct InstrumentEnvelope {
 /// `boxed` (stored as `Box<Type>`), and `summary` is the one-sentence
 /// description the schema index shows for the tag.
 macro_rules! with_instrument_json_registry {
-    ($callback:ident $(, $extra:expr )* $(,)?) => {
+    ($callback:ident $(, $extra:expr_2021 )* $(,)?) => {
         $callback! {
             [$($extra),*]
             plain: Bond(Bond) => "bond" @ "fixed_income" = Bond::example();
@@ -275,20 +275,20 @@ macro_rules! with_instrument_json_registry {
 macro_rules! instrument_payload {
     (ty plain $ty:ty) => { $ty };
     (ty boxed $ty:ty) => { Box<$ty> };
-    (wrap plain $value:expr) => { $value };
-    (wrap boxed $value:expr) => { Box::new($value) };
-    (boxed plain $value:expr) => { Box::new($value) as Box<dyn Instrument> };
-    (boxed boxed $value:expr) => { $value as Box<dyn Instrument> };
-    (unwrap plain $value:expr) => { $value };
-    (unwrap boxed $value:expr) => { *$value };
-    (as_dyn plain $value:expr) => { $value as &dyn Instrument };
-    (as_dyn boxed $value:expr) => { $value.as_ref() as &dyn Instrument };
+    (wrap plain $value:expr_2021) => { $value };
+    (wrap boxed $value:expr_2021) => { Box::new($value) };
+    (boxed plain $value:expr_2021) => { Box::new($value) as Box<dyn Instrument> };
+    (boxed boxed $value:expr_2021) => { $value as Box<dyn Instrument> };
+    (unwrap plain $value:expr_2021) => { $value };
+    (unwrap boxed $value:expr_2021) => { *$value };
+    (as_dyn plain $value:expr_2021) => { $value as &dyn Instrument };
+    (as_dyn boxed $value:expr_2021) => { $value.as_ref() as &dyn Instrument };
 }
 
 macro_rules! define_instrument_json {
     (
         []
-        $($kind:ident: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr; $summary:literal;)*
+        $($kind:ident: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr_2021; $summary:literal;)*
     ) => {
         mod instrument_variant {
             $(
@@ -649,7 +649,7 @@ mod tests {
     use super::*;
     use crate::instruments::rates::{cap_floor::RateOptionType, repo::CollateralSpec};
     use finstack_quant_valuations_core::instruments::envelope::{
-        instrument_load_error, MAX_JSON_BYTES,
+        MAX_JSON_BYTES, instrument_load_error,
     };
 
     fn load(json: &str) -> Result<Box<dyn Instrument>> {

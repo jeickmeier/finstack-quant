@@ -133,8 +133,8 @@
 
 use crate::attribution::ReconciliationReport;
 use crate::brinson::{
-    carino_link_effects, check_identical_rows, check_net_weight, check_weights_sum,
-    validate_link_period, CarinoPeriod, LinkPeriod,
+    CarinoPeriod, LinkPeriod, carino_link_effects, check_identical_rows, check_net_weight,
+    check_weights_sum, validate_link_period,
 };
 use crate::error::{Error, Result};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
@@ -835,8 +835,16 @@ pub fn campisi_carino_link(periods: &[FiAttributionResult]) -> Result<FiCarinoLi
 
     let mut linked_sectors = Vec::with_capacity(sector_names.len());
     let mut totals = [NeumaierAccumulator::new(); N_EFFECTS];
-    for (name, [allocation, active_carry, active_treasury, active_spread, selection]) in
-        sector_names.into_iter().zip(linked.rows)
+    for (
+        name,
+        [
+            allocation,
+            active_carry,
+            active_treasury,
+            active_spread,
+            selection,
+        ],
+    ) in sector_names.into_iter().zip(linked.rows)
     {
         for (total, value) in totals.iter_mut().zip([
             allocation,
@@ -858,8 +866,13 @@ pub fn campisi_carino_link(periods: &[FiAttributionResult]) -> Result<FiCarinoLi
         });
     }
 
-    let [linked_allocation, linked_active_carry, linked_active_treasury, linked_active_spread, linked_selection] =
-        totals.map(|value| value.total());
+    let [
+        linked_allocation,
+        linked_active_carry,
+        linked_active_treasury,
+        linked_active_spread,
+        linked_selection,
+    ] = totals.map(|value| value.total());
     Ok(FiCarinoLinkedResult {
         periods: periods.to_vec(),
         portfolio_return_compounded: linked.portfolio_return_compounded,
@@ -1403,10 +1416,12 @@ mod tests {
 
         // The removed `spread_mode` key must now fail closed as an unknown
         // field, so a stale caller is told rather than silently ignored.
-        assert!(serde_json::from_str::<FiAttributionConfig>(
-            r#"{"period_years": 0.25, "spread_mode": "dts"}"#
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<FiAttributionConfig>(
+                r#"{"period_years": 0.25, "spread_mode": "dts"}"#
+            )
+            .is_err()
+        );
     }
 
     /// The spread effect is `−SD · Δs` and never touches the spread *level*,

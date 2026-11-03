@@ -8,9 +8,9 @@ use super::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId, IrFutureContractId,
     SwaptionConventionId, XccyConventionId,
 };
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_core::{Error, Result};
 use std::sync::OnceLock;
 

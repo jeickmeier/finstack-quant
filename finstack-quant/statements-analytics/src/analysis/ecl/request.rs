@@ -3,9 +3,9 @@
 use finstack_quant_core::{Error, Result};
 
 use super::engine::{
-    compute_ecl_weighted_from_curves, EclConfigBuilder, MacroScenario, WeightedEclResult,
+    EclConfigBuilder, MacroScenario, WeightedEclResult, compute_ecl_weighted_from_curves,
 };
-use super::staging::{classify_stage_with_pds, StageResult, StagingConfig};
+use super::staging::{StageResult, StagingConfig, classify_stage_with_pds};
 use super::types::{Exposure, PdTermStructure, RawPdCurve, Stage};
 
 const SCENARIO_RATING: &str = "scenario";
@@ -228,10 +228,12 @@ mod tests {
         exposure.qualitative_flags.watchlist = true;
         let result = classify_stage(&exposure, 0.02, 0.02, &StagingConfig::default()).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
-        assert!(result
-            .triggers
-            .iter()
-            .any(|t| matches!(t, StagingTrigger::Qualitative { .. })));
+        assert!(
+            result
+                .triggers
+                .iter()
+                .any(|t| matches!(t, StagingTrigger::Qualitative { .. }))
+        );
 
         exposure.qualitative_flags.watchlist = false;
         let result = classify_stage(&exposure, 0.03, 0.015, &StagingConfig::default()).unwrap();

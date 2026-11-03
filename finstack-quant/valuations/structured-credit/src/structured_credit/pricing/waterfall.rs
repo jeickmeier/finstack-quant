@@ -11,13 +11,13 @@ use crate::structured_credit::types::{
     TrancheSeniority, TrancheStructure, Waterfall, WaterfallDistribution, WaterfallTier,
 };
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_core::Error;
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error;
-use finstack_quant_core::FxHashMap;
-use finstack_quant_core::Result;
 
 /// Returns the number of decimal places for currency-aware penny-safe allocation.
 #[inline]
@@ -193,7 +193,9 @@ pub fn execute_waterfall(
     {
         return Err(Error::Validation(format!(
             "waterfall available cash must equal nonnegative interest plus principal in its base currency: available={}, interest={}, principal={}",
-            context.available_cash.amount(), interest_remaining.amount(), principal_remaining.amount()
+            context.available_cash.amount(),
+            interest_remaining.amount(),
+            principal_remaining.amount()
         )));
     }
     let mut total_diverted = Money::from((0_i64, waterfall.currency));
@@ -238,10 +240,10 @@ pub fn execute_waterfall(
     let mut payable_principal_tranche_ids = Vec::new();
     if let Some(tier) = diversion_principal_tier {
         for recipient in &tier.recipients {
-            if let RecipientType::Tranche(tranche_id) = &recipient.recipient_type {
-                if !payable_principal_tranche_ids.contains(&tranche_id.as_str()) {
-                    payable_principal_tranche_ids.push(tranche_id.as_str());
-                }
+            if let RecipientType::Tranche(tranche_id) = &recipient.recipient_type
+                && !payable_principal_tranche_ids.contains(&tranche_id.as_str())
+            {
+                payable_principal_tranche_ids.push(tranche_id.as_str());
             }
         }
     }
@@ -334,12 +336,11 @@ pub fn execute_waterfall(
                 if let Some(result) = coverage_test_results
                     .iter()
                     .find(|result| result.test_id == test.id)
+                    && !result.passing
                 {
-                    if !result.passing {
-                        failing.push(test.id.as_str());
-                        if let Some(cure) = result.cure_amount {
-                            binding_cure = binding_cure.max(cure.amount());
-                        }
+                    failing.push(test.id.as_str());
+                    if let Some(cure) = result.cure_amount {
+                        binding_cure = binding_cure.max(cure.amount());
                     }
                 }
             }
@@ -1515,8 +1516,8 @@ mod coverage_position_tests {
     //! a junior class never traps a senior class's coupon. The IC cure-sizing
     //! rules (recipient order, out-of-denominator recipients) are covered at
     //! the `CoverageTest::calculate` level in `coverage_tests.rs`.
-    use super::execute_waterfall;
     use super::WaterfallContext;
+    use super::execute_waterfall;
     use crate::structured_credit::types::{
         AllocationMode, AssetPool, AssetType, CoverageTestSpec, DealType, PaymentCalculation,
         PaymentType, PoolAsset, Recipient, RecipientType, Tranche, TrancheSeniority,
@@ -2137,10 +2138,12 @@ mod coverage_position_tests {
                 .is_none_or(|m| m.amount() < 1.0),
             "nothing reaches equity below a failing test"
         );
-        assert!(result
-            .diverted_amounts
-            .iter()
-            .any(|record| record.target_tranche == "principal_account"));
+        assert!(
+            result
+                .diverted_amounts
+                .iter()
+                .any(|record| record.target_tranche == "principal_account")
+        );
     }
 
     /// A fee tier ranked behind note interest is junior to the IC claim and

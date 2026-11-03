@@ -5,13 +5,13 @@
 //! fractional kernel internally using standard normal increments — no fBM generator
 //! is required.
 
-use super::pricing::{stochastic_vol_inputs, ModelInputs};
+use super::pricing::{ModelInputs, stochastic_vol_inputs};
 use super::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::pricer::expect_inst;
 use finstack_quant_valuations_core::pricer::PricingError;
+use finstack_quant_valuations_core::pricer::expect_inst;
 
 /// Monte Carlo pricer for the rough Heston model.
 ///

@@ -1,9 +1,9 @@
 //! Shared helpers for quote-to-instrument builders.
 
-use finstack_quant_core::dates::{
-    adjust, calendar_by_id_strict, BusinessDayConvention, Date, DateExt,
-};
 use finstack_quant_core::Result;
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DateExt, adjust, calendar_by_id_strict,
+};
 
 /// Resolve the spot date given settlement lag and market conventions.
 pub(crate) fn resolve_spot_date(

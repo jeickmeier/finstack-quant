@@ -2,8 +2,8 @@
 
 use super::registry::attach_metric_measures;
 use super::{ModelKey, PricerRegistry, PricingError, PricingErrorContext};
-use crate::instruments::common_impl::helpers::{compute_metrics_dyn, MetricBuildOptions};
 use crate::instruments::Instrument;
+use crate::instruments::common_impl::helpers::{MetricBuildOptions, compute_metrics_dyn};
 use crate::metrics::risk::MarketHistory;
 use crate::metrics::{MetricId, MetricRegistry};
 use crate::results::ValuationResult;

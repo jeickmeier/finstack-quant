@@ -123,11 +123,13 @@ fn derived_fx_shocks_preserve_dates_policies_and_reciprocals() {
     let bumped = matrix
         .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, base())
         .unwrap();
-    assert!(bumped
-        .get_serializable_state()
-        .expect("stable FX state")
-        .provider_quotes
-        .is_empty());
+    assert!(
+        bumped
+            .get_serializable_state()
+            .expect("stable FX state")
+            .provider_quotes
+            .is_empty()
+    );
     for on in [base(), Date::from_ordinal_date(2025, 182).unwrap()] {
         for policy in [
             FxConversionPolicy::CashflowDate,
@@ -253,24 +255,32 @@ fn volatility_mutations_reject_invalid_values_without_changing_the_source() {
     let original = surface.vols().to_vec();
     for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         assert!(surface.scaled(invalid).is_err());
-        assert!(surface
-            .bump_point_absolute_in_place(1.0, 90.0, invalid)
-            .is_err());
-        assert!(surface
-            .bump_point_absolute_in_place(invalid, 90.0, 0.01)
-            .is_err());
-        assert!(surface
-            .bump_point_absolute_in_place(1.0, invalid, 0.01)
-            .is_err());
+        assert!(
+            surface
+                .bump_point_absolute_in_place(1.0, 90.0, invalid)
+                .is_err()
+        );
+        assert!(
+            surface
+                .bump_point_absolute_in_place(invalid, 90.0, 0.01)
+                .is_err()
+        );
+        assert!(
+            surface
+                .bump_point_absolute_in_place(1.0, invalid, 0.01)
+                .is_err()
+        );
     }
     assert!(surface.scaled(-1.0).is_err());
     assert_eq!(surface.scaled(1.0).unwrap().vols(), original);
-    assert!(surface
-        .scaled(0.0)
-        .unwrap()
-        .vols()
-        .iter()
-        .all(|v| *v == 0.0));
+    assert!(
+        surface
+            .scaled(0.0)
+            .unwrap()
+            .vols()
+            .iter()
+            .all(|v| *v == 0.0)
+    );
     assert_eq!(surface.vols(), original);
     let enormous = surface.scaled(f64::MAX).unwrap();
     assert!(enormous.scaled(10.0).is_err());

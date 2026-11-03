@@ -282,11 +282,7 @@ fn barrier_helper_zero_vol(
 
     // barrier_helper computes the knock-IN value. If the barrier was crossed,
     // the knock-in option activates and pays the vanilla intrinsic; otherwise 0.
-    if barrier_crossed {
-        intrinsic
-    } else {
-        0.0
-    }
+    if barrier_crossed { intrinsic } else { 0.0 }
 }
 
 /// Validate that the price-like barrier inputs are strictly positive finite
@@ -395,11 +391,7 @@ fn barrier_helper(
     let knock_in = if spot > barrier {
         // DOWN barrier
         if is_call {
-            if strike >= barrier {
-                c
-            } else {
-                a - b + d
-            }
+            if strike >= barrier { c } else { a - b + d }
         } else if strike >= barrier {
             b - c + d
         } else {
@@ -408,11 +400,7 @@ fn barrier_helper(
     } else {
         // UP barrier
         if is_call {
-            if strike <= barrier {
-                b - c + d
-            } else {
-                a
-            }
+            if strike <= barrier { b - c + d } else { a }
         } else if strike <= barrier {
             c
         } else {
@@ -2505,54 +2493,70 @@ mod tests {
     #[test]
     fn public_wrappers_do_not_return_finite_price_for_non_positive_inputs() {
         // Negative spot through every call/put wrapper.
-        assert!(!barrier_price(
-            &BarrierParams::new(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
-            BarrierType::DownAndOut,
-            OptionType::Call
-        )
-        .is_finite());
-        assert!(!barrier_price(
-            &BarrierParams::new(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
-            BarrierType::DownAndIn,
-            OptionType::Call
-        )
-        .is_finite());
-        assert!(!barrier_price(
-            &BarrierParams::new(100.0, 100.0, -120.0, 1.0, 0.05, 0.02, 0.2),
-            BarrierType::UpAndOut,
-            OptionType::Call
-        )
-        .is_finite());
-        assert!(!barrier_price(
-            &BarrierParams::new(100.0, 0.0, 120.0, 1.0, 0.05, 0.02, 0.2),
-            BarrierType::UpAndIn,
-            OptionType::Call
-        )
-        .is_finite());
-        assert!(!barrier_price(
-            &BarrierParams::new(100.0, -100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
-            BarrierType::DownAndOut,
-            OptionType::Put
-        )
-        .is_finite());
-        assert!(!barrier_price(
-            &BarrierParams::new(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
-            BarrierType::DownAndIn,
-            OptionType::Put
-        )
-        .is_finite());
-        assert!(!barrier_price(
-            &BarrierParams::new(100.0, 100.0, -120.0, 1.0, 0.05, 0.02, 0.2),
-            BarrierType::UpAndOut,
-            OptionType::Put
-        )
-        .is_finite());
-        assert!(!barrier_price(
-            &BarrierParams::new(0.0, 100.0, 120.0, 1.0, 0.05, 0.02, 0.2),
-            BarrierType::UpAndIn,
-            OptionType::Put
-        )
-        .is_finite());
+        assert!(
+            !barrier_price(
+                &BarrierParams::new(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
+                BarrierType::DownAndOut,
+                OptionType::Call
+            )
+            .is_finite()
+        );
+        assert!(
+            !barrier_price(
+                &BarrierParams::new(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
+                BarrierType::DownAndIn,
+                OptionType::Call
+            )
+            .is_finite()
+        );
+        assert!(
+            !barrier_price(
+                &BarrierParams::new(100.0, 100.0, -120.0, 1.0, 0.05, 0.02, 0.2),
+                BarrierType::UpAndOut,
+                OptionType::Call
+            )
+            .is_finite()
+        );
+        assert!(
+            !barrier_price(
+                &BarrierParams::new(100.0, 0.0, 120.0, 1.0, 0.05, 0.02, 0.2),
+                BarrierType::UpAndIn,
+                OptionType::Call
+            )
+            .is_finite()
+        );
+        assert!(
+            !barrier_price(
+                &BarrierParams::new(100.0, -100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
+                BarrierType::DownAndOut,
+                OptionType::Put
+            )
+            .is_finite()
+        );
+        assert!(
+            !barrier_price(
+                &BarrierParams::new(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2),
+                BarrierType::DownAndIn,
+                OptionType::Put
+            )
+            .is_finite()
+        );
+        assert!(
+            !barrier_price(
+                &BarrierParams::new(100.0, 100.0, -120.0, 1.0, 0.05, 0.02, 0.2),
+                BarrierType::UpAndOut,
+                OptionType::Put
+            )
+            .is_finite()
+        );
+        assert!(
+            !barrier_price(
+                &BarrierParams::new(0.0, 100.0, 120.0, 1.0, 0.05, 0.02, 0.2),
+                BarrierType::UpAndIn,
+                OptionType::Put
+            )
+            .is_finite()
+        );
     }
 
     /// At-hit KO rebates discount over the (random) hit time τ ≤ T, so with a

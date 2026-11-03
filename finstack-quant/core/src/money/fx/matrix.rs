@@ -5,7 +5,7 @@ use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::{recover_lock, FxHashMap};
+use crate::{FxHashMap, recover_lock};
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     recover_lock(mutex.lock())
@@ -16,10 +16,10 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 use crate::currency::Currency;
 use crate::dates::Date;
 
-use super::provider::{directional_rate, reciprocal_rate_or_err, validate_fx_rate, FxProvider};
+use super::provider::{FxProvider, directional_rate, reciprocal_rate_or_err, validate_fx_rate};
 use super::types::{
-    CurrencyPair, FxConfig, FxConversionPolicy, FxMatrixState, FxQuery, FxRateResult,
-    DEFAULT_CACHE_CAPACITY,
+    CurrencyPair, DEFAULT_CACHE_CAPACITY, FxConfig, FxConversionPolicy, FxMatrixState, FxQuery,
+    FxRateResult,
 };
 
 const MAX_STATE_ATTEMPTS: usize = 3;

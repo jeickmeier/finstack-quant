@@ -235,8 +235,10 @@ fn analytics_dts_matches_runtime_hotspots() {
     assert!(
         ticker_names_docs.contains("Ticker labels in column order as a JavaScript string array.")
     );
-    assert!(ticker_names_docs
-        .contains("Rejects if the ticker-name vector cannot be serialized to JavaScript."));
+    assert!(
+        ticker_names_docs
+            .contains("Rejects if the ticker-name vector cannot be serialized to JavaScript.")
+    );
     assert!(contains_signature(&dts, "maxDrawdownDuration(): number[];"));
     assert!(
         drawdown_duration_docs.contains("Longest drawdown duration in calendar days per asset.")
@@ -529,7 +531,10 @@ fn valuations_dts_exposes_direct_fx_instruments() {
         "withStub(stub: 'none' | 'short_front' | 'short_back' | 'long_front' | 'long_back'): Bond;"
     ));
     let bond_ctor = interface_block(&dts, "BondConstructor");
-    assert!(contains_ignoring_ws(bond_ctor, "withConvention(id: string, notional: Money, couponRate: Rate, issueDate: string, maturity: string, convention:"));
+    assert!(contains_ignoring_ws(
+        bond_ctor,
+        "withConvention(id: string, notional: Money, couponRate: Rate, issueDate: string, maturity: string, convention:"
+    ));
     let touch = interface_block(&dts, "FxTouchOption ");
     assert!(contains_signature(
         touch,
@@ -1157,16 +1162,20 @@ fn models_and_valuations_dts_expose_owned_credit_namespaces() {
     assert!(dts.contains("export interface ModelCreditNamespace"));
     let merton = interface_block(&dts, "MertonModel");
     let merton_statics = interface_block(&dts, "MertonModelConstructor");
-    assert!(merton
-        .contains("defaultProbabilityWithDrift(assetDrift: number, horizon: number): number;"));
+    assert!(
+        merton
+            .contains("defaultProbabilityWithDrift(assetDrift: number, horizon: number): number;")
+    );
     assert!(
         merton.contains("distanceToDefaultWithDrift(assetDrift: number, horizon: number): number;")
     );
     assert!(merton.contains("debtSpread(horizon: number): number;"));
     assert!(merton.contains("cdsParSpread(maturity: number, recovery: number): number;"));
     assert!(merton.contains("): HazardCurve;"));
-    assert!(merton_statics
-        .contains("kmvDefaultPoint(shortTermDebt: number, longTermDebt: number): number;"));
+    assert!(
+        merton_statics
+            .contains("kmvDefaultPoint(shortTermDebt: number, longTermDebt: number): number;")
+    );
     assert!(merton_statics.contains("creditGrades("));
     // Label lookups take strings; the index lookup takes numbers (the binding
     // converts with `js_uint` and throws a `TypeError` for a string).
@@ -1532,7 +1541,10 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
         "flat(id: string, baseDate: string, hazardRate: number, recoveryRate: number): HazardCurve;",
         "fromJson(json: JsonInput): HazardCurve;",
     ] {
-        assert!(contains_signature(hazard_constructor, sig), "HazardCurveConstructor: {sig}");
+        assert!(
+            contains_signature(hazard_constructor, sig),
+            "HazardCurveConstructor: {sig}"
+        );
     }
     assert!(contains_signature(
         interface_block(&dts, "ForwardCurveConstructor "),
@@ -1846,7 +1858,10 @@ fn rust_computation_twins_are_declared() {
         "FxForward: FxForwardConstructor;",
         "FxOption: FxOptionConstructor;",
     ] {
-        assert!(contains_signature(&dts, sig), "index.d.ts is missing `{sig}`");
+        assert!(
+            contains_signature(&dts, sig),
+            "index.d.ts is missing `{sig}`"
+        );
     }
 }
 
@@ -1882,7 +1897,10 @@ fn typed_cashflows_and_covenants_surface_is_declared() {
         "covenantTypeCustom(metric: string, test: 'maximum' | 'minimum', value: number): generated.covenants.CovenantType;",
         "thresholdScheduleThresholdFor(schedule: generated.covenants.ThresholdSchedule, testDate: string): number | undefined;",
     ] {
-        assert!(contains_signature(&dts, sig), "index.d.ts is missing `{sig}`");
+        assert!(
+            contains_signature(&dts, sig),
+            "index.d.ts is missing `{sig}`"
+        );
     }
     // The facade joins the market / no-market twins; the raw twins are not published.
     assert!(!dts.contains("buildWithMarket("));

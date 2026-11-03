@@ -190,7 +190,8 @@ impl PoolAsset {
                     )))
                 }
                 finstack_quant_valuations_fixed_income::bond::CashflowSpec::Amortizing {
-                    base, ..
+                    base,
+                    ..
                 } => economics(base),
                 finstack_quant_valuations_fixed_income::bond::CashflowSpec::StepUp(_) => {
                     Err(finstack_quant_core::Error::Validation(
@@ -988,26 +989,24 @@ impl AssetPool {
                 self.reserve_account_rate
             )));
         }
-        if let Some(target) = self.reserve_target {
-            if target.currency() != self.currency || target.amount() < 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "reserve_target must be a non-negative {} amount, got {target}",
-                    self.currency
-                )));
-            }
+        if let Some(target) = self.reserve_target
+            && (target.currency() != self.currency || target.amount() < 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "reserve_target must be a non-negative {} amount, got {target}",
+                self.currency
+            )));
         }
         if let ReserveInterestDestination::Tranche { tranche_id } =
             &self.reserve_interest_destination
-        {
-            if !tranches
+            && !tranches
                 .tranches
                 .iter()
                 .any(|t| t.id.as_str() == tranche_id)
-            {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "reserve_interest_destination names unknown tranche '{tranche_id}'"
-                )));
-            }
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "reserve_interest_destination names unknown tranche '{tranche_id}'"
+            )));
         }
         Ok(())
     }
@@ -1039,19 +1038,20 @@ impl AssetPool {
     /// Total pool balance
     pub fn total_balance(&self) -> finstack_quant_core::Result<Money> {
         self.validate_representation()?;
-        if let Some(instruments) = &self.instruments {
-            if self.assets.is_empty() && !instruments.is_empty() {
-                return instruments.total_balance(self.currency);
-            }
+        if let Some(instruments) = &self.instruments
+            && self.assets.is_empty()
+            && !instruments.is_empty()
+        {
+            return instruments.total_balance(self.currency);
         }
-        if let Some(lines) = &self.rep_lines {
-            if self.assets.is_empty() {
-                return lines
-                    .iter()
-                    .try_fold(Money::from((0_i64, self.currency)), |sum, line| {
-                        sum.checked_add(line.balance)
-                    });
-            }
+        if let Some(lines) = &self.rep_lines
+            && self.assets.is_empty()
+        {
+            return lines
+                .iter()
+                .try_fold(Money::from((0_i64, self.currency)), |sum, line| {
+                    sum.checked_add(line.balance)
+                });
         }
         self.assets
             .iter()
@@ -1259,13 +1259,13 @@ impl AssetPool {
                 actual,
             });
         }
-        if let Some(payment) = asset.contractual_payment {
-            if payment.currency() != self.currency {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: self.currency,
-                    actual: payment.currency(),
-                });
-            }
+        if let Some(payment) = asset.contractual_payment
+            && payment.currency() != self.currency
+        {
+            return Err(finstack_quant_core::Error::CurrencyMismatch {
+                expected: self.currency,
+                actual: payment.currency(),
+            });
         }
         Ok(())
     }

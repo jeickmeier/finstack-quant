@@ -1,17 +1,17 @@
 //! Canonical position-evaluation kernel.
 
 use super::{EvaluationMetricProfile, EvaluationProfile, RiskFailurePolicy};
+use crate::Portfolio;
 use crate::error::{Error, Result};
 use crate::position::Position;
 use crate::types::{EntityId, PositionId};
 use crate::valuation::{PortfolioValuation, PositionValue};
-use crate::Portfolio;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::neumaier_sum;
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxRateResult};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxRateResult};
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::STANDARD;

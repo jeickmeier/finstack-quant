@@ -185,11 +185,7 @@ fn annualized_years(
 #[must_use]
 pub(crate) fn mean_return(returns: &[f64], annualize: bool, ann_factor: f64) -> f64 {
     let m = mean(returns);
-    if annualize {
-        m * ann_factor
-    } else {
-        m
-    }
+    if annualize { m * ann_factor } else { m }
 }
 
 /// Annualized mean and volatility from one Welford pass.
@@ -699,22 +695,26 @@ mod tests {
     fn date_cagr_rejects_non_positive_spans() {
         let returns = [0.10];
 
-        assert!(cagr(
-            &returns,
-            jan1(2024),
-            jan1(2024),
-            CagrDayCount::default(),
-            None,
-        )
-        .is_err());
-        assert!(cagr(
-            &returns,
-            jan1(2025),
-            jan1(2024),
-            CagrDayCount::default(),
-            None,
-        )
-        .is_err());
+        assert!(
+            cagr(
+                &returns,
+                jan1(2024),
+                jan1(2024),
+                CagrDayCount::default(),
+                None,
+            )
+            .is_err()
+        );
+        assert!(
+            cagr(
+                &returns,
+                jan1(2025),
+                jan1(2024),
+                CagrDayCount::default(),
+                None,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1024,7 +1024,7 @@ mod tests {
     mod fixture_tests {
         use super::{cagr_from_factor, sharpe, sortino};
         use crate::benchmark::rolling_greeks;
-        use crate::multi_factor::{multi_factor_greeks, ReturnKind};
+        use crate::multi_factor::{ReturnKind, multi_factor_greeks};
         use crate::risk_metrics::{expected_shortfall, value_at_risk};
         use finstack_quant_core::dates::Date;
         use serde::Deserialize;

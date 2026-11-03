@@ -3,10 +3,10 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    validate_tiers, ValidationError,
+    AllocationMode, PaymentCalculation, PaymentType, Recipient, RecipientType, WaterfallTier,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    AllocationMode, PaymentCalculation, PaymentType, Recipient, RecipientType, WaterfallTier,
+    ValidationError, validate_tiers,
 };
 
 fn fixed_fee_recipient(id: &str) -> Recipient {

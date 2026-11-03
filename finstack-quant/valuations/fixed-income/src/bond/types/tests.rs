@@ -1,10 +1,10 @@
 //! Bond type tests (construction, cashflows, floating, amortization).
 
 use super::*;
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_cashflows::builder::{
     CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
 };
-use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -14,8 +14,8 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use rust_decimal::Decimal;
 use time::Month;
 
@@ -617,8 +617,8 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
 
 #[test]
 fn test_bond_amortization_signed_schedule_preserves_all_flows() {
-    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_core::cashflow::CFKind;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");

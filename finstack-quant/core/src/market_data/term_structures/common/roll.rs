@@ -203,11 +203,7 @@ pub(crate) fn roll_knots(knots: &[f64], values: &[f64], dt: f64) -> Vec<(f64, f6
         .zip(values.iter())
         .filter_map(|(&t, &v)| {
             let new_t = t - dt;
-            if new_t > 0.0 {
-                Some((new_t, v))
-            } else {
-                None
-            }
+            if new_t > 0.0 { Some((new_t, v)) } else { None }
         })
         .collect()
 }

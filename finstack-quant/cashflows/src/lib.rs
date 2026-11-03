@@ -92,13 +92,13 @@ mod json;
 pub mod schema;
 
 pub use json::{
-    build_cashflow_schedule_json, dated_flows_json, validate_cashflow_schedule_json,
     CashflowScheduleBuildSpec, CouponLegSpec, DatedFlowJson, MarginStepSpec, PaymentProgramSpec,
-    PaymentStepSpec,
+    PaymentStepSpec, build_cashflow_schedule_json, dated_flows_json,
+    validate_cashflow_schedule_json,
 };
 pub use traits::{
-    schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider,
-    CashflowScheduleSource, ScheduleBuildOpts,
+    CashflowProvider, CashflowScheduleSource, ScheduleBuildOpts, schedule_from_classified_flows,
+    schedule_from_dated_flows,
 };
 
 /// Compiles the crate `README.md` Rust samples as doctests.

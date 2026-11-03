@@ -71,10 +71,10 @@ fn structured_credit_json_acceptance_enforces_canonical_rules() {
     let valid = serde_json::json!({"asset_class":"*", "rate":0.8});
     let rate: AdvanceRate = serde_json::from_value(valid).unwrap();
     assert_eq!(rate.rate, 0.8);
-    assert!(serde_json::from_value::<AdvanceRate>(
-        serde_json::json!({"asset_class":"*", "rate":1.1})
-    )
-    .is_err());
+    assert!(
+        serde_json::from_value::<AdvanceRate>(serde_json::json!({"asset_class":"*", "rate":1.1}))
+            .is_err()
+    );
 }
 
 #[test]
@@ -128,10 +128,12 @@ fn retired_public_options_are_rejected_in_json() {
     use finstack_quant_valuations::instruments::rates::swaption::Swaption;
     let mut swaption = serde_json::to_value(Swaption::example().unwrap()).unwrap();
     swaption["exercise_style"] = serde_json::json!("european");
-    assert!(serde_json::from_value::<Swaption>(swaption)
-        .unwrap_err()
-        .to_string()
-        .contains("exercise_style"));
+    assert!(
+        serde_json::from_value::<Swaption>(swaption)
+            .unwrap_err()
+            .to_string()
+            .contains("exercise_style")
+    );
     let spec = StochasticUtilizationSpec {
         utilization_process: UtilizationProcess::MeanReverting {
             theta: 0.5,
@@ -144,9 +146,11 @@ fn retired_public_options_are_rejected_in_json() {
     for value in [false, true] {
         let mut wire = serde_json::to_value(&spec).unwrap();
         wire["use_sobol_qmc"] = serde_json::json!(value);
-        assert!(serde_json::from_value::<StochasticUtilizationSpec>(wire)
-            .unwrap_err()
-            .to_string()
-            .contains("use_sobol_qmc"));
+        assert!(
+            serde_json::from_value::<StochasticUtilizationSpec>(wire)
+                .unwrap_err()
+                .to_string()
+                .contains("use_sobol_qmc")
+        );
     }
 }

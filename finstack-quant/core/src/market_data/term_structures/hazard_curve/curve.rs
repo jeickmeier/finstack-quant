@@ -154,12 +154,12 @@ impl HazardCurve {
         if t <= 0.0 {
             return 1.0;
         }
-        if let Some(&last_t) = self.knots.last() {
-            if t > last_t {
-                let survival_at_last = self.interp.interp(last_t);
-                let tail_hazard = self.lambdas[self.lambdas.len() - 1];
-                return survival_at_last * (-tail_hazard * (t - last_t)).exp();
-            }
+        if let Some(&last_t) = self.knots.last()
+            && t > last_t
+        {
+            let survival_at_last = self.interp.interp(last_t);
+            let tail_hazard = self.lambdas[self.lambdas.len() - 1];
+            return survival_at_last * (-tail_hazard * (t - last_t)).exp();
         }
         self.interp.interp(t)
     }
@@ -451,19 +451,19 @@ impl HazardCurve {
         }
 
         // Log-linear falls back to linear when the spreads cannot be logged.
-        if method == ParInterp::LogLinear {
-            if let Ok(strat) = LogLinearStrategy::from_raw(
+        if method == ParInterp::LogLinear
+            && let Ok(strat) = LogLinearStrategy::from_raw(
                 &self.par_tenors,
                 &self.par_spreads_bp,
                 ExtrapolationPolicy::FlatForward,
-            ) {
-                return strat.interp(
-                    t,
-                    &self.par_tenors,
-                    &self.par_spreads_bp,
-                    ExtrapolationPolicy::FlatForward,
-                );
-            }
+            )
+        {
+            return strat.interp(
+                t,
+                &self.par_tenors,
+                &self.par_spreads_bp,
+                ExtrapolationPolicy::FlatForward,
+            );
         }
         LinearStrategy.interp(
             t,

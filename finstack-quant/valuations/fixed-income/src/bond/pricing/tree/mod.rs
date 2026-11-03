@@ -32,9 +32,9 @@ mod tests;
 mod tree_pricer;
 
 pub use bond_valuator::BondValuator;
-pub(crate) use config::bond_tree_settings;
 #[cfg(test)]
 use config::TreePricerConfig;
-pub(crate) use config::{bond_tree_config, TreeModelChoice};
+pub(crate) use config::bond_tree_settings;
+pub(crate) use config::{TreeModelChoice, bond_tree_config};
 pub(crate) use tree_pricer::TreePriceOutcome;
 pub(crate) use tree_pricer::TreePricer;

@@ -146,10 +146,10 @@ mod production_mortgage_audit {
 /// pricer in the umbrella crate.
 #[cfg(test)]
 mod rate_risk_rebuild_tests {
-    use crate::dollar_roll::pricer::price_dollar_roll;
     use crate::dollar_roll::DollarRoll;
-    use crate::tba::pricer::{create_assumed_pool, price_tba};
+    use crate::dollar_roll::pricer::price_dollar_roll;
     use crate::tba::AgencyTba;
+    use crate::tba::pricer::{create_assumed_pool, price_tba};
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};

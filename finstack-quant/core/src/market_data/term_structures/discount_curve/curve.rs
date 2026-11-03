@@ -1,9 +1,9 @@
 //! Discount-curve construction, queries, and forward derivation.
 
 use super::super::forward_curve::ForwardCurve;
-use super::{DiscountCurve, DiscountCurveBuilder, ValidationMode, DEFAULT_MIN_FORWARD_TENOR};
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
+use super::{DEFAULT_MIN_FORWARD_TENOR, DiscountCurve, DiscountCurveBuilder, ValidationMode};
 use crate::math::Compounding;
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{
     dates::{Date, DayCount},
     types::CurveId,

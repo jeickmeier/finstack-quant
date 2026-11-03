@@ -45,7 +45,7 @@
 //! - Gaussian copula reference: `docs/REFERENCES.md#li-2000-gaussian-copula`
 //!
 
-use super::{default_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
+use super::{Copula, DEFAULT_QUADRATURE_ORDER, default_quadrature};
 use finstack_quant_core::math::{integration::GaussHermiteQuadrature, special_functions::norm_cdf};
 use std::sync::Arc;
 
@@ -399,11 +399,15 @@ mod tests {
     fn checked_probability_rejects_invalid_correlation() {
         let copula = GaussianCopula::new();
         let threshold = standard_normal_inv_cdf(0.05);
-        assert!(copula
-            .conditional_default_prob_checked(threshold, &[0.0], -0.01)
-            .is_err());
-        assert!(copula
-            .conditional_default_prob_checked(threshold, &[0.0], 1.01)
-            .is_err());
+        assert!(
+            copula
+                .conditional_default_prob_checked(threshold, &[0.0], -0.01)
+                .is_err()
+        );
+        assert!(
+            copula
+                .conditional_default_prob_checked(threshold, &[0.0], 1.01)
+                .is_err()
+        );
     }
 }

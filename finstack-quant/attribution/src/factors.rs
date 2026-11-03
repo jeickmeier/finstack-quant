@@ -65,6 +65,7 @@
 //! - [`crate::waterfall`] - Waterfall attribution using this module
 
 use crate::AttributionFactor;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::market_data::dividends::DividendSchedule;
 use finstack_quant_core::market_data::scalars::InflationIndex;
@@ -81,7 +82,6 @@ use finstack_quant_core::market_data::term_structures::PriceCurve;
 use finstack_quant_core::market_data::term_structures::PriceCurveKind;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations::instruments::MarketDependencies;
 use std::sync::Arc;
 

@@ -8,8 +8,8 @@ use std::sync::Arc;
 use finstack_quant_core::market_data::term_structures::Seniority;
 use pyo3::prelude::*;
 
-use super::helpers::{columns_to_dataframe, extract_time_point, TimePoint};
-use crate::bindings::core::currency::{extract_currency, PyCurrency};
+use super::helpers::{TimePoint, columns_to_dataframe, extract_time_point};
+use crate::bindings::core::currency::{PyCurrency, extract_currency};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};

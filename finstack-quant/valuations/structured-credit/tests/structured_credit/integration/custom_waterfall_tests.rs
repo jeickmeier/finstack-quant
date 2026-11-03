@@ -386,7 +386,7 @@ fn executor_allocates_floating_interest_on_the_shifted_path() {
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        execute_waterfall, WaterfallContext,
+        WaterfallContext, execute_waterfall,
     };
 
     let float_tranche = Tranche::new(

@@ -1,6 +1,6 @@
 //! Central-difference factor sensitivity engine.
 //!
-use super::traits::{factor_bump, mapping_bumps_fx, FactorRepricingPlan, FactorSensitivityEngine};
+use super::traits::{FactorRepricingPlan, FactorSensitivityEngine, factor_bump, mapping_bumps_fx};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{
@@ -334,15 +334,15 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_core::money::fx::{FxMatrix, FxQuery, SimpleFxProvider};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::money::fx::{FxMatrix, FxQuery, SimpleFxProvider};
     use finstack_quant_core::types::Attributes;
     use finstack_quant_valuations::instruments::MarketDependencies;
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     };
     use time::macros::date;
 
@@ -653,7 +653,7 @@ mod tests {
                 other => {
                     return Err(Error::Validation(format!(
                         "expected Curve bump, got {other:?}"
-                    )))
+                    )));
                 }
             };
             assert!(

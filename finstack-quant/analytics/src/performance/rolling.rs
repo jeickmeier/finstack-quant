@@ -2,7 +2,7 @@
 
 use super::Performance;
 use crate::risk_metrics::{
-    rolling_returns, rolling_sharpe, rolling_sortino, rolling_volatility, DatedSeries,
+    DatedSeries, rolling_returns, rolling_sharpe, rolling_sortino, rolling_volatility,
 };
 
 impl Performance {

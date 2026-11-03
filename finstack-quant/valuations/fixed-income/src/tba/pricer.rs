@@ -5,8 +5,8 @@
 
 use super::AgencyTba;
 use crate::mbs_passthrough::{
-    pricer::{price_mbs, quote_basis_pool},
     AgencyMbsPassthrough, AgencyProgram, PoolType,
+    pricer::{price_mbs, quote_basis_pool},
 };
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};

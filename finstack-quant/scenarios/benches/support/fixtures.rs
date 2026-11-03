@@ -9,7 +9,7 @@
 #![allow(clippy::expect_used)]
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{build_periods, Date};
+use finstack_quant_core::dates::{Date, build_periods};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::hierarchy::MarketDataHierarchy;
 use finstack_quant_core::market_data::scalars::MarketScalar;
@@ -18,10 +18,10 @@ use finstack_quant_core::market_data::term_structures::{
     BaseCorrelationCurve, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve, PriceCurve,
     PriceCurveKind,
 };
-use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::Compounding;
-use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_models::credit::pool::CorrelationStructure;
 use finstack_quant_scenarios::{
     ApplicationReport, ExecutionContext, HazardBumpMode, OperationSpec, RateBindingSpec,
@@ -29,13 +29,13 @@ use finstack_quant_scenarios::{
 };
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
-use finstack_quant_valuations::instruments::Instrument;
-use indexmap::{indexmap, IndexMap};
+use indexmap::{IndexMap, indexmap};
 use std::sync::Arc;
-use time::macros::date;
 use time::Month;
+use time::macros::date;
 
 pub const AS_OF: Date = date!(2025 - 01 - 01);
 pub const USD_SOFR: &str = "USD_SOFR";
@@ -282,8 +282,8 @@ pub fn financial_model() -> FinancialModelSpec {
     model
 }
 
-pub fn interest_rate_bindings(
-) -> IndexMap<finstack_quant_statements::types::NodeId, RateBindingSpec> {
+pub fn interest_rate_bindings()
+-> IndexMap<finstack_quant_statements::types::NodeId, RateBindingSpec> {
     indexmap! {
         "InterestRate".into() => RateBindingSpec {
             node_id: "InterestRate".into(),

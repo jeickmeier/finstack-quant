@@ -87,13 +87,12 @@ pub fn bump_active_volatility<I: crate::instruments::Instrument + Clone>(
     surface_id: &str,
     bump_abs: f64,
 ) -> finstack_quant_core::Result<(I, finstack_quant_core::market_data::context::MarketContext)> {
-    if let Some(bumped) = bumped_volatility_override(instrument, bump_abs)? {
-        Ok((bumped, market.clone()))
-    } else {
-        Ok((
+    match bumped_volatility_override(instrument, bump_abs)? {
+        Some(bumped) => Ok((bumped, market.clone())),
+        _ => Ok((
             instrument.clone(),
             bump_surface_vol_absolute(market, surface_id, bump_abs)?,
-        ))
+        )),
     }
 }
 

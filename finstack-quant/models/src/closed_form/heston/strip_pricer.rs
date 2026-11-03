@@ -1,7 +1,7 @@
 use super::fourier_prices::validate_heston_inputs;
 use super::params::HESTON_TAIL_DIAGNOSTIC_THRESHOLD;
 use super::{HestonFourierSettings, HestonPricingParams};
-use crate::volatility::heston::{heston_pj_characteristic_function, HestonCfStatus};
+use crate::volatility::heston::{HestonCfStatus, heston_pj_characteristic_function};
 use finstack_quant_core::math::integration::gauss_legendre_grid;
 use finstack_quant_core::{Error, Result};
 use num_complex::Complex;
@@ -220,7 +220,10 @@ impl HestonStripPricer {
         {
             return Err(Error::Calibration {
                 category: "heston_fourier".to_string(),
-                message: format!("Heston integration tail is unresolved: price-tail estimate={tail_price}, CF magnitude={}", self.tail_cf_magnitude),
+                message: format!(
+                    "Heston integration tail is unresolved: price-tail estimate={tail_price}, CF magnitude={}",
+                    self.tail_cf_magnitude
+                ),
             });
         }
 

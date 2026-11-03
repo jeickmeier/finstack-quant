@@ -430,13 +430,13 @@ impl AgencyCmo {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "{context} PAC tranche '{}' requires its original dated principal schedule",
                         tranche.id
-                    )))
+                    )));
                 }
                 (_, Some(_)) => {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "{context} non-PAC tranche '{}' cannot define a PAC schedule",
                         tranche.id
-                    )))
+                    )));
                 }
                 _ => {}
             }
