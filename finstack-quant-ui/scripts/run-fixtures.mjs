@@ -20,6 +20,7 @@ const generators = [
   "tests/portfolio/workbench/generate.mjs",
   "tests/scenarios/application/generate.mjs",
   "tests/portfolio/attribution/generate.mjs",
+  "tests/portfolio/returns/generate.mjs",
   "tests/scenarios/horizon/generate.mjs",
   "tests/scenarios/templates/generate.mjs",
   "tests/attribution/generate.mjs",

@@ -488,6 +488,13 @@ const displays = [
       "Returned PortfolioAttribution: total_pnl and every base-currency bucket as exact money with shares only from portfolioAttributionPctOfTotalByBucket, the reconciliation verdict, gap and tolerance only from portfolioAttributionReconciliationCheck at the host's tolerance, explain only from portfolioAttributionExplainText, and result_invalid as returned; by_position rows in returned order in each instrument's currency, one column per book bucket filled from that position's pnlAttributionPctOfTotalByBucket, and the selected position through pnl-attribution-report. The method is required and chosen by the user; nothing is summed, differenced or converted.",
   },
   {
+    id: "portfolio-returns",
+    api: ["portfolio.twrrLinked", "PortfolioNamespace", "twrrLinked"],
+    route: "returned-report",
+    convention:
+      "Returned twrrLinked LinkedReturn: cumulative, annualised, is_annualised and num_periods as returned, the annualised figure labelled per year only when Rust's is_annualised says so; the twrrModifiedDietz period return as a decimal for the period, not annualised; the mwrXirr return as an annualised decimal on Act/365F. Inputs are the host's returns, horizon in 365-day years, one period's values and flows with their fractions of the period remaining (contributions positive) and dated investor flows (contributions negative); nothing is defaulted, derived from dates, sign-flipped, summed or compared, and each form shows its native error.",
+  },
+  {
     id: "scenario-pnl-table",
     schema: `${base}portfolio/1/scenario_pnl_batch_item.schema.json`,
     pointer: "#",

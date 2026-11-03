@@ -2158,6 +2158,32 @@
       }
     },
     {
+      "id": "portfolio-returns",
+      "route": "returned-report",
+      "convention": "Returned twrrLinked LinkedReturn: cumulative, annualised, is_annualised and num_periods as returned, the annualised figure labelled per year only when Rust's is_annualised says so; the twrrModifiedDietz period return as a decimal for the period, not annualised; the mwrXirr return as an annualised decimal on Act/365F. Inputs are the host's returns, horizon in 365-day years, one period's values and flows with their fractions of the period remaining (contributions positive) and dated investor flows (contributions negative); nothing is defaulted, derived from dates, sign-flipped, summed or compared, and each form shows its native error.",
+      "api": {
+        "name": "portfolio.twrrLinked",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "twrrLinked",
+        "inputs": [
+          {
+            "name": "returnsJson",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "horizonYears",
+            "type": "number",
+            "optional": false
+          }
+        ],
+        "returns": "LinkedReturn",
+        "declaration": "/**\n   * Geometrically link TWRR sub-period returns from returns JSON.\n   * @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.\n   * @param returnsJson - Numeric return-series JSON.\n   * @param horizonYears - Full elapsed horizon in 365-day calendar years; below one year the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).\n   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.\n   */\n  twrrLinked(returnsJson: JsonInput, horizonYears: number): LinkedReturn;",
+        "sha256": "2f168e2f81c19d93698bd435607aaff11052cfa110ef63c243c59950e857b52a"
+      }
+    },
+    {
       "id": "scenario-pnl-table",
       "route": "returned-pnl",
       "convention": "Returned ScenarioPnlBatchItem per scenario in batch order: by_position money in Portfolio#positionIds (spec) order, the total row from pnl.total in the base currency, the totals charted as returned and each ApplicationReport; nothing summed or differenced. The batch fails whole on the earliest failing scenario.",

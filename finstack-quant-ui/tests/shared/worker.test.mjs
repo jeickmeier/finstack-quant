@@ -144,6 +144,9 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "portfolioMargin",
     "attributePortfolioPnl",
     "computeFactorSensitivities",
+    "twrrLinked",
+    "twrrModifiedDietz",
+    "mwrXirr",
     // MarginApi
     "validateSimmSensitivities",
     "simmIm",

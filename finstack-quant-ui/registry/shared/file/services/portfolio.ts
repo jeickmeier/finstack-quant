@@ -17,6 +17,9 @@ export type PortfolioNative = {
     | "portfolioAttributionExplainText"
     | "portfolioAttributionReconciliationCheck"
     | "portfolioAttributionPctOfTotalByBucket"
+    | "twrrLinked"
+    | "twrrModifiedDietz"
+    | "mwrXirr"
   >;
   attribution: Pick<
     typeof attribution,
@@ -149,6 +152,17 @@ export function createPortfolioService(
           request.bumpConfigJson ?? undefined,
         ),
       );
+    },
+    twrrLinked(request) {
+      return context.result(() =>
+        native.portfolio.twrrLinked([...request.returns], request.horizonYears),
+      );
+    },
+    twrrModifiedDietz(period) {
+      return context.result(() => native.portfolio.twrrModifiedDietz(period));
+    },
+    mwrXirr(cashflows) {
+      return context.result(() => native.portfolio.mwrXirr([...cashflows]));
     },
   };
 }

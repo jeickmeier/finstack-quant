@@ -439,9 +439,15 @@
       "worker": "none"
     },
     {
+      "name": "portfolio-returns",
+      "type": "registry:component",
+      "docs": "Three forms, each presenting one native result: the geometric link of sub-period returns over a horizon (portfolio.twrrLinked: cumulative, annualised, is_annualised and num_periods as returned; when Rust's is_annualised is false the annualised figure is the cumulative one and the form says so), one period's Modified-Dietz return from its beginning and ending values and flows weighted by the fraction of the period remaining (portfolio.twrrModifiedDietz, a decimal for the period, not annualised; a contribution is positive) and the money-weighted return of dated investor flows (portfolio.mwrXirr, an annualised decimal on Act/365F; a contribution is negative, and the net flows must change sign once). Connect useTwrrLinked, useTwrrModifiedDietz and useMwrXirr. The forms start from defaultInputs and edit their own copies; nothing is defaulted, and the horizon and flow fractions are the host's numbers, never derived from dates here. An empty field is submitted as NaN, which Rust rejects. Each form shows its own native error. Accepts defaultInputs, onSubmitLinked, onSubmitDietz, onSubmitXirr, linked, dietz, xirr, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "portfolio-workbench",
       "type": "registry:block",
-      "docs": "Tabs over the portfolio components, with no native call of its own. Positions: portfolio-summary and positions-table of useValuePortfolio (portfolio.valuePortfolio, then aggregateMetrics) with Rust metricMetadata of every returned measure id. Risk: portfolio-metrics of the same report, charting the usePortfolioMetricsSeries series of seriesBase when one is supplied. Scenarios (only when scenarioJsons are supplied): scenario-pnl-table of useScenarioPnlBatch (portfolio.scenarioPnlBatch). Attribution (only when attribution is supplied): portfolio-attribution-report of useAttributePortfolioPnl (portfolio.attributePortfolioPnl from marketJson on asOf to attribution.marketT1Json on attribution.asOfT1, with Rust's explain, reconciliation at attribution.reconciliationTolerance and buckets) under the method the user picks; every Rust method is offered, none preselected, waterfall in useDefaultWaterfallOrder's order, and a method that fails on the book shows its native error. Margin: portfolio-margin-report of usePortfolioMargin (portfolio.portfolioMargin) on asOf with any currentImCollateral. Book: PortfolioSpec JSON that usePortfolioSpecValidator validates natively before every tab values it. The Scenarios, Attribution and Margin calls run only when their tab first opens. Host-supplied props: defaultSpecJson (PortfolioSpec; remount for a different book), marketJson (MarketContextState), asOf (ISO margin date, never read from the spec), metrics (omitted is Rust's standard set), seriesBase, scenarioJsons (never parsed), attribution (the closing MarketContextState marketT1Json, which needs any FIXING: series a seasoned floating leg fixes before its asOfT1, that ISO date and a base-currency reconciliationTolerance; Rust has no default for any of them), currentImCollateral (omitted is none held) and density. Nothing is summed, netted or converted; native errors show as returned. Requires FinstackQueryProvider.",
+      "docs": "Tabs over the portfolio components, with no native call of its own. Positions: portfolio-summary and positions-table of useValuePortfolio (portfolio.valuePortfolio, then aggregateMetrics) with Rust metricMetadata of every returned measure id. Risk: portfolio-metrics of the same report, charting the usePortfolioMetricsSeries series of seriesBase when one is supplied. Scenarios (only when scenarioJsons are supplied): scenario-pnl-table of useScenarioPnlBatch (portfolio.scenarioPnlBatch). Attribution (only when attribution is supplied): portfolio-attribution-report of useAttributePortfolioPnl (portfolio.attributePortfolioPnl from marketJson on asOf to attribution.marketT1Json on attribution.asOfT1, with Rust's explain, reconciliation at attribution.reconciliationTolerance and buckets) under the method the user picks; every Rust method is offered, none preselected, waterfall in useDefaultWaterfallOrder's order, and a method that fails on the book shows its native error. Returns (only when returns is supplied): portfolio-returns of useTwrrLinked, useTwrrModifiedDietz and useMwrXirr (portfolio.twrrLinked, twrrModifiedDietz and mwrXirr) over the host's returns.linked (sub-period decimal returns and horizonYears in 365-day years), returns.dietz (one TwrrPeriod) and returns.xirr (dated investor flows), computed when the tab opens and again for each form the user resubmits. Margin: portfolio-margin-report of usePortfolioMargin (portfolio.portfolioMargin) on asOf with any currentImCollateral. Book: PortfolioSpec JSON that usePortfolioSpecValidator validates natively before every tab values it. The Scenarios, Attribution, Returns and Margin calls run only when their tab first opens. Host-supplied props: defaultSpecJson (PortfolioSpec; remount for a different book), marketJson (MarketContextState), asOf (ISO margin date, never read from the spec), metrics (omitted is Rust's standard set), seriesBase, scenarioJsons (never parsed), attribution (the closing MarketContextState marketT1Json, which needs any FIXING: series a seasoned floating leg fixes before its asOfT1, that ISO date and a base-currency reconciliationTolerance; Rust has no default for any of them), returns (performance data, none of it defaulted or derived from the book), currentImCollateral (omitted is none held) and density. Nothing is summed, netted or converted; native errors show as returned. Requires FinstackQueryProvider.",
       "worker": "host"
     },
     {
@@ -860,6 +866,10 @@
     },
     {
       "name": "use-attribute-portfolio-pnl",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-portfolio-returns",
       "type": "registry:hook"
     },
     {
@@ -1786,11 +1796,15 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-      "sha256": "e7331b6f4e9d5d23a242d77354a48a2ffcd7576feb1061e8515cc55b8eedfbdb"
+      "sha256": "bb28cd8ca7af71c8e78e2f28a29acb0080b7a0d7771be55e9447418ac0e68d32"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/attribution/cases.json",
-      "sha256": "e7e14c81ac4c7854e17b94562fc36b159a4814ae4e6a122d982984b6e27b412a"
+      "sha256": "9200e89d0a14c0c1ddcd84477f6061c7e6fde3ba4b74dddefff87cc41051603a"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",
+      "sha256": "a0cbcdb02d200658059f964995a8ad6f476c13c0e87dde5d543586a606a2c299"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",

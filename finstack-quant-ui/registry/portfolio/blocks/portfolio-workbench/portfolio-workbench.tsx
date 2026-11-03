@@ -21,9 +21,18 @@ import {
   type PortfolioAttributionInputs,
 } from "./attribution-panel";
 export type { PortfolioAttributionInputs } from "./attribution-panel";
+import { ReturnsPanel } from "./returns-panel";
+import type { PortfolioReturnsInputs } from "@/components/finstack/portfolio/components/portfolio-returns/portfolio-returns";
+export type { PortfolioReturnsInputs } from "@/components/finstack/portfolio/components/portfolio-returns/portfolio-returns";
 
 type Tab =
-  "positions" | "risk" | "scenarios" | "attribution" | "margin" | "book";
+  | "positions"
+  | "risk"
+  | "scenarios"
+  | "attribution"
+  | "returns"
+  | "margin"
+  | "book";
 
 export interface PortfolioWorkbenchProps {
   /** Complete PortfolioSpec JSON supplied by the host (positions with their instrument specs, entities, base currency). Remount for a different book; the Book tab replaces it after native validation. */
@@ -40,6 +49,8 @@ export interface PortfolioWorkbenchProps {
   scenarioJsons?: readonly string[];
   /** The closing (T1) market and date and the reconciliation tolerance of the Attribution tab, which attributes the book from marketJson on asOf to them; the tab appears only when supplied. */
   attribution?: PortfolioAttributionInputs | null;
+  /** The host's performance data for the Returns tab: sub-period returns and their horizon, one period's values and flows, and dated investor flows; the tab appears only when supplied. */
+  returns?: PortfolioReturnsInputs | null;
   /** IM collateral already held by CSA id, in that CSA's currency; omitted is none held. */
   currentImCollateral?: Readonly<Record<string, MoneyValue>> | null;
   /** Row and text density of the workbench surface; compact by default. Sets SurfaceContext and data-density on the root, while data-theme is inherited from the host. */
@@ -55,6 +66,7 @@ export function PortfolioWorkbench({
   seriesBase,
   scenarioJsons,
   attribution,
+  returns,
   currentImCollateral,
   density = "compact",
 }: PortfolioWorkbenchProps) {
@@ -92,6 +104,7 @@ export function PortfolioWorkbench({
     ...(attribution
       ? [{ id: "attribution" as const, label: "Attribution" }]
       : []),
+    ...(returns ? [{ id: "returns" as const, label: "Returns" }] : []),
     { id: "margin", label: "Margin" },
     { id: "book", label: "Book" },
   ];
@@ -118,7 +131,7 @@ export function PortfolioWorkbench({
       >
         <header className="border-b border-border pb-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Portfolio · positions, risk, attribution and margin
+            Portfolio · positions, risk, attribution, returns and margin
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Book valued natively over the supplied market; margin as of {asOf}.
@@ -186,6 +199,11 @@ export function PortfolioWorkbench({
                 {...attribution}
                 density={density}
               />
+            </TabsContent>
+          )}
+          {returns && (
+            <TabsContent value="returns">
+              <ReturnsPanel inputs={returns} density={density} />
             </TabsContent>
           )}
           <TabsContent value="margin">
