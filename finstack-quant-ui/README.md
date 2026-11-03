@@ -104,9 +104,17 @@ To add an item (the gate that catches each omission is in brackets):
    leaf in its `<Crate>Native` (never a whole sub-namespace) and run
    `npm --prefix finstack-quant-ui run coverage`, which moves the key from
    `planned` to `covered` in `facade-coverage.json`. That file also lists
-   each excluded key with its reason (`data-constructor` or `schema-form`);
-   `schema.*` keys, `*Json` wire twins and builders are excluded by rule, and
-   a dropped slice deletes its `planned` keys [`ui-check`: `coverage --check`].
+   each excluded key with one reason from the closed set `listedReasons` in
+   `scripts/coverage.mjs`, which defines each: `data-constructor` (builds a
+   plain value from fields or a label), `schema-form` (an enum variant or
+   preset a schema form builds), `setter` (a copy with fields set), `getter`
+   (reads one stored field or entry), `validator` (a shape check returning
+   nothing or canonical JSON) and `performance-duplicate` (an `analytics`
+   series function with the same kernel as the `Performance` method).
+   `coverage --check` rejects any other reason, and picking an excluded key
+   fails until its entry is deleted. `schema.*` keys, `*Json` wire twins and
+   builders are excluded by rule, and a dropped slice deletes its `planned`
+   keys [`ui-check`: `coverage --check`].
 
 CI runs only `ui-check` (the Test UI job); the other gates are local.
 
