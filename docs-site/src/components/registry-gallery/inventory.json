@@ -433,6 +433,12 @@
       "worker": "none"
     },
     {
+      "name": "portfolio-workbench",
+      "type": "registry:block",
+      "docs": "Tabs over the portfolio components, with no native call of its own. Positions: portfolio-summary and positions-table of useValuePortfolio (portfolio.valuePortfolio, then aggregateMetrics) with Rust metricMetadata of every returned measure id. Risk: portfolio-metrics of the same report, charting the usePortfolioMetricsSeries series of seriesBase when one is supplied. Scenarios (only when scenarioJsons are supplied): scenario-pnl-table of useScenarioPnlBatch (portfolio.scenarioPnlBatch). Margin: portfolio-margin-report of usePortfolioMargin (portfolio.portfolioMargin) on asOf with any currentImCollateral. Book: PortfolioSpec JSON that usePortfolioSpecValidator validates natively before every tab values it. The Scenarios and Margin calls run only when their tab first opens. Host-supplied props: defaultSpecJson (PortfolioSpec; remount for a different book), marketJson (MarketContextState), asOf (ISO margin date, never read from the spec), metrics (omitted is Rust's standard set), seriesBase, scenarioJsons (never parsed), currentImCollateral (omitted is none held) and density. Nothing is summed, netted or converted; native errors show as returned. Requires FinstackQueryProvider.",
+      "worker": "host"
+    },
+    {
       "name": "simm-sensitivity-table",
       "type": "registry:component",
       "docs": "Display-only view of a SimmSensitivitiesJson document (for example the canonical text useSimmSensitivitiesValidator returns, parsed). Sections follow the SIMM risk classes (interest rate, credit qualifying, credit non-qualifying, equity, commodity, FX); each holds the class's delta and vega tuples in input order, with columns named after the Rust tuple positions, and the curvature entries whose risk_class is that class. Empty fields are omitted. Nothing is summed, netted, regrouped or converted; amounts are in the set's base currency, which is shown. Accepts sensitivities, formatValue and density props; no worker or query provider required.",
@@ -1767,6 +1773,10 @@
     {
       "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
       "sha256": "99a20d53501df2235088de008c35124cc339f9741b9e160338de66b4e2c67a50"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
+      "sha256": "9106758768fc151618a9f2dc5abb427949b225c9e37c38b098c420393e096f27"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",

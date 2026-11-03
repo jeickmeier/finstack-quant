@@ -174,10 +174,10 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the thirty-four native fixture generators under
+`mise run ui-fixtures` runs the thirty-five native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
-portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
+portfolio → portfolio margin → portfolio workbench; curves → market-browser → curve-query; cubes, calibration,
 scenario-table; statements → covenants, normalizations, capital structures, relative value; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
@@ -947,6 +947,32 @@ variation margin as `-0`, and the report shows it as returned. Nothing is
 summed, netted or converted. The fixture (`tests/portfolio/margin/`: two swaps
 under the Rust USD regulatory CSA and a regulatory CSA-B, plus an unmargined
 deposit, over the pricing market) also pins collateral held and an unknown CSA.
+
+## Portfolio workbench
+
+`PortfolioWorkbench` (`@finstack/portfolio-workbench`) puts the portfolio
+components under tabs and adds no native call of its own. The host supplies
+the book and its context as props: `defaultSpecJson` (a complete
+`PortfolioSpec`; remount for a different book), `marketJson`
+(`MarketContextState`), `asOf` (the ISO margin date, never read from the
+spec), and optionally `metrics` (omitted is Rust's standard set),
+`seriesBase` (the base metric id charted by bucket), `scenarioJsons`
+(`ScenarioSpec` texts, never parsed) and `currentImCollateral` (omitted is
+none held).
+
+| Tab       | Shows                                                                                                                   |
+| --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Positions | `PortfolioSummary` and `PositionsTable` of `useValuePortfolio`, with Rust `metricMetadata` of every returned measure id |
+| Risk      | `PortfolioMetrics` of the same report and, when `seriesBase` is supplied, its `usePortfolioMetricsSeries` series        |
+| Scenarios | `ScenarioPnlTable` of `useScenarioPnlBatch`; the tab is shown only when `scenarioJsons` are supplied                    |
+| Margin    | `PortfolioMarginReport` of `usePortfolioMargin` on `asOf`                                                               |
+| Book      | `PortfolioSpec` JSON that `usePortfolioSpecValidator` validates natively before every tab values it                     |
+
+The Scenarios and Margin calls run when their tab first opens. Later
+portfolio panels (attribution, returns, Brinson, exposures, correlation) add
+their own tabs when they land. The fixture (`tests/portfolio/workbench/`) is
+the margined rates book from `tests/portfolio/margin/` over the pricing
+market under the host-parity USD-OIS scenarios.
 
 ## Returned rating migration
 
