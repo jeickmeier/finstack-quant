@@ -95,14 +95,24 @@ const emptyField = failure("linked", {
   returns: [0.05, Number.NaN],
   horizonYears: 1,
 }).error;
+// A blank horizon field is submitted as NaN and one past the float range
+// ("1e999") as Infinity; Rust rejects both rather than reporting a cumulative
+// or a zero annualised return. Only the errors are stored, as above.
+const nonFiniteHorizon = {
+  blank: failure("linked", { ...inputs.linked, horizonYears: Number.NaN })
+    .error,
+  overflow: failure("linked", { ...inputs.linked, horizonYears: Infinity })
+    .error,
+};
 await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({
     description:
-      "Native portfolio.twrrLinked, twrrModifiedDietz and mwrXirr results of host-supplied returns, one period's values and flows, and dated investor cash flows, with the native errors of inputs Rust rejects.",
+      "Native portfolio.twrrLinked, twrrModifiedDietz and mwrXirr results of host-supplied returns, one period's values and flows, and dated investor cash flows, with the native errors of inputs Rust rejects, including a blank (NaN) and an overflowing (Infinity) horizon.",
     inputs,
     cases,
     errors,
     emptyField,
+    nonFiniteHorizon,
   }),
 );

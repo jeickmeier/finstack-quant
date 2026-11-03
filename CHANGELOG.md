@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Portfolio: a linked return rejects a non-finite horizon
+
+`twrr_linked` now returns a validation error when `horizon_years` is NaN or infinite. A blank horizon field (NaN) used to come back as an unannualised cumulative return and an overflowing one (`1e999`, infinity) as an annualised return of zero. Zero and negative horizons still skip annualisation. Python `twrr_linked` raises `ValueError`; WASM `portfolio.twrrLinked` throws a `validation` `FinstackError`. The returns UI fixture records both native errors. No existing value moves.
+
 ### UI: facade-coverage ledger lists what a screen never wires
 
 `finstack-quant-ui/facade-coverage.json` now excludes 108 more facade units, each with a reason from a closed set in `scripts/coverage.mjs` that `coverage --check` enforces: constructors and label parsers (`data-constructor`), enum-variant constructors (`schema-form`), copy-with-field setters (`setter`), stored-field lookups (`getter`), shape validators (`validator`) and the four `analytics` series functions that repeat a `Performance` method (`performance-duplicate`). The six covenant `with_*` setters move from `schema-form` to `setter`. Coverage reads 176 of 636 units instead of 176 of 744; computations, numeric checks, presets and later-phase targets stay counted.

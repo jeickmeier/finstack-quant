@@ -80156,7 +80156,7 @@
     ]
   },
   "portfolioReturns": {
-    "description": "Native portfolio.twrrLinked, twrrModifiedDietz and mwrXirr results of host-supplied returns, one period's values and flows, and dated investor cash flows, with the native errors of inputs Rust rejects.",
+    "description": "Native portfolio.twrrLinked, twrrModifiedDietz and mwrXirr results of host-supplied returns, one period's values and flows, and dated investor cash flows, with the native errors of inputs Rust rejects, including a blank (NaN) and an overflowing (Infinity) horizon.",
     "inputs": {
       "linked": {
         "returns": [0.08, -0.03, 0.11],
@@ -80361,6 +80361,18 @@
       "name": "TypeError",
       "kind": "invalid_type",
       "message": "returnsJson: returnsJson[1] is NaN, which JSON cannot represent"
+    },
+    "nonFiniteHorizon": {
+      "blank": {
+        "name": "FinstackError",
+        "kind": "validation",
+        "message": "Validation error: TWRR horizon_years is NaN; it must be a finite number of 365-day years (a non-positive horizon skips annualization)"
+      },
+      "overflow": {
+        "name": "FinstackError",
+        "kind": "validation",
+        "message": "Validation error: TWRR horizon_years is inf; it must be a finite number of 365-day years (a non-positive horizon skips annualization)"
+      }
     }
   },
   "portfolioBrinson": {

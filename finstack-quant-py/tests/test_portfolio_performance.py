@@ -40,6 +40,15 @@ def test_twrr_linked_binding_geometrically_links_returns() -> None:
     assert result["num_periods"] == 2
 
 
+@pytest.mark.parametrize("horizon", [float("nan"), float("inf"), float("-inf")])
+def test_twrr_linked_rejects_non_finite_horizon(horizon: float) -> None:
+    """A blank (NaN) or overflowing horizon is a ValueError, not a silent figure."""
+    from finstack_quant.portfolio import twrr_linked
+
+    with pytest.raises(ValueError, match="horizon_years"):
+        twrr_linked(json.dumps([0.05, 0.03]), horizon)
+
+
 def test_mwr_xirr_binding_solves_money_weighted_return() -> None:
     """The Python binding exposes money-weighted return from dated cashflows."""
     from finstack_quant.portfolio import mwr_xirr

@@ -2194,8 +2194,8 @@
           }
         ],
         "returns": "LinkedReturn",
-        "declaration": "/**\n   * Geometrically link TWRR sub-period returns from returns JSON.\n   * @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.\n   * @param returnsJson - Numeric return-series JSON.\n   * @param horizonYears - Full elapsed horizon in 365-day calendar years; below one year the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).\n   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.\n   */\n  twrrLinked(returnsJson: JsonInput, horizonYears: number): LinkedReturn;",
-        "sha256": "2f168e2f81c19d93698bd435607aaff11052cfa110ef63c243c59950e857b52a"
+        "declaration": "/**\n   * Geometrically link TWRR sub-period returns from returns JSON.\n   * @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.\n   * @param returnsJson - Numeric return-series JSON.\n   * @param horizonYears - Full elapsed horizon in 365-day calendar years; must be finite (`NaN` or `Infinity` throws). Below one year, including zero and negative values, the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).\n   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, `horizonYears` is `NaN` or infinite, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.\n   */\n  twrrLinked(returnsJson: JsonInput, horizonYears: number): LinkedReturn;",
+        "sha256": "0f960e8d69e9afea6046b7ee43b4f99e2eaabe03e69a82c278071be169cb7ef4"
       }
     },
     {
