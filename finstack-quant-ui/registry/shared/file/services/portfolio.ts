@@ -20,6 +20,7 @@ export type PortfolioNative = {
     | "twrrLinked"
     | "twrrModifiedDietz"
     | "mwrXirr"
+    | "brinsonLinked"
   >;
   attribution: Pick<
     typeof attribution,
@@ -163,6 +164,13 @@ export function createPortfolioService(
     },
     mwrXirr(cashflows) {
       return context.result(() => native.portfolio.mwrXirr([...cashflows]));
+    },
+    brinsonLinked(request) {
+      return context.result(() =>
+        native.portfolio.brinsonLinked(
+          request.periods.map((period) => [...period]),
+        ),
+      );
     },
   };
 }

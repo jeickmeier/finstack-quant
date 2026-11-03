@@ -320,6 +320,13 @@ export const importHarnesses = {
       name: "use-portfolio-returns",
       modules: modules.length,
     })),
+  "use-brinson-linked": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-brinson-linked/use-brinson-linked"),
+    ]).then((modules) => ({
+      name: "use-brinson-linked",
+      modules: modules.length,
+    })),
   "use-simm-im": () =>
     Promise.all([import("@/hooks/margin/use-simm-im/use-simm-im")]).then(
       (modules) => ({ name: "use-simm-im", modules: modules.length }),

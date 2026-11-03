@@ -24,6 +24,9 @@ export type { PortfolioAttributionInputs } from "./attribution-panel";
 import { ReturnsPanel } from "./returns-panel";
 import type { PortfolioReturnsInputs } from "@/components/finstack/portfolio/components/portfolio-returns/portfolio-returns";
 export type { PortfolioReturnsInputs } from "@/components/finstack/portfolio/components/portfolio-returns/portfolio-returns";
+import { BrinsonPanel } from "./brinson-panel";
+import type { BrinsonReportInputs } from "@/components/finstack/portfolio/components/brinson-report/brinson-report";
+export type { BrinsonReportInputs } from "@/components/finstack/portfolio/components/brinson-report/brinson-report";
 
 type Tab =
   | "positions"
@@ -31,6 +34,7 @@ type Tab =
   | "scenarios"
   | "attribution"
   | "returns"
+  | "brinson"
   | "margin"
   | "book";
 
@@ -51,6 +55,8 @@ export interface PortfolioWorkbenchProps {
   attribution?: PortfolioAttributionInputs | null;
   /** The host's performance data for the Returns tab: sub-period returns and their horizon, one period's values and flows, and dated investor flows; the tab appears only when supplied. */
   returns?: PortfolioReturnsInputs | null;
+  /** The host's sector weights and returns per period (and optionally each period's name) for the Brinson tab; the tab appears only when supplied. */
+  brinson?: BrinsonReportInputs | null;
   /** IM collateral already held by CSA id, in that CSA's currency; omitted is none held. */
   currentImCollateral?: Readonly<Record<string, MoneyValue>> | null;
   /** Row and text density of the workbench surface; compact by default. Sets SurfaceContext and data-density on the root, while data-theme is inherited from the host. */
@@ -67,6 +73,7 @@ export function PortfolioWorkbench({
   scenarioJsons,
   attribution,
   returns,
+  brinson,
   currentImCollateral,
   density = "compact",
 }: PortfolioWorkbenchProps) {
@@ -105,6 +112,7 @@ export function PortfolioWorkbench({
       ? [{ id: "attribution" as const, label: "Attribution" }]
       : []),
     ...(returns ? [{ id: "returns" as const, label: "Returns" }] : []),
+    ...(brinson ? [{ id: "brinson" as const, label: "Brinson" }] : []),
     { id: "margin", label: "Margin" },
     { id: "book", label: "Book" },
   ];
@@ -131,7 +139,8 @@ export function PortfolioWorkbench({
       >
         <header className="border-b border-border pb-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Portfolio · positions, risk, attribution, returns and margin
+            Portfolio · positions, risk, attribution, returns, Brinson and
+            margin
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Book valued natively over the supplied market; margin as of {asOf}.
@@ -204,6 +213,11 @@ export function PortfolioWorkbench({
           {returns && (
             <TabsContent value="returns">
               <ReturnsPanel inputs={returns} density={density} />
+            </TabsContent>
+          )}
+          {brinson && (
+            <TabsContent value="brinson">
+              <BrinsonPanel inputs={brinson} density={density} />
             </TabsContent>
           )}
           <TabsContent value="margin">

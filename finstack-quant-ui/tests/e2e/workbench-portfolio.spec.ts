@@ -3,6 +3,7 @@ import data from "../../../docs-site/src/components/registry-gallery/data.json" 
 
 const fixture = data.portfolioWorkbench;
 const returns = data.portfolioReturns.cases;
+const brinson = data.portfolioBrinson.result;
 const attribution = data.portfolioAttribution.cases.find(
   (entry) => entry.scenario === "usd-ois-50bp" && entry.name === "taylor",
 )!;
@@ -48,6 +49,16 @@ test("portfolio-workbench opens each tab on the native result, in a real worker"
     returns.xirr.conventional.result,
   ])
     await expect(performance.getByTitle(String(value))).toBeVisible();
+  await workbench.getByRole("tab", { name: "Brinson" }).click();
+  const linked = workbench.getByRole("region", {
+    name: "Brinson attribution",
+  });
+  for (const value of [
+    brinson.portfolio_return_compounded,
+    brinson.linked_allocation,
+    brinson.periods[2]!.total_excess_return,
+  ])
+    await expect(linked.getByTitle(String(value)).first()).toBeVisible();
   await workbench.getByRole("tab", { name: "Margin" }).click();
   await expect(
     workbench

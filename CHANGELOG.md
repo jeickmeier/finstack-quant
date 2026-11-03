@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: Brinson report and the workbench Brinson tab
+
+`@finstack/brinson-report` presents multi-period Brinson-Fachler attribution of the host's sector weights and returns, one native `portfolio.brinsonLinked` call through `@finstack/use-brinson-linked`: the compounded portfolio and benchmark returns, each sector's Carino-linked allocation, selection, interaction and total with Rust's linked total of each effect, a chart of the sectors' linked totals, and every period's returns, sector effects and totals, all as returned. Nothing is summed, differenced or linked in JavaScript. `portfolio-workbench` adds a Brinson tab when the host supplies `brinson` periods.
+
 ### UI: portfolio returns and the workbench Returns tab
 
 `@finstack/portfolio-returns` answers how the book has performed from the host's performance data in three forms, each one native call through `@finstack/use-portfolio-returns`: `twrrLinked` of sub-period decimal returns over a horizon in 365-day years (cumulative, annualised, `is_annualised` and the period count as returned, saying when Rust did not annualise), `twrrModifiedDietz` of one period's values and flows (a decimal for the period; contributions positive) and `mwrXirr` of dated investor flows (an annualised decimal on Act/365F; contributions negative). Nothing is defaulted, derived from dates or sign-flipped, and each form shows its native error. `portfolio-workbench` adds a Returns tab when the host supplies `returns`.

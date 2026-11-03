@@ -2184,6 +2184,27 @@
       }
     },
     {
+      "id": "brinson-report",
+      "route": "returned-report",
+      "convention": "Returned brinsonLinked CarinoLinkedAttribution: portfolio_return_compounded and benchmark_return_compounded, each linked sector's allocation, selection, interaction and total with linked_allocation, linked_selection and linked_interaction as the footer, and every period's portfolio, benchmark and excess returns, sector effects and returned totals, all decimals of return in returned order. Inputs are the host's chronological SectorPeriod rows with any period names; nothing is defaulted, summed, differenced, linked or stacked, and the compounded active return is not shown because Rust returns only its two sides.",
+      "api": {
+        "name": "portfolio.brinsonLinked",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "brinsonLinked",
+        "inputs": [
+          {
+            "name": "periods",
+            "type": "generated.portfolio.SectorPeriod[][] | string",
+            "optional": false
+          }
+        ],
+        "returns": "CarinoLinkedAttribution",
+        "declaration": "/**\n   * Attribute each period with Brinson-Fachler and Carino-link the results.\n   *\n   * Binds Rust `brinson_linked`: the multi-period Brinson-Fachler report in one\n   * call, identical to `carinoLink(periods.map(brinsonFachler))`. Returns a\n   * structured `CarinoLinkedAttribution` object with every period's sector\n   * allocation, selection and interaction (`periods`), the linked effects by\n   * sector (`linked_sectors`) and by effect (`linked_allocation`,\n   * `linked_selection`, `linked_interaction`), and the compounded portfolio and\n   * benchmark returns; the linked effects sum to the compounded active return.\n   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).\n   * @param periods - Chronological array of periods (or its JSON text), each an array of `SectorPeriod` objects (`sector`, `portfolio_weight`, `benchmark_weight`, `portfolio_return`, `benchmark_return`). Weights are decimal fractions summing to one on each side; returns are decimal period returns (`0.015` is +1.5 %). Every period lists the same sectors in the same order; a sector absent on one side keeps a zero weight.\n   * @throws Error - Throws a JavaScript exception if `periods` is malformed or a row has an unknown field, there are no periods, a period fails Brinson-Fachler (no sectors, a non-finite input, or weights not summing to one; the message names the zero-based period), the sector ordering changes between periods, or a period return is at most `-1` (kind `validation`).\n   */\n  brinsonLinked(periods: generated.portfolio.SectorPeriod[][] | string): CarinoLinkedAttribution;",
+        "sha256": "8249c3b9e85923ee6605e08c096e061bc00b85441b65f1aca0a80e82f18411da"
+      }
+    },
+    {
       "id": "scenario-pnl-table",
       "route": "returned-pnl",
       "convention": "Returned ScenarioPnlBatchItem per scenario in batch order: by_position money in Portfolio#positionIds (spec) order, the total row from pnl.total in the base currency, the totals charted as returned and each ApplicationReport; nothing summed or differenced. The batch fails whole on the earliest failing scenario.",

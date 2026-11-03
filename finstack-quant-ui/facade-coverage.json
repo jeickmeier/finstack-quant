@@ -81,6 +81,7 @@
     "portfolio.aggregateMetrics",
     "portfolio.applyScenarioAndRevalue",
     "portfolio.attributePortfolioPnl",
+    "portfolio.brinsonLinked",
     "portfolio.computeFactorSensitivities",
     "portfolio.mwrXirr",
     "portfolio.parsePortfolioSpecJson",
