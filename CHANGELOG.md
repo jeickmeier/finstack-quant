@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Python: relative value report keeps typed extractors and takes universe JSON
+
+`RelativeValueDimension.y` and `.x` return the `MetricExtractor` document (`{"named": "oas_bp"}`, `{"custom": ...}`, `{"multiple": "ev_ebitda"}`) instead of a flattened `"name"` / `"multiple:<name>"` label that could not tell a custom key from a canonical metric of the same name; they now equal the WASM report's `y` and `x`. `relative_value_report` also takes the whole `universe` as one JSON array text, as WASM does. No value moves.
+
+### Statements: LTM covers twelve calendar months on daily models
+
+`ttm()`, `capital_structure_summary` and the credit assessment's trailing sums (leverage, interest coverage and the leverage check) now share one window, `finstack_quant_core::dates::ltm_window`: the twelve calendar months ending at the reporting period's end. Monthly, quarterly, semi-annual, annual and weekly models read the same 12, 4, 2, 1 and 52 periods as before, so their values do not move. A daily model used to read a fixed 252 periods, about 8.3 calendar months of a calendar-day grid, so LTM EBITDA read low and leverage about 1.45x high; it now sums every model day in the trailing year, 365 or 366 on a calendar-day grid and the trading days (about 252) on a business-day grid, whose missing weekends and holidays are not missing data. A daily window is short, and its LTM figures are NaN or `None`, while the model's daily grid starts after the window's first day. The credit assessment's daily window previously demanded every calendar day, so a business-day model had no trailing sum at all; weekly and fiscal daily results now have one.
+
 ### UI: recovery-waterfall fields from the contracts; DCF WACC default
 
 `recovery-waterfall` labels its claim, collateral and workout fields through `labelFor` and takes their help from the generated contracts (the new `recovery_claim` contract root, and `workout_lgd`), so "Direct costs" reads "Direct cost rate", "Time to resolution" reads "Workout years" and "Exposure at default" reads "EAD" (`labelFor` upper-cases `ead`). "Add claim" starts the accrued, penalties and haircut fields empty instead of at 0, so an untyped amount is rejected by Rust rather than sent as zero. The statements workbench's valuation panel leaves the DCF form's WACC unset until the calculator or an edit sets it, so a form given `defaultAssumptions` shows its WACC instead of an empty field.

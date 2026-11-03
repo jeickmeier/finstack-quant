@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary.schema.json",
-      "bytes": 29213,
+      "bytes": 29312,
       "kind": "output",
       "path": "schemas/statements_analytics/1/capital_structure_summary.schema.json",
       "summary": "Debt stack by seniority at one period: leverage and coverage through each payment class, and the maturity wall.",

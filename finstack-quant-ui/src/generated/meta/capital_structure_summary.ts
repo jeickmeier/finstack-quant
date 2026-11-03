@@ -1191,7 +1191,7 @@ export default [
   {
     "path": "#/properties/ltm_periods_required",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary.schema.json#/properties/ltm_periods_required",
-    "description": "Periods a full LTM window holds at the reporting period's frequency (4\nfor quarters, 12 for months).",
+    "description": "Periods a full LTM window holds: 4 for quarters, 12 for months, and for a\ndaily model the model's days in the trailing twelve months plus any\ncalendar days of that year before the model's first day.",
     "format": "uint32",
     "minimum": 0
   },

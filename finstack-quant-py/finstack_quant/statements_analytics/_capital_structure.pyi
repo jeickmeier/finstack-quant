@@ -679,7 +679,8 @@ class CapitalStructureSummary:
         Returns
         -------
         int
-            4 for quarters, 12 for months.
+            4 for quarters, 12 for months; for a daily model, the model's days in the
+            trailing twelve months plus any calendar days of that year before its first day.
         Notes
         -----
         This accessor does not raise; it returns the stored value.
@@ -790,8 +791,9 @@ def capital_structure_summary(
     A model with no waterfall or no payment classes has one implicit class: every
     tranche has rank ``0`` and no class id.
 
-    LTM EBITDA and LTM interest sum the trailing periods of one year ending at the
-    reporting period (4 quarters, 12 months), the slots ``ttm()`` reads in a formula. A
+    LTM EBITDA and LTM interest sum the twelve calendar months of model periods ending at
+    the reporting period (4 quarters, 12 months, and on a daily model every calendar or
+    business day of the trailing year), the slots ``ttm()`` reads in a formula. A
     window with a slot missing from the model or a slot where the EBITDA node has no
     value is never annualised or partially summed: LTM EBITDA and every ratio are
     ``None``, and ``ltm_periods_found`` says how many slots held. A zero or negative LTM
