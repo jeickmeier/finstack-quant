@@ -2230,6 +2230,27 @@
       }
     },
     {
+      "id": "statement-export",
+      "route": "returned-report",
+      "convention": "Returned TableEnvelope of one StatementResult in the wide or long layout the user picks, statementResultToTableLong for long, in Rust's row and column order. The CSV holds exactly those cells: RFC 4180 quoting, the native column names as its header, and each number as String(value), unrounded. A cell Rust holds with no value (NaN, null in JSON) shows as undefined and is an empty field, never zero. Nothing is computed here.",
+      "api": {
+        "name": "statements.statementResultToTableWide",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "StatementsNamespace",
+        "member": "statementResultToTableWide",
+        "inputs": [
+          {
+            "name": "resultJson",
+            "type": "StatementResult | string",
+            "optional": false
+          }
+        ],
+        "returns": "TableEnvelope",
+        "declaration": "/**\n   * Export a statement result as a wide-format table (twin of Python `StatementResult.to_arrow_wide`, Rust `StatementResult::to_table_wide`).\n   * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).\n   * @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds `NaN` (serialized as `null`), not zero.\n   * @throws Error - Throws with kind `validation` if the result input is malformed or table construction fails.\n   */\n  statementResultToTableWide(resultJson: StatementResult | string): TableEnvelope;",
+        "sha256": "efcf9053f59b4cd7789076de3be933e23287f2b367f2c7356f373b7978051867"
+      }
+    },
+    {
       "id": "wacc-calculator",
       "route": "returned-report",
       "convention": "Returned WACC of the five entered decimals, itself a decimal. The two capital weights are separate inputs; nothing is blended, defaulted or checked here, and weights that do not sum to one or a tax rate outside [0, 1] show the native error. Applying the rate to a DCF is an explicit user action that passes the returned number unchanged.",

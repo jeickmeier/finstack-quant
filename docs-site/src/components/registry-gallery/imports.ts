@@ -530,6 +530,13 @@ export const importHarnesses = {
       name: "use-credit-assessment",
       modules: modules.length,
     })),
+  "use-statement-result-table": () =>
+    Promise.all([
+      import("@/hooks/statements/use-statement-result-table/use-statement-result-table"),
+    ]).then((modules) => ({
+      name: "use-statement-result-table",
+      modules: modules.length,
+    })),
   "use-wacc": () =>
     Promise.all([import("@/hooks/statements/use-wacc/use-wacc")]).then(
       (modules) => ({ name: "use-wacc", modules: modules.length }),

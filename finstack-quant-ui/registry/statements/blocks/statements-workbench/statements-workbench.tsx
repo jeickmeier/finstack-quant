@@ -8,6 +8,7 @@ import { ForecastEditor } from "./forecast-editor";
 import { MetricEditor } from "./metric-editor";
 import { ScenarioPanel } from "./scenario-panel";
 import { ValuationPanel } from "./valuation-panel";
+import { ExportPanel } from "./export-panel";
 import { SensitivityPanel } from "./sensitivity-panel";
 import { MonteCarloPanel } from "./monte-carlo-panel";
 import { CovenantsPanel } from "./covenants-panel";
@@ -777,6 +778,7 @@ export function StatementsWorkbench({
                     )}
                   </div>
                 )}
+                <ExportPanel result={view?.result ?? null} density={density} />
                 {reported && activeNode && activePeriod && (
                   <details>
                     <summary>Explain selected value</summary>

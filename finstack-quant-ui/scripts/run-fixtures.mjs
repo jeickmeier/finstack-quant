@@ -36,6 +36,7 @@ const generators = [
   "tests/valuations/scenario-table/generate.mjs",
   "tests/statements/generate.mjs",
   "tests/statements/wacc/generate.mjs",
+  "tests/statements/export/generate.mjs",
   "tests/covenants/generate.mjs",
   "tests/analytics/generate.mjs",
   "tests/models/credit/generate.mjs",

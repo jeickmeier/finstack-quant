@@ -61,6 +61,7 @@ import { Example as Example82 } from "./examples/metric-values-table";
 import { Example as Example80 } from "./examples/yield-workout-ladder";
 import { Example as ExampleQuoteConverter } from "./examples/quote-converter";
 import { Example as ExampleWaccCalculator } from "./examples/wacc-calculator";
+import { Example as ExampleStatementExport } from "./examples/statement-export";
 import { Example as Example74 } from "./examples/liability-management-card";
 import { Example as Example75 } from "./examples/pool-report";
 import { Example as Example76 } from "./examples/waterfall-report";
@@ -148,6 +149,7 @@ const examples = {
   "yield-workout-ladder": Example80,
   "quote-converter": ExampleQuoteConverter,
   "wacc-calculator": ExampleWaccCalculator,
+  "statement-export": ExampleStatementExport,
   "liability-management-card": Example74,
   "waterfall-report": Example76,
   "coverage-test-chart": Example77,

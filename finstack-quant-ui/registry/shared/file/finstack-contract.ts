@@ -1511,6 +1511,14 @@ export interface StatementsApi {
   creditAssessment(
     request: CreditAssessmentRequest,
   ): Promise<Envelope<CreditAssessment>>;
+  /** statements.statementResultToTableWide: one row per period, one column per node; a node with no value holds NaN. */
+  statementResultToTableWide(
+    resultJson: string,
+  ): Promise<Envelope<TableEnvelope>>;
+  /** statements.statementResultToTableLong: one row per node and period. */
+  statementResultToTableLong(
+    resultJson: string,
+  ): Promise<Envelope<TableEnvelope>>;
   /** statements_analytics.wacc: the blended rate as a decimal. */
   wacc(request: WaccRequest): Promise<Envelope<number>>;
   /** statements_analytics.plSummaryReport: the P&L summary TableEnvelope over the line items and periods. */

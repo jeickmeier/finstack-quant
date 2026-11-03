@@ -13,6 +13,8 @@ export type StatementsNative = {
     | "statementResultRollup"
     | "rollupSpecDefaultFor"
     | "monteCarloBreachProbability"
+    | "statementResultToTableWide"
+    | "statementResultToTableLong"
   >;
   statements_analytics: Pick<
     typeof statements_analytics,
@@ -187,6 +189,16 @@ export function createStatementsService(
           [...request.lineItems],
           [...request.periods],
         ),
+      );
+    },
+    statementResultToTableWide(resultJson) {
+      return context.result(() =>
+        native.statements.statementResultToTableWide(resultJson),
+      );
+    },
+    statementResultToTableLong(resultJson) {
+      return context.result(() =>
+        native.statements.statementResultToTableLong(resultJson),
       );
     },
     wacc(request) {
