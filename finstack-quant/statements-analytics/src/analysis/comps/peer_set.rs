@@ -12,8 +12,14 @@ use serde::{Deserialize, Serialize};
 /// All criteria are AND-ed: a company must satisfy every non-empty
 /// constraint to be included. For OR semantics across sectors or
 /// ratings, supply multiple values in the respective `Vec`.
+///
+/// Every field may be omitted from the serde document: an omitted list or
+/// bound is no constraint, so `{}` (the [`Default`]) accepts every company.
+/// Unknown keys are rejected, so a misspelt criterion is an error rather than
+/// a silently dropped screen.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(default, deny_unknown_fields)]
 pub struct PeerFilter {
     /// GICS sector codes to include (meta key: "gics_sector").
     pub gics_sectors: Vec<String>,
@@ -170,5 +176,41 @@ impl PeerSet {
     /// Number of peers (excluding subject).
     pub fn peer_count(&self) -> usize {
         self.peers.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::types::Attributes;
+
+    fn sector(id: &str, sector: &str) -> CompanyMetrics {
+        let mut metrics = CompanyMetrics::new(id);
+        metrics.attributes = Attributes::default().with_meta("gics_sector", sector);
+        metrics
+    }
+
+    #[test]
+    fn partial_filter_defaults_the_omitted_criteria() {
+        let filter: PeerFilter =
+            serde_json::from_value(serde_json::json!({"gics_sectors": ["Energy"]}))
+                .expect("a partial filter deserializes");
+        assert_eq!(filter.gics_sectors, vec!["Energy".to_string()]);
+        assert!(filter.ratings.is_empty() && filter.market_cap_min.is_none());
+        assert!(filter.accepts(&sector("A", "Energy")));
+        assert!(!filter.accepts(&sector("B", "Tech")));
+
+        let empty: PeerFilter =
+            serde_json::from_value(serde_json::json!({})).expect("an empty filter deserializes");
+        assert!(empty.accepts(&sector("B", "Tech")));
+    }
+
+    #[test]
+    fn misspelt_filter_field_is_rejected() {
+        let error = serde_json::from_value::<PeerFilter>(serde_json::json!({
+            "gics_sector": ["Energy"],
+        }))
+        .expect_err("unknown field");
+        assert!(error.to_string().contains("gics_sector"), "{error}");
     }
 }

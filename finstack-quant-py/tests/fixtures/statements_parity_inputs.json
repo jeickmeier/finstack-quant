@@ -1108,5 +1108,53 @@
     "multiples": [
       "ev_ebitda"
     ]
+  },
+  "relative_value_partial_filter_config": {
+    "filter": {
+      "gics_sectors": [
+        "energy"
+      ]
+    },
+    "period_basis": "ltm",
+    "dimensions": [
+      {
+        "label": "Spread vs Leverage",
+        "y_extractor": {
+          "named": "oas_bp"
+        },
+        "x_extractor": {
+          "named": "leverage"
+        },
+        "weight": 0.7,
+        "direction": "higher_is_cheap"
+      },
+      {
+        "label": "EV/EBITDA",
+        "y_extractor": {
+          "multiple": "ev_ebitda"
+        },
+        "weight": 0.3,
+        "direction": "higher_is_rich"
+      },
+      {
+        "label": "Disabled",
+        "y_extractor": {
+          "named": "oas_bp"
+        },
+        "weight": 0.0
+      },
+      {
+        "label": "Nobody has it",
+        "y_extractor": {
+          "custom": "missing"
+        },
+        "weight": 1.0
+      }
+    ],
+    "multiples": [
+      "spread_per_turn",
+      "ev_ebitda",
+      "pe"
+    ]
   }
 }

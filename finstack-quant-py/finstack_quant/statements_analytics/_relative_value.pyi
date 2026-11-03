@@ -1126,8 +1126,9 @@ def relative_value_report(
         subject's id is never a peer and does not count as excluded.
     config : dict or str
         ``RelativeValueReportConfig`` document, a dict or JSON text: ``filter``
-        (optional; a ``PeerFilter`` document listing every field, omitted means every
-        other company is a peer), ``period_basis`` (required; ``"ltm"``, ``"ntm"`` or
+        (optional; a ``PeerFilter`` document in which every field is optional, an
+        omitted field meaning no constraint and an unknown one rejected; an omitted
+        filter makes every other company a peer), ``period_basis`` (required; ``"ltm"``, ``"ntm"`` or
         ``{"custom": "<label>"}``; it labels the report and the metrics are used as
         given), ``dimensions`` (required; ``ScoringDimension`` documents with finite
         non-negative weights, zero disabling one; may be empty when ``multiples`` is
@@ -1143,9 +1144,9 @@ def relative_value_report(
     Raises
     ------
     ValueError
-        If an argument is malformed or ``config`` carries an unknown field, both
-        ``dimensions`` and ``multiples`` are empty, or a weight is negative or
-        non-finite.
+        If an argument is malformed or carries an unknown field (a misspelt
+        ``CompanyMetrics`` or ``PeerFilter`` key included), both ``dimensions`` and
+        ``multiples`` are empty, or a weight is negative or non-finite.
 
     Examples
     --------
