@@ -678,6 +678,20 @@ export interface PerformanceReport extends Omit<
   /** correlationMatrix rows in tickerNames order. */
   correlation: { matrix: number[][]; repaired: boolean };
 }
+/** A ticker-major return or price panel whose Pearson correlation matrix Rust estimates; host-supplied, never defaulted. */
+export type CorrelationMatrixRequest = Pick<
+  PerformanceReportRequest,
+  "dates" | "values" | "kind" | "tickerNames" | "frequency"
+>;
+/** Performance#correlationMatrix as returned, with the panel's ticker names in matrix order. */
+export interface CorrelationMatrixReport {
+  /** Performance#getTickerNames: row and column order of the matrix. */
+  tickerNames: string[];
+  /** Pearson correlations, one row per ticker, unit diagonal. */
+  matrix: number[][];
+  /** True when Rust projected the raw estimate to the nearest valid correlation matrix (Higham). */
+  repaired: boolean;
+}
 /** A ticker-major panel measured against a named benchmark; every omitted option is left to Rust. */
 export interface BenchmarkReportRequest {
   /** ISO-8601 observation dates, ascending, one per value of each series. */
@@ -1510,6 +1524,10 @@ export interface AnalyticsApi {
   performanceReport(
     request: PerformanceReportRequest,
   ): Promise<Envelope<PerformanceReport>>;
+  /** analytics.Performance (fromReturns or the price constructor) + getTickerNames and correlationMatrix; the handle is freed. */
+  correlationMatrix(
+    request: CorrelationMatrixRequest,
+  ): Promise<Envelope<CorrelationMatrixReport>>;
   /** analytics.Performance against a named benchmark: greeks, beta, the relative ratios and captures, outperformance and drawdown difference, rollingGreeks and (with a factor panel) multiFactorGreeks per ticker; the handle is freed. */
   benchmarkReport(
     request: BenchmarkReportRequest,

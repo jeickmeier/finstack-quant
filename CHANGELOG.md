@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: correlation heatmap on the workbench Risk tab
+
+`@finstack/correlation-heatmap` draws the Pearson correlation matrix of a host return panel, one native `analytics.Performance` `correlationMatrix` chain through `@finstack/use-correlation-matrix`, as a heatmap and a table in Rust's ticker order, stamped Repaired only when Rust's `repaired` flag says it projected the estimate to the nearest valid correlation matrix. `portfolio-workbench` shows it on the Risk tab when the host supplies a `correlation` panel.
+
 ### UI: exposure report on the workbench Risk tab
 
 `@finstack/exposure-report` presents a book's primitive exposures, one native `portfolio.primitiveExposures` call through `@finstack/use-exposure-report`: each primitive's net and gross quantity and value in the base currency with a chart of the two values, each requested additive metric's net and gross amount, and the position-aware paths, all as returned; and, when the host supplies factor definitions, the book's `portfolio.computeFactorSensitivities` matrix. Rust returns both net and gross; nothing is summed or netted in JavaScript. `portfolio-workbench` shows it on the Risk tab over its book and market, with the host's `exposures` metric ids and factors.

@@ -1940,6 +1940,21 @@
       }
     },
     {
+      "id": "correlation-heatmap",
+      "route": "returned-analytics",
+      "convention": "Returned analytics.Performance correlationMatrix of a host-supplied panel: Pearson coefficients in Rust's ticker order as a diverging heatmap over the fixed correlation range [-1, 0, 1] (presentation only) and a table, with the Repaired stamp shown only when Rust's repaired flag is true. Nothing is estimated, clamped, reordered or inferred; a coefficient outside [-1, 1] keeps the table and drops the heatmap.",
+      "api": {
+        "name": "analytics.Performance#correlationMatrix",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "Performance",
+        "member": "correlationMatrix",
+        "inputs": [],
+        "returns": "{ matrix: Float64Array[]; repaired: boolean }",
+        "declaration": "/**\n   * Return the correlation matrix across assets and whether it was repaired.\n   *\n   * Uses the complete-case common window when every ticker has at least\n   * two overlapping points; otherwise pairwise intersecting spans. A raw\n   * estimate that is not a valid correlation matrix is Higham-repaired to\n   * the nearest valid correlation matrix.\n   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, and `true` when Higham repair was applied.\n   * @throws Error - Rejects a degenerate pair or a matrix that cannot be repaired to a valid correlation matrix.\n   */\n  correlationMatrix(): { matrix: Float64Array[]; repaired: boolean };",
+        "sha256": "e2cb9a611e0f42cf955f43401779b326ae3a08ec4de17815c8f427d4541b6fce"
+      }
+    },
+    {
       "id": "benchmark-report",
       "route": "returned-analytics",
       "deferred": "machine-readable-units",

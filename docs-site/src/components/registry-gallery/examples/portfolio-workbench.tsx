@@ -3,6 +3,7 @@ import type { ExampleProps } from "./props";
 import {
   PortfolioWorkbench,
   type BrinsonReportInputs,
+  type CorrelationMatrixRequest,
   type ExposureReportInputs,
   type PortfolioReturnsInputs,
 } from "@/components/finstack/portfolio/blocks/portfolio-workbench/portfolio-workbench";
@@ -13,7 +14,8 @@ import data from "../data.json";
 // a 50bp USD-OIS shock as the closing snapshot; for the Returns tab, the
 // returns fixture's host performance data; for the Brinson tab, the brinson
 // fixture's host sector periods; and, on the Risk tab, the exposures fixture's
-// additive metrics and host-parity factor. Every tab values it natively.
+// additive metrics and host-parity factor and the correlation fixture's return
+// panel. Every tab values it natively.
 const { specJson, request } = data.portfolioWorkbench;
 const attribution = {
   ...data.portfolioAttribution.closing["usd-ois-50bp"],
@@ -22,6 +24,7 @@ const attribution = {
 const returns = data.portfolioReturns.inputs as PortfolioReturnsInputs;
 const brinson = data.portfolioBrinson.inputs as BrinsonReportInputs;
 const exposures = data.portfolioExposures.inputs as ExposureReportInputs;
+const correlation = data.correlation.request as CorrelationMatrixRequest;
 const marketJson = JSON.stringify(data.pricingMarket);
 export function Example({ density = "compact" }: ExampleProps) {
   return (
@@ -32,6 +35,7 @@ export function Example({ density = "compact" }: ExampleProps) {
       metrics={request.metrics}
       seriesBase={request.seriesBase}
       exposures={exposures}
+      correlation={correlation}
       scenarioJsons={request.scenarioJsons}
       attribution={attribution}
       returns={returns}

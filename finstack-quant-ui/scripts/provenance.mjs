@@ -433,6 +433,17 @@ const displays = [
       "Returned analytics.Performance results of a host-supplied panel: the summary TableEnvelope, per-ticker series against each ticker's own active dates, rolling series, monthly and annual periodic returns, drawdown episodes and lookback returns (FYTD from a core.FiscalConfig only when a fiscal-year start is supplied). Decimal fractions and ratios as returned, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The monthly heatmap colour domain is the caller's or the returned values' extent (presentation only).",
   },
   {
+    id: "correlation-heatmap",
+    api: [
+      "analytics.Performance#correlationMatrix",
+      "Performance",
+      "correlationMatrix",
+    ],
+    route: "returned-analytics",
+    convention:
+      "Returned analytics.Performance correlationMatrix of a host-supplied panel: Pearson coefficients in Rust's ticker order as a diverging heatmap over the fixed correlation range [-1, 0, 1] (presentation only) and a table, with the Repaired stamp shown only when Rust's repaired flag is true. Nothing is estimated, clamped, reordered or inferred; a coefficient outside [-1, 1] keeps the table and drops the heatmap.",
+  },
+  {
     id: "benchmark-report",
     api: ["analytics.Performance#greeks", "Performance", "greeks"],
     route: "returned-analytics",

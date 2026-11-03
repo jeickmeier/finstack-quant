@@ -48,6 +48,7 @@ const sources = {
   pnlAttribution: "tests/attribution/cases.json",
   performance: "tests/analytics/explicit.json",
   benchmark: "tests/analytics/benchmark.json",
+  correlation: "tests/analytics/correlation/cases.json",
   credit: "tests/models/credit/migration.json",
   merton: "tests/models/credit/merton.json",
   scorecard: "tests/models/credit/scorecard.json",

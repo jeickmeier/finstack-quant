@@ -174,11 +174,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the thirty-eight native fixture generators under
+`mise run ui-fixtures` runs the thirty-nine native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
 portfolio → portfolio margin → portfolio workbench → primitive exposures; portfolio returns; Brinson; curves → market-browser → curve-query; cubes, calibration,
-scenario-table; statements → covenants, normalizations, capital structures, relative value; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
+scenario-table; statements → covenants, normalizations, capital structures, relative value; WACC rates; statement tables; analytics → correlation; models credit, risk, options, liability management and recovery;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -956,7 +956,7 @@ the book and its context as props: `defaultSpecJson` (a complete
 `PortfolioSpec`; remount for a different book), `marketJson`
 (`MarketContextState`), `asOf` (the ISO margin date, never read from the
 spec), and optionally `metrics` (omitted is Rust's standard set),
-`seriesBase` (the base metric id charted by bucket), `exposures`, `scenarioJsons`
+`seriesBase` (the base metric id charted by bucket), `exposures`, `correlation`, `scenarioJsons`
 (`ScenarioSpec` texts, never parsed), `attribution`, `returns`, `brinson` and
 `currentImCollateral` (omitted is none held). `attribution` is the host's
 closing snapshot for the Attribution tab: `marketT1Json`
@@ -974,7 +974,9 @@ tab's exposure report: `metrics` (additive metric ids reported per primitive;
 omitted is quantity and value only) and `factorsJson` (`FactorDefinition`
 array) with an optional `bumpConfigJson` for the sensitivity matrix (omitted
 shows no matrix). The book's primitive exposures show whether or not it is
-supplied.
+supplied. `correlation` is the host's return (or price) panel for the Risk
+tab's correlation heatmap: ISO `dates`, ticker-major `values`, their `kind`,
+`tickerNames` and an optional `frequency`; it is never derived from the book.
 
 | Tab         | Shows                                                                                                                                                                                                                                           |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -988,8 +990,9 @@ supplied.
 | Book        | `PortfolioSpec` JSON that `usePortfolioSpecValidator` validates natively before every tab values it                                                                                                                                             |
 
 The Risk tab's exposure calls and the Scenarios, Attribution, Returns, Brinson
-and Margin calls run when their tab first opens. The return-correlation
-heatmap will join the Risk tab when it lands. The fixture (`tests/portfolio/workbench/`) is the
+and Margin calls run when their tab first opens. The Risk tab adds
+`CorrelationHeatmap` of `useCorrelationMatrix` only when `correlation` is
+supplied. The fixture (`tests/portfolio/workbench/`) is the
 margined rates book from `tests/portfolio/margin/` over the pricing market
 under the host-parity USD-OIS scenarios.
 
@@ -1081,6 +1084,25 @@ matrix in the base currency, with its own native error. The fixture
 with dv01 and theta and with no metric, the host-parity `usd_rates` factor, and
 the native errors of a non-additive metric, a metric the deposit cannot compute
 and a factor on a curve the market lacks.
+
+## Return correlation
+
+`CorrelationHeatmap` (`@finstack/correlation-heatmap`) draws one native
+`analytics.Performance` `correlationMatrix` result of a host return or price
+panel through `useCorrelationMatrix` (`@finstack/use-correlation-matrix`,
+which builds the `Performance`, reads `getTickerNames` and `correlationMatrix`
+and frees the handle): a diverging heatmap over the fixed correlation range
+`[-1, 0, 1]` and a table of every coefficient, in Rust's ticker order. A
+Repaired stamp appears only when Rust's `repaired` flag says it projected the
+raw estimate to the nearest valid correlation matrix (Higham); nothing is
+estimated, clamped or inferred here, and a coefficient outside `[-1, 1]` keeps
+the table and drops the heatmap. Rust estimates over the complete-case common
+window whenever every pair overlaps by two observations, so a panel Rust
+accepts does not reach the repair today; the stamp is tested with the
+supplied flag. The fixture (`tests/analytics/correlation/`) is four sleeves'
+daily returns over 60 business days, with the native errors of a
+zero-variance series, an interior missing return and two series with no
+overlap, rebuilt from `panels.mjs` because JSON cannot carry their gaps.
 
 ## Returned rating migration
 
