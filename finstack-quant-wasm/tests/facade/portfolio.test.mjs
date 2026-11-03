@@ -1087,6 +1087,18 @@ test('portfolio.twrrLinked returns a structured linked return', () => {
   assert.equal(portfolio.twrrLinked([0.05, 0.03], 0.5).is_annualised, false);
 });
 
+test('portfolio.twrrLinked rejects a non-finite horizon', () => {
+  for (const horizon of [Number.NaN, Infinity, -Infinity])
+    assert.throws(
+      () => portfolio.twrrLinked([0.05, 0.03], horizon),
+      (error) =>
+        error.name === 'FinstackError' &&
+        error.kind === 'validation' &&
+        error.message.includes('horizon_years'),
+      String(horizon)
+    );
+});
+
 // Position ids / weights / covariance are all shared by the three
 // decomposition entry points. The key sets and values below are asserted
 // identically by finstack-quant-py/tests/test_factor_risk_wire.py: both hosts

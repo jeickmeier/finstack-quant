@@ -23,12 +23,12 @@ pub fn twrr_modified_dietz(period_json: JsValue) -> Result<f64, JsValue> {
 
 /// Geometrically link TWRR sub-period returns from returns JSON.
 /// @param returns_json - Numeric return-series JSON.
-/// @param horizon_years - Full elapsed horizon in 365-day calendar years; below one year the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).
+/// @param horizon_years - Full elapsed horizon in 365-day calendar years; must be finite (`NaN` or `Infinity` throws). Below one year, including zero and negative values, the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `returnsJson` is malformed, the return
-/// series is invalid (non-finite sub-period return or return at most -1, non-positive compounded
+/// Throws a JavaScript exception if `returnsJson` is malformed, `horizonYears`
+/// is `NaN` or infinite, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded
 /// growth factor), or the linked result cannot be converted to a JavaScript
 /// value.
 #[wasm_bindgen(js_name = twrrLinked)]

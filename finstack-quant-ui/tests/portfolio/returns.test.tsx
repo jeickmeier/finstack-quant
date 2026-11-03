@@ -148,6 +148,25 @@ it(
   },
   budget(30000),
 );
+it(
+  "Rust rejects a blank or overflowing horizon rather than linking over it",
+  async () => {
+    for (const [horizonYears, expected] of [
+      [Number.NaN, fixture.nonFiniteHorizon.blank],
+      [Infinity, fixture.nonFiniteHorizon.overflow],
+    ] as const) {
+      const result = await proxy().twrrLinked({
+        ...inputs.linked,
+        horizonYears,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.kind).toBe(expected.kind);
+      expect(result.error.message).toBe(expected.message);
+    }
+  },
+  budget(30000),
+);
 it("Rust flags which linked return it annualised", () => {
   expect(cases.linked.annual.result.is_annualised).toBe(true);
   expect(cases.linked.quarter.result.is_annualised).toBe(false);

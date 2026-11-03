@@ -121,8 +121,9 @@ fn twrr_modified_dietz(py: Python<'_>, period: &Bound<'_, PyAny>) -> PyResult<f6
 /// returns_json : str | dict | list | pandas.DataFrame
 ///     JSON array of sub-period returns as decimal fractions.
 /// horizon_years : float
-///     Full elapsed horizon in 365-day calendar years; values below one skip
-///     annualization (``annualised`` then mirrors ``cumulative``).
+///     Full elapsed horizon in 365-day calendar years; must be finite. Values
+///     below one, including zero and negative values, skip annualization
+///     (``annualised`` then mirrors ``cumulative``).
 ///
 /// Returns
 /// -------
@@ -134,8 +135,9 @@ fn twrr_modified_dietz(py: Python<'_>, period: &Bound<'_, PyAny>) -> PyResult<f6
 /// Raises
 /// ------
 /// ValueError
-///     When any sub-period return is non-finite or at most -1, or the
-///     compounded growth factor is non-positive.
+///     When ``horizon_years`` is NaN or infinite, any sub-period return is
+///     non-finite or at most -1, or the compounded growth factor is
+///     non-positive.
 #[pyfunction]
 #[pyo3(text_signature = "(returns_json, horizon_years)")]
 fn twrr_linked(

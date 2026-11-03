@@ -34261,8 +34261,8 @@ export interface PortfolioNamespace {
    * Geometrically link TWRR sub-period returns from returns JSON.
    * @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.
    * @param returnsJson - Numeric return-series JSON.
-   * @param horizonYears - Full elapsed horizon in 365-day calendar years; below one year the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).
-   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.
+   * @param horizonYears - Full elapsed horizon in 365-day calendar years; must be finite (`NaN` or `Infinity` throws). Below one year, including zero and negative values, the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).
+   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, `horizonYears` is `NaN` or infinite, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.
    */
   twrrLinked(returnsJson: JsonInput, horizonYears: number): LinkedReturn;
   /**

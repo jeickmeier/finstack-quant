@@ -231,12 +231,14 @@ pub struct DatedCashflow {
 /// * `periods` - Sequential sub-period returns as decimal fractions, such as
 ///   `0.02` for 2%; every value must be finite and greater than -1. A
 ///   complete loss terminates the return series and is rejected.
-/// * `horizon_years` - Full elapsed horizon in 365-day calendar years; values
-///   below one skip annualization.
+/// * `horizon_years` - Full elapsed horizon in 365-day calendar years; must be
+///   finite. Values below one, including zero and negative values, skip
+///   annualization.
 ///
 /// # Errors
 ///
 /// Returns [`finstack_quant_core::Error::Validation`] when:
+/// - `horizon_years` is NaN or infinite;
 /// - any sub-period return is non-finite or at most -1;
 /// - the compounded growth factor `Π(1 + r_i)` is non-finite or non-positive,
 ///   which means the portfolio was wiped out (or worse) and no geometric link
@@ -245,6 +247,12 @@ pub fn twrr_linked(
     periods: &[f64],
     horizon_years: f64,
 ) -> finstack_quant_core::Result<LinkedReturn> {
+    if !horizon_years.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "TWRR horizon_years is {horizon_years}; it must be a finite number of \
+             365-day years (a non-positive horizon skips annualization)"
+        )));
+    }
     for (index, r) in periods.iter().enumerate() {
         if !r.is_finite() || *r <= -1.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -432,6 +440,22 @@ mod tests {
             "a non-positive horizon skips annualization"
         );
         assert_eq!(skipped.annualised, skipped.cumulative);
+        let negative = twrr_linked(&[0.10], -1.0).expect("finite");
+        assert!(!negative.is_annualised);
+    }
+
+    /// A blank horizon field (NaN) or an overflowing one (infinity) is an
+    /// error, not a silent cumulative or a zero annualised return.
+    #[test]
+    fn linked_return_rejects_non_finite_horizon() {
+        for horizon in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let error = twrr_linked(&[0.05, 0.03], horizon).expect_err("non-finite horizon");
+            assert!(
+                matches!(error, finstack_quant_core::Error::Validation(ref message)
+                    if message.contains("horizon_years")),
+                "{error}"
+            );
+        }
     }
 
     /// Non-finite period → validation error.
