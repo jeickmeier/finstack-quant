@@ -236,6 +236,7 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
         ],
         "attribute_portfolio_pnl": json.loads(attribution.to_json()),
         "attribution_explain": attribution.explain(),
+        "attribution_pct_of_total_by_bucket": attribution.pct_of_total_by_bucket(),
         "attribution_reconciliation_check": json.loads(
             attribution.reconciliation_check(inputs["reconciliation_tolerance"]).to_json()
         ),

@@ -3581,6 +3581,7 @@
       "optimizePortfolio",
       "parsePortfolioSpecJson",
       "portfolioAttributionExplainText",
+      "portfolioAttributionPctOfTotalByBucket",
       "portfolioAttributionReconciliationCheck",
       "portfolioMargin",
       "portfolioMetricsGetMetric",
@@ -3750,6 +3751,9 @@
     "kind": "function"
   },
   "portfolio.portfolioAttributionExplainText": {
+    "kind": "function"
+  },
+  "portfolio.portfolioAttributionPctOfTotalByBucket": {
     "kind": "function"
   },
   "portfolio.portfolioAttributionReconciliationCheck": {

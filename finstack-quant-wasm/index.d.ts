@@ -34591,6 +34591,13 @@ export interface PortfolioNamespace {
    */
   portfolioAttributionExplainText(attribution: PortfolioAttribution | string): string;
   /**
+   * Every base-currency money bucket of a portfolio attribution with its share of total P&L.
+   * @param attribution - `PortfolioAttribution` object or JSON from `attributePortfolioPnl`.
+   * @returns One `PnlBucketShare` per bucket: the attribute's wire `field`, its `amount` in the base currency and `pct_of_total` in signed percentage points, `null` when `total_pnl` is effectively zero.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `attribution` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `PortfolioAttribution` schema.
+   */
+  portfolioAttributionPctOfTotalByBucket(attribution: PortfolioAttribution | string): PnlBucketShare[];
+  /**
    * Check that a portfolio attribution's factor buckets sum to its total P&L.
    *
    * Twin of Python `PortfolioAttribution.reconciliation_check` (Rust

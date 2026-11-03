@@ -209,6 +209,12 @@ impl PyPortfolioAttribution {
         serde_rows_to_dataframe_with_schema(py, &rows, &columns)
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._attribution", "PortfolioAttribution.pct_of_total_by_bucket")]
+    #[pyo3(text_signature = "($self)")]
+    fn pct_of_total_by_bucket<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.pct_of_total_by_bucket())
+    }
+
     /// Human-readable explanation tree of the portfolio-level buckets with
     /// each bucket's share of ``total_pnl`` (mirrors the Rust ``explain``).
     #[pyo3(text_signature = "(self)")]

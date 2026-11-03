@@ -126,6 +126,10 @@ test('attributePortfolioPnl and its result methods match Python', () => {
     expected.attribution_explain
   );
   assertClose(
+    wire(portfolio.portfolioAttributionPctOfTotalByBucket(attribution)),
+    expected.attribution_pct_of_total_by_bucket
+  );
+  assertClose(
     wire(
       portfolio.portfolioAttributionReconciliationCheck(
         attribution,

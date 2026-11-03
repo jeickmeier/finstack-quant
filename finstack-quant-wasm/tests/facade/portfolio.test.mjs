@@ -60,6 +60,7 @@ const EXPORTED_KEYS = [
   'optimizePortfolio',
   'parsePortfolioSpecJson',
   'portfolioAttributionExplainText',
+  'portfolioAttributionPctOfTotalByBucket',
   'portfolioAttributionReconciliationCheck',
   'portfolioMargin',
   'portfolioMetricsGetMetric',
