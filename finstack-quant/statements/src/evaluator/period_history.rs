@@ -18,6 +18,7 @@ pub struct PeriodHistory {
     rows: Vec<Vec<Option<f64>>>,
     period_bounds: Arc<IndexMap<PeriodId, (Date, Date)>>,
     periods_by_start: Arc<BTreeMap<(PeriodKind, bool, Date), PeriodId>>,
+    periods: Arc<[Period]>,
 }
 
 impl PeriodHistory {
@@ -35,6 +36,7 @@ impl PeriodHistory {
             rows: Vec::new(),
             period_bounds: Arc::default(),
             periods_by_start: Arc::default(),
+            periods: Arc::from(Vec::new()),
         }
     }
 
@@ -65,7 +67,13 @@ impl PeriodHistory {
                 })
                 .collect(),
         );
+        history.periods = Arc::from(periods);
         history
+    }
+
+    /// The model's periods with their dates; empty for history built without them.
+    pub(crate) fn model_periods(&self) -> &[Period] {
+        &self.periods
     }
 
     /// Explicit start and exclusive end dates for a model period.
