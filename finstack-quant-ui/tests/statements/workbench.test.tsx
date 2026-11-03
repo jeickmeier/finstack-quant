@@ -683,7 +683,7 @@ it(
     await summarize(region, expected.as_of);
     const table = await within(region).findByRole(
       "table",
-      { name: `Debt stack at ${expected.as_of}` },
+      { name: `Debt stack at ${expected.as_of} (${expected.currency})` },
       { timeout: budget(10000) },
     );
     const request = lastCall("capitalStructureSummary");

@@ -107,7 +107,9 @@ test("capital-structure-report summarizes the debt stack and leaves a short wind
     "/registry-gallery/?item=capital-structure-report&theme=light&density=compact&focus=1",
   );
   const report = page.getByRole("region", { name: "Capital structure" });
-  const stack = report.getByRole("table", { name: "Debt stack at 2025Q4" });
+  const stack = report.getByRole("table", {
+    name: "Debt stack at 2025Q4 (USD)",
+  });
   await expect(stack.getByRole("rowheader")).toHaveText([
     "SR-A",
     "SR-B",
@@ -120,7 +122,7 @@ test("capital-structure-report summarizes the debt stack and leaves a short wind
   await page.getByRole("option", { name: "2025Q3", exact: true }).click();
   await report.getByRole("button", { name: "Summarize" }).click();
   await expect(
-    report.getByRole("table", { name: "Debt stack at 2025Q3" }),
+    report.getByRole("table", { name: "Debt stack at 2025Q3 (USD)" }),
   ).toBeVisible();
   // Rust returns no LTM EBITDA or ratio for three of four quarters.
   await expect(report.getByText("3 of 4 periods found")).toBeVisible();

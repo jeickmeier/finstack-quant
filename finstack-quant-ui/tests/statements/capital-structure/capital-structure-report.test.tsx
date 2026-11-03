@@ -34,7 +34,7 @@ import {
   type CapitalStructureSummary,
 } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
-import { formatPercent, groupDecimal } from "@/lib/finstack/format/format";
+import { groupDecimal } from "@/lib/finstack/format/format";
 import { startWorker } from "../../shared/worker/harness.mjs";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
@@ -85,7 +85,15 @@ const summaryOf = (name: keyof typeof fixture.cases) =>
   fixture.cases[name].summary as unknown as CapitalStructureSummary;
 const full = summaryOf("full");
 const props = { nodeIds, periodIds, onSubmit: () => {} };
-const exact = (value: number) => groupDecimal(String(value));
+/** The item's default display: ratios to four decimals, shares as percents to two. */
+const ratio = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 4,
+  signDisplay: "negative",
+}).format;
+const share = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  maximumFractionDigits: 2,
+}).format;
 const money = (value: { amount: string }) => groupDecimal(value.amount);
 it("returns the fixture's summaries and rejections through the worker", async () => {
   // netCash is a summary of another model's result.
@@ -117,9 +125,15 @@ it("shows the headline figures and the LTM periods Rust found", () => {
   expect(value("Cash")).toBe(money(full.cash!));
   expect(value("Net debt")).toBe(money(full.net_debt!));
   expect(value("LTM EBITDA")).toBe(money(full.ltm_ebitda!));
-  expect(value("Total leverage")).toBe(exact(full.total_leverage!));
-  expect(value("Net leverage")).toBe(exact(full.net_leverage!));
-  expect(value("Total coverage")).toBe(exact(full.total_coverage!));
+  expect(value("Total leverage")).toBe(ratio(full.total_leverage!));
+  expect(value("Net leverage")).toBe(ratio(full.net_leverage!));
+  expect(value("Total coverage")).toBe(ratio(full.total_coverage!));
+  // Every returned digit stays in the title.
+  expect(
+    screen
+      .getByText("Net leverage", { selector: "dt" })
+      .nextElementSibling!.firstElementChild!.getAttribute("title"),
+  ).toBe(String(full.net_leverage));
   expect(
     screen.getByText(
       `${full.ltm_periods_found} of ${full.ltm_periods_required} periods found`,
@@ -131,7 +145,7 @@ it("shows the headline figures and the LTM periods Rust found", () => {
 it("lists the tranches in Rust's order with the figures through each class", () => {
   render(<CapitalStructureReport {...props} summary={full} />);
   const table = screen.getByRole("table", {
-    name: `Debt stack at ${full.as_of}`,
+    name: `Debt stack at ${full.as_of} (${full.currency})`,
   });
   const rows = within(table).getAllByRole("row").slice(1);
   expect(
@@ -149,12 +163,23 @@ it("lists the tranches in Rust's order with the figures through each class", () 
       tranche.payment_class,
       String(tranche.rank),
       money(tranche.balance),
-      `${formatPercent(tranche.share_of_debt!)}%`,
+      share(tranche.share_of_debt!),
       money(tranche.cumulative_debt),
-      exact(tranche.leverage!),
-      exact(tranche.interest_coverage!),
+      ratio(tranche.leverage!),
+      ratio(tranche.interest_coverage!),
       money(tranche.ltm_interest!),
       tranche.maturity,
+    ]);
+    expect(
+      within(rows[index]!)
+        .getAllByRole("cell")
+        .slice(4, 8)
+        .map((cell) => cell.firstElementChild?.getAttribute("title")),
+    ).toEqual([
+      String(tranche.share_of_debt),
+      undefined,
+      String(tranche.leverage),
+      String(tranche.interest_coverage),
     ]);
   });
   expect(
@@ -205,7 +230,7 @@ it("shows Rust's null ratios of a short LTM window as Undefined, beside the peri
     ),
   ).toBeTruthy();
   const table = screen.getByRole("table", {
-    name: `Debt stack at ${short.as_of}`,
+    name: `Debt stack at ${short.as_of} (${short.currency})`,
   });
   expect(within(table).getAllByText("Undefined")).toHaveLength(
     // Leverage, interest coverage and LTM interest of every tranche.
@@ -240,13 +265,13 @@ it("shows no cash as Undefined and negative net debt and leverage as returned", 
     screen.getByText(label, { selector: "dt" }).nextElementSibling!.textContent;
   expect(value("Cash")).toBe("Undefined");
   expect(value("Net leverage")).toBe("Undefined");
-  expect(value("Total leverage")).toBe(exact(noCash.total_leverage!));
+  expect(value("Total leverage")).toBe(ratio(noCash.total_leverage!));
   const netCash = summaryOf("netCash");
   expect(netCash.net_leverage).toBeLessThan(0);
   rerender(<CapitalStructureReport {...props} summary={netCash} />);
   expect(value("Net debt")).toBe(money(netCash.net_debt!));
   expect(value("Net debt")!.startsWith("-")).toBe(true);
-  expect(value("Net leverage")).toBe(exact(netCash.net_leverage!));
+  expect(value("Net leverage")).toBe(ratio(netCash.net_leverage!));
 });
 
 it("shows native errors and loading as such", () => {
@@ -323,7 +348,7 @@ it(
     );
     const table = await screen.findByRole(
       "table",
-      { name: `Debt stack at ${full.as_of}` },
+      { name: `Debt stack at ${full.as_of} (${full.currency})` },
       { timeout: budget(10000) },
     );
     expect(within(table).getAllByRole("rowheader")[0]!.textContent).toBe(

@@ -70,10 +70,18 @@ export interface RecoveryWaterfallProps {
   stats: AnalysisState<SeniorityStats>;
   /** Rust's calibration ids, default first (useSeniorityCalibrationIds). */
   calibrationIds?: readonly string[] | null;
-  /** Display text of a finite returned number; omitted shows every digit. */
+  /** Display text of a finite returned number; omitted shows four decimals. Every digit stays in the cell's title. */
   formatValue?: (value: number) => string;
   density?: "compact" | "comfortable";
 }
+/**
+ * A returned number to four decimals, never "-0", as relative-value-table
+ * shows its numbers; every digit stays in the cell's title.
+ */
+const defaultValue = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 4,
+  signDisplay: "negative",
+}).format;
 /** Rust's choices with their Rust descriptions. */
 const options = (values: readonly { value: string; description?: string }[]) =>
   values.map(({ value, description }) => ({
@@ -161,7 +169,7 @@ export function RecoveryWaterfall({
   workout,
   stats,
   calibrationIds,
-  formatValue = String,
+  formatValue = defaultValue,
   density = "compact",
 }: RecoveryWaterfallProps) {
   const [estate, setEstate] = useState(String(defaultWaterfall.estateValue));
