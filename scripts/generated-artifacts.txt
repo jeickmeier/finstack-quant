@@ -264,6 +264,7 @@ finstack-quant-ui/src/generated/meta/private_markets_fund.ts
 finstack-quant-ui/src/generated/meta/quanto_option.ts
 finstack-quant-ui/src/generated/meta/range_accrual.ts
 finstack-quant-ui/src/generated/meta/real_estate_asset.ts
+finstack-quant-ui/src/generated/meta/recovery_claim.ts
 finstack-quant-ui/src/generated/meta/relative_value_report.ts
 finstack-quant-ui/src/generated/meta/relative_value_report_config.ts
 finstack-quant-ui/src/generated/meta/repo.ts
@@ -400,6 +401,7 @@ finstack-quant-ui/src/generated/schemas/private_markets_fund.json
 finstack-quant-ui/src/generated/schemas/quanto_option.json
 finstack-quant-ui/src/generated/schemas/range_accrual.json
 finstack-quant-ui/src/generated/schemas/real_estate_asset.json
+finstack-quant-ui/src/generated/schemas/recovery_claim.json
 finstack-quant-ui/src/generated/schemas/relative_value_report.json
 finstack-quant-ui/src/generated/schemas/relative_value_report_config.json
 finstack-quant-ui/src/generated/schemas/repo.json
@@ -533,6 +535,7 @@ finstack-quant-ui/src/generated/types/private_markets_fund.ts
 finstack-quant-ui/src/generated/types/quanto_option.ts
 finstack-quant-ui/src/generated/types/range_accrual.ts
 finstack-quant-ui/src/generated/types/real_estate_asset.ts
+finstack-quant-ui/src/generated/types/recovery_claim.ts
 finstack-quant-ui/src/generated/types/relative_value_report.ts
 finstack-quant-ui/src/generated/types/relative_value_report_config.ts
 finstack-quant-ui/src/generated/types/repo.ts

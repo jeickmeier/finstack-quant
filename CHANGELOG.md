@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: recovery-waterfall fields from the contracts; DCF WACC default
+
+`recovery-waterfall` labels its claim, collateral and workout fields through `labelFor` and takes their help from the generated contracts (the new `recovery_claim` contract root, and `workout_lgd`), so "Direct costs" reads "Direct cost rate", "Time to resolution" reads "Workout years" and "Exposure at default" reads "EAD" (`labelFor` upper-cases `ead`). "Add claim" starts the accrued, penalties and haircut fields empty instead of at 0, so an untyped amount is rejected by Rust rather than sent as zero. The statements workbench's valuation panel leaves the DCF form's WACC unset until the calculator or an edit sets it, so a form given `defaultAssumptions` shows its WACC instead of an empty field.
+
 ### Comps: each scatter point says whether it is the subject
 
 `RelativeValuePoint` carries `is_subject`, true on the subject's point (the first point of a dimension whose subject has both metrics) and false on every peer's, as `RelativeValueCompany` already does for the comps table. Python `RelativeValuePoint.is_subject`, the WASM `relativeValueReport` result and the generated schema and TypeScript types include it; `RelativeValuePoint.from_json` now requires it. `relative-value-table` marks the subject on its scatter from it instead of comparing `company_id` with `subject_id`. No value moves.

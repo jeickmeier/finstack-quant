@@ -126,6 +126,7 @@ export async function generate(repo = repoRoot) {
           "zmijewski_input",
           "workout_lgd",
           "seniority_calibration",
+          "recovery_claim",
           "credit_assessment",
           "capital_structure_summary",
           "capital_structure_summary_config",

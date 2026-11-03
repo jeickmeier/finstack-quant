@@ -112,8 +112,8 @@ describe("discovered canonical fixtures", () => {
     }
     // Rust publishes no example for CovenantEngine, CovenantForecastConfig,
     // CovenantReport, DatedCovenantReports, FutureBreach,
-    // the five credit-scoring inputs, ArbitrageReport, MertonModel, WorkoutLgd,
-    // SeniorityCalibration, CreditAssessment,
+    // the five credit-scoring inputs, ArbitrageReport, MertonModel, RecoveryClaim,
+    // WorkoutLgd, SeniorityCalibration, CreditAssessment,
     // DcfOptions, DcfSensitivityResult, LboConfig, LboResult, ScenarioSet,
     // ScenarioDiff, SensitivityResult, BridgeChart, ForecastMetrics,
     // VarianceConfig, CapitalStructureSummary or RelativeValueReport, nor their
@@ -130,6 +130,7 @@ describe("discovered canonical fixtures", () => {
       "schemas/arbitrage_report.json",
       "schemas/merton_model.json",
       "schemas/ohlson_o_score_input.json",
+      "schemas/recovery_claim.json",
       "schemas/seniority_calibration.json",
       "schemas/workout_lgd.json",
       "schemas/zmijewski_input.json",

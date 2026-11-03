@@ -4192,6 +4192,39 @@
       }
     },
     {
+      "name": "contract-recovery-claim",
+      "type": "registry:lib",
+      "title": "Recovery claim contract",
+      "description": "Generated schema, wire types and metadata for the canonical Rust recovery_claim contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/recovery_claim.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/recovery_claim.json"
+        },
+        {
+          "path": "src/generated/types/recovery_claim.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/recovery_claim.ts"
+        },
+        {
+          "path": "src/generated/meta/recovery_claim.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/recovery_claim.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-seniority-calibration",
       "type": "registry:lib",
       "title": "Seniority calibration contract",

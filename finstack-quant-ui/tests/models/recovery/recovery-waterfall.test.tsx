@@ -17,6 +17,7 @@ import {
   within,
 } from "@testing-library/react";
 import { useState } from "react";
+import userEvent from "@testing-library/user-event";
 import type { models as modelsWire } from "finstack-quant-wasm/types";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
@@ -44,6 +45,9 @@ import { unwrap, type Envelope } from "@/workers/finstack-contract";
 import { startWorker } from "../../shared/worker/harness.mjs";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
+import recoveryClaim from "../../../src/generated/schemas/recovery_claim.json";
+import workoutLgd from "../../../src/generated/schemas/workout_lgd.json";
+import { labelFor } from "../../../src/format/label.mjs";
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/hooks/shared/use-finstack/client", () => ({
   createClient: mock.createClient,
@@ -279,7 +283,15 @@ it("adds and removes claims and collateral pieces", () => {
     "Notes-B",
     "",
   ]);
-  expect(claims[3].principal).toBeNaN();
+  // A new claim starts empty: every amount, haircut included, is NaN until typed, never 0.
+  for (const field of [
+    "principal",
+    "accrued",
+    "penalties",
+    "collateral_haircut",
+  ])
+    expect(claims[3][field]).toBeNaN();
+  expect(claims[3].collateral_value).toBeNull();
   fireEvent.click(
     within(screen.getByRole("group", { name: "Collateral 0" })).getByRole(
       "button",
@@ -290,6 +302,35 @@ it("adds and removes claims and collateral pieces", () => {
   expect(onWorkoutSubmit.mock.lastCall![0].collateral).toEqual([
     workoutTerms.collateral[1],
   ]);
+});
+it("labels each field by its wire name and describes it from the generated contracts", async () => {
+  const user = userEvent.setup();
+  view({});
+  const help = async (scope: HTMLElement, label: string, text: string) => {
+    expect(within(scope).getByLabelText(label)).toBeTruthy();
+    await user.click(
+      within(scope).getByRole("button", { name: `${label} help` }),
+    );
+    expect((await screen.findByText(text)).textContent).toBe(text);
+    await user.keyboard("{Escape}");
+  };
+  const loan = screen.getByRole("group", { name: "Claim TL-B" });
+  for (const [field, node] of Object.entries(recoveryClaim.properties))
+    await help(loan, labelFor(field), node.description);
+  const workout = screen.getByRole("form", { name: "Workout terms" });
+  await help(
+    workout,
+    "Workout years",
+    workoutLgd.properties.workout_years.description,
+  );
+  await help(
+    workout,
+    "Discount rate",
+    workoutLgd.properties.discount_rate.description,
+  );
+  expect(within(workout).getByLabelText("EAD")).toBeTruthy();
+  expect(within(workout).getByLabelText("Direct cost rate")).toBeTruthy();
+  expect(within(workout).getByLabelText("Indirect cost rate")).toBeTruthy();
 });
 it("tables the workout and seniority results as returned", () => {
   const workout = value<modelsWire.WorkoutLgdResult>(fixture.workout.secured);
