@@ -5,10 +5,10 @@
 
 use super::provider::directional_rate;
 use super::{FxConversionPolicy, FxProvider};
+use crate::InputError;
 use crate::currency::Currency;
 use crate::dates::Date;
-use crate::InputError;
-use crate::{recover_lock as recover, FxHashMap};
+use crate::{FxHashMap, recover_lock as recover};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -382,10 +382,11 @@ impl FxProvider for BumpedFxProvider {
             }
         }
         for &(base, quote, on, policy, rate) in &quotes {
-            if base == to && quote == from {
-                if let Ok(reciprocal) = super::reciprocal_rate_or_err(rate, to, from) {
-                    rates.entry((on, policy)).or_insert(reciprocal);
-                }
+            if base == to
+                && quote == from
+                && let Ok(reciprocal) = super::reciprocal_rate_or_err(rate, to, from)
+            {
+                rates.entry((on, policy)).or_insert(reciprocal);
             }
         }
         quotes.retain(|&(base, quote, _, _, _)| {
@@ -599,28 +600,34 @@ mod tests {
             .set_snapshot_pinned_quotes(&[(Currency::EUR, Currency::USD, on, policy, 1.2)])
             .expect("initial scoped quote");
         for invalid in [f64::NAN, f64::INFINITY, 0.0, -1.0] {
-            assert!(provider
-                .set_snapshot_pinned_quotes(&[
-                    (Currency::EUR, Currency::USD, on, policy, 1.5),
-                    (Currency::USD, Currency::GBP, on, policy, invalid),
-                ])
-                .is_err());
+            assert!(
+                provider
+                    .set_snapshot_pinned_quotes(&[
+                        (Currency::EUR, Currency::USD, on, policy, 1.5),
+                        (Currency::USD, Currency::GBP, on, policy, invalid),
+                    ])
+                    .is_err()
+            );
             assert_eq!(
                 provider
                     .rate(Currency::EUR, Currency::USD, on, policy)
                     .expect("original"),
                 1.2
             );
-            assert!(provider
-                .rate(Currency::USD, Currency::GBP, on, policy)
-                .is_err());
+            assert!(
+                provider
+                    .rate(Currency::USD, Currency::GBP, on, policy)
+                    .is_err()
+            );
         }
-        assert!(provider
-            .set_snapshot_pinned_quotes(&[
-                (Currency::EUR, Currency::USD, on, policy, 1.5),
-                (Currency::EUR, Currency::USD, on, policy, 1.6),
-            ])
-            .is_err());
+        assert!(
+            provider
+                .set_snapshot_pinned_quotes(&[
+                    (Currency::EUR, Currency::USD, on, policy, 1.5),
+                    (Currency::EUR, Currency::USD, on, policy, 1.6),
+                ])
+                .is_err()
+        );
         assert_eq!(
             provider
                 .rate(Currency::EUR, Currency::USD, on, policy)

@@ -15,9 +15,9 @@ use super::bond_valuator::BondValuator;
 use crate::bond::pricing::return_floor::realized_distributions;
 use crate::bond::{Bond, CallPut, CashflowSpec, ProtectionWindow, ReturnFloorKind};
 use finstack_quant_cashflows::builder::{
-    observed_index_fixing, CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
+    CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
     FloatingCouponReplayState, FloatingRateObservation, OvernightObservationSchedule,
-    OvernightRateConstraints,
+    OvernightRateConstraints, observed_index_fixing,
 };
 use finstack_quant_cashflows::builder::{CouponType, FloatingCouponSpec};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
@@ -295,7 +295,8 @@ pub(crate) fn price_bond_lsmc(
         if !actual.is_finite() || actual > target {
             return Err(Error::Validation(format!(
                 "Bond '{}' hazard LSMC exhausted its fixed budget of {} independent pricing estimators with 95% CI half-width {actual}, above target {target}",
-                bond.id.as_str(), pricing_estimators
+                bond.id.as_str(),
+                pricing_estimators
             )));
         }
     }

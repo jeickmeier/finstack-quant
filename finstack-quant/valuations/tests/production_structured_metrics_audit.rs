@@ -6,8 +6,8 @@ use finstack_quant_core::market_data::{context::MarketContext, term_structures::
 use finstack_quant_valuations::{
     instruments::PricingOptions,
     instruments::{
-        fixed_income::structured_credit::{tranche_metrics, StructuredCredit},
         Instrument,
+        fixed_income::structured_credit::{StructuredCredit, tranche_metrics},
     },
     metrics::MetricId,
 };
@@ -180,7 +180,7 @@ fn production_structured_metrics_clean_quote_adds_accrued_once() {
 #[test]
 fn production_structured_metrics_settlement_crosses_coupon_once() {
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        tranche_oas, OasConfig,
+        OasConfig, tranche_oas,
     };
     let (mut deal, market) = deal_and_market();
     let as_of = date!(2024 - 02 - 15);

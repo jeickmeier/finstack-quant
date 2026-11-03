@@ -12,7 +12,7 @@ use finstack_quant_cashflows::{CashflowScheduleBuildSpec, ScheduleBuildOpts};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
-use crate::bindings::core::cashflow::{extract_cf_kind, PyCashFlow};
+use crate::bindings::core::cashflow::{PyCashFlow, extract_cf_kind};
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
 use builder::schedule::{PyCashFlowMeta, PyCashFlowSchedule};

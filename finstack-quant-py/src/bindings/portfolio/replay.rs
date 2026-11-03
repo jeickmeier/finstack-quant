@@ -2,7 +2,7 @@
 
 use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::pandas_utils::{
-    serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
+    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::errors::{display_to_py, portfolio_to_py};
 use pyo3::prelude::*;

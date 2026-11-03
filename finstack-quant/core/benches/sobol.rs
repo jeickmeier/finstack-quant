@@ -6,7 +6,7 @@
 //! the raw sequence generation, and only a split measurement shows which of
 //! the two is worth optimizing.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::math::random::SobolRng;
 use std::hint::black_box;
 

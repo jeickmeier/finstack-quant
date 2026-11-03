@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use super::error::MigrationError;
 use crate::credit::moodys_warf_factor;
-use finstack_quant_core::types::CreditRating;
 use finstack_quant_core::FxHashMap;
+use finstack_quant_core::types::CreditRating;
 
 /// An ordered set of states defining a transition matrix's row/column layout.
 ///
@@ -240,19 +240,19 @@ impl RatingScale {
         }
         let mut best: Option<(f64, f64, usize)> = None; // (abs_distance, factor, index)
         for (i, label) in self.labels.iter().enumerate() {
-            if let Ok(r) = label.parse::<CreditRating>() {
-                if let Ok(factor) = moodys_warf_factor(r) {
-                    let dist = (factor - warf).abs();
-                    let is_better = match best {
-                        None => true,
-                        Some((best_dist, best_factor, _)) => {
-                            dist < best_dist
-                                || ((dist - best_dist).abs() < f64::EPSILON && factor > best_factor)
-                        }
-                    };
-                    if is_better {
-                        best = Some((dist, factor, i));
+            if let Ok(r) = label.parse::<CreditRating>()
+                && let Ok(factor) = moodys_warf_factor(r)
+            {
+                let dist = (factor - warf).abs();
+                let is_better = match best {
+                    None => true,
+                    Some((best_dist, best_factor, _)) => {
+                        dist < best_dist
+                            || ((dist - best_dist).abs() < f64::EPSILON && factor > best_factor)
                     }
+                };
+                if is_better {
+                    best = Some((dist, factor, i));
                 }
             }
         }

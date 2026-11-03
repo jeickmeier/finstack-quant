@@ -132,7 +132,9 @@ pub enum InputError {
     },
 
     /// No business day found within maximum allowed adjustment period.
-    #[error("Business day adjustment failed: no business day found within {max_days} days from {date} using {convention:?} convention")]
+    #[error(
+        "Business day adjustment failed: no business day found within {max_days} days from {date} using {convention:?} convention"
+    )]
     AdjustmentFailed {
         /// The original date that couldn't be adjusted.
         date: Date,
@@ -309,7 +311,9 @@ pub enum InputError {
     ///
     /// This error occurs when the numerical solver cannot find a volatility
     /// that produces the target price within tolerance.
-    #[error("Volatility conversion failed: solver did not converge within tolerance {tolerance} (residual: {residual:.2e})")]
+    #[error(
+        "Volatility conversion failed: solver did not converge within tolerance {tolerance} (residual: {residual:.2e})"
+    )]
     VolatilityConversionFailed {
         /// The solver tolerance that was used.
         tolerance: f64,
@@ -322,7 +326,9 @@ pub enum InputError {
     /// The Black (lognormal) model is undefined for non-positive forward rates.
     /// Use the models-layer `VolatilityConvention::ShiftedLognormal` convention
     /// with an appropriate shift for negative rate environments.
-    #[error("Lognormal volatility requires positive forward rate (got {forward:.6}); use ShiftedLognormal with shift >= {required_shift:.6}")]
+    #[error(
+        "Lognormal volatility requires positive forward rate (got {forward:.6}); use ShiftedLognormal with shift >= {required_shift:.6}"
+    )]
     NonPositiveForwardForLognormal {
         /// The forward rate that was provided.
         forward: f64,
@@ -333,7 +339,9 @@ pub enum InputError {
     /// Shifted lognormal conversion has non-positive shifted forward.
     ///
     /// The shifted forward (F + shift) must be positive for the model to be valid.
-    #[error("Shifted forward must be positive: forward ({forward:.6}) + shift ({shift:.6}) = {shifted:.6}")]
+    #[error(
+        "Shifted forward must be positive: forward ({forward:.6}) + shift ({shift:.6}) = {shifted:.6}"
+    )]
     NonPositiveShiftedForward {
         /// The forward rate.
         forward: f64,
@@ -373,7 +381,9 @@ pub enum InputError {
     ///
     /// This error provides diagnostic information about why the solver failed,
     /// including iteration count, final residual, and the specific failure mode.
-    #[error("Solver failed after {iterations} iterations: {reason} (residual: {residual:.6e}, last x: {last_x:.6e})")]
+    #[error(
+        "Solver failed after {iterations} iterations: {reason} (residual: {residual:.6e}, last x: {last_x:.6e})"
+    )]
     SolverConvergenceFailed {
         /// Number of iterations performed before failure.
         iterations: usize,

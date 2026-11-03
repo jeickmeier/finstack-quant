@@ -2,13 +2,13 @@
 //! settlement for `CdsTranchePricer`.
 
 use super::pricer::{
-    CdsTranchePricer, DiscountAt, EffectiveStructure, ProjectedDiscountedRow, ProjectionInputs,
-    BESPOKE_SETTLEMENT_DAYS, INDEX_SETTLEMENT_DAYS, PROBABILITY_CLIP,
+    BESPOKE_SETTLEMENT_DAYS, CdsTranchePricer, DiscountAt, EffectiveStructure,
+    INDEX_SETTLEMENT_DAYS, PROBABILITY_CLIP, ProjectedDiscountedRow, ProjectionInputs,
 };
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
-use finstack_quant_core::dates::{calendar_by_id_strict, Date, DateExt, HolidayCalendar};
+use finstack_quant_core::dates::{Date, DateExt, HolidayCalendar, calendar_by_id_strict};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
@@ -422,18 +422,18 @@ impl CdsTranchePricer {
                 index_data_arc.index_credit_curve().base_date()
             )));
         }
-        if as_of < tranche.maturity {
-            if let Some(issuer_curves) = index_data_arc.issuer_credit_curves() {
-                for (issuer_id, curve) in issuer_curves {
-                    if curve.base_date() != as_of {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "CDS tranche '{}' requires issuer credit curve '{}' to be based on valuation date {}; got {}. Rebase the curve or provide a conditionally rebased credit index.",
-                            tranche.id,
-                            issuer_id,
-                            as_of,
-                            curve.base_date()
-                        )));
-                    }
+        if as_of < tranche.maturity
+            && let Some(issuer_curves) = index_data_arc.issuer_credit_curves()
+        {
+            for (issuer_id, curve) in issuer_curves {
+                if curve.base_date() != as_of {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "CDS tranche '{}' requires issuer credit curve '{}' to be based on valuation date {}; got {}. Rebase the curve or provide a conditionally rebased credit index.",
+                        tranche.id,
+                        issuer_id,
+                        as_of,
+                        curve.base_date()
+                    )));
                 }
             }
         }

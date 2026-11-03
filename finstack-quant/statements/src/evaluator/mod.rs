@@ -48,7 +48,7 @@ mod precedence;
 mod results;
 mod rollup;
 
-pub use cashflow_export::{node_to_dated_schedule, PeriodDateConvention};
+pub use cashflow_export::{PeriodDateConvention, node_to_dated_schedule};
 pub use context::EvaluationContext;
 pub use dag::DependencyGraph;
 pub use engine::{Evaluator, PreparedEvaluation};

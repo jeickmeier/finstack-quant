@@ -10,6 +10,7 @@ use crate::quotes::VolQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::traits::TimeGridAndGuesses;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::dividends::DividendKind;
@@ -17,7 +18,6 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::Result;
 use finstack_quant_models::rates::clock::model_time_on_curve;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use std::cell::RefCell;
@@ -155,18 +155,18 @@ pub(crate) fn resolve_continuous_dividend_yield(
                 Ok(MarketScalar::Price(_)) => {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "equity carry scalar '{scalar_key}' must be unitless"
-                    )))
+                    )));
                 }
                 Err(_) => None,
             }
         }
     };
-    if let Some(value) = continuous_yield {
-        if !value.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{label} dividend yield must be finite, got {value}"
-            )));
-        }
+    if let Some(value) = continuous_yield
+        && !value.is_finite()
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{label} dividend yield must be finite, got {value}"
+        )));
     }
     Ok(continuous_yield)
 }
@@ -224,12 +224,15 @@ pub(crate) fn resolve_equity_forward_inputs(
                     event.date,
                     DayCountContext::default(),
                 )?;
-                cash_dividends.push((surface_time, amount.amount() * discount.df_between_dates(base_date, event.date)?));
+                cash_dividends.push((
+                    surface_time,
+                    amount.amount() * discount.df_between_dates(base_date, event.date)?,
+                ));
             }
             DividendKind::Yield(_) | DividendKind::Stock { .. } => {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "equity '{ticker}' dividend schedule contains non-cash events; supply an explicit continuous dividend yield"
-                )))
+                )));
             }
         }
     }
@@ -514,16 +517,16 @@ pub(crate) fn sorted_knot_grid<Q>(
     let mut initials = Vec::with_capacity(entries.len());
     let mut active_quotes = Vec::with_capacity(entries.len());
     for (t, guess, quote) in entries {
-        if let Some(&prev) = times.last() {
-            if (t - prev).abs() <= TOLERANCE_DUP_KNOTS {
-                return Err(finstack_quant_core::Error::Calibration {
-                    message: format!(
-                        "Duplicate or unsorted {label} knot times detected (prev={prev:.10}, new={t:.10}). \
+        if let Some(&prev) = times.last()
+            && (t - prev).abs() <= TOLERANCE_DUP_KNOTS
+        {
+            return Err(finstack_quant_core::Error::Calibration {
+                message: format!(
+                    "Duplicate or unsorted {label} knot times detected (prev={prev:.10}, new={t:.10}). \
 Ensure quotes map to strictly increasing year fractions."
-                    ),
-                    category: "global_solve".to_string(),
-                });
-            }
+                ),
+                category: "global_solve".to_string(),
+            });
         }
         times.push(t);
         initials.push(guess);

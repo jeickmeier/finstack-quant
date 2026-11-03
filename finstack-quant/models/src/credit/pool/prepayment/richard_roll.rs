@@ -34,7 +34,7 @@
 
 use super::super::expected_shocked_smm;
 use super::traits::StochasticPrepayment;
-use finstack_quant_cashflows::builder::{annual_to_monthly_clamped, PSA_RAMP_MONTHS};
+use finstack_quant_cashflows::builder::{PSA_RAMP_MONTHS, annual_to_monthly_clamped};
 
 /// Refinancing slope parameter (lambda) of the arctangent incentive response.
 const REFI_SLOPE: f64 = 20.0;

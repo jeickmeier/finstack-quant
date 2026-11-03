@@ -113,12 +113,12 @@ impl SabrParameters {
                 self.rho
             )));
         }
-        if let Some(shift) = self.shift {
-            if !shift.is_finite() || shift <= 0.0 {
-                return Err(Error::Validation(format!(
-                    "SABR shift parameter must be positive for negative rate support, got: {shift:.6}"
-                )));
-            }
+        if let Some(shift) = self.shift
+            && (!shift.is_finite() || shift <= 0.0)
+        {
+            return Err(Error::Validation(format!(
+                "SABR shift parameter must be positive for negative rate support, got: {shift:.6}"
+            )));
         }
         Ok(())
     }

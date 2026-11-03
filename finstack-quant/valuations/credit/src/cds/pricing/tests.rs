@@ -14,11 +14,11 @@ use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::constants::credit;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
+use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use rust_decimal::Decimal;
-use time::macros::date;
 use time::Duration;
+use time::macros::date;
 
 fn create_test_cds(
     id: impl Into<String>,

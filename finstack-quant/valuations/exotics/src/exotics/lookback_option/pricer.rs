@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
@@ -1122,7 +1122,7 @@ mod tests {
     #[test]
     fn rho_reprices_with_the_requested_model() {
         use finstack_quant_valuations_core::instruments::PricingOptions;
-        use finstack_quant_valuations_core::metrics::{bump_discount_curve_parallel, MetricId};
+        use finstack_quant_valuations_core::metrics::{MetricId, bump_discount_curve_parallel};
 
         let as_of = date(2025, 1, 2);
         let curves = market(as_of, 100.0, 0.25, 0.03, 0.0);

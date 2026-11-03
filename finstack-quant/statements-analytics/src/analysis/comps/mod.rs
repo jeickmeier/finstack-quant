@@ -18,15 +18,15 @@ mod types;
 pub use multiples::{compute_multiple, compute_peer_multiples};
 pub use peer_set::{PeerFilter, PeerSet};
 pub use report::{
-    relative_value_report, CompositeExclusion, RelativeValueCompany, RelativeValueDimension,
-    RelativeValueMultiple, RelativeValuePoint, RelativeValueReport, RelativeValueReportConfig,
+    CompositeExclusion, RelativeValueCompany, RelativeValueDimension, RelativeValueMultiple,
+    RelativeValuePoint, RelativeValueReport, RelativeValueReportConfig, relative_value_report,
 };
 pub use scoring::{
-    score_relative_value, DimensionExclusion, DimensionScore, MetricExtractor, RelativeValueResult,
-    ScoreDirection, ScoringDimension,
+    DimensionExclusion, DimensionScore, MetricExtractor, RelativeValueResult, ScoreDirection,
+    ScoringDimension, score_relative_value,
 };
 pub use stats::{
-    peer_stats, percentile_rank, regression_fair_value, z_score, PeerStats, RegressionResult,
+    PeerStats, RegressionResult, peer_stats, percentile_rank, regression_fair_value, z_score,
 };
 pub use types::{CompanyId, CompanyMetrics, Multiple, PeriodBasis};
 

@@ -157,43 +157,41 @@ pub(super) fn apply(
     // when the credit curve is twisted (signed mean ≈ 0). Emit a note so the
     // consumer knows the gamma number is not a real upper bound. Average over
     // the same credit curves the metrics-based attribution consumed.
-    if credit_has_data {
-        if let Some(avg_shift) = credit_convexity_avg_shift_bp {
-            if let Some(cs_gamma) = inputs.val_t0.measures.get(MetricId::CsGamma.as_str()) {
-                let shift_decimal = avg_shift / 10_000.0;
-                let gamma_pnl = 0.5 * cs_gamma * shift_decimal * shift_decimal;
-                push_second_order_step(
-                    attribution,
-                    "CreditGamma",
-                    MoveUnit::BasisPoint,
-                    avg_shift,
-                    gamma_pnl,
-                );
-                attribution.credit_curves_pnl = inputs.money(
-                    attribution.credit_curves_pnl.amount() + gamma_pnl,
-                    "credit gamma P&L",
-                    attribution,
-                    non_finite_detected,
-                );
-            }
-
-            if avg_shift.abs() > LARGE_SPREAD_MOVE_THRESHOLD_BP {
-                attribution.meta.notes.push(format!(
-                    "Warning: Large credit spread move ({:.0}bp) exceeds {}bp threshold; \
-                         consider parallel/waterfall attribution for more accurate results",
-                    avg_shift.abs(),
-                    LARGE_SPREAD_MOVE_THRESHOLD_BP
-                ));
-            }
-
-            // Averaged over the credit curves the attribution consumed.
-            note_twist(
-                &mut attribution.meta.notes,
-                "Credit gamma",
+    if credit_has_data && let Some(avg_shift) = credit_convexity_avg_shift_bp {
+        if let Some(cs_gamma) = inputs.val_t0.measures.get(MetricId::CsGamma.as_str()) {
+            let shift_decimal = avg_shift / 10_000.0;
+            let gamma_pnl = 0.5 * cs_gamma * shift_decimal * shift_decimal;
+            push_second_order_step(
+                attribution,
+                "CreditGamma",
+                MoveUnit::BasisPoint,
                 avg_shift,
-                &inputs.market_deps.curves.credit_curves,
-                |id| credit_curve_abs_shift_bp(id, inputs.market_t0, inputs.market_t1),
+                gamma_pnl,
+            );
+            attribution.credit_curves_pnl = inputs.money(
+                attribution.credit_curves_pnl.amount() + gamma_pnl,
+                "credit gamma P&L",
+                attribution,
+                non_finite_detected,
             );
         }
+
+        if avg_shift.abs() > LARGE_SPREAD_MOVE_THRESHOLD_BP {
+            attribution.meta.notes.push(format!(
+                "Warning: Large credit spread move ({:.0}bp) exceeds {}bp threshold; \
+                         consider parallel/waterfall attribution for more accurate results",
+                avg_shift.abs(),
+                LARGE_SPREAD_MOVE_THRESHOLD_BP
+            ));
+        }
+
+        // Averaged over the credit curves the attribution consumed.
+        note_twist(
+            &mut attribution.meta.notes,
+            "Credit gamma",
+            avg_shift,
+            &inputs.market_deps.curves.credit_curves,
+            |id| credit_curve_abs_shift_bp(id, inputs.market_t0, inputs.market_t1),
+        );
     }
 }

@@ -55,10 +55,10 @@
 //! # }
 //! ```
 
-use crate::dates::{
-    adjust, BusinessDayConvention, Date, DayCount, DayCountContext, HolidayCalendar,
-};
 use crate::InputError;
+use crate::dates::{
+    BusinessDayConvention, Date, DayCount, DayCountContext, HolidayCalendar, adjust,
+};
 
 const MAX_TENOR_YEARS: u32 = 200;
 const MAX_TENOR_DAYS: u32 = MAX_TENOR_YEARS * 366;

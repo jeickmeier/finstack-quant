@@ -2,13 +2,13 @@
 
 use serde::{Deserialize, Serialize};
 
+use finstack_quant_statements::Result;
 use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
     Severity, SignConventionPolicy,
 };
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_statements::Result;
 
 /// Verifies PP&E(t) = PP&E(t−1) + Capex(t) − D&A(t) − Disposals(t).
 ///
@@ -106,15 +106,15 @@ impl Check for DepreciationReconciliation {
             ) {
                 findings.push(f);
             }
-            if let Some(node) = self.disposals_node.as_ref() {
-                if let Some(f) = self.sign_convention.validate(
+            if let Some(node) = self.disposals_node.as_ref()
+                && let Some(f) = self.sign_convention.validate(
                     disposals,
                     node.as_str(),
                     Some(*curr_pid),
                     self.id(),
-                ) {
-                    findings.push(f);
-                }
+                )
+            {
+                findings.push(f);
             }
 
             let expected = ppe_prev + capex - da - disposals;

@@ -635,7 +635,7 @@ fn compose_rejects_invalid_inputs_naming_the_scenario() {
 fn correlation_shocks_update_inventory_and_report_clamping() {
     use finstack_quant_models::credit::pool::CorrelationStructure;
     use finstack_quant_valuations::instruments::{
-        fixed_income::structured_credit::StructuredCredit, Instrument,
+        Instrument, fixed_income::structured_credit::StructuredCredit,
     };
     for (operation, expected_asset, expected_prepay, clamped) in [
         (

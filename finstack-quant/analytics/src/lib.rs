@@ -93,7 +93,7 @@ pub(crate) mod risk_metrics;
 pub mod schema;
 
 pub use aggregation::{PeriodStats, PeriodicReturn};
-pub use benchmark::{beta, BetaResult, GreeksResult, RollingGreeks};
+pub use benchmark::{BetaResult, GreeksResult, RollingGreeks, beta};
 pub use defaults::{
     DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR,
     DEFAULT_PERIODIC_FREQUENCY, DEFAULT_PERIODS_PER_YEAR, DEFAULT_RISK_FREE_RATE,
@@ -103,7 +103,7 @@ pub use drawdown::DrawdownEpisode;
 pub use multi_factor::{MultiFactorResult, ReturnKind};
 pub use performance::{LookbackReturns, Performance};
 pub use risk_metrics::{
-    max_drawdown, sharpe, sortino, volatility, CagrDayCount, DatedSeries, RollingMetric,
+    CagrDayCount, DatedSeries, RollingMetric, max_drawdown, sharpe, sortino, volatility,
 };
 
 #[cfg(test)]

@@ -6,8 +6,8 @@ use finstack_quant_core::{
     dates::Date,
     market_data::{context::MarketContext, term_structures::DiscountCurve},
     math::interp::InterpStyle,
-    money::fx::{FxConversionPolicy, FxMatrix, FxProvider},
     money::Money,
+    money::fx::{FxConversionPolicy, FxMatrix, FxProvider},
     types::InstrumentId,
 };
 pub use finstack_quant_test_utils::assert::approx_eq;

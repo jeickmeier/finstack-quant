@@ -4,7 +4,7 @@ use finstack_quant_models::credit::lgd::{
     CollateralPiece, DownturnLgd, EadCalculator, WorkoutCollateralType, WorkoutCosts, WorkoutLgd,
 };
 use finstack_quant_models::credit::migration::{
-    project, GeneratorMatrix, MigrationSimulator, RatingScale, TransitionMatrix,
+    GeneratorMatrix, MigrationSimulator, RatingScale, TransitionMatrix, project,
 };
 use finstack_quant_models::credit::pd::MasterScale;
 

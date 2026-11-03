@@ -14,7 +14,7 @@
 
 use crate::instruments::Instrument;
 use crate::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
 };
 use crate::results::ValuationResult;
 use finstack_quant_core::market_data::context::MarketContext;

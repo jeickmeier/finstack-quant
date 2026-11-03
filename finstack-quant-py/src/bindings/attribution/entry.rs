@@ -3,7 +3,7 @@
 use crate::bindings::attribution::pnl_attribution::{PyPnlAttribution, WIDE_COLUMNS};
 use crate::bindings::attribution::result_envelope::PyAttributionResultEnvelope;
 use crate::bindings::attribution::return_contribution::{
-    extract_return_contribution_spec, PyReturnContributionResult,
+    PyReturnContributionResult, extract_return_contribution_spec,
 };
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::money::PyMoney;

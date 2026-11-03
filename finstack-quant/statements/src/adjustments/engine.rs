@@ -84,7 +84,10 @@ pub fn normalize(
                 .copied()
                 .unwrap_or(NodeValueType::Scalar);
             if source_type != value_type {
-                return Err(Error::eval(format!("Normalization target '{}' ({value_type:?}) and reference '{node}' ({source_type:?}) have incompatible units", config.target_node)));
+                return Err(Error::eval(format!(
+                    "Normalization target '{}' ({value_type:?}) and reference '{node}' ({source_type:?}) have incompatible units",
+                    config.target_node
+                )));
             }
         }
     }
@@ -452,9 +455,10 @@ mod tests {
             .expect("unique adjustment id");
 
         let err = normalize(&results, &config).expect_err("missing reference period should fail");
-        assert!(err
-            .to_string()
-            .contains("Reference node 'Revenue' has no value for period 2025Q2"));
+        assert!(
+            err.to_string()
+                .contains("Reference node 'Revenue' has no value for period 2025Q2")
+        );
     }
 
     #[test]

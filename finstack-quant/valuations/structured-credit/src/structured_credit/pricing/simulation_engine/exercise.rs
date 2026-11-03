@@ -239,10 +239,11 @@ pub(super) fn worst_call_period(
     let last = period_dates.len() - 1;
     let mut best: Option<(f64, Option<usize>)> = None;
     let mut consider = |value: Result<f64>, period: Option<usize>| {
-        if let Ok(y) = value {
-            if y.is_finite() && best.is_none_or(|(b, _)| y < b) {
-                best = Some((y, period));
-            }
+        if let Ok(y) = value
+            && y.is_finite()
+            && best.is_none_or(|(b, _)| y < b)
+        {
+            best = Some((y, period));
         }
     };
     consider(yield_to(last, None), None);

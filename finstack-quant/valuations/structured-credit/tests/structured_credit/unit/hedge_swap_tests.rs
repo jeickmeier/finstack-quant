@@ -8,19 +8,19 @@ use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{
     DefaultModelSpec, FloatingRateSpec, PrepaymentModelSpec, RecoveryModelSpec,
 };
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    execute_waterfall, AssetPool, CoverageTestSpec, DealType, HedgeSwap, PaymentType, PoolAsset,
-    Recipient, StructuredCredit, SwapNotional, SwapPriority, Tranche, TrancheCashflows,
-    TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
+    AssetPool, CoverageTestSpec, DealType, HedgeSwap, PaymentType, PoolAsset, Recipient,
+    StructuredCredit, SwapNotional, SwapPriority, Tranche, TrancheCashflows, TrancheStructure,
+    Waterfall, WaterfallContext, WaterfallTier, execute_waterfall,
 };
 use time::macros::date;
 
@@ -291,11 +291,13 @@ fn swap_payments_rank_as_fees_and_tighten_the_ic_test() {
         ],
         "a junior swap payment opens a fee tier after the coupons, ahead of principal"
     );
-    assert!(junior
-        .tiers
-        .iter()
-        .enumerate()
-        .all(|(index, tier)| tier.priority == index + 1));
+    assert!(
+        junior
+            .tiers
+            .iter()
+            .enumerate()
+            .all(|(index, tier)| tier.priority == index + 1)
+    );
 
     // A's coupon needs the SOFR fixing; use a fixed-coupon twin of the deal
     // for the executor-level comparison.

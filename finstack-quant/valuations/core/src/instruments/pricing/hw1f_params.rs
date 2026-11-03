@@ -6,11 +6,11 @@
 //! performs a fit, or substitutes model defaults.
 
 use crate::instruments::pricing_overrides::ModelConfig;
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::Result;
 use finstack_quant_models::rates::hull_white::{
-    capfloor_hw1f_scalar_keys, hw1f_scalar_keys, HullWhiteCalibrationParams,
+    HullWhiteCalibrationParams, capfloor_hw1f_scalar_keys, hw1f_scalar_keys,
 };
 
 /// Finite-difference step for Hull-White short-rate σ sensitivities

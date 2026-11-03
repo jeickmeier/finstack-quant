@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use finstack_quant_core::math::special_functions::norm_cdf;
 
-use super::types::{check_finite, CreditScoringError, ScoringResult, ScoringZone};
+use super::types::{CreditScoringError, ScoringResult, ScoringZone, check_finite};
 
 /// Input for the Zmijewski (1984) probit bankruptcy prediction model.
 ///

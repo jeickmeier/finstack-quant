@@ -2,7 +2,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -14,6 +14,8 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::ExerciseStyle;
+use finstack_quant_valuations::instruments::FloatLegSpec;
+use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
 use finstack_quant_valuations::instruments::rates::cap_floor::{CapFloor, RateOptionType};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
@@ -22,8 +24,6 @@ use finstack_quant_valuations::instruments::rates::ir_future::{
     FutureContractSpecs, InterestRateFuture,
 };
 use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Repo};
-use finstack_quant_valuations::instruments::FloatLegSpec;
-use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::instruments::{Instrument, PayReceive, SettlementType};
 use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use finstack_quant_valuations::metrics::MetricId;

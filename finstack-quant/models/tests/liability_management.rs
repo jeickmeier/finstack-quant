@@ -2,7 +2,7 @@
 
 use finstack_quant_core::wire::{serde_label, serde_parse};
 use finstack_quant_models::credit::liability_management::{
-    analyze_exchange_offer, analyze_lme, ExchangeType, LmeType, TENDER_RECOMMENDATION_HURDLE,
+    ExchangeType, LmeType, TENDER_RECOMMENDATION_HURDLE, analyze_exchange_offer, analyze_lme,
 };
 
 #[test]

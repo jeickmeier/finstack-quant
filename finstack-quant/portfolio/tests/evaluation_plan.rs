@@ -10,20 +10,20 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::valuation::{
-    value_portfolio, value_portfolio_at, PortfolioValuationOptions, RequestedMetrics,
+    PortfolioValuationOptions, RequestedMetrics, value_portfolio, value_portfolio_at,
 };
-use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::results::ValuationResult;
 use std::any::Any;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
+    atomic::{AtomicUsize, Ordering},
 };
 use time::macros::date;
 
@@ -356,9 +356,11 @@ fn strict_and_best_effort_profiles_remain_distinct() {
         },
     )
     .expect_err("strict profile must not reuse a degraded result");
-    assert!(strict_error
-        .to_string()
-        .contains("configured metric failure for INSTRUMENT_0000"));
+    assert!(
+        strict_error
+            .to_string()
+            .contains("configured metric failure for INSTRUMENT_0000")
+    );
     assert_eq!(probes[0].metric_calls.load(Ordering::SeqCst), 2);
     assert_eq!(
         probes[0].base_calls.load(Ordering::SeqCst),

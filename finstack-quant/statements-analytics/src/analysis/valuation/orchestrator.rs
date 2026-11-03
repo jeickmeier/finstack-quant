@@ -4,7 +4,7 @@
 //! statement evaluation, credit instrument pricing, and equity valuation
 //! in a single pipeline.
 
-use crate::analysis::credit::{compute_credit_context, CreditContextMetrics, CreditNumeratorNodes};
+use crate::analysis::credit::{CreditContextMetrics, CreditNumeratorNodes, compute_credit_context};
 use crate::analysis::valuation::corporate::{CorporateValuationResult, DcfOptions};
 use finstack_quant_core::dates::{Date, Period, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -630,8 +630,8 @@ mod tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use finstack_quant_statements::builder::ModelBuilder;
-    use finstack_quant_statements::checks::builtins::NonFiniteCheck;
     use finstack_quant_statements::checks::CheckSuite;
+    use finstack_quant_statements::checks::builtins::NonFiniteCheck;
     use finstack_quant_statements::types::AmountOrScalar;
     use time::macros::date;
 
@@ -698,13 +698,15 @@ mod tests {
         assert!(result.equity.is_none());
         assert!(result.credit.is_empty());
         assert!(!result.ev_suppressed_non_positive);
-        assert!(result
-            .statement
-            .get(
-                "ebitda",
-                &PeriodId::quarter(2025, 1).expect("valid period fixture")
-            )
-            .is_some());
+        assert!(
+            result
+                .statement
+                .get(
+                    "ebitda",
+                    &PeriodId::quarter(2025, 1).expect("valid period fixture")
+                )
+                .is_some()
+        );
     }
 
     #[test]
@@ -1006,23 +1008,27 @@ mod tests {
             "collateral".into(),
             IndexMap::from([(periods[0].id, Money::from((1_000_i64, Currency::EUR)))]),
         );
-        assert!(ltv_reference_path(
-            &periods,
-            &statement,
-            Some("collateral"),
-            None,
-            Currency::USD
-        )
-        .is_err());
+        assert!(
+            ltv_reference_path(
+                &periods,
+                &statement,
+                Some("collateral"),
+                None,
+                Currency::USD
+            )
+            .is_err()
+        );
         statement.monetary_nodes.clear();
-        assert!(ltv_reference_path(
-            &periods,
-            &statement,
-            Some("collateral"),
-            None,
-            Currency::USD
-        )
-        .is_err());
+        assert!(
+            ltv_reference_path(
+                &periods,
+                &statement,
+                Some("collateral"),
+                None,
+                Currency::USD
+            )
+            .is_err()
+        );
     }
 
     #[test]

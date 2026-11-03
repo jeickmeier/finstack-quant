@@ -1,12 +1,12 @@
 //! Credit-factor attribution detail and carry decomposition helpers.
 
-use crate::credit_cascade::{
-    apply_curve_shape_residual, build_credit_factor_attribution, plan_credit_cascade,
-    resolve_issuer, shift_credit_curves_par_spread, single_issuer_by_bucket, CreditStepKind,
-};
-use crate::factors::{MarketRestoreFlags, MarketSnapshot};
 use crate::AttributionRequest;
 use crate::PnlAttribution;
+use crate::credit_cascade::{
+    CreditStepKind, apply_curve_shape_residual, build_credit_factor_attribution,
+    plan_credit_cascade, resolve_issuer, shift_credit_curves_par_spread, single_issuer_by_bucket,
+};
+use crate::factors::{MarketRestoreFlags, MarketSnapshot};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::Result;
 use finstack_quant_factor::credit::hierarchy::CreditFactorModel;
@@ -379,7 +379,7 @@ pub(crate) fn carry_credit_decomposition(
 mod tests {
     use crate::{AttributionMethod, CarryDetail, PnlAttribution, SourceLine};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{create_date, Date};
+    use finstack_quant_core::dates::{Date, create_date};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{
         DiscountCurve, HazardCurve, ValidationMode,
@@ -388,16 +388,16 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, IssuerId};
+    use finstack_quant_factor::ISSUER_ID_META_KEY;
     use finstack_quant_factor::credit::hierarchy::{
         AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditFactorModelSchema,
         CreditHierarchySpec, DateRange, FactorCorrelationMatrix, GenericFactorSpec,
         HierarchyDimension, IssuerBetaMode, IssuerBetaPolicy, IssuerBetaRow, IssuerBetas,
         IssuerTags, LevelsAtAnchor, VolState,
     };
-    use finstack_quant_factor::ISSUER_ID_META_KEY;
     use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
-    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::Instrument;
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use std::sync::Arc;
     use time::Month;
 

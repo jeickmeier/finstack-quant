@@ -5,13 +5,13 @@
 
 use super::AgencyMbsPassthrough;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 /// Generated MBS cashflow for a single period.
 #[derive(Debug, Clone)]
@@ -696,14 +696,18 @@ mod tests {
             .expect("projected schedule should build");
 
         assert!(!schedule.get_flows().is_empty());
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .any(|cf| cf.kind == CFKind::Fixed));
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .any(|cf| matches!(cf.kind, CFKind::Amortization | CFKind::PrePayment)));
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .any(|cf| cf.kind == CFKind::Fixed)
+        );
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .any(|cf| matches!(cf.kind, CFKind::Amortization | CFKind::PrePayment))
+        );
     }
 
     #[test]

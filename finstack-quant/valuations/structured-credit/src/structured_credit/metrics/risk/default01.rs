@@ -17,8 +17,8 @@
 
 use crate::structured_credit::StructuredCredit;
 use finstack_quant_cashflows::builder::DefaultModelSpec;
-use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Standard default bump: 1bp (0.0001) of annual CDR

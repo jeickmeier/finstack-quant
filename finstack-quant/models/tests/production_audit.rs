@@ -1,8 +1,8 @@
 //! Production audit regressions against explicit quote conventions and formulas.
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
 use finstack_quant_models::volatility::{
-    sabr::{SabrCalibrator, SabrParameters},
     VolSource,
+    sabr::{SabrCalibrator, SabrParameters},
 };
 use std::sync::Arc;
 

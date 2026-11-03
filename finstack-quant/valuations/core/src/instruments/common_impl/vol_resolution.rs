@@ -101,10 +101,11 @@ pub fn resolve_volatility(
             shift: source_shift,
         }),
     ) = (convention, source_convention)
+        && (shift - source_shift).abs() > 1e-12
     {
-        if (shift - source_shift).abs() > 1e-12 {
-            return Err(Error::Validation(format!("configured volatility displacement {shift} differs from source displacement {source_shift}")));
-        }
+        return Err(Error::Validation(format!(
+            "configured volatility displacement {shift} differs from source displacement {source_shift}"
+        )));
     }
     let sigma = if let Some(sigma) = overrides.implied_volatility {
         sigma

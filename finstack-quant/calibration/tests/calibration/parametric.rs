@@ -9,16 +9,16 @@ use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::RateQuote;
 use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_calibration::{CalibrationConfig, DiscountCurveSolveConfig};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::term_structures::NsVariant;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::FxHashMap;
 use time::Month;
 
 use crate::calibration::calibration_support as cal_utils;
 
 fn contractual_quote_dates(base: Date, index: &str, tenor: &str) -> (Date, Date) {
-    use finstack_quant_core::dates::{adjust, calendar_by_id_strict, DateExt};
+    use finstack_quant_core::dates::{DateExt, adjust, calendar_by_id_strict};
     use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 
     let registry = ConventionRegistry::try_global().expect("conventions");
@@ -454,9 +454,9 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
 fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_cashflows::builder::RollRule;
-    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{adjust, calendar_by_id_strict, DayCount, DayCountContext};
+    use finstack_quant_core::dates::{DayCount, DayCountContext, adjust, calendar_by_id_strict};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{NelsonSiegelModel, ParametricCurve};
     use finstack_quant_core::market_data::traits::Discounting;

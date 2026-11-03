@@ -667,19 +667,19 @@ fn validate_triangular_bucket_grid(
             "key-rate target bucket must be finite".to_string(),
         ));
     }
-    if let Some(p) = prev {
-        if !p.is_finite() || p >= target {
-            return Err(crate::Error::Validation(
-                "key-rate prev bucket must be finite and before the target bucket".to_string(),
-            ));
-        }
+    if let Some(p) = prev
+        && (!p.is_finite() || p >= target)
+    {
+        return Err(crate::Error::Validation(
+            "key-rate prev bucket must be finite and before the target bucket".to_string(),
+        ));
     }
-    if let Some(n) = next {
-        if !n.is_finite() || target >= n {
-            return Err(crate::Error::Validation(
-                "key-rate next bucket must be finite and after the target bucket".to_string(),
-            ));
-        }
+    if let Some(n) = next
+        && (!n.is_finite() || target >= n)
+    {
+        return Err(crate::Error::Validation(
+            "key-rate next bucket must be finite and after the target bucket".to_string(),
+        ));
     }
     Ok(())
 }
@@ -893,8 +893,8 @@ mod tests {
 
         // 2. Additive Percent
         let spec_pct = BumpSpec::inflation_shift_pct(0.5); // Using helper, treated as Additive Percent
-                                                           // ForwardCurve generic logic handles Additive/Percent -> value/100
-                                                           // So 0.5 -> 0.005. rate = 0.04 + 0.005 = 0.045
+        // ForwardCurve generic logic handles Additive/Percent -> value/100
+        // So 0.5 -> 0.005. rate = 0.04 + 0.005 = 0.045
         let bumped_pct = fc.apply_bump(spec_pct)?;
         assert!((bumped_pct.rate(1.0) - 0.045).abs() < 1e-12);
 

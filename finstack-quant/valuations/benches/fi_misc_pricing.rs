@@ -10,7 +10,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
@@ -19,6 +19,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{MarketScalar, ScalarTimeSeries};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::TrsScheduleSpec;
 use finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo;
 use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
 use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
@@ -28,8 +30,6 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
 };
 use finstack_quant_valuations::instruments::fixed_income::tba::AgencyTba;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::TrsScheduleSpec;
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;

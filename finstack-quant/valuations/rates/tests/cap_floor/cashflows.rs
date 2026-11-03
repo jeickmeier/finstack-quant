@@ -2,9 +2,9 @@
 //!
 //! Validates period generation for multi-period caps and floors.
 
-use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams, SchedulePeriod};
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_cashflows::builder::{BuildPeriodsParams, SchedulePeriod, build_periods};
 use finstack_quant_core::Result;
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use time::macros::date;
 
 fn build_schedule(

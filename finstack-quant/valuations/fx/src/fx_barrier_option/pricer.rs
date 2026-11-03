@@ -1,7 +1,7 @@
 //! FX barrier option pricers (Monte Carlo and analytical).
 
 use crate::fx_barrier_option::types::FxBarrierOption;
-use crate::shared::{collect_fx_option_inputs_at_spot, FxOptionInputRequest, FxOptionInputs};
+use crate::shared::{FxOptionInputRequest, FxOptionInputs, collect_fx_option_inputs_at_spot};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -9,7 +9,7 @@ use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::Monitoring;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
@@ -251,7 +251,7 @@ fn validate_monitoring_state(
 }
 
 use finstack_quant_core::types::BarrierType;
-use finstack_quant_models::closed_form::{barrier_price, barrier_rebate, BarrierParams};
+use finstack_quant_models::closed_form::{BarrierParams, barrier_price, barrier_rebate};
 
 fn expired_barrier_value_per_unit(
     inst: &FxBarrierOption,
@@ -509,8 +509,8 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::types::BarrierType;
     use finstack_quant_core::types::PayoutTiming;
     use finstack_quant_models::closed_form::barrier_rebate;
@@ -539,9 +539,11 @@ mod tests {
             Some(InstrumentType::FxBarrierOption)
         );
         assert_eq!(context.model, Some(ModelKey::FxBarrierBSContinuous));
-        assert!(context
-            .curve_ids
-            .contains(&inst.domestic_discount_curve_id.to_string()));
+        assert!(
+            context
+                .curve_ids
+                .contains(&inst.domestic_discount_curve_id.to_string())
+        );
         assert!(context.curve_ids.contains(&inst.vol_surface_id.to_string()));
     }
 
@@ -562,9 +564,11 @@ mod tests {
         let default_error = inst
             .value(&MarketContext::new(), as_of)
             .expect_err("future monitoring");
-        assert!(default_error
-            .to_string()
-            .contains("Future FX barrier monitoring"));
+        assert!(
+            default_error
+                .to_string()
+                .contains("Future FX barrier monitoring")
+        );
     }
 
     #[test]
@@ -612,9 +616,12 @@ mod tests {
             let expected = inst.notional.amount()
                 * (-0.03_f64).exp()
                 * finstack_quant_models::closed_form::black_call(1.20, strike, 0.15, 1.0);
-            assert!((result.value.amount() - expected).abs() < 5.0 * diagnostics.standard_error,
+            assert!(
+                (result.value.amount() - expected).abs() < 5.0 * diagnostics.standard_error,
                 "expiry-only barrier must equal vanilla within MC uncertainty: actual={}, expected={expected}, stderr={}",
-                result.value.amount(), diagnostics.standard_error);
+                result.value.amount(),
+                diagnostics.standard_error
+            );
         }
     }
 
@@ -987,27 +994,33 @@ mod tests {
 
         let mut bad_strike = FxBarrierOption::example().expect("example");
         bad_strike.strike = 0.0;
-        assert!(bad_strike
-            .validate()
-            .expect_err("bad strike")
-            .to_string()
-            .contains("strike"));
+        assert!(
+            bad_strike
+                .validate()
+                .expect_err("bad strike")
+                .to_string()
+                .contains("strike")
+        );
 
         let mut bad_barrier = FxBarrierOption::example().expect("example");
         bad_barrier.barrier = f64::NAN;
-        assert!(bad_barrier
-            .validate()
-            .expect_err("bad barrier")
-            .to_string()
-            .contains("barrier"));
+        assert!(
+            bad_barrier
+                .validate()
+                .expect_err("bad barrier")
+                .to_string()
+                .contains("barrier")
+        );
 
         let mut bad_notional = FxBarrierOption::example().expect("example");
         bad_notional.notional = Money::from((0_i64, Currency::EUR));
-        assert!(bad_notional
-            .validate()
-            .expect_err("bad notional")
-            .to_string()
-            .contains("notional"));
+        assert!(
+            bad_notional
+                .validate()
+                .expect_err("bad notional")
+                .to_string()
+                .contains("notional")
+        );
     }
 
     #[test]

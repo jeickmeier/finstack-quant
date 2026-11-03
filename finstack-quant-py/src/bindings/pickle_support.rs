@@ -27,14 +27,14 @@ pub(crate) fn reduce_via_json<'py>(
     from_json: Bound<'py, PyAny>,
     payload: String,
 ) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-    if payload.contains("null") {
-        if let Err(err) = from_json.call1((&payload,)) {
-            return Err(crate::errors::value_error(format!(
-                "cannot pickle this value: its JSON form does not round-trip ({err}). \
+    if payload.contains("null")
+        && let Err(err) = from_json.call1((&payload,))
+    {
+        return Err(crate::errors::value_error(format!(
+            "cannot pickle this value: its JSON form does not round-trip ({err}). \
                  This usually means a non-finite float (NaN or infinity), which the \
                  JSON wire format cannot represent."
-            )));
-        }
+        )));
     }
     Ok((from_json, (payload,)))
 }

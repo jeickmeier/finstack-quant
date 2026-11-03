@@ -3,11 +3,11 @@
 use crate::bindings::macros::{label_enum, typed_or_label, wire_methods};
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{Attributes, Bps, CreditRating, Rate};
+use pyo3::IntoPyObjectExt;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyString, PyType};
-use pyo3::IntoPyObjectExt;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 

@@ -5,7 +5,7 @@ use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
-use finstack_quant_portfolio::types::{Entity, DUMMY_ENTITY_ID};
+use finstack_quant_portfolio::types::{DUMMY_ENTITY_ID, Entity};
 use finstack_quant_portfolio::{Error, Portfolio};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use std::sync::Arc;

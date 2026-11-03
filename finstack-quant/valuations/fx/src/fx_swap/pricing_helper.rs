@@ -3,11 +3,11 @@
 //! Centralizes the CIP forward rate calculation and PV decomposition logic
 //! to ensure consistency across the main pricer and all metric calculators.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::fx::FxQuery;
-use finstack_quant_core::Result;
 
 use super::FxSwap;
 
@@ -214,8 +214,8 @@ mod tests {
             currency::Currency,
             market_data::term_structures::DiscountCurve,
             money::{
-                fx::{FxMatrix, SimpleFxProvider},
                 Money,
+                fx::{FxMatrix, SimpleFxProvider},
             },
             types::InstrumentId,
         };
@@ -347,8 +347,8 @@ mod tests {
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::market_data::context::MarketContext;
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
-        use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
         use finstack_quant_core::money::Money;
+        use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
         use finstack_quant_core::types::Attributes;
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use std::sync::Arc;

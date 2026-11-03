@@ -3,14 +3,14 @@
 //! Provides reusable market data setups, mock providers, and utility functions
 //! to maintain DRY principles across the test suite.
 
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 pub use finstack_quant_test_utils::assert::approx_eq;
 use finstack_quant_valuations_fx::fx_swap::FxSwap;
 use std::sync::Arc;

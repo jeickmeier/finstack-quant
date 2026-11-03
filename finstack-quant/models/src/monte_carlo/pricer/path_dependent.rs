@@ -8,8 +8,8 @@ use super::super::results::{MoneyEstimate, MonteCarloResult};
 use super::super::traits::Payoff;
 use crate::monte_carlo::discretization::exact::ExactGbm;
 use crate::monte_carlo::estimate::Estimate;
-use crate::monte_carlo::greeks::lrm::{lrm_delta, lrm_vega_from_scores, LrmGreeks};
-use crate::monte_carlo::payoff::asian::{default_fixing_steps, Asian, AveragingMethod};
+use crate::monte_carlo::greeks::lrm::{LrmGreeks, lrm_delta, lrm_vega_from_scores};
+use crate::monte_carlo::payoff::asian::{Asian, AveragingMethod, default_fixing_steps};
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::ProcessMetadata;
@@ -17,7 +17,7 @@ use crate::monte_carlo::traits::{RandomStream, StochasticProcess};
 use finstack_quant_core::cashflow::flat_discount_factor;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::random::BrownianBridge;
-use finstack_quant_core::math::random::{SobolRng, MAX_SOBOL_DIMENSION};
+use finstack_quant_core::math::random::{MAX_SOBOL_DIMENSION, SobolRng};
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::{Error, Result};
@@ -258,18 +258,16 @@ impl PathDependentPricerConfig {
                     .to_string(),
             ));
         }
-        if self.path_capture.enabled {
-            if let crate::monte_carlo::engine::PathCaptureMode::Sample { count, .. } =
+        if self.path_capture.enabled
+            && let crate::monte_carlo::engine::PathCaptureMode::Sample { count, .. } =
                 self.path_capture.capture_mode
-            {
-                if count == 0 || count > self.num_paths {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "PathDependentPricerConfig: path-capture sample count must satisfy \
+            && (count == 0 || count > self.num_paths)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "PathDependentPricerConfig: path-capture sample count must satisfy \
                          1 <= count <= num_paths (got count = {count}, num_paths = {})",
-                        self.num_paths
-                    )));
-                }
-            }
+                self.num_paths
+            )));
         }
         Ok(())
     }
@@ -1487,16 +1485,18 @@ mod tests {
             )
             .expect("antithetic estimate");
         assert_eq!(estimate.num_simulated_paths, 64);
-        assert!(pricer
-            .price_with_paths_and_grid(
-                &gbm,
-                100.0,
-                TimeGrid::uniform(1.0, 4).expect("grid"),
-                &call,
-                Currency::USD,
-                0.95
-            )
-            .is_err());
+        assert!(
+            pricer
+                .price_with_paths_and_grid(
+                    &gbm,
+                    100.0,
+                    TimeGrid::uniform(1.0, 4).expect("grid"),
+                    &call,
+                    Currency::USD,
+                    0.95
+                )
+                .is_err()
+        );
     }
 
     #[test]

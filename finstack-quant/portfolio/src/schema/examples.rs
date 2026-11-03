@@ -6,9 +6,9 @@
 //! through the contract type so a payload the type rejects cannot be published;
 //! they describe the one-deposit portfolio of the materialization example.
 
-use finstack_quant_core::schema::{example, example_from_json};
 use finstack_quant_core::Result;
-use serde_json::{json, Value};
+use finstack_quant_core::schema::{example, example_from_json};
+use serde_json::{Value, json};
 
 fn usd(amount: &str) -> Value {
     json!({"amount": amount, "currency": "USD"})

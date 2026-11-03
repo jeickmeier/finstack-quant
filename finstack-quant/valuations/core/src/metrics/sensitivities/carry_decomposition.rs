@@ -25,9 +25,9 @@ use crate::instruments::pricing::coupon_period::icma_reference_period;
 use crate::metrics::period_cash::collect_period_cash_cached;
 use crate::metrics::sensitivities::theta::{calculate_theta_date, theta_termination_date};
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::Result;
 use std::sync::Arc;
 
 /// The yield clock a carry decomposition accretes along.
@@ -49,7 +49,7 @@ pub trait YieldClock: Send + Sync {
     ///   quoting convention.
     /// * `rolled_date` - End of the carry horizon.
     fn accretion_factor(&self, context: &MetricContext, ytm: f64, rolled_date: Date)
-        -> Result<f64>;
+    -> Result<f64>;
 }
 
 /// Annual compounding on the context's day count (ACT/365F when none was

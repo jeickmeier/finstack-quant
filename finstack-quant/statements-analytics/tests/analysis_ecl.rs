@@ -5,8 +5,8 @@
 //! input validation, and EAD amortization schedules.
 
 use finstack_quant_statements_analytics::analysis::{
-    compute_ecl_from_curve, CeclConfig, CeclEngine, CeclMethodology, EclConfig, EclConfigBuilder,
-    Exposure, MacroScenario, PdTermStructure, QualitativeFlags, RawPdCurve, Stage,
+    CeclConfig, CeclEngine, CeclMethodology, EclConfig, EclConfigBuilder, Exposure, MacroScenario,
+    PdTermStructure, QualitativeFlags, RawPdCurve, Stage, compute_ecl_from_curve,
 };
 
 fn exposure(id: &str) -> Exposure {
@@ -380,7 +380,7 @@ fn undrawn_ccf_scales_stage1_ecl() {
 
 #[test]
 fn unchanged_rating_still_compares_distinct_pd_snapshots() {
-    use finstack_quant_statements_analytics::analysis::{classify_stage, StagingConfig};
+    use finstack_quant_statements_analytics::analysis::{StagingConfig, classify_stage};
     let exp = exposure("same-rating");
     assert_eq!(
         classify_stage(&exp, 0.20, 0.01, &StagingConfig::default())
@@ -436,24 +436,30 @@ fn impaired_full_loss_is_not_discounted_and_delayed_recovery_increases_loss() {
 fn ecl_rejects_non_finite_curves_and_configs() {
     for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         assert!(RawPdCurve::new("BBB", vec![(0.0, 0.0), (invalid, 0.1)]).is_err());
-        assert!(EclConfig {
-            bucket_width_years: invalid,
-            ..Default::default()
-        }
-        .validate()
-        .is_err());
-        assert!(CeclConfig {
-            bucket_width_years: invalid,
-            ..Default::default()
-        }
-        .validate()
-        .is_err());
-        assert!(CeclConfig {
-            forecast_horizon_years: invalid,
-            ..Default::default()
-        }
-        .validate()
-        .is_err());
+        assert!(
+            EclConfig {
+                bucket_width_years: invalid,
+                ..Default::default()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            CeclConfig {
+                bucket_width_years: invalid,
+                ..Default::default()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            CeclConfig {
+                forecast_horizon_years: invalid,
+                ..Default::default()
+            }
+            .validate()
+            .is_err()
+        );
         let scenario = MacroScenario {
             id: "base".into(),
             weight: 1.0,

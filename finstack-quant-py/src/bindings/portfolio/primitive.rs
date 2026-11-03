@@ -8,7 +8,7 @@ use finstack_quant_valuations::metrics::MetricId;
 
 use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
+use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
 use crate::errors::{core_to_py, portfolio_to_py};
 
 use crate::bindings::json_bridge::{deserialize_json, serialize_json};

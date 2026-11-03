@@ -478,10 +478,10 @@ impl CalibrationReport {
     /// id, carrying the signed residual with no quote value and `NaN` for the
     /// sensitivity that was not recorded.
     pub fn quote_rows(&self) -> Vec<QuoteQuality> {
-        if let Some(diagnostics) = &self.diagnostics {
-            if !diagnostics.per_quote.is_empty() {
-                return diagnostics.per_quote.clone();
-            }
+        if let Some(diagnostics) = &self.diagnostics
+            && !diagnostics.per_quote.is_empty()
+        {
+            return diagnostics.per_quote.clone();
         }
         self.residuals
             .iter()

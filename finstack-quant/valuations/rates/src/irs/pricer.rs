@@ -22,12 +22,12 @@
 //! - Kahan, W. (1965). "Further Remarks on Reducing Truncation Errors." `docs/REFERENCES.md#kahan-1965`
 
 use crate::irs::InterestRateSwap;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::PayReceive;
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
@@ -285,8 +285,8 @@ pub(crate) fn compute_float_leg_pv(
 mod tests {
     use super::*;
     use crate::irs::cashflow::full_signed_schedule_with_curves;
-    use finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay;
     use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay;
 
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCountContext;
@@ -939,7 +939,7 @@ mod tests {
         use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
 
         let as_of = date(2024, 1, 2); // Tuesday
-                                      // Use dates that don't require business day adjustment (both weekdays)
+        // Use dates that don't require business day adjustment (both weekdays)
         let start = date(2024, 3, 4); // Monday
         let end = date(2024, 6, 3); // Monday
 

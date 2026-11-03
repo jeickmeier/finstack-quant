@@ -5,13 +5,13 @@
 //! - [`DiscountedCashFlow`] instrument implementing the standard DCF formula
 
 use crate::dcf_equity::pricer;
+use finstack_quant_core::Error;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_core::Error;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::MarketDependencies;
@@ -149,12 +149,12 @@ impl ValuationDiscounts {
     /// Validate that all discount rates are in `[0.0, 1.0]`.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         fn check(name: &str, val: Option<f64>) -> finstack_quant_core::Result<()> {
-            if let Some(v) = val {
-                if !(0.0..=1.0).contains(&v) {
-                    return Err(Error::Validation(format!(
-                        "{name} must be in [0.0, 1.0], got {v:.6}"
-                    )));
-                }
+            if let Some(v) = val
+                && !(0.0..=1.0).contains(&v)
+            {
+                return Err(Error::Validation(format!(
+                    "{name} must be in [0.0, 1.0], got {v:.6}"
+                )));
             }
             Ok(())
         }
@@ -446,14 +446,14 @@ impl DiscountedCashFlow {
                 )));
             }
         }
-        if let Some(shares) = self.shares_outstanding {
-            if !shares.is_finite() || shares <= 0.0 {
-                return Err(Error::Validation(format!(
-                    "DCF '{}' shares_outstanding must be finite and positive, got {}",
-                    self.id.as_str(),
-                    shares
-                )));
-            }
+        if let Some(shares) = self.shares_outstanding
+            && (!shares.is_finite() || shares <= 0.0)
+        {
+            return Err(Error::Validation(format!(
+                "DCF '{}' shares_outstanding must be finite and positive, got {}",
+                self.id.as_str(),
+                shares
+            )));
         }
         for (i, sec) in self.dilution_securities.iter().enumerate() {
             if !sec.quantity.is_finite() || sec.quantity < 0.0 {
@@ -476,35 +476,33 @@ impl DiscountedCashFlow {
         if let Some(d) = &self.valuation_discounts {
             d.validate()?;
         }
-        if let Some(tf) = self.terminal_flow_override {
-            if !tf.is_finite() {
-                return Err(Error::Validation(format!(
-                    "DCF '{}' terminal_flow_override must be finite, got {}",
-                    self.id.as_str(),
-                    tf
-                )));
-            }
+        if let Some(tf) = self.terminal_flow_override
+            && !tf.is_finite()
+        {
+            return Err(Error::Validation(format!(
+                "DCF '{}' terminal_flow_override must be finite, got {}",
+                self.id.as_str(),
+                tf
+            )));
         }
         self.validate_terminal_value_spec()?;
         if matches!(
             self.terminal_value,
             TerminalValueSpec::GordonGrowth { .. } | TerminalValueSpec::HModel { .. }
         ) && self.terminal_flow_override.is_none()
+            && let Some(spacing) = self.average_flow_spacing_years()
+            && spacing < SUB_ANNUAL_GRID_SPACING_THRESHOLD_YEARS
         {
-            if let Some(spacing) = self.average_flow_spacing_years() {
-                if spacing < SUB_ANNUAL_GRID_SPACING_THRESHOLD_YEARS {
-                    return Err(Error::Validation(format!(
-                        "DCF '{}' has a sub-annual flow grid (average spacing {:.2}y) with a \
+            return Err(Error::Validation(format!(
+                "DCF '{}' has a sub-annual flow grid (average spacing {:.2}y) with a \
                          growth-perpetuity terminal value and no terminal_flow_override; the \
                          last period flow would be capitalized as an annual flow, understating \
                          the terminal value by ~{:.0}x. Set terminal_flow_override to the \
                          trailing-twelve-month aggregate of the final explicit year",
-                        self.id.as_str(),
-                        spacing,
-                        1.0 / spacing
-                    )));
-                }
-            }
+                self.id.as_str(),
+                spacing,
+                1.0 / spacing
+            )));
         }
         Ok(())
     }

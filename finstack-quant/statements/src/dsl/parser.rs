@@ -5,6 +5,7 @@ use crate::error::{Error, Result};
 use crate::types::NodeId;
 use finstack_quant_core::expr::{BinOp, UnaryOp};
 use nom::{
+    IResult, Parser,
     branch::alt,
     bytes::complete::{tag, take_while1},
     character::complete::{char, multispace0, multispace1},
@@ -12,7 +13,6 @@ use nom::{
     multi::separated_list0,
     number::complete::double,
     sequence::{delimited, pair, preceded},
-    IResult, Parser,
 };
 use std::cell::Cell;
 

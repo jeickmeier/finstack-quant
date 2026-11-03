@@ -2,11 +2,11 @@
 
 use crate::templates;
 use crate::{CovenantEngine, CovenantReport, CovenantSpec, HashMapMetricSource};
+use finstack_quant_core::Result;
 use finstack_quant_core::canonical::to_canonical_bytes;
 use finstack_quant_core::dates::parse_iso_date;
-use finstack_quant_core::Result;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 fn roundtrip_json<T>(json: &str) -> Result<String>
 where

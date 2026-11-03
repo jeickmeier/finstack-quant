@@ -132,7 +132,7 @@ macro_rules! instrument_envelope_methods {
     (
         $ty:ident($name:literal, module = $module:literal), $variant:ident,
         builder = $builder:ident($builder_name:literal, $shape:ident),
-        seed = $seed:expr $(,)?
+        seed = $seed:expr_2021 $(,)?
     ) => {
         $crate::bindings::valuations::typed_macros::instrument_envelope_methods!(
             @impl $ty, $name, $module, $variant, $builder, $builder_name, $shape, $seed
@@ -141,13 +141,13 @@ macro_rules! instrument_envelope_methods {
             $ty, $name, $builder, $builder_name, $shape, module = $module
         );
     };
-    (@new_builder fields, $builder:ident, $seed:expr) => {
+    (@new_builder fields, $builder:ident, $seed:expr_2021) => {
         $builder {
             inner: Some($seed),
             fields: Vec::new(),
         }
     };
-    (@new_builder no_fields, $builder:ident, $seed:expr) => {
+    (@new_builder no_fields, $builder:ident, $seed:expr_2021) => {
         $builder { inner: Some($seed) }
     };
     (@repr fields, $builder_name:literal, $slf:ident) => {
@@ -161,7 +161,7 @@ macro_rules! instrument_envelope_methods {
     };
     (
         @impl $ty:ident, $name:literal, $module:literal, $variant:ident, $builder:ident,
-        $builder_name:literal, $shape:ident, $seed:expr
+        $builder_name:literal, $shape:ident, $seed:expr_2021
     ) => {
         #[pymethods]
         impl $ty {
@@ -358,13 +358,13 @@ pub(crate) use pricing_override_methods;
 /// `(stringify!($field), $repr)` in `$slf.fields` for `__repr__`; the
 /// two-argument form is for builders without a `fields` vector.
 macro_rules! builder_set {
-    ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{
+    ($slf:ident, $field:ident, $repr:expr_2021, $apply:expr_2021) => {{
         let b = $crate::bindings::valuations::convert::take_builder(&mut $slf.inner)?;
         $slf.inner = Some($apply(b));
         $slf.fields.push((stringify!($field), $repr));
         Ok($slf)
     }};
-    ($slf:ident, $apply:expr) => {{
+    ($slf:ident, $apply:expr_2021) => {{
         let b = $crate::bindings::valuations::convert::take_builder(&mut $slf.inner)?;
         $slf.inner = Some($apply(b));
         Ok($slf)

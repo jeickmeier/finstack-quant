@@ -36,14 +36,14 @@
 //! let price = valuator.price().unwrap();
 //! ```
 use super::hw_cashflows::{HwExerciseNode, HwExerciseTerms, HwSwaptionCashflows};
-use crate::swaption::types::BermudanType;
 use crate::swaption::BermudanSwaption;
 use crate::swaption::PreparedHullWhiteModel;
-use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use crate::swaption::types::BermudanType;
 use finstack_quant_core::FxHashSet;
 use finstack_quant_core::Result;
-use finstack_quant_models::rates::clock::{model_time, ModelDiscountCurve};
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_models::rates::clock::{ModelDiscountCurve, model_time};
 use finstack_quant_models::trees::tree_framework::TreeDiscounting;
 
 /// Tree valuator for Bermudan swaption pricing.

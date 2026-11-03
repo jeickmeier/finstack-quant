@@ -132,7 +132,7 @@ pub fn evaluate_risk_budget(
     let portfolio_var = js_f64(&portfolio_var, "portfolioVar")?;
     let utilization_threshold = js_opt_f64(utilization_threshold.as_ref(), "utilizationThreshold")?;
     use finstack_quant_factor::risk::{
-        evaluate_risk_budget as eval_risk_budget, DEFAULT_UTILIZATION_THRESHOLD,
+        DEFAULT_UTILIZATION_THRESHOLD, evaluate_risk_budget as eval_risk_budget,
     };
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let actual_var = js_f64_seq(&actual_var, "actualVar")?;

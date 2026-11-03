@@ -9,17 +9,17 @@ pub(crate) use inflation01::Inflation01Calculator;
 
 use self::inflation01::bumped_inflation_market;
 use crate::inflation_linked_bond::InflationLinkedBond;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::math::ZERO_TOLERANCE;
-use finstack_quant_core::Result;
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
+use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 
 /// Register all ILB metrics with the registry
 pub(crate) fn register_ilb_metrics(
@@ -185,9 +185,9 @@ mod inflation_convexity_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::PricingOptions;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::metrics::MetricId;
     use time::macros::date;
 

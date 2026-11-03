@@ -154,14 +154,16 @@ fn total_variance_materialized_slice_matches_canonical_cube_query() {
 #[test]
 fn vol_cube_and_sabr_parameter_data_reject_invalid_inputs() {
     assert!(SabrParameterData::new(0.03, 0.5, 0.4, -0.2, Some(f64::NAN)).is_err());
-    assert!(VolCube::from_grid(
-        "BAD-EXPIRY",
-        &[0.0],
-        &[5.0],
-        &[SabrParameterData::new(0.03, 0.5, 0.4, -0.2, None).unwrap()],
-        &[0.03],
-    )
-    .is_err());
+    assert!(
+        VolCube::from_grid(
+            "BAD-EXPIRY",
+            &[0.0],
+            &[5.0],
+            &[SabrParameterData::new(0.03, 0.5, 0.4, -0.2, None).unwrap()],
+            &[0.03],
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -314,7 +316,7 @@ fn test_vol_cube_materialize_expiry_slice() {
 
 #[test]
 fn expiry_slice_preserves_coordinates_through_vol_source() {
-    use finstack_quant_models::volatility::{materialize_cube_expiry_slice, VolSource};
+    use finstack_quant_models::volatility::{VolSource, materialize_cube_expiry_slice};
     use std::sync::Arc;
     let p0 = SabrParameterData::new(0.1, 1.0, 0.0, 0.0, None).unwrap();
     let p1 = SabrParameterData::new(0.3, 1.0, 0.0, 0.0, None).unwrap();
@@ -333,8 +335,8 @@ fn expiry_slice_preserves_coordinates_through_vol_source() {
 fn shifted_materialization_preserves_convention_and_displacement_rows() {
     use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
     use finstack_quant_models::volatility::{
-        materialize_cube_expiry_slice, materialize_cube_tenor_slice, VolSource,
-        VolatilityConvention,
+        VolSource, VolatilityConvention, materialize_cube_expiry_slice,
+        materialize_cube_tenor_slice,
     };
     use std::sync::Arc;
     let p0 = SabrParameterData::new(0.2, 1.0, 0.0, 0.0, Some(0.02)).unwrap();
@@ -342,9 +344,11 @@ fn shifted_materialization_preserves_convention_and_displacement_rows() {
     let cube = VolCube::from_grid("SHIFT", &[1.0, 3.0], &[5.0], &[p0, p1], &[0.03; 2]).unwrap();
     let surface = materialize_cube_tenor_slice(&cube, 5.0, &[0.02, 0.03, 0.04]).unwrap();
     assert_eq!(surface.quote_type(), VolQuoteType::ShiftedBlackLognormal);
-    assert!(surface
-        .require_quote_type(VolQuoteType::BlackLognormal)
-        .is_err());
+    assert!(
+        surface
+            .require_quote_type(VolQuoteType::BlackLognormal)
+            .is_err()
+    );
     assert_eq!(surface.displacements(), Some(&[0.02, 0.04][..]));
     let restored: VolSurface =
         serde_json::from_str(&serde_json::to_string(&surface).unwrap()).unwrap();
@@ -696,8 +700,8 @@ fn zero_vol_of_vol_cube_preserves_the_exact_black_limit() {
 #[test]
 fn cube_convention_and_vol_lookups_are_bit_stable() {
     use finstack_quant_models::volatility::{
-        get_cube_normal_vol, get_cube_normal_vol_clamped, get_cube_vol, get_cube_vol_clamped,
-        VolSource, VolatilityConvention,
+        VolSource, VolatilityConvention, get_cube_normal_vol, get_cube_normal_vol_clamped,
+        get_cube_vol, get_cube_vol_clamped,
     };
     use std::sync::Arc;
 

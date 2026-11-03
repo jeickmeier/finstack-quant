@@ -5,7 +5,7 @@
 //! which offsets most of the gain from recovering more.
 
 use crate::instruments::test_support::credit::{
-    calibrated_hazard_curve_from_spec, pricing_options, CalibratedHazardSpec,
+    CalibratedHazardSpec, calibrated_hazard_curve_from_spec, pricing_options,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;

@@ -558,7 +558,7 @@ impl TrancheBuilder {
                     "attach_pct and detach_pct must be set together, or both omitted so the \
                      TrancheStructure derives them from the balances"
                         .to_string(),
-                ))
+                ));
             }
         };
         let seniority = self.seniority.ok_or_else(|| {
@@ -871,7 +871,10 @@ impl TrancheStructure {
 
         for tranche in &sorted_tranches {
             if (tranche.effective_attach_pct() - expected_attachment).abs() > TOLERANCE {
-                return Err(finstack_quant_core::Error::Validation(format!("tranche attachment {} does not continue from the previous detachment {expected_attachment}", tranche.effective_attach_pct())));
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "tranche attachment {} does not continue from the previous detachment {expected_attachment}",
+                    tranche.effective_attach_pct()
+                )));
             }
             if tranche.effective_detach_pct() <= tranche.effective_attach_pct() {
                 return Err(finstack_quant_core::Error::Validation(

@@ -222,19 +222,15 @@ impl CorrelationStructure {
                 let mut count = 0;
                 for i in 0..n {
                     for j in 0..n {
-                        if i != j {
-                            if let Some(value) = correlations.get(i * n + j) {
-                                sum += *value;
-                                count += 1;
-                            }
+                        if i != j
+                            && let Some(value) = correlations.get(i * n + j)
+                        {
+                            sum += *value;
+                            count += 1;
                         }
                     }
                 }
-                if count > 0 {
-                    sum / count as f64
-                } else {
-                    0.0
-                }
+                if count > 0 { sum / count as f64 } else { 0.0 }
             }
         }
     }
@@ -543,11 +539,13 @@ mod tests {
     fn constructors_and_serde_reject_invalid_input() {
         assert!(CorrelationStructure::flat(1.5, -0.3).is_err());
         assert!(CorrelationStructure::sectored(0.3, -0.1, -0.2).is_err());
-        assert!(CorrelationStructure::matrix(
-            vec![1.0, 0.2, 0.2],
-            vec!["A".to_string(), "B".to_string()],
-        )
-        .is_err());
+        assert!(
+            CorrelationStructure::matrix(
+                vec![1.0, 0.2, 0.2],
+                vec!["A".to_string(), "B".to_string()],
+            )
+            .is_err()
+        );
 
         let invalid =
             r#"{"structure":"flat","asset_correlation":1.5,"prepay_default_correlation":-0.3}"#;
@@ -640,9 +638,11 @@ mod tests {
         };
         let result = corr.validate();
         assert!(result.is_err());
-        assert!(result
-            .expect_err("expected validation error for non-unit diagonal")
-            .contains("Diagonal"));
+        assert!(
+            result
+                .expect_err("expected validation error for non-unit diagonal")
+                .contains("Diagonal")
+        );
     }
 
     #[test]
@@ -653,9 +653,11 @@ mod tests {
         };
         let result = corr.validate();
         assert!(result.is_err());
-        assert!(result
-            .expect_err("expected validation error for non-symmetric matrix")
-            .contains("symmetric"));
+        assert!(
+            result
+                .expect_err("expected validation error for non-symmetric matrix")
+                .contains("symmetric")
+        );
     }
 
     #[test]

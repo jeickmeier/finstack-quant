@@ -4,8 +4,8 @@ pub(crate) mod contributions;
 mod functions;
 mod stress;
 use budget::{
-    evaluate_risk_budget, evaluate_risk_budget_from_decomposition, PyPositionBudgetEntry,
-    PyRiskBudgetResult,
+    PyPositionBudgetEntry, PyRiskBudgetResult, evaluate_risk_budget,
+    evaluate_risk_budget_from_decomposition,
 };
 pub(crate) use contributions::PyRiskDecomposition;
 use contributions::{
@@ -18,7 +18,7 @@ use functions::{
 };
 use pyo3::prelude::*;
 use stress::{
-    build_stress_attribution, PyStressAttribution, PyStressPositionEntry, PyTailScenarioBreakdown,
+    PyStressAttribution, PyStressPositionEntry, PyTailScenarioBreakdown, build_stress_attribution,
 };
 /// Register models-owned factor-risk classes and pure calculation functions.
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -281,13 +281,13 @@ impl CdsQuote {
     ///
     /// ISDA-style upfront quotes are only supported with standard running coupons.
     fn validate_market_conventions(&self) -> Result<()> {
-        if let CdsQuote::CdsUpfront { coupon_bp, .. } = self {
-            if !is_standard_upfront_running_coupon_bp(*coupon_bp) {
-                return Err(Error::Validation(format!(
-                    "CDS upfront quotes require a standard running coupon of 25bp, 100bp, 500bp or 1000bp; got {}bp",
-                    coupon_bp
-                )));
-            }
+        if let CdsQuote::CdsUpfront { coupon_bp, .. } = self
+            && !is_standard_upfront_running_coupon_bp(*coupon_bp)
+        {
+            return Err(Error::Validation(format!(
+                "CDS upfront quotes require a standard running coupon of 25bp, 100bp, 500bp or 1000bp; got {}bp",
+                coupon_bp
+            )));
         }
 
         Ok(())

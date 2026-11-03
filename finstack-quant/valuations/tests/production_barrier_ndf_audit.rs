@@ -12,7 +12,7 @@ use finstack_quant_core::{
     types::BarrierType,
 };
 use finstack_quant_valuations::instruments::{
-    exotics::barrier_option::BarrierOption, fx::ndf::Ndf, Instrument, NdfQuoteConvention,
+    Instrument, NdfQuoteConvention, exotics::barrier_option::BarrierOption, fx::ndf::Ndf,
 };
 use time::macros::date;
 

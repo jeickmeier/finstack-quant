@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 
 use crate::bindings::pandas_utils::{
-    serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
+    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::bindings::portfolio::attribution::PyReconciliationReport;
 use crate::errors::{portfolio_to_py, serde_json_to_py};

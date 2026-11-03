@@ -1,7 +1,7 @@
 //! JSON Schema contract tests for scenario envelopes.
 
 use finstack_quant_valuations::pricer::InstrumentType;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Render through the registry: only that path applies the packager, the
 /// single-branch-union collapse and examples, which is what is checked in.
@@ -120,14 +120,18 @@ fn checked_in_schema_keeps_meaningful_nested_validation() {
     let schema = checked_in_schema();
 
     assert!(schema.pointer("/$defs/ScenarioSpec").is_some());
-    assert!(schema
-        .pointer("/$defs/InstrumentType/oneOf")
-        .and_then(Value::as_array)
-        .is_some_and(|variants| variants.len() > 50));
-    assert!(schema
-        .pointer("/$defs/OperationSpec/oneOf")
-        .and_then(Value::as_array)
-        .is_some_and(|variants| variants.len() > 10));
+    assert!(
+        schema
+            .pointer("/$defs/InstrumentType/oneOf")
+            .and_then(Value::as_array)
+            .is_some_and(|variants| variants.len() > 50)
+    );
+    assert!(
+        schema
+            .pointer("/$defs/OperationSpec/oneOf")
+            .and_then(Value::as_array)
+            .is_some_and(|variants| variants.len() > 10)
+    );
     assert_eq!(
         schema.pointer("/properties/scenario/$ref"),
         Some(&json!("#/$defs/ScenarioSpec"))
@@ -158,10 +162,12 @@ fn scenario_spec_artifact_is_the_envelope_scenario_standing_alone() {
         schema["$id"],
         "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json"
     );
-    assert!(schema
-        .pointer("/$defs/OperationSpec/oneOf")
-        .and_then(Value::as_array)
-        .is_some_and(|variants| variants.len() > 10));
+    assert!(
+        schema
+            .pointer("/$defs/OperationSpec/oneOf")
+            .and_then(Value::as_array)
+            .is_some_and(|variants| variants.len() > 10)
+    );
 
     let example = schema["examples"][0].clone();
     assert_eq!(

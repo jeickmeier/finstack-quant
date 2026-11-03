@@ -31,5 +31,5 @@ pub(crate) mod metrics;
 mod pricing;
 mod types;
 
-pub use pricing::{FacilityProjection, FACILITY_TRANCHE_ID, RESIDUAL_TRANCHE_ID};
+pub use pricing::{FACILITY_TRANCHE_ID, FacilityProjection, RESIDUAL_TRANCHE_ID};
 pub use types::{AmortizationEvent, AssetBackedFacility, AssetBackedFacilityBuilder, TermOutSpec};

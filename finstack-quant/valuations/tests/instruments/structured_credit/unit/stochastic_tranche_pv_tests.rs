@@ -236,15 +236,21 @@ fn stochastic_json_result_contains_full_tranche_details() {
 
     assert_eq!(details.tranche_results.len(), sc.tranches.tranches.len());
     assert_eq!(result.value, details.npv);
-    assert!(result
-        .measures
-        .contains_key(&MetricId::custom("expected_loss")));
-    assert!(result
-        .measures
-        .contains_key(&MetricId::custom("tranche_npv::SR")));
-    assert!(result
-        .measures
-        .contains_key(&MetricId::custom("tranche_expected_loss::EQ")));
+    assert!(
+        result
+            .measures
+            .contains_key(&MetricId::custom("expected_loss"))
+    );
+    assert!(
+        result
+            .measures
+            .contains_key(&MetricId::custom("tranche_npv::SR"))
+    );
+    assert!(
+        result
+            .measures
+            .contains_key(&MetricId::custom("tranche_expected_loss::EQ"))
+    );
 }
 
 #[test]

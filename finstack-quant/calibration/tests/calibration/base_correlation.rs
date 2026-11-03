@@ -1,5 +1,6 @@
 //! Base-correlation calibration must reprice the complete settlement-quoted trade.
 
+use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationSchema,
@@ -8,11 +9,10 @@ use finstack_quant_calibration::api::schema::{
 use finstack_quant_calibration::quotes::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::QuoteId;
-use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    adjust, calendar_by_id_strict, prev_cds_date, Date, DateExt, DayCount,
+    Date, DateExt, DayCount, adjust, calendar_by_id_strict, prev_cds_date,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
@@ -22,8 +22,8 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations_credit::cds_tranche::{CdsTranche, CdsTranchePricer};
 use std::sync::Arc;
 use time::Month;

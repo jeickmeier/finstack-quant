@@ -27,8 +27,8 @@ use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Teno
 use finstack_quant_core::market_data::term_structures::DiscountCurve as CoreDiscCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use time::Month;
 
 #[test]
@@ -1419,7 +1419,7 @@ fn test_weighted_average_life_ignores_coupons() {
 fn lagged_redemption_matches_final_coupon_on_weekend_maturity() {
     let issue = Date::from_calendar_date(2025, Month::January, 17).unwrap(); // Friday
     let maturity = Date::from_calendar_date(2026, Month::January, 17).unwrap(); // Saturday
-                                                                                // Following: Sat 17 -> Mon 19; +2 business days -> Wed 21.
+    // Following: Sat 17 -> Mon 19; +2 business days -> Wed 21.
     let redemption_date = Date::from_calendar_date(2026, Month::January, 21).unwrap();
 
     let float = FloatingCouponSpec {

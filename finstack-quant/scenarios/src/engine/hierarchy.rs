@@ -4,11 +4,11 @@ use super::ScenarioMarketTarget;
 use crate::error::Result;
 use crate::spec::{CurveKind, OperationSpec};
 use crate::warning::Warning;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::market_data::hierarchy::{
     HierarchyTarget, MarketDataHierarchy, ResolutionMode,
 };
 use finstack_quant_core::types::{CurveId, PriceId};
-use finstack_quant_core::FxHashMap;
 
 struct HierarchyExpansion {
     matched_depth: usize,

@@ -784,12 +784,12 @@ fn validate_constraints(constraints: OvernightRateConstraints) -> Result<()> {
             )));
         }
     }
-    if let (Some(floor), Some(cap)) = (constraints.index_floor_bp, constraints.index_cap_bp) {
-        if floor > cap {
-            return Err(Error::Validation(format!(
-                "overnight replay index floor {floor} bp exceeds index cap {cap} bp"
-            )));
-        }
+    if let (Some(floor), Some(cap)) = (constraints.index_floor_bp, constraints.index_cap_bp)
+        && floor > cap
+    {
+        return Err(Error::Validation(format!(
+            "overnight replay index floor {floor} bp exceeds index cap {cap} bp"
+        )));
     }
     Ok(())
 }

@@ -2,10 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use finstack_quant_statements::checks::{get_finite_node_value, sum_nodes};
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
 };
+use finstack_quant_statements::checks::{get_finite_node_value, sum_nodes};
 use finstack_quant_statements::types::NodeId;
 use finstack_quant_statements::{Error, Result};
 

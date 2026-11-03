@@ -9,7 +9,7 @@ use finstack_quant_attribution::{
 use finstack_quant_core::config::ResultsMeta;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use time::macros::date;
 

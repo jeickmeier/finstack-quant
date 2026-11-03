@@ -21,10 +21,10 @@
 use super::bloomberg_quadrature;
 use crate::cds::CreditDefaultSwap;
 use crate::cds_option::CdsOption;
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
 
@@ -135,8 +135,8 @@ pub(crate) fn implied_vol(
     let f_hi = f(ln_max)?;
     if !f_lo.is_finite() || !f_hi.is_finite() || f_lo * f_hi > 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
-                "implied vol target outside model bounds: target={target_price}, f(σ_min)={f_lo:.3e}, f(σ_max)={f_hi:.3e}"
-            )));
+            "implied vol target outside model bounds: target={target_price}, f(σ_min)={f_lo:.3e}, f(σ_max)={f_hi:.3e}"
+        )));
     }
 
     let initial_log_guess = initial_guess

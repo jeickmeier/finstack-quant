@@ -2,11 +2,11 @@ use finstack_quant_core::math::Compounding;
 use finstack_quant_core::{Error, Result};
 
 use crate::trees::tree_framework::{
-    price_recombining_tree, NodeState, RecombiningInputs, RecombiningLattice, TreeDiscounting,
-    TreeValuator,
+    NodeState, RecombiningInputs, RecombiningLattice, TreeDiscounting, TreeValuator,
+    price_recombining_tree,
 };
 
-use super::black_karasinski::{transition_index, transition_offsets, BkTrinomialLattice};
+use super::black_karasinski::{BkTrinomialLattice, transition_index, transition_offsets};
 use super::{ShortRateModel, ShortRateTree};
 
 impl ShortRateTree {
@@ -71,10 +71,10 @@ impl ShortRateTree {
                 for (offset, probability) in
                     transition_offsets(j_signed, boundary_j_max, node_probs)
                 {
-                    if let Some(idx) = transition_index(j_signed, offset, next_j_max) {
-                        if idx < values.len() {
-                            expected_value += probability * values[idx];
-                        }
+                    if let Some(idx) = transition_index(j_signed, offset, next_j_max)
+                        && idx < values.len()
+                    {
+                        expected_value += probability * values[idx];
                     }
                 }
 

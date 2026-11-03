@@ -15,8 +15,8 @@ use finstack_quant_scenarios::{
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::{
-    instruments::fixed_income::bond::CashflowSpec,
     instruments::Instrument,
+    instruments::fixed_income::bond::CashflowSpec,
     metrics::risk::{MarketScenario, RiskFactorShift, RiskFactorType},
 };
 use time::macros::date;
@@ -66,7 +66,7 @@ fn production_history_reuses_the_pricing_boundary_recalibration_provider() {
     };
     use finstack_quant_valuations::{
         instruments::PricingOptions,
-        metrics::{risk::MarketHistory, MetricId},
+        metrics::{MetricId, risk::MarketHistory},
         recalibration::{
             HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
         },

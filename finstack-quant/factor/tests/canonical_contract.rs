@@ -4,8 +4,9 @@ use std::collections::BTreeMap;
 
 use finstack_quant_core::canonical::{content_hash, to_canonical_bytes};
 use finstack_quant_core::contract::LoadLimits;
-use finstack_quant_core::dates::{create_date, Date, DateExt};
+use finstack_quant_core::dates::{Date, DateExt, create_date};
 use finstack_quant_core::types::IssuerId;
+use finstack_quant_factor::FactorModelConfigEnvelope;
 use finstack_quant_factor::credit::calibration::{
     BucketSizeThresholds, BucketWeighting, CovarianceStrategy, CreditCalibrationConfig,
     CreditCalibrationInputs, CreditCalibrator, GenericFactorSeries, HistoryPanel, IssuerTagPanel,
@@ -15,7 +16,6 @@ use finstack_quant_factor::credit::hierarchy::{
     CreditFactorModel, CreditHierarchySpec, GenericFactorSpec, HierarchyDimension,
     IssuerBetaPolicy, IssuerTags,
 };
-use finstack_quant_factor::FactorModelConfigEnvelope;
 use time::Month;
 
 fn config_bytes(overrides: &str) -> Vec<u8> {

@@ -17,17 +17,17 @@
 use finstack_quant_core::market_data::traits::Discounting;
 use std::sync::Arc;
 
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCountContext};
-use finstack_quant_core::Result;
 
 use crate::loan_quotes::{
     all_in_rate_from_schedule, pv_with_discount_margin, solve_discount_margin,
 };
 use crate::revolving_credit::RevolvingCredit;
+use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_cashflows::builder::RateSpec;
-use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// The facility's settlement schedule, built once per metric context.

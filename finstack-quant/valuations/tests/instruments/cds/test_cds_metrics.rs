@@ -16,10 +16,10 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IndexId};
-use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
+use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::market::conventions::CdsValuationConvention;
+use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::recalibration::QuoteBump;
 use time::macros::date;

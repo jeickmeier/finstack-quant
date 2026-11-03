@@ -68,15 +68,15 @@ impl PeerFilter {
         }
 
         // Market cap range
-        if let Some(min) = self.market_cap_min {
-            if metrics.market_cap.is_none_or(|mc| mc < min) {
-                return false;
-            }
+        if let Some(min) = self.market_cap_min
+            && metrics.market_cap.is_none_or(|mc| mc < min)
+        {
+            return false;
         }
-        if let Some(max) = self.market_cap_max {
-            if metrics.market_cap.is_none_or(|mc| mc > max) {
-                return false;
-            }
+        if let Some(max) = self.market_cap_max
+            && metrics.market_cap.is_none_or(|mc| mc > max)
+        {
+            return false;
         }
 
         if !self.ratings.is_empty() {

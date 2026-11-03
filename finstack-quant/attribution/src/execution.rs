@@ -2,7 +2,7 @@
 
 use crate::spec::{AttributionInputs, AttributionResult, AttributionSpec};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::{currency::Currency, dates::Date, money::Money, Error, Result};
+use finstack_quant_core::{Error, Result, currency::Currency, dates::Date, money::Money};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
@@ -194,17 +194,17 @@ mod tests {
         CashFlowMeta, CashFlowSchedule, CashflowRepresentation,
     };
     use finstack_quant_cashflows::{
-        schedule_from_classified_flows, CashflowScheduleSource, ScheduleBuildOpts,
+        CashflowScheduleSource, ScheduleBuildOpts, schedule_from_classified_flows,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
-    use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
     use finstack_quant_valuations::instruments::MarketDependencies;
+    use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
     use finstack_quant_valuations::pricer::InstrumentType;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use time::macros::date;
 
     #[derive(Clone)]
@@ -373,11 +373,13 @@ mod tests {
                 .get(&Currency::EUR),
             Some(&6)
         );
-        assert!(!finstack_config
-            .rounding
-            .output_scale
-            .get_overrides()
-            .contains_key(&Currency::USD));
+        assert!(
+            !finstack_config
+                .rounding
+                .output_scale
+                .get_overrides()
+                .contains_key(&Currency::USD)
+        );
         assert_eq!(probe.successful_valuations(), 1);
         assert_eq!(instrument.valuation_calls(), 1);
     }

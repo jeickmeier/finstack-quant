@@ -1,15 +1,15 @@
 //! Exact-profile request planning and bounded batch execution.
 
-use super::executor::{evaluate_portfolio, EvaluationInput, PositionExecution, SelectiveSeed};
+use super::executor::{EvaluationInput, PositionExecution, SelectiveSeed, evaluate_portfolio};
 use super::state::{PreparedMarketState, PreparedPortfolioState};
+use crate::Portfolio;
 use crate::error::{Error, Result};
 use crate::valuation::{PortfolioValuation, PortfolioValuationOptions, RequestedMetrics};
-use crate::Portfolio;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations::metrics::MetricId;
 use indexmap::IndexMap;
 use std::sync::Arc;
@@ -529,8 +529,8 @@ mod tests {
     use finstack_quant_valuations::results::ValuationResult;
     use std::any::Any;
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     };
     use time::macros::date;
 
@@ -869,11 +869,13 @@ mod tests {
         let outcome = plan.execute();
         let best_effort_result = outcome.get(best_effort_job).expect("best-effort result");
         assert!(!best_effort_result.degraded_positions.is_empty());
-        assert!(outcome
-            .get(strict_job)
-            .expect_err("strict job must surface metric failure")
-            .to_string()
-            .contains("metric failure for METRICS_INSTRUMENT"));
+        assert!(
+            outcome
+                .get(strict_job)
+                .expect_err("strict job must surface metric failure")
+                .to_string()
+                .contains("metric failure for METRICS_INSTRUMENT")
+        );
         assert_eq!(metric_calls.load(Ordering::SeqCst), 2);
         assert_eq!(base_calls.load(Ordering::SeqCst), 1);
     }
@@ -991,10 +993,12 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(failure_ids[0], first);
         assert_eq!(failure_ids[1], second);
-        assert!(outcome
-            .get(first)
-            .expect_err("first failure")
-            .to_string()
-            .contains("FIRST_INSTRUMENT"));
+        assert!(
+            outcome
+                .get(first)
+                .expect_err("first failure")
+                .to_string()
+                .contains("FIRST_INSTRUMENT")
+        );
     }
 }

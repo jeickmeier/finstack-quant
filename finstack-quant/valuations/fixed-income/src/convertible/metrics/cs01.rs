@@ -21,15 +21,15 @@
 //! [canonical]: finstack_quant_valuations_core::metrics::sensitivities::cs01
 
 use crate::convertible::ConvertibleBond;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::{format_bucket_label, STANDARD_BUCKETS_YEARS};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_valuations_core::metrics::{STANDARD_BUCKETS_YEARS, format_bucket_label};
 use std::borrow::Cow;
 
 /// Pricing setup for a CS01 shock: the bond to reprice, the market holding

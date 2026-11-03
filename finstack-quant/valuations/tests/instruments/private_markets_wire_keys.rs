@@ -11,9 +11,9 @@ use finstack_quant_valuations::instruments::equity::pe_fund::{ClawbackSpec, PeFu
 use finstack_quant_valuations::instruments::equity::real_estate::{
     LeveredRealEstateEquity, RealEstateAsset,
 };
-use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
 
 /// Serialize `value`, apply `edit`, and require deserialization to fail.
 fn assert_rejected<T: Serialize + DeserializeOwned>(value: &T, edit: impl FnOnce(&mut Value)) {

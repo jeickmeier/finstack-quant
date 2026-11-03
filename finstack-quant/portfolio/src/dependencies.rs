@@ -7,11 +7,11 @@
 //! efficient lookup of affected positions
 //! when a subset of market data changes.
 
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::FxHashSet;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::FxHashMap;
-use finstack_quant_core::FxHashSet;
 use finstack_quant_valuations::instruments::MarketDependencies;
 use finstack_quant_valuations::instruments::RatesCurveKind;
 
@@ -543,15 +543,17 @@ pub(crate) mod tests {
                 vec![0]
             );
         }
-        assert!(dependency_index
-            .affected_positions(
-                &[MarketFactorKey::curve(
-                    "INDEX-HZ".into(),
-                    RatesCurveKind::Credit
-                )],
-                &MarketContext::new(),
-            )
-            .is_err());
+        assert!(
+            dependency_index
+                .affected_positions(
+                    &[MarketFactorKey::curve(
+                        "INDEX-HZ".into(),
+                        RatesCurveKind::Credit
+                    )],
+                    &MarketContext::new(),
+                )
+                .is_err()
+        );
     }
 
     #[test]

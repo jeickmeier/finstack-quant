@@ -2,11 +2,10 @@
 
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_covenants::{
-    validate_covenant_engine_json, validate_covenant_report_json, BoundKind,
-    ConsequenceApplication, Covenant, CovenantBreach, CovenantConsequence, CovenantEngine,
-    CovenantForecast, CovenantForecastConfig, CovenantMetricId, CovenantReport, CovenantScope,
-    CovenantSpec, CovenantType, CovenantWindow, FutureBreach, SpringingCondition,
-    ThresholdSchedule, ThresholdTest,
+    BoundKind, ConsequenceApplication, Covenant, CovenantBreach, CovenantConsequence,
+    CovenantEngine, CovenantForecast, CovenantForecastConfig, CovenantMetricId, CovenantReport,
+    CovenantScope, CovenantSpec, CovenantType, CovenantWindow, FutureBreach, SpringingCondition,
+    ThresholdSchedule, ThresholdTest, validate_covenant_engine_json, validate_covenant_report_json,
 };
 use time::Month;
 

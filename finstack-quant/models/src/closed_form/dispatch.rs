@@ -38,7 +38,7 @@
 use finstack_quant_core::{Error, Result};
 
 use super::asian::{arithmetic_asian_tw_price, geometric_asian_price};
-use super::barrier::{barrier_price, BarrierParams};
+use super::barrier::{BarrierParams, barrier_price};
 use super::lookback::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put,
@@ -551,18 +551,20 @@ mod tests {
         );
         // Degenerate maturity with a negative domestic rate drives the price
         // non-finite; the dispatcher must reject it.
-        assert!(quanto_option_price(
-            100.0,
-            100.0,
-            1.0e6,
-            -1.0,
-            0.01,
-            0.0,
-            0.20,
-            0.10,
-            0.3,
-            OptionType::Put,
-        )
-        .is_err());
+        assert!(
+            quanto_option_price(
+                100.0,
+                100.0,
+                1.0e6,
+                -1.0,
+                0.01,
+                0.0,
+                0.20,
+                0.10,
+                0.3,
+                OptionType::Put,
+            )
+            .is_err()
+        );
     }
 }

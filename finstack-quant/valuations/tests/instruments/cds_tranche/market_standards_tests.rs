@@ -11,10 +11,10 @@ use super::helpers::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::distributions::binomial_pmf_all;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
-use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
 
 // ==================== Standard Tranche Structure Tests ====================

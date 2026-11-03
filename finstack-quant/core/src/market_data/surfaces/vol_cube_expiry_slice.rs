@@ -1,7 +1,7 @@
 //! Observed volatility by tenor and strike at one fixed option expiry.
 
 use super::VolQuoteType;
-use crate::{types::CurveId, Error, Result};
+use crate::{Error, Result, types::CurveId};
 
 /// A fixed-expiry slice of a volatility cube with truthful tenor and strike axes.
 ///
@@ -162,26 +162,30 @@ mod tests {
 
     #[test]
     fn slice_rejects_missing_displacement_and_invalid_expiry() {
-        assert!(VolCubeExpirySlice::from_grid(
-            "BAD",
-            1.0,
-            &[5.0],
-            &[0.03],
-            &[0.2],
-            VolQuoteType::ShiftedBlackLognormal,
-            None
-        )
-        .is_err());
-        assert!(VolCubeExpirySlice::from_grid(
-            "BAD",
-            f64::NAN,
-            &[5.0],
-            &[0.03],
-            &[0.2],
-            VolQuoteType::BlackLognormal,
-            None
-        )
-        .is_err());
+        assert!(
+            VolCubeExpirySlice::from_grid(
+                "BAD",
+                1.0,
+                &[5.0],
+                &[0.03],
+                &[0.2],
+                VolQuoteType::ShiftedBlackLognormal,
+                None
+            )
+            .is_err()
+        );
+        assert!(
+            VolCubeExpirySlice::from_grid(
+                "BAD",
+                f64::NAN,
+                &[5.0],
+                &[0.03],
+                &[0.2],
+                VolQuoteType::BlackLognormal,
+                None
+            )
+            .is_err()
+        );
         let slice = VolCubeExpirySlice::from_grid(
             "SHIFT",
             1.0,
@@ -196,16 +200,18 @@ mod tests {
         raw["displacements"] = serde_json::Value::Null;
         assert!(serde_json::from_value::<VolCubeExpirySlice>(raw).is_err());
         for expiry in [0.0, -1.0] {
-            assert!(VolCubeExpirySlice::from_grid(
-                "BAD",
-                expiry,
-                &[5.0],
-                &[0.03],
-                &[0.2],
-                VolQuoteType::BlackLognormal,
-                None,
-            )
-            .is_err());
+            assert!(
+                VolCubeExpirySlice::from_grid(
+                    "BAD",
+                    expiry,
+                    &[5.0],
+                    &[0.03],
+                    &[0.2],
+                    VolQuoteType::BlackLognormal,
+                    None,
+                )
+                .is_err()
+            );
         }
     }
 }

@@ -1,11 +1,11 @@
 //! Bond pricing methods, validation, and cashflow projection.
 
-use finstack_quant_core::validation;
 use finstack_quant_core::Result;
+use finstack_quant_core::validation;
 use rust_decimal::prelude::ToPrimitive;
 
-use super::definitions::Bond;
 use super::CashflowSpec;
+use super::definitions::Bond;
 
 impl Bond {
     /// Whether instrument-owned inputs request the joint rates-credit family
@@ -85,13 +85,14 @@ impl Bond {
         use crate::bond::pricing::hazard;
         use finstack_quant_valuations_core::pricer::ModelKey;
 
-        if model == ModelKey::RatesCredit && self.credit_curve_id.is_none() {
-            if let Some(field) = self.configured_credit_factor_input() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Bond '{}' configures {field} but has no credit_curve_id; add the hazard curve identifier for 'rates_credit' pricing or explicitly select a rates-only model",
-                    self.id
-                )));
-            }
+        if model == ModelKey::RatesCredit
+            && self.credit_curve_id.is_none()
+            && let Some(field) = self.configured_credit_factor_input()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Bond '{}' configures {field} but has no credit_curve_id; add the hazard curve identifier for 'rates_credit' pricing or explicitly select a rates-only model",
+                self.id
+            )));
         }
 
         match model {
@@ -128,7 +129,7 @@ impl Bond {
     ) -> Result<crate::bond::pricing::tree::TreePriceOutcome> {
         use crate::bond::pricing::{
             discount, hazard,
-            tree::{bond_tree_config, bond_tree_settings, TreePriceOutcome, TreePricer},
+            tree::{TreePriceOutcome, TreePricer, bond_tree_config, bond_tree_settings},
         };
         use finstack_quant_valuations_core::pricer::ModelKey;
 
@@ -371,12 +372,11 @@ impl Bond {
             if !(after_boundary && Self::is_holder_cashflow(cf)) {
                 continue;
             }
-            if cf.kind.is_interest_like() {
-                if let Some(rule) = &ex_coupon {
-                    if rule.is_ex_coupon(cf.date, entitlement_date)? {
-                        continue;
-                    }
-                }
+            if cf.kind.is_interest_like()
+                && let Some(rule) = &ex_coupon
+                && rule.is_ex_coupon(cf.date, entitlement_date)?
+            {
+                continue;
             }
             flows.push((cf.date, cf.amount));
         }
@@ -528,8 +528,8 @@ mod tests {
         bond
     }
 
-    fn deterministic_credit_bond_and_market(
-    ) -> (Bond, MarketContext, finstack_quant_core::dates::Date) {
+    fn deterministic_credit_bond_and_market()
+    -> (Bond, MarketContext, finstack_quant_core::dates::Date) {
         let as_of = date!(2025 - 01 - 01);
         let mut bond = Bond::fixed(
             "DETERMINISTIC-CREDIT-BULLET",
@@ -647,11 +647,12 @@ mod tests {
             }],
             puts: Vec::new(),
         });
-        assert!(bond
-            .validate()
-            .expect_err("NaN call price must fail")
-            .to_string()
-            .contains("finite"));
+        assert!(
+            bond.validate()
+                .expect_err("NaN call price must fail")
+                .to_string()
+                .contains("finite")
+        );
 
         let call = &mut bond.call_put.as_mut().expect("schedule").calls[0];
         call.price_pct_of_par = 101.0;
@@ -659,11 +660,12 @@ mod tests {
             reference_curve_id: CurveId::new("USD-TREASURY"),
             spread_bp: f64::INFINITY,
         });
-        assert!(bond
-            .validate()
-            .expect_err("infinite make-whole spread must fail")
-            .to_string()
-            .contains("make-whole"));
+        assert!(
+            bond.validate()
+                .expect_err("infinite make-whole spread must fail")
+                .to_string()
+                .contains("make-whole")
+        );
     }
 
     #[test]

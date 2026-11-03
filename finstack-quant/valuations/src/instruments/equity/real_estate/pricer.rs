@@ -1,9 +1,9 @@
 //! Real estate asset pricer implementation.
 
 use super::RealEstateAsset;
+use finstack_quant_core::Error;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error;
 
 pub(crate) fn compute_pv(
     asset: &RealEstateAsset,
@@ -196,11 +196,11 @@ pub(crate) fn unlevered_flows(
 
     let mut merged: Vec<(Date, f64)> = Vec::with_capacity(noi.len());
     for (date, amount) in noi {
-        if let Some((last_date, last_amount)) = merged.last_mut() {
-            if *last_date == date {
-                *last_amount += amount;
-                continue;
-            }
+        if let Some((last_date, last_amount)) = merged.last_mut()
+            && *last_date == date
+        {
+            *last_amount += amount;
+            continue;
         }
         merged.push((date, amount));
     }

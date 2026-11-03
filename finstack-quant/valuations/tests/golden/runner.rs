@@ -1,7 +1,7 @@
 //! Fixture execution and comparison reporting.
 
 use crate::golden::golden::schema::GoldenFixture;
-use crate::golden::golden::tolerance::{compare, ComparisonResult};
+use crate::golden::golden::tolerance::{ComparisonResult, compare};
 use std::fs::OpenOptions;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};

@@ -13,11 +13,7 @@ use pyo3::prelude::*;
 
 /// Render a bool the way Python's `repr` does.
 fn py_bool(value: bool) -> &'static str {
-    if value {
-        "True"
-    } else {
-        "False"
-    }
+    if value { "True" } else { "False" }
 }
 
 #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer")]

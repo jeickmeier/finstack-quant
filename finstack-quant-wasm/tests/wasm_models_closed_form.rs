@@ -23,19 +23,21 @@ fn barrier_put_dispatches() {
     )
     .expect("finite price");
     assert!(p > 0.0);
-    assert!(barrier_option_price(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(80.0),
-        JsValue::from(0.05),
-        JsValue::from(0.0),
-        JsValue::from(0.2),
-        JsValue::from(1.0),
-        JsValue::from("sideways"),
-        JsValue::from("out"),
-        Some(JsValue::from(false))
-    )
-    .is_err());
+    assert!(
+        barrier_option_price(
+            JsValue::from(100.0),
+            JsValue::from(100.0),
+            JsValue::from(80.0),
+            JsValue::from(0.05),
+            JsValue::from(0.0),
+            JsValue::from(0.2),
+            JsValue::from(1.0),
+            JsValue::from("sideways"),
+            JsValue::from("out"),
+            Some(JsValue::from(false))
+        )
+        .is_err()
+    );
 }
 
 #[wasm_bindgen_test]
@@ -90,24 +92,28 @@ fn black76_and_bachelier_prices_are_positive() {
 
 #[wasm_bindgen_test]
 fn black76_price_rejects_non_positive_df() {
-    assert!(black76_price(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(-0.95),
-        JsValue::from(0.2),
-        JsValue::from(1.0),
-        JsValue::from(true)
-    )
-    .is_err());
-    assert!(black76_price(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(0.0),
-        JsValue::from(0.2),
-        JsValue::from(1.0),
-        JsValue::from(true)
-    )
-    .is_err());
+    assert!(
+        black76_price(
+            JsValue::from(100.0),
+            JsValue::from(100.0),
+            JsValue::from(-0.95),
+            JsValue::from(0.2),
+            JsValue::from(1.0),
+            JsValue::from(true)
+        )
+        .is_err()
+    );
+    assert!(
+        black76_price(
+            JsValue::from(100.0),
+            JsValue::from(100.0),
+            JsValue::from(0.0),
+            JsValue::from(0.2),
+            JsValue::from(1.0),
+            JsValue::from(true)
+        )
+        .is_err()
+    );
 }
 
 #[wasm_bindgen_test]
@@ -138,12 +144,14 @@ fn vanilla_expiry_payoff_call_itm() {
 
 #[wasm_bindgen_test]
 fn vanilla_expiry_payoff_rejects_negative_spot() {
-    assert!(vanilla_expiry_payoff(
-        JsValue::from(-1.0),
-        JsValue::from(100.0),
-        JsValue::from(true)
-    )
-    .is_err());
+    assert!(
+        vanilla_expiry_payoff(
+            JsValue::from(-1.0),
+            JsValue::from(100.0),
+            JsValue::from(true)
+        )
+        .is_err()
+    );
     let put = vanilla_expiry_payoff(
         JsValue::from(0.0),
         JsValue::from(100.0),
@@ -199,16 +207,18 @@ fn bs_price_rejects_non_finite_result() {
         "a non-finite Black-Scholes price must produce an error"
     );
     // A well-posed input still returns a finite price unchanged.
-    assert!(bs_price(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(0.05),
-        JsValue::from(0.02),
-        JsValue::from(0.2),
-        JsValue::from(1.0),
-        JsValue::from(true)
-    )
-    .is_ok());
+    assert!(
+        bs_price(
+            JsValue::from(100.0),
+            JsValue::from(100.0),
+            JsValue::from(0.05),
+            JsValue::from(0.02),
+            JsValue::from(0.2),
+            JsValue::from(1.0),
+            JsValue::from(true)
+        )
+        .is_ok()
+    );
 }
 
 #[wasm_bindgen_test]
@@ -231,19 +241,21 @@ fn quanto_option_price_rejects_non_finite_result() {
         "a non-finite quanto option price must produce an error"
     );
     // A well-posed input still returns a finite price.
-    assert!(quanto_option_price(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(1.0),
-        JsValue::from(0.03),
-        JsValue::from(0.01),
-        JsValue::from(0.0),
-        JsValue::from(0.20),
-        JsValue::from(0.10),
-        JsValue::from(0.3),
-        Some(JsValue::from(true))
-    )
-    .is_ok());
+    assert!(
+        quanto_option_price(
+            JsValue::from(100.0),
+            JsValue::from(100.0),
+            JsValue::from(1.0),
+            JsValue::from(0.03),
+            JsValue::from(0.01),
+            JsValue::from(0.0),
+            JsValue::from(0.20),
+            JsValue::from(0.10),
+            JsValue::from(0.3),
+            Some(JsValue::from(true))
+        )
+        .is_ok()
+    );
 }
 
 #[wasm_bindgen_test]

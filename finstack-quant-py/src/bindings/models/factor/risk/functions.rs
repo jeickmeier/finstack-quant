@@ -8,7 +8,7 @@ use crate::errors::{core_to_py, display_to_py, value_error};
 
 use super::contributions::{PyPositionRiskDecomposition, PyRiskDecomposition};
 use crate::bindings::matrix_input::{
-    extract_position_pnls, extract_square_matrix, PositionPnlMatrix,
+    PositionPnlMatrix, extract_position_pnls, extract_square_matrix,
 };
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::portfolio::sensitivity::PySensitivityMatrix;

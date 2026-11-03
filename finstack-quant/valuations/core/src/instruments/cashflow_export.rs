@@ -57,7 +57,7 @@ use serde::Serialize;
 
 use crate::instruments::Instrument;
 use crate::pricer::{ModelKey, PricerKey};
-use finstack_quant_cashflows::aggregation::{calendar_year_ladder, CalendarYearLadderRow};
+use finstack_quant_cashflows::aggregation::{CalendarYearLadderRow, calendar_year_ladder};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use std::collections::HashMap;
 
@@ -795,7 +795,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{sum_pvs, InstrumentCashflowEnvelope};
+    use super::{InstrumentCashflowEnvelope, sum_pvs};
     use finstack_quant_core::currency::Currency;
 
     fn flow(

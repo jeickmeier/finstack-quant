@@ -672,12 +672,12 @@ impl CovenantSpec {
                 "net debt/EBITDA requires denominator_metric_id".into(),
             ));
         }
-        if let Some(id) = &self.denominator_metric_id {
-            if id.as_str().trim().is_empty() || !self.covenant.covenant_type.is_ratio_max() {
-                return Err(finstack_quant_core::Error::Validation(
+        if let Some(id) = &self.denominator_metric_id
+            && (id.as_str().trim().is_empty() || !self.covenant.covenant_type.is_ratio_max())
+        {
+            return Err(finstack_quant_core::Error::Validation(
                     "denominator_metric_id must name an earnings metric for a built-in leverage covenant".into(),
                 ));
-            }
         }
         Ok(())
     }

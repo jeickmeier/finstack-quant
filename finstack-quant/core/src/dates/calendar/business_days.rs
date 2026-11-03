@@ -593,9 +593,9 @@ pub fn resolve_joint_calendar(
 #[cfg(test)]
 mod serde_tests {
     use super::*;
-    use crate::dates::{create_date, DateExt};
-    use time::macros::date;
+    use crate::dates::{DateExt, create_date};
     use time::Month;
+    use time::macros::date;
 
     struct Jan29Holiday;
     struct Jan30And31Holidays;
@@ -666,9 +666,11 @@ mod serde_tests {
         let july4 = date!(2025 - 07 - 04);
         let joint = calendar_by_id_strict("nyse+gblo").expect("joint");
         assert!(!joint.is_business_day(july4));
-        assert!(calendar_by_id_strict("gblo")
-            .expect("gblo")
-            .is_business_day(july4));
+        assert!(
+            calendar_by_id_strict("gblo")
+                .expect("gblo")
+                .is_business_day(july4)
+        );
         // 2025-08-25 (UK Summer bank holiday): GBLO holiday, NYSE open.
         assert!(!joint.is_business_day(date!(2025 - 08 - 25)));
 
@@ -750,7 +752,7 @@ mod serde_tests {
 #[cfg(test)]
 mod joint_calendar_tests {
     use super::*;
-    use crate::dates::{create_date, DateExt};
+    use crate::dates::{DateExt, create_date};
     use time::Month;
 
     #[test]

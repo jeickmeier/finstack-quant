@@ -17,12 +17,12 @@ use std::sync::Arc;
 use time::Month;
 
 use finstack_quant_attribution::{
-    attribute_pnl, attribute_pnl_metrics_based, AttributionMethod, AttributionRequest,
-    ExecutionPolicy, TaylorAttributionConfig,
+    AttributionMethod, AttributionRequest, ExecutionPolicy, TaylorAttributionConfig, attribute_pnl,
+    attribute_pnl_metrics_based,
 };
 use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
-use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };

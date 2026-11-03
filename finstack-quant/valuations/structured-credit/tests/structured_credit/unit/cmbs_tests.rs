@@ -231,9 +231,11 @@ fn balloon_extends_thirty_percent_of_the_balance_by_twenty_four_months() {
     assert!(extended[payoff].payment_date >= extended_maturity);
     assert!(extended[payoff - 1].payment_date < extended_maturity);
     assert!((extended[payoff].principal_collections.amount() - 3_000_000.0).abs() < 1e-6);
-    assert!(extended[k + 1..payoff]
-        .iter()
-        .all(|p| (p.pool_balance.amount() - 3_000_000.0).abs() < 1e-6));
+    assert!(
+        extended[k + 1..payoff]
+            .iter()
+            .all(|p| (p.pool_balance.amount() - 3_000_000.0).abs() < 1e-6)
+    );
 }
 
 /// An 80% appraisal reduction on one of two loans cuts interest collections
@@ -812,14 +814,16 @@ fn yield_maintenance_discounts_the_lost_coupons_on_the_curve() {
         (ratio - 0.866).abs() < 0.005,
         "discounted premium is 13.4% below undiscounted: ratio {ratio}"
     );
-    assert!(PrepaymentPenalty::YieldMaintenance {
-        discount_curve_id: Some("USD-YM".into()),
-        reinvestment_rate: Some(0.05),
-        floor_pct: None,
-        through: None,
-    }
-    .premium(1_000_000.0, 0.08, date, maturity, None)
-    .is_err());
+    assert!(
+        PrepaymentPenalty::YieldMaintenance {
+            discount_curve_id: Some("USD-YM".into()),
+            reinvestment_rate: Some(0.05),
+            floor_pct: None,
+            through: None,
+        }
+        .premium(1_000_000.0, 0.08, date, maturity, None)
+        .is_err()
+    );
 }
 
 /// When rates rise above the coupon the lost coupon is zero and the 1%

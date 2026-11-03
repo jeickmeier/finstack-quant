@@ -1052,14 +1052,14 @@ impl CreditFactorModel {
         for row in &self.issuer_betas {
             for dim in &self.hierarchy.levels {
                 let key = dimension_key(dim);
-                if let Some(v) = row.tags.0.get(key) {
-                    if v.contains('.') {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "CreditFactorModel: issuer {:?} tag {key:?} = {v:?} contains '.', \
+                if let Some(v) = row.tags.0.get(key)
+                    && v.contains('.')
+                {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "CreditFactorModel: issuer {:?} tag {key:?} = {v:?} contains '.', \
                              which is reserved as the bucket-path separator",
-                            row.issuer_id.as_str()
-                        )));
-                    }
+                        row.issuer_id.as_str()
+                    )));
                 }
             }
         }

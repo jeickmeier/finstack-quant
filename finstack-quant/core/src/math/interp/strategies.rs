@@ -10,8 +10,8 @@ use super::{
     traits::InterpolationStrategy,
     types::ExtrapolationPolicy,
     utils::{
-        locate_segment_unchecked, validate_knot_spacing, validate_positive_series,
-        MIN_RELATIVE_KNOT_GAP,
+        MIN_RELATIVE_KNOT_GAP, locate_segment_unchecked, validate_knot_spacing,
+        validate_positive_series,
     },
 };
 use std::vec::Vec;
@@ -41,7 +41,7 @@ impl InterpolationStrategy for LinearStrategy {
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::{check_extrapolation, Extension};
+        use super::utils::{Extension, check_extrapolation};
 
         if let Some(val) = check_extrapolation(
             x,
@@ -84,7 +84,7 @@ impl InterpolationStrategy for LinearStrategy {
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::{check_extrapolation, Extension};
+        use super::utils::{Extension, check_extrapolation};
 
         if let Some(val) = check_extrapolation(
             x,
@@ -153,7 +153,7 @@ impl InterpolationStrategy for LogLinearStrategy {
         _values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::{check_extrapolation, Extension};
+        use super::utils::{Extension, check_extrapolation};
 
         if let Some(val) = check_extrapolation(
             x,
@@ -201,7 +201,7 @@ impl InterpolationStrategy for LogLinearStrategy {
         // For log-linear interpolation: f(x) = exp(y0 + w*(y1-y0)) where w = (x-x0)/(x1-x0)
         // The derivative is: df/dx = f(x) * (y1-y0)/(x1-x0)
 
-        use super::utils::{check_extrapolation, Extension};
+        use super::utils::{Extension, check_extrapolation};
 
         if let Some(val) = check_extrapolation(
             x,
@@ -348,7 +348,7 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
         _values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::{check_extrapolation, Extension};
+        use super::utils::{Extension, check_extrapolation};
 
         if let Some(val) = check_extrapolation(
             x,
@@ -379,7 +379,7 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
         _values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::{check_extrapolation, Extension};
+        use super::utils::{Extension, check_extrapolation};
 
         if let Some(val) = check_extrapolation(
             x,
@@ -491,7 +491,7 @@ impl InterpolationStrategy for CubicHermiteStrategy {
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::{check_extrapolation, Extension};
+        use super::utils::{Extension, check_extrapolation};
 
         if let Some(val) = check_extrapolation(
             x,
@@ -547,7 +547,7 @@ impl InterpolationStrategy for CubicHermiteStrategy {
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::{check_extrapolation, Extension};
+        use super::utils::{Extension, check_extrapolation};
 
         if let Some(val) = check_extrapolation(
             x,
@@ -723,7 +723,7 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::{check_extrapolation, Extension};
+        use super::utils::{Extension, check_extrapolation};
 
         if let Some(val) = check_extrapolation(
             x,
@@ -767,7 +767,7 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         _values: &[f64],
         extrapolation: ExtrapolationPolicy,
     ) -> f64 {
-        use super::utils::{check_extrapolation, Extension};
+        use super::utils::{Extension, check_extrapolation};
 
         if let Some(val) = check_extrapolation(
             x,

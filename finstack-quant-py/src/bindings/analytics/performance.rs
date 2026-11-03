@@ -11,9 +11,9 @@ use crate::bindings::pandas_utils::{dates_to_pylist, int_values_to_series, value
 use crate::bindings::pydoc::pydoc;
 use crate::errors::analytics_to_py;
 use finstack_quant_analytics::{
-    CagrDayCount, Performance, ReturnKind, DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE,
-    DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR, DEFAULT_PERIODIC_FREQUENCY,
-    DEFAULT_PERIODS_PER_YEAR, DEFAULT_RISK_FREE_RATE, DEFAULT_ROLLING_WINDOW,
+    CagrDayCount, DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY,
+    DEFAULT_MAR, DEFAULT_PERIODIC_FREQUENCY, DEFAULT_PERIODS_PER_YEAR, DEFAULT_RISK_FREE_RATE,
+    DEFAULT_ROLLING_WINDOW, Performance, ReturnKind,
 };
 use finstack_quant_core::dates::{HolidayCalendar, PeriodKind};
 use pyo3::buffer::PyBuffer;

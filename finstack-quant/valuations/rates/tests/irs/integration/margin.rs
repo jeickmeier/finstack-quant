@@ -6,9 +6,9 @@
 //! - CSA bilateral vs cleared margin requirements
 
 use finstack_quant_core::{currency::Currency, dates::Date, money::Money, types::InstrumentId};
-use finstack_quant_margin::calculators::im::schedule::ScheduleImCalculator;
-use finstack_quant_margin::calculators::im::SimmCalculator;
 use finstack_quant_margin::calculators::VmCalculator;
+use finstack_quant_margin::calculators::im::SimmCalculator;
+use finstack_quant_margin::calculators::im::schedule::ScheduleImCalculator;
 use finstack_quant_margin::types::{
     ClearingStatus, CsaSpec, ImMethodology, ImParameters, MarginCallTiming, MarginTenor,
     OtcMarginSpec, VmParameters,

@@ -8,7 +8,7 @@ use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::pricer::ModelKey;
-use time::{macros::date, Duration};
+use time::{Duration, macros::date};
 
 #[test]
 fn cash_dividend_theta_matches_smooth_calendar_repricing() {
@@ -71,8 +71,11 @@ fn cash_dividend_theta_matches_smooth_calendar_repricing() {
                     * 0.5
                     * 365.0
                     / option.metric_pricing_overrides.theta_days_per_year();
-                assert!((actual - expected).abs() < 2e-5,
-                    "rate={rate}, call={is_call}, dividends={:?}: theta={actual}, repriced={expected}", option.discrete_dividends);
+                assert!(
+                    (actual - expected).abs() < 2e-5,
+                    "rate={rate}, call={is_call}, dividends={:?}: theta={actual}, repriced={expected}",
+                    option.discrete_dividends
+                );
             }
         }
     }
@@ -176,8 +179,10 @@ fn zero_volatility_pde_matches_discounted_payoffs_and_optimal_exercise() {
                 assert!((european - expected_european).abs() < 1e-9);
                 option.exercise_style = ExerciseStyle::American;
                 let american = pde_price(&option, &market, as_of);
-                assert!((american - expected_american).abs() < 1e-6,
-                    "rate={rate}, yield={dividend_yield}, strike={strike}, call={is_call}: {american} vs {expected_american}");
+                assert!(
+                    (american - expected_american).abs() < 1e-6,
+                    "rate={rate}, yield={dividend_yield}, strike={strike}, call={is_call}: {american} vs {expected_american}"
+                );
                 assert!(american + 1e-9 >= european);
             }
         }
@@ -225,7 +230,7 @@ fn positive_volatility_pde_approaches_the_deterministic_limit() {
 #[test]
 fn pending_cash_exercise_keeps_rate_risk_and_accretion() {
     use finstack_quant_valuations::instruments::{
-        equity::equity_option::EquityOptionExercise, SettlementType,
+        SettlementType, equity::equity_option::EquityOptionExercise,
     };
     let as_of = date!(2025 - 01 - 06);
     let pay = date!(2025 - 02 - 06);
@@ -293,21 +298,25 @@ fn tree_theta_rolls_expiry_dividends_and_bermudan_dates() {
         if style == ExerciseStyle::Bermudan {
             option.exercise_dates = Some(vec![as_of + Duration::days(1), expiry]);
         }
-        assert!(crate::metrics::common::direct_equity_greek(
-            &option,
-            &market,
-            as_of,
-            finstack_quant_valuations::instruments::OptionGreekKind::Theta
-        )
-        .unwrap()
-        .is_finite());
-        assert!(crate::metrics::common::direct_equity_greek(
-            &option,
-            &market,
-            as_of,
-            finstack_quant_valuations::instruments::OptionGreekKind::Delta
-        )
-        .unwrap()
-        .is_finite());
+        assert!(
+            crate::metrics::common::direct_equity_greek(
+                &option,
+                &market,
+                as_of,
+                finstack_quant_valuations::instruments::OptionGreekKind::Theta
+            )
+            .unwrap()
+            .is_finite()
+        );
+        assert!(
+            crate::metrics::common::direct_equity_greek(
+                &option,
+                &market,
+                as_of,
+                finstack_quant_valuations::instruments::OptionGreekKind::Delta
+            )
+            .unwrap()
+            .is_finite()
+        );
     }
 }

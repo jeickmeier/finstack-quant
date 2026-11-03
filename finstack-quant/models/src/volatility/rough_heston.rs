@@ -425,10 +425,10 @@ impl RoughHestonFourierParams {
             let value = self
                 .demeaned_char_func(&solver, u)
                 .map(|value| value * drift.exp());
-            if let (Some(current), Some(prior)) = (value, previous) {
-                if (current - prior).norm() <= CHARACTERISTIC_TOLERANCE {
-                    return current;
-                }
+            if let (Some(current), Some(prior)) = (value, previous)
+                && (current - prior).norm() <= CHARACTERISTIC_TOLERANCE
+            {
+                return current;
             }
             previous = value;
             steps *= 2;
@@ -538,17 +538,16 @@ impl RoughHestonFourierParams {
             let current = self
                 .lewis_integral(t, x, steps)
                 .map(|integral| spot_pv - strike_pv * integral / PI);
-            if let (Some(call), Some(prior)) = (current, previous) {
-                if (call - prior).abs() <= price_tolerance
-                    && call >= lower_bound - price_tolerance
-                    && call <= spot_pv + price_tolerance
-                {
-                    return if is_call {
-                        call
-                    } else {
-                        call - spot_pv + strike_pv
-                    };
-                }
+            if let (Some(call), Some(prior)) = (current, previous)
+                && (call - prior).abs() <= price_tolerance
+                && call >= lower_bound - price_tolerance
+                && call <= spot_pv + price_tolerance
+            {
+                return if is_call {
+                    call
+                } else {
+                    call - spot_pv + strike_pv
+                };
             }
             previous = current;
             steps *= 2;
@@ -687,15 +686,21 @@ mod tests {
             },
             ..base
         };
-        assert!(params
-            .price_european(100.0, 100.0, 0.0, 0.0, 1.0, true)
-            .is_nan());
-        assert!(!params
-            .char_func(Complex64::new(1.0, 0.0), 0.0, 0.0, 1.0)
-            .is_finite());
-        assert!(params
-            .implied_vol(100.0, 100.0, 0.0, 0.0, 1.0, true)
-            .is_none());
+        assert!(
+            params
+                .price_european(100.0, 100.0, 0.0, 0.0, 1.0, true)
+                .is_nan()
+        );
+        assert!(
+            !params
+                .char_func(Complex64::new(1.0, 0.0), 0.0, 0.0, 1.0)
+                .is_finite()
+        );
+        assert!(
+            params
+                .implied_vol(100.0, 100.0, 0.0, 0.0, 1.0, true)
+                .is_none()
+        );
     }
 
     #[test]

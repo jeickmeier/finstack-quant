@@ -398,25 +398,24 @@ impl FinancialModelSpec {
             }
         }
 
-        if let Some(first_forecast) = periods.iter().position(|p| !p.is_actual) {
-            if let Some(stray) = periods
+        if let Some(first_forecast) = periods.iter().position(|p| !p.is_actual)
+            && let Some(stray) = periods
                 .iter()
                 .skip(first_forecast)
                 .find(|p| p.is_actual)
                 .map(|p| p.id)
-            {
-                let first_forecast_id = periods
-                    .get(first_forecast)
-                    .map(|p| p.id.to_string())
-                    .unwrap_or_default();
-                return Err(Error::build(format!(
-                    "Actual periods must form a prefix of the timeline, but actual period {stray} \
+        {
+            let first_forecast_id = periods
+                .get(first_forecast)
+                .map(|p| p.id.to_string())
+                .unwrap_or_default();
+            return Err(Error::build(format!(
+                "Actual periods must form a prefix of the timeline, but actual period {stray} \
                      appears after forecast period {first_forecast_id}. Forecasts anchor on the \
                      last actual period, so an actual after a forecast would anchor that forecast \
                      on a value from a later period (look-ahead). Mark the intervening periods as \
                      actuals, or move the actual before the first forecast period."
-                )));
-            }
+            )));
         }
 
         Ok(())
@@ -576,14 +575,13 @@ impl FinancialModelSpec {
                 )
                 .map_err(|error| {
                     Error::build(format!("Invalid formula on node '{node_id}': {error}"))
-                })? {
-                    if node.value_type != Some(inferred) {
-                        return Err(Error::build(format!(
-                            "Formula node '{node_id}' declares {:?} but its expression returns \
+                })? && node.value_type != Some(inferred)
+                {
+                    return Err(Error::build(format!(
+                        "Formula node '{node_id}' declares {:?} but its expression returns \
                              {:?}",
-                            node.value_type, inferred
-                        )));
-                    }
+                        node.value_type, inferred
+                    )));
                 }
                 let expression = crate::dsl::compile(ast).map_err(|e| {
                     Error::build(format!("Invalid formula on node '{}': {}", node_id, e))
@@ -664,13 +662,13 @@ pub(crate) fn validated_explicit_value_type(
         .map(|values| crate::types::infer_series_value_type(values.values()))
         .transpose()?
         .flatten();
-    if let (Some(declared), Some(actual)) = (node.value_type, inferred) {
-        if declared != actual {
-            return Err(Error::build(format!(
-                "Node '{}' declares {declared:?} but its explicit values have type {actual:?}",
-                node.node_id
-            )));
-        }
+    if let (Some(declared), Some(actual)) = (node.value_type, inferred)
+        && declared != actual
+    {
+        return Err(Error::build(format!(
+            "Node '{}' declares {declared:?} but its explicit values have type {actual:?}",
+            node.node_id
+        )));
     }
     Ok(inferred)
 }

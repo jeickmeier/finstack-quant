@@ -67,7 +67,7 @@ pub(crate) fn execute_error_to_py(py: Python<'_>, err: ExecuteError) -> PyErr {
                 "failed to convert calibration diagnostics ({}): underlying calibration error: {}",
                 convert_err.value(py),
                 details.cause
-            ))
+            ));
         }
     };
     let attrs: [(&str, PyResult<()>); 6] = [

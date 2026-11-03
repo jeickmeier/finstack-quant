@@ -7,10 +7,10 @@
 //! them. Render an entry with
 //! [`SchemaArtifact::generate`](finstack_quant_core::schema::SchemaArtifact::generate).
 
-use finstack_quant_core::schema::{
-    externalize_schema_definitions, ExternalSchemaDefinition, SchemaArtifact,
-};
 use finstack_quant_core::Result;
+use finstack_quant_core::schema::{
+    ExternalSchemaDefinition, SchemaArtifact, externalize_schema_definitions,
+};
 use finstack_quant_statements::adjustments::NormalizationConfig;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;

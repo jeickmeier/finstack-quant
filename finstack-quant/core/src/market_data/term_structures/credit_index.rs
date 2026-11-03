@@ -19,7 +19,7 @@
 //! - Bespoke portfolio pricing
 //! - Credit correlation trading
 
-use super::{hazard_curve::HazardCurve, BaseCorrelationCurve};
+use super::{BaseCorrelationCurve, hazard_curve::HazardCurve};
 use crate::Result;
 use std::collections::BTreeMap;
 use std::sync::Arc;

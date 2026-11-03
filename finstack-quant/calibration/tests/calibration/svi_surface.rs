@@ -25,6 +25,7 @@
 //! `interpolate_svi_vol` outputs directly — reading them back exercises the
 //! cross-expiry interpolation, not surface bilinear interpolation.
 
+use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepParams, SurfaceExtrapolationPolicy,
@@ -33,12 +34,11 @@ use finstack_quant_calibration::api::schema::{
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::QuoteId;
 use finstack_quant_calibration::quotes::VolQuote;
-use finstack_quant_calibration::CalibrationConfig;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::types::UnderlyingId;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::svi::SviParams;
 use time::Month;
@@ -503,12 +503,18 @@ fn surface_acceptance_policy_preserves_fit_and_execution_controls() {
                             fit_success && !(violation && mode == ValidationMode::Error);
                         let result = engine::calibrate(&envelope);
                         if fail_on_bad_fit && !expected_success {
-                            assert!(result.is_err(), "{params:?}, fit={fit_success}, violation={violation}, mode={mode:?}");
+                            assert!(
+                                result.is_err(),
+                                "{params:?}, fit={fit_success}, violation={violation}, mode={mode:?}"
+                            );
                             continue;
                         }
                         let result = result.expect("accepted execution policy");
                         let report = &result.result.step_reports["surface"];
-                        assert_eq!(report.success, expected_success, "{params:?}, fit={fit_success}, violation={violation}, mode={mode:?}: {report:?}");
+                        assert_eq!(
+                            report.success, expected_success,
+                            "{params:?}, fit={fit_success}, violation={violation}, mode={mode:?}: {report:?}"
+                        );
                         assert_eq!(
                             report.metadata.contains_key("validation_warning"),
                             violation && mode == ValidationMode::Warn
@@ -518,10 +524,12 @@ fn surface_acceptance_policy_preserves_fit_and_execution_controls() {
                             !(violation && mode == ValidationMode::Error)
                         );
                         if violation && mode == ValidationMode::Error {
-                            assert!(report
-                                .validation_error
-                                .as_deref()
-                                .is_some_and(|s| s.contains("volatility")));
+                            assert!(
+                                report
+                                    .validation_error
+                                    .as_deref()
+                                    .is_some_and(|s| s.contains("volatility"))
+                            );
                         }
                     }
                 }

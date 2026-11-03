@@ -1,6 +1,6 @@
 use super::{MertonMcResult, MertonMcRun, PathStatistics};
-use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 use finstack_quant_core::Result;
+use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 use finstack_quant_models::credit::CreditState;
 use finstack_quant_models::credit::{AssetDynamics, MertonBarrierType};
 use finstack_quant_valuations_core::instruments::{
@@ -616,15 +616,13 @@ impl MertonMcEngine {
                 cash_fraction,
                 pik_fraction,
             } = mode
-            {
-                if *cash_fraction < 0.0
+                && (*cash_fraction < 0.0
                     || *pik_fraction < 0.0
-                    || (*cash_fraction + *pik_fraction - 1.0).abs() > 1e-10
-                {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "cash and PIK fractions must be non-negative and sum to one".to_string(),
-                    ));
-                }
+                    || (*cash_fraction + *pik_fraction - 1.0).abs() > 1e-10)
+            {
+                return Err(finstack_quant_core::Error::Validation(
+                    "cash and PIK fractions must be non-negative and sum to one".to_string(),
+                ));
             }
             Ok(())
         };

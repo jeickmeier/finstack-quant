@@ -7,8 +7,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::{BreakevenConfig, BreakevenMode, BreakevenTarget};
 use finstack_quant_valuations::metrics::sensitivities::breakeven::BreakevenCalculator;
 use finstack_quant_valuations::metrics::sensitivities::theta::calculate_theta_date;
@@ -230,9 +230,9 @@ fn test_iterative_breakeven_base_correlation_is_explicitly_unsupported() {
 
 #[test]
 fn test_breakeven_via_standard_registry() {
-    use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
     use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
 
     let as_of = date!(2025 - 01 - 15);
     let mut bond = Bond::fixed(
@@ -485,9 +485,9 @@ fn test_iterative_breakeven_zeroes_the_horizon_pnl() {
 fn test_iterative_zspread_rejected_for_credit_curve_instrument() {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
     use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
 
     let as_of = date!(2025 - 01 - 15);
     let mut bond = Bond::fixed(
@@ -555,9 +555,9 @@ fn test_zero_sensitivity_error_names_the_metric_and_value() {
 
 #[test]
 fn test_breakeven_horizon_matches_carry_horizon() {
-    use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
     use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
 
     let as_of = date!(2025 - 01 - 15);
 

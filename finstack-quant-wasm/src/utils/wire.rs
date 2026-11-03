@@ -9,8 +9,8 @@
 
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::wire::DecimalWire;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use wasm_bindgen::JsValue;
 
 use super::input::{from_js_json, js_string};
@@ -33,14 +33,14 @@ use super::to_js_err;
 /// Throws a `TypeError` (`kind: "invalid_type"`) as [`from_js_json`] does, and
 /// a validation error naming `label` when the value does not match `T`.
 pub fn js_wire<T: DeserializeOwned>(value: &JsValue, label: &str) -> Result<T, JsValue> {
-    if let Some(text) = value.as_string() {
-        if !text.trim_start().starts_with(['{', '[', '"']) {
-            return serde_json::from_value(serde_json::Value::String(text)).map_err(|error| {
-                to_js_err(finstack_quant_core::Error::Validation(format!(
-                    "{label}: {error}"
-                )))
-            });
-        }
+    if let Some(text) = value.as_string()
+        && !text.trim_start().starts_with(['{', '[', '"'])
+    {
+        return serde_json::from_value(serde_json::Value::String(text)).map_err(|error| {
+            to_js_err(finstack_quant_core::Error::Validation(format!(
+                "{label}: {error}"
+            )))
+        });
     }
     from_js_json(value, label)
 }

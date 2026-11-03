@@ -18,7 +18,7 @@ use crate::evaluator::formula_aggregates::{
     evaluate_statistical_function,
 };
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
-use finstack_quant_core::math::{stats::quantile, summation::kahan_sum, ZERO_TOLERANCE};
+use finstack_quant_core::math::{ZERO_TOLERANCE, stats::quantile, summation::kahan_sum};
 
 /// Evaluate a function call.
 ///
@@ -250,17 +250,17 @@ fn finite_arg_values(
     }
     // The skip-NaN policy is intentional, but a silently dropped line item can
     // hide an upstream problem — surface the count as a warning.
-    if dropped > 0 {
-        if let Some(id) = node_id {
-            context
-                .warnings
-                .push(crate::evaluator::EvalWarning::NonFiniteSkipped {
-                    node_id: id.to_string(),
-                    period: context.period_id,
-                    function: function.to_string(),
-                    count: dropped,
-                });
-        }
+    if dropped > 0
+        && let Some(id) = node_id
+    {
+        context
+            .warnings
+            .push(crate::evaluator::EvalWarning::NonFiniteSkipped {
+                node_id: id.to_string(),
+                period: context.period_id,
+                function: function.to_string(),
+                count: dropped,
+            });
     }
     Ok(values)
 }

@@ -39,7 +39,7 @@
 //! - Koller, T., Goedhart, M., & Wessels, D. (2020). *Valuation: Measuring and
 //!   Managing the Value of Companies* (7th ed.). Wiley. Ch. 36. `docs/REFERENCES.md#koller-valuation`
 
-use crate::analysis::checks::{lbo_model_checks, CreditMapping, ThreeStatementMapping};
+use crate::analysis::checks::{CreditMapping, ThreeStatementMapping, lbo_model_checks};
 use crate::analysis::valuation::corporate::extract_currency_from_model;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::Money;
@@ -506,8 +506,10 @@ mod tests {
             .meta
             .insert("currency".into(), serde_json::json!("EUR"));
         let error = evaluate_lbo(&model, &demo_config()).unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("must be finite monetary data in EUR"));
+        assert!(
+            error
+                .to_string()
+                .contains("must be finite monetary data in EUR")
+        );
     }
 }

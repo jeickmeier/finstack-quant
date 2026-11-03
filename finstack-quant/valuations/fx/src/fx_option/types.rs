@@ -46,9 +46,9 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_models::types::OptionType;
 // Pricing/greeks live in pricing engine; keep types minimal.
+use finstack_quant_core::Result;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::Result;
 
 use super::pricer;
 use finstack_quant_valuations_core::impl_instrument_base;

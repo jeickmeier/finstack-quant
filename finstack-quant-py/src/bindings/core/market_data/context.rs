@@ -6,13 +6,13 @@ use std::sync::Arc;
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::{ConvertedMoney, MarketContext};
 use finstack_quant_core::market_data::scalars::MarketScalar;
+use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyString};
-use pyo3::IntoPyObjectExt;
 
 use crate::bindings::core::currency::extract_currency;
-use crate::bindings::core::money::{decimal_to_py, is_python_decimal, money_from_amount, PyMoney};
+use crate::bindings::core::money::{PyMoney, decimal_to_py, is_python_decimal, money_from_amount};
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::errors::core_to_py;
@@ -22,7 +22,7 @@ use super::curves::{
     PyFxDeltaVolSurface, PyHazardCurve, PyInflationCurve, PyPriceCurve, PyVolCube, PyVolSurface,
 };
 use super::fx::{PyFxMatrix, PyFxRateResult};
-use super::scalars::{extract_f64, PyInflationIndex, PyScalarTimeSeries};
+use super::scalars::{PyInflationIndex, PyScalarTimeSeries, extract_f64};
 
 /// Unified market data container for curves, surfaces, scalars and FX.
 ///

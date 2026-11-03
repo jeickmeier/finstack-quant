@@ -3,8 +3,8 @@
 //! Computes sensitivity to a 1bp parallel bump in one leg's discount curve
 //! using central finite difference for O(h²) accuracy.
 
-use crate::fx_swap::pricing_helper::FxSwapPricingContext;
 use crate::fx_swap::FxSwap;
+use crate::fx_swap::pricing_helper::FxSwapPricingContext;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

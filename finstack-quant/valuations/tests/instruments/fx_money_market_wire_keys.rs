@@ -22,7 +22,7 @@ use finstack_quant_valuations::instruments::fx::ndf::Ndf;
 use finstack_quant_valuations::instruments::fx::quanto_option::QuantoOption;
 use finstack_quant_valuations::instruments::rates::repo::CollateralType;
 use finstack_quant_valuations::instruments::rates::repo::Repo;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn rejects<T: serde::de::DeserializeOwned>(mut value: Value, new_key: &str, old_key: &str) {
     let moved = value[new_key].take();

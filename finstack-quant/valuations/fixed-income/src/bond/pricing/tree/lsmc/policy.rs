@@ -35,10 +35,10 @@ impl DecisionSnapshot {
         let decision_after_put = self.put.map_or(continuation_for_decision, |put| {
             continuation_for_decision.max(put)
         });
-        if let Some(call) = self.call {
-            if decision_after_put > call + self.friction {
-                return call;
-            }
+        if let Some(call) = self.call
+            && decision_after_put > call + self.friction
+        {
+            return call;
         }
         if put_exercised {
             self.put.unwrap_or(realized_hold)

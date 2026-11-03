@@ -30,8 +30,8 @@
 
 use super::exercise::RateView;
 use super::instrument_flows::{
-    hazard_period_default, run_period, NamePeriod, NameState, PeriodDefaultSource, PeriodModel,
-    PreparedInstrumentSchedules, SpreadTerms, FROZEN_UTILIZATION_VOL,
+    FROZEN_UTILIZATION_VOL, NamePeriod, NameState, PeriodDefaultSource, PeriodModel,
+    PreparedInstrumentSchedules, SpreadTerms, hazard_period_default, run_period,
 };
 use super::pool_flow_source::{PerNameResolution, PeriodShockSource};
 use super::*;
@@ -226,11 +226,7 @@ impl<'a, S: PeriodShockSource> InstrumentPathFlowSource<'a, S> {
     /// One standard normal draw, negated on the antithetic partner.
     fn draw(&mut self) -> f64 {
         let raw = self.rng.next_std_normal();
-        if self.antithetic {
-            -raw
-        } else {
-            raw
-        }
+        if self.antithetic { -raw } else { raw }
     }
 
     /// Advance every live stochastic revolver's spread and utilization over

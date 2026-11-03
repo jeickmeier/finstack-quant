@@ -304,9 +304,10 @@ mod tests {
     fn venue_filter_is_exact_and_json_is_stable() {
         let mx = listed_product_catalog(Some(ListedExchange::Montreal))
             .expect("embedded Montréal catalog");
-        assert!(mx
-            .iter()
-            .all(|row| row.exchange == ListedExchange::Montreal));
+        assert!(
+            mx.iter()
+                .all(|row| row.exchange == ListedExchange::Montreal)
+        );
         let json = listed_product_catalog_json(Some(ListedExchange::Montreal))
             .expect("json")
             .to_lowercase();

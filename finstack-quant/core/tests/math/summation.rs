@@ -1,6 +1,6 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
-use finstack_quant_core::math::summation::{kahan_sum, neumaier_sum, NeumaierAccumulator};
+use finstack_quant_core::math::summation::{NeumaierAccumulator, kahan_sum, neumaier_sum};
 
 // Kahan Sum Tests
 

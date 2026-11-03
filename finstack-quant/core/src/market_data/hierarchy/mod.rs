@@ -30,8 +30,8 @@ pub use resolution::{
     HierarchyTarget, ResolutionMode, ResolvedCurveMatch, TagFilter, TagPredicate,
 };
 
-use crate::types::CurveId;
 use crate::FxHashMap;
+use crate::types::CurveId;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 

@@ -35,10 +35,10 @@
 //! - O'Kane, D. (2008). *Modelling Single-name and Multi-name Credit
 //!   Derivatives*. John Wiley & Sons. `docs/REFERENCES.md#o-kane-2008`
 
+use crate::mbs_passthrough::AgencyMbsPassthrough;
 use crate::mbs_passthrough::pricer::{
     first_unpaid_accrual_start, pool_month_step, quote_basis_pool, settlement_accrued_interest,
 };
-use crate::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
@@ -109,7 +109,7 @@ impl McOasConfig {
             _ => {
                 return Err(Error::Validation(
                     "MBS MC-OAS requires hw1f_mean_reversion and hw1f_sigma together".into(),
-                ))
+                ));
             }
         };
         Ok(Self {
@@ -563,7 +563,7 @@ mod tests {
 
         for path in &paths {
             assert_eq!(path.rates.len(), 121); // 120 steps + initial
-                                               // Initial rate should match
+            // Initial rate should match
             assert!((path.rates[0] - 0.04).abs() < 1e-10);
             // Rates should be finite
             for &r in &path.rates {

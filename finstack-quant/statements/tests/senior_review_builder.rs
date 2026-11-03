@@ -25,40 +25,46 @@ fn swap_params(id: &str, fixed_rate: f64) -> SwapParams {
 
 fn reject_invalid_instruments(builder: &mut ModelBuilder) {
     let notional = Money::from((100_000_i64, Currency::USD));
-    assert!(builder
-        .add_bond(
-            "bad-bond",
-            notional,
-            0.05,
-            date!(2025 - 01 - 01),
-            date!(2024 - 01 - 01),
-            "USD-OIS"
-        )
-        .is_err());
-    assert!(builder
-        .add_bond_with_convention(BondConventionParams {
-            id: "bad-regional-bond".into(),
-            notional,
-            coupon_rate: Rate::from_decimal(0.05).expect("valid coupon"),
-            issue_date: date!(2025 - 01 - 01),
-            maturity_date: date!(2024 - 01 - 01),
-            convention: BondConvention::UsCorporate,
-            discount_curve_id: "USD-OIS".into(),
-        })
-        .is_err());
+    assert!(
+        builder
+            .add_bond(
+                "bad-bond",
+                notional,
+                0.05,
+                date!(2025 - 01 - 01),
+                date!(2024 - 01 - 01),
+                "USD-OIS"
+            )
+            .is_err()
+    );
+    assert!(
+        builder
+            .add_bond_with_convention(BondConventionParams {
+                id: "bad-regional-bond".into(),
+                notional,
+                coupon_rate: Rate::from_decimal(0.05).expect("valid coupon"),
+                issue_date: date!(2025 - 01 - 01),
+                maturity_date: date!(2024 - 01 - 01),
+                convention: BondConvention::UsCorporate,
+                discount_curve_id: "USD-OIS".into(),
+            })
+            .is_err()
+    );
     assert!(builder.add_swap(swap_params("bad-swap", f64::NAN)).is_err());
-    assert!(builder
-        .add_swap_with_conventions(
-            swap_params("bad-regional-swap", f64::NAN),
-            SwapConventions {
-                fixed_frequency: Tenor::semi_annual(),
-                fixed_day_count: DayCount::Thirty360,
-                float_frequency: Tenor::quarterly(),
-                float_day_count: DayCount::Act360,
-                business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            },
-        )
-        .is_err());
+    assert!(
+        builder
+            .add_swap_with_conventions(
+                swap_params("bad-regional-swap", f64::NAN),
+                SwapConventions {
+                    fixed_frequency: Tenor::semi_annual(),
+                    fixed_day_count: DayCount::Thirty360,
+                    float_frequency: Tenor::quarterly(),
+                    float_day_count: DayCount::Act360,
+                    business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                },
+            )
+            .is_err()
+    );
 }
 
 #[test]
@@ -119,12 +125,14 @@ fn failed_model_setters_preserve_state_and_allow_retry() {
     assert!(retry.compute("revenue", "(").is_err());
     assert!(retry.compute("__reserved", "revenue").is_err());
     assert!(retry.availability_dates("unknown", &[]).is_err());
-    assert!(retry
-        .add_metric_from_registry(
-            "missing.metric",
-            &finstack_quant_statements::registry::Registry::new()
-        )
-        .is_err());
+    assert!(
+        retry
+            .add_metric_from_registry(
+                "missing.metric",
+                &finstack_quant_statements::registry::Registry::new()
+            )
+            .is_err()
+    );
     clean
         .periods("2025Q1..Q2", Some("2025Q1"))
         .expect("clean timeline");

@@ -17,11 +17,11 @@ use finstack_quant_valuations_fixed_income::revolving_credit::{
     StochasticUtilizationSpec, UtilizationProcess,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    tranche_oas, CallExercisePolicy, InstrumentCollateral, OasConfig, StructuredCredit,
+    CallExercisePolicy, InstrumentCollateral, OasConfig, StructuredCredit, tranche_oas,
 };
 use time::macros::date;
 
-use super::instrument_pool_tests::{deal_with, fixed_revolver, market_with_curves, usd, DealSpec};
+use super::instrument_pool_tests::{DealSpec, deal_with, fixed_revolver, market_with_curves, usd};
 
 const CLOSING: Date = date!(2024 - 01 - 15);
 const MATURITY: Date = date!(2034 - 01 - 15);

@@ -9,16 +9,16 @@
 // `api::validate`.
 #![allow(clippy::result_large_err)]
 
+use crate::CalibrationReport;
 use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::config::{CalibrationConfig, CalibrationMethod, RatesStepConventions};
 use crate::quotes::QuoteId;
-use crate::CalibrationReport;
 use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::config::ResultsMeta;
 use finstack_quant_core::contract::{
-    deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, Diagnostic,
-    LoadLimits, LoadPhase, Severity, ValidationReport as ContractValidationReport,
+    ContractDescriptor, ContractError, Diagnostic, LoadLimits, LoadPhase, Severity,
+    ValidationReport as ContractValidationReport, deserialize_json_value, parse_json_value,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::BusinessDayConvention;
@@ -109,7 +109,7 @@ fn prefix_json_pointer(prefix: &str, child: Option<&str>) -> String {
 
 #[cfg(test)]
 mod pointer_tests {
-    use super::{prefix_json_pointer, FINAL_MARKET_POINTER};
+    use super::{FINAL_MARKET_POINTER, prefix_json_pointer};
 
     #[test]
     fn nested_diagnostic_pointer_join_is_rfc_6901_safe() {
@@ -1467,8 +1467,10 @@ mod step_report_tests {
             .step_report("USD-OIS")
             .expect_err("no such step");
         assert_eq!(error.kind(), finstack_quant_core::ErrorKind::NotFound);
-        assert!(error
-            .to_string()
-            .contains("calibration step 'USD-OIS'; available steps: []"));
+        assert!(
+            error
+                .to_string()
+                .contains("calibration step 'USD-OIS'; available steps: []")
+        );
     }
 }

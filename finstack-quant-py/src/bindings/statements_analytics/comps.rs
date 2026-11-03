@@ -14,19 +14,19 @@
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_statements_analytics::analysis::{
+    CompanyMetrics, DimensionScore, MetricExtractor, Multiple, PeerFilter, PeerSet, PeerStats,
+    PeriodBasis, RegressionResult, RelativeValueResult, ScoreDirection, ScoringDimension,
     compute_multiple as core_compute_multiple, peer_stats as core_peer_stats,
     percentile_rank as core_percentile_rank, regression_fair_value as core_regression,
-    score_relative_value as core_score, z_score as core_z_score, CompanyMetrics, DimensionScore,
-    MetricExtractor, Multiple, PeerFilter, PeerSet, PeerStats, PeriodBasis, RegressionResult,
-    RelativeValueResult, ScoreDirection, ScoringDimension,
+    score_relative_value as core_score, z_score as core_z_score,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    ColumnSchema,
+    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
+    serde_rows_to_dataframe_with_schema,
 };
 use crate::bindings::statements_analytics::extract_serde_any;
 use crate::errors::{core_to_py, display_to_py};
@@ -503,16 +503,24 @@ impl PyPeerSet {
             for (column, cell) in columns.iter().zip(row.iter()) {
                 if cell.is_none() {
                     values.push((column.clone(), None));
-                } else if let Ok(v) = cell.extract::<f64>() {
-                    // pandas marks a missing numeric cell with NaN.
-                    let is_nan: bool = math.call_method1("isnan", (v,))?.extract()?;
-                    values.push((column.clone(), (!is_nan).then_some(v)));
-                } else if let Ok(s) = cell.extract::<String>() {
-                    meta.insert(column.clone(), s);
                 } else {
-                    return Err(crate::errors::value_error(format!(
-                        "column '{column}' for company '{id}' must be numeric, string or missing"
-                    )));
+                    match cell.extract::<f64>() {
+                        Ok(v) => {
+                            // pandas marks a missing numeric cell with NaN.
+                            let is_nan: bool = math.call_method1("isnan", (v,))?.extract()?;
+                            values.push((column.clone(), (!is_nan).then_some(v)));
+                        }
+                        _ => match cell.extract::<String>() {
+                            Ok(s) => {
+                                meta.insert(column.clone(), s);
+                            }
+                            _ => {
+                                return Err(crate::errors::value_error(format!(
+                                    "column '{column}' for company '{id}' must be numeric, string or missing"
+                                )));
+                            }
+                        },
+                    }
                 }
             }
             let mut metrics = CompanyMetrics::from_flat_metrics(id.clone(), values);
@@ -1153,10 +1161,9 @@ fn regression_fair_value(
 #[pyfunction]
 #[pyo3(text_signature = "(company_metrics, multiple)")]
 fn compute_multiple(company_metrics: &Bound<'_, PyAny>, multiple: &str) -> PyResult<Option<f64>> {
-    let metrics = if let Ok(typed) = company_metrics.extract::<PyRef<'_, PyCompanyMetrics>>() {
-        typed.inner.clone()
-    } else {
-        dict_to_company_metrics("subject", company_metrics.cast::<PyDict>()?)?
+    let metrics = match company_metrics.extract::<PyRef<'_, PyCompanyMetrics>>() {
+        Ok(typed) => typed.inner.clone(),
+        _ => dict_to_company_metrics("subject", company_metrics.cast::<PyDict>()?)?,
     };
     let multiple: Multiple = multiple.parse().map_err(display_to_py)?;
     Ok(core_compute_multiple(&metrics, multiple))
@@ -1170,13 +1177,12 @@ fn extract_dimensions(
     if let Ok(list) = dimensions.cast::<PyList>() {
         return list
             .iter()
-            .map(|item| {
-                if let Ok(typed) = item.extract::<PyRef<'_, PyScoringDimension>>() {
-                    Ok(typed.inner.clone())
-                } else {
-                    extract_serde_any(py, &item, "dimensions")
-                }
-            })
+            .map(
+                |item| match item.extract::<PyRef<'_, PyScoringDimension>>() {
+                    Ok(typed) => Ok(typed.inner.clone()),
+                    _ => extract_serde_any(py, &item, "dimensions"),
+                },
+            )
             .collect();
     }
     extract_serde_any(py, dimensions, "dimensions")
@@ -1225,10 +1231,9 @@ fn score_relative_value(
     peer_set: &Bound<'_, PyAny>,
     dimensions: &Bound<'_, PyAny>,
 ) -> PyResult<PyRelativeValueResult> {
-    let peer_set: PeerSet = if let Ok(typed) = peer_set.extract::<PyRef<'_, PyPeerSet>>() {
-        typed.inner.clone()
-    } else {
-        extract_serde_any(py, peer_set, "peer_set")?
+    let peer_set: PeerSet = match peer_set.extract::<PyRef<'_, PyPeerSet>>() {
+        Ok(typed) => typed.inner.clone(),
+        _ => extract_serde_any(py, peer_set, "peer_set")?,
     };
     let dims = extract_dimensions(py, dimensions)?;
     let inner = core_score(&peer_set, &dims).map_err(core_to_py)?;

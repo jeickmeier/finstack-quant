@@ -1,7 +1,8 @@
 //! Coupon cashflow emission (fixed and floating).
 
-use crate::builder::orchestrator::BuildState;
 use crate::builder::FloatingLegCompounding;
+use crate::builder::orchestrator::BuildState;
+use finstack_quant_core::InputError;
 use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -9,7 +10,6 @@ use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 use tracing::warn;
 
@@ -267,11 +267,11 @@ pub(crate) fn emit_fixed_coupons_on(
 
                 let pik_added =
                     add_pik_flow_if_nonzero(out_flows, d, pik_amt, ccy, Some(rate_f64), yf)?;
-                if pik_added > 0.0 {
-                    if let Some(flow) = out_flows.last_mut() {
-                        flow.principal_date = Some(period.accrual_end);
-                        flow.accrual = Some(accrual);
-                    }
+                if pik_added > 0.0
+                    && let Some(flow) = out_flows.last_mut()
+                {
+                    flow.principal_date = Some(period.accrual_end);
+                    flow.accrual = Some(accrual);
                 }
                 pik_to_add += pik_added;
             }
@@ -753,7 +753,7 @@ pub(crate) fn emit_float_coupons_on(
 mod tests {
     use super::*;
     use crate::builder::FloatingLegCompounding;
-    use finstack_quant_core::dates::{calendar_by_id_strict, DayCount};
+    use finstack_quant_core::dates::{DayCount, calendar_by_id_strict};
     use time::Month;
 
     #[test]

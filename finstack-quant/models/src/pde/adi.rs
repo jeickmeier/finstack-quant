@@ -58,7 +58,7 @@
 //!   scheme for parabolic equations with mixed derivatives."
 
 use super::grid2d::Grid2D;
-use super::operator2d::{apply_cross_derivative, Operators2D};
+use super::operator2d::{Operators2D, apply_cross_derivative};
 use super::problem2d::PdeProblem2D;
 use super::solver::boundary_value;
 use super::stepper::StepperError;

@@ -349,10 +349,12 @@ mod tests {
 
         let result = backtest_forecast(&actual, &forecast);
         assert!(result.is_err());
-        assert!(result
-            .expect_err("should fail")
-            .to_string()
-            .contains("same length"));
+        assert!(
+            result
+                .expect_err("should fail")
+                .to_string()
+                .contains("same length")
+        );
     }
 
     #[test]
@@ -362,10 +364,12 @@ mod tests {
 
         let result = backtest_forecast(&actual, &forecast);
         assert!(result.is_err());
-        assert!(result
-            .expect_err("should fail")
-            .to_string()
-            .contains("empty"));
+        assert!(
+            result
+                .expect_err("should fail")
+                .to_string()
+                .contains("empty")
+        );
     }
 
     #[test]

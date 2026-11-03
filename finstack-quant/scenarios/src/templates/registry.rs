@@ -1,6 +1,6 @@
 //! Template registry for stress test metadata and scenario specs.
 
-use super::{json::JsonTemplateDocument, TemplateMetadata};
+use super::{TemplateMetadata, json::JsonTemplateDocument};
 use crate::{Error, Result, ScenarioSpec};
 use indexmap::IndexMap;
 

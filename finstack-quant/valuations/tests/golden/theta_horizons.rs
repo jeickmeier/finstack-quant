@@ -310,7 +310,7 @@ fn registry() -> Vec<Case> {
 /// One `#[test]` per fixture family and horizon:
 /// `name => case source, index into [`HORIZONS`]`.
 macro_rules! theta_tests {
-    ($($test:ident => $family:ident, $horizon:expr;)*) => {$(
+    ($($test:ident => $family:ident, $horizon:expr_2021;)*) => {$(
         #[test]
         fn $test() {
             assert_theta_finite(stringify!($family), &$family(), HORIZONS[$horizon]);

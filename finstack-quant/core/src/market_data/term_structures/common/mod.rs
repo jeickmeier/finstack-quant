@@ -5,4 +5,4 @@ mod adjustment;
 mod roll;
 
 pub(crate) use adjustment::{PiecewiseLinearAdjustment, RateShock};
-pub(crate) use roll::{roll_knots, validate_pillars, InterpRollState};
+pub(crate) use roll::{InterpRollState, roll_knots, validate_pillars};

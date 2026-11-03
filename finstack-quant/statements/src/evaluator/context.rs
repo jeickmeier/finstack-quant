@@ -6,8 +6,8 @@
 //! graph.
 
 use crate::error::{Error, Result};
-use crate::evaluator::results::EvalWarning;
 use crate::evaluator::PeriodHistory;
+use crate::evaluator::results::EvalWarning;
 use crate::types::NodeId;
 use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use indexmap::IndexMap;

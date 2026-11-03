@@ -629,16 +629,18 @@ mod tests {
             vec![f64::NAN],
             vec![f64::INFINITY],
         ] {
-            assert!(Asian::new(
-                OptionType::Call,
-                100.0,
-                1.0,
-                AveragingMethod::Arithmetic,
-                vec![1]
-            )
-            .expect("call")
-            .with_fixing_multipliers(&multipliers)
-            .is_err());
+            assert!(
+                Asian::new(
+                    OptionType::Call,
+                    100.0,
+                    1.0,
+                    AveragingMethod::Arithmetic,
+                    vec![1]
+                )
+                .expect("call")
+                .with_fixing_multipliers(&multipliers)
+                .is_err()
+            );
         }
     }
 }

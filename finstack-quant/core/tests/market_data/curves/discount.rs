@@ -1641,11 +1641,13 @@ mod continuous_transform_regressions {
     #[test]
     fn discount_origin_is_validated_by_builder_and_serde() {
         for points in [[(0.0, 0.9), (1.0, 0.8)], [(-1.0, 1.1), (1.0, 0.9)]] {
-            assert!(DiscountCurve::builder("INVALID")
-                .base_date(sample_base_date())
-                .knots(points)
-                .build()
-                .is_err());
+            assert!(
+                DiscountCurve::builder("INVALID")
+                    .base_date(sample_base_date())
+                    .knots(points)
+                    .build()
+                    .is_err()
+            );
         }
         let source = shaped(InterpStyle::LogLinear);
         let mut json = serde_json::to_value(&source).expect("serialize");
@@ -1826,10 +1828,12 @@ mod negative_rate_stress {
         assert!(curve.apply_bump(BumpSpec::parallel_bp(f64::NAN)).is_err());
         assert!(curve.apply_bump(BumpSpec::parallel_bp(-1e308)).is_err());
         assert!((curve.df(2.0) - (-0.02_f64).exp()).abs() < 1e-12);
-        assert!(DiscountCurve::builder("STRICT")
-            .base_date(base)
-            .knots([(0.0, 1.0), (1.0, 1.01)])
-            .build()
-            .is_err());
+        assert!(
+            DiscountCurve::builder("STRICT")
+                .base_date(base)
+                .knots([(0.0, 1.0), (1.0, 1.01)])
+                .build()
+                .is_err()
+        );
     }
 }

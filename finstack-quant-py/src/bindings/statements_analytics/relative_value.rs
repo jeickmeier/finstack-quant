@@ -3,8 +3,8 @@
 //! is the Rust serde form, a dict or JSON text, the same document WASM takes.
 
 use super::comps::{
-    extract_company_metrics, period_basis_label, PyPeerStats, PyRegressionResult,
-    PyRelativeValueResult,
+    PyPeerStats, PyRegressionResult, PyRelativeValueResult, extract_company_metrics,
+    period_basis_label,
 };
 use super::{extract_serde_any, py_bool};
 use crate::bindings::macros::wire_methods;

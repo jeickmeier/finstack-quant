@@ -200,12 +200,11 @@ impl MertonModel {
         if let MertonBarrierType::FirstPassage {
             barrier_growth_rate,
         } = barrier_type
+            && !barrier_growth_rate.is_finite()
         {
-            if !barrier_growth_rate.is_finite() {
-                return Err(Error::Validation(format!(
-                    "MertonModel: barrier_growth_rate must be finite, got {barrier_growth_rate}"
-                )));
-            }
+            return Err(Error::Validation(format!(
+                "MertonModel: barrier_growth_rate must be finite, got {barrier_growth_rate}"
+            )));
         }
         dynamics.validate()?;
         match (&dynamics, &barrier_type) {

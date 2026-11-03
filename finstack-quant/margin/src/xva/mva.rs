@@ -455,9 +455,9 @@ fn validate_spread_curve(curve: &[(f64, f64)]) -> finstack_quant_core::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SimmVersion;
     use crate::calculators::im::SimmCalculator;
     use crate::types::SimmSensitivities;
-    use crate::SimmVersion;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
@@ -514,16 +514,20 @@ mod tests {
 
     #[test]
     fn decay_validate_rejects_bad_maturity() {
-        assert!(ImDecayProfile::LinearToMaturity {
-            maturity_years: 0.0
-        }
-        .validate()
-        .is_err());
-        assert!(ImDecayProfile::SqrtTime {
-            maturity_years: f64::NAN
-        }
-        .validate()
-        .is_err());
+        assert!(
+            ImDecayProfile::LinearToMaturity {
+                maturity_years: 0.0
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            ImDecayProfile::SqrtTime {
+                maturity_years: f64::NAN
+            }
+            .validate()
+            .is_err()
+        );
         assert!(ImDecayProfile::Constant.validate().is_ok());
     }
 
@@ -688,18 +692,22 @@ mod tests {
         assert_eq!(back, decay);
 
         // Unknown fields must be rejected on all new inbound types.
-        assert!(serde_json::from_str::<ImProfile>(
-            r#"{"times":[1.0],"im_values":[2.0],"surprise":1}"#
-        )
-        .is_err());
-        assert!(serde_json::from_str::<MvaResult>(
-            r#"{"mva":1.0,"average_im":1.0,"im_profile":[[1.0,1.0]],"surprise":1}"#
-        )
-        .is_err());
-        assert!(serde_json::from_str::<ImDecayProfile>(
-            r#"{"linear_to_maturity":{"maturity_years":2.0,"surprise":1}}"#
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<ImProfile>(r#"{"times":[1.0],"im_values":[2.0],"surprise":1}"#)
+                .is_err()
+        );
+        assert!(
+            serde_json::from_str::<MvaResult>(
+                r#"{"mva":1.0,"average_im":1.0,"im_profile":[[1.0,1.0]],"surprise":1}"#
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<ImDecayProfile>(
+                r#"{"linear_to_maturity":{"maturity_years":2.0,"surprise":1}}"#
+            )
+            .is_err()
+        );
     }
 
     #[test]

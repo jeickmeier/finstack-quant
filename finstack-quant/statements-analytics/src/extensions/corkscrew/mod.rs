@@ -66,9 +66,9 @@
 //! # }
 //! ```
 
+use finstack_quant_statements::Result;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
-use finstack_quant_statements::Result;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -322,18 +322,20 @@ impl CorkscrewExtension {
         let mut data = IndexMap::new();
         data.insert(
             "validations".into(),
-            serde_json::json!(validations
-                .iter()
-                .map(|v| {
-                    serde_json::json!({
-                        "account": v.account_id,
-                        "type": v.account_type,
-                        "periods_validated": v.periods_validated,
-                        "max_error": v.max_error,
-                        "is_valid": v.is_valid,
+            serde_json::json!(
+                validations
+                    .iter()
+                    .map(|v| {
+                        serde_json::json!({
+                            "account": v.account_id,
+                            "type": v.account_type,
+                            "periods_validated": v.periods_validated,
+                            "max_error": v.max_error,
+                            "is_valid": v.is_valid,
+                        })
                     })
-                })
-                .collect::<Vec<_>>()),
+                    .collect::<Vec<_>>()
+            ),
         );
 
         Ok(CorkscrewReport {
@@ -693,10 +695,12 @@ mod tests {
             CorkscrewStatus::Failed,
             "a roll-forward identity break must fail the report in strict mode"
         );
-        assert!(report
-            .errors
-            .iter()
-            .any(|e| e.contains("roll-forward identity failed")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("roll-forward identity failed"))
+        );
     }
 
     #[test]
@@ -923,10 +927,12 @@ mod tests {
             .expect("extension should execute");
 
         assert_eq!(report.status, CorkscrewStatus::Failed);
-        assert!(report
-            .errors
-            .iter()
-            .any(|e| e.contains("Balance sheet not articulated")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("Balance sheet not articulated"))
+        );
     }
 
     #[test]

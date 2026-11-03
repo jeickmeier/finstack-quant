@@ -92,12 +92,12 @@ impl SaCcrEngine {
         let mut entities = BTreeMap::new();
         for trade in trades {
             let key = (trade.asset_class, trade.underlier.as_str());
-            if let Some(previous) = entities.insert(key, trade.supervisory_category) {
-                if previous != trade.supervisory_category {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "SA-CCR entity has inconsistent supervisory categories".into(),
-                    ));
-                }
+            if let Some(previous) = entities.insert(key, trade.supervisory_category)
+                && previous != trade.supervisory_category
+            {
+                return Err(finstack_quant_core::Error::Validation(
+                    "SA-CCR entity has inconsistent supervisory categories".into(),
+                ));
             }
         }
         let rc = replacement_cost(config, trades);

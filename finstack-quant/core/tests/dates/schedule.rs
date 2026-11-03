@@ -9,11 +9,13 @@ use finstack_quant_core::dates::{
 fn eom_rejects_incompatible_schedule_rules() {
     let builder = || Schedule::builder(make_date(2025, 1, 1), make_date(2025, 12, 20)).unwrap();
     for frequency in [Tenor::daily(), Tenor::weekly()] {
-        assert!(builder()
-            .frequency(frequency)
-            .end_of_month(true)
-            .build()
-            .is_err());
+        assert!(
+            builder()
+                .frequency(frequency)
+                .end_of_month(true)
+                .build()
+                .is_err()
+        );
     }
     assert!(builder().cds_imm().end_of_month(true).build().is_err());
     assert!(builder().end_of_month(true).cds_imm().build().is_err());
@@ -50,11 +52,13 @@ fn schedule_calendar_setters_replace_the_previous_representation() {
         Some(&make_date(2025, 7, 7))
     );
     // Replacing an invalid deferred ID must discard its pending lookup too.
-    assert!(builder()
-        .adjust_with(BusinessDayConvention::Following, "invalid_calendar")
-        .adjust_with(BusinessDayConvention::Following, "weekends_only")
-        .build()
-        .is_ok());
+    assert!(
+        builder()
+            .adjust_with(BusinessDayConvention::Following, "invalid_calendar")
+            .adjust_with(BusinessDayConvention::Following, "weekends_only")
+            .build()
+            .is_ok()
+    );
 }
 
 #[test]
@@ -594,9 +598,11 @@ fn boundary_rolls_keep_noninteger_and_invalid_tenor_errors() {
         .frequency(Tenor::monthly())
         .build()
         .expect_err("no-stub schedules still require exact tenor alignment");
-    assert!(error
-        .to_string()
-        .contains("requires the tenor to divide evenly"));
+    assert!(
+        error
+            .to_string()
+            .contains("requires the tenor to divide evenly")
+    );
 
     // Unsupported tenor sizes are rejected before a schedule can be built.
     assert!(Tenor::parse("4294967295M").is_err());

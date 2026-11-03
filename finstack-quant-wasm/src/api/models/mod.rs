@@ -50,7 +50,7 @@ macro_rules! json_round_trip {
             |inner| inner.to_json().map_err($crate::utils::to_js_err)
         );
     };
-    (@impl $js:ident, $class:ident, |$json:ident| $load:expr, |$inner:ident| $dump:expr) => {
+    (@impl $js:ident, $class:ident, |$json:ident| $load:expr_2021, |$inner:ident| $dump:expr_2021) => {
         #[wasm_bindgen::prelude::wasm_bindgen(js_class = $class)]
         impl $js {
             /// Load a handle from its canonical JSON wire form, the same form

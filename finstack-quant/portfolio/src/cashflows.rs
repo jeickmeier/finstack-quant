@@ -11,10 +11,10 @@
 //! `F(T) = S × DF_from(T) / DF_base(T)` for later dates. Missing discount
 //! curves or discount factors fail closed.
 
+use crate::Portfolio;
 use crate::error::{Error, Result};
 use crate::evaluation::try_map_positions;
 use crate::types::PositionId;
-use crate::Portfolio;
 #[cfg(test)]
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_cashflows::builder::CashflowRepresentation;
@@ -508,12 +508,12 @@ mod tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::types::{Attributes, CurveId};
+    use finstack_quant_valuations::instruments::Instrument as InternalInstrument;
     use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
     use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex;
     use finstack_quant_valuations::instruments::fixed_income::bond;
     use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
     use finstack_quant_valuations::instruments::rates::swaption::Swaption;
-    use finstack_quant_valuations::instruments::Instrument as InternalInstrument;
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
     use std::collections::HashMap;

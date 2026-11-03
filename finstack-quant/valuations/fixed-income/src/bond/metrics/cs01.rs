@@ -45,8 +45,8 @@
 //! [`ZSpreadCalculator`]: crate::bond::ZSpreadCalculator
 
 use super::risk_view::{active_model_consumes_credit, with_bond_risk_view};
-use crate::bond::pricing::quote_conversions::BondZSpreadPricingKernel;
 use crate::bond::Bond;
+use crate::bond::pricing::quote_conversions::BondZSpreadPricingKernel;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::require_hazard_replay;
@@ -151,7 +151,7 @@ fn oas_bumped_pvs(context: &MetricContext) -> finstack_quant_core::Result<(f64, 
         None => {
             return Err(finstack_quant_valuations_core::metrics::metric_not_found(
                 MetricId::Oas,
-            ))
+            ));
         }
     };
     if !base_oas.is_finite() {
@@ -308,11 +308,11 @@ mod tests {
     use finstack_quant_valuations_core::instruments::PricingOptions;
     use finstack_quant_valuations_core::metrics::MetricRegistry;
     use finstack_quant_valuations_core::pricer::{
-        expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
+        InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError, expect_inst,
     };
     use finstack_quant_valuations_core::results::ValuationResult;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use time::macros::date;
 
     struct OasSensitiveTreePricer {

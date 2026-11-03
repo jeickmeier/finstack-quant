@@ -5,8 +5,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricRegistry, MetricRegistryError};
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, Family, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
-    PricingErrorContext,
+    Family, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
+    PricingErrorContext, expect_inst,
 };
 use finstack_quant_valuations_core::register_generic;
 use finstack_quant_valuations_core::results::{

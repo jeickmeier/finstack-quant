@@ -111,11 +111,10 @@ impl StatementResult {
         all_periods.dedup();
 
         let period_strings: Vec<String> = all_periods.iter().map(ToString::to_string).collect();
-        let mut columns =
-            vec![
-                TableColumn::new("period_id", TableColumnData::String(period_strings))
-                    .with_role(TableColumnRole::Index),
-            ];
+        let mut columns = vec![
+            TableColumn::new("period_id", TableColumnData::String(period_strings))
+                .with_role(TableColumnRole::Index),
+        ];
 
         for (node_id, period_map) in &self.nodes {
             let mut node_values = Vec::with_capacity(all_periods.len());

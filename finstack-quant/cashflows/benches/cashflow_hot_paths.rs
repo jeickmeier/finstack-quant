@@ -22,9 +22,9 @@
 #[path = "support/fixtures.rs"]
 mod fixtures;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_cashflows::accrual::{
-    accrued_interest_amount, AccrualConfig, AccrualMethod, ExCouponRule,
+    AccrualConfig, AccrualMethod, ExCouponRule, accrued_interest_amount,
 };
 use finstack_quant_cashflows::aggregation::{
     aggregate_by_period, aggregate_cashflows_checked, calendar_year_ladder,

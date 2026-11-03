@@ -8,18 +8,18 @@
 //! - Cashflow schedule consistency
 
 use crate::support::rates as test_utils;
-use finstack_quant_cashflows::builder::FloatingLegCompounding;
-use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
 use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay;
 use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use time::macros::date;
 

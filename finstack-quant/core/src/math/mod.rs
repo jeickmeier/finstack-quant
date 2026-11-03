@@ -141,4 +141,4 @@ pub mod summation;
 pub mod time_grid;
 pub mod units;
 
-pub use compounding::{z_spread_discount_factor, Compounding};
+pub use compounding::{Compounding, z_spread_discount_factor};

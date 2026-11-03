@@ -1,10 +1,10 @@
 //! Traits and result types for margin calculators.
 
 use crate::Marginable;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 use super::super::types::{ImMethodology, SimmRiskClass};
 

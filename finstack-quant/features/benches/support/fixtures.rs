@@ -7,7 +7,7 @@
 //! by only one target look unused to the other.
 #![allow(dead_code)]
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Default research-year panel used by the absolute-cost benches: 100 names
 /// times 252 daily observations (25,200 rows).

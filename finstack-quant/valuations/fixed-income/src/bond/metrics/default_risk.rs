@@ -17,7 +17,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::metrics::sensitivities::recovery01::{
-    market_with_recovery, recovery01_fd, RecoveryReplayTerms,
+    RecoveryReplayTerms, market_with_recovery, recovery01_fd,
 };
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::pricer::ModelKey;

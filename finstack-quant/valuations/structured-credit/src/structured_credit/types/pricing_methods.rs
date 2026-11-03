@@ -7,11 +7,11 @@ use crate::structured_credit::pricing::stochastic::pricer::ScenarioTreeConfig;
 use crate::structured_credit::pricing::stochastic::pricer::{
     StochasticPricer, StochasticPricerConfig,
 };
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_models::correlation::RecoverySpec;
 use finstack_quant_models::credit::pool::StochasticPrepaySpec;
 use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
@@ -251,14 +251,13 @@ impl StructuredCredit {
         // horizon-persistent factor of the base scenario configuration.
         if let StochasticDefaultSpec::IntensityProcess { mean_reversion, .. } =
             &tree_config.default_spec
+            && *mean_reversion > 0.0
         {
-            if *mean_reversion > 0.0 {
-                tree_config.factor_spec =
-                    finstack_quant_models::correlation::LatentFactorSpec::SingleFactor {
-                        volatility: 1.0,
-                        mean_reversion: *mean_reversion,
-                    };
-            }
+            tree_config.factor_spec =
+                finstack_quant_models::correlation::LatentFactorSpec::SingleFactor {
+                    volatility: 1.0,
+                    mean_reversion: *mean_reversion,
+                };
         }
 
         if !self.market_conditions.refi_rate.is_finite() {

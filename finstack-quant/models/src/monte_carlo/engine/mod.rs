@@ -54,10 +54,10 @@ mod simulation;
 #[cfg(test)]
 mod tests;
 
-pub use config::{McEngineConfig, MAX_CAPTURED_PATHS, MAX_NUM_PATHS};
+pub use config::{MAX_CAPTURED_PATHS, MAX_NUM_PATHS, McEngineConfig};
 pub use fractional::simulate_path_fractional;
 pub use path_capture::{PathCaptureConfig, PathCaptureMode};
 pub use pricing::McEngine;
 
-pub(crate) use pricing::{build_correlation_factor, PathInputs, PathScratch};
-pub(crate) use simulation::{fill_shocks, run_path_loop, NoiseHook};
+pub(crate) use pricing::{PathInputs, PathScratch, build_correlation_factor};
+pub(crate) use simulation::{NoiseHook, fill_shocks, run_path_loop};

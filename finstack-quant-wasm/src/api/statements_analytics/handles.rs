@@ -6,7 +6,7 @@ use crate::utils::input::{from_js_json, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::evaluator::{DependencyGraph, StatementResult};
 use finstack_quant_statements::types::FinancialModelSpec;
-use finstack_quant_statements_analytics::analysis::{render_tree_detailed, DependencyTracer};
+use finstack_quant_statements_analytics::analysis::{DependencyTracer, render_tree_detailed};
 use finstack_quant_statements_analytics::extensions::{
     CorkscrewConfig, CorkscrewExtension, CreditScorecardExtension, ScorecardConfig,
 };

@@ -100,18 +100,20 @@ fn generic_ccp_wire_describes_only_the_actual_proxy() {
         serde_json::to_value(CcpMethodology::GenericProxy).expect("serialize proxy"),
         serde_json::json!("generic_proxy")
     );
-    assert!(serde_json::from_value::<CcpMethodology>(
-        serde_json::json!({"generic_var": {"confidence": 0.99, "lookback_days": 250}})
-    )
-    .is_err());
+    assert!(
+        serde_json::from_value::<CcpMethodology>(
+            serde_json::json!({"generic_var": {"confidence": 0.99, "lookback_days": 250}})
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn published_simm_wire_examples_are_accepted_by_the_calculator() {
+    use finstack_quant_margin::SimmVersion;
     use finstack_quant_margin::calculators::im::SimmCalculator;
     use finstack_quant_margin::types::SimmSensitivities;
     use finstack_quant_margin::types::SimmSensitivitiesJson;
-    use finstack_quant_margin::SimmVersion;
     let artifact = finstack_quant_margin::schema::ARTIFACTS
         .iter()
         .find(|a| {

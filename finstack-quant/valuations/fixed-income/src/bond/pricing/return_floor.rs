@@ -632,10 +632,12 @@ mod tests {
             date!(2024 - 01 - 15),
         )
         .unwrap();
-        assert!(sched
-            .calls
-            .iter()
-            .all(|c| c.price_pct_of_par >= 100.0 - 1e-9));
+        assert!(
+            sched
+                .calls
+                .iter()
+                .all(|c| c.price_pct_of_par >= 100.0 - 1e-9)
+        );
     }
 
     #[test]
@@ -766,10 +768,12 @@ mod tests {
         let floored = fixed_10pct_bullet().min_moic(1.25);
         let eff_floored = floored.effective_for_pricing(&curves, as_of).unwrap();
         assert!(eff_floored.return_floor.is_none());
-        assert!(eff_floored
-            .call_put
-            .as_ref()
-            .is_some_and(|c| !c.calls.is_empty()));
+        assert!(
+            eff_floored
+                .call_put
+                .as_ref()
+                .is_some_and(|c| !c.calls.is_empty())
+        );
         assert_eq!(
             eff_floored
                 .instrument_pricing_overrides

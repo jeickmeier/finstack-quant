@@ -4,7 +4,7 @@
 //! leg decomposition, and sensitivity to market parameters.
 
 use super::test_utils::*;
-use finstack_quant_cashflows::{builder::ScheduleParams, CashflowProvider};
+use finstack_quant_cashflows::{CashflowProvider, builder::ScheduleParams};
 use finstack_quant_core::currency::Currency::*;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;

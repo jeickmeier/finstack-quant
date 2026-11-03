@@ -9,11 +9,11 @@ use super::helpers::get_finite_node_value;
 use super::{
     Check, CheckComparison, CheckContext, CheckFinding, CheckResult, FormulaCheckSpec, Severity,
 };
+use crate::Result;
 use crate::evaluator::{
-    formula::evaluate_formula, EvalWarning, EvaluationContext, PeriodHistory, StatementResult,
+    EvalWarning, EvaluationContext, PeriodHistory, StatementResult, formula::evaluate_formula,
 };
 use crate::types::NodeId;
-use crate::Result;
 
 impl Check for FormulaCheckSpec {
     fn id(&self) -> &str {

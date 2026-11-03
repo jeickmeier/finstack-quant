@@ -12,8 +12,8 @@
 //!
 //! Returned as a decimal fraction (e.g., 0.25 = 25% volatility).
 
-use crate::convertible::pricing::settlement_dirty_price;
 use crate::convertible::ConvertibleBond;
+use crate::convertible::pricing::settlement_dirty_price;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
@@ -83,7 +83,9 @@ impl MetricCalculator for ImpliedVolCalculator {
             .solve_fallible(&evaluate, 0.25_f64.clamp(lower, upper))?;
         let residual = evaluate(volatility)?;
         if residual.abs() > 1e-10 {
-            return Err(Error::Validation(format!("convertible implied volatility failed repricing: dirty-price residual per unit notional {residual}")));
+            return Err(Error::Validation(format!(
+                "convertible implied volatility failed repricing: dirty-price residual per unit notional {residual}"
+            )));
         }
         Ok(volatility)
     }
@@ -136,8 +138,8 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::instruments::{
         AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
     };

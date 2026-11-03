@@ -1,8 +1,8 @@
 //! Swap payment utilities: the annuity floor and holiday-aware payment delays.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{Date, DateExt};
-use finstack_quant_core::Result;
 
 /// Minimum threshold for annuity values to avoid divide-by-zero in par spread calculations.
 ///

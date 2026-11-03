@@ -22,15 +22,15 @@
 //! typically understates the recalibrated one by 2-5x; a par bond's overstates
 //! it, because at fixed spreads the higher hazard rate offsets most of the gain.
 
-use crate::market::conventions::ids::CdsDocClause;
 use crate::market::conventions::CdsValuationConvention;
+use crate::market::conventions::ids::CdsDocClause;
 use crate::metrics::MetricContext;
 use crate::recalibration::{
     DealCdsQuoteOverride, HazardRecalibrationAction, HazardRecalibrationRequest,
 };
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use std::sync::Arc;
 
 /// Standard recovery rate bump: 1% (0.01).

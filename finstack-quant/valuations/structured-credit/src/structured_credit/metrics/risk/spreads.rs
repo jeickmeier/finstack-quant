@@ -1,11 +1,12 @@
 //! Spread calculators for structured credit (Z-spread, CS01, Spread Duration).
 
+use crate::structured_credit::StructuredCredit;
 use crate::structured_credit::metrics::discounted_flows;
 use crate::structured_credit::types::constants::{
     Z_SPREAD_INITIAL_BRACKET, Z_SPREAD_SOLVER_TOLERANCE,
 };
-use crate::structured_credit::StructuredCredit;
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -13,7 +14,6 @@ use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 
@@ -530,7 +530,7 @@ pub struct BucketedCs01Calculator;
 impl MetricCalculator for BucketedCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         use finstack_quant_valuations_core::metrics::{
-            format_bucket_label, STANDARD_BUCKETS_YEARS,
+            STANDARD_BUCKETS_YEARS, format_bucket_label,
         };
 
         let base_spread = context.computed_metric(&MetricId::ZSpread)?;

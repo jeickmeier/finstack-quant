@@ -84,11 +84,7 @@ pub(in crate::builder) fn emit_amortization_on(
             if on_boundary && d > *start && d <= *end =>
         {
             if let Some(installment) = state.linear_between_installment {
-                if d == *end {
-                    *outstanding
-                } else {
-                    installment
-                }
+                if d == *end { *outstanding } else { installment }
             } else {
                 Decimal::ZERO
             }

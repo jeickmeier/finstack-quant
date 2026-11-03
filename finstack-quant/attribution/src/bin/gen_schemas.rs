@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use finstack_quant_attribution::schema::ARTIFACTS;
-use finstack_quant_core::schema::{run_schema_generator, SchemaGenerationCommand};
+use finstack_quant_core::schema::{SchemaGenerationCommand, run_schema_generator};
 
 fn main() {
     let command = SchemaGenerationCommand::from_env()

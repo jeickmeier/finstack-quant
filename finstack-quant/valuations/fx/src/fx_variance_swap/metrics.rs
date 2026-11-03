@@ -4,12 +4,12 @@
 //! metrics, and their registry hook.
 
 use super::types::FxVarianceSwap;
-use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
+use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega;
 
 /// Register FX variance swap metrics with the registry.
 pub(crate) fn register_fx_variance_swap_metrics(
@@ -138,8 +138,8 @@ mod expected_variance_tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::stats::RealizedVarMethod;
-    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_valuations_core::instruments::Instrument;

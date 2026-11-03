@@ -19,9 +19,9 @@ use finstack_quant_valuations_core::results::structured_credit::{
     StochasticPricingResult, StructuredCreditPricingMode, TrancheSeniority,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    tranche_metrics, AssetPool, CoverageTestSpec, DealType, LossAllocationPolicy, PoolAsset,
-    ReinvestmentCriteria, ReinvestmentPeriod, SimulationRun, StructuredCredit, Tranche,
-    TrancheStructure,
+    AssetPool, CoverageTestSpec, DealType, LossAllocationPolicy, PoolAsset, ReinvestmentCriteria,
+    ReinvestmentPeriod, SimulationRun, StructuredCredit, Tranche, TrancheStructure,
+    tranche_metrics,
 };
 use time::Month;
 

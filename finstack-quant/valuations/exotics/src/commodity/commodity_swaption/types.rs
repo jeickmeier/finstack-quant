@@ -18,6 +18,7 @@
 //! - d1 = [ln(F/K) + 0.5*sigma^2*T] / (sigma*sqrt(T))
 //! - d2 = d1 - sigma*sqrt(T)
 
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -25,7 +26,6 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
-use finstack_quant_core::Result;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
@@ -418,21 +418,21 @@ fn validate_black76_domain(
              got {time}"
         )));
     }
-    if let Some(sigma) = sigma {
-        if !sigma.is_finite() || sigma < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "CommoditySwaption '{instrument_id}' Black-76 sigma must be finite and \
+    if let Some(sigma) = sigma
+        && (!sigma.is_finite() || sigma < 0.0)
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CommoditySwaption '{instrument_id}' Black-76 sigma must be finite and \
                  non-negative, got {sigma}"
-            )));
-        }
+        )));
     }
-    if let Some(annuity) = annuity {
-        if !annuity.is_finite() || annuity <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "CommoditySwaption '{instrument_id}' Black-76 annuity must be finite and \
+    if let Some(annuity) = annuity
+        && (!annuity.is_finite() || annuity <= 0.0)
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CommoditySwaption '{instrument_id}' Black-76 annuity must be finite and \
                  positive, got {annuity}"
-            )));
-        }
+        )));
     }
     Ok(())
 }

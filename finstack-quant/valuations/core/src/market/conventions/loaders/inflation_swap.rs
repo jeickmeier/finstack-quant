@@ -1,10 +1,10 @@
 //! Loader for inflation swap conventions embedded in JSON registries.
 
-use crate::market::conventions::ids::InflationSwapConventionId;
 use crate::market::conventions::InflationSwapConventions;
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+use crate::market::conventions::ids::InflationSwapConventionId;
 use finstack_quant_core::Error;
 use finstack_quant_core::FxHashMap;
+use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -37,8 +37,8 @@ impl InflationSwapConventionRecord {
 }
 
 /// Load the Inflation Swap conventions from the embedded JSON registry.
-pub(crate) fn load_registry(
-) -> Result<FxHashMap<InflationSwapConventionId, InflationSwapConventions>, Error> {
+pub(crate) fn load_registry()
+-> Result<FxHashMap<InflationSwapConventionId, InflationSwapConventions>, Error> {
     let json = include_str!("../../../../data/conventions/inflation_swap_conventions.json");
     super::json::parse_and_rekey(
         json,

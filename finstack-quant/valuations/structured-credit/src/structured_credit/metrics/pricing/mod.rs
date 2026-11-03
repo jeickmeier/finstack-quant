@@ -3,15 +3,15 @@
 pub(crate) mod prices;
 pub(crate) mod wal;
 
+use crate::structured_credit::StructuredCredit;
 use crate::structured_credit::types::DealAccruals;
 use crate::structured_credit::types::TrancheCashflows;
-use crate::structured_credit::StructuredCredit;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 pub(crate) use prices::{CleanPriceCalculator, DirtyPriceCalculator};
-pub use wal::calculate_tranche_wal;
 pub(crate) use wal::WalCalculator;
+pub use wal::calculate_tranche_wal;
 
 /// Calculates current-period contractual accrued interest in note currency.
 ///

@@ -11,7 +11,7 @@ use rust_decimal::Decimal;
 
 use super::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
-use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
+use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
 use crate::bindings::core::money::decimal_to_py;
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::repr_support::{enum_repr_from_serde as enum_repr, repr_from_serde};

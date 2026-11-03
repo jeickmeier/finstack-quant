@@ -180,9 +180,11 @@ mod tests {
             .expect("valid curve");
         let market = MarketContext::new().insert(fwd);
 
-        assert!(RateSpec::Fixed { rate: f64::NAN }
-            .try_rate_for_period(start, end, 0.25, base, &market)
-            .is_err());
+        assert!(
+            RateSpec::Fixed { rate: f64::NAN }
+                .try_rate_for_period(start, end, 0.25, base, &market)
+                .is_err()
+        );
 
         let base_float = FloatingRateSpec {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
@@ -205,16 +207,20 @@ mod tests {
 
         let mut neg_lag = base_float.clone();
         neg_lag.reset_lag_days = -2;
-        assert!(RateSpec::Floating(neg_lag)
-            .try_rate_for_period(start, end, 0.25, base, &market)
-            .is_err());
+        assert!(
+            RateSpec::Floating(neg_lag)
+                .try_rate_for_period(start, end, 0.25, base, &market)
+                .is_err()
+        );
 
         let mut compounded = base_float.clone();
         compounded.compounding =
             Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 });
-        assert!(RateSpec::Floating(compounded)
-            .try_rate_for_period(start, end, 0.25, base, &market)
-            .is_err());
+        assert!(
+            RateSpec::Floating(compounded)
+                .try_rate_for_period(start, end, 0.25, base, &market)
+                .is_err()
+        );
 
         let mut zero_lag = base_float.clone();
         zero_lag.reset_lag_days = 0;

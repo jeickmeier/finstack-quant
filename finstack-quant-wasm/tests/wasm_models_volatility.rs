@@ -71,20 +71,24 @@ fn sabr_calibrator_with_tolerance_calibrates() {
 
 #[wasm_bindgen_test]
 fn sabr_parameters_reject_non_number_arguments() {
-    assert!(JsSabrParameters::new(
-        JsValue::from("0.2"),
-        JsValue::from(0.5),
-        JsValue::from(0.3),
-        JsValue::from(-0.2),
-        None,
-    )
-    .is_err());
-    assert!(JsSabrParameters::new(
-        JsValue::NULL,
-        JsValue::from(0.5),
-        JsValue::from(0.3),
-        JsValue::from(-0.2),
-        None,
-    )
-    .is_err());
+    assert!(
+        JsSabrParameters::new(
+            JsValue::from("0.2"),
+            JsValue::from(0.5),
+            JsValue::from(0.3),
+            JsValue::from(-0.2),
+            None,
+        )
+        .is_err()
+    );
+    assert!(
+        JsSabrParameters::new(
+            JsValue::NULL,
+            JsValue::from(0.5),
+            JsValue::from(0.3),
+            JsValue::from(-0.2),
+            None,
+        )
+        .is_err()
+    );
 }

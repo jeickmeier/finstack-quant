@@ -200,9 +200,11 @@ mod tests {
         }"#;
         let error = serde_json::from_str::<RiskDecomposition>(incomplete_json)
             .expect_err("position_residual_contributions is required");
-        assert!(error
-            .to_string()
-            .contains("position_residual_contributions"));
+        assert!(
+            error
+                .to_string()
+                .contains("position_residual_contributions")
+        );
     }
 
     #[test]

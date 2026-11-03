@@ -770,10 +770,12 @@ mod tests {
         let mut losses = allocate_loss_buffer(64).expect("buffer");
         fill_parallel_losses(&mut losses, |path_index| Ok(path_index as f64 * 2.0))
             .expect("no failures");
-        assert!(losses
-            .iter()
-            .enumerate()
-            .all(|(index, loss)| *loss == index as f64 * 2.0));
+        assert!(
+            losses
+                .iter()
+                .enumerate()
+                .all(|(index, loss)| *loss == index as f64 * 2.0)
+        );
     }
 
     #[test]

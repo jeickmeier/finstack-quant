@@ -1,12 +1,12 @@
 //! Formula-evaluation helpers for statement expressions.
 //!
+use super::EvaluationContext;
 use super::formula::{
     collect_expression_range_values, collect_expression_values_sorted,
     collect_expression_window_values, eval_error, evaluate_non_negative_integer_arg, require_args,
     require_min_args,
 };
 use super::results::EvalWarning;
-use super::EvaluationContext;
 use crate::error::Result;
 use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use finstack_quant_core::expr::{Expr, Function};

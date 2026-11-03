@@ -8,9 +8,9 @@ use super::builtins::{
 };
 use super::traits::{Check, CheckContext};
 use super::types::{CheckCategory, CheckConfig, CheckReport, CheckResult, CheckSummary, Severity};
+use crate::Result;
 use crate::evaluator::{Evaluator, StatementResult};
 use crate::types::FinancialModelSpec;
-use crate::Result;
 
 /// A named, self-contained collection of checks with its own configuration.
 pub struct CheckSuite {
@@ -88,12 +88,12 @@ impl CheckSuite {
                 // materiality setting silently convert a failing accounting
                 // identity into a passing check. Tolerances — not materiality
                 // — decide whether a diff is an Error in the first place.
-                if mat_threshold > 0.0 && f.severity < Severity::Error {
-                    if let Some(ref m) = f.materiality {
-                        if m.absolute.abs() < mat_threshold {
-                            return false;
-                        }
-                    }
+                if mat_threshold > 0.0
+                    && f.severity < Severity::Error
+                    && let Some(ref m) = f.materiality
+                    && m.absolute.abs() < mat_threshold
+                {
+                    return false;
                 }
                 true
             });
@@ -418,10 +418,12 @@ mod tests {
         }
         let unknown: std::result::Result<BuiltinCheckSpec, serde_json::Error> =
             serde_json::from_value(serde_json::json!({ "type": "no_such_check" }));
-        assert!(unknown
-            .expect_err("unknown tag must fail")
-            .to_string()
-            .contains("unknown variant"));
+        assert!(
+            unknown
+                .expect_err("unknown tag must fail")
+                .to_string()
+                .contains("unknown variant")
+        );
         // Tag-only construction succeeds for the checks whose fields all
         // default, which is what a host's `builtin_checks=["non_finite"]`
         // shorthand relies on.

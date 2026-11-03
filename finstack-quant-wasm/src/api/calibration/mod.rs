@@ -355,10 +355,12 @@ mod tests {
         assert_eq!(details.stage.as_str(), "ingestion");
         assert_eq!(details.category, "strict_load");
         assert!(!details.cause.is_empty());
-        assert!(error
-            .details()
-            .to_json()
-            .contains("\"stage\":\"ingestion\""));
+        assert!(
+            error
+                .details()
+                .to_json()
+                .contains("\"stage\":\"ingestion\"")
+        );
     }
 
     #[test]

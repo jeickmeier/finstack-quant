@@ -10,7 +10,7 @@ use finstack_quant_portfolio::optimization::{
 use finstack_quant_portfolio::types::PositionId;
 
 use crate::bindings::pandas_utils::{
-    dict_to_dataframe, serde_rows_to_dataframe_with_schema, ColumnSchema,
+    ColumnSchema, dict_to_dataframe, serde_rows_to_dataframe_with_schema,
 };
 
 use super::enums::{PyMissingMetricPolicy, PyWeightingScheme};
@@ -315,18 +315,18 @@ impl PyPortfolioOptimizationSpec {
         portfolio: &Bound<'_, PyAny>,
         objective: PyObjective,
     ) -> PyResult<Self> {
-        let portfolio: finstack_quant_portfolio::PortfolioSpec = if let Ok(built) =
-            portfolio.cast::<crate::bindings::portfolio::container::PyPortfolio>()
-        {
-            built.borrow().inner.to_spec()
-        } else {
-            let json: String = portfolio.extract().map_err(|_| {
-                pyo3::exceptions::PyTypeError::new_err(
-                    "expected a Portfolio or a canonical PortfolioSpec JSON string",
-                )
-            })?;
-            deserialize_json(&json)?
-        };
+        let portfolio: finstack_quant_portfolio::PortfolioSpec =
+            match portfolio.cast::<crate::bindings::portfolio::container::PyPortfolio>() {
+                Ok(built) => built.borrow().inner.to_spec(),
+                _ => {
+                    let json: String = portfolio.extract().map_err(|_| {
+                        pyo3::exceptions::PyTypeError::new_err(
+                            "expected a Portfolio or a canonical PortfolioSpec JSON string",
+                        )
+                    })?;
+                    deserialize_json(&json)?
+                }
+            };
         Ok(Self::from_inner(PortfolioOptimizationSpec::new(
             portfolio,
             objective.inner,

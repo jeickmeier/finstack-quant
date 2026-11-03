@@ -12,8 +12,8 @@ use finstack_quant_core::expr::Expr;
 use finstack_quant_core::expr::UnaryOp;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::{Error, Result};
 use indexmap::IndexMap;
@@ -77,10 +77,12 @@ fn cross_currency_values_and_dependencies_use_reporting_fx() -> Result<()> {
     let market = MarketContext::new().insert_fx(FxMatrix::new(provider));
 
     let dependencies = composite.market_dependencies()?;
-    assert!(dependencies
-        .fx_pairs
-        .iter()
-        .any(|pair| { pair.base == Currency::EUR && pair.quote == Currency::USD }));
+    assert!(
+        dependencies
+            .fx_pairs
+            .iter()
+            .any(|pair| { pair.base == Currency::EUR && pair.quote == Currency::USD })
+    );
     let result = composite.price_with_metrics(
         &market,
         date!(2025 - 01 - 02),
@@ -319,9 +321,11 @@ fn rebalance_result_wire_carries_the_canonical_instrument_envelope() -> Result<(
         .map_err(|error| Error::Internal(error.to_string()))?;
     let error = serde_json::from_value::<CompositeRebalanceResult>(wrong)
         .expect_err("a non-composite envelope must be rejected");
-    assert!(error
-        .to_string()
-        .contains("expected instrument type `composite`, got `equity`"));
+    assert!(
+        error
+            .to_string()
+            .contains("expected instrument type `composite`, got `equity`")
+    );
     Ok(())
 }
 

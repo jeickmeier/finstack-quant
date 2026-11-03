@@ -225,7 +225,8 @@ impl ReplayCursor {
         if self.outstanding < -1.0e-8 || !self.outstanding.is_finite() {
             return Err(Error::Validation(format!(
                 "Bond '{}' hazard LSMC replay produced invalid outstanding principal {} at step {step}",
-                bond.id.as_str(), self.outstanding
+                bond.id.as_str(),
+                self.outstanding
             )));
         }
         self.outstanding = self.outstanding.max(0.0);
@@ -456,11 +457,11 @@ impl ReplayTemplate {
             .filter(|date| *date > as_of || (*date == as_of && include_as_of_cash))
             .map(|date| exact_grid_step(&times, as_of, date))
             .transpose()?;
-        if let Some(step) = redemption_step {
-            if decision_steps.binary_search(&step).is_err() {
-                decision_steps.push(step);
-                decision_steps.sort_unstable();
-            }
+        if let Some(step) = redemption_step
+            && decision_steps.binary_search(&step).is_err()
+        {
+            decision_steps.push(step);
+            decision_steps.sort_unstable();
         }
         for claim in &mut make_whole_claims {
             claim.decision_index =
@@ -639,7 +640,9 @@ impl ReplayTemplate {
                         {
                             return Err(Error::Validation(format!(
                                 "Bond '{}' overnight coupon paid {} still requires unobserved fixings after payment for PIK capitalization on {}",
-                                bond.id.as_str(), flow.date, flow.get_balance_date(),
+                                bond.id.as_str(),
+                                flow.date,
+                                flow.get_balance_date(),
                             )));
                         }
                     }
@@ -688,7 +691,8 @@ impl ReplayTemplate {
             if let Some((&payment, _)) = periods_by_payment.iter().find(|(_, count)| **count > 1) {
                 return Err(Error::Validation(format!(
                     "Bond '{}' segmented overnight coupon paid {} cannot be replayed without its original full-period observation and constraint scope",
-                    bond.id.as_str(), payment,
+                    bond.id.as_str(),
+                    payment,
                 )));
             }
         }
@@ -739,7 +743,11 @@ impl ReplayTemplate {
             if accrual_start_step >= payment_step {
                 return Err(Error::Validation(format!(
                     "Bond '{}' floating coupon accruing {} to {} (paid {}) maps accrual start and payment to step {}; use a daily rates-credit grid through the adjusted payment date",
-                    bond.id.as_str(), start, end, payment, accrual_start_step
+                    bond.id.as_str(),
+                    start,
+                    end,
+                    payment,
+                    accrual_start_step
                 )));
             }
             let spec = floating_spec.ok_or_else(|| {
@@ -788,14 +796,19 @@ impl ReplayTemplate {
                         if observation_end_time > times[terminal_step] + 1.0e-12 {
                             return Err(Error::Validation(format!(
                                 "Bond '{}' term-index observation at {} with tenor {:.12}y ends beyond the calibrated rates-credit horizon {:.12}y",
-                                bond.id.as_str(), reset, tenor_years, times[terminal_step]
+                                bond.id.as_str(),
+                                reset,
+                                tenor_years,
+                                times[terminal_step]
                             )));
                         }
                         let observation_end_step = nearest_step(times, observation_end_time);
                         if observation_end_step <= reset_step {
                             return Err(Error::Validation(format!(
                                 "Bond '{}' term-index observation at {} with tenor {:.12}y maps to no positive rates-credit interval",
-                                bond.id.as_str(), reset, tenor_years
+                                bond.id.as_str(),
+                                reset,
+                                tenor_years
                             )));
                         }
                         let index_accrual = times[observation_end_step] - times[reset_step];
@@ -819,7 +832,9 @@ impl ReplayTemplate {
                         if !base_df.is_finite() || base_df <= 0.0 {
                             return Err(Error::Validation(format!(
                                 "Bond '{}' has an invalid reference discount factor over the term-index observation [{:.12}, {:.12}]",
-                                bond.id.as_str(), times[reset_step], times[observation_end_step]
+                                bond.id.as_str(),
+                                times[reset_step],
+                                times[observation_end_step]
                             )));
                         }
                         ObservedRateSource::Conditional(ConditionalRate {
@@ -858,13 +873,14 @@ impl ReplayTemplate {
             )?;
             if let FloatingRateModel::Overnight(overnight) = &rate_model {
                 for source in overnight.sources.values() {
-                    if let OvernightRateSource::Conditional(source) = source {
-                        if source.observation_step > payment_step {
-                            return Err(Error::Validation(format!(
-                                "Bond '{}' overnight coupon paid {} requires an observation after payment; adjust the accrual end or payment lag",
-                                bond.id.as_str(), payment,
-                            )));
-                        }
+                    if let OvernightRateSource::Conditional(source) = source
+                        && source.observation_step > payment_step
+                    {
+                        return Err(Error::Validation(format!(
+                            "Bond '{}' overnight coupon paid {} requires an observation after payment; adjust the accrual end or payment lag",
+                            bond.id.as_str(),
+                            payment,
+                        )));
                     }
                 }
             }
@@ -1098,7 +1114,8 @@ impl ReplayTemplate {
                     if event_minus_step.abs() > 1.0e-10 {
                         return Err(Error::Validation(format!(
                             "Bond '{}' cashflow date {} is not an exact node on the daily ACT/365F rates-credit grid (offset {event_minus_step}); rebuild calibration with build_daily_bond_rates_credit_targets",
-                            bond.id.as_str(), flow.date
+                            bond.id.as_str(),
+                            flow.date
                         )));
                     }
                     static_cash[step].push(CashEvent {
@@ -1107,11 +1124,11 @@ impl ReplayTemplate {
                     });
                 }
             }
-            if flow.get_balance_date() >= as_of {
-                if let Some(delta) = static_balance_delta(flow, terminal_redemption) {
-                    let balance_step = exact_grid_step(times, as_of, flow.get_balance_date())?;
-                    balance_events[balance_step].push(BalanceEvent { delta });
-                }
+            if flow.get_balance_date() >= as_of
+                && let Some(delta) = static_balance_delta(flow, terminal_redemption)
+            {
+                let balance_step = exact_grid_step(times, as_of, flow.get_balance_date())?;
+                balance_events[balance_step].push(BalanceEvent { delta });
             }
             if flow.date >= as_of && is_holder_distribution(flow) {
                 static_distributions[step].push(DistributionEvent {
@@ -1566,13 +1583,13 @@ impl ReplayTemplate {
                 put = Some(put.map_or(value, |existing| existing.max(value)));
             }
         }
-        if let (Some(call), Some(put)) = (call, put) {
-            if put > call + 1.0e-10 {
-                return Err(Error::Validation(format!(
-                    "Bond '{}' has incompatible path-dependent barriers at step {step}: holder put {put} exceeds issuer call {call}",
-                    bond.id.as_str()
-                )));
-            }
+        if let (Some(call), Some(put)) = (call, put)
+            && put > call + 1.0e-10
+        {
+            return Err(Error::Validation(format!(
+                "Bond '{}' has incompatible path-dependent barriers at step {step}: holder put {put} exceeds issuer call {call}",
+                bond.id.as_str()
+            )));
         }
         Ok((call, put))
     }

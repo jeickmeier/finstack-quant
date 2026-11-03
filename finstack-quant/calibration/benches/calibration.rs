@@ -2,7 +2,9 @@
 //!
 //! This benchmark suite focuses on the plan-driven calibration step engine.
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use finstack_quant_calibration::CalibrationConfig;
+use finstack_quant_calibration::CalibrationMethod;
 use finstack_quant_calibration::api::market_datum::MarketDatum;
 use finstack_quant_calibration::api::{
     engine,
@@ -14,9 +16,8 @@ use finstack_quant_calibration::api::{
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::RateQuote;
 use finstack_quant_calibration::quotes::{Pillar, QuoteId};
-use finstack_quant_calibration::recalibration::{bump_hazard_spreads, CachedRecalibrationProvider};
-use finstack_quant_calibration::CalibrationConfig;
-use finstack_quant_calibration::CalibrationMethod;
+use finstack_quant_calibration::recalibration::{CachedRecalibrationProvider, bump_hazard_spreads};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -25,7 +26,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;

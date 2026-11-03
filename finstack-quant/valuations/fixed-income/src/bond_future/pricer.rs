@@ -6,13 +6,13 @@
 //! future-level financing inputs and therefore uses the CTD bond's discount
 //! curve.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
-use finstack_quant_valuations_core::pricer::expect_inst;
 use finstack_quant_valuations_core::pricer::PricingError;
+use finstack_quant_valuations_core::pricer::expect_inst;
 
 use crate::bond::Bond;
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -508,7 +508,9 @@ mod tests {
             total += amount.amount();
         }
         println!("Total cashflows: ${:.2}", total);
-        println!("Expected for 100k notional with 6% coupon: ~$103,000 (coupons) + $100,000 (redemption)");
+        println!(
+            "Expected for 100k notional with 6% coupon: ~$103,000 (coupons) + $100,000 (redemption)"
+        );
     }
 
     // ========== Conversion Factor Tests (CME standard formula) ==========

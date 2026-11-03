@@ -24,8 +24,8 @@ use std::collections::HashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::fx::{FxQuery, FxRateResult};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxQuery, FxRateResult};
 use finstack_quant_core::types::CurveId;
 
 use crate::error::{Error, Result};

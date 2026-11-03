@@ -78,7 +78,7 @@ use finstack_quant_models::volatility::rough_heston::RoughHestonFourierParams;
 use finstack_quant_models::volatility::sabr::SabrParameters;
 use finstack_quant_models::volatility::svi::SviParams;
 use finstack_quant_models::volatility::{implied_vol_bachelier, implied_vol_black};
-use finstack_quant_test_utils::golden::{load_suite_from_path, GoldenSuite};
+use finstack_quant_test_utils::golden::{GoldenSuite, load_suite_from_path};
 use finstack_quant_test_utils::golden_path;
 use serde::Deserialize;
 

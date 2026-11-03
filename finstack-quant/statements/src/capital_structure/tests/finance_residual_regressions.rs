@@ -1,10 +1,10 @@
 //! Financial regressions for residual coupon and principal-date reconstruction.
 
+use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{
     CashFlowMeta, CashFlowSchedule, CouponType, FixedCouponSpec, Notional, ScheduleParams,
 };
-use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::currency::Currency;
@@ -363,11 +363,13 @@ fn full_paydown_preserves_paid_cash_and_suppresses_its_later_principal_movement(
     );
     assert_close(amount_on(rebuilt, CFKind::Notional, maturity), 0.0);
     assert_matures_to_zero(rebuilt, maturity);
-    assert!(rebuilt
-        .outstanding_by_date()
-        .expect("valid principal path")
-        .iter()
-        .all(|(_, balance)| balance.amount() >= 0.0));
+    assert!(
+        rebuilt
+            .outstanding_by_date()
+            .expect("valid principal path")
+            .iter()
+            .all(|(_, balance)| balance.amount() >= 0.0)
+    );
     assert_repeated_rebuild_is_unchanged(&mut state, cutoff);
 }
 

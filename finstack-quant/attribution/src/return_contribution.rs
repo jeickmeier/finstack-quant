@@ -344,21 +344,21 @@ impl ReturnContributionSpec {
                     position.id
                 )));
             }
-            if let Some(market_value) = position.market_value {
-                if !market_value.is_finite() {
-                    return Err(Error::Validation(format!(
-                        "return contribution position '{}' market_value must be finite",
-                        position.id
-                    )));
-                }
+            if let Some(market_value) = position.market_value
+                && !market_value.is_finite()
+            {
+                return Err(Error::Validation(format!(
+                    "return contribution position '{}' market_value must be finite",
+                    position.id
+                )));
             }
-            if let Some(weight) = position.weight {
-                if !weight.is_finite() {
-                    return Err(Error::Validation(format!(
-                        "return contribution position '{}' weight must be finite",
-                        position.id
-                    )));
-                }
+            if let Some(weight) = position.weight
+                && !weight.is_finite()
+            {
+                return Err(Error::Validation(format!(
+                    "return contribution position '{}' weight must be finite",
+                    position.id
+                )));
             }
             if position.market_value.is_some() == position.weight.is_some() {
                 return Err(Error::Validation(format!(

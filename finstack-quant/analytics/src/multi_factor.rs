@@ -235,11 +235,7 @@ pub(crate) fn multi_factor_greeks(
         n,
         p,
         |row, col| {
-            if col == 0 {
-                1.0
-            } else {
-                factors[col - 1][row]
-            }
+            if col == 0 { 1.0 } else { factors[col - 1][row] }
         },
     );
     let targets = DMatrix::from_column_slice(n, 1, y);

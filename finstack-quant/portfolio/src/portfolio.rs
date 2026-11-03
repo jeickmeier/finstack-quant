@@ -9,9 +9,9 @@ use crate::dependencies::DependencyIndex;
 use crate::error::{Error, Result};
 use crate::position::Position;
 use crate::types::{Entity, EntityId, PositionId};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::FxHashMap;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -219,10 +219,10 @@ impl Portfolio {
             book.position_ids.clear();
         }
         for position in &positions {
-            if let Some(book_id) = &position.book_id {
-                if let Some(book) = self.books.get_mut(book_id) {
-                    book.position_ids.push(position.position_id.clone());
-                }
+            if let Some(book_id) = &position.book_id
+                && let Some(book) = self.books.get_mut(book_id)
+            {
+                book.position_ids.push(position.position_id.clone());
             }
         }
         self.positions = positions;
@@ -394,13 +394,13 @@ fn check_position_ids_and_books<'a>(
                 position.position_id
             )));
         }
-        if let Some(book_id) = &position.book_id {
-            if !books.contains_key(book_id) {
-                return Err(Error::invalid_input(format!(
-                    "Position '{}' references non-existent book '{}'",
-                    position.position_id, book_id
-                )));
-            }
+        if let Some(book_id) = &position.book_id
+            && !books.contains_key(book_id)
+        {
+            return Err(Error::invalid_input(format!(
+                "Position '{}' references non-existent book '{}'",
+                position.position_id, book_id
+            )));
         }
     }
     Ok(seen_ids)
@@ -556,9 +556,11 @@ mod tests {
         assert!(portfolio.books["CHILD"].position_ids.is_empty());
         portfolio.validate().expect("consistent replacement");
         let snapshot = portfolio.to_spec();
-        assert!(portfolio
-            .set_positions(vec![test_position_with_book("MISSING")])
-            .is_err());
+        assert!(
+            portfolio
+                .set_positions(vec![test_position_with_book("MISSING")])
+                .is_err()
+        );
         assert_eq!(
             portfolio.to_spec().positions.len(),
             snapshot.positions.len()
@@ -577,11 +579,13 @@ mod tests {
             .expect("root")
             .position_ids
             .push(PositionId::new("POS_BOOK_TEST"));
-        assert!(portfolio
-            .validate()
-            .expect_err("duplicate membership")
-            .to_string()
-            .contains("more than once"));
+        assert!(
+            portfolio
+                .validate()
+                .expect_err("duplicate membership")
+                .to_string()
+                .contains("more than once")
+        );
         let mut portfolio = book_portfolio();
         portfolio
             .books
@@ -590,11 +594,13 @@ mod tests {
             .child_book_ids
             .clear();
         portfolio.books.get_mut("CHILD").expect("child").parent_id = Some("MISSING".into());
-        assert!(portfolio
-            .validate()
-            .expect_err("dangling parent")
-            .to_string()
-            .contains("missing parent"));
+        assert!(
+            portfolio
+                .validate()
+                .expect_err("dangling parent")
+                .to_string()
+                .contains("missing parent")
+        );
     }
 
     #[test]
@@ -606,11 +612,13 @@ mod tests {
             .expect("child")
             .position_ids
             .clear();
-        assert!(portfolio
-            .validate()
-            .expect_err("missing reciprocal membership")
-            .to_string()
-            .contains("disagrees"));
+        assert!(
+            portfolio
+                .validate()
+                .expect_err("missing reciprocal membership")
+                .to_string()
+                .contains("disagrees")
+        );
         let mut portfolio = book_portfolio();
         portfolio
             .books
@@ -618,10 +626,12 @@ mod tests {
             .expect("root")
             .child_book_ids
             .clear();
-        assert!(portfolio
-            .validate()
-            .expect_err("missing reciprocal child")
-            .to_string()
-            .contains("does not list"));
+        assert!(
+            portfolio
+                .validate()
+                .expect_err("missing reciprocal child")
+                .to_string()
+                .contains("does not list")
+        );
     }
 }

@@ -4,8 +4,8 @@
 //! `finstack-quant-calibration`, keeping the permanent dependency direction
 //! `calibration -> valuations`.
 
-use crate::market::conventions::ids::CdsDocClause;
 use crate::market::conventions::CdsValuationConvention;
+use crate::market::conventions::ids::CdsDocClause;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{

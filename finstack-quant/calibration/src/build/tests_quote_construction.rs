@@ -1,10 +1,10 @@
 //! Quote-to-instrument construction coverage for every quote class.
 #![allow(clippy::unwrap_used, clippy::panic)]
 
-use crate::build::cds::build_cds_instrument;
-use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
-use crate::build::rates::build_rate_instrument;
 use crate::build::BuildCtx;
+use crate::build::cds::build_cds_instrument;
+use crate::build::cds_tranche::{CdsTrancheBuildOverrides, build_cds_tranche_instrument};
+use crate::build::rates::build_rate_instrument;
 use crate::quotes::CdsQuote;
 use crate::quotes::CdsTrancheQuote;
 use crate::quotes::InflationQuote;
@@ -24,9 +24,9 @@ use time::Month;
 // Comprehensive quote-to-instrument construction test for canonical calibration engine.
 // Verifies that all quote types can be successfully converted to calibration instruments.
 
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DateExt; // Imports DateExt
-use finstack_quant_core::FxHashMap;
 use rust_decimal::Decimal;
 
 // Helper to create date validly
@@ -188,28 +188,27 @@ fn test_all_quote_types_instrument_construction() {
     }
 
     for q in &inflation_quotes {
-        if let MarketQuote::Inflation(_) = q {
-            if let MarketQuote::Inflation(InflationQuote::InflationSwap {
+        if let MarketQuote::Inflation(_) = q
+            && let MarketQuote::Inflation(InflationQuote::InflationSwap {
                 maturity,
                 rate,
                 index,
                 ..
             }) = q
-            {
-                let swap = InflationSwap::builder()
-                    .id(format!("INF-{}", maturity).into())
-                    .notional(Money::from((1_000_000_i64, currency)))
-                    .start_date(base_date)
-                    .maturity(*maturity)
-                    .fixed_rate(Decimal::try_from(*rate).expect("valid decimal"))
-                    .inflation_index_id(index.clone().into())
-                    .discount_curve_id("USD-OIS".into())
-                    .day_count(DayCount::Act365F)
-                    .side(PayReceive::Pay)
-                    .build()
-                    .expect("inflation swap build");
-                swap.validate().expect("inflation swap validate");
-            }
+        {
+            let swap = InflationSwap::builder()
+                .id(format!("INF-{}", maturity).into())
+                .notional(Money::from((1_000_000_i64, currency)))
+                .start_date(base_date)
+                .maturity(*maturity)
+                .fixed_rate(Decimal::try_from(*rate).expect("valid decimal"))
+                .inflation_index_id(index.clone().into())
+                .discount_curve_id("USD-OIS".into())
+                .day_count(DayCount::Act365F)
+                .side(PayReceive::Pay)
+                .build()
+                .expect("inflation swap build");
+            swap.validate().expect("inflation swap validate");
         }
     }
 

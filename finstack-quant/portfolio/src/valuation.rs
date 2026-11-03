@@ -1,13 +1,13 @@
 //! Portfolio valuation and aggregation.
 
-use crate::types::{EntityId, PositionId};
 use crate::Portfolio;
 use crate::Result;
+use crate::types::{EntityId, PositionId};
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::results::ValuationResult;
 use indexmap::IndexMap;
@@ -501,7 +501,7 @@ mod tests {
 
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market;
-    use crate::types::{Entity, DUMMY_ENTITY_ID};
+    use crate::types::{DUMMY_ENTITY_ID, Entity};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
@@ -528,9 +528,11 @@ mod tests {
     #[test]
     fn metric_names_resolve_against_the_standard_registry() {
         let listed = finstack_quant_valuations::pricer::list_standard_metrics();
-        assert!(listed
-            .iter()
-            .any(|name| MetricId::parse_strict(name).is_err()));
+        assert!(
+            listed
+                .iter()
+                .any(|name| MetricId::parse_strict(name).is_err())
+        );
         let RequestedMetrics::Only(resolved) =
             RequestedMetrics::try_from_metric_names(Some(listed.clone()))
                 .expect("every listed standard metric is a valid portfolio metric")

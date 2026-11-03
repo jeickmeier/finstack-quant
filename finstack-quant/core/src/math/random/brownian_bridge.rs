@@ -275,9 +275,10 @@ mod tests {
     fn zero_and_one_step_bridges_validate_their_own_dimensions() {
         let zero = BrownianBridge::new(0);
         let mut two_points = [0.0; 2];
-        assert!(zero
-            .construct_path(&[0.0], &mut two_points, &[0.0, 0.25])
-            .is_err());
+        assert!(
+            zero.construct_path(&[0.0], &mut two_points, &[0.0, 0.25])
+                .is_err()
+        );
 
         let one = BrownianBridge::new(1);
         let mut one_point = [0.0; 1];
@@ -302,27 +303,37 @@ mod tests {
 
         // Wrong shock count for this bridge
         let mut w = vec![0.0; 3];
-        assert!(bridge
-            .construct_path(&[1.0, 0.5], &mut w, &[0.0, 0.25, 0.5])
-            .is_err());
+        assert!(
+            bridge
+                .construct_path(&[1.0, 0.5], &mut w, &[0.0, 0.25, 0.5])
+                .is_err()
+        );
 
         // Non-finite times
         let mut w5 = vec![0.0; 5];
-        assert!(bridge
-            .construct_path(&z, &mut w5, &[0.0, 0.25, f64::NAN, 0.75, 1.0])
-            .is_err());
+        assert!(
+            bridge
+                .construct_path(&z, &mut w5, &[0.0, 0.25, f64::NAN, 0.75, 1.0])
+                .is_err()
+        );
 
         // times[0] != 0, non-monotonic, wrong length
         let mut w5 = vec![0.0; 5];
-        assert!(bridge
-            .construct_path(&z, &mut w5, &[0.1, 0.2, 0.3, 0.4, 0.5])
-            .is_err());
-        assert!(bridge
-            .construct_path(&z, &mut w5, &[0.0, 0.2, 0.15, 0.4, 0.5])
-            .is_err());
-        assert!(bridge
-            .construct_path(&z, &mut w5, &[0.0, 0.2, 0.4, 0.5])
-            .is_err());
+        assert!(
+            bridge
+                .construct_path(&z, &mut w5, &[0.1, 0.2, 0.3, 0.4, 0.5])
+                .is_err()
+        );
+        assert!(
+            bridge
+                .construct_path(&z, &mut w5, &[0.0, 0.2, 0.15, 0.4, 0.5])
+                .is_err()
+        );
+        assert!(
+            bridge
+                .construct_path(&z, &mut w5, &[0.0, 0.2, 0.4, 0.5])
+                .is_err()
+        );
     }
 
     /// Reference implementation: per-path ordered-set bracket lookup, the

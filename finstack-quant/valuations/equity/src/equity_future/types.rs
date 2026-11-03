@@ -640,9 +640,11 @@ mod tests {
         let fair_error = future
             .fair_price(&market, as_of)
             .expect_err("non-positive prepaid forward");
-        assert!(fair_error
-            .to_string()
-            .contains("forward must be finite and positive"));
+        assert!(
+            fair_error
+                .to_string()
+                .contains("forward must be finite and positive")
+        );
         assert!(future.spot_delta(&market, as_of).is_err());
     }
 

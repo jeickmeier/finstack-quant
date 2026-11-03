@@ -3,12 +3,12 @@
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::{
+    Result,
     currency::Currency,
     dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor},
     market_data::context::MarketContext,
     money::Money,
     types::{InstrumentId, PriceId},
-    Result,
 };
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -256,12 +256,12 @@ impl EquityTotalReturnSwap {
         self.underlying.validate(&context)?;
         self.financing_leg.validate(&context)?;
         self.schedule.validate(&context)?;
-        if let Some(level) = self.initial_level {
-            if !level.is_finite() || level <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} initial_level must be positive and finite"
-                )));
-            }
+        if let Some(level) = self.initial_level
+            && (!level.is_finite() || level <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} initial_level must be positive and finite"
+            )));
         }
         if !self.dividend_tax_rate.is_finite() || !(0.0..=1.0).contains(&self.dividend_tax_rate) {
             return Err(finstack_quant_core::Error::Validation(format!(

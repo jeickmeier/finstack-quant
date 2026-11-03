@@ -136,18 +136,18 @@ pub use types::ReturnFloorSpec;
 
 #[cfg(test)]
 mod tests {
-    use crate::bond::{pricing::settlement, Bond, BondSettlementConvention, CashflowSpec};
+    use crate::bond::{Bond, BondSettlementConvention, CashflowSpec, pricing::settlement};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
     use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations_core::instruments::BondConvention;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::pricing_overrides::{
         InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
     };
-    use finstack_quant_valuations_core::instruments::BondConvention;
-    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::pricer::InstrumentType;
     use rust_decimal::Decimal;
     use time::macros::date;
@@ -805,9 +805,11 @@ mod tests {
             .attributes(Attributes::new())
             .build()
             .expect_err("issue_date is a required contractual input");
-        assert!(error
-            .to_string()
-            .contains("missing required field 'issue_date'"));
+        assert!(
+            error
+                .to_string()
+                .contains("missing required field 'issue_date'")
+        );
     }
 
     #[test]
@@ -1011,8 +1013,10 @@ mod tests {
 
     #[test]
     fn bond_scenario_spread_shock_supported_reflects_configuration() {
-        assert!(build_test_bond(InstrumentPricingOverrides::default())
-            .scenario_spread_shock_supported());
+        assert!(
+            build_test_bond(InstrumentPricingOverrides::default())
+                .scenario_spread_shock_supported()
+        );
         assert!(
             build_test_bond(InstrumentPricingOverrides::default().with_quoted_z_spread(0.01))
                 .scenario_spread_shock_supported(),

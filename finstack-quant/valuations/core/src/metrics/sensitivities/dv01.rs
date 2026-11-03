@@ -28,8 +28,8 @@
 
 use crate::instruments::Instrument;
 use crate::instruments::RatesCurveKind;
-use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::MetricCalculator;
+use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricContext, MetricId};
 
 use finstack_quant_core::market_data::bumps::BumpSpec;

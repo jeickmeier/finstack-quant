@@ -1,12 +1,12 @@
 //! Variance swap type definitions.
 
 use finstack_quant_core::{
+    Result,
     dates::{BusinessDayConvention, Date, DayCount, Tenor},
     market_data::context::MarketContext,
     math::stats::RealizedVarMethod,
     money::Money,
     types::{CurveId, InstrumentId, PriceId},
-    Result,
 };
 use time::macros::date;
 
@@ -373,7 +373,9 @@ impl VarianceSwap {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "VarianceSwap valuation as_of date ({}) is before discount curve '{}' base date ({}). \
                  Market data must be aligned with or precede the valuation date.",
-                as_of, self.discount_curve_id.as_str(), curve_base
+                as_of,
+                self.discount_curve_id.as_str(),
+                curve_base
             )));
         }
 

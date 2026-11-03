@@ -11,15 +11,15 @@
 
 use crate::instruments::pricing::default_rate_calendar_id;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    adjust, calendar_by_id_strict, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext,
-    HolidayCalendar, Tenor,
+    BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, HolidayCalendar, Tenor,
+    adjust, calendar_by_id_strict,
 };
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::Result;
 
 /// Curve source used to project future overnight fixings.
 #[derive(Clone, Copy)]
@@ -378,7 +378,8 @@ fn projected_rate(
             if obs_start < forward.base_date() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Overnight projection for {} starts before its curve base date {}; supply the historical fixing for {obs_start}",
-                    forward.id(), forward.base_date()
+                    forward.id(),
+                    forward.base_date()
                 )));
             }
             let t0 = if obs_start <= forward.base_date() {
@@ -600,11 +601,11 @@ pub fn project_overnight_coupon(
             .min(input.accrual_end);
         let mut obs_start = date.add_business_days(-shift_days, input.fixing_calendar)?;
         let mut obs_end = step_end.add_business_days(-shift_days, input.fixing_calendar)?;
-        if let Some((lockout_start, reference_start, reference_end)) = cutoff {
-            if date >= lockout_start {
-                obs_start = reference_start;
-                obs_end = reference_end;
-            }
+        if let Some((lockout_start, reference_start, reference_end)) = cutoff
+            && date >= lockout_start
+        {
+            obs_start = reference_start;
+            obs_end = reference_end;
         }
         if obs_end <= obs_start {
             return Err(finstack_quant_core::Error::Validation(format!(

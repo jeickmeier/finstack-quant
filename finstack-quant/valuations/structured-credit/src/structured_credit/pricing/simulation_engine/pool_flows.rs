@@ -403,11 +403,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         let period_mdr = if let Some(mdr) = state.pool_state.mdr_overrides[i] {
             1.0 - (1.0 - mdr).powf(request.months_per_period)
         } else if let Some((defaulted, _)) = per_name_claim {
-            if defaulted {
-                1.0
-            } else {
-                0.0
-            }
+            if defaulted { 1.0 } else { 0.0 }
         } else if let Some(rate) = lhp_period_rate {
             rate.clamp(0.0, 1.0)
         } else if let Some(mdr) = request.asset_rates.mdr(i) {
@@ -867,18 +863,19 @@ pub(super) fn calculate_pool_flows_with_rates(
         let mut cured_arrears_principal = 0.0_f64;
         if let (Some(model), Some((outcome, _))) = (request.delinquency, &delinquency) {
             // Modified loans blend their coupon concession into the line.
-            if let Some(spec) = model.modification {
-                if outcome.modified > 0.0 && performing_after > 0.0 {
-                    let weight = (outcome.modified / performing_after).min(1.0);
-                    if state.pool_state.curve_indices[i].is_some() {
-                        if let Some(spread) = state.pool_state.spread_bp[i].as_mut() {
-                            *spread -= spec.rate_reduction_bp * weight;
-                        }
-                    } else {
-                        state.pool_state.rates[i] = (state.pool_state.rates[i]
-                            - spec.rate_reduction_bp / BASIS_POINTS_PER_UNIT * weight)
-                            .max(0.0);
+            if let Some(spec) = model.modification
+                && outcome.modified > 0.0
+                && performing_after > 0.0
+            {
+                let weight = (outcome.modified / performing_after).min(1.0);
+                if state.pool_state.curve_indices[i].is_some() {
+                    if let Some(spread) = state.pool_state.spread_bp[i].as_mut() {
+                        *spread -= spec.rate_reduction_bp * weight;
                     }
+                } else {
+                    state.pool_state.rates[i] = (state.pool_state.rates[i]
+                        - spec.rate_reduction_bp / BASIS_POINTS_PER_UNIT * weight)
+                        .max(0.0);
                 }
             }
             // Arrears: the P&I the delinquent balance missed, owed by the

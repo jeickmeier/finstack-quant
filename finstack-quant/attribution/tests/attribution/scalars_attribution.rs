@@ -8,8 +8,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::equity::spot::Equity;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::equity::spot::Equity;
 
 #[test]
 fn test_scalars_snapshot_extraction() {
@@ -136,8 +136,8 @@ fn test_equity_price_id_uses_restored_scalar_price() {
 #[test]
 fn test_taylor_equity_spot_move_lands_in_market_scalars_pnl() {
     use finstack_quant_attribution::{
-        attribute_pnl, AttributionMethod, AttributionRequest, ExecutionPolicy,
-        TaylorAttributionConfig,
+        AttributionMethod, AttributionRequest, ExecutionPolicy, TaylorAttributionConfig,
+        attribute_pnl,
     };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use std::sync::Arc;

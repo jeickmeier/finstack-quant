@@ -9,7 +9,7 @@
 mod bench_common;
 
 use bench_common::{base_date, create_institutional_portfolio, create_market_context};
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_portfolio::cashflows::aggregate_full_cashflows;

@@ -100,8 +100,12 @@ fn test_delta_increases_with_moneyness_call() {
         assert!(
             deltas[i] < deltas[i - 1],
             "Delta should decrease from ITM to OTM: strike[{}]={} has delta {}, strike[{}]={} has delta {}",
-            i-1, strikes[i-1], deltas[i-1],
-            i, strikes[i], deltas[i]
+            i - 1,
+            strikes[i - 1],
+            deltas[i - 1],
+            i,
+            strikes[i],
+            deltas[i]
         );
     }
 }

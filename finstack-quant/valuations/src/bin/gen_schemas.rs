@@ -1,7 +1,7 @@
 //! Generate every valuations JSON Schema and canonical instrument fixture.
 
 use finstack_quant_core::schema::{
-    deterministic_json_bytes, run_schema_generator, sync_generated_files, SchemaGenerationCommand,
+    SchemaGenerationCommand, deterministic_json_bytes, run_schema_generator, sync_generated_files,
 };
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations::instruments::json_loader::instrument_registry;

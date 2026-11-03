@@ -158,15 +158,14 @@ impl BarrierOption {
     pub(crate) fn validate_monitoring_state(&self, as_of: Date) -> finstack_quant_core::Result<()> {
         use finstack_quant_valuations_core::instruments::Instrument;
         self.validate_invariants()?;
-        if let Monitoring::Discrete { observation_dates } = &self.monitoring {
-            if observation_dates.iter().any(|date| *date < as_of)
-                && self.observed_barrier_breached.is_none()
-            {
-                return Err(finstack_quant_core::Error::Validation(
-                    "BarrierOption requires observed_barrier_breached for past observation dates"
-                        .to_string(),
-                ));
-            }
+        if let Monitoring::Discrete { observation_dates } = &self.monitoring
+            && observation_dates.iter().any(|date| *date < as_of)
+            && self.observed_barrier_breached.is_none()
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "BarrierOption requires observed_barrier_breached for past observation dates"
+                    .to_string(),
+            ));
         }
         Ok(())
     }

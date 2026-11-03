@@ -57,11 +57,11 @@ use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::validation;
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_valuations_core::constants::isda::STANDARD_RECOVERY_SENIOR;
-use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations_core::market::conventions::CdsConvention;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
-use rust_decimal::prelude::ToPrimitive;
+use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use time::macros::date;
 
 use crate::cds::pricing::CdsPricer;
@@ -461,14 +461,14 @@ impl CreditDefaultSwap {
         }
 
         let currency = self.notional.currency();
-        if let Some((_, upfront)) = self.upfront {
-            if upfront.currency() != currency {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CDS upfront currency {} must match notional currency {}",
-                    upfront.currency(),
-                    currency
-                )));
-            }
+        if let Some((_, upfront)) = self.upfront
+            && upfront.currency() != currency
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS upfront currency {} must match notional currency {}",
+                upfront.currency(),
+                currency
+            )));
         }
 
         if let Some(margin_spec) = &self.margin_spec {

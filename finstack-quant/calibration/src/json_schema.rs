@@ -3,7 +3,7 @@
 use crate::api::schema::{CalibrationEnvelope, CalibrationResultEnvelope};
 use crate::api::validate::CalibrationValidationReport;
 use crate::quotes::MarketQuote;
-use finstack_quant_core::schema::{example, example_from_json, SchemaArtifact, SchemaKind};
+use finstack_quant_core::schema::{SchemaArtifact, SchemaKind, example, example_from_json};
 use serde_json::Value;
 use std::sync::OnceLock;
 

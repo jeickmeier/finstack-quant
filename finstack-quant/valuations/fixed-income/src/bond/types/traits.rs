@@ -12,8 +12,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::impl_instrument_base;
 
-use super::definitions::Bond;
 use super::CashflowSpec;
+use super::definitions::Bond;
 
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
 impl finstack_quant_valuations_core::instruments::Instrument for Bond {
@@ -490,11 +490,13 @@ mod metrics_equivalent_tests {
         let equivalent = bond.metrics_equivalent().expect("bond equivalent");
         let equivalent = equivalent.as_any().downcast_ref::<Bond>().expect("bond");
         assert_eq!(coupon_type_of(&equivalent.cashflow_spec), CouponType::Cash);
-        assert!(equivalent
-            .instrument_pricing_overrides
-            .model_config
-            .merton_mc_config
-            .is_none());
+        assert!(
+            equivalent
+                .instrument_pricing_overrides
+                .model_config
+                .merton_mc_config
+                .is_none()
+        );
         assert_eq!(
             serde_json::to_value(&bond).expect("original unchanged"),
             original

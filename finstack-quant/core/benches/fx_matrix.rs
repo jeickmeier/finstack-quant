@@ -5,7 +5,7 @@
 //! caches and the provider. Measures all four shapes because pricing loops
 //! hit different ones per currency pair.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxQuery, SimpleFxProvider};

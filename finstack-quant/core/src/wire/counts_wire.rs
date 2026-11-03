@@ -70,8 +70,8 @@ pub mod count {
 /// The list form of [`count`]: each element is written as a `u32` so that a
 /// BigInt-preserving JavaScript serializer still emits plain numbers.
 pub mod counts {
-    use serde::ser::SerializeSeq;
     use serde::Deserialize;
+    use serde::ser::SerializeSeq;
 
     /// Serialize a list of `usize` values as `u32` elements.
     ///

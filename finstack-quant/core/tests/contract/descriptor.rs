@@ -1,5 +1,5 @@
 use finstack_quant_core::contract::{
-    ContractDescriptor, ContractError, LoadLimits, DEFAULT_MAX_BYTES,
+    ContractDescriptor, ContractError, DEFAULT_MAX_BYTES, LoadLimits,
 };
 
 #[test]

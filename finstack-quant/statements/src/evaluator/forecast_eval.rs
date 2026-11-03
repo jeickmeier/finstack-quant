@@ -4,7 +4,7 @@ use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
 use crate::forecast;
 use crate::forecast::statistical::{
-    monte_carlo_correlated_series, parse_correlation_params, CorrelatedMonteCarloSeries,
+    CorrelatedMonteCarloSeries, monte_carlo_correlated_series, parse_correlation_params,
 };
 use crate::types::{FinancialModelSpec, ForecastMethod, NodeId, NodeSpec};
 use finstack_quant_core::dates::{Date, PeriodId};
@@ -35,10 +35,10 @@ pub(crate) fn evaluate_forecast(
     mc_z_cache: &mut Option<&mut IndexMap<NodeId, IndexMap<PeriodId, f64>>>,
     visibility_cutoff: Option<Date>,
 ) -> Result<f64> {
-    if let Some(cached) = forecast_cache.get(node_spec.node_id.as_str()) {
-        if let Some(value) = cached.get(period_id) {
-            return Ok(*value);
-        }
+    if let Some(cached) = forecast_cache.get(node_spec.node_id.as_str())
+        && let Some(value) = cached.get(period_id)
+    {
+        return Ok(*value);
     }
 
     let forecast_spec = node_spec
@@ -187,10 +187,10 @@ fn determine_base_value(
             && node_spec.explicit_value_is_visible(period, visibility_cutoff)
     });
     if let Some(last_actual) = last_actual_period {
-        if let Some(values) = &node_spec.values {
-            if let Some(val) = values.get(&last_actual.id) {
-                return Ok(val.value());
-            }
+        if let Some(values) = &node_spec.values
+            && let Some(val) = values.get(&last_actual.id)
+        {
+            return Ok(val.value());
         }
 
         if let Some(val) = context
@@ -201,8 +201,8 @@ fn determine_base_value(
         }
     }
 
-    if let Some(&column) = context.node_to_column.get(node_spec.node_id.as_str()) {
-        if let Some((_, value)) = context
+    if let Some(&column) = context.node_to_column.get(node_spec.node_id.as_str())
+        && let Some((_, value)) = context
             .history
             .iter()
             .filter(|(period, _)| *period < *current_period_id)
@@ -213,9 +213,8 @@ fn determine_base_value(
                     .map(|value| (period, value))
             })
             .max_by_key(|(period, _)| *period)
-        {
-            return Ok(value);
-        }
+    {
+        return Ok(value);
     }
 
     Err(Error::forecast(format!(

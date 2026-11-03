@@ -6,8 +6,9 @@ use std::collections::BTreeMap;
 
 use finstack_quant_core::dates::create_date;
 use finstack_quant_core::types::IssuerId;
+use finstack_quant_factor::MatchingConfig;
 use finstack_quant_factor::credit::decomposition::{
-    decompose_levels, decompose_period, DecompositionError, LevelsAtDate,
+    DecompositionError, LevelsAtDate, decompose_levels, decompose_period,
 };
 use finstack_quant_factor::credit::hierarchy::{
     AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec,
@@ -15,7 +16,6 @@ use finstack_quant_factor::credit::hierarchy::{
     IssuerBetaMode, IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor,
     VolState,
 };
-use finstack_quant_factor::MatchingConfig;
 use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig};
 use time::Month;
 

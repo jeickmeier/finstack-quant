@@ -1,7 +1,7 @@
 //! Python bindings for lightweight strategy allocation.
 
 use crate::bindings::pandas_utils::{
-    serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
+    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::errors::portfolio_to_py;
 use pyo3::prelude::*;

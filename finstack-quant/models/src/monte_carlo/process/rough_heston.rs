@@ -472,20 +472,22 @@ mod tests {
     fn test_rho_boundary_values_are_rejected() {
         // The shared Heston block uses the open interval ρ ∈ (−1, 1).
         for rho in [-1.0, 1.0] {
-            assert!(RoughHestonParams {
-                r: 0.05,
-                q: 0.02,
-                hurst: make_hurst(0.1),
-                model: HestonParams {
-                    v0: 0.04,
-                    kappa: 2.0,
-                    theta: 0.04,
-                    sigma_v: 0.3,
-                    rho,
-                },
-            }
-            .validate()
-            .is_err());
+            assert!(
+                RoughHestonParams {
+                    r: 0.05,
+                    q: 0.02,
+                    hurst: make_hurst(0.1),
+                    model: HestonParams {
+                        v0: 0.04,
+                        kappa: 2.0,
+                        theta: 0.04,
+                        sigma_v: 0.3,
+                        rho,
+                    },
+                }
+                .validate()
+                .is_err()
+            );
         }
     }
 

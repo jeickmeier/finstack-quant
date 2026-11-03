@@ -7,11 +7,11 @@ use super::peer_set::{PeerFilter, PeerSet};
 #[cfg(doc)]
 use super::scoring::score_relative_value;
 use super::scoring::{
+    DimensionExclusion, MetricExtractor, RelativeValueResult, ScoreDirection, ScoringDimension,
     evaluate_dimension, is_finite_score, score_relative_value_unchecked,
-    validate_dimension_weights, DimensionExclusion, MetricExtractor, RelativeValueResult,
-    ScoreDirection, ScoringDimension,
+    validate_dimension_weights,
 };
-use super::stats::{peer_stats, percentile_rank, z_score, PeerStats, RegressionResult};
+use super::stats::{PeerStats, RegressionResult, peer_stats, percentile_rank, z_score};
 use super::types::{CompanyId, CompanyMetrics, Multiple, PeriodBasis};
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -856,10 +856,12 @@ mod tests {
             report.composite_excluded_reason,
             Some(CompositeExclusion::NonFiniteScore)
         );
-        assert!(report
-            .dimensions
-            .iter()
-            .all(|d| d.excluded_reason.is_none()));
+        assert!(
+            report
+                .dimensions
+                .iter()
+                .all(|d| d.excluded_reason.is_none())
+        );
     }
 
     #[test]

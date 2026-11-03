@@ -6,14 +6,14 @@
 //! takes the quantile of the summed P&L, so diversification is preserved.
 
 use super::pricing::PyMarketHistory;
-use crate::bindings::extract::{extract_instrument, extract_market, InstrumentArg};
+use crate::bindings::extract::{InstrumentArg, extract_instrument, extract_market};
 use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{core_to_py, display_to_py};
-use finstack_quant_valuations::metrics::risk::var_calculator::{
-    calculate_var as rust_calculate_var, VarConfig, VarResult,
-};
 use finstack_quant_valuations::metrics::risk::MarketHistory;
+use finstack_quant_valuations::metrics::risk::var_calculator::{
+    VarConfig, VarResult, calculate_var as rust_calculate_var,
+};
 use finstack_quant_valuations::pricer::PricingDispatch;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;

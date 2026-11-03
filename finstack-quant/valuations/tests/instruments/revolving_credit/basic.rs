@@ -7,11 +7,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -574,9 +574,12 @@ fn test_term_forward_with_floor() {
     // With floor: max(0.01%, 1%) + 5% margin = 1% + 5% = 6% (borrower pays 6%)
     // Without floor: 0.01% + 5% margin = 5.01% (borrower pays 5.01%)
     // With floor, the borrower pays more interest, so from lender perspective PV is higher
-    assert!(pv_with_floor.amount() > pv_no_floor.amount(),
+    assert!(
+        pv_with_floor.amount() > pv_no_floor.amount(),
         "Floor should increase PV (lender receives more interest). With floor: {}, Without floor: {}",
-        pv_with_floor.amount(), pv_no_floor.amount());
+        pv_with_floor.amount(),
+        pv_no_floor.amount()
+    );
 }
 
 #[test]

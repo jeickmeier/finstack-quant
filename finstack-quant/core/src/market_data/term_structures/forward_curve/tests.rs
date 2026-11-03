@@ -292,8 +292,7 @@ fn full_rate_calibration_retains_one_day_cutoff() {
         serde_json::from_value(serialized.clone()).expect("round-trip full recipe");
 
     assert_eq!(
-        serialized["rate_calibration"]["ois_compounding"]["compounded_with_rate_cutoff"]
-            ["cutoff_days"],
+        serialized["rate_calibration"]["ois_compounding"]["compounded_with_rate_cutoff"]["cutoff_days"],
         1
     );
     assert_eq!(
@@ -400,10 +399,11 @@ fn rate_period_preserves_point_and_negative_time_policies() {
             fc.rate(time)
         );
     }
-    assert!(fc
-        .rate_period(-1.0, -0.5)
-        .expect("negative finite interval")
-        .is_finite());
+    assert!(
+        fc.rate_period(-1.0, -0.5)
+            .expect("negative finite interval")
+            .is_finite()
+    );
 }
 
 #[test]

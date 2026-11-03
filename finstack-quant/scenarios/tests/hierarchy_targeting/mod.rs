@@ -308,20 +308,24 @@ fn cumulative_mode_stacks_shocks_down_tree() {
         report.operations_applied, report.warnings
     );
     assert_eq!(report.changes.market_targets.len(), 2);
-    assert!(report
-        .changes
-        .market_targets
-        .contains(&ScenarioMarketTarget::Curve {
-            curve_kind: CurveKind::Discount,
-            curve_id: "JPM-5Y".into(),
-        }));
-    assert!(report
-        .changes
-        .market_targets
-        .contains(&ScenarioMarketTarget::Curve {
-            curve_kind: CurveKind::Discount,
-            curve_id: "OXY-5Y".into(),
-        }));
+    assert!(
+        report
+            .changes
+            .market_targets
+            .contains(&ScenarioMarketTarget::Curve {
+                curve_kind: CurveKind::Discount,
+                curve_id: "JPM-5Y".into(),
+            })
+    );
+    assert!(
+        report
+            .changes
+            .market_targets
+            .contains(&ScenarioMarketTarget::Curve {
+                curve_kind: CurveKind::Discount,
+                curve_id: "OXY-5Y".into(),
+            })
+    );
 }
 
 /// MostSpecificWins keeps only the deepest matching shock per curve.

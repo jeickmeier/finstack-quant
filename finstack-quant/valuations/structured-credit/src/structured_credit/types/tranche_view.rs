@@ -15,13 +15,13 @@
 //! tranche.
 
 use super::StructuredCredit;
-use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
+use finstack_quant_cashflows::{ScheduleBuildOpts, schedule_from_classified_flows};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
-use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
 
 /// A deal plus the identifier of the note the metrics are computed for.
 ///

@@ -6,12 +6,12 @@
 //! round-tripped through the contract type so a payload the type rejects cannot
 //! be published.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::schema::{example, example_from_json};
-use finstack_quant_core::Result;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::instruments::fixed_income::structured_credit;
 use crate::market::conventions::ConventionRegistry;
@@ -311,8 +311,8 @@ pub(super) fn pool_stats() -> Result<Vec<Value>> {
 
 /// The workout ladder of the example callable bond at 108 clean on a flat curve.
 pub(super) fn bond_workout_ladder() -> Result<Vec<Value>> {
-    use crate::instruments::fixed_income::bond::pricing::quote_conversions;
     use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions;
     use crate::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -333,8 +333,8 @@ pub(super) fn bond_workout_ladder() -> Result<Vec<Value>> {
 
 /// The quote set of the example bond at 98.5 clean on a sloping curve.
 pub(super) fn bond_quote_set() -> Result<Vec<Value>> {
-    use crate::instruments::fixed_income::bond::pricing::quote_conversions;
     use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions;
     use crate::instruments::{BondQuoteInput, PricingOptions};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;

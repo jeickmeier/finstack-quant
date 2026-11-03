@@ -25,9 +25,9 @@
 
 use super::super::expected_shocked_smm;
 use super::traits::StochasticPrepayment;
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 use finstack_quant_cashflows::builder::monthly_to_annual;
-use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
 /// Factor-correlated prepayment model.
 ///

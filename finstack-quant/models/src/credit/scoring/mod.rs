@@ -39,10 +39,10 @@ mod types;
 mod zmijewski;
 
 pub use altman::{
-    altman_em_score, altman_z_double_prime, altman_z_prime, altman_z_score,
-    AltmanZDoublePrimeInput, AltmanZPrimeInput, AltmanZScoreInput,
+    AltmanZDoublePrimeInput, AltmanZPrimeInput, AltmanZScoreInput, altman_em_score,
+    altman_z_double_prime, altman_z_prime, altman_z_score,
 };
 pub(crate) use ohlson::logistic;
-pub use ohlson::{ohlson_o_score, OhlsonOScoreInput};
+pub use ohlson::{OhlsonOScoreInput, ohlson_o_score};
 pub use types::{CreditScoringError, ScoringResult, ScoringZone};
-pub use zmijewski::{zmijewski_score, ZmijewskiInput};
+pub use zmijewski::{ZmijewskiInput, zmijewski_score};

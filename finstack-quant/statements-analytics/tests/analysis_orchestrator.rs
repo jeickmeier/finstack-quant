@@ -8,8 +8,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::checks::builtins::NonFiniteCheck;
 use finstack_quant_statements::checks::CheckSuite;
+use finstack_quant_statements::checks::builtins::NonFiniteCheck;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::AmountOrScalar;
 use finstack_quant_statements_analytics::analysis::CorporateAnalysisBuilder;
@@ -184,13 +184,15 @@ fn test_statement_only_no_equity_no_credit() {
     assert!(analysis.equity.is_none());
     assert!(analysis.credit.is_empty());
     assert!(!analysis.ev_suppressed_non_positive);
-    assert!(analysis
-        .statement
-        .get(
-            "revenue",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture")
-        )
-        .is_some());
+    assert!(
+        analysis
+            .statement
+            .get(
+                "revenue",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .is_some()
+    );
 }
 
 #[test]

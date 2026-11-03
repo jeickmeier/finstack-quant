@@ -206,7 +206,7 @@ mod tests {
 
 #[cfg(test)]
 mod base_amount_tests {
-    use super::{base_amount, BaseAmountCalculator};
+    use super::{BaseAmountCalculator, base_amount};
     use crate::fx_spot::FxSpot;
     use finstack_quant_core::{
         currency::Currency, dates::Date, market_data::context::MarketContext, money::Money,

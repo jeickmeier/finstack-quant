@@ -4,10 +4,10 @@
 //! so it can be dispatched via the pricing registry under
 //! `(BermudanSwaption, LmmMonteCarlo)`.
 
-use crate::swaption::bermudan::{apply_exercise_today, require_discount_curve, settled_result};
-use crate::swaption::pricing::lmm_bermudan::price_bermudan_lmm;
 use crate::swaption::BermudanSwaption;
 use crate::swaption::BermudanType;
+use crate::swaption::bermudan::{apply_exercise_today, require_discount_curve, settled_result};
+use crate::swaption::pricing::lmm_bermudan::price_bermudan_lmm;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;

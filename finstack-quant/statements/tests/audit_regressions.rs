@@ -3,7 +3,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_statements::adjustments::{normalize, Adjustment, NormalizationConfig};
+use finstack_quant_statements::adjustments::{Adjustment, NormalizationConfig, normalize};
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::evaluator::{EvalWarning, StatementResult};
@@ -278,9 +278,11 @@ fn reporting_currency_requires_fx_even_with_one_native_currency() {
             currency: Currency::USD,
         });
     }
-    assert!(Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 15))
-        .is_err());
+    assert!(
+        Evaluator::new()
+            .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 15))
+            .is_err()
+    );
 }
 
 #[test]

@@ -2,19 +2,19 @@
 
 use super::cache::KeyedOnceCache;
 use super::ensure_replay_fit_accepted;
+use crate::CalibrationConfig;
 use crate::api::schema::{HazardCurveParams, StepParams};
 use crate::quotes::CdsQuote;
 use crate::quotes::MarketQuote;
 use crate::quotes::Pillar;
 use crate::step_runtime;
 use crate::targets::hazard::ReplayQuote;
-use crate::CalibrationConfig;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{HazardCalibrationRecipe, HazardCurve};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
+use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations_core::market::conventions::{CdsConvention, ConventionRegistry};
 use finstack_quant_valuations_core::recalibration::{
     DealCdsQuoteOverride, HazardSpreadRiskBucket, QuoteBump,
@@ -440,12 +440,11 @@ fn recalibrate_from_par_spreads(
     if let (Some(requested), Some(stored)) = (
         request.cds_valuation_convention,
         params.cds_valuation_convention,
-    ) {
-        if stored != requested {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "hazard replay valuation convention {requested:?} conflicts with stored convention {stored:?}"
-            )));
-        }
+    ) && stored != requested
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "hazard replay valuation convention {requested:?} conflicts with stored convention {stored:?}"
+        )));
     }
 
     let base_request = HazardParRecalibration {
@@ -467,14 +466,14 @@ fn recalibrate_from_par_spreads(
     )?;
     require_zero_shock_identity(request.hazard, &replayed_base)?;
 
-    if let Some((index, _)) = request.exact_spread_bump {
-        if index >= spread_risk_inputs.len() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "hazard spread-risk quote index {index} is out of range for '{}' ({})",
-                request.hazard.id(),
-                spread_risk_inputs.len()
-            )));
-        }
+    if let Some((index, _)) = request.exact_spread_bump
+        && index >= spread_risk_inputs.len()
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "hazard spread-risk quote index {index} is out of range for '{}' ({})",
+            request.hazard.id(),
+            spread_risk_inputs.len()
+        )));
     }
     if request.recovery_rate.to_bits() == params.recovery_rate.to_bits()
         && request.spread_bump.is_none_or(QuoteBump::is_zero)
@@ -807,8 +806,8 @@ pub(super) fn recalibrate_hazard_with_recovery(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quotes::{Pillar, QuoteId};
     use crate::CalibrationReport;
+    use crate::quotes::{Pillar, QuoteId};
     use finstack_quant_core::market_data::term_structures::{
         HazardCalibrationInput, HazardCalibrationRecipe,
     };

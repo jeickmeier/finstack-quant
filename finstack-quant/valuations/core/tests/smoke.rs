@@ -11,8 +11,10 @@ fn unregistered_family_has_universal_metrics_and_no_pricers() {
     let family = Family::unregistered();
     assert!(family.metrics().has_metric(MetricId::Theta));
     assert!(family.metrics().has_metric(MetricId::CarryTotal));
-    assert!(family
-        .pricers()
-        .get_pricer(PricerKey::new(InstrumentType::Bond, ModelKey::Discounting))
-        .is_none());
+    assert!(
+        family
+            .pricers()
+            .get_pricer(PricerKey::new(InstrumentType::Bond, ModelKey::Discounting))
+            .is_none()
+    );
 }

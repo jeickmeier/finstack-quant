@@ -1,11 +1,11 @@
 //! Low-path MC calibration loop with common random numbers.
 
 use super::MertonMcRun;
+use crate::bond::Bond;
 use crate::bond::pricing::quote_conversions::{
     clean_price_from_japanese_simple_yield, price_from_ytm, price_from_ytw, price_from_z_spread,
 };
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::bond::Bond;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -109,7 +109,7 @@ fn target_pv_from_quote(
         | BondQuoteInput::ISpread(_) => {
             return Err(finstack_quant_core::Error::Validation(
                 "Merton MC calibration accepts price, yield and z-spread quotes only".to_string(),
-            ))
+            ));
         }
     };
 

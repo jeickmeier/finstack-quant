@@ -2,10 +2,10 @@
 
 use super::types::{Basket, BasketConstituent, ConstituentReference};
 use finstack_quant_core::{
+    Result,
     dates::Date,
     market_data::context::MarketContext,
-    money::{fx::FxQuery, Money},
-    Result,
+    money::{Money, fx::FxQuery},
 };
 
 /// Net asset value per share of `basket`, after one day of expense drag.

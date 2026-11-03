@@ -4,9 +4,9 @@ use crate::hull_white::pricing::{
     scheduled_cap_floor_implied_normal_vol, scheduled_cap_floor_price,
 };
 use crate::hull_white::{
+    CapFloorCalibrationConfig, PiecewiseSigmaCalibrationConfig,
     bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
-    calibrate_hull_white_to_cap_floors_with_fn, CapFloorCalibrationConfig,
-    PiecewiseSigmaCalibrationConfig,
+    calibrate_hull_white_to_cap_floors_with_fn,
 };
 use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_models::rates::hull_white::HullWhiteParams;

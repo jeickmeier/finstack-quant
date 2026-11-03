@@ -38,41 +38,46 @@ fn extract_keys(obj: &Bound<'_, PyAny>, role: &str) -> PyResult<Vec<String>> {
         ))
     })? {
         let item = item?;
-        if let Ok(text) = item.extract::<String>() {
-            keys.push(text);
-        } else if item.is_instance(&datetime_type)? {
-            let offset = item.call_method0("utcoffset")?;
-            let aware = !offset.is_none();
-            if aware_kind.is_some_and(|previous| previous != aware) {
-                return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                    "{role} must not mix timezone-aware and naive datetimes"
-                )));
+        match item.extract::<String>() {
+            Ok(text) => {
+                keys.push(text);
             }
-            aware_kind = Some(aware);
-            let wall = wall_datetime(&item)?;
-            keys.push(if aware {
-                let seconds: i32 = offset
-                    .call_method0("total_seconds")?
-                    .call_method0("__int__")?
-                    .extract()?;
-                let offset = time::UtcOffset::from_whole_seconds(seconds)
-                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-                finstack_quant_features::datetime_order_key(wall.assume_offset(offset))
-            } else {
-                finstack_quant_features::naive_datetime_order_key(wall)
-            });
-        } else if item.is_instance(&date_type)? {
-            // A plain date: ISO `YYYY-MM-DD` sorts chronologically. Other
-            // objects with an `isoformat` (durations such as `pd.Timedelta`,
-            // times) do not sort correctly as text, so they are rejected below.
-            keys.push(item.call_method0("isoformat")?.extract()?);
-        } else {
-            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
-                "{role} entries must be str, datetime or date, got {}",
-                item.get_type()
-                    .name()
-                    .map_or_else(|_| "?".to_string(), |n| n.to_string())
-            )));
+            _ => {
+                if item.is_instance(&datetime_type)? {
+                    let offset = item.call_method0("utcoffset")?;
+                    let aware = !offset.is_none();
+                    if aware_kind.is_some_and(|previous| previous != aware) {
+                        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                            "{role} must not mix timezone-aware and naive datetimes"
+                        )));
+                    }
+                    aware_kind = Some(aware);
+                    let wall = wall_datetime(&item)?;
+                    keys.push(if aware {
+                        let seconds: i32 = offset
+                            .call_method0("total_seconds")?
+                            .call_method0("__int__")?
+                            .extract()?;
+                        let offset = time::UtcOffset::from_whole_seconds(seconds)
+                            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                        finstack_quant_features::datetime_order_key(wall.assume_offset(offset))
+                    } else {
+                        finstack_quant_features::naive_datetime_order_key(wall)
+                    });
+                } else if item.is_instance(&date_type)? {
+                    // A plain date: ISO `YYYY-MM-DD` sorts chronologically. Other
+                    // objects with an `isoformat` (durations such as `pd.Timedelta`,
+                    // times) do not sort correctly as text, so they are rejected below.
+                    keys.push(item.call_method0("isoformat")?.extract()?);
+                } else {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                        "{role} entries must be str, datetime or date, got {}",
+                        item.get_type()
+                            .name()
+                            .map_or_else(|_| "?".to_string(), |n| n.to_string())
+                    )));
+                }
+            }
         }
     }
     Ok(keys)
@@ -1026,34 +1031,39 @@ impl PyPanelTransformResult {
 #[pyfunction]
 #[pyo3(text_signature = "(spec)")]
 fn transform_panel(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPanelTransformResult> {
-    let spec: PanelTransformSpec =
-        if let Ok(typed) = spec.extract::<PyRef<'_, PyPanelTransformSpec>>() {
-            typed.inner.clone()
-        } else if let Ok(json) = spec.extract::<String>() {
-            serde_json::from_str(&json).map_err(|error| {
-                crate::errors::serde_json_to_py(error, "invalid panel transform spec")
-            })?
-        } else {
-            // Host conversion only: numeric/NaN values, date-like keys and other
-            // fields become JSON; Rust serde owns the field set, the
-            // required fields and the unknown-field rejection.
-            let mapping = spec.cast::<PyDict>()?;
-            let mut fields = serde_json::Map::new();
-            for (key, value) in mapping.iter() {
-                let key: String = key.extract()?;
-                let json = match key.as_str() {
-                    _ if value.is_none() => Value::Null,
-                    // Non-finite numbers (NaN marks missing) become JSON null.
-                    "values" => Value::from(value.extract::<Vec<Option<f64>>>()?),
-                    "entity" | "order" | "time_key" => Value::from(extract_keys(&value, &key)?),
-                    _ => py_to_json_value(py, &value, "panel transform spec field")?,
-                };
-                fields.insert(key, json);
+    let spec: PanelTransformSpec = match spec.extract::<PyRef<'_, PyPanelTransformSpec>>() {
+        Ok(typed) => typed.inner.clone(),
+        _ => {
+            match spec.extract::<String>() {
+                Ok(json) => serde_json::from_str(&json).map_err(|error| {
+                    crate::errors::serde_json_to_py(error, "invalid panel transform spec")
+                })?,
+                _ => {
+                    // Host conversion only: numeric/NaN values, date-like keys and other
+                    // fields become JSON; Rust serde owns the field set, the
+                    // required fields and the unknown-field rejection.
+                    let mapping = spec.cast::<PyDict>()?;
+                    let mut fields = serde_json::Map::new();
+                    for (key, value) in mapping.iter() {
+                        let key: String = key.extract()?;
+                        let json = match key.as_str() {
+                            _ if value.is_none() => Value::Null,
+                            // Non-finite numbers (NaN marks missing) become JSON null.
+                            "values" => Value::from(value.extract::<Vec<Option<f64>>>()?),
+                            "entity" | "order" | "time_key" => {
+                                Value::from(extract_keys(&value, &key)?)
+                            }
+                            _ => py_to_json_value(py, &value, "panel transform spec field")?,
+                        };
+                        fields.insert(key, json);
+                    }
+                    serde_json::from_value(Value::Object(fields)).map_err(|error| {
+                        crate::errors::serde_json_to_py(error, "invalid panel transform spec")
+                    })?
+                }
             }
-            serde_json::from_value(Value::Object(fields)).map_err(|error| {
-                crate::errors::serde_json_to_py(error, "invalid panel transform spec")
-            })?
-        };
+        }
+    };
     py.detach(move || finstack_quant_features::transform_panel(&spec))
         .map(|inner| PyPanelTransformResult { inner })
         .map_err(core_to_py)

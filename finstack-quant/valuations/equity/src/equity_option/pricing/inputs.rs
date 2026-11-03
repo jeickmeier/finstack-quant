@@ -1,11 +1,11 @@
 //! Equity-option market inputs, lifecycle, and discrete-dividend helpers.
 
 use crate::equity_option::types::EquityOption;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use finstack_quant_valuations_core::instruments::SettlementType;

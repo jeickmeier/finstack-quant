@@ -6,17 +6,18 @@
 use super::compiler::{FixedSchedule, FloatSchedule, PeriodicFee};
 use super::date_generation::CompiledPeriod;
 use super::emission::{
-    emit_amortization_on, emit_fees_on, emit_fixed_coupons_on, emit_float_coupons_on,
-    ResolvedFloatMarket,
+    ResolvedFloatMarket, emit_amortization_on, emit_fees_on, emit_fixed_coupons_on,
+    emit_float_coupons_on,
 };
 use super::orchestrator::{
-    apply_principal_event, coupon_periods, initialize_build_state, AmortizationSetup, BuildState,
-    PreparedAmortization,
+    AmortizationSetup, BuildState, PreparedAmortization, apply_principal_event, coupon_periods,
+    initialize_build_state,
 };
 use super::schedule::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
 use super::specs::PrincipalEventSpec;
 use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
 use crate::fixings::ProjectedFixing;
+use finstack_quant_core::InputError;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::decimal::f64_to_decimal;
@@ -24,7 +25,6 @@ use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 use std::sync::Arc;
 use tracing::debug;
@@ -56,11 +56,11 @@ impl CompiledCashFlowPlan {
 
     /// Fix equal installments from the balance after all start-date movements.
     fn initialize_linear_between(&self, d: Date, state: &mut BuildState) {
-        if let PreparedAmortization::LinearBetween { start, count, .. } = &self.amort_setup.rule {
-            if *start == d {
-                state.linear_between_installment =
-                    Some(state.outstanding / Decimal::from(*count as u64));
-            }
+        if let PreparedAmortization::LinearBetween { start, count, .. } = &self.amort_setup.rule
+            && *start == d
+        {
+            state.linear_between_installment =
+                Some(state.outstanding / Decimal::from(*count as u64));
         }
     }
 
@@ -147,22 +147,24 @@ impl CompiledCashFlowPlan {
             &mut state.flows,
         )?;
         self.initialize_linear_between(d, state);
-        if let PreparedAmortization::LinearBetween { start, end, .. } = &self.amort_setup.rule {
-            if funded > Decimal::ZERO && d > *start && d < *end {
-                // Each later draw repays equally over its remaining dates.
-                // Add after today's payment: a same-day draw first amortizes
-                // at the next contractual boundary, never at its funding date.
-                let remaining = self
-                    .amort_setup
-                    .payment_dates
-                    .keys()
-                    .filter(|&&date| date > d && date <= *end)
-                    .count();
-                if remaining > 0 {
-                    *state
-                        .linear_between_installment
-                        .get_or_insert(Decimal::ZERO) += funded / Decimal::from(remaining as u64);
-                }
+        if let PreparedAmortization::LinearBetween { start, end, .. } = &self.amort_setup.rule
+            && funded > Decimal::ZERO
+            && d > *start
+            && d < *end
+        {
+            // Each later draw repays equally over its remaining dates.
+            // Add after today's payment: a same-day draw first amortizes
+            // at the next contractual boundary, never at its funding date.
+            let remaining = self
+                .amort_setup
+                .payment_dates
+                .keys()
+                .filter(|&&date| date > d && date <= *end)
+                .count();
+            if remaining > 0 {
+                *state
+                    .linear_between_installment
+                    .get_or_insert(Decimal::ZERO) += funded / Decimal::from(remaining as u64);
             }
         }
         self.handle_maturity(d, state)?;

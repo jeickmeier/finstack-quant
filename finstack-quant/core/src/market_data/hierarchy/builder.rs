@@ -1,6 +1,6 @@
 //! Fluent builder for constructing hierarchies from `/`-separated paths.
 
-use super::{parse_path, HierarchyNode, MarketDataHierarchy};
+use super::{HierarchyNode, MarketDataHierarchy, parse_path};
 
 /// Fluent builder for `MarketDataHierarchy`.
 ///
@@ -70,10 +70,10 @@ impl HierarchyBuilder {
     ///
     /// No-op if `add_node` has not been called first.
     pub fn tag(mut self, key: &str, value: &str) -> Self {
-        if let Some(path) = self.current_path.clone() {
-            if let Some(node) = self.hierarchy.get_node_mut(&path) {
-                node.set_tag(key, value);
-            }
+        if let Some(path) = self.current_path.clone()
+            && let Some(node) = self.hierarchy.get_node_mut(&path)
+        {
+            node.set_tag(key, value);
         }
         self
     }
@@ -82,11 +82,11 @@ impl HierarchyBuilder {
     ///
     /// No-op if `add_node` has not been called first.
     pub fn curve_ids(mut self, ids: &[&str]) -> Self {
-        if let Some(path) = self.current_path.clone() {
-            if let Some(node) = self.hierarchy.get_node_mut(&path) {
-                for id in ids {
-                    node.add_curve_id(*id);
-                }
+        if let Some(path) = self.current_path.clone()
+            && let Some(node) = self.hierarchy.get_node_mut(&path)
+        {
+            for id in ids {
+                node.add_curve_id(*id);
             }
         }
         self

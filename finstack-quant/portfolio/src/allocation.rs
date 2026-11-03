@@ -2,9 +2,9 @@
 
 use crate::error::{Error, Result};
 use finstack_quant_core::math::stats::variance;
-use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
-use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use finstack_quant_core::math::summation::{NeumaierAccumulator, neumaier_sum};
 use rust_decimal::Decimal;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
 const WEIGHT_TOLERANCE: f64 = 1e-9;

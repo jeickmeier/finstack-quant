@@ -156,10 +156,10 @@ impl Attributes {
             return self.has_tag(tag);
         }
 
-        if let Some(meta_spec) = selector.strip_prefix("meta:") {
-            if let Some((key, value)) = meta_spec.split_once('=') {
-                return self.get_meta(key) == Some(value);
-            }
+        if let Some(meta_spec) = selector.strip_prefix("meta:")
+            && let Some((key, value)) = meta_spec.split_once('=')
+        {
+            return self.get_meta(key) == Some(value);
         }
 
         false

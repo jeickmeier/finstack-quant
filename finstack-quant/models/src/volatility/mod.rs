@@ -80,17 +80,16 @@ pub mod svi;
 /// Carr-Madan discrete variance replication for variance swaps.
 pub mod variance_replication;
 
-pub use convert::{convert_atm_volatility, VolatilityConvention};
+pub use convert::{VolatilityConvention, convert_atm_volatility};
 pub use implied::{implied_vol_bachelier, implied_vol_black};
 pub use source::{
-    get_cube_expiry_slice_vol, get_cube_expiry_slice_vol_clamped, get_cube_normal_vol,
+    VolSource, get_cube_expiry_slice_vol, get_cube_expiry_slice_vol_clamped, get_cube_normal_vol,
     get_cube_normal_vol_clamped, get_cube_vol, get_cube_vol_clamped, get_surface_vol,
     get_surface_vol_clamped, materialize_cube_expiry_slice, materialize_cube_expiry_slice_normal,
     materialize_cube_tenor_slice, materialize_cube_tenor_slice_normal, measure_vol_surface_shift,
-    VolSource,
 };
 
 pub use fx::{
-    delta_to_strike, get_fx_delta_pillar_vols, get_fx_delta_vol, materialize_fx_delta_surface,
-    strike_to_delta, FxVolSurfaceBuilder,
+    FxVolSurfaceBuilder, delta_to_strike, get_fx_delta_pillar_vols, get_fx_delta_vol,
+    materialize_fx_delta_surface, strike_to_delta,
 };

@@ -1,10 +1,10 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 
 /// Inputs for forward swap rate calculation.
 pub struct ForwardSwapRateInputs<'a> {
@@ -194,7 +194,7 @@ mod tests {
     }
     #[test]
     fn single_curve_forward_prices_actual_adjusted_and_lagged_payments() {
-        use finstack_quant_core::dates::{adjust, calendar_by_id_strict, DateExt};
+        use finstack_quant_core::dates::{DateExt, adjust, calendar_by_id_strict};
         let as_of = Date::from_calendar_date(2025, Month::January, 2).expect("date");
         let start = Date::from_calendar_date(2025, Month::January, 31).expect("date");
         let end = Date::from_calendar_date(2027, Month::January, 31).expect("date");

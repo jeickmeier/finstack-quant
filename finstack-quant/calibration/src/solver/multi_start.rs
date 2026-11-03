@@ -103,15 +103,15 @@ pub(crate) fn perturb_initial_guess(
             let h = halton(restart_idx + 1, base);
             let perturbation = perturbation_scale * (2.0 * h - 1.0);
             let mut v = x + perturbation;
-            if let Some(lower) = lb {
-                if i < lower.len() {
-                    v = v.max(lower[i]);
-                }
+            if let Some(lower) = lb
+                && i < lower.len()
+            {
+                v = v.max(lower[i]);
             }
-            if let Some(upper) = ub {
-                if i < upper.len() {
-                    v = v.min(upper[i]);
-                }
+            if let Some(upper) = ub
+                && i < upper.len()
+            {
+                v = v.min(upper[i]);
             }
             v
         })

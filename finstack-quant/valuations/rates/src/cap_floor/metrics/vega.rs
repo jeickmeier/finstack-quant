@@ -1,9 +1,9 @@
 //! Vega calculator for interest rate options (caps/floors/caplets/floorlets).
 
-use crate::cap_floor::hw_pricer::resolve_capfloor_hw1f_model_params;
 use crate::cap_floor::CapFloor;
-use finstack_quant_core::market_data::surfaces::VolQuoteType;
+use crate::cap_floor::hw_pricer::resolve_capfloor_hw1f_model_params;
 use finstack_quant_core::Result;
+use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_valuations_core::metrics::bump_surface_vol_absolute;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::pricer::ModelKey;

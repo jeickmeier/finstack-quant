@@ -6,11 +6,11 @@ use crate::revolving_credit::cashflow_engine::{
     CashflowEngine, PathAwareCashflowSchedule, ThreeFactorPathData,
 };
 use crate::revolving_credit::types::{DrawRepaySpec, RevolvingCredit};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 /// Whether the facility's spread process is a constant: the pricer simulates
 /// it with minimal CIR dynamics for numerical stability, but the fair spread

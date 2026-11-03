@@ -11,7 +11,7 @@
 use crate::monte_carlo::discretization::qe_common::qe_step_variance;
 use crate::monte_carlo::process::credit_line::{CreditLineProcess, InterestRateSpec};
 use crate::monte_carlo::traits::Discretization;
-use finstack_quant_core::math::linalg::{cholesky_correlation, CholeskyError};
+use finstack_quant_core::math::linalg::{CholeskyError, cholesky_correlation};
 
 /// Discretization scheme for revolving credit process.
 ///

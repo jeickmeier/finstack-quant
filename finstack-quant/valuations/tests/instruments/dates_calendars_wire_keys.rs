@@ -29,9 +29,9 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 };
 use finstack_quant_valuations::instruments::rates::cms_spread_option::CmsSpreadOption;
 use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
 
 /// Serialize `instrument`, insert `retired` with `value` into the object at
 /// `pointer` (JSON pointer, `""` for the root), and require a rejection that

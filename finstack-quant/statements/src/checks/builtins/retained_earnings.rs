@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::Result;
 use crate::checks::helpers::{get_finite_node_value, sum_nodes};
 use crate::checks::types::effective_tolerance;
 use crate::checks::{
@@ -9,7 +10,6 @@ use crate::checks::{
     Severity, SignConventionPolicy,
 };
 use crate::types::NodeId;
-use crate::Result;
 
 /// Checks that retained earnings flow correctly across periods:
 /// RE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).
@@ -163,10 +163,10 @@ impl Check for RetainedEarningsReconciliation {
             // the roll-forward into a silent pass. Warn and skip, mirroring
             // the core-input handling above.
             let mut missing_optional: Vec<String> = Vec::new();
-            if let Some(node) = self.dividends_node.as_ref() {
-                if get_finite_node_value(context.results, node, curr_pid).is_none() {
-                    missing_optional.push(format!("{node} @ {curr_pid}"));
-                }
+            if let Some(node) = self.dividends_node.as_ref()
+                && get_finite_node_value(context.results, node, curr_pid).is_none()
+            {
+                missing_optional.push(format!("{node} @ {curr_pid}"));
             }
             for node in &self.other_adjustments {
                 if get_finite_node_value(context.results, node, curr_pid).is_none() {
@@ -202,15 +202,15 @@ impl Check for RetainedEarningsReconciliation {
 
             // Dividends must be a non-negative magnitude under the
             // default convention; the formula subtracts it.
-            if let Some(node) = self.dividends_node.as_ref() {
-                if let Some(f) = self.dividends_sign_convention.validate(
+            if let Some(node) = self.dividends_node.as_ref()
+                && let Some(f) = self.dividends_sign_convention.validate(
                     dividends,
                     node.as_str(),
                     Some(*curr_pid),
                     self.id(),
-                ) {
-                    findings.push(f);
-                }
+                )
+            {
+                findings.push(f);
             }
 
             let adjustments = sum_nodes(context.results, &self.other_adjustments, curr_pid);

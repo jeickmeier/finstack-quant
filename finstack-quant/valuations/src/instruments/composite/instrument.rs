@@ -1,21 +1,21 @@
 //! Priceable composite instrument and its [`Instrument`] implementation.
 
 use super::reporting::{
-    aggregate_primitive_paths, flatten_composite, register_execution_definition,
-    CompositeRebalanceResult, CompositeTrade,
+    CompositeRebalanceResult, CompositeTrade, aggregate_primitive_paths, flatten_composite,
+    register_execution_definition,
 };
 use super::spec::CompositeSpec;
 use super::spec_support::{
-    convert_amount, validate_history, CompositeLegSpec, CompositeMarketObservation, CompositeState,
-    RebalanceRule, WeightingMethod, MIN_ABS_INPUT,
+    CompositeLegSpec, CompositeMarketObservation, CompositeState, MIN_ABS_INPUT, RebalanceRule,
+    WeightingMethod, convert_amount, validate_history,
 };
+use crate::instruments::MarketDependencies;
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use crate::instruments::pricing_overrides::{
     InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
 };
-use crate::instruments::MarketDependencies;
 use crate::instruments::{Instrument, PricingOptions};
-use crate::metrics::{is_additive_metric, MetricId};
+use crate::metrics::{MetricId, is_additive_metric};
 use crate::results::composite::{
     CompositeExposureReport, CompositeLegValuation, CompositeValuationDetails, PrimitiveExposure,
 };
@@ -659,10 +659,10 @@ impl Instrument for CompositeInstrument {
         let mut dependencies = MarketDependencies::new();
         for instrument in self.boxed_legs()? {
             dependencies.merge(instrument.market_dependencies()?);
-            if let Some(notional) = instrument.notional()? {
-                if notional.currency() != self.spec.reporting_currency {
-                    dependencies.add_fx_pair(notional.currency(), self.spec.reporting_currency);
-                }
+            if let Some(notional) = instrument.notional()?
+                && notional.currency() != self.spec.reporting_currency
+            {
+                dependencies.add_fx_pair(notional.currency(), self.spec.reporting_currency);
             }
         }
         Ok(dependencies)
@@ -724,11 +724,13 @@ mod tests {
         equity.quoted_spot = Some(200.0);
         equity.spot_id = Some("CURRENT-LONG-SPOT".into());
         assert_current_definition(&composite, 110.0);
-        assert!(composite
-            .market_dependencies()
-            .expect("dependencies")
-            .market_scalar_ids
-            .contains(&"CURRENT-LONG-SPOT".to_string()));
+        assert!(
+            composite
+                .market_dependencies()
+                .expect("dependencies")
+                .market_scalar_ids
+                .contains(&"CURRENT-LONG-SPOT".to_string())
+        );
 
         composite.spec.legs.swap(0, 1);
         composite.state.resolved_legs.swap(0, 1);
@@ -759,8 +761,10 @@ mod tests {
         assert_current_definition(&composite, 160.0);
 
         composite.spec.legs.pop();
-        assert!(composite
-            .value(&MarketContext::new(), date!(2025 - 01 - 01))
-            .is_err());
+        assert!(
+            composite
+                .value(&MarketContext::new(), date!(2025 - 01 - 01))
+                .is_err()
+        );
     }
 }

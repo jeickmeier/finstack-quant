@@ -3,11 +3,11 @@
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_models::credit::scoring::{
-    altman_em_score as core_altman_em_score, altman_z_double_prime as core_altman_z_double_prime,
-    altman_z_prime as core_altman_z_prime, altman_z_score as core_altman_z_score,
-    ohlson_o_score as core_ohlson_o_score, zmijewski_score as core_zmijewski_score,
     AltmanZDoublePrimeInput, AltmanZPrimeInput, AltmanZScoreInput, OhlsonOScoreInput,
-    ScoringResult, ZmijewskiInput,
+    ScoringResult, ZmijewskiInput, altman_em_score as core_altman_em_score,
+    altman_z_double_prime as core_altman_z_double_prime, altman_z_prime as core_altman_z_prime,
+    altman_z_score as core_altman_z_score, ohlson_o_score as core_ohlson_o_score,
+    zmijewski_score as core_zmijewski_score,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};

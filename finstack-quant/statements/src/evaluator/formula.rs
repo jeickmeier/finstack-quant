@@ -64,11 +64,7 @@ where
 /// Convert boolean to f64 (1.0 for true, 0.0 for false).
 #[inline]
 fn bool_to_f64(b: bool) -> f64 {
-    if b {
-        1.0
-    } else {
-        0.0
-    }
+    if b { 1.0 } else { 0.0 }
 }
 
 /// Validate that a function has exactly the expected number of arguments.

@@ -276,8 +276,8 @@ pub fn evaluate_risk_budget_from_decomposition(
 #[cfg(test)]
 mod tests {
     use super::super::position::{
-        parametric_var_decomposition, DecompositionMethod, PositionRiskDecomposition,
-        PositionVarContribution,
+        DecompositionMethod, PositionRiskDecomposition, PositionVarContribution,
+        parametric_var_decomposition,
     };
     use super::*;
 
@@ -318,14 +318,16 @@ mod tests {
                 evaluate_risk_budget(ids.clone(), &[-100.0], &[1.0], -100.0, threshold).is_err()
             );
         }
-        assert!(evaluate_risk_budget(
-            vec!["A".into(), "B".into()],
-            &[-120.0, 20.0],
-            &[-0.1, 1.1],
-            -100.0,
-            1.2,
-        )
-        .is_err());
+        assert!(
+            evaluate_risk_budget(
+                vec!["A".into(), "B".into()],
+                &[-120.0, 20.0],
+                &[-0.1, 1.1],
+                -100.0,
+                1.2,
+            )
+            .is_err()
+        );
     }
 
     /// Evaluate `(position_id, target fraction)` pairs against a decomposition
@@ -340,10 +342,11 @@ mod tests {
             .iter()
             .map(|c| c.position_id.clone())
             .collect();
-        assert!(ids
-            .iter()
-            .map(String::as_str)
-            .eq(targets.iter().map(|(id, _)| *id)));
+        assert!(
+            ids.iter()
+                .map(String::as_str)
+                .eq(targets.iter().map(|(id, _)| *id))
+        );
         let actual: Vec<f64> = decomposition
             .var_contributions
             .iter()

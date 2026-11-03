@@ -8,7 +8,7 @@ use super::js_date;
 use crate::utils::input::{from_js_json, js_f64, js_opt_f64, js_uint};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin::regulatory::sa_ccr::{
-    saccr_ead as saccr_ead_rs, SaCcrEngine, SaCcrNettingSetConfig, SaCcrTrade,
+    SaCcrEngine, SaCcrNettingSetConfig, SaCcrTrade, saccr_ead as saccr_ead_rs,
 };
 use finstack_quant_margin::types::NettingSetId;
 use wasm_bindgen::prelude::*;

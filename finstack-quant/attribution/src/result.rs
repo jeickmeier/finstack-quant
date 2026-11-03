@@ -6,7 +6,7 @@
 
 use finstack_quant_core::config::RoundingContext;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::money::{fx::FxPolicyMeta, Money};
+use finstack_quant_core::money::{Money, fx::FxPolicyMeta};
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
@@ -1444,10 +1444,11 @@ mod tests {
         assert_eq!(rates.pct_of_total, Some(-25.0));
 
         pnl.total_pnl = Money::from((0_i64, Currency::USD));
-        assert!(pnl
-            .pct_of_total_by_bucket()
-            .iter()
-            .all(|bucket| bucket.pct_of_total.is_none()));
+        assert!(
+            pnl.pct_of_total_by_bucket()
+                .iter()
+                .all(|bucket| bucket.pct_of_total.is_none())
+        );
     }
 
     #[test]

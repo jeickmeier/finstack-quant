@@ -6,8 +6,8 @@
 
 use crate::errors::{display_to_py, serde_json_to_py};
 use pyo3::prelude::*;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 /// Deserialize a JSON string into a Rust type while releasing the GIL.
 pub(crate) fn deserialize_json<T: DeserializeOwned + Send>(json: &str) -> PyResult<T> {

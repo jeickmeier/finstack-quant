@@ -3,8 +3,8 @@
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{currency::Currency, money::Money};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    execute_waterfall, FundingSource, PaymentCalculation, PaymentType, Recipient, RecipientType,
-    StructuredCredit, Waterfall, WaterfallContext, WaterfallDistribution, WaterfallTier,
+    FundingSource, PaymentCalculation, PaymentType, Recipient, RecipientType, StructuredCredit,
+    Waterfall, WaterfallContext, WaterfallDistribution, WaterfallTier, execute_waterfall,
 };
 use time::macros::date;
 

@@ -4,7 +4,7 @@
 //! per sample (millions in a VaR/CVA run), so this measures the per-path cost —
 //! the path that shares the `RatingScale` via `Arc` instead of cloning it.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_models::credit::migration::{GeneratorMatrix, MigrationSimulator, RatingScale};
 use std::hint::black_box;
 
@@ -35,8 +35,8 @@ fn benchmark_migration(c: &mut Criterion) {
     let mut group = c.benchmark_group("migration");
 
     for &n in &[5usize, 10] {
-        let gen = build_generator(n);
-        let sim = MigrationSimulator::new(gen, 5.0).expect("valid simulator");
+        let r#gen = build_generator(n);
+        let sim = MigrationSimulator::new(r#gen, 5.0).expect("valid simulator");
 
         group.bench_with_input(BenchmarkId::new("simulate_1000", n), &n, |b, _| {
             b.iter(|| {

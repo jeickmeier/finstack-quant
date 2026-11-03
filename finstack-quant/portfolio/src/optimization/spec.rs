@@ -2,11 +2,11 @@
 //! bindings call.
 
 use super::{
-    optimize, rebalance, CandidatePosition, Constraint, MissingMetricPolicy, Objective,
-    PortfolioOptimizationProblem, PortfolioOptimizationResult, TradeUniverse, WeightingScheme,
+    CandidatePosition, Constraint, MissingMetricPolicy, Objective, PortfolioOptimizationProblem,
+    PortfolioOptimizationResult, TradeUniverse, WeightingScheme, optimize, rebalance,
 };
-use crate::portfolio::{Portfolio, PortfolioSpec};
 use crate::Result;
+use crate::portfolio::{Portfolio, PortfolioSpec};
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::market_data::context::MarketContext;
 use serde::{Deserialize, Serialize};

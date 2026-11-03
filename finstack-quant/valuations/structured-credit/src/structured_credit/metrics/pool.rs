@@ -1,7 +1,7 @@
 //! AssetPool characteristic metrics for structured credit.
 
-use crate::structured_credit::types::pool::weighted_avg_rating_factor;
 use crate::structured_credit::StructuredCredit;
+use crate::structured_credit::types::pool::weighted_avg_rating_factor;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

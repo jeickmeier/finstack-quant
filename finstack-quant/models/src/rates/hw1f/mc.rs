@@ -26,10 +26,10 @@ use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, PathState, Payoff, RandomStream, StateKey};
 use crate::rates::hw1f::bank_account::bank_step_factor;
 use crate::rates::hw1f::config::{Hw1fMcConfig, SampleSplit};
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::math::time_grid::TimeGrid;
-use finstack_quant_core::Result;
 
 /// HW1F Monte Carlo pricer for path-dependent rate exotics without exercise.
 ///
@@ -457,9 +457,11 @@ mod tests {
                 },
                 currency: Currency::USD,
             };
-            assert!(pricer
-                .price(|| -> ZcbPayoff { panic!("invalid run must not create a payoff") })
-                .is_err());
+            assert!(
+                pricer
+                    .price(|| -> ZcbPayoff { panic!("invalid run must not create a payoff") })
+                    .is_err()
+            );
         }
     }
 

@@ -470,14 +470,18 @@ mod tests {
         }
         wire["costs"]["direct_cost_rate"] = serde_json::json!(-1.0);
         assert!(serde_json::from_value::<WorkoutLgd>(wire).is_err());
-        assert!(serde_json::from_str::<CollateralPiece>(
-            r#"{"collateral_type":"cash","book_value":100.0,"haircut":1.1}"#
-        )
-        .is_err());
-        assert!(serde_json::from_str::<WorkoutCosts>(
-            r#"{"direct_cost_rate":-1.0,"indirect_cost_rate":0.0}"#
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<CollateralPiece>(
+                r#"{"collateral_type":"cash","book_value":100.0,"haircut":1.1}"#
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<WorkoutCosts>(
+                r#"{"direct_cost_rate":-1.0,"indirect_cost_rate":0.0}"#
+            )
+            .is_err()
+        );
         let bad_costs = WorkoutCosts {
             direct_cost_rate: -1.0,
             indirect_cost_rate: 0.0,
@@ -643,14 +647,18 @@ mod tests {
         assert!(WorkoutLgd::builder().workout_years(-1.0).build().is_err());
         // Negative discount rate
         assert!(WorkoutLgd::builder().discount_rate(-0.01).build().is_err());
-        assert!(WorkoutLgd::builder()
-            .workout_years(f64::NAN)
-            .build()
-            .is_err());
-        assert!(WorkoutLgd::builder()
-            .discount_rate(f64::INFINITY)
-            .build()
-            .is_err());
+        assert!(
+            WorkoutLgd::builder()
+                .workout_years(f64::NAN)
+                .build()
+                .is_err()
+        );
+        assert!(
+            WorkoutLgd::builder()
+                .discount_rate(f64::INFINITY)
+                .build()
+                .is_err()
+        );
     }
 
     #[test]

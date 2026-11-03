@@ -1,13 +1,13 @@
 //! Instrument implementation used by the traits subsystem.
 //!
-use crate::instruments::model_params::ModelParamsSnapshot;
 use crate::instruments::MarketDependencies;
+use crate::instruments::model_params::ModelParamsSnapshot;
 use crate::metrics::MetricId;
 use crate::pricer::{Family, InstrumentType, ModelKey};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::Attributes;
-use finstack_quant_core::{currency::Currency, dates::Date, money::Money, types::CurveId, Error};
+use finstack_quant_core::{Error, currency::Currency, dates::Date, money::Money, types::CurveId};
 use std::any::Any;
 
 use super::pricing_options::PricingOptions;
@@ -428,7 +428,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// - Scenario overrides are applied only by the canonical wrapper lifecycle.
     /// - Metric overrides are consumed only by the metrics pipeline.
     fn base_value(&self, market: &MarketContext, as_of: Date)
-        -> finstack_quant_core::Result<Money>;
+    -> finstack_quant_core::Result<Money>;
 
     /// Resolve the effective valuation date used to price and stamp this instrument.
     ///

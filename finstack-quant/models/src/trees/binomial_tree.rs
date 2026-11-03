@@ -6,13 +6,13 @@
 use crate::closed_form::d1_d2;
 use crate::trees::tree_framework::NodeState;
 use crate::types::{OptionMarketParams, OptionType};
+use finstack_quant_core::FxHashSet;
 use finstack_quant_core::math::time_grid::map_exercise_dates_to_steps;
 use finstack_quant_core::validation::validate_f64_positive;
-use finstack_quant_core::FxHashSet;
 use finstack_quant_core::{Error, Result};
 
 use super::tree_framework::{
-    price_recombining_tree, EvolutionParams, RecombiningInputs, RecombiningLattice, TreeValuator,
+    EvolutionParams, RecombiningInputs, RecombiningLattice, TreeValuator, price_recombining_tree,
 };
 
 /// Binomial tree types
@@ -927,9 +927,10 @@ mod tests {
     fn test_leisen_reimer_rejects_missing_spot_or_strike() {
         let tree = BinomialTree::new(51, crate::trees::binomial_tree::TreeType::LeisenReimer);
         for (spot, strike) in [(0.0, 100.0), (100.0, 0.0), (-1.0, 100.0), (f64::NAN, 100.0)] {
-            assert!(tree
-                .calculate_parameters(spot, strike, 0.03, 0.25, 1.0, 0.01)
-                .is_err());
+            assert!(
+                tree.calculate_parameters(spot, strike, 0.03, 0.25, 1.0, 0.01)
+                    .is_err()
+            );
         }
     }
 
