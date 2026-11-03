@@ -39,7 +39,7 @@
     {
       "name": "id-combobox",
       "type": "registry:ui",
-      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; IDs are never inferred.",
+      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; typed text is the value and survives Tab, blur and Escape; IDs are never inferred.",
       "worker": "none"
     },
     {

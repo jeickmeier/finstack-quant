@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: id-combobox keeps typed free text
+
+The `id-combobox` registry primitive no longer empties its value when the suggestions close. Typing an id that is not among the suggestions and then pressing Tab, Escape or clicking elsewhere left the field (and every SchemaForm node, metric or curve id built on it) as `''`, so Rust reported for example "Target node '' not found". Typed text is now the value until the user types again or picks a suggestion.
+
 ### Comps: relative value table in the UI
 
 The `relative-value-table` registry component, with the `use-relative-value-report` hook, takes a host-supplied subject and universe of `CompanyMetrics`, edits a `RelativeValueReportConfig` (peer filter, period basis, scoring dimensions, multiples) with a schema form over the generated contract, and draws `statements_analytics.relativeValueReport` as returned: the comps table with the subject marked, each multiple's subject value, percentile bar, z-score and peer statistics, each dimension's regression scatter through Rust's fitted values with its signal, z-score and exclusion reason, and the composite score or Rust's reason for none. `labelFor` upper-cases `ev`, `fcf`, `ntm`, `pb`, `pe` and `ptbv`, so a multiple reads "EV EBITDA" or "PE".
