@@ -95,6 +95,7 @@ import { Example as ExamplePortfolioWorkbench } from "./examples/portfolio-workb
 import { Example as ExamplePortfolioAttributionReport } from "./examples/portfolio-attribution-report";
 import { Example as ExamplePortfolioReturns } from "./examples/portfolio-returns";
 import { Example as ExampleBrinsonReport } from "./examples/brinson-report";
+import { Example as ExampleExposureReport } from "./examples/exposure-report";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -191,6 +192,7 @@ const examples = {
   "portfolio-attribution-report": ExamplePortfolioAttributionReport,
   "portfolio-returns": ExamplePortfolioReturns,
   "brinson-report": ExampleBrinsonReport,
+  "exposure-report": ExampleExposureReport,
 };
 export function ComponentDemo({
   name,

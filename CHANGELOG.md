@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: exposure report on the workbench Risk tab
+
+`@finstack/exposure-report` presents a book's primitive exposures, one native `portfolio.primitiveExposures` call through `@finstack/use-exposure-report`: each primitive's net and gross quantity and value in the base currency with a chart of the two values, each requested additive metric's net and gross amount, and the position-aware paths, all as returned; and, when the host supplies factor definitions, the book's `portfolio.computeFactorSensitivities` matrix. Rust returns both net and gross; nothing is summed or netted in JavaScript. `portfolio-workbench` shows it on the Risk tab over its book and market, with the host's `exposures` metric ids and factors.
+
 ### UI: Brinson report and the workbench Brinson tab
 
 `@finstack/brinson-report` presents multi-period Brinson-Fachler attribution of the host's sector weights and returns, one native `portfolio.brinsonLinked` call through `@finstack/use-brinson-linked`: the compounded portfolio and benchmark returns, each sector's Carino-linked allocation, selection, interaction and total with Rust's linked total of each effect, a chart of the sectors' linked totals, and every period's returns, sector effects and totals, all as returned. Nothing is summed, differenced or linked in JavaScript. `portfolio-workbench` adds a Brinson tab when the host supplies `brinson` periods.

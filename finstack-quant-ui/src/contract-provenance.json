@@ -2205,6 +2205,37 @@
       }
     },
     {
+      "id": "exposure-report",
+      "route": "returned-report",
+      "convention": "Returned primitiveExposures PortfolioPrimitiveExposureReport: each aggregate's net and gross quantity and value in base_currency, ordered by primitive id as returned and charted side by side (never stacked); each requested additive metric's net_measures and gross_measures entry per primitive under its returned id; and the position-aware paths with their position-scaled quantity and value. The optional sensitivity section shows computeFactorSensitivities (positions by factor ids, base currency) as returned. Inputs are the host's book, market, additive metric ids (omitted is none: quantity and value only) and any factor definitions and bump config; nothing is summed, netted, converted or re-sorted.",
+      "api": {
+        "name": "portfolio.primitiveExposures",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "primitiveExposures",
+        "inputs": [
+          {
+            "name": "portfolio",
+            "type": "Portfolio",
+            "optional": false
+          },
+          {
+            "name": "market",
+            "type": "MarketContext",
+            "optional": false
+          },
+          {
+            "name": "metrics",
+            "type": "string[] | string",
+            "optional": false
+          }
+        ],
+        "returns": "PortfolioPrimitiveExposureReport",
+        "declaration": "/**\n   * Decompose every portfolio position into primitive economic exposures.\n   *\n   * Direct instruments yield one primitive path; composite positions recurse\n   * through their frozen resolved leg quantities. The position quantity scales\n   * every primitive quantity, value and additive risk amount. Returns the\n   * `PortfolioPrimitiveExposureReport`: `base_currency`, position-aware\n   * `paths` and per-instrument net/gross `aggregates`, all in the portfolio\n   * base currency.\n   * @param portfolio - Built portfolio whose direct and composite positions are decomposed.\n   * @param market - `core.MarketContext` handle with the complete valuation and FX market.\n   * @param metrics - Array of additive metric ids (e.g. `\"dv01\"`); pass `[]` for quantity and value only.\n   * @returns The `PortfolioPrimitiveExposureReport`.\n   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `metrics` is not an array or JSON string, and a `FinstackError` if a metric id is not canonical or is non-additive, primitive definitions conflict across positions, a composite is invalid, or market data or FX is missing.\n   */\n  primitiveExposures(\n    portfolio: Portfolio,\n    market: MarketContext,\n    metrics: string[] | string\n  ): PortfolioPrimitiveExposureReport;",
+        "sha256": "c12c1e0f77ada735cb96d2da39ec493f7ec2bebe892831c0f9a66d244a9746eb"
+      }
+    },
+    {
       "id": "scenario-pnl-table",
       "route": "returned-pnl",
       "convention": "Returned ScenarioPnlBatchItem per scenario in batch order: by_position money in Portfolio#positionIds (spec) order, the total row from pnl.total in the base currency, the totals charted as returned and each ApplicationReport; nothing summed or differenced. The batch fails whole on the earliest failing scenario.",

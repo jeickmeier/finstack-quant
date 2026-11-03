@@ -174,10 +174,10 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the thirty-seven native fixture generators under
+`mise run ui-fixtures` runs the thirty-eight native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
-portfolio → portfolio margin → portfolio workbench; portfolio returns; Brinson; curves → market-browser → curve-query; cubes, calibration,
+portfolio → portfolio margin → portfolio workbench → primitive exposures; portfolio returns; Brinson; curves → market-browser → curve-query; cubes, calibration,
 scenario-table; statements → covenants, normalizations, capital structures, relative value; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
@@ -956,7 +956,7 @@ the book and its context as props: `defaultSpecJson` (a complete
 `PortfolioSpec`; remount for a different book), `marketJson`
 (`MarketContextState`), `asOf` (the ISO margin date, never read from the
 spec), and optionally `metrics` (omitted is Rust's standard set),
-`seriesBase` (the base metric id charted by bucket), `scenarioJsons`
+`seriesBase` (the base metric id charted by bucket), `exposures`, `scenarioJsons`
 (`ScenarioSpec` texts, never parsed), `attribution`, `returns`, `brinson` and
 `currentImCollateral` (omitted is none held). `attribution` is the host's
 closing snapshot for the Attribution tab: `marketT1Json`
@@ -969,22 +969,27 @@ past a seasoned floating leg's fixing needs that index's `FIXING:` series in
 `TwrrPeriod`) and `xirr` (dated investor flows); none is derived from the book.
 `brinson` is the host's sector data for the Brinson tab: `periods` (one array of
 `SectorPeriod` rows per period, oldest first) and optionally `periodLabels`;
-none is derived from the book.
+none is derived from the book. `exposures` is the host's choice for the Risk
+tab's exposure report: `metrics` (additive metric ids reported per primitive;
+omitted is quantity and value only) and `factorsJson` (`FactorDefinition`
+array) with an optional `bumpConfigJson` for the sensitivity matrix (omitted
+shows no matrix). The book's primitive exposures show whether or not it is
+supplied.
 
-| Tab         | Shows                                                                                                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Positions   | `PortfolioSummary` and `PositionsTable` of `useValuePortfolio`, with Rust `metricMetadata` of every returned measure id                                                                                |
-| Risk        | `PortfolioMetrics` of the same report and, when `seriesBase` is supplied, its `usePortfolioMetricsSeries` series                                                                                       |
-| Scenarios   | `ScenarioPnlTable` of `useScenarioPnlBatch`; the tab is shown only when `scenarioJsons` are supplied                                                                                                   |
-| Attribution | `PortfolioAttributionReport` of `useAttributePortfolioPnl` from `marketJson` on `asOf` to the `attribution` market and date under the method the user picks; shown only when `attribution` is supplied |
-| Returns     | `PortfolioReturns` of `useTwrrLinked`, `useTwrrModifiedDietz` and `useMwrXirr` over the `returns` data, each form resubmittable; shown only when `returns` is supplied                                 |
-| Brinson     | `BrinsonReport` of `useBrinsonLinked` over the `brinson` periods; shown only when `brinson` is supplied                                                                                                |
-| Margin      | `PortfolioMarginReport` of `usePortfolioMargin` on `asOf`                                                                                                                                              |
-| Book        | `PortfolioSpec` JSON that `usePortfolioSpecValidator` validates natively before every tab values it                                                                                                    |
+| Tab         | Shows                                                                                                                                                                                                                                           |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Positions   | `PortfolioSummary` and `PositionsTable` of `useValuePortfolio`, with Rust `metricMetadata` of every returned measure id                                                                                                                         |
+| Risk        | `PortfolioMetrics` of the same report and, when `seriesBase` is supplied, its `usePortfolioMetricsSeries` series; `ExposureReport` of `usePrimitiveExposures` and, when `exposures.factorsJson` is supplied, `useFactorSensitivities` on `asOf` |
+| Scenarios   | `ScenarioPnlTable` of `useScenarioPnlBatch`; the tab is shown only when `scenarioJsons` are supplied                                                                                                                                            |
+| Attribution | `PortfolioAttributionReport` of `useAttributePortfolioPnl` from `marketJson` on `asOf` to the `attribution` market and date under the method the user picks; shown only when `attribution` is supplied                                          |
+| Returns     | `PortfolioReturns` of `useTwrrLinked`, `useTwrrModifiedDietz` and `useMwrXirr` over the `returns` data, each form resubmittable; shown only when `returns` is supplied                                                                          |
+| Brinson     | `BrinsonReport` of `useBrinsonLinked` over the `brinson` periods; shown only when `brinson` is supplied                                                                                                                                         |
+| Margin      | `PortfolioMarginReport` of `usePortfolioMargin` on `asOf`                                                                                                                                                                                       |
+| Book        | `PortfolioSpec` JSON that `usePortfolioSpecValidator` validates natively before every tab values it                                                                                                                                             |
 
-The Scenarios, Attribution, Returns, Brinson and Margin calls run when their tab first opens.
-Later portfolio panels (exposures, correlation) add their
-own tabs when they land. The fixture (`tests/portfolio/workbench/`) is the
+The Risk tab's exposure calls and the Scenarios, Attribution, Returns, Brinson
+and Margin calls run when their tab first opens. The return-correlation
+heatmap will join the Risk tab when it lands. The fixture (`tests/portfolio/workbench/`) is the
 margined rates book from `tests/portfolio/margin/` over the pricing market
 under the host-parity USD-OIS scenarios.
 
@@ -1054,6 +1059,28 @@ periods, weights not summing to one, which Rust names by zero-based period,
 or a reordered period) is the native error. The fixture
 (`tests/portfolio/brinson/`) is the portfolio host-parity golden's three
 periods with those three errors.
+
+## Primitive exposures
+
+`ExposureReport` (`@finstack/exposure-report`) presents one native
+`portfolio.primitiveExposures` result (`PortfolioPrimitiveExposureReport`) of
+the host's book over the host's market through `usePrimitiveExposures`
+(`@finstack/use-exposure-report`): each primitive's net (algebraic) and gross
+(absolute) quantity and value in the base currency, ordered by primitive id as
+Rust returns them, with a grouped bar chart of the two values; each requested
+additive metric's net and gross amount per primitive under its returned id;
+and the position-aware primitive paths. Rust returns both net and gross;
+nothing is summed, netted, converted or re-sorted. The metric ids are the
+host's: an empty list reports quantity and value only, and Rust rejects a
+non-additive id or one a position cannot compute (naming the position). With
+`sensitivities` (from `useFactorSensitivities`, one native
+`portfolio.computeFactorSensitivities` against host `FactorDefinition` JSON on
+an ISO date, an omitted bump config left to Rust) it adds the position-by-factor
+matrix in the base currency, with its own native error. The fixture
+(`tests/portfolio/exposures/`) is the workbench book over the pricing market
+with dv01 and theta and with no metric, the host-parity `usd_rates` factor, and
+the native errors of a non-additive metric, a metric the deposit cannot compute
+and a factor on a curve the market lacks.
 
 ## Returned rating migration
 
