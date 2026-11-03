@@ -131,7 +131,7 @@ test("capital-structure-report summarizes the debt stack and leaves a short wind
   expect(errors).toEqual([]);
 });
 
-test("statements-workbench shows Rust's error for a model with no capital structure, in a real worker", async ({
+test("statements-workbench summarizes the sample model's TLB and RCF, in a real worker", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -151,8 +151,10 @@ test("statements-workbench shows Rust's error for a model with no capital struct
   await page.getByRole("option", { name: "ebitda", exact: true }).click();
   await expect(node).toHaveValue("ebitda");
   await report.getByRole("button", { name: "Summarize" }).click();
-  await expect(report.getByRole("alert")).toContainText(
-    "has no capital structure",
-  );
+  const table = report.getByRole("table", {
+    name: "Debt stack at 2025Q4 (USD)",
+  });
+  await expect(table.getByRole("rowheader")).toHaveText(["TLB", "RCF"]);
+  await expect(report.getByRole("alert")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
