@@ -164,7 +164,8 @@ mod calendar;
 
 mod periods;
 pub use periods::{
-    build_fiscal_periods, build_periods, FiscalConfig, Period, PeriodId, PeriodKind, PeriodPlan,
+    build_fiscal_periods, build_periods, ltm_window, FiscalConfig, LtmWindow, Period, PeriodId,
+    PeriodKind, PeriodPlan,
 };
 
 /// Parse an ISO 8601 (extended) date string into a [`Date`].
