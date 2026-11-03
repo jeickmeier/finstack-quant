@@ -36,7 +36,8 @@ pub struct RecoveryClaim {
     pub penalties: f64,
     /// Gross value of collateral pledged exclusively to this claim.
     pub collateral_value: Option<f64>,
-    /// Collateral haircut in the inclusive range `[0, 1]`.
+    /// Collateral haircut as a decimal fraction between 0 and 1 inclusive
+    /// (0.25 removes a quarter of the collateral value).
     pub collateral_haircut: f64,
 }
 
