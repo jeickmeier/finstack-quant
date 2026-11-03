@@ -86286,6 +86286,1148 @@
       }
     }
   },
+  "relativeValueTable": {
+    "subject": {
+      "id": "NORTHWIND",
+      "attributes": {
+        "meta": {
+          "gics_sector": "Energy",
+          "rating": "BB"
+        }
+      },
+      "enterprise_value": 5400,
+      "market_cap": 2600,
+      "revenue": 6100,
+      "ebitda": 720,
+      "net_income": 210,
+      "oas_bp": 365,
+      "leverage": 3.9
+    },
+    "universe": [
+      {
+        "id": "ALDER",
+        "attributes": {
+          "meta": {
+            "gics_sector": "Energy",
+            "rating": "BB"
+          }
+        },
+        "enterprise_value": 4800,
+        "market_cap": 2500,
+        "revenue": 5200,
+        "ebitda": 690,
+        "net_income": 230,
+        "oas_bp": 290,
+        "leverage": 3.1,
+        "interest_coverage": 5.2
+      },
+      {
+        "id": "BIRCH",
+        "attributes": {
+          "meta": {
+            "gics_sector": "Energy",
+            "rating": "B"
+          }
+        },
+        "enterprise_value": 3900,
+        "market_cap": 1500,
+        "revenue": 4700,
+        "ebitda": 520,
+        "net_income": 120,
+        "oas_bp": 455,
+        "leverage": 4.6,
+        "interest_coverage": 3.1
+      },
+      {
+        "id": "CEDAR",
+        "attributes": {
+          "meta": {
+            "gics_sector": "Energy",
+            "rating": "BB"
+          }
+        },
+        "enterprise_value": 7200,
+        "market_cap": 3900,
+        "revenue": 7900,
+        "ebitda": 980,
+        "net_income": 360,
+        "oas_bp": 250,
+        "leverage": 2.8,
+        "interest_coverage": 6
+      },
+      {
+        "id": "DOGWOOD",
+        "attributes": {
+          "meta": {
+            "gics_sector": "Utilities",
+            "rating": "BBB"
+          }
+        },
+        "enterprise_value": 9800,
+        "market_cap": 5200,
+        "revenue": 4100,
+        "ebitda": 1150,
+        "net_income": 420,
+        "oas_bp": 160,
+        "leverage": 4.1,
+        "interest_coverage": 4.4
+      },
+      {
+        "id": "ELM",
+        "attributes": {
+          "meta": {
+            "gics_sector": "Energy",
+            "rating": "B"
+          }
+        },
+        "enterprise_value": 2600,
+        "market_cap": 900,
+        "revenue": 3300,
+        "ebitda": 340,
+        "net_income": 60,
+        "oas_bp": 540,
+        "leverage": 5.3,
+        "interest_coverage": 2.4
+      },
+      {
+        "id": "FIR",
+        "attributes": {
+          "meta": {
+            "gics_sector": "Energy",
+            "rating": "BB"
+          }
+        },
+        "enterprise_value": 6100,
+        "market_cap": 3100,
+        "revenue": 6800,
+        "ebitda": 800,
+        "net_income": 270,
+        "oas_bp": 330,
+        "leverage": 3.6,
+        "interest_coverage": 4.7
+      },
+      {
+        "id": "GINKGO",
+        "attributes": {
+          "meta": {
+            "gics_sector": "Energy",
+            "rating": "BB"
+          }
+        },
+        "enterprise_value": 5000,
+        "market_cap": 2300,
+        "revenue": 5600,
+        "ebitda": 610,
+        "oas_bp": 395,
+        "leverage": 4.2,
+        "interest_coverage": 3.9
+      },
+      {
+        "id": "HAZEL",
+        "attributes": {
+          "meta": {
+            "gics_sector": "Energy",
+            "rating": "B"
+          }
+        },
+        "enterprise_value": 3300,
+        "market_cap": 1200,
+        "revenue": 4000,
+        "ebitda": 430,
+        "net_income": 90,
+        "oas_bp": 480,
+        "interest_coverage": 2.9
+      },
+      {
+        "id": "IRONWOOD",
+        "attributes": {
+          "meta": {
+            "gics_sector": "Utilities",
+            "rating": "BBB"
+          }
+        },
+        "enterprise_value": 11200,
+        "market_cap": 6000,
+        "revenue": 4600,
+        "ebitda": 1300,
+        "net_income": 480,
+        "oas_bp": 145,
+        "leverage": 4.3,
+        "interest_coverage": 4.6
+      },
+      {
+        "id": "JUNIPER",
+        "attributes": {
+          "meta": {
+            "gics_sector": "Energy",
+            "rating": "BB"
+          }
+        },
+        "enterprise_value": 4400,
+        "market_cap": 2100,
+        "revenue": 5000,
+        "ebitda": 560,
+        "net_income": 180,
+        "oas_bp": 345,
+        "leverage": 3.7,
+        "interest_coverage": 4.1
+      }
+    ],
+    "cases": {
+      "full": {
+        "config": {
+          "filter": {
+            "gics_sectors": ["Energy"]
+          },
+          "period_basis": "ltm",
+          "dimensions": [
+            {
+              "label": "Spread vs leverage",
+              "y_extractor": {
+                "named": "oas_bp"
+              },
+              "x_extractor": {
+                "named": "leverage"
+              },
+              "weight": 0.6,
+              "direction": "higher_is_cheap"
+            },
+            {
+              "label": "EV/EBITDA",
+              "y_extractor": {
+                "multiple": "ev_ebitda"
+              },
+              "weight": 0.4,
+              "direction": "higher_is_rich"
+            }
+          ],
+          "multiples": ["ev_ebitda", "ev_revenue", "pe", "spread_per_turn"]
+        },
+        "report": {
+          "subject_id": "NORTHWIND",
+          "period_basis": "ltm",
+          "peer_count": 8,
+          "excluded_count": 2,
+          "companies": [
+            {
+              "id": "NORTHWIND",
+              "is_subject": true,
+              "values": [
+                7.5, 0.8852459016393442, 12.380952380952381, 93.58974358974359
+              ]
+            },
+            {
+              "id": "ALDER",
+              "is_subject": false,
+              "values": [
+                6.956521739130435, 0.9230769230769231, 10.869565217391305,
+                93.54838709677419
+              ]
+            },
+            {
+              "id": "BIRCH",
+              "is_subject": false,
+              "values": [7.5, 0.8297872340425532, 12.5, 98.91304347826087]
+            },
+            {
+              "id": "CEDAR",
+              "is_subject": false,
+              "values": [
+                7.346938775510204, 0.9113924050632911, 10.833333333333334,
+                89.28571428571429
+              ]
+            },
+            {
+              "id": "ELM",
+              "is_subject": false,
+              "values": [
+                7.647058823529412, 0.7878787878787878, 15, 101.88679245283019
+              ]
+            },
+            {
+              "id": "FIR",
+              "is_subject": false,
+              "values": [
+                7.625, 0.8970588235294118, 11.481481481481481, 91.66666666666667
+              ]
+            },
+            {
+              "id": "GINKGO",
+              "is_subject": false,
+              "values": [
+                8.19672131147541,
+                0.8928571428571429,
+                null,
+                94.04761904761904
+              ]
+            },
+            {
+              "id": "HAZEL",
+              "is_subject": false,
+              "values": [7.674418604651163, 0.825, 13.333333333333334, null]
+            },
+            {
+              "id": "JUNIPER",
+              "is_subject": false,
+              "values": [
+                7.857142857142857, 0.88, 11.666666666666666, 93.24324324324324
+              ]
+            }
+          ],
+          "multiples": [
+            {
+              "multiple": "ev_ebitda",
+              "subject_value": 7.5,
+              "peer_stats": {
+                "count": 8,
+                "mean": 7.600475263929935,
+                "median": 7.6360294117647065,
+                "std_dev": 0.36227039678045797,
+                "min": 6.956521739130435,
+                "max": 8.19672131147541,
+                "q1": 7.461734693877551,
+                "q3": 7.720099667774086,
+                "iqr": 0.25836497389653523
+              },
+              "percentile": 0.375,
+              "z_score": -0.2773488113378053
+            },
+            {
+              "multiple": "ev_revenue",
+              "subject_value": 0.8852459016393442,
+              "peer_stats": {
+                "count": 8,
+                "mean": 0.8683814145560137,
+                "median": 0.8864285714285715,
+                "std_dev": 0.04818138547808468,
+                "min": 0.7878787878787878,
+                "max": 0.9230769230769231,
+                "q1": 0.8285904255319149,
+                "q3": 0.9006422189128817,
+                "iqr": 0.07205179338096679
+              },
+              "percentile": 0.5,
+              "z_score": 0.3500207998585108
+            },
+            {
+              "multiple": "pe",
+              "subject_value": 12.380952380952381,
+              "peer_stats": {
+                "count": 7,
+                "mean": 12.240625718886589,
+                "median": 11.666666666666666,
+                "std_dev": 1.507837253356077,
+                "min": 10.833333333333334,
+                "max": 15,
+                "q1": 11.175523349436393,
+                "q3": 12.916666666666668,
+                "iqr": 1.741143317230275
+              },
+              "percentile": 0.5714285714285714,
+              "z_score": 0.09306485945579307
+            },
+            {
+              "multiple": "spread_per_turn",
+              "subject_value": 93.58974358974359,
+              "peer_stats": {
+                "count": 7,
+                "mean": 94.6559237530155,
+                "median": 93.54838709677419,
+                "std_dev": 4.316164895719103,
+                "min": 89.28571428571429,
+                "max": 101.88679245283019,
+                "q1": 92.45495495495496,
+                "q3": 96.48033126293996,
+                "iqr": 4.025376307984999
+              },
+              "percentile": 0.5714285714285714,
+              "z_score": -0.24702025734220148
+            }
+          ],
+          "dimensions": [
+            {
+              "label": "Spread vs leverage",
+              "weight": 0.6,
+              "direction": "higher_is_cheap",
+              "y": {
+                "named": "oas_bp"
+              },
+              "x": {
+                "named": "leverage"
+              },
+              "subject_y": 365,
+              "subject_x": 3.9,
+              "peer_stats": {
+                "count": 8,
+                "mean": 385.625,
+                "median": 370,
+                "std_dev": 99.94418084968372,
+                "min": 250,
+                "max": 540,
+                "q1": 320,
+                "q3": 461.25,
+                "iqr": 141.25
+              },
+              "percentile": 0.5,
+              "z_score": -0.20636519129633019,
+              "regression": {
+                "intercept": -74.80404551201008,
+                "slope": 114.60176991150442,
+                "r_squared": 0.9936537965067316,
+                "fitted_value": 372.14285714285717,
+                "residual": -7.142857142857167,
+                "n": 7
+              },
+              "signal": -0.8985610688619625,
+              "excluded_reason": null,
+              "points": [
+                {
+                  "company_id": "NORTHWIND",
+                  "x": 3.9,
+                  "y": 365,
+                  "fitted_y": 372.14285714285717
+                },
+                {
+                  "company_id": "ALDER",
+                  "x": 3.1,
+                  "y": 290,
+                  "fitted_y": 280.46144121365364
+                },
+                {
+                  "company_id": "BIRCH",
+                  "x": 4.6,
+                  "y": 455,
+                  "fitted_y": 452.3640960809102
+                },
+                {
+                  "company_id": "CEDAR",
+                  "x": 2.8,
+                  "y": 250,
+                  "fitted_y": 246.0809102402023
+                },
+                {
+                  "company_id": "ELM",
+                  "x": 5.3,
+                  "y": 540,
+                  "fitted_y": 532.5853350189634
+                },
+                {
+                  "company_id": "FIR",
+                  "x": 3.6,
+                  "y": 330,
+                  "fitted_y": 337.76232616940587
+                },
+                {
+                  "company_id": "GINKGO",
+                  "x": 4.2,
+                  "y": 395,
+                  "fitted_y": 406.5233881163085
+                },
+                {
+                  "company_id": "JUNIPER",
+                  "x": 3.7,
+                  "y": 345,
+                  "fitted_y": 349.2225031605563
+                }
+              ]
+            },
+            {
+              "label": "EV/EBITDA",
+              "weight": 0.4,
+              "direction": "higher_is_rich",
+              "y": {
+                "multiple": "ev_ebitda"
+              },
+              "x": null,
+              "subject_y": 7.5,
+              "subject_x": null,
+              "peer_stats": {
+                "count": 8,
+                "mean": 7.600475263929935,
+                "median": 7.6360294117647065,
+                "std_dev": 0.36227039678045797,
+                "min": 6.956521739130435,
+                "max": 8.19672131147541,
+                "q1": 7.461734693877551,
+                "q3": 7.720099667774086,
+                "iqr": 0.25836497389653523
+              },
+              "percentile": 0.375,
+              "z_score": -0.2773488113378053,
+              "regression": null,
+              "signal": 0.2773488113378053,
+              "excluded_reason": null,
+              "points": []
+            }
+          ],
+          "composite": {
+            "company_id": "NORTHWIND",
+            "composite_score": -0.4281971167820553,
+            "dimensions": [
+              {
+                "label": "Spread vs leverage",
+                "percentile": 0.5,
+                "z_score": -0.20636519129633019,
+                "regression_residual": -7.142857142857167,
+                "r_squared": 0.9936537965067316,
+                "weight": 0.6
+              },
+              {
+                "label": "EV/EBITDA",
+                "percentile": 0.375,
+                "z_score": -0.2773488113378053,
+                "regression_residual": null,
+                "r_squared": null,
+                "weight": 0.4
+              }
+            ],
+            "confidence": 0.9936537965067316,
+            "peer_count": 8
+          },
+          "composite_excluded_reason": null
+        }
+      },
+      "excludedDimension": {
+        "config": {
+          "filter": {
+            "gics_sectors": ["Energy"]
+          },
+          "period_basis": "ltm",
+          "dimensions": [
+            {
+              "label": "Spread vs leverage",
+              "y_extractor": {
+                "named": "oas_bp"
+              },
+              "x_extractor": {
+                "named": "leverage"
+              },
+              "weight": 0.6,
+              "direction": "higher_is_cheap"
+            },
+            {
+              "label": "EV/EBITDA",
+              "y_extractor": {
+                "multiple": "ev_ebitda"
+              },
+              "weight": 0.4,
+              "direction": "higher_is_rich"
+            },
+            {
+              "label": "Spread vs coverage",
+              "y_extractor": {
+                "named": "oas_bp"
+              },
+              "x_extractor": {
+                "named": "interest_coverage"
+              },
+              "weight": 0.3,
+              "direction": "higher_is_cheap"
+            }
+          ],
+          "multiples": ["ev_ebitda", "ev_revenue", "pe", "spread_per_turn"]
+        },
+        "report": {
+          "subject_id": "NORTHWIND",
+          "period_basis": "ltm",
+          "peer_count": 8,
+          "excluded_count": 2,
+          "companies": [
+            {
+              "id": "NORTHWIND",
+              "is_subject": true,
+              "values": [
+                7.5, 0.8852459016393442, 12.380952380952381, 93.58974358974359
+              ]
+            },
+            {
+              "id": "ALDER",
+              "is_subject": false,
+              "values": [
+                6.956521739130435, 0.9230769230769231, 10.869565217391305,
+                93.54838709677419
+              ]
+            },
+            {
+              "id": "BIRCH",
+              "is_subject": false,
+              "values": [7.5, 0.8297872340425532, 12.5, 98.91304347826087]
+            },
+            {
+              "id": "CEDAR",
+              "is_subject": false,
+              "values": [
+                7.346938775510204, 0.9113924050632911, 10.833333333333334,
+                89.28571428571429
+              ]
+            },
+            {
+              "id": "ELM",
+              "is_subject": false,
+              "values": [
+                7.647058823529412, 0.7878787878787878, 15, 101.88679245283019
+              ]
+            },
+            {
+              "id": "FIR",
+              "is_subject": false,
+              "values": [
+                7.625, 0.8970588235294118, 11.481481481481481, 91.66666666666667
+              ]
+            },
+            {
+              "id": "GINKGO",
+              "is_subject": false,
+              "values": [
+                8.19672131147541,
+                0.8928571428571429,
+                null,
+                94.04761904761904
+              ]
+            },
+            {
+              "id": "HAZEL",
+              "is_subject": false,
+              "values": [7.674418604651163, 0.825, 13.333333333333334, null]
+            },
+            {
+              "id": "JUNIPER",
+              "is_subject": false,
+              "values": [
+                7.857142857142857, 0.88, 11.666666666666666, 93.24324324324324
+              ]
+            }
+          ],
+          "multiples": [
+            {
+              "multiple": "ev_ebitda",
+              "subject_value": 7.5,
+              "peer_stats": {
+                "count": 8,
+                "mean": 7.600475263929935,
+                "median": 7.6360294117647065,
+                "std_dev": 0.36227039678045797,
+                "min": 6.956521739130435,
+                "max": 8.19672131147541,
+                "q1": 7.461734693877551,
+                "q3": 7.720099667774086,
+                "iqr": 0.25836497389653523
+              },
+              "percentile": 0.375,
+              "z_score": -0.2773488113378053
+            },
+            {
+              "multiple": "ev_revenue",
+              "subject_value": 0.8852459016393442,
+              "peer_stats": {
+                "count": 8,
+                "mean": 0.8683814145560137,
+                "median": 0.8864285714285715,
+                "std_dev": 0.04818138547808468,
+                "min": 0.7878787878787878,
+                "max": 0.9230769230769231,
+                "q1": 0.8285904255319149,
+                "q3": 0.9006422189128817,
+                "iqr": 0.07205179338096679
+              },
+              "percentile": 0.5,
+              "z_score": 0.3500207998585108
+            },
+            {
+              "multiple": "pe",
+              "subject_value": 12.380952380952381,
+              "peer_stats": {
+                "count": 7,
+                "mean": 12.240625718886589,
+                "median": 11.666666666666666,
+                "std_dev": 1.507837253356077,
+                "min": 10.833333333333334,
+                "max": 15,
+                "q1": 11.175523349436393,
+                "q3": 12.916666666666668,
+                "iqr": 1.741143317230275
+              },
+              "percentile": 0.5714285714285714,
+              "z_score": 0.09306485945579307
+            },
+            {
+              "multiple": "spread_per_turn",
+              "subject_value": 93.58974358974359,
+              "peer_stats": {
+                "count": 7,
+                "mean": 94.6559237530155,
+                "median": 93.54838709677419,
+                "std_dev": 4.316164895719103,
+                "min": 89.28571428571429,
+                "max": 101.88679245283019,
+                "q1": 92.45495495495496,
+                "q3": 96.48033126293996,
+                "iqr": 4.025376307984999
+              },
+              "percentile": 0.5714285714285714,
+              "z_score": -0.24702025734220148
+            }
+          ],
+          "dimensions": [
+            {
+              "label": "Spread vs leverage",
+              "weight": 0.6,
+              "direction": "higher_is_cheap",
+              "y": {
+                "named": "oas_bp"
+              },
+              "x": {
+                "named": "leverage"
+              },
+              "subject_y": 365,
+              "subject_x": 3.9,
+              "peer_stats": {
+                "count": 8,
+                "mean": 385.625,
+                "median": 370,
+                "std_dev": 99.94418084968372,
+                "min": 250,
+                "max": 540,
+                "q1": 320,
+                "q3": 461.25,
+                "iqr": 141.25
+              },
+              "percentile": 0.5,
+              "z_score": -0.20636519129633019,
+              "regression": {
+                "intercept": -74.80404551201008,
+                "slope": 114.60176991150442,
+                "r_squared": 0.9936537965067316,
+                "fitted_value": 372.14285714285717,
+                "residual": -7.142857142857167,
+                "n": 7
+              },
+              "signal": -0.8985610688619625,
+              "excluded_reason": null,
+              "points": [
+                {
+                  "company_id": "NORTHWIND",
+                  "x": 3.9,
+                  "y": 365,
+                  "fitted_y": 372.14285714285717
+                },
+                {
+                  "company_id": "ALDER",
+                  "x": 3.1,
+                  "y": 290,
+                  "fitted_y": 280.46144121365364
+                },
+                {
+                  "company_id": "BIRCH",
+                  "x": 4.6,
+                  "y": 455,
+                  "fitted_y": 452.3640960809102
+                },
+                {
+                  "company_id": "CEDAR",
+                  "x": 2.8,
+                  "y": 250,
+                  "fitted_y": 246.0809102402023
+                },
+                {
+                  "company_id": "ELM",
+                  "x": 5.3,
+                  "y": 540,
+                  "fitted_y": 532.5853350189634
+                },
+                {
+                  "company_id": "FIR",
+                  "x": 3.6,
+                  "y": 330,
+                  "fitted_y": 337.76232616940587
+                },
+                {
+                  "company_id": "GINKGO",
+                  "x": 4.2,
+                  "y": 395,
+                  "fitted_y": 406.5233881163085
+                },
+                {
+                  "company_id": "JUNIPER",
+                  "x": 3.7,
+                  "y": 345,
+                  "fitted_y": 349.2225031605563
+                }
+              ]
+            },
+            {
+              "label": "EV/EBITDA",
+              "weight": 0.4,
+              "direction": "higher_is_rich",
+              "y": {
+                "multiple": "ev_ebitda"
+              },
+              "x": null,
+              "subject_y": 7.5,
+              "subject_x": null,
+              "peer_stats": {
+                "count": 8,
+                "mean": 7.600475263929935,
+                "median": 7.6360294117647065,
+                "std_dev": 0.36227039678045797,
+                "min": 6.956521739130435,
+                "max": 8.19672131147541,
+                "q1": 7.461734693877551,
+                "q3": 7.720099667774086,
+                "iqr": 0.25836497389653523
+              },
+              "percentile": 0.375,
+              "z_score": -0.2773488113378053,
+              "regression": null,
+              "signal": 0.2773488113378053,
+              "excluded_reason": null,
+              "points": []
+            },
+            {
+              "label": "Spread vs coverage",
+              "weight": 0.3,
+              "direction": "higher_is_cheap",
+              "y": {
+                "named": "oas_bp"
+              },
+              "x": {
+                "named": "interest_coverage"
+              },
+              "subject_y": 365,
+              "subject_x": null,
+              "peer_stats": {
+                "count": 8,
+                "mean": 385.625,
+                "median": 370,
+                "std_dev": 99.94418084968372,
+                "min": 250,
+                "max": 540,
+                "q1": 320,
+                "q3": 461.25,
+                "iqr": 141.25
+              },
+              "percentile": 0.5,
+              "z_score": -0.20636519129633019,
+              "regression": null,
+              "signal": null,
+              "excluded_reason": "no_subject_x",
+              "points": [
+                {
+                  "company_id": "ALDER",
+                  "x": 5.2,
+                  "y": 290,
+                  "fitted_y": null
+                },
+                {
+                  "company_id": "BIRCH",
+                  "x": 3.1,
+                  "y": 455,
+                  "fitted_y": null
+                },
+                {
+                  "company_id": "CEDAR",
+                  "x": 6,
+                  "y": 250,
+                  "fitted_y": null
+                },
+                {
+                  "company_id": "ELM",
+                  "x": 2.4,
+                  "y": 540,
+                  "fitted_y": null
+                },
+                {
+                  "company_id": "FIR",
+                  "x": 4.7,
+                  "y": 330,
+                  "fitted_y": null
+                },
+                {
+                  "company_id": "GINKGO",
+                  "x": 3.9,
+                  "y": 395,
+                  "fitted_y": null
+                },
+                {
+                  "company_id": "HAZEL",
+                  "x": 2.9,
+                  "y": 480,
+                  "fitted_y": null
+                },
+                {
+                  "company_id": "JUNIPER",
+                  "x": 4.1,
+                  "y": 345,
+                  "fitted_y": null
+                }
+              ]
+            }
+          ],
+          "composite": {
+            "company_id": "NORTHWIND",
+            "composite_score": -0.4281971167820553,
+            "dimensions": [
+              {
+                "label": "Spread vs leverage",
+                "percentile": 0.5,
+                "z_score": -0.20636519129633019,
+                "regression_residual": -7.142857142857167,
+                "r_squared": 0.9936537965067316,
+                "weight": 0.6
+              },
+              {
+                "label": "EV/EBITDA",
+                "percentile": 0.375,
+                "z_score": -0.2773488113378053,
+                "regression_residual": null,
+                "r_squared": null,
+                "weight": 0.4
+              }
+            ],
+            "confidence": 0.9936537965067316,
+            "peer_count": 8
+          },
+          "composite_excluded_reason": null
+        }
+      },
+      "tooFewPeers": {
+        "config": {
+          "filter": {
+            "gics_sectors": ["Utilities"],
+            "market_cap_max": 5500
+          },
+          "period_basis": {
+            "custom": "FY2025E"
+          },
+          "dimensions": [
+            {
+              "label": "Spread vs leverage",
+              "y_extractor": {
+                "named": "oas_bp"
+              },
+              "x_extractor": {
+                "named": "leverage"
+              },
+              "weight": 0.6,
+              "direction": "higher_is_cheap"
+            },
+            {
+              "label": "EV/EBITDA",
+              "y_extractor": {
+                "multiple": "ev_ebitda"
+              },
+              "weight": 0.4,
+              "direction": "higher_is_rich"
+            }
+          ],
+          "multiples": ["ev_ebitda", "ev_revenue", "pe", "spread_per_turn"]
+        },
+        "report": {
+          "subject_id": "NORTHWIND",
+          "period_basis": {
+            "custom": "FY2025E"
+          },
+          "peer_count": 1,
+          "excluded_count": 9,
+          "companies": [
+            {
+              "id": "NORTHWIND",
+              "is_subject": true,
+              "values": [
+                7.5, 0.8852459016393442, 12.380952380952381, 93.58974358974359
+              ]
+            },
+            {
+              "id": "DOGWOOD",
+              "is_subject": false,
+              "values": [
+                8.521739130434783, 2.3902439024390243, 12.380952380952381,
+                39.024390243902445
+              ]
+            }
+          ],
+          "multiples": [
+            {
+              "multiple": "ev_ebitda",
+              "subject_value": 7.5,
+              "peer_stats": {
+                "count": 1,
+                "mean": 8.521739130434783,
+                "median": 8.521739130434783,
+                "std_dev": 0,
+                "min": 8.521739130434783,
+                "max": 8.521739130434783,
+                "q1": 8.521739130434783,
+                "q3": 8.521739130434783,
+                "iqr": 0
+              },
+              "percentile": 0,
+              "z_score": null
+            },
+            {
+              "multiple": "ev_revenue",
+              "subject_value": 0.8852459016393442,
+              "peer_stats": {
+                "count": 1,
+                "mean": 2.3902439024390243,
+                "median": 2.3902439024390243,
+                "std_dev": 0,
+                "min": 2.3902439024390243,
+                "max": 2.3902439024390243,
+                "q1": 2.3902439024390243,
+                "q3": 2.3902439024390243,
+                "iqr": 0
+              },
+              "percentile": 0,
+              "z_score": null
+            },
+            {
+              "multiple": "pe",
+              "subject_value": 12.380952380952381,
+              "peer_stats": {
+                "count": 1,
+                "mean": 12.380952380952381,
+                "median": 12.380952380952381,
+                "std_dev": 0,
+                "min": 12.380952380952381,
+                "max": 12.380952380952381,
+                "q1": 12.380952380952381,
+                "q3": 12.380952380952381,
+                "iqr": 0
+              },
+              "percentile": 1,
+              "z_score": null
+            },
+            {
+              "multiple": "spread_per_turn",
+              "subject_value": 93.58974358974359,
+              "peer_stats": {
+                "count": 1,
+                "mean": 39.024390243902445,
+                "median": 39.024390243902445,
+                "std_dev": 0,
+                "min": 39.024390243902445,
+                "max": 39.024390243902445,
+                "q1": 39.024390243902445,
+                "q3": 39.024390243902445,
+                "iqr": 0
+              },
+              "percentile": 1,
+              "z_score": null
+            }
+          ],
+          "dimensions": [
+            {
+              "label": "Spread vs leverage",
+              "weight": 0.6,
+              "direction": "higher_is_cheap",
+              "y": {
+                "named": "oas_bp"
+              },
+              "x": {
+                "named": "leverage"
+              },
+              "subject_y": 365,
+              "subject_x": 3.9,
+              "peer_stats": {
+                "count": 1,
+                "mean": 160,
+                "median": 160,
+                "std_dev": 0,
+                "min": 160,
+                "max": 160,
+                "q1": 160,
+                "q3": 160,
+                "iqr": 0
+              },
+              "percentile": 1,
+              "z_score": null,
+              "regression": null,
+              "signal": null,
+              "excluded_reason": "no_dispersion",
+              "points": [
+                {
+                  "company_id": "NORTHWIND",
+                  "x": 3.9,
+                  "y": 365,
+                  "fitted_y": null
+                },
+                {
+                  "company_id": "DOGWOOD",
+                  "x": 4.1,
+                  "y": 160,
+                  "fitted_y": null
+                }
+              ]
+            },
+            {
+              "label": "EV/EBITDA",
+              "weight": 0.4,
+              "direction": "higher_is_rich",
+              "y": {
+                "multiple": "ev_ebitda"
+              },
+              "x": null,
+              "subject_y": 7.5,
+              "subject_x": null,
+              "peer_stats": {
+                "count": 1,
+                "mean": 8.521739130434783,
+                "median": 8.521739130434783,
+                "std_dev": 0,
+                "min": 8.521739130434783,
+                "max": 8.521739130434783,
+                "q1": 8.521739130434783,
+                "q3": 8.521739130434783,
+                "iqr": 0
+              },
+              "percentile": 0,
+              "z_score": null,
+              "regression": null,
+              "signal": null,
+              "excluded_reason": "no_dispersion",
+              "points": []
+            }
+          ],
+          "composite": null,
+          "composite_excluded_reason": "no_usable_dimension"
+        }
+      }
+    },
+    "errors": {
+      "typo": {
+        "config": {
+          "filter": {
+            "gics_sector": ["Energy"]
+          },
+          "period_basis": "ltm",
+          "dimensions": [
+            {
+              "label": "Spread vs leverage",
+              "y_extractor": {
+                "named": "oas_bp"
+              },
+              "x_extractor": {
+                "named": "leverage"
+              },
+              "weight": 0.6,
+              "direction": "higher_is_cheap"
+            },
+            {
+              "label": "EV/EBITDA",
+              "y_extractor": {
+                "multiple": "ev_ebitda"
+              },
+              "weight": 0.4,
+              "direction": "higher_is_rich"
+            }
+          ],
+          "multiples": ["ev_ebitda", "ev_revenue", "pe", "spread_per_turn"]
+        },
+        "message": "Validation error: config: unknown field `gics_sector`, expected one of `gics_sectors`, `gics_industries`, `countries`, `market_cap_min`, `market_cap_max`, `ratings`, `required_tags`, `excluded_tags`, `selectors` at line 1 column 24"
+      }
+    }
+  },
   "statementExport": {
     "analyst": {
       "wide": {

@@ -127,6 +127,7 @@
     "statements_analytics.goalSeek",
     "statements_analytics.parameterSpecWithPercentages",
     "statements_analytics.plSummaryReport",
+    "statements_analytics.relativeValueReport",
     "statements_analytics.runChecks",
     "statements_analytics.runCreditUnderwritingChecks",
     "statements_analytics.runSensitivity",

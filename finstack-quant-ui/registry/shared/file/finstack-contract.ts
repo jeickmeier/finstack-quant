@@ -344,6 +344,24 @@ export interface CapitalStructureSummaryRequest {
   /** Rust CapitalStructureSummaryConfig JSON; Rust rejects unknown keys. */
   readonly configJson: string;
 }
+/** Native RelativeValueReport (not a top-level package export). */
+export type RelativeValueReport = ReturnType<
+  typeof statements_analytics.relativeValueReport
+>;
+/** One company's CompanyMetrics serde document, as the report takes it. */
+export type CompanyMetrics = Exclude<
+  Parameters<typeof statements_analytics.relativeValueReport>[0],
+  string
+>;
+/** One subject against a host-supplied universe of peers. */
+export interface RelativeValueReportRequest {
+  /** The subject's CompanyMetrics JSON; Rust rejects unknown keys. */
+  readonly subjectJson: string;
+  /** JSON array of the universe's CompanyMetrics, in the order the report returns peers. */
+  readonly universeJson: string;
+  /** Rust RelativeValueReportConfig JSON; Rust rejects unknown keys. */
+  readonly configJson: string;
+}
 /** One sensitivity parameter: statements_analytics.parameterSpecWithPercentages arguments. */
 export interface SensitivityParameterRequest {
   readonly nodeId: string;
@@ -1621,6 +1639,10 @@ export interface StatementsApi {
   capitalStructureSummary(
     request: CapitalStructureSummaryRequest,
   ): Promise<Envelope<CapitalStructureSummary>>;
+  /** statements_analytics.relativeValueReport: the comps table, peer statistics, regression scatter and composite score of one subject against its filtered peers. */
+  relativeValueReport(
+    request: RelativeValueReportRequest,
+  ): Promise<Envelope<RelativeValueReport>>;
   /** statements_analytics.parameterSpecWithPercentages per parameter, runSensitivity, then generateTornadoEntries at the target metric and period (skipped for full_grid). */
   runSensitivity(
     request: RunSensitivityRequest,

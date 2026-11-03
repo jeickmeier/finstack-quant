@@ -548,6 +548,17 @@ const displays = [
       "Returned CapitalStructureSummary at the configured period, in its currency: money as Rust's exact decimal strings, ratios in turns and shares of debt as decimal fractions (shown as percent digits). Tranches in Rust's rank-then-declaration order with cumulative debt, leverage and interest coverage through each payment class; the maturity wall in Rust's year order, each bar drawn from zero to its returned amount. A null ratio (short LTM window, non-positive EBITDA or debt) or a live NaN shows as undefined beside Rust's ltm_periods_found and ltm_periods_required; negative net debt and net leverage show as returned. Nothing is summed, netted or divided here; a model with no capital structure or a missing node shows the native error.",
   },
   {
+    id: "relative-value-table",
+    api: [
+      "statements_analytics.relativeValueReport",
+      "StatementsAnalyticsNamespace",
+      "relativeValueReport",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned RelativeValueReport of a host-supplied subject and universe, metrics in their own units as supplied (monetary ones in one currency, normalized by the host). The comps table has the subject first, marked by Rust's is_subject, then the peers in universe order, one returned value per configured multiple. Per multiple: the subject value, percentile (a 0-1 share, shown as a percent and drawn as a bar from zero to it), z-score and peer statistics. Per dimension: Rust's subject values, percentile, z-score, regression, direction-adjusted signal (positive meaning cheap; -0 shown as 0) and exclusion reason, and a scatter of the returned points, the subject found by comparing company_id with subject_id and the line drawn through each point's returned fitted_y in order of x. The composite score and confidence, or Rust's composite_excluded_reason. A null or live NaN shows as undefined; nothing is computed here, and a misspelt field shows the native error.",
+  },
+  {
     id: "wacc-calculator",
     api: ["statements_analytics.wacc", "StatementsAnalyticsNamespace", "wacc"],
     route: "returned-report",

@@ -174,11 +174,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the thirty-three native fixture generators under
+`mise run ui-fixtures` runs the thirty-four native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
-scenario-table; statements → covenants, normalizations, capital structures; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
+scenario-table; statements → covenants, normalizations, capital structures, relative value; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -1197,6 +1197,35 @@ under `sp_recovery_historical`, shows Rust's error. An empty amount is sent as N
 for Rust to reject and an empty collateral value is an unsecured claim. The item is
 standalone: claims are entered, not read from a statements model. The native
 fixture is `tests/models/recovery/cases.json`.
+
+## Relative value table
+
+`useRelativeValueReport` (`@finstack/use-relative-value-report`) calls
+`statements_analytics.relativeValueReport` through one worker method.
+`RelativeValueTable` takes the host-supplied `subject` and `universe`
+(`CompanyMetrics` serde documents, which Rust now reads strictly) and edits a
+`RelativeValueReportConfig` with `SchemaForm` over the generated
+`relative_value_report_config` contract. Every choice the form offers (period
+basis, multiples, metric extractors, score direction) comes from that contract;
+the `PeerFilter` sectors, industries, countries, ratings, tags and selectors are
+free text, because Rust declares no list of them, and any filter field may be
+left out. There is no native parse of the config, so Compare passes the
+subject, universe and config JSON through and Rust validates them on the call.
+
+The report is shown as returned: the subject, period basis, peer and excluded
+counts and the composite score and confidence, or Rust's
+`composite_excluded_reason`; the comps table with the subject first, marked by
+Rust's `is_subject`; per multiple, the subject value, percentile, z-score and
+peer statistics, and one bar per multiple from zero to Rust's `percentile`; per
+dimension, Rust's subject values, percentile, z-score, regression, signal and
+`excluded_reason` with its contract description, and a scatter of Rust's
+`points`, the subject found by comparing `company_id` with `subject_id` and the
+line drawn through each point's `fitted_y` in order of `x`. Numbers show to
+four decimals by default (`formatNumber`), never as "-0", and percentiles as a
+percent (`formatPercentile`); a null or a live NaN shows as Undefined. Nothing
+is computed here. The item is standalone: the universe is host-supplied, and
+the statements workbench holds one model, not a peer set. The native fixture is
+`tests/statements/relative-value/cases.json`.
 
 ## Credit scorecard
 
