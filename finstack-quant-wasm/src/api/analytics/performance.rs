@@ -938,7 +938,7 @@ impl JsPerformance {
     ///
     /// Rejects a degenerate pair or a matrix that cannot be repaired to a
     /// valid correlation matrix.
-    /// @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, and `true` when Higham repair was applied.
+    /// @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, with a diagonal of exactly 1 and every coefficient inside [-1, 1], and `true` when Higham repair was applied.
     #[wasm_bindgen(js_name = correlationMatrix)]
     pub fn correlation_matrix(&self) -> Result<JsValue, JsValue> {
         let (matrix, repaired) = self.inner.correlation_matrix().map_err(to_js_err)?;

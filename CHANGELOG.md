@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Analytics: correlation matrices stay inside [-1, 1]
+
+`Performance::correlation_matrix` now returns a diagonal of exactly 1 and clamps every off-diagonal to `[-1, 1]`, on the clean path and after Higham repair. The validator it applies first tolerates `1e-10` on the diagonal and `1e-12` past each bound, so rounding in the Pearson estimate or the repair could return a coefficient such as `1.0000000000000002`, which a correlation cannot take. Python `Performance.correlation_matrix` and WASM `correlationMatrix` document the bound. No UI fixture moves.
+
 ### Portfolio: a linked return rejects a non-finite horizon
 
 `twrr_linked` now returns a validation error when `horizon_years` is NaN or infinite. A blank horizon field (NaN) used to come back as an unannualised cumulative return and an overflowing one (`1e999`, infinity) as an annualised return of zero. Zero and negative horizons still skip annualisation. Python `twrr_linked` raises `ValueError`; WASM `portfolio.twrrLinked` throws a `validation` `FinstackError`. The returns UI fixture records both native errors. No existing value moves.
