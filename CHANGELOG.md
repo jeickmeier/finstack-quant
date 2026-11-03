@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: facade-coverage ledger counts three more computations
+
+`core.SifmaSettlementClass` (`fromAgencyTerm` classifies a term), `models.credit.lgd.WorkoutCosts` (`totalRate` computes and `standard` is a preset) and `margin.excessCollateral` (computes collateral less required) are no longer excluded as data constructors. The `data-constructor` definition now also covers a handle class whose other members only read back what it was built from, which is what `DayCountContext`, `VolCubeExpirySlice` and `LatentSingleFactor` are. Coverage reads 176 of 639 units.
+
 ### UI: attribution fixture with a book Rust does not reconcile
 
 The portfolio attribution fixture adds a native `metrics_based` attribution at a host tolerance of zero, where `portfolioAttributionReconciliationCheck` reports the book not reconciled (the bucket sum leaves about 5e-13 USD). Tests now render the "Not reconciled" badge and a position whose residual is outside Rust's tolerance. At the host's one-cent tolerance the book always reconciles, because Rust's buckets include the residual.

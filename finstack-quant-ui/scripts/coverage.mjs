@@ -14,8 +14,11 @@ import { emit } from "./fixture-output.mjs";
  * Reasons a listed exclusion may give; rule exclusions are computed. A unit
  * a worker later picks leaves `excluded` (the check says so).
  * - `data-constructor`: builds a plain value from its fields or a label
- *   (`::new`, `from_str`, `parse`), or is a handle class with no method
- *   beyond its constructors.
+ *   (`::new`, `from_str`, `parse`), or is a handle class whose members beyond
+ *   its constructors only read back what it was built from (stored-field
+ *   getters, a constant, the lengths of stored arrays, `toJson`). A member
+ *   that classifies, derives or presets a value (`fromAgencyTerm`,
+ *   `totalRate`, `standard`) keeps the class counted.
  * - `schema-form`: an enum-variant or preset value a schema form builds.
  * - `setter`: returns a copy of its input with fields set (`with_*`, `add_*`).
  * - `getter`: reads one stored field, row or entry of a value (`get_*`,
