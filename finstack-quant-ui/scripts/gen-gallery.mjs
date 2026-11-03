@@ -61,6 +61,7 @@ const sources = {
   scenarioPnl: "tests/portfolio/scenario-pnl.json",
   portfolioMargin: "tests/portfolio/margin/cases.json",
   portfolioWorkbench: "tests/portfolio/workbench/cases.json",
+  portfolioExposures: "tests/portfolio/exposures/cases.json",
   portfolioAttribution: "tests/portfolio/attribution/cases.json",
   portfolioReturns: "tests/portfolio/returns/cases.json",
   portfolioBrinson: "tests/portfolio/brinson/cases.json",

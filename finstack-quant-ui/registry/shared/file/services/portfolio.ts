@@ -21,6 +21,7 @@ export type PortfolioNative = {
     | "twrrModifiedDietz"
     | "mwrXirr"
     | "brinsonLinked"
+    | "primitiveExposures"
   >;
   attribution: Pick<
     typeof attribution,
@@ -164,6 +165,15 @@ export function createPortfolioService(
     },
     mwrXirr(cashflows) {
       return context.result(() => native.portfolio.mwrXirr([...cashflows]));
+    },
+    primitiveExposures(request) {
+      return context.result(() =>
+        native.portfolio.primitiveExposures(
+          context.portfolio(request.specJson).handle,
+          context.market(request.marketJson).handle,
+          [...request.metrics],
+        ),
+      );
     },
     brinsonLinked(request) {
       return context.result(() =>

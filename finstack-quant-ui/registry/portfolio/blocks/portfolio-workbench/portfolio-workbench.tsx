@@ -27,6 +27,9 @@ export type { PortfolioReturnsInputs } from "@/components/finstack/portfolio/com
 import { BrinsonPanel } from "./brinson-panel";
 import type { BrinsonReportInputs } from "@/components/finstack/portfolio/components/brinson-report/brinson-report";
 export type { BrinsonReportInputs } from "@/components/finstack/portfolio/components/brinson-report/brinson-report";
+import { ExposurePanel } from "./exposure-panel";
+import type { ExposureReportInputs } from "@/components/finstack/portfolio/components/exposure-report/exposure-report";
+export type { ExposureReportInputs } from "@/components/finstack/portfolio/components/exposure-report/exposure-report";
 
 type Tab =
   | "positions"
@@ -43,12 +46,14 @@ export interface PortfolioWorkbenchProps {
   defaultSpecJson: string;
   /** MarketContextState JSON every tab values the book over. */
   marketJson: string;
-  /** ISO valuation date of the margin run; not read from the spec. */
+  /** ISO valuation date of the margin run and the factor sensitivity matrix; not read from the spec. */
   asOf: string;
   /** Risk-metric menu offered to every position; omitted is Rust's standard set (PV plus dv01), empty is PV only. */
   metrics?: readonly string[] | null;
   /** Canonical base metric id charted by bucket on the Risk tab, for example "bucketed_dv01"; omitted charts no series. */
   seriesBase?: string;
+  /** The host's exposure choices for the Risk tab: additive metric ids per primitive (omitted is quantity and value only) and FactorDefinition JSON with an optional BumpSizeConfig for the sensitivity matrix (omitted shows none). The book's primitive exposures show on the Risk tab whether or not this is supplied. */
+  exposures?: ExposureReportInputs | null;
   /** ScenarioSpec JSON texts in batch order, never parsed here; the Scenarios tab appears only when some are supplied. */
   scenarioJsons?: readonly string[];
   /** The closing (T1) market and date and the reconciliation tolerance of the Attribution tab, which attributes the book from marketJson on asOf to them; the tab appears only when supplied. */
@@ -70,6 +75,7 @@ export function PortfolioWorkbench({
   asOf,
   metrics,
   seriesBase,
+  exposures,
   scenarioJsons,
   attribution,
   returns,
@@ -176,18 +182,27 @@ export function PortfolioWorkbench({
             </div>
           </TabsContent>
           <TabsContent value="risk">
-            <PortfolioMetrics
-              report={valuation}
-              series={
-                seriesBase && series.data
-                  ? { base: seriesBase, entries: series.data }
-                  : null
-              }
-              metadata={metadata.data}
-              loading={report.isFetching}
-              error={valuationError ?? series.error?.message}
-              density={density}
-            />
+            <div className="space-y-6">
+              <PortfolioMetrics
+                report={valuation}
+                series={
+                  seriesBase && series.data
+                    ? { base: seriesBase, entries: series.data }
+                    : null
+                }
+                metadata={metadata.data}
+                loading={report.isFetching}
+                error={valuationError ?? series.error?.message}
+                density={density}
+              />
+              <ExposurePanel
+                specJson={specJson}
+                marketJson={marketJson}
+                asOf={asOf}
+                inputs={exposures}
+                density={density}
+              />
+            </div>
           </TabsContent>
           {hasScenarios && (
             <TabsContent value="scenarios">

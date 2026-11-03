@@ -4,6 +4,7 @@ import data from "../../../docs-site/src/components/registry-gallery/data.json" 
 const fixture = data.portfolioWorkbench;
 const returns = data.portfolioReturns.cases;
 const brinson = data.portfolioBrinson.result;
+const exposures = data.portfolioExposures;
 const attribution = data.portfolioAttribution.cases.find(
   (entry) => entry.scenario === "usd-ois-50bp" && entry.name === "taylor",
 )!;
@@ -26,6 +27,18 @@ test("portfolio-workbench opens each tab on the native result, in a real worker"
   await workbench.getByRole("tab", { name: "Risk" }).click();
   await expect(
     workbench.getByRole("region", { name: "Portfolio metrics" }),
+  ).toBeVisible();
+  const primitives = workbench.getByRole("region", {
+    name: "Primitive exposures",
+  });
+  for (const value of [
+    exposures.report.aggregates[1]!.gross_value.amount,
+    exposures.report.aggregates[0]!.gross_measures.dv01,
+    exposures.sensitivities.data[0]![0]!,
+  ])
+    await expect(primitives.getByTitle(String(value)).first()).toBeVisible();
+  await expect(
+    primitives.getByRole("img", { name: "Net and gross value by primitive" }),
   ).toBeVisible();
   await workbench.getByRole("tab", { name: "Scenarios" }).click();
   const pnl = workbench.getByRole("region", { name: "Portfolio scenario P&L" });

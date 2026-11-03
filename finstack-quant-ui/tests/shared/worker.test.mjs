@@ -148,6 +148,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "twrrModifiedDietz",
     "mwrXirr",
     "brinsonLinked",
+    "primitiveExposures",
     // MarginApi
     "validateSimmSensitivities",
     "simmIm",

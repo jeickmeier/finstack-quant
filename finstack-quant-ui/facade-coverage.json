@@ -90,6 +90,7 @@
     "portfolio.portfolioAttributionReconciliationCheck",
     "portfolio.portfolioMargin",
     "portfolio.portfolioMetricsSeries",
+    "portfolio.primitiveExposures",
     "portfolio.scenarioPnlBatch",
     "portfolio.twrrLinked",
     "portfolio.twrrModifiedDietz",

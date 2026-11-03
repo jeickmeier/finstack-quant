@@ -327,6 +327,13 @@ export const importHarnesses = {
       name: "use-brinson-linked",
       modules: modules.length,
     })),
+  "use-exposure-report": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-exposure-report/use-exposure-report"),
+    ]).then((modules) => ({
+      name: "use-exposure-report",
+      modules: modules.length,
+    })),
   "use-simm-im": () =>
     Promise.all([import("@/hooks/margin/use-simm-im/use-simm-im")]).then(
       (modules) => ({ name: "use-simm-im", modules: modules.length }),

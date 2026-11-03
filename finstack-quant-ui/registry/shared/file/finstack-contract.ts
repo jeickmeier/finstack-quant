@@ -1134,6 +1134,18 @@ export interface BrinsonLinkedRequest {
 }
 /** portfolio.brinsonLinked, as returned: each period's Brinson-Fachler effects, the Carino-linked effects by sector and by effect, and the compounded portfolio and benchmark returns. */
 export type CarinoLinkedAttribution = portfolioWire.CarinoLinkedAttribution;
+/** A primitive-exposure request over the cached book and market handles; the metric ids are the host's, never defaulted. */
+export interface PrimitiveExposuresRequest {
+  /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
+  readonly specJson: string;
+  /** MarketContextState JSON every primitive is valued and converted over; through the shared market handle cache. */
+  readonly marketJson: string;
+  /** Additive metric ids reported per primitive (for example "dv01"); empty reports quantity and value only. Rust rejects a non-additive or unknown id. */
+  readonly metrics: readonly string[];
+}
+/** portfolio.primitiveExposures, as returned: position-aware primitive paths and per-primitive net and gross quantity, value and additive risk, in the base currency. */
+export type PortfolioPrimitiveExposureReport =
+  portfolioWire.PortfolioPrimitiveExposureReport;
 /** Scenario name to its native statement result. */
 export type StatementScenarioResults = ScenarioResults;
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
@@ -1541,6 +1553,10 @@ export interface PortfolioApi {
   brinsonLinked(
     request: BrinsonLinkedRequest,
   ): Promise<Envelope<CarinoLinkedAttribution>>;
+  /** portfolio.primitiveExposures over the cached Portfolio and MarketContext handles: primitive paths and net and gross aggregates in the base currency. */
+  primitiveExposures(
+    request: PrimitiveExposuresRequest,
+  ): Promise<Envelope<PortfolioPrimitiveExposureReport>>;
   /** portfolio.computeFactorSensitivities over the cached Portfolio and MarketContext handles: the position-by-factor sensitivity matrix in the base currency. */
   computeFactorSensitivities(
     request: FactorSensitivitiesRequest,

@@ -6,7 +6,7 @@ import { requireWasm } from "./require-wasm.mjs";
 // the gallery pin, in dependency order: results writes src/fixtures/results/
 // bond.json, which the scenario application, horizon return, templates, attribution,
 // cashflows and details embed (attribution also reads the scenario
-// application cases); the portfolio workbench reads the margin book, and portfolio attribution reads the workbench book and the scenario application cases; curves writes the curve-link market that market-browser
+// application cases); the portfolio workbench reads the margin book, and the primitive exposures and portfolio attribution read the workbench book and the scenario application cases; curves writes the curve-link market that market-browser
 // extends, and market-browser's snapshot is what curve-query cuts down; covenants reads the analyst result that statements writes;
 // gen-gallery copies the fixtures into docs-site last. Each generator runs in its own process so the
 // WASM instances do not share memory.
@@ -18,6 +18,7 @@ const generators = [
   "tests/portfolio/generate.mjs",
   "tests/portfolio/margin/generate.mjs",
   "tests/portfolio/workbench/generate.mjs",
+  "tests/portfolio/exposures/generate.mjs",
   "tests/scenarios/application/generate.mjs",
   "tests/portfolio/attribution/generate.mjs",
   "tests/portfolio/returns/generate.mjs",

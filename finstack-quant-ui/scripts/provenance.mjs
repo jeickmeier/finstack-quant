@@ -502,6 +502,17 @@ const displays = [
       "Returned brinsonLinked CarinoLinkedAttribution: portfolio_return_compounded and benchmark_return_compounded, each linked sector's allocation, selection, interaction and total with linked_allocation, linked_selection and linked_interaction as the footer, and every period's portfolio, benchmark and excess returns, sector effects and returned totals, all decimals of return in returned order. Inputs are the host's chronological SectorPeriod rows with any period names; nothing is defaulted, summed, differenced, linked or stacked, and the compounded active return is not shown because Rust returns only its two sides.",
   },
   {
+    id: "exposure-report",
+    api: [
+      "portfolio.primitiveExposures",
+      "PortfolioNamespace",
+      "primitiveExposures",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned primitiveExposures PortfolioPrimitiveExposureReport: each aggregate's net and gross quantity and value in base_currency, ordered by primitive id as returned and charted side by side (never stacked); each requested additive metric's net_measures and gross_measures entry per primitive under its returned id; and the position-aware paths with their position-scaled quantity and value. The optional sensitivity section shows computeFactorSensitivities (positions by factor ids, base currency) as returned. Inputs are the host's book, market, additive metric ids (omitted is none: quantity and value only) and any factor definitions and bump config; nothing is summed, netted, converted or re-sorted.",
+  },
+  {
     id: "scenario-pnl-table",
     schema: `${base}portfolio/1/scenario_pnl_batch_item.schema.json`,
     pointer: "#",
