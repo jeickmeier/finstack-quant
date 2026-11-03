@@ -405,7 +405,7 @@
     {
       "name": "correlation-heatmap",
       "type": "registry:component",
-      "docs": "Presents one native analytics.Performance correlationMatrix result as returned: a diverging heatmap over the fixed correlation range [-1, 0, 1] and a table of every coefficient, rows and columns in Rust's ticker order, with a Repaired stamp shown only when Rust's repaired flag says it projected the raw estimate to the nearest valid correlation matrix (Higham); the flag is Rust's, never inferred here. A coefficient outside [-1, 1] leaves the heatmap out and keeps the table. Connect useCorrelationMatrix. Accepts report, loading, error, formatValue and density props; no worker or query provider required.",
+      "docs": "Presents one native analytics.Performance correlationMatrix result as returned: a diverging heatmap over the fixed correlation range [-1, 0, 1] and a table of every coefficient, rows and columns in Rust's ticker order, with a Repaired stamp shown only when Rust's repaired flag says it projected the raw estimate to the nearest valid correlation matrix (Higham); the flag is Rust's, never inferred here. Rust returns a unit diagonal and every coefficient inside [-1, 1]. Connect useCorrelationMatrix. Accepts report, loading, error, formatValue and density props; no worker or query provider required.",
       "worker": "none"
     },
     {

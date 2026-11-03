@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### UI: correlation heatmap always draws Rust's matrix
+
+`@finstack/correlation-heatmap` no longer checks coefficients against [-1, 1] and drops its chart for one outside; Rust now returns every coefficient inside the bound, so the heatmap and the table always show. The Repaired-stamp test says plainly that no native panel reaches Rust's repair today.
+
 ### Portfolio: attribution explain text and bucket shares agree on a zero total
 
 `PortfolioAttribution::explain` treated `total_pnl` as zero only below `1e-10`, while `pct_of_total_by_bucket` uses the default `RoundingContext` (half a unit of the base currency's output scale). A total of 0.003 USD printed percentage shares in the text while the table had none. Both now use one rule, so the text prints `0.0%` exactly where the shares are `None`. Python and WASM explain text follow. No UI fixture moves.
