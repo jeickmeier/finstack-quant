@@ -2107,6 +2107,57 @@
       ]
     },
     {
+      "id": "portfolio-attribution-report",
+      "route": "returned-report",
+      "convention": "Returned PortfolioAttribution: total_pnl and every base-currency bucket as exact money with shares only from portfolioAttributionPctOfTotalByBucket, the reconciliation verdict, gap and tolerance only from portfolioAttributionReconciliationCheck at the host's tolerance, explain only from portfolioAttributionExplainText, and result_invalid as returned; by_position rows in returned order in each instrument's currency, one column per book bucket filled from that position's pnlAttributionPctOfTotalByBucket, and the selected position through pnl-attribution-report. The method is required and chosen by the user; nothing is summed, differenced or converted.",
+      "api": {
+        "name": "portfolio.attributePortfolioPnl",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "PortfolioNamespace",
+        "member": "attributePortfolioPnl",
+        "inputs": [
+          {
+            "name": "portfolio",
+            "type": "Portfolio",
+            "optional": false
+          },
+          {
+            "name": "marketT0",
+            "type": "MarketContext",
+            "optional": false
+          },
+          {
+            "name": "marketT1",
+            "type": "MarketContext",
+            "optional": false
+          },
+          {
+            "name": "asOfT0",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "asOfT1",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "method",
+            "type": "JsonInput",
+            "optional": false
+          },
+          {
+            "name": "config",
+            "type": "JsonInput",
+            "optional": true
+          }
+        ],
+        "returns": "PortfolioAttribution",
+        "declaration": "/**\n   * Attribute portfolio P&L between two market snapshots.\n   *\n   * Returns the `PortfolioAttribution`: base-currency `total_pnl`, one bucket\n   * per factor (`carry`, `rates_curves_pnl`, `credit_curves_pnl`, `fx_pnl`,\n   * `vol_pnl`, ..., `residual`) and the per-position `by_position` detail.\n   * @param portfolio - Built portfolio whose positions are attributed.\n   * @param marketT0 - `core.MarketContext` handle for the opening snapshot.\n   * @param marketT1 - `core.MarketContext` handle for the closing snapshot.\n   * @param asOfT0 - ISO-8601 date of the opening snapshot.\n   * @param asOfT1 - ISO-8601 date of the closing snapshot.\n   * @param method - `AttributionMethod` wire value: a unit variant name such as `\"parallel\"` or `\"metrics_based\"`, an object such as `{ waterfall: [\"carry\", \"rates_curves\"] }`, or the same value as JSON text.\n   * @param config - Optional `FinstackConfig` object or JSON; omit for the Rust default configuration.\n   * @returns The `PortfolioAttribution`.\n   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a `FinstackError` if a date is not an ISO date or `method` / `config` is malformed (kind `validation`), a required FX rate or market datum is missing (kind `not_found`), or a position valuation or attribution fails.\n   */\n  attributePortfolioPnl(\n    portfolio: Portfolio,\n    marketT0: MarketContext,\n    marketT1: MarketContext,\n    asOfT0: string,\n    asOfT1: string,\n    method: JsonInput,\n    config?: JsonInput\n  ): PortfolioAttribution;",
+        "sha256": "a49e7fb3fcc3f9d91e9047d39c53a6b8b47a421d075891596c7a4c5875a13735"
+      }
+    },
+    {
       "id": "scenario-pnl-table",
       "route": "returned-pnl",
       "convention": "Returned ScenarioPnlBatchItem per scenario in batch order: by_position money in Portfolio#positionIds (spec) order, the total row from pnl.total in the base currency, the totals charted as returned and each ApplicationReport; nothing summed or differenced. The batch fails whole on the earliest failing scenario.",

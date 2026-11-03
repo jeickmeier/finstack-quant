@@ -57,6 +57,8 @@ import type {
   ScenarioPnlBatchItem,
   ScenarioRevalueView,
   PortfolioMarginResult,
+  PortfolioAttribution,
+  ReconciliationReport,
   ImResult,
   CsaSpec,
   VmResult,
@@ -1066,6 +1068,49 @@ export interface PortfolioMarginRequest {
   /** One-way IM collateral already held, keyed by CSA id in that CSA's currency; omitted is none (Rust treats a missing key as zero), and an unknown CSA id is a native validation error. */
   readonly currentImCollateral?: Readonly<Record<string, MoneyValue>> | null;
 }
+/** A book attributed between two host-supplied market snapshots; every other option is left to Rust. */
+export interface PortfolioAttributionRequest {
+  /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
+  readonly specJson: string;
+  /** MarketContext JSON of the opening snapshot; canonicalized through the shared market cache. */
+  readonly marketT0Json: string;
+  /** MarketContext JSON of the closing snapshot; canonicalized through the shared market cache. */
+  readonly marketT1Json: string;
+  /** ISO date of the opening snapshot. */
+  readonly asOfT0: string;
+  /** ISO date of the closing snapshot. */
+  readonly asOfT1: string;
+  /** AttributionMethod wire value; Rust requires one. */
+  readonly method: attributionWire.AttributionMethod;
+  /** Largest absolute reconciliation gap, in base-currency units, Rust still reports as reconciled; host-supplied, Rust has no default. */
+  readonly reconciliationTolerance: number;
+}
+/** One position's native-currency attribution with the Rust helpers its report shows. */
+export interface PortfolioPositionAttribution {
+  /** Position id, in the order Rust keyed by_position. */
+  readonly positionId: string;
+  /** The position's PnlAttribution from by_position, in its instrument's currency. */
+  readonly attribution: PnlAttribution;
+  /** attribution.pnlAttributionExplainText of that attribution. */
+  readonly explain: string;
+  /** attribution.pnlAttributionResidualWithinTolerance against the position run's own tolerances. */
+  readonly residualWithinTolerance: boolean;
+  /** attribution.pnlAttributionPctOfTotalByBucket of that attribution. */
+  readonly buckets: readonly PnlBucketShare[];
+}
+/** A native portfolio attribution with the Rust helpers the report shows beside it. */
+export interface PortfolioAttributionReport {
+  /** portfolio.attributePortfolioPnl, as returned. */
+  readonly attribution: PortfolioAttribution;
+  /** portfolio.portfolioAttributionExplainText. */
+  readonly explain: string;
+  /** portfolio.portfolioAttributionReconciliationCheck at the requested tolerance. */
+  readonly reconciliation: ReconciliationReport;
+  /** portfolio.portfolioAttributionPctOfTotalByBucket: every base-currency bucket with its share of total, in Rust's order. */
+  readonly buckets: readonly PnlBucketShare[];
+  /** Each by_position entry with Rust's explain text, residual check and buckets, in by_position order. */
+  readonly positions: readonly PortfolioPositionAttribution[];
+}
 /** Scenario name to its native statement result. */
 export type StatementScenarioResults = ScenarioResults;
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
@@ -1459,6 +1504,10 @@ export interface PortfolioApi {
   portfolioMargin(
     request: PortfolioMarginRequest,
   ): Promise<Envelope<PortfolioMarginResult>>;
+  /** portfolio.attributePortfolioPnl over the cached Portfolio and both MarketContext handles, then portfolioAttributionExplainText, portfolioAttributionReconciliationCheck and portfolioAttributionPctOfTotalByBucket, and per by_position entry attribution.pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotalByBucket. */
+  attributePortfolioPnl(
+    request: PortfolioAttributionRequest,
+  ): Promise<Envelope<PortfolioAttributionReport>>;
   /** portfolio.computeFactorSensitivities over the cached Portfolio and MarketContext handles: the position-by-factor sensitivity matrix in the base currency. */
   computeFactorSensitivities(
     request: FactorSensitivitiesRequest,

@@ -957,22 +957,50 @@ the book and its context as props: `defaultSpecJson` (a complete
 (`MarketContextState`), `asOf` (the ISO margin date, never read from the
 spec), and optionally `metrics` (omitted is Rust's standard set),
 `seriesBase` (the base metric id charted by bucket), `scenarioJsons`
-(`ScenarioSpec` texts, never parsed) and `currentImCollateral` (omitted is
-none held).
+(`ScenarioSpec` texts, never parsed), `attribution` and
+`currentImCollateral` (omitted is none held). `attribution` is the host's
+closing snapshot for the Attribution tab: `marketT1Json`
+(`MarketContextState`), `asOfT1` (ISO date) and `reconciliationTolerance`
+(base-currency units). Rust has no default for any of them. A closing date
+past a seasoned floating leg's fixing needs that index's `FIXING:` series in
+`marketT1Json`; without it every method returns Rust's missing-fixing error.
 
-| Tab       | Shows                                                                                                                   |
-| --------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Positions | `PortfolioSummary` and `PositionsTable` of `useValuePortfolio`, with Rust `metricMetadata` of every returned measure id |
-| Risk      | `PortfolioMetrics` of the same report and, when `seriesBase` is supplied, its `usePortfolioMetricsSeries` series        |
-| Scenarios | `ScenarioPnlTable` of `useScenarioPnlBatch`; the tab is shown only when `scenarioJsons` are supplied                    |
-| Margin    | `PortfolioMarginReport` of `usePortfolioMargin` on `asOf`                                                               |
-| Book      | `PortfolioSpec` JSON that `usePortfolioSpecValidator` validates natively before every tab values it                     |
+| Tab         | Shows                                                                                                                                                                                                  |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Positions   | `PortfolioSummary` and `PositionsTable` of `useValuePortfolio`, with Rust `metricMetadata` of every returned measure id                                                                                |
+| Risk        | `PortfolioMetrics` of the same report and, when `seriesBase` is supplied, its `usePortfolioMetricsSeries` series                                                                                       |
+| Scenarios   | `ScenarioPnlTable` of `useScenarioPnlBatch`; the tab is shown only when `scenarioJsons` are supplied                                                                                                   |
+| Attribution | `PortfolioAttributionReport` of `useAttributePortfolioPnl` from `marketJson` on `asOf` to the `attribution` market and date under the method the user picks; shown only when `attribution` is supplied |
+| Margin      | `PortfolioMarginReport` of `usePortfolioMargin` on `asOf`                                                                                                                                              |
+| Book        | `PortfolioSpec` JSON that `usePortfolioSpecValidator` validates natively before every tab values it                                                                                                    |
 
-The Scenarios and Margin calls run when their tab first opens. Later
-portfolio panels (attribution, returns, Brinson, exposures, correlation) add
-their own tabs when they land. The fixture (`tests/portfolio/workbench/`) is
-the margined rates book from `tests/portfolio/margin/` over the pricing
-market under the host-parity USD-OIS scenarios.
+The Scenarios, Attribution and Margin calls run when their tab first opens.
+Later portfolio panels (returns, Brinson, exposures, correlation) add their
+own tabs when they land. The fixture (`tests/portfolio/workbench/`) is the
+margined rates book from `tests/portfolio/margin/` over the pricing market
+under the host-parity USD-OIS scenarios.
+
+`useAttributePortfolioPnl` (`@finstack/use-attribute-portfolio-pnl`) calls
+`portfolio.attributePortfolioPnl` over the cached `Portfolio` and both
+`MarketContext` handles with the required `AttributionMethod` wire value (the
+config stays unset), then `portfolioAttributionExplainText`,
+`portfolioAttributionReconciliationCheck` at the requested tolerance and
+`portfolioAttributionPctOfTotalByBucket`, and for every `by_position` entry
+`pnlAttributionExplainText`, `pnlAttributionResidualWithinTolerance` and
+`pnlAttributionPctOfTotalByBucket`. The display-only
+`PortfolioAttributionReport` shows the book total, Rust's reconciliation
+verdict, gap and tolerance, the base-currency buckets through
+`PnlFactorBuckets` (the factor table and chart `PnlAttributionReport` exports),
+a row per position with one column per book bucket filled from that
+position's own buckets, the selected position through `PnlAttributionReport`,
+and the explain text. Positions are in each instrument's currency and exclude
+FX translation, so they do not add up to the book. The Attribution tab offers
+every Rust method with none preselected, and a method that fails on the book
+shows its native error. The fixture (`tests/portfolio/attribution/`) attributes
+the workbench book to two closing markets the market-scenario cases return: a
+50bp USD-OIS shock on the same date, where all four methods reconcile, and a
+one-month roll with a 25bp shock, where every method returns Rust's
+missing-fixing error for the swaps' SOFR fixing.
 
 ## Returned rating migration
 
