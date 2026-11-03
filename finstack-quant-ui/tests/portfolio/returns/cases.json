@@ -1,0 +1,220 @@
+{
+  "description": "Native portfolio.twrrLinked, twrrModifiedDietz and mwrXirr results of host-supplied returns, one period's values and flows, and dated investor cash flows, with the native errors of inputs Rust rejects, including a blank (NaN) and an overflowing (Infinity) horizon.",
+  "inputs": {
+    "linked": {
+      "returns": [0.08, -0.03, 0.11],
+      "horizonYears": 3
+    },
+    "dietz": {
+      "beginning_market_value": 10000000,
+      "ending_market_value": 10500000,
+      "cashflows": [
+        {
+          "amount": 1000000,
+          "fraction_of_period_remaining": 0.6
+        }
+      ]
+    },
+    "xirr": [
+      {
+        "date": "2023-01-03",
+        "amount": -1000000
+      },
+      {
+        "date": "2023-07-03",
+        "amount": -250000
+      },
+      {
+        "date": "2024-12-31",
+        "amount": 1400000
+      }
+    ]
+  },
+  "cases": {
+    "linked": {
+      "annual": {
+        "request": {
+          "returns": [0.08, -0.03, 0.11],
+          "horizonYears": 3
+        },
+        "result": {
+          "cumulative": 0.1628360000000002,
+          "annualised": 0.05157315206752977,
+          "is_annualised": true,
+          "num_periods": 3
+        }
+      },
+      "quarter": {
+        "request": {
+          "returns": [0.012, -0.004, 0.009],
+          "horizonYears": 0.25
+        },
+        "result": {
+          "cumulative": 0.017023567999999933,
+          "annualised": 0.017023567999999933,
+          "is_annualised": false,
+          "num_periods": 3
+        }
+      }
+    },
+    "dietz": {
+      "contribution": {
+        "request": {
+          "beginning_market_value": 10000000,
+          "ending_market_value": 10500000,
+          "cashflows": [
+            {
+              "amount": 1000000,
+              "fraction_of_period_remaining": 0.6
+            }
+          ]
+        },
+        "result": -0.04716981132075472
+      },
+      "withdrawal": {
+        "request": {
+          "beginning_market_value": 5000000,
+          "ending_market_value": 4700000,
+          "cashflows": [
+            {
+              "amount": -400000,
+              "fraction_of_period_remaining": 0.25
+            }
+          ]
+        },
+        "result": 0.02040816326530612
+      },
+      "noFlows": {
+        "request": {
+          "beginning_market_value": 100,
+          "ending_market_value": 110,
+          "cashflows": []
+        },
+        "result": 0.1
+      }
+    },
+    "xirr": {
+      "conventional": {
+        "request": [
+          {
+            "date": "2023-01-03",
+            "amount": -1000000
+          },
+          {
+            "date": "2023-07-03",
+            "amount": -250000
+          },
+          {
+            "date": "2024-12-31",
+            "amount": 1400000
+          }
+        ],
+        "result": 0.0615779210908761
+      }
+    }
+  },
+  "errors": {
+    "linked": {
+      "completeLoss": {
+        "request": {
+          "returns": [0.05, -1],
+          "horizonYears": 1
+        },
+        "error": {
+          "name": "FinstackError",
+          "kind": "validation",
+          "message": "Validation error: TWRR sub-period return 1 is invalid (-1); every linked sub-period return must be finite and greater than -1"
+        }
+      }
+    },
+    "dietz": {
+      "fraction": {
+        "request": {
+          "beginning_market_value": 10000000,
+          "ending_market_value": 10500000,
+          "cashflows": [
+            {
+              "amount": 1000000,
+              "fraction_of_period_remaining": 1.2
+            }
+          ]
+        },
+        "error": {
+          "name": "FinstackError",
+          "kind": "validation",
+          "message": "Validation error: Modified-Dietz cashflow 0 has fraction_of_period_remaining = 1.2; it must be finite and within [0, 1]"
+        }
+      },
+      "denominator": {
+        "request": {
+          "beginning_market_value": 1000000,
+          "ending_market_value": 0,
+          "cashflows": [
+            {
+              "amount": -1000000,
+              "fraction_of_period_remaining": 1
+            }
+          ]
+        },
+        "error": {
+          "name": "FinstackError",
+          "kind": "validation",
+          "message": "Validation error: Modified-Dietz denominator (BMV + sum of weighted cashflows) is 0; it must be finite and strictly positive for the return to be defined"
+        }
+      }
+    },
+    "xirr": {
+      "twoSignChanges": {
+        "request": [
+          {
+            "date": "2023-01-03",
+            "amount": -1000000
+          },
+          {
+            "date": "2023-12-29",
+            "amount": 2300000
+          },
+          {
+            "date": "2024-12-31",
+            "amount": -1320000
+          }
+        ],
+        "error": {
+          "name": "FinstackError",
+          "kind": "validation",
+          "message": "Validation error: IRR requires exactly one sign change after netting; found 2. Nonconventional cashflows can have multiple or repeated roots"
+        }
+      },
+      "oneFlow": {
+        "request": [
+          {
+            "date": "2023-01-03",
+            "amount": -1000000
+          }
+        ],
+        "error": {
+          "name": "FinstackError",
+          "kind": "validation",
+          "message": "Validation error: Cashflows must contain at least two cashflows"
+        }
+      }
+    }
+  },
+  "emptyField": {
+    "name": "TypeError",
+    "kind": "invalid_type",
+    "message": "returnsJson: returnsJson[1] is NaN, which JSON cannot represent"
+  },
+  "nonFiniteHorizon": {
+    "blank": {
+      "name": "FinstackError",
+      "kind": "validation",
+      "message": "Validation error: TWRR horizon_years is NaN; it must be a finite number of 365-day years (a non-positive horizon skips annualization)"
+    },
+    "overflow": {
+      "name": "FinstackError",
+      "kind": "validation",
+      "message": "Validation error: TWRR horizon_years is inf; it must be a finite number of 365-day years (a non-positive horizon skips annualization)"
+    }
+  }
+}

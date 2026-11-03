@@ -1,0 +1,269 @@
+{
+  "description": "Native primitive exposures of the portfolio workbench's margined rates book (two interest rate swaps and a deposit) over the pricing market: portfolio.primitiveExposures with the host's additive dv01 and theta and with no metric, portfolio.computeFactorSensitivities against the host-parity usd_rates factor (a parallel USD-OIS shift in bp) on the workbench date with Rust's default bump, and the native errors of a non-additive metric, a metric one position cannot compute and a factor mapped to a curve the market lacks. The market is not stored.",
+  "sources": [
+    {
+      "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
+      "sha256": "bb28cd8ca7af71c8e78e2f28a29acb0080b7a0d7771be55e9447418ac0e68d32"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
+      "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c"
+    },
+    {
+      "path": "finstack-quant/portfolio/tests/fixtures/host_parity.json",
+      "sha256": "454ce7f21091caf608a17ec5a46da33c617c36b16a4006d7a773eb7bdcdd5b86"
+    }
+  ],
+  "asOf": "2023-12-28",
+  "inputs": {
+    "metrics": ["dv01", "theta"],
+    "factorsJson": "[{\"id\":\"usd_rates\",\"factor_type\":\"rates\",\"market_mapping\":{\"curve_parallel\":{\"curve_ids\":[\"USD-OIS\"],\"units\":\"rate_bp\"}},\"description\":\"Parallel USD rates shift\"}]"
+  },
+  "report": {
+    "base_currency": "USD",
+    "paths": [
+      {
+        "position_id": "IRS-A",
+        "path": ["IRS-A"],
+        "instrument_id": "IRS-A",
+        "instrument_type": "interest_rate_swap",
+        "quantity": 1,
+        "value": {
+          "amount": "8912.21632401552",
+          "currency": "USD"
+        },
+        "measures": {
+          "dv01": 4646.2148100399645,
+          "theta": 0.7437544469703425
+        }
+      },
+      {
+        "position_id": "IRS-B",
+        "path": ["IRS-B"],
+        "instrument_id": "IRS-B",
+        "instrument_type": "interest_rate_swap",
+        "quantity": 2,
+        "value": {
+          "amount": "17824.43264803104",
+          "currency": "USD"
+        },
+        "measures": {
+          "dv01": 9292.429620079929,
+          "theta": 1.487508893940685
+        }
+      },
+      {
+        "position_id": "DEP-1",
+        "path": ["DEP-USD-6M"],
+        "instrument_id": "DEP-USD-6M",
+        "instrument_type": "deposit",
+        "quantity": 1,
+        "value": {
+          "amount": "725.219469065873",
+          "currency": "USD"
+        },
+        "measures": {
+          "dv01": -4.9659946569527165,
+          "theta": 0.06052200538067609
+        }
+      }
+    ],
+    "aggregates": [
+      {
+        "instrument_id": "DEP-USD-6M",
+        "instrument_type": "deposit",
+        "net_quantity": 1,
+        "gross_quantity": 1,
+        "net_value": {
+          "amount": "725.219469065873",
+          "currency": "USD"
+        },
+        "gross_value": {
+          "amount": "725.219469065873",
+          "currency": "USD"
+        },
+        "net_measures": {
+          "dv01": -4.9659946569527165,
+          "theta": 0.06052200538067609
+        },
+        "gross_measures": {
+          "dv01": 4.9659946569527165,
+          "theta": 0.06052200538067609
+        }
+      },
+      {
+        "instrument_id": "IRS-A",
+        "instrument_type": "interest_rate_swap",
+        "net_quantity": 1,
+        "gross_quantity": 1,
+        "net_value": {
+          "amount": "8912.21632401552",
+          "currency": "USD"
+        },
+        "gross_value": {
+          "amount": "8912.21632401552",
+          "currency": "USD"
+        },
+        "net_measures": {
+          "dv01": 4646.2148100399645,
+          "theta": 0.7437544469703425
+        },
+        "gross_measures": {
+          "dv01": 4646.2148100399645,
+          "theta": 0.7437544469703425
+        }
+      },
+      {
+        "instrument_id": "IRS-B",
+        "instrument_type": "interest_rate_swap",
+        "net_quantity": 2,
+        "gross_quantity": 2,
+        "net_value": {
+          "amount": "17824.43264803104",
+          "currency": "USD"
+        },
+        "gross_value": {
+          "amount": "17824.43264803104",
+          "currency": "USD"
+        },
+        "net_measures": {
+          "dv01": 9292.429620079929,
+          "theta": 1.487508893940685
+        },
+        "gross_measures": {
+          "dv01": 9292.429620079929,
+          "theta": 1.487508893940685
+        }
+      }
+    ]
+  },
+  "unmeasured": {
+    "base_currency": "USD",
+    "paths": [
+      {
+        "position_id": "IRS-A",
+        "path": ["IRS-A"],
+        "instrument_id": "IRS-A",
+        "instrument_type": "interest_rate_swap",
+        "quantity": 1,
+        "value": {
+          "amount": "8912.21632401552",
+          "currency": "USD"
+        },
+        "measures": {}
+      },
+      {
+        "position_id": "IRS-B",
+        "path": ["IRS-B"],
+        "instrument_id": "IRS-B",
+        "instrument_type": "interest_rate_swap",
+        "quantity": 2,
+        "value": {
+          "amount": "17824.43264803104",
+          "currency": "USD"
+        },
+        "measures": {}
+      },
+      {
+        "position_id": "DEP-1",
+        "path": ["DEP-USD-6M"],
+        "instrument_id": "DEP-USD-6M",
+        "instrument_type": "deposit",
+        "quantity": 1,
+        "value": {
+          "amount": "725.219469065873",
+          "currency": "USD"
+        },
+        "measures": {}
+      }
+    ],
+    "aggregates": [
+      {
+        "instrument_id": "DEP-USD-6M",
+        "instrument_type": "deposit",
+        "net_quantity": 1,
+        "gross_quantity": 1,
+        "net_value": {
+          "amount": "725.219469065873",
+          "currency": "USD"
+        },
+        "gross_value": {
+          "amount": "725.219469065873",
+          "currency": "USD"
+        },
+        "net_measures": {},
+        "gross_measures": {}
+      },
+      {
+        "instrument_id": "IRS-A",
+        "instrument_type": "interest_rate_swap",
+        "net_quantity": 1,
+        "gross_quantity": 1,
+        "net_value": {
+          "amount": "8912.21632401552",
+          "currency": "USD"
+        },
+        "gross_value": {
+          "amount": "8912.21632401552",
+          "currency": "USD"
+        },
+        "net_measures": {},
+        "gross_measures": {}
+      },
+      {
+        "instrument_id": "IRS-B",
+        "instrument_type": "interest_rate_swap",
+        "net_quantity": 2,
+        "gross_quantity": 2,
+        "net_value": {
+          "amount": "17824.43264803104",
+          "currency": "USD"
+        },
+        "gross_value": {
+          "amount": "17824.43264803104",
+          "currency": "USD"
+        },
+        "net_measures": {},
+        "gross_measures": {}
+      }
+    ]
+  },
+  "sensitivities": {
+    "base_currency": "USD",
+    "position_ids": ["IRS-A", "IRS-B", "DEP-1"],
+    "factor_ids": ["usd_rates"],
+    "data": [[20.539950367060555], [41.07990073412111], [-4.965994656952489]]
+  },
+  "errors": {
+    "nonAdditive": {
+      "request": {
+        "metrics": ["ytm"]
+      },
+      "error": {
+        "name": "FinstackError",
+        "kind": "validation",
+        "message": "Invalid input: metric 'ytm' is non-additive and cannot be aggregated as a primitive portfolio exposure"
+      }
+    },
+    "notApplicable": {
+      "request": {
+        "metrics": ["pv01"]
+      },
+      "error": {
+        "name": "FinstackError",
+        "kind": "validation",
+        "message": "Valuation error for position 'DEP-1': Invalid input: Metric 'pv01' is not applicable to instrument type 'deposit' [instrument=DEP-USD-6M, type=Deposit, model=Discounting]"
+      }
+    },
+    "missingCurve": {
+      "request": {
+        "factorsJson": "[{\"id\":\"eur_rates\",\"factor_type\":\"rates\",\"market_mapping\":{\"curve_parallel\":{\"curve_ids\":[\"EUR-ESTR\"],\"units\":\"rate_bp\"}}}]"
+      },
+      "error": {
+        "name": "FinstackError",
+        "kind": "not_found",
+        "message": "Requested item not found: EUR-ESTR"
+      }
+    }
+  }
+}

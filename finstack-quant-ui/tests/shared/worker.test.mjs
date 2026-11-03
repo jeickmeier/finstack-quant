@@ -134,6 +134,7 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "defaultWaterfallOrder",
     // AnalyticsApi
     "performanceReport",
+    "correlationMatrix",
     "benchmarkReport",
     // PortfolioApi
     "valuePortfolio",
@@ -142,7 +143,13 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "scenarioPnlBatch",
     "applyScenarioAndRevalue",
     "portfolioMargin",
+    "attributePortfolioPnl",
     "computeFactorSensitivities",
+    "twrrLinked",
+    "twrrModifiedDietz",
+    "mwrXirr",
+    "brinsonLinked",
+    "primitiveExposures",
     // MarginApi
     "validateSimmSensitivities",
     "simmIm",

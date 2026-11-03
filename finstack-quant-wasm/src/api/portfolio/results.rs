@@ -34,6 +34,29 @@ pub fn portfolio_attribution_explain_text(attribution: JsValue) -> Result<String
     Ok(attribution.explain())
 }
 
+/// Every base-currency money bucket of a portfolio attribution with its share of total P&L.
+///
+/// Free-function twin of Python `PortfolioAttribution.pct_of_total_by_bucket`
+/// (Rust `PortfolioAttribution::pct_of_total_by_bucket`). Lists the eleven
+/// factor buckets (`fx_translation_pnl` included) and `residual` in the struct's
+/// field order, the amounts `portfolioAttributionReconciliationCheck` adds up, so
+/// a report reads the buckets from Rust instead of naming them.
+/// @param attribution - `PortfolioAttribution` object or JSON from `attributePortfolioPnl`.
+/// @returns One `PnlBucketShare` per bucket: the attribute's wire `field`, its `amount` in the base currency and `pct_of_total` in signed percentage points, `null` when `total_pnl` is effectively zero.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) if `attribution` is not a JSON
+/// string or plain object, and a `FinstackError` (kind `validation`) if it
+/// does not match the `PortfolioAttribution` schema.
+#[wasm_bindgen(js_name = portfolioAttributionPctOfTotalByBucket)]
+pub fn portfolio_attribution_pct_of_total_by_bucket(
+    attribution: JsValue,
+) -> Result<JsValue, JsValue> {
+    let attribution: PortfolioAttribution = from_js_json(&attribution, "attribution")?;
+    to_js_value(&attribution.pct_of_total_by_bucket())
+}
+
 /// Check that a portfolio attribution's factor buckets sum to its total P&L.
 ///
 /// Twin of Python `PortfolioAttribution.reconciliation_check` (Rust

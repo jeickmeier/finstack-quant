@@ -100,6 +100,7 @@ optimize_portfolio = _portfolio.optimize_portfolio
 rebalance_from_spec = _portfolio.rebalance_from_spec
 replay_portfolio = _portfolio.replay_portfolio
 brinson_fachler = _portfolio.brinson_fachler
+brinson_linked = _portfolio.brinson_linked
 carino_link = _portfolio.carino_link
 campisi_attribution = _portfolio.campisi_attribution
 campisi_carino_link = _portfolio.campisi_carino_link
@@ -225,6 +226,7 @@ __all__ = [
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
     "brinson_fachler",
+    "brinson_linked",
     "build_credit_vol_report",
     "campisi_attribution",
     "campisi_carino_link",

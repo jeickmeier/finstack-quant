@@ -389,6 +389,71 @@ pub fn carino_link(periods: &[BrinsonPeriodResult]) -> Result<CarinoLinkedAttrib
     })
 }
 
+/// Attribute each period with [`brinson_fachler`] and Carino-link the results.
+///
+/// This is the multi-period Brinson-Fachler report in one call: the returned
+/// [`CarinoLinkedAttribution`] carries every period's sector allocation,
+/// selection and interaction (`periods`), the linked effects by sector
+/// (`linked_sectors`) and by effect (`linked_allocation`, `linked_selection`,
+/// `linked_interaction`), and the geometrically compounded portfolio and
+/// benchmark returns. The linked effects sum to the compounded active return
+/// `R_p − R_b`. The result is identical to calling [`carino_link`] on the
+/// [`brinson_fachler`] result of each period.
+///
+/// # Arguments
+///
+/// * `periods` - Chronologically ordered periods, each a list of
+///   [`SectorPeriod`] rows: weights at period start as decimal fractions
+///   summing to one on each side, and period arithmetic returns as decimals
+///   (`0.015` = +1.5 %). Every period lists the same sectors in the same
+///   order; a sector absent on one side keeps a zero weight. A zero benchmark
+///   weight takes the off-benchmark convention of [`brinson_fachler`].
+///
+/// # Errors
+///
+/// * `Error::InvalidInput` if `periods` is empty; if a period fails
+///   [`brinson_fachler`] (no sectors, a non-finite input, or weights not
+///   summing to one), with the zero-based period index in the message; if the
+///   sector ordering differs between periods; or if a period return is at or
+///   below −100 %.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_portfolio::brinson::{brinson_linked, SectorPeriod};
+///
+/// let row = |sector: &str, wp: f64, wb: f64, rp: f64, rb: f64| SectorPeriod {
+///     sector: sector.into(),
+///     portfolio_weight: wp,
+///     benchmark_weight: wb,
+///     portfolio_return: rp,
+///     benchmark_return: rb,
+/// };
+/// let periods = vec![
+///     vec![row("Tech", 0.7, 0.5, 0.10, 0.06), row("Energy", 0.3, 0.5, 0.04, 0.05)],
+///     vec![row("Tech", 0.6, 0.5, 0.02, 0.03), row("Energy", 0.4, 0.5, -0.01, 0.00)],
+/// ];
+/// let report = brinson_linked(&periods)?;
+/// let active = report.portfolio_return_compounded - report.benchmark_return_compounded;
+/// let linked = report.linked_allocation + report.linked_selection + report.linked_interaction;
+/// assert!((linked - active).abs() < 1e-12);
+/// assert_eq!(report.periods.len(), 2);
+/// # Ok::<(), finstack_quant_portfolio::Error>(())
+/// ```
+pub fn brinson_linked(periods: &[Vec<SectorPeriod>]) -> Result<CarinoLinkedAttribution> {
+    let results = periods
+        .iter()
+        .enumerate()
+        .map(|(index, sectors)| {
+            brinson_fachler(sectors).map_err(|err| match err {
+                Error::InvalidInput(msg) => Error::invalid_input(format!("period {index}: {msg}")),
+                other => other,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    carino_link(&results)
+}
+
 /// One period's returns and per-row effect vector for Carino linking.
 ///
 /// `rows` is one `[f64; N]` effect vector per attribution row (sector, or a
@@ -1091,6 +1156,87 @@ mod tests {
             (arithmetic_active - geometric_active).abs() > 1e-6,
             "test setup should produce distinct arithmetic vs geometric active returns"
         );
+    }
+
+    /// `brinson_linked` attributes raw sector periods and links them in one
+    /// call: the linked effects sum to the compounded active return, by
+    /// sector and by effect, and the result is bit-identical to linking the
+    /// per-period `brinson_fachler` results with `carino_link`.
+    #[test]
+    fn brinson_linked_matches_compounded_active_return() {
+        let periods = vec![
+            period_two_sector(0.70, 0.50, 0.10, 0.06, 0.04, 0.05),
+            period_two_sector(0.60, 0.50, 0.02, 0.03, -0.01, 0.00),
+            period_two_sector(0.40, 0.55, -0.03, -0.02, 0.05, 0.01),
+        ];
+        let report = brinson_linked(&periods).expect("brinson_linked");
+
+        // Compounded returns from the per-period totals, by hand.
+        let (mut growth_p, mut growth_b) = (1.0, 1.0);
+        for sectors in &periods {
+            let r_p: f64 = sectors
+                .iter()
+                .map(|s| s.portfolio_weight * s.portfolio_return)
+                .sum();
+            let r_b: f64 = sectors
+                .iter()
+                .map(|s| s.benchmark_weight * s.benchmark_return)
+                .sum();
+            growth_p *= 1.0 + r_p;
+            growth_b *= 1.0 + r_b;
+        }
+        assert!((report.portfolio_return_compounded - (growth_p - 1.0)).abs() < 1e-15);
+        assert!((report.benchmark_return_compounded - (growth_b - 1.0)).abs() < 1e-15);
+
+        let active = growth_p - growth_b;
+        let by_effect =
+            report.linked_allocation + report.linked_selection + report.linked_interaction;
+        let by_sector: f64 = report.linked_sectors.iter().map(|s| s.total).sum();
+        assert!(
+            (by_effect - active).abs() < 1e-12,
+            "{by_effect} vs {active}"
+        );
+        assert!(
+            (by_sector - active).abs() < 1e-12,
+            "{by_sector} vs {active}"
+        );
+
+        let per_period: Vec<BrinsonPeriodResult> = periods
+            .iter()
+            .map(|sectors| brinson_fachler(sectors).expect("period"))
+            .collect();
+        let reference = carino_link(&per_period).expect("carino");
+        assert_eq!(
+            serde_json::to_value(&report).expect("report json"),
+            serde_json::to_value(&reference).expect("reference json")
+        );
+        assert_eq!(report.periods.len(), 3);
+        assert_eq!(report.linked_sectors.len(), 2);
+    }
+
+    #[test]
+    fn brinson_linked_rejects_empty_input_and_names_the_failing_period() {
+        let err = brinson_linked(&[]).expect_err("no periods");
+        assert!(err.to_string().contains("at least one period"), "{err}");
+
+        let err = brinson_linked(&[Vec::new()]).expect_err("empty period");
+        assert!(err.to_string().contains("period 0"), "{err}");
+
+        let mut bad = period_two_sector(0.60, 0.50, 0.02, 0.03, -0.01, 0.00);
+        bad[0].portfolio_weight = 0.9;
+        let err = brinson_linked(&[period_two_sector(0.70, 0.50, 0.10, 0.06, 0.04, 0.05), bad])
+            .expect_err("weights must sum to one");
+        assert!(err.to_string().contains("period 1"), "{err}");
+        assert!(err.to_string().contains("weights must sum to 1.0"), "{err}");
+
+        let mut renamed = period_two_sector(0.60, 0.50, 0.02, 0.03, -0.01, 0.00);
+        renamed[1].sector = "C".into();
+        let err = brinson_linked(&[
+            period_two_sector(0.70, 0.50, 0.10, 0.06, 0.04, 0.05),
+            renamed,
+        ])
+        .expect_err("sector ordering must match");
+        assert!(err.to_string().contains("sector ordering"), "{err}");
     }
 
     /// The Carino coefficient is numerically well-defined even when

@@ -250,6 +250,13 @@ export const importHarnesses = {
       name: "use-benchmark-report",
       modules: modules.length,
     })),
+  "use-correlation-matrix": () =>
+    Promise.all([
+      import("@/hooks/analytics/use-correlation-matrix/use-correlation-matrix"),
+    ]).then((modules) => ({
+      name: "use-correlation-matrix",
+      modules: modules.length,
+    })),
   "analytics-report-presentation": () =>
     Promise.all([
       import("@/components/finstack/analytics/lib/analytics-report-presentation"),
@@ -304,6 +311,34 @@ export const importHarnesses = {
       import("@/hooks/portfolio/use-portfolio-margin/use-portfolio-margin"),
     ]).then((modules) => ({
       name: "use-portfolio-margin",
+      modules: modules.length,
+    })),
+  "use-attribute-portfolio-pnl": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-attribute-portfolio-pnl/use-attribute-portfolio-pnl"),
+    ]).then((modules) => ({
+      name: "use-attribute-portfolio-pnl",
+      modules: modules.length,
+    })),
+  "use-portfolio-returns": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-portfolio-returns/use-portfolio-returns"),
+    ]).then((modules) => ({
+      name: "use-portfolio-returns",
+      modules: modules.length,
+    })),
+  "use-brinson-linked": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-brinson-linked/use-brinson-linked"),
+    ]).then((modules) => ({
+      name: "use-brinson-linked",
+      modules: modules.length,
+    })),
+  "use-exposure-report": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-exposure-report/use-exposure-report"),
+    ]).then((modules) => ({
+      name: "use-exposure-report",
       modules: modules.length,
     })),
   "use-simm-im": () =>

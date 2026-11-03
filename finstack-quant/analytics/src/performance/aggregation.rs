@@ -89,8 +89,12 @@ impl Performance {
     /// # Returns
     ///
     /// `(matrix, repaired)`. `matrix` is `n × n` in [`Self::get_ticker_names`]
-    /// order with a unit diagonal and passes
-    /// [`finstack_quant_core::math::linalg::validate_correlation_matrix`]. `repaired` is
+    /// order with a diagonal of exactly `1.0`, every off-diagonal inside
+    /// `[-1, 1]`, and passes
+    /// [`finstack_quant_core::math::linalg::validate_correlation_matrix`]. The
+    /// validator accepts off-diagonals up to `1e-12` outside `[-1, 1]`, from
+    /// rounding in the Pearson estimate or the repair; those are clamped to the
+    /// bound before return, so a reader can rely on the closed interval. `repaired` is
     /// `true` when the raw pairwise matrix failed that validation and was
     /// projected to the nearest valid correlation matrix, so a reader can
     /// tell a clean estimate from a repaired one.
@@ -395,12 +399,25 @@ fn pair_correlation(
     Ok(corr)
 }
 
+/// Set the diagonal to exactly `1.0` and clamp every off-diagonal to
+/// `[-1, 1]`. Applied to a matrix that already passed
+/// [`validate_correlation_matrix`], whose tolerances (`1e-10` on the diagonal,
+/// `1e-12` past each bound) allow values a correlation cannot take.
+fn clamp_to_correlation_bounds(matrix: &mut [Vec<f64>]) {
+    for (i, row) in matrix.iter_mut().enumerate() {
+        for (j, value) in row.iter_mut().enumerate() {
+            *value = if i == j { 1.0 } else { value.clamp(-1.0, 1.0) };
+        }
+    }
+}
+
 fn finalize_correlation_matrix(
-    matrix: Vec<Vec<f64>>,
+    mut matrix: Vec<Vec<f64>>,
 ) -> finstack_quant_core::Result<(Vec<Vec<f64>>, bool)> {
     let n = matrix.len();
     let flat: Vec<f64> = matrix.iter().flatten().copied().collect();
     if validate_correlation_matrix(&flat, n).is_ok() {
+        clamp_to_correlation_bounds(&mut matrix);
         return Ok((matrix, false));
     }
     let repaired = nearest_correlation(&flat, n, NearestCorrelationOpts::default())
@@ -413,8 +430,9 @@ fn finalize_correlation_matrix(
         )
         .into());
     }
-    let repaired = unflatten_square(&repaired, n)
+    let mut repaired = unflatten_square(&repaired, n)
         .map_err(|err| invalid_return_series("<correlation>", 0, err.to_string()))?;
+    clamp_to_correlation_bounds(&mut repaired);
     Ok((repaired, true))
 }
 
@@ -647,10 +665,48 @@ mod tests {
         .expect("panel");
         let (m, repaired) = perf.correlation_matrix().expect("psd correlation");
         assert!(!repaired);
-        assert!((m[0][0] - 1.0).abs() < 1e-12);
-        assert!((m[1][1] - 1.0).abs() < 1e-12);
-        assert!((m[0][1] - 1.0).abs() < 1e-12);
-        assert!((m[1][0] - 1.0).abs() < 1e-12);
+        assert_eq!(m[0][0], 1.0);
+        assert_eq!(m[1][1], 1.0);
+        assert!((m[0][1] - 1.0).abs() < 1e-12 && m[0][1] <= 1.0);
+        assert!((m[1][0] - 1.0).abs() < 1e-12 && m[1][0] <= 1.0);
+    }
+
+    /// Values the validator tolerates but a correlation cannot take are
+    /// brought onto the bound, on the clean path as on the repaired one.
+    #[test]
+    fn correlation_matrix_is_clamped_to_unit_bounds() {
+        let mut clamped = vec![
+            vec![1.0 + 1e-11, 1.0 + 1e-13, -1.0 - 1e-13],
+            vec![1.0 + 1e-13, 1.0 - 1e-11, -1.0],
+            vec![-1.0 - 1e-13, -1.0, 1.0],
+        ];
+        clamp_to_correlation_bounds(&mut clamped);
+        assert_eq!(
+            clamped,
+            vec![
+                vec![1.0, 1.0, -1.0],
+                vec![1.0, 1.0, -1.0],
+                vec![-1.0, -1.0, 1.0],
+            ]
+        );
+
+        let indefinite = vec![
+            vec![1.0, -0.55, -0.55],
+            vec![-0.55, 1.0, -0.55],
+            vec![-0.55, -0.55, 1.0],
+        ];
+        let (repaired, was_repaired) =
+            finalize_correlation_matrix(indefinite).expect("Higham repair");
+        assert!(was_repaired);
+        for (i, row) in repaired.iter().enumerate() {
+            for (j, value) in row.iter().enumerate() {
+                if i == j {
+                    assert_eq!(*value, 1.0);
+                } else {
+                    assert!((-1.0..=1.0).contains(value), "({i}, {j}) = {value}");
+                }
+            }
+        }
     }
 
     #[test]

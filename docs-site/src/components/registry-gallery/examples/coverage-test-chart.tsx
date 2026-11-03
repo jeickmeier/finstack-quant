@@ -1,5 +1,8 @@
 "use client";
-import type { SimulationFieldUnits, StructuredCredit } from "finstack-quant-wasm";
+import type {
+  SimulationFieldUnits,
+  StructuredCredit,
+} from "finstack-quant-wasm";
 import type { ExampleProps } from "./props";
 import { CoverageTestChart } from "@/components/finstack/valuations/components/coverage-test-chart/coverage-test-chart";
 import data from "../data.json";

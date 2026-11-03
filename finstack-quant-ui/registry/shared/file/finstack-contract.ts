@@ -57,6 +57,8 @@ import type {
   ScenarioPnlBatchItem,
   ScenarioRevalueView,
   PortfolioMarginResult,
+  PortfolioAttribution,
+  ReconciliationReport,
   ImResult,
   CsaSpec,
   VmResult,
@@ -75,6 +77,7 @@ import type {
   core as wire,
   covenants as covenantsWire,
   models as modelsWire,
+  portfolio as portfolioWire,
   scenarios as scenarioWire,
 } from "finstack-quant-wasm/types";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
@@ -675,6 +678,20 @@ export interface PerformanceReport extends Omit<
   /** correlationMatrix rows in tickerNames order. */
   correlation: { matrix: number[][]; repaired: boolean };
 }
+/** A ticker-major return or price panel whose Pearson correlation matrix Rust estimates; host-supplied, never defaulted. */
+export type CorrelationMatrixRequest = Pick<
+  PerformanceReportRequest,
+  "dates" | "values" | "kind" | "tickerNames" | "frequency"
+>;
+/** Performance#correlationMatrix as returned, with the panel's ticker names in matrix order. */
+export interface CorrelationMatrixReport {
+  /** Performance#getTickerNames: row and column order of the matrix. */
+  tickerNames: string[];
+  /** Pearson correlations, one row per ticker, unit diagonal. */
+  matrix: number[][];
+  /** True when Rust projected the raw estimate to the nearest valid correlation matrix (Higham). */
+  repaired: boolean;
+}
 /** A ticker-major panel measured against a named benchmark; every omitted option is left to Rust. */
 export interface BenchmarkReportRequest {
   /** ISO-8601 observation dates, ascending, one per value of each series. */
@@ -1066,6 +1083,83 @@ export interface PortfolioMarginRequest {
   /** One-way IM collateral already held, keyed by CSA id in that CSA's currency; omitted is none (Rust treats a missing key as zero), and an unknown CSA id is a native validation error. */
   readonly currentImCollateral?: Readonly<Record<string, MoneyValue>> | null;
 }
+/** A book attributed between two host-supplied market snapshots; every other option is left to Rust. */
+export interface PortfolioAttributionRequest {
+  /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
+  readonly specJson: string;
+  /** MarketContext JSON of the opening snapshot; canonicalized through the shared market cache. */
+  readonly marketT0Json: string;
+  /** MarketContext JSON of the closing snapshot; canonicalized through the shared market cache. */
+  readonly marketT1Json: string;
+  /** ISO date of the opening snapshot. */
+  readonly asOfT0: string;
+  /** ISO date of the closing snapshot. */
+  readonly asOfT1: string;
+  /** AttributionMethod wire value; Rust requires one. */
+  readonly method: attributionWire.AttributionMethod;
+  /** Largest absolute reconciliation gap, in base-currency units, Rust still reports as reconciled; host-supplied, Rust has no default. */
+  readonly reconciliationTolerance: number;
+}
+/** One position's native-currency attribution with the Rust helpers its report shows. */
+export interface PortfolioPositionAttribution {
+  /** Position id, in the order Rust keyed by_position. */
+  readonly positionId: string;
+  /** The position's PnlAttribution from by_position, in its instrument's currency. */
+  readonly attribution: PnlAttribution;
+  /** attribution.pnlAttributionExplainText of that attribution. */
+  readonly explain: string;
+  /** attribution.pnlAttributionResidualWithinTolerance against the position run's own tolerances. */
+  readonly residualWithinTolerance: boolean;
+  /** attribution.pnlAttributionPctOfTotalByBucket of that attribution. */
+  readonly buckets: readonly PnlBucketShare[];
+}
+/** A native portfolio attribution with the Rust helpers the report shows beside it. */
+export interface PortfolioAttributionReport {
+  /** portfolio.attributePortfolioPnl, as returned. */
+  readonly attribution: PortfolioAttribution;
+  /** portfolio.portfolioAttributionExplainText. */
+  readonly explain: string;
+  /** portfolio.portfolioAttributionReconciliationCheck at the requested tolerance. */
+  readonly reconciliation: ReconciliationReport;
+  /** portfolio.portfolioAttributionPctOfTotalByBucket: every base-currency bucket with its share of total, in Rust's order. */
+  readonly buckets: readonly PnlBucketShare[];
+  /** Each by_position entry with Rust's explain text, residual check and buckets, in by_position order. */
+  readonly positions: readonly PortfolioPositionAttribution[];
+}
+/** Sub-period returns to link geometrically over a horizon; both host-supplied, neither defaulted. */
+export interface TwrrLinkedRequest {
+  /** Sequential sub-period returns as decimal fractions (0.02 is 2%), each finite and above -1. */
+  readonly returns: readonly number[];
+  /** Full elapsed horizon in 365-day calendar years; below one, Rust reports the linked return cumulatively. */
+  readonly horizonYears: number;
+}
+/** portfolio.twrrLinked, as returned: cumulative, annualised, is_annualised and num_periods. */
+export type LinkedReturn = portfolioWire.LinkedReturn;
+/** One period's beginning and ending values and its external flows, with the portfolio's signs (contributions positive). */
+export type TwrrPeriod = portfolioWire.TwrrPeriod;
+/** A dated flow from the investor's cash account (contributions negative, distributions and terminal value positive). */
+export type DatedCashflow = portfolioWire.DatedCashflow;
+/** One sector's start-of-period weights and period returns on both sides, as decimals; weights sum to one on each side. */
+export type SectorPeriod = portfolioWire.SectorPeriod;
+/** Chronological periods of SectorPeriod rows, every period listing the same sectors in the same order; host-supplied, never defaulted. */
+export interface BrinsonLinkedRequest {
+  /** One array of SectorPeriod rows per period, oldest first. */
+  readonly periods: readonly (readonly SectorPeriod[])[];
+}
+/** portfolio.brinsonLinked, as returned: each period's Brinson-Fachler effects, the Carino-linked effects by sector and by effect, and the compounded portfolio and benchmark returns. */
+export type CarinoLinkedAttribution = portfolioWire.CarinoLinkedAttribution;
+/** A primitive-exposure request over the cached book and market handles; the metric ids are the host's, never defaulted. */
+export interface PrimitiveExposuresRequest {
+  /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
+  readonly specJson: string;
+  /** MarketContextState JSON every primitive is valued and converted over; through the shared market handle cache. */
+  readonly marketJson: string;
+  /** Additive metric ids reported per primitive (for example "dv01"); empty reports quantity and value only. Rust rejects a non-additive or unknown id. */
+  readonly metrics: readonly string[];
+}
+/** portfolio.primitiveExposures, as returned: position-aware primitive paths and per-primitive net and gross quantity, value and additive risk, in the base currency. */
+export type PortfolioPrimitiveExposureReport =
+  portfolioWire.PortfolioPrimitiveExposureReport;
 /** Scenario name to its native statement result. */
 export type StatementScenarioResults = ScenarioResults;
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
@@ -1430,6 +1524,10 @@ export interface AnalyticsApi {
   performanceReport(
     request: PerformanceReportRequest,
   ): Promise<Envelope<PerformanceReport>>;
+  /** analytics.Performance (fromReturns or the price constructor) + getTickerNames and correlationMatrix; the handle is freed. */
+  correlationMatrix(
+    request: CorrelationMatrixRequest,
+  ): Promise<Envelope<CorrelationMatrixReport>>;
   /** analytics.Performance against a named benchmark: greeks, beta, the relative ratios and captures, outperformance and drawdown difference, rollingGreeks and (with a factor panel) multiFactorGreeks per ticker; the handle is freed. */
   benchmarkReport(
     request: BenchmarkReportRequest,
@@ -1459,6 +1557,24 @@ export interface PortfolioApi {
   portfolioMargin(
     request: PortfolioMarginRequest,
   ): Promise<Envelope<PortfolioMarginResult>>;
+  /** portfolio.attributePortfolioPnl over the cached Portfolio and both MarketContext handles, then portfolioAttributionExplainText, portfolioAttributionReconciliationCheck and portfolioAttributionPctOfTotalByBucket, and per by_position entry attribution.pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotalByBucket. */
+  attributePortfolioPnl(
+    request: PortfolioAttributionRequest,
+  ): Promise<Envelope<PortfolioAttributionReport>>;
+  /** portfolio.twrrLinked: the geometric link of host-supplied sub-period returns over a horizon. */
+  twrrLinked(request: TwrrLinkedRequest): Promise<Envelope<LinkedReturn>>;
+  /** portfolio.twrrModifiedDietz: one period's Modified-Dietz return, a decimal, not annualised. */
+  twrrModifiedDietz(period: TwrrPeriod): Promise<Envelope<number>>;
+  /** portfolio.mwrXirr: the annualised money-weighted return of dated investor flows, a decimal on Act/365F. */
+  mwrXirr(cashflows: readonly DatedCashflow[]): Promise<Envelope<number>>;
+  /** portfolio.brinsonLinked: every period's Brinson-Fachler attribution of host-supplied sector rows, Carino-linked. */
+  brinsonLinked(
+    request: BrinsonLinkedRequest,
+  ): Promise<Envelope<CarinoLinkedAttribution>>;
+  /** portfolio.primitiveExposures over the cached Portfolio and MarketContext handles: primitive paths and net and gross aggregates in the base currency. */
+  primitiveExposures(
+    request: PrimitiveExposuresRequest,
+  ): Promise<Envelope<PortfolioPrimitiveExposureReport>>;
   /** portfolio.computeFactorSensitivities over the cached Portfolio and MarketContext handles: the position-by-factor sensitivity matrix in the base currency. */
   computeFactorSensitivities(
     request: FactorSensitivitiesRequest,

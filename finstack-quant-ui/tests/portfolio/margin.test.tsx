@@ -103,7 +103,7 @@ it("returns the native validation error for collateral under an unknown CSA", as
 it("leaves omitted collateral unset and passes supplied collateral unchanged", async () => {
   const portfolioMargin = vi.fn(native.portfolioMargin);
   const service = createPortfolioService(
-    { portfolio: { ...native, portfolioMargin } },
+    { portfolio: { ...native, portfolioMargin }, attribution: native },
     createContext({
       initialize: async () => undefined,
       core: { MarketContext: native.MarketContext },

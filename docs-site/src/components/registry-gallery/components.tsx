@@ -91,6 +91,12 @@ import { Example as Example67 } from "./examples/statement-monte-carlo";
 import { Example as Example68 } from "./examples/surface-arbitrage-badge";
 import { Example as Example69 } from "./examples/covenant-engine-editor";
 import { Example as Example70 } from "./examples/covenant-breach-forecast";
+import { Example as ExamplePortfolioWorkbench } from "./examples/portfolio-workbench";
+import { Example as ExamplePortfolioAttributionReport } from "./examples/portfolio-attribution-report";
+import { Example as ExamplePortfolioReturns } from "./examples/portfolio-returns";
+import { Example as ExampleBrinsonReport } from "./examples/brinson-report";
+import { Example as ExampleExposureReport } from "./examples/exposure-report";
+import { Example as ExampleCorrelationHeatmap } from "./examples/correlation-heatmap";
 const examples = {
   "schema-form": Example0,
   "instrument-form": Example1,
@@ -183,6 +189,12 @@ const examples = {
   "surface-arbitrage-badge": Example68,
   "covenant-engine-editor": Example69,
   "covenant-breach-forecast": Example70,
+  "portfolio-workbench": ExamplePortfolioWorkbench,
+  "portfolio-attribution-report": ExamplePortfolioAttributionReport,
+  "portfolio-returns": ExamplePortfolioReturns,
+  "brinson-report": ExampleBrinsonReport,
+  "exposure-report": ExampleExposureReport,
+  "correlation-heatmap": ExampleCorrelationHeatmap,
 };
 export function ComponentDemo({
   name,

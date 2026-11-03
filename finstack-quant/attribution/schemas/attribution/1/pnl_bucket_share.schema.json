@@ -845,7 +845,7 @@
       "description": "The bucket's P&L as attributed, in the `total_pnl` currency."
     },
     "field": {
-      "description": "Wire name of the [`PnlAttribution`] field holding this bucket (`carry`,\n`rates_curves_pnl`, ..., `residual`).",
+      "description": "Wire name of the result field holding this bucket (`carry`,\n`rates_curves_pnl`, ..., `residual`); the instrument and portfolio\nresults use the same names.",
       "type": "string"
     },
     "pct_of_total": {

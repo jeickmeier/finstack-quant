@@ -35,7 +35,9 @@ export function Example({ density = "compact" }: ExampleProps) {
         <Live density={density} />
         <YieldWorkoutLadder
           ladder={quoteDateCall.ladder as YieldWorkoutLadderProps["ladder"]}
-          metadata={data.workoutLadder.metadata as YieldWorkoutLadderProps["metadata"]}
+          metadata={
+            data.workoutLadder.metadata as YieldWorkoutLadderProps["metadata"]
+          }
           formatValue={sixPlaces}
           density={density}
         />

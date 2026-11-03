@@ -133,7 +133,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/pnl_bucket_share.schema.json",
             "type_name": "PnlBucketShare",
             "kind": "output",
-            "bytes": 21888
+            "bytes": 21934
           }
         ]
       },
@@ -1772,7 +1772,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/linked_return.schema.json",
             "type_name": "LinkedReturn",
             "kind": "output",
-            "bytes": 994
+            "bytes": 1382
           },
           {
             "path": "schemas/portfolio/1/market_factor_key.schema.json",
@@ -3735,7 +3735,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/pnl_bucket_share.schema.json",
             "type_name": "PnlBucketShare",
             "kind": "output",
-            "bytes": 21888
+            "bytes": 21934
           },
           {
             "domain": "calibration",
@@ -4407,7 +4407,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/linked_return.schema.json",
             "type_name": "LinkedReturn",
             "kind": "output",
-            "bytes": 994
+            "bytes": 1382
           },
           {
             "domain": "portfolio",

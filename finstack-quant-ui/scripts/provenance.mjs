@@ -433,6 +433,17 @@ const displays = [
       "Returned analytics.Performance results of a host-supplied panel: the summary TableEnvelope, per-ticker series against each ticker's own active dates, rolling series, monthly and annual periodic returns, drawdown episodes and lookback returns (FYTD from a core.FiscalConfig only when a fiscal-year start is supplied). Decimal fractions and ratios as returned, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The monthly heatmap colour domain is the caller's or the returned values' extent (presentation only).",
   },
   {
+    id: "correlation-heatmap",
+    api: [
+      "analytics.Performance#correlationMatrix",
+      "Performance",
+      "correlationMatrix",
+    ],
+    route: "returned-analytics",
+    convention:
+      "Returned analytics.Performance correlationMatrix of a host-supplied panel: Pearson coefficients in Rust's ticker order as a diverging heatmap over the fixed correlation range [-1, 0, 1] (presentation only) and a table, with the Repaired stamp shown only when Rust's repaired flag is true. Nothing is estimated, clamped, reordered or inferred here; Rust returns a unit diagonal and every coefficient inside [-1, 1].",
+  },
+  {
     id: "benchmark-report",
     api: ["analytics.Performance#greeks", "Performance", "greeks"],
     route: "returned-analytics",
@@ -475,6 +486,42 @@ const displays = [
     route: "returned-report",
     convention:
       "Returned PortfolioMarginResult: every total as exact base-currency money (including a -0 variation margin, as returned), total_positions and positions_without_margin as returned counts, netting sets in returned order with the returned is_approximate flag beside an always-shown Indicative badge, by_csa collateral in the netting sets' CSA order, degraded positions, and the selected set's im_breakdown and SIMM sensitivities. Omitted collateral is left to Rust; nothing summed, netted or converted.",
+  },
+  {
+    id: "portfolio-attribution-report",
+    api: [
+      "portfolio.attributePortfolioPnl",
+      "PortfolioNamespace",
+      "attributePortfolioPnl",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned PortfolioAttribution: total_pnl and every base-currency bucket as exact money with shares only from portfolioAttributionPctOfTotalByBucket, the reconciliation verdict, gap and tolerance only from portfolioAttributionReconciliationCheck at the host's tolerance, explain only from portfolioAttributionExplainText, and result_invalid as returned; by_position rows in returned order in each instrument's currency, one column per book bucket filled from that position's pnlAttributionPctOfTotalByBucket, and the selected position through pnl-attribution-report. The method is required and chosen by the user; nothing is summed, differenced or converted.",
+  },
+  {
+    id: "portfolio-returns",
+    api: ["portfolio.twrrLinked", "PortfolioNamespace", "twrrLinked"],
+    route: "returned-report",
+    convention:
+      "Returned twrrLinked LinkedReturn: cumulative, annualised, is_annualised and num_periods as returned, the annualised figure labelled per year only when Rust's is_annualised says so; the twrrModifiedDietz period return as a decimal for the period, not annualised; the mwrXirr return as an annualised decimal on Act/365F. Inputs are the host's returns, horizon in 365-day years, one period's values and flows with their fractions of the period remaining (contributions positive) and dated investor flows (contributions negative); nothing is defaulted, derived from dates, sign-flipped, summed or compared, and each form shows its native error.",
+  },
+  {
+    id: "brinson-report",
+    api: ["portfolio.brinsonLinked", "PortfolioNamespace", "brinsonLinked"],
+    route: "returned-report",
+    convention:
+      "Returned brinsonLinked CarinoLinkedAttribution: portfolio_return_compounded and benchmark_return_compounded, each linked sector's allocation, selection, interaction and total with linked_allocation, linked_selection and linked_interaction as the footer, and every period's portfolio, benchmark and excess returns, sector effects and returned totals, all decimals of return in returned order. Inputs are the host's chronological SectorPeriod rows with any period names; nothing is defaulted, summed, differenced, linked or stacked, and the compounded active return is not shown because Rust returns only its two sides.",
+  },
+  {
+    id: "exposure-report",
+    api: [
+      "portfolio.primitiveExposures",
+      "PortfolioNamespace",
+      "primitiveExposures",
+    ],
+    route: "returned-report",
+    convention:
+      "Returned primitiveExposures PortfolioPrimitiveExposureReport: each aggregate's net and gross quantity and value in base_currency, ordered by primitive id as returned and charted side by side (never stacked); each requested additive metric's net_measures and gross_measures entry per primitive under its returned id; and the position-aware paths with their position-scaled quantity and value. The optional sensitivity section shows computeFactorSensitivities (positions by factor ids, base currency) as returned. Inputs are the host's book, market, additive metric ids (omitted is none: quantity and value only) and any factor definitions and bump config; nothing is summed, netted, converted or re-sorted.",
   },
   {
     id: "scenario-pnl-table",

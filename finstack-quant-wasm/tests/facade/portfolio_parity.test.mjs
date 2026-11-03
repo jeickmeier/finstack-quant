@@ -126,6 +126,10 @@ test('attributePortfolioPnl and its result methods match Python', () => {
     expected.attribution_explain
   );
   assertClose(
+    wire(portfolio.portfolioAttributionPctOfTotalByBucket(attribution)),
+    expected.attribution_pct_of_total_by_bucket
+  );
+  assertClose(
     wire(
       portfolio.portfolioAttributionReconciliationCheck(
         attribution,
@@ -365,5 +369,18 @@ test('optimizePortfolio validates constraint objects and requires a UnitScaling 
   assert.throws(
     () => portfolio.optimizePortfolio(spec([], 'unit_scaling'), inputs.market_t0),
     (error) => error.kind === 'validation' && /MO-9/.test(error.message)
+  );
+});
+
+test('brinsonLinked matches Python', () => {
+  assertClose(wire(portfolio.brinsonLinked(inputs.brinson_periods)), expected.brinson_linked);
+});
+
+test('twrrLinked matches Python, annualised flag included', () => {
+  assertClose(
+    inputs.twrr_horizons.map((horizon) =>
+      wire(portfolio.twrrLinked(JSON.stringify(inputs.twrr_returns), horizon))
+    ),
+    expected.twrr_linked
   );
 });

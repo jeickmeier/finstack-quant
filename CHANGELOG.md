@@ -10,6 +10,74 @@
 
 `ttm()`, `capital_structure_summary` and the credit assessment's trailing sums (leverage, interest coverage and the leverage check) now share one window, `finstack_quant_core::dates::ltm_window`: the twelve calendar months ending at the reporting period's end. Monthly, quarterly, semi-annual, annual and weekly models read the same 12, 4, 2, 1 and 52 periods as before, so their values do not move. A daily model used to read a fixed 252 periods, about 8.3 calendar months of a calendar-day grid, so LTM EBITDA read low and leverage about 1.45x high; it now sums every model day in the trailing year, 365 or 366 on a calendar-day grid and the trading days (about 252) on a business-day grid, whose missing weekends and holidays are not missing data. A daily window is short, and its LTM figures are NaN or `None`, while the model's daily grid starts after the window's first day. The credit assessment's daily window previously demanded every calendar day, so a business-day model had no trailing sum at all; weekly and fiscal daily results now have one.
 
+### UI: facade-coverage ledger counts three more computations
+
+`core.SifmaSettlementClass` (`fromAgencyTerm` classifies a term), `models.credit.lgd.WorkoutCosts` (`totalRate` computes and `standard` is a preset) and `margin.excessCollateral` (computes collateral less required) are no longer excluded as data constructors. The `data-constructor` definition now also covers a handle class whose other members only read back what it was built from, which is what `DayCountContext`, `VolCubeExpirySlice` and `LatentSingleFactor` are. Coverage reads 176 of 639 units.
+
+### UI: attribution fixture with a book Rust does not reconcile
+
+The portfolio attribution fixture adds a native `metrics_based` attribution at a host tolerance of zero, where `portfolioAttributionReconciliationCheck` reports the book not reconciled (the bucket sum leaves about 5e-13 USD). Tests now render the "Not reconciled" badge and a position whose residual is outside Rust's tolerance. At the host's one-cent tolerance the book always reconciles, because Rust's buckets include the residual.
+
+### UI: portfolio returns keep NaN and Infinity apart
+
+`@finstack/use-portfolio-returns` keys its three queries with `requestSnapshot`, as `use-correlation-matrix` does, instead of putting the cloned request in the TanStack key, whose JSON hashing turns NaN and Infinity both into `null`. A blank horizon followed by an overflowing one now makes two native `twrrLinked` calls and shows each native error.
+
+### UI: correlation heatmap always draws Rust's matrix
+
+`@finstack/correlation-heatmap` no longer checks coefficients against [-1, 1] and drops its chart for one outside; Rust now returns every coefficient inside the bound, so the heatmap and the table always show. The Repaired-stamp test says plainly that no native panel reaches Rust's repair today.
+
+### Portfolio: attribution explain text and bucket shares agree on a zero total
+
+`PortfolioAttribution::explain` treated `total_pnl` as zero only below `1e-10`, while `pct_of_total_by_bucket` uses the default `RoundingContext` (half a unit of the base currency's output scale). A total of 0.003 USD printed percentage shares in the text while the table had none. Both now use one rule, so the text prints `0.0%` exactly where the shares are `None`. Python and WASM explain text follow. No UI fixture moves.
+
+### Analytics: correlation matrices stay inside [-1, 1]
+
+`Performance::correlation_matrix` now returns a diagonal of exactly 1 and clamps every off-diagonal to `[-1, 1]`, on the clean path and after Higham repair. The validator it applies first tolerates `1e-10` on the diagonal and `1e-12` past each bound, so rounding in the Pearson estimate or the repair could return a coefficient such as `1.0000000000000002`, which a correlation cannot take. Python `Performance.correlation_matrix` and WASM `correlationMatrix` document the bound. No UI fixture moves.
+
+### Portfolio: a linked return rejects a non-finite horizon
+
+`twrr_linked` now returns a validation error when `horizon_years` is NaN or infinite. A blank horizon field (NaN) used to come back as an unannualised cumulative return and an overflowing one (`1e999`, infinity) as an annualised return of zero. Zero and negative horizons still skip annualisation. Python `twrr_linked` raises `ValueError`; WASM `portfolio.twrrLinked` throws a `validation` `FinstackError`. The returns UI fixture records both native errors. No existing value moves.
+
+### UI: facade-coverage ledger lists what a screen never wires
+
+`finstack-quant-ui/facade-coverage.json` now excludes 108 more facade units, each with a reason from a closed set in `scripts/coverage.mjs` that `coverage --check` enforces: constructors and label parsers (`data-constructor`), enum-variant constructors (`schema-form`), copy-with-field setters (`setter`), stored-field lookups (`getter`), shape validators (`validator`) and the four `analytics` series functions that repeat a `Performance` method (`performance-duplicate`). The six covenant `with_*` setters move from `schema-form` to `setter`. Coverage reads 176 of 636 units instead of 176 of 744; computations, numeric checks, presets and later-phase targets stay counted.
+
+### UI: correlation heatmap on the workbench Risk tab
+
+`@finstack/correlation-heatmap` draws the Pearson correlation matrix of a host return panel, one native `analytics.Performance` `correlationMatrix` chain through `@finstack/use-correlation-matrix`, as a heatmap and a table in Rust's ticker order, stamped Repaired only when Rust's `repaired` flag says it projected the estimate to the nearest valid correlation matrix. `portfolio-workbench` shows it on the Risk tab when the host supplies a `correlation` panel.
+
+### UI: exposure report on the workbench Risk tab
+
+`@finstack/exposure-report` presents a book's primitive exposures, one native `portfolio.primitiveExposures` call through `@finstack/use-exposure-report`: each primitive's net and gross quantity and value in the base currency with a chart of the two values, each requested additive metric's net and gross amount, and the position-aware paths, all as returned; and, when the host supplies factor definitions, the book's `portfolio.computeFactorSensitivities` matrix. Rust returns both net and gross; nothing is summed or netted in JavaScript. `portfolio-workbench` shows it on the Risk tab over its book and market, with the host's `exposures` metric ids and factors.
+
+### UI: Brinson report and the workbench Brinson tab
+
+`@finstack/brinson-report` presents multi-period Brinson-Fachler attribution of the host's sector weights and returns, one native `portfolio.brinsonLinked` call through `@finstack/use-brinson-linked`: the compounded portfolio and benchmark returns, each sector's Carino-linked allocation, selection, interaction and total with Rust's linked total of each effect, a chart of the sectors' linked totals, and every period's returns, sector effects and totals, all as returned. Nothing is summed, differenced or linked in JavaScript. `portfolio-workbench` adds a Brinson tab when the host supplies `brinson` periods.
+
+### UI: portfolio returns and the workbench Returns tab
+
+`@finstack/portfolio-returns` answers how the book has performed from the host's performance data in three forms, each one native call through `@finstack/use-portfolio-returns`: `twrrLinked` of sub-period decimal returns over a horizon in 365-day years (cumulative, annualised, `is_annualised` and the period count as returned, saying when Rust did not annualise), `twrrModifiedDietz` of one period's values and flows (a decimal for the period; contributions positive) and `mwrXirr` of dated investor flows (an annualised decimal on Act/365F; contributions negative). Nothing is defaulted, derived from dates or sign-flipped, and each form shows its native error. `portfolio-workbench` adds a Returns tab when the host supplies `returns`.
+
+### Portfolio: linked returns say whether they were annualised
+
+`LinkedReturn` gains `is_annualised`: true when `twrr_linked`'s `horizon_years` is at least one year, false for shorter or non-positive horizons, where `annualised` mirrors `cumulative` (GIPS 2020 reports them cumulatively). A report can now say which figure it shows without restating that rule. Python `LinkedReturn.is_annualised` (and a `to_dataframe` column); WASM `portfolio.twrrLinked` returns the field. The host parity fixture pins a two-year and a half-year link for both hosts. No existing value moves.
+
+### UI: portfolio attribution report and the workbench Attribution tab
+
+`@finstack/portfolio-attribution-report` shows why the book moved between two snapshots as Rust returns it: the book total, the reconciliation verdict, gap and tolerance from `portfolioAttributionReconciliationCheck`, the base-currency buckets with their shares from `portfolioAttributionPctOfTotalByBucket` as a table and a signed chart, a row per position with one column per bucket from that position's own Rust buckets, the selected position through `pnl-attribution-report` (which now exports its factor table and chart as `PnlFactorBuckets`), and `portfolioAttributionExplainText`. `@finstack/use-attribute-portfolio-pnl` makes the one `attributePortfolioPnl` call. `portfolio-workbench` adds an Attribution tab when the host supplies `attribution` (closing market, closing date and reconciliation tolerance, none defaulted); every Rust method is offered with none preselected, and a failing method shows the native error.
+
+### Portfolio: attribution buckets and their shares from Rust
+
+`PortfolioAttribution::pct_of_total_by_bucket()` lists the book's eleven base-currency factor buckets (`fx_translation_pnl` included) and `residual`, the amounts `reconciliation_check` adds up, as `PnlBucketShare` records with each share of `total_pnl` (`None` when the total is effectively zero), so a report reads the buckets from Rust instead of naming them. Bound as Python `PortfolioAttribution.pct_of_total_by_bucket` and WASM `portfolio.portfolioAttributionPctOfTotalByBucket`; the host parity fixture pins both. No existing value moves.
+
+### UI: portfolio workbench
+
+`@finstack/portfolio-workbench` puts the portfolio components under tabs over a host-supplied book, market and margin date: Positions (summary and positions), Risk (aggregated metrics and a bucketed series), Scenarios (scenario P&L, shown when the host supplies scenarios), Margin and Book (a `PortfolioSpec` validated natively before it is valued). It adds no native call; the Scenarios and Margin runs start when their tab opens. No value moves.
+
+### Portfolio: multi-period Brinson in one call
+
+`brinson_linked(periods)` attributes each period with Brinson-Fachler and Carino-links the results, returning the existing `CarinoLinkedAttribution`: every period's sector allocation, selection and interaction, the linked effects by sector and by effect, and the compounded portfolio and benchmark returns, whose difference the linked effects sum to. It is identical to `carino_link` over each period's `brinson_fachler` result, so a host no longer loops over periods; a period that fails Brinson-Fachler is named by its zero-based index. Bound in Python (`brinson_linked`) and WASM (`portfolio.brinsonLinked`). No value moves.
+
 ### UI: recovery-waterfall fields from the contracts; DCF WACC default
 
 `recovery-waterfall` labels its claim, collateral and workout fields through `labelFor` and takes their help from the generated contracts (the new `recovery_claim` contract root, and `workout_lgd`), so "Direct costs" reads "Direct cost rate", "Time to resolution" reads "Workout years" and "Exposure at default" reads "EAD" (`labelFor` upper-cases `ead`). "Add claim" starts the accrued, penalties and haircut fields empty instead of at 0, so an untyped amount is rejected by Rust rather than sent as zero. The statements workbench's valuation panel leaves the DCF form's WACC unset until the calculator or an edit sets it, so a form given `defaultAssumptions` shows its WACC instead of an empty field.
