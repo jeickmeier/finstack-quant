@@ -441,6 +441,31 @@ fn joint_probabilities_preserve_marginals_at_skewed_nodes() {
     }
 }
 
+/// A marginal clamped to exactly 1 leaves `p_r + p_h − 1` a rounding of the
+/// other marginal, which can land one ulp above `min(p_r, p_h)`. The inverted
+/// interval must not panic, and the factor that cannot move keeps both
+/// marginals exact.
+#[test]
+fn joint_probabilities_survive_a_rounded_frechet_interval() {
+    // The other marginal at the node where a callable bond's vega panicked.
+    let p = 0.4998626174292936_f64;
+    assert!(
+        1.0 + p - 1.0 > p,
+        "fixture must invert the Fréchet interval: lower bound {}, upper bound {p}",
+        1.0 + p - 1.0
+    );
+
+    for &rho in &[-0.1, 0.0, 0.1] {
+        let tree = RatesCreditTree::new(RatesCreditConfig {
+            correlation: rho,
+            ..RatesCreditConfig::default()
+        });
+
+        assert_eq!(tree.joint_probabilities(1.0, p), (p, 1.0 - p, 0.0, 0.0));
+        assert_eq!(tree.joint_probabilities(p, 1.0), (p, 0.0, 1.0 - p, 0.0));
+    }
+}
+
 /// Without mean reversion every marginal is ½, so the whole `[-1, 1]`
 /// range stays feasible and calibration accepts extreme correlations.
 #[test]
