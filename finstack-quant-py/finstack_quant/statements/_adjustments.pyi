@@ -11,7 +11,7 @@ class AppliedAdjustment:
     Examples
     --------
     >>> from finstack_quant.statements import NormalizationResult
-    >>> payload = '{"value_type":{"type":"scalar"},"period":"2025Q1","base_value":10.0,"adjustments":[{"adjustment_id":"a1","name":"Add-back","raw_amount":2.0,"capped_amount":1.5,"is_capped":true}],"final_value":11.5}'
+    >>> payload = '{"value_type":{"type":"scalar"},"period":"2025Q1","base_value":10.0,"adjustments":[{"adjustment_id":"a1","name":"Add-back","raw_amount":2.0,"capped_amount":1.5,"is_capped":true,"adjusted_value":11.5}],"final_value":11.5}'
     >>> NormalizationResult.from_json(payload).adjustments[0].capped_amount
     1.5
     """
@@ -86,6 +86,24 @@ class AppliedAdjustment:
         This accessor does not raise; it returns stored result data.
         """
         ...
+    @property
+    def adjusted_value(self) -> float:
+        """Return the target value through this adjustment.
+
+        Returns
+        -------
+        float
+            The period's ``base_value`` plus the capped amounts of this and every
+            earlier adjustment, in declaration order and the normalized metric's
+            reporting units. The last adjustment's value equals the period's
+            ``final_value``, so each step of a base-to-adjusted bridge spans from
+            the previous step's value (or ``base_value``) to this one.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored result data.
+        """
+        ...
     def __repr__(self) -> str: ...
     @staticmethod
     def from_json(json: str, /) -> AppliedAdjustment:
@@ -94,7 +112,7 @@ class AppliedAdjustment:
         Parameters
         ----------
         json:
-            Serialized adjustment_id, name, raw_amount, capped_amount, and is_capped fields; amounts use the normalized metric's units.
+            Serialized adjustment_id, name, raw_amount, capped_amount, is_capped, and adjusted_value fields; amounts use the normalized metric's units.
 
         Returns
         -------
@@ -110,7 +128,7 @@ class AppliedAdjustment:
         --------
         >>> from finstack_quant.statements import AppliedAdjustment
         >>> AppliedAdjustment.from_json(
-        ...     '{"adjustment_id":"a","name":"A","raw_amount":2.0,"capped_amount":1.0,"is_capped":true}'
+        ...     '{"adjustment_id":"a","name":"A","raw_amount":2.0,"capped_amount":1.0,"is_capped":true,"adjusted_value":11.0}'
         ... ).capped_amount
         1.0
         """

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Statements: adjusted value through each normalization step
+
+`AppliedAdjustment` gains `adjusted_value` (Python `AppliedAdjustment.adjusted_value`, WASM and JSON `adjusted_value`): the target's value through that adjustment, the period's `base_value` plus the capped amounts of this and every earlier adjustment in declaration order. The last step equals `final_value` exactly, so a base-to-adjusted bridge reads each step's position from the result instead of summing. The field is required in `NormalizationResult` JSON; no existing value moves.
+
 ### Models: recovery waterfall in the UI
 
 The `recovery-waterfall` registry component and `use-recovery-waterfall` hooks draw `models.credit.recoveryWaterfall.allocateRecovery` (Rust's per-claim allocations with recovery rates and deficiencies, and the estate's distributed and undistributed totals), `models.credit.lgd.workoutLgd` and `seniorityRecoveryStats`. Collateral types and seniority classes come from the generated `workout_lgd` and `seniority_calibration` contracts, now UI schema roots, and the calibration choice from `seniorityCalibrationIds`.

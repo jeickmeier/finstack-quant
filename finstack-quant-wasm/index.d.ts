@@ -32175,7 +32175,7 @@ export interface StatementsNamespace {
    * Twin of Python `normalize` (Rust `adjustments::normalize`).
    * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
    * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
-   * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped) and the final value.
+   * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped amounts and `adjusted_value`, the target through that step) and the final value.
    * @throws Error - Throws with kind `validation` if an input is malformed, the target node or a referenced node is absent from the results, the configuration is invalid, or the target and a reference node have incompatible units.
    */
   normalize(
