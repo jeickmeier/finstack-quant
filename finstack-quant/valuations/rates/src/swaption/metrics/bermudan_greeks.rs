@@ -25,10 +25,10 @@
 //! the absolute [`HW_SIGMA_BUMP`](finstack_quant_valuations_core::instruments::pricing::hw1f_params::HW_SIGMA_BUMP)
 //! step shared with cap/floor `HwSigmaVega`.
 
-use crate::swaption::pricing::BermudanSwaptionTreeValuator;
 use crate::swaption::BermudanSwaption;
-use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use crate::swaption::pricing::BermudanSwaptionTreeValuator;
 use finstack_quant_core::Result;
+use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Default bump size for the second-order (gamma) rate shift (10 basis points).
@@ -70,7 +70,7 @@ pub(crate) struct HwGreekParams {
 impl HwGreekParams {
     fn resolve(swaption: &BermudanSwaption, context: &MetricContext) -> Result<Self> {
         use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
-            resolve_hw1f_params, Hw1fParamFamily,
+            Hw1fParamFamily, resolve_hw1f_params,
         };
         let params = resolve_hw1f_params(
             Hw1fParamFamily::Swaption,

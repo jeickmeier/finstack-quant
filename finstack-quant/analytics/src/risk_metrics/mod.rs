@@ -9,13 +9,13 @@ mod return_based;
 mod rolling;
 mod tail_risk;
 
+pub use return_based::{CagrDayCount, max_drawdown, sharpe, sortino, volatility};
 pub(crate) use return_based::{
     cagr, downside_deviation, gain_to_pain, geometric_mean, invalid_annualization_factor,
     mean_return, mean_vol_annualized, modified_sharpe, omega_ratio,
 };
-pub use return_based::{max_drawdown, sharpe, sortino, volatility, CagrDayCount};
-pub(crate) use rolling::{rolling_returns, rolling_sharpe, rolling_sortino, rolling_volatility};
 pub use rolling::{DatedSeries, RollingMetric};
+pub(crate) use rolling::{rolling_returns, rolling_sharpe, rolling_sortino, rolling_volatility};
 pub(crate) use tail_risk::{
     cornish_fisher_var, expected_shortfall, kurtosis, parametric_var, skewness, tail_ratio,
     value_at_risk, value_at_risk_and_es,

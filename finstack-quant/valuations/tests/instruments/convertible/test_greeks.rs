@@ -10,8 +10,8 @@
 //! - Greeks behavior across moneyness
 
 use super::fixtures::*;
-use finstack_quant_valuations::instruments::fixed_income::convertible::calculate_convertible_greeks;
 use finstack_quant_valuations::instruments::GreekBumps;
+use finstack_quant_valuations::instruments::fixed_income::convertible::calculate_convertible_greeks;
 
 #[test]
 fn test_delta_positive_for_itm() {

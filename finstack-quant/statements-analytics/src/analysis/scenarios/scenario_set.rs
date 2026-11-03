@@ -38,7 +38,7 @@
 //! scenario can change any forecast method or parameter: growth rates, curves,
 //! seeds and volatilities of stochastic methods, external series, bounds.
 
-use crate::analysis::{run_variance, VarianceConfig, VarianceReport};
+use crate::analysis::{VarianceConfig, VarianceReport, run_variance};
 use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::ZERO_TOLERANCE;
@@ -766,20 +766,19 @@ impl ScenarioResults {
                 .with_role(TableColumnRole::Measure),
             );
 
-            if *scenario_name != baseline_name {
-                if let Some(pct_idx) = non_baseline_names
+            if *scenario_name != baseline_name
+                && let Some(pct_idx) = non_baseline_names
                     .iter()
                     .position(|name| *name == *scenario_name)
-                {
-                    let frac_col_name = format!("{}_vs_{}_frac", scenario_name, baseline_name);
-                    columns.push(
-                        TableColumn::new(
-                            frac_col_name,
-                            TableColumnData::NullableFloat64(pct_values[pct_idx].clone()),
-                        )
-                        .with_role(TableColumnRole::Measure),
-                    );
-                }
+            {
+                let frac_col_name = format!("{}_vs_{}_frac", scenario_name, baseline_name);
+                columns.push(
+                    TableColumn::new(
+                        frac_col_name,
+                        TableColumnData::NullableFloat64(pct_values[pct_idx].clone()),
+                    )
+                    .with_role(TableColumnRole::Measure),
+                );
             }
         }
 

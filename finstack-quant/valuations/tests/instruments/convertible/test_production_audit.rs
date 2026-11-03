@@ -6,9 +6,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve, HazardCurve};
+use finstack_quant_valuations::instruments::ConversionPolicy;
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
-use finstack_quant_valuations::instruments::ConversionPolicy;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
@@ -407,16 +407,19 @@ fn production_convertible_credit_curve_is_a_hazard_dependency() {
     bond.credit_curve_id = Some("CREDIT".into());
     bond.recovery_rate = Some(0.4);
     let deps = bond.market_dependencies().expect("dependencies");
-    assert!(deps
-        .curves
-        .credit_curves
-        .iter()
-        .any(|id| id.as_str() == "CREDIT"));
-    assert!(!deps
-        .curves
-        .discount_curves
-        .iter()
-        .any(|id| id.as_str() == "CREDIT"));
+    assert!(
+        deps.curves
+            .credit_curves
+            .iter()
+            .any(|id| id.as_str() == "CREDIT")
+    );
+    assert!(
+        !deps
+            .curves
+            .discount_curves
+            .iter()
+            .any(|id| id.as_str() == "CREDIT")
+    );
 }
 
 #[test]
@@ -465,8 +468,8 @@ fn production_convertible_implied_vol_uses_a_valid_lattice_bracket() {
 #[test]
 fn production_convertible_implied_vol_preserves_selected_engine() {
     use finstack_quant_valuations::pricer::{
-        expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
-        PricingErrorContext,
+        InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
+        PricingErrorContext, expect_inst,
     };
     use finstack_quant_valuations::results::ValuationResult;
     struct SelectedTree;

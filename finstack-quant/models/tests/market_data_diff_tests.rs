@@ -4,8 +4,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::diff::{
-    measure_discount_curve_shift, measure_fx_shift, measure_inflation_curve_shift,
-    measure_scalar_absolute_shift, measure_scalar_shift, TenorSamplingMethod, STANDARD_TENORS,
+    STANDARD_TENORS, TenorSamplingMethod, measure_discount_curve_shift, measure_fx_shift,
+    measure_inflation_curve_shift, measure_scalar_absolute_shift, measure_scalar_shift,
 };
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
@@ -13,8 +13,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::{
-    fx::{FxConversionPolicy, FxMatrix, FxProvider},
     Money,
+    fx::{FxConversionPolicy, FxMatrix, FxProvider},
 };
 use finstack_quant_models::volatility::measure_vol_surface_shift;
 use std::sync::Arc;

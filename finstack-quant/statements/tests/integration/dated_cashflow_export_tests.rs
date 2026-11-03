@@ -3,7 +3,7 @@
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::{
-    node_to_dated_schedule, Evaluator, PeriodDateConvention,
+    Evaluator, PeriodDateConvention, node_to_dated_schedule,
 };
 use finstack_quant_statements::types::AmountOrScalar;
 

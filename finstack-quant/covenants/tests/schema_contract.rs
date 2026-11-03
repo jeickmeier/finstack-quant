@@ -9,7 +9,7 @@ use finstack_quant_covenants::schema::ARTIFACTS;
 use finstack_quant_covenants::{
     Covenant, CovenantEngine, CovenantMetricId, CovenantSpec, CovenantType, ThresholdSchedule,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use time::Month;
 
 fn schema(type_name: &str) -> Value {

@@ -2,7 +2,7 @@
 
 use crate::metrics::PortfolioMetrics;
 use crate::valuation::PortfolioValuation;
-use finstack_quant_core::config::{results_meta, FinstackConfig, ResultsMeta};
+use finstack_quant_core::config::{FinstackConfig, ResultsMeta, results_meta};
 use finstack_quant_core::wire::SchemaVersion;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -71,12 +71,12 @@ impl PortfolioResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Portfolio;
     use crate::metrics::aggregate_metrics;
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market;
     use crate::types::Entity;
     use crate::valuation::value_portfolio;
-    use crate::Portfolio;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;

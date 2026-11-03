@@ -380,30 +380,38 @@ fn test_multiple_periods_with_forecast() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Check that all periods are evaluated
-    assert!(results
-        .get(
-            "revenue",
-            &PeriodId::quarter(2025, 3).expect("valid period fixture")
-        )
-        .is_some());
-    assert!(results
-        .get(
-            "revenue",
-            &PeriodId::quarter(2025, 4).expect("valid period fixture")
-        )
-        .is_some());
-    assert!(results
-        .get(
-            "revenue",
-            &PeriodId::quarter(2026, 1).expect("valid period fixture")
-        )
-        .is_some());
-    assert!(results
-        .get(
-            "revenue",
-            &PeriodId::quarter(2026, 4).expect("valid period fixture")
-        )
-        .is_some());
+    assert!(
+        results
+            .get(
+                "revenue",
+                &PeriodId::quarter(2025, 3).expect("valid period fixture")
+            )
+            .is_some()
+    );
+    assert!(
+        results
+            .get(
+                "revenue",
+                &PeriodId::quarter(2025, 4).expect("valid period fixture")
+            )
+            .is_some()
+    );
+    assert!(
+        results
+            .get(
+                "revenue",
+                &PeriodId::quarter(2026, 1).expect("valid period fixture")
+            )
+            .is_some()
+    );
+    assert!(
+        results
+            .get(
+                "revenue",
+                &PeriodId::quarter(2026, 4).expect("valid period fixture")
+            )
+            .is_some()
+    );
 
     // Verify compounding over longer period
     let q1_2026 = results

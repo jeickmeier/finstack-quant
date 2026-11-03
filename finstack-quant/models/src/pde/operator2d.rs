@@ -11,7 +11,7 @@
 use super::boundary::BoundaryCondition;
 use super::grid::Grid1D;
 use super::grid2d::Grid2D;
-use super::operator::{node_stencil, TridiagOperator};
+use super::operator::{TridiagOperator, node_stencil};
 use super::problem2d::PdeProblem2D;
 
 /// Assembled 2D operators for one time level, split by direction.

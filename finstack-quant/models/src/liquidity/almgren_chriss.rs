@@ -361,8 +361,8 @@ mod tests {
     }
 
     #[test]
-    fn execution_rejects_invalid_reference_price_override_and_fallback(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn execution_rejects_invalid_reference_price_override_and_fallback()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let model = AlmgrenChrissModel::new(0.001, 0.01, 1.0)?;
         for reference_price in [-100.0, 0.0, f64::NAN, f64::INFINITY] {
             let mut params = test_params(1_000.0)?;
@@ -474,8 +474,8 @@ mod tests {
     }
 
     #[test]
-    fn trajectory_zero_risk_aversion_is_uniform(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn trajectory_zero_risk_aversion_is_uniform()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let model = AlmgrenChrissModel::new(0.001, 0.01, 1.0)?;
         let mut params = test_params(10_000.0)?;
         params.risk_aversion = Some(0.0);
@@ -498,8 +498,8 @@ mod tests {
     ///   temporary = eta * Q^2 / T       (uniform rate Q/T over the horizon)
     /// This pins the midpoint discretization of the permanent component.
     #[test]
-    fn trajectory_cost_matches_closed_form_uniform(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn trajectory_cost_matches_closed_form_uniform()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let gamma = 0.001;
         let eta = 0.01;
         let model = AlmgrenChrissModel::new(gamma, eta, 1.0)?;
@@ -528,8 +528,8 @@ mod tests {
     /// `remaining[n] == 0`) contributed zero for the last bucket: exactly
     /// `0.0` at `n = 1`, `−15%` biased at `n = 5`.
     #[test]
-    fn trajectory_cost_variance_matches_execution_risk_squared_for_uniform(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn trajectory_cost_variance_matches_execution_risk_squared_for_uniform()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let model = AlmgrenChrissModel::new(0.001, 0.01, 1.0)?;
         let mut params = test_params(10_000.0)?;
         params.risk_aversion = Some(0.0);
@@ -555,8 +555,8 @@ mod tests {
     }
 
     #[test]
-    fn trajectory_rejects_negative_risk_aversion(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn trajectory_rejects_negative_risk_aversion()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let model = AlmgrenChrissModel::new(0.001, 0.01, 1.0)?;
         let mut params = test_params(10_000.0)?;
         params.risk_aversion = Some(-1.0);
@@ -594,8 +594,8 @@ mod tests {
     /// inclusive, so the realistic boundary case is `delta = 1.0 - eps` for
     /// a small `eps` — it must still be accepted by the trajectory.
     #[test]
-    fn trajectory_accepts_delta_near_unity_within_tolerance(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn trajectory_accepts_delta_near_unity_within_tolerance()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         // 1.0 - 1e-13 is within 1e-12 of 1.0 and must be accepted.
         let model = AlmgrenChrissModel::new(0.001, 0.01, 1.0_f64 - 1e-13)?;
         let params = test_params(10_000.0)?;

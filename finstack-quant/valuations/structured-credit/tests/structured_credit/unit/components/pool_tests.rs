@@ -12,7 +12,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_pool_stats, AssetPool, AssetType, DealType, PoolAsset, PoolStats,
+    AssetPool, AssetType, DealType, PoolAsset, PoolStats, calculate_pool_stats,
 };
 use time::Month;
 
@@ -950,7 +950,7 @@ fn test_pool_stats_rejects_retired_keys() {
 mod pool_report_tests {
     use super::*;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        pool_report, PoolConcentrationEntry, PoolReport, RepLine,
+        PoolConcentrationEntry, PoolReport, RepLine, pool_report,
     };
 
     fn row(

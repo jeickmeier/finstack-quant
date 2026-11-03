@@ -257,39 +257,37 @@ impl<'a> CreditTreeEngine<'a> {
                 // Uses adjusted soft-call trigger with observation window correction.
                 let call_allowed = self.valuator.soft_call_triggered(node_spot);
 
-                if call_allowed {
-                    if let Some(call_price) = call_price_here {
-                        // Holder converts in response to a call only if
-                        // conversion is genuinely permitted here and is worth
-                        // more than the cash call price.
-                        let holder_converts = can_convert && conversion_val >= call_price;
-                        let value_if_called = if holder_converts {
-                            conversion_val
-                        } else {
-                            call_price
-                        };
+                if call_allowed && let Some(call_price) = call_price_here {
+                    // Holder converts in response to a call only if
+                    // conversion is genuinely permitted here and is worth
+                    // more than the cash call price.
+                    let holder_converts = can_convert && conversion_val >= call_price;
+                    let value_if_called = if holder_converts {
+                        conversion_val
+                    } else {
+                        call_price
+                    };
 
-                        // Issuer calls iff it strictly lowers the bond value.
-                        if final_total > value_if_called {
-                            if holder_converts {
-                                final_total = conversion_val;
-                                final_cash = 0.0;
-                            } else {
-                                // Cash redemption at the call price: the whole
-                                // payoff is a cash (credit-risky) component.
-                                final_total = call_price;
-                                final_cash = call_price;
-                            }
+                    // Issuer calls iff it strictly lowers the bond value.
+                    if final_total > value_if_called {
+                        if holder_converts {
+                            final_total = conversion_val;
+                            final_cash = 0.0;
+                        } else {
+                            // Cash redemption at the call price: the whole
+                            // payoff is a cash (credit-risky) component.
+                            final_total = call_price;
+                            final_cash = call_price;
                         }
                     }
                 }
 
                 // 3. Put (Holder maximizes value)
-                if let Some(put_price) = put_price_here {
-                    if final_total < put_price {
-                        final_total = put_price;
-                        final_cash = final_total;
-                    }
+                if let Some(put_price) = put_price_here
+                    && final_total < put_price
+                {
+                    final_total = put_price;
+                    final_cash = final_total;
                 }
 
                 final_total += coupon;

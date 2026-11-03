@@ -3,12 +3,12 @@
 //! (daily by default, or once per period), and a daily floor pays at least
 //! the period floor when the overnight fixings straddle zero.
 
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{
     FloatingLegCompounding, FloatingRateSpec, OvernightIndexConstraintApplication,
 };
-use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};

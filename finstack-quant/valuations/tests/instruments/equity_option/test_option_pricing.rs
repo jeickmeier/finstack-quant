@@ -13,8 +13,8 @@ use finstack_quant_core::market_data::surfaces::{VolGridOpts, VolSurface};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::metrics::MetricId;
 #[allow(unused_imports)]
 use finstack_quant_valuations_test_support::tolerances;

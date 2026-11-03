@@ -612,18 +612,22 @@ mod smile_tests {
         let params = SabrParameters::new(0.2, 1.0, 0.0, 0.0).expect("valid parameters");
         let smile = SabrSmile::new(params, 100.0, 1.0);
         for strikes in [[99.0, 100.0, 120.0], [80.0, 100.0, 101.0]] {
-            assert!(smile
-                .validate_no_arbitrage(&strikes, 0.05)
-                .expect("diagnostics")
-                .is_arbitrage_free());
+            assert!(
+                smile
+                    .validate_no_arbitrage(&strikes, 0.05)
+                    .expect("diagnostics")
+                    .is_arbitrage_free()
+            );
             let repaired = smile
                 .repair_arbitrage(&strikes, 0.05, 10)
                 .expect("clean repair");
             assert!(repaired.iter().all(|vol| (vol - 0.2).abs() < 1e-12));
-            assert!(!smile
-                .post_repair_validation(&strikes, &[0.2, 0.8, 0.2], 0.05)
-                .expect("invalid-smile diagnostics")
-                .is_arbitrage_free());
+            assert!(
+                !smile
+                    .post_repair_validation(&strikes, &[0.2, 0.8, 0.2], 0.05)
+                    .expect("invalid-smile diagnostics")
+                    .is_arbitrage_free()
+            );
         }
     }
 
@@ -654,10 +658,12 @@ mod smile_tests {
                 .repair_arbitrage(&strikes, 0.05, 10)
                 .expect("short-grid repair");
             assert_eq!(repaired.len(), strikes.len());
-            assert!(smile
-                .post_repair_validation(&strikes, &repaired, 0.05)
-                .expect("short-grid diagnostics")
-                .is_arbitrage_free());
+            assert!(
+                smile
+                    .post_repair_validation(&strikes, &repaired, 0.05)
+                    .expect("short-grid diagnostics")
+                    .is_arbitrage_free()
+            );
         }
     }
 
@@ -673,9 +679,11 @@ mod smile_tests {
             assert!(smile.validate_no_arbitrage(&strikes, 0.0).is_err());
             assert!(smile.repair_arbitrage(&strikes, 0.0, 10).is_err());
         }
-        assert!(smile
-            .validate_no_arbitrage(&[99.0, 100.0, 120.0], f64::NAN)
-            .is_err());
+        assert!(
+            smile
+                .validate_no_arbitrage(&[99.0, 100.0, 120.0], f64::NAN)
+                .is_err()
+        );
     }
 
     /// Black-76 ATM call: df · F · (N(d1) - N(d2)).
@@ -714,10 +722,12 @@ mod smile_tests {
         let normal_params = SabrParameters::new(0.01, 0.0, 0.25, -0.15).expect("normal params");
         let normal_smile = SabrSmile::new(normal_params, -0.002, 1.0);
         let strikes = [-0.010, -0.005, -0.002, 0.001, 0.005];
-        assert!(normal_smile
-            .validate_no_arbitrage(&strikes, 0.0)
-            .expect("normal arbitrage validation")
-            .is_arbitrage_free());
+        assert!(
+            normal_smile
+                .validate_no_arbitrage(&strikes, 0.0)
+                .expect("normal arbitrage validation")
+                .is_arbitrage_free()
+        );
         let repaired_normal = normal_smile
             .repair_arbitrage(&strikes, 0.0, 10)
             .expect("normal arbitrage repair");
@@ -726,10 +736,12 @@ mod smile_tests {
         let shifted_params =
             SabrParameters::new_with_shift(0.02, 0.5, 0.25, -0.15, 0.03).expect("shifted params");
         let shifted_smile = SabrSmile::new(shifted_params, -0.002, 1.0);
-        assert!(shifted_smile
-            .validate_no_arbitrage(&strikes, 0.0)
-            .expect("shifted arbitrage validation")
-            .is_arbitrage_free());
+        assert!(
+            shifted_smile
+                .validate_no_arbitrage(&strikes, 0.0)
+                .expect("shifted arbitrage validation")
+                .is_arbitrage_free()
+        );
         let repaired_shifted = shifted_smile
             .repair_arbitrage(&strikes, 0.0, 10)
             .expect("shifted arbitrage repair");

@@ -425,9 +425,9 @@ impl InterestRateFuture {
             get_fixing_series, require_fixing_value_exact,
         };
         use finstack_quant_valuations_core::instruments::pricing::overnight::{
-            project_arithmetic_overnight_rate, project_overnight_coupon,
-            resolve_overnight_fixing_calendar, OvernightArithmeticProjectionInput,
-            OvernightCouponProjectionInput, OvernightProjectionCurve,
+            OvernightArithmeticProjectionInput, OvernightCouponProjectionInput,
+            OvernightProjectionCurve, project_arithmetic_overnight_rate, project_overnight_coupon,
+            resolve_overnight_fixing_calendar,
         };
 
         let (fixing_date, period_start, period_end) = self.resolve_dates()?;
@@ -576,10 +576,10 @@ impl InterestRateFuture {
         as_of: Date,
         projected_rate: f64,
     ) -> finstack_quant_core::Result<f64> {
-        use finstack_quant_models::rates::hull_white::{hw_b, HullWhiteParams};
+        use finstack_quant_models::rates::hull_white::{HullWhiteParams, hw_b};
         use finstack_quant_valuations_core::instruments::pricing::overnight::{
-            project_overnight_coupon, resolve_overnight_fixing_calendar,
-            OvernightCouponProjectionInput, OvernightProjectionCurve,
+            OvernightCouponProjectionInput, OvernightProjectionCurve, project_overnight_coupon,
+            resolve_overnight_fixing_calendar,
         };
         let config = &self.instrument_pricing_overrides.model_config;
         let (kappa, sigma) = match (config.hw1f_mean_reversion, config.hw1f_sigma) {
@@ -1135,14 +1135,16 @@ mod tests {
             )
             .expect("tenor surface"),
         ] {
-            assert!(future
-                .calculate_convexity_adjusted_rate(
-                    &MarketContext::new().insert_surface(surface),
-                    0.04,
-                    1.0,
-                    1.25
-                )
-                .is_err());
+            assert!(
+                future
+                    .calculate_convexity_adjusted_rate(
+                        &MarketContext::new().insert_surface(surface),
+                        0.04,
+                        1.0,
+                        1.25
+                    )
+                    .is_err()
+            );
         }
         let normal = finstack_quant_valuations_test_support::volatility::relabel_quote_type(
             &base,

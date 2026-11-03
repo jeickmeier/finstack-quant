@@ -11,7 +11,7 @@
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::special_functions::student_t_inv_cdf;
 use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats};
-use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
+use finstack_quant_core::math::summation::{NeumaierAccumulator, neumaier_sum};
 use finstack_quant_core::wire::NonFiniteFields;
 
 // Recompute the four sliding-window sums (sr, sb, srb, sb²) every 64 steps to

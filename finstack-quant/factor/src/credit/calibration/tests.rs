@@ -12,8 +12,8 @@ use super::statistics::{
     ewma_variance, factor_variances, ledoit_wolf_cov_and_corr, sample_correlation_flat,
 };
 use super::validation::validate_calibration_config;
-use crate::credit::hierarchy::{CreditHierarchySpec, IssuerBetaPolicy};
 use crate::FactorId;
+use crate::credit::hierarchy::{CreditHierarchySpec, IssuerBetaPolicy};
 
 /// Audit item #5: on a sparse panel the pairwise-overlap mean differs from
 /// each factor's marginal mean. Demeaning the covariance with the marginal
@@ -421,7 +421,7 @@ fn inputs_from_panel_anchor_at_last_date() {
 mod calibration_pipeline {
     use std::collections::BTreeMap;
 
-    use finstack_quant_core::dates::{create_date, Date};
+    use finstack_quant_core::dates::{Date, create_date};
     use finstack_quant_core::types::IssuerId;
     use time::Month;
 

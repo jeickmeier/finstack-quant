@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "json-schema")]
 use serde_json::Value;
 
-use crate::calculators::im::schedule::ScheduleAssetClass;
 use crate::calculators::im::CcpMethodology;
+use crate::calculators::im::schedule::ScheduleAssetClass;
 use crate::calculators::{ImResult, VmResult};
 use crate::regulatory::frtb::{FrtbRiskClass, FrtbSbaResult, FrtbSensitivities};
 use crate::regulatory::sa_ccr::{EadResult, SaCcrNettingSetConfig, SaCcrTrade};
@@ -13,10 +13,10 @@ use crate::types::{ConcentrationBreach, ImCollateralResult, RepoMarginSpec};
 use crate::types::{CsaSpec, MarginCall, OtcMarginSpec};
 #[cfg(feature = "json-schema")]
 use crate::{
-    constants::MarginConstants, metrics::ExcessCollateral, metrics::Haircut01,
+    SimmVersion, constants::MarginConstants, metrics::ExcessCollateral, metrics::Haircut01,
     metrics::MarginFundingCost, metrics::MarginUtilization, types::SimmSensitivitiesJson,
     xva::mva::ImDecayProfile, xva::mva::MvaResult, xva::types::ExposureProfile,
-    xva::types::FundingConfig, xva::types::XvaResult, SimmVersion,
+    xva::types::FundingConfig, xva::types::XvaResult,
 };
 
 /// Stable base URI for margin-owned schemas.
@@ -198,11 +198,11 @@ mod examples {
     //! Calculator outputs are produced by running the calculator on the
     //! neighbouring input example, so the pair stays consistent.
 
+    use finstack_quant_core::Result;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::schema::{example, example_from_json};
-    use finstack_quant_core::Result;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     fn usd(amount: i64) -> Money {
         Money::from((amount, Currency::USD))

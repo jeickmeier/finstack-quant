@@ -553,15 +553,14 @@ fn validate_fee_record(record: &FeeRecord) -> Result<()> {
     if let Some(fee) = record.master_servicer_fee_bp {
         validate_nonnegative_finite(fee, "master servicer fee bp")?;
     }
-    if let Some(incentive) = record.incentive_fee {
-        if !incentive.hurdle_irr.is_finite()
+    if let Some(incentive) = record.incentive_fee
+        && (!incentive.hurdle_irr.is_finite()
             || !incentive.share.is_finite()
-            || !(0.0..=1.0).contains(&incentive.share)
-        {
-            return Err(finstack_quant_core::Error::Validation(
-                "incentive fee needs a finite hurdle IRR and a share in [0, 1]".into(),
-            ));
-        }
+            || !(0.0..=1.0).contains(&incentive.share))
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "incentive fee needs a finite hurdle IRR and a share in [0, 1]".into(),
+        ));
     }
     if let Some(fee) = record.special_servicer_fee_bp {
         validate_nonnegative_finite(fee, "special servicer fee bp")?;

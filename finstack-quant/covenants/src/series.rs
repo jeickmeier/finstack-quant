@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::engine::{CovenantEngine, CovenantSpec};
 use crate::forward::{
-    forecast_breaches_generic, forecast_covenant_generic, CovenantForecast, CovenantForecastConfig,
-    FutureBreach, ModelTimeSeries,
+    CovenantForecast, CovenantForecastConfig, FutureBreach, ModelTimeSeries,
+    forecast_breaches_generic, forecast_covenant_generic,
 };
 use crate::metric::{CovenantMetricId, CovenantMetricSource, HashMapMetricSource};
 use crate::report::CovenantReport;

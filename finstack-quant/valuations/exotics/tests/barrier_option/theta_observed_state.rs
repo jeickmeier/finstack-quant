@@ -68,7 +68,9 @@ fn discrete_barrier_theta_observes_the_held_spot_on_dates_inside_the_roll() {
         option.instrument_pricing_overrides.model_config.mc_paths = Some(2_000);
         let rolled = as_of + time::Duration::days(1);
         assert!(
-            option.value(&market(as_of).roll_forward(1).expect("roll"), rolled).is_err(),
+            option
+                .value(&market(as_of).roll_forward(1).expect("roll"), rolled)
+                .is_err(),
             "{barrier_type:?}: ordinary pricing past an observation date still requires observed_barrier_breached"
         );
 

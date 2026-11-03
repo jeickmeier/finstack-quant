@@ -16,13 +16,13 @@ mod dv01;
 pub(crate) mod gamma;
 mod recovery01;
 
+use crate::cds_option::CdsOption;
 use crate::cds_option::bloomberg_quadrature;
 use crate::cds_option::pricer;
 use crate::cds_option::pricer::resolve_sigma;
 use crate::cds_option::pricer::synthetic_underlying_cds;
-use crate::cds_option::CdsOption;
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;

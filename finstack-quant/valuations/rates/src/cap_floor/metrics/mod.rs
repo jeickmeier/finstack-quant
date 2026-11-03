@@ -21,14 +21,14 @@ mod vega;
 
 use self::common::CapletInputs;
 use crate::cap_floor::CapFloor;
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::bumps::MarketBump;
-use finstack_quant_core::Result;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
-use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
+use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
 
 /// Register all CapFloor metrics with the registry
 pub(crate) fn register_cap_floor_metrics(

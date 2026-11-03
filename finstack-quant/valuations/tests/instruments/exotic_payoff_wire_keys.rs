@@ -37,8 +37,8 @@ use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricing
 use finstack_quant_valuations::instruments::rates::cms_spread_option::CmsSpreadOption;
 use finstack_quant_valuations::instruments::{Instrument, Monitoring, PricingOptions};
 use finstack_quant_valuations::pricer::ModelKey;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use time::Month;
 

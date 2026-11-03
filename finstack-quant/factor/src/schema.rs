@@ -1,13 +1,13 @@
 //! JSON Schema generation helpers for factor-model contracts.
 
+use crate::FactorModelConfigEnvelope;
+use crate::MarketDependency;
 use crate::credit::calibration::{CreditCalibrationConfig, CreditCalibrationInputs};
 use crate::credit::decomposition::{LevelsAtDate, PeriodDecomposition};
 use crate::credit::hierarchy::CreditFactorModel;
 use crate::risk::{
     PositionRiskDecomposition, RiskBudgetResult, RiskDecomposition, StressAttribution,
 };
-use crate::FactorModelConfigEnvelope;
-use crate::MarketDependency;
 
 /// The three-issuer, six-date panel behind both credit examples.
 ///
@@ -120,8 +120,8 @@ fn json_fixed_point_value<T>(value: &T) -> finstack_quant_core::Result<serde_jso
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
 {
-    use finstack_quant_core::canonical::to_canonical_bytes;
     use finstack_quant_core::Error;
+    use finstack_quant_core::canonical::to_canonical_bytes;
 
     let mut bytes = to_canonical_bytes(value)?;
     for _ in 0..8 {

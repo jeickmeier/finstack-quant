@@ -18,7 +18,7 @@ mod fixtures;
 use std::hint::black_box;
 
 use bench_utils::bench_iter;
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
+use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_factor::credit::calibration::CovarianceStrategy;
 use finstack_quant_factor::credit::decomposition::{decompose_levels, decompose_period};
@@ -30,8 +30,8 @@ use finstack_quant_factor::{
     MatchingConfig,
 };
 use fixtures::{
-    credit_dependency, credit_hierarchical_config, factor_ids, known_issuer_attrs, mapping_rules,
-    psd_matrix, unknown_issuer_attrs, zero_sensitivity_matrix, CreditBook,
+    CreditBook, credit_dependency, credit_hierarchical_config, factor_ids, known_issuer_attrs,
+    mapping_rules, psd_matrix, unknown_issuer_attrs, zero_sensitivity_matrix,
 };
 
 fn bench_covariance_construction(c: &mut Criterion) {

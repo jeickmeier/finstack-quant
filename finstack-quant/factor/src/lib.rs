@@ -96,13 +96,13 @@ mod sensitivity_matrix;
 pub use config::{BumpSizeConfig, FactorModelConfig, RiskMeasure, UnmatchedPolicy};
 pub use covariance::FactorCovarianceMatrix;
 pub use envelope::{
-    FactorModelConfigEnvelope, FactorModelConfigSchema, FACTOR_MODEL_CONFIG_CONTRACT,
+    FACTOR_MODEL_CONFIG_CONTRACT, FactorModelConfigEnvelope, FactorModelConfigSchema,
 };
 pub use matching::{
-    bucket_factor_id, parse_bucket_factor_id, AttributeFilter, CreditHierarchicalConfig,
-    DependencyFilter, FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode,
-    HierarchicalConfig, MappingRule, MappingTableMatcher, MatchingConfig, CREDIT_GENERIC_FACTOR_ID,
-    ISSUER_ID_META_KEY,
+    AttributeFilter, CREDIT_GENERIC_FACTOR_ID, CreditHierarchicalConfig, DependencyFilter,
+    FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode, HierarchicalConfig,
+    ISSUER_ID_META_KEY, MappingRule, MappingTableMatcher, MatchingConfig, bucket_factor_id,
+    parse_bucket_factor_id,
 };
 pub use primitives::{
     CurveType, DependencyType, FactorDefinition, FactorId, FactorType, MarketDependency,

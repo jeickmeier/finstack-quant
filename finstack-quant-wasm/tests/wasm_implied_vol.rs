@@ -44,23 +44,27 @@ fn implied_vol_adapters_reprice_calls_and_puts_with_carry() {
         assert!((bs - 0.35).abs() < 1e-12);
         assert!((black - 0.35).abs() < 1e-12);
     }
-    assert!(black76_implied_vol(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(1.0),
-        JsValue::from(1.0),
-        JsValue::from(100.0),
-        JsValue::from(true)
-    )
-    .is_err());
-    assert!(bs_implied_vol(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(0.0),
-        JsValue::from(0.0),
-        JsValue::from(0.0),
-        JsValue::from(5.0),
-        JsValue::from(true)
-    )
-    .is_err());
+    assert!(
+        black76_implied_vol(
+            JsValue::from(100.0),
+            JsValue::from(100.0),
+            JsValue::from(1.0),
+            JsValue::from(1.0),
+            JsValue::from(100.0),
+            JsValue::from(true)
+        )
+        .is_err()
+    );
+    assert!(
+        bs_implied_vol(
+            JsValue::from(100.0),
+            JsValue::from(100.0),
+            JsValue::from(0.0),
+            JsValue::from(0.0),
+            JsValue::from(0.0),
+            JsValue::from(5.0),
+            JsValue::from(true)
+        )
+        .is_err()
+    );
 }

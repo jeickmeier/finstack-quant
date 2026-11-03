@@ -21,10 +21,10 @@ use crate::bindings::pandas_utils::{
 use crate::errors::core_to_py;
 use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::credit::{
-    merton_report as rust_merton_report, moodys_warf_factor as rust_moodys_warf_factor,
     AssetDynamics, CreditState, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
     MertonBarrierType, MertonModel, MertonReport, MertonReportRequest, RatingFactorTable,
-    SimulatedPaths, ThresholdDirection, ToggleExerciseModel,
+    SimulatedPaths, ThresholdDirection, ToggleExerciseModel, merton_report as rust_merton_report,
+    moodys_warf_factor as rust_moodys_warf_factor,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};

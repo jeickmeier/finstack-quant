@@ -644,10 +644,10 @@ impl FutureOptionTerms {
         if as_of > self.settlement.terminal_date() {
             return Ok(0.0);
         }
-        if let Some(exercise) = self.exercise {
-            if as_of >= exercise.date {
-                return self.post_exercise_value(instrument_id, market, as_of, exercise);
-            }
+        if let Some(exercise) = self.exercise
+            && as_of >= exercise.date
+        {
+            return self.post_exercise_value(instrument_id, market, as_of, exercise);
         }
         if as_of >= self.expiry {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -684,30 +684,30 @@ impl FutureOptionTerms {
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
-        if let Some(exercise) = self.exercise {
-            if as_of >= exercise.date {
-                return match self.settlement {
-                    FutureOptionSettlement::Future {
-                        underlying_last_trading_date,
-                        underlying_settlement_date,
-                        underlying_settlement_price,
-                    } if as_of <= underlying_settlement_date => {
-                        if as_of > underlying_last_trading_date {
-                            underlying_settlement_price.ok_or_else(|| {
+        if let Some(exercise) = self.exercise
+            && as_of >= exercise.date
+        {
+            return match self.settlement {
+                FutureOptionSettlement::Future {
+                    underlying_last_trading_date,
+                    underlying_settlement_date,
+                    underlying_settlement_price,
+                } if as_of <= underlying_settlement_date => {
+                    if as_of > underlying_last_trading_date {
+                        underlying_settlement_price.ok_or_else(|| {
                                 finstack_quant_core::Error::Validation(format!(
                                     "FutureOptionTerms requires underlying_settlement_price after underlying last trading date {underlying_last_trading_date}"
                                 ))
                             })?;
-                            Ok(0.0)
-                        } else if self.is_in_the_money(exercise.futures_price) {
-                            Ok(self.exercise_direction() * self.contracts * self.multiplier)
-                        } else {
-                            Ok(0.0)
-                        }
+                        Ok(0.0)
+                    } else if self.is_in_the_money(exercise.futures_price) {
+                        Ok(self.exercise_direction() * self.contracts * self.multiplier)
+                    } else {
+                        Ok(0.0)
                     }
-                    _ => Ok(0.0),
-                };
-            }
+                }
+                _ => Ok(0.0),
+            };
         }
         if as_of >= self.expiry {
             return Ok(0.0);
@@ -959,14 +959,18 @@ mod tests {
         let mut terms = option(FutureOptionModel::Black76, OptionType::Call);
         terms.futures_price = 1.0e-8;
         terms.strike = 1.0e-8;
-        assert!(terms
-            .cash_delta(None, vol(FutureOptionModel::Black76), &market, as_of)
-            .expect("delta")
-            .is_finite());
-        assert!(terms
-            .cash_gamma(None, vol(FutureOptionModel::Black76), &market, as_of)
-            .expect("gamma")
-            .is_finite());
+        assert!(
+            terms
+                .cash_delta(None, vol(FutureOptionModel::Black76), &market, as_of)
+                .expect("delta")
+                .is_finite()
+        );
+        assert!(
+            terms
+                .cash_gamma(None, vol(FutureOptionModel::Black76), &market, as_of)
+                .expect("gamma")
+                .is_finite()
+        );
     }
 
     #[test]
@@ -1039,9 +1043,11 @@ mod tests {
                 date!(2026 - 01 - 01),
             )
             .expect_err("live option without a volatility quote");
-        assert!(error
-            .to_string()
-            .contains("instrument_pricing_overrides.market_quotes.implied_volatility"));
+        assert!(
+            error
+                .to_string()
+                .contains("instrument_pricing_overrides.market_quotes.implied_volatility")
+        );
     }
 
     #[test]
@@ -1068,9 +1074,11 @@ mod tests {
                 option.expiry,
             )
             .expect_err("missing expiry observation");
-        assert!(error
-            .to_string()
-            .contains("requires an exercise/expiry observation"));
+        assert!(
+            error
+                .to_string()
+                .contains("requires an exercise/expiry observation")
+        );
     }
 
     #[test]
@@ -1254,12 +1262,16 @@ mod tests {
                 {
                     *underlying_settlement_price = None;
                 }
-                assert!(terms
-                    .cash_delta(None, None, &market, date!(2026 - 06 - 06))
-                    .is_err());
-                assert!(terms
-                    .npv_raw(&id, None, None, &market, date!(2026 - 06 - 06))
-                    .is_err());
+                assert!(
+                    terms
+                        .cash_delta(None, None, &market, date!(2026 - 06 - 06))
+                        .is_err()
+                );
+                assert!(
+                    terms
+                        .npv_raw(&id, None, None, &market, date!(2026 - 06 - 06))
+                        .is_err()
+                );
             }
         }
     }

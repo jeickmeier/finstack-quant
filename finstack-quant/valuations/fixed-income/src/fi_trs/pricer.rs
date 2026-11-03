@@ -25,10 +25,10 @@
 //! It intentionally omits roll-down and mark-to-market from underlying rate/spread moves.
 
 use super::types::FiIndexTotalReturnSwap;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::pricing::{FinancingLegFlows, PeriodReturnInputs};
 use finstack_quant_valuations_core::instruments::{
     TotalReturnLegParams, TrsEngine, TrsReturnModel,

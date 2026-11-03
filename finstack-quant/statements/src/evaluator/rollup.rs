@@ -20,12 +20,12 @@
 //! [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
 
 use crate::error::{Error, Result};
+use crate::evaluator::Evaluator;
+use crate::evaluator::PeriodHistory;
 use crate::evaluator::context::EvaluationContext;
 use crate::evaluator::formula::evaluate_formula;
 use crate::evaluator::formula_helpers::is_truthy;
 use crate::evaluator::results::{EvalStats, NumericMode, StatementResult};
-use crate::evaluator::Evaluator;
-use crate::evaluator::PeriodHistory;
 use crate::types::{FinancialModelSpec, NodeId, NodeValueType, RollupMethod};
 use finstack_quant_core::dates::{Period, PeriodId, PeriodKind};
 use indexmap::IndexMap;

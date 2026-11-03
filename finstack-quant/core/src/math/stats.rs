@@ -134,11 +134,7 @@ fn online_covariance(x: &[f64], y: &[f64]) -> OnlineCovariance {
 /// * `xs` - Observations to average. Supply an empty slice only when `NaN` is
 ///   the desired missing-statistic sentinel.
 pub fn mean_or_nan(xs: &[f64]) -> f64 {
-    if xs.is_empty() {
-        f64::NAN
-    } else {
-        mean(xs)
-    }
+    if xs.is_empty() { f64::NAN } else { mean(xs) }
 }
 
 /// Sample variance, returning [`f64::NAN`] for fewer than 2 observations.
@@ -148,11 +144,7 @@ pub fn mean_or_nan(xs: &[f64]) -> f64 {
 /// * `xs` - Sample observations. Fewer than two values return `NaN` instead
 ///   of the `0.0` fallback used by [`variance`].
 pub fn sample_variance_or_nan(xs: &[f64]) -> f64 {
-    if xs.len() < 2 {
-        f64::NAN
-    } else {
-        variance(xs)
-    }
+    if xs.len() < 2 { f64::NAN } else { variance(xs) }
 }
 
 /// Sample standard deviation, returning [`f64::NAN`] for fewer than 2 observations.
@@ -1506,54 +1498,62 @@ mod tests {
 
     #[test]
     fn realized_variance_rejects_invalid_ohlc_and_annualization() {
-        use super::{realized_variance, realized_variance_ohlc, RealizedVarMethod};
+        use super::{RealizedVarMethod, realized_variance, realized_variance_ohlc};
 
         let open = [100.0, 101.0];
         let high = [102.0, 103.0];
         let low = [99.0, 100.0];
         let close = [101.0, 102.0];
-        assert!(realized_variance_ohlc(
-            &open,
-            &high,
-            &[0.0, 100.0],
-            &close,
-            Some(RealizedVarMethod::Parkinson),
-            Some(252.0),
-        )
-        .is_err());
-        assert!(realized_variance_ohlc(
-            &[f64::NAN, 101.0],
-            &high,
-            &low,
-            &close,
-            Some(RealizedVarMethod::GarmanKlass),
-            Some(252.0),
-        )
-        .is_err());
-        assert!(realized_variance_ohlc(
-            &open,
-            &[98.0, 103.0],
-            &low,
-            &close,
-            Some(RealizedVarMethod::RogersSatchell),
-            Some(252.0),
-        )
-        .is_err());
-        assert!(realized_variance_ohlc(
-            &open,
-            &high,
-            &low,
-            &close,
-            Some(RealizedVarMethod::YangZhang),
-            Some(f64::INFINITY),
-        )
-        .is_err());
+        assert!(
+            realized_variance_ohlc(
+                &open,
+                &high,
+                &[0.0, 100.0],
+                &close,
+                Some(RealizedVarMethod::Parkinson),
+                Some(252.0),
+            )
+            .is_err()
+        );
+        assert!(
+            realized_variance_ohlc(
+                &[f64::NAN, 101.0],
+                &high,
+                &low,
+                &close,
+                Some(RealizedVarMethod::GarmanKlass),
+                Some(252.0),
+            )
+            .is_err()
+        );
+        assert!(
+            realized_variance_ohlc(
+                &open,
+                &[98.0, 103.0],
+                &low,
+                &close,
+                Some(RealizedVarMethod::RogersSatchell),
+                Some(252.0),
+            )
+            .is_err()
+        );
+        assert!(
+            realized_variance_ohlc(
+                &open,
+                &high,
+                &low,
+                &close,
+                Some(RealizedVarMethod::YangZhang),
+                Some(f64::INFINITY),
+            )
+            .is_err()
+        );
         assert!(realized_variance(&close, Some(-1.0)).is_err());
     }
 
     #[test]
     fn realized_variance_defaults_are_rust_owned() {
-        use super::{realized_variance, realized_variance_ohlc, RealizedVarMethod};
+        use super::{RealizedVarMethod, realized_variance, realized_variance_ohlc};
 
         let open = [100.0, 101.5, 100.8, 102.0];
         let high = [102.0, 103.0, 102.5, 103.5];

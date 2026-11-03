@@ -4,17 +4,17 @@
 //! valuation date, recomputing time-dependent instrument metrics, and returning
 //! a structured report of the resulting P&L decomposition.
 
+use crate::TimeRollMode;
 use crate::engine::{ExecutionContext, RollForwardReport};
 use crate::error::Result;
-use crate::TimeRollMode;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, HolidayCalendar, Tenor, WEEKENDS_ONLY,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
-use indexmap::map::Entry;
 use indexmap::IndexMap;
+use indexmap::map::Entry;
 
 /// Resolve the canonical forward-roll target before projecting fixings.
 pub(crate) fn resolve_roll_dates(
@@ -274,7 +274,7 @@ fn one_instrument_pnl(
     let flows = match collect_instrument_cashflows(instrument, market, old_date, new_date) {
         Ok(flows) => flows,
         Err(err) => {
-            return InstrumentPnlRow::Failed(inst_id, format!("cashflow collection failed: {err}"))
+            return InstrumentPnlRow::Failed(inst_id, format!("cashflow collection failed: {err}"));
         }
     };
     for flow in flows.into_values() {
@@ -425,8 +425,8 @@ mod tests {
             finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default();
         apply_time_roll_forward(ctx, period, mode, &[], &provider)
     }
-    use crate::engine::ExecutionContext;
     use crate::TimeRollMode;
+    use crate::engine::ExecutionContext;
     use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -438,8 +438,8 @@ mod tests {
     use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
     use finstack_quant_valuations::metrics::MetricId;
-    use time::macros::date;
     use time::Month;
+    use time::macros::date;
 
     #[derive(Clone)]
     struct MissingCashflows(Attributes);
@@ -561,12 +561,16 @@ mod tests {
         assert!(total_carry.is_empty());
         assert_eq!(failed_instruments.len(), 1);
         assert_eq!(failed_instruments[0].0, "missing-cashflows");
-        assert!(failed_instruments[0]
-            .1
-            .contains("cashflow collection failed:"));
-        assert!(failed_instruments[0]
-            .1
-            .contains("missing fixing for coupon"));
+        assert!(
+            failed_instruments[0]
+                .1
+                .contains("cashflow collection failed:")
+        );
+        assert!(
+            failed_instruments[0]
+                .1
+                .contains("missing fixing for coupon")
+        );
     }
 
     #[test]

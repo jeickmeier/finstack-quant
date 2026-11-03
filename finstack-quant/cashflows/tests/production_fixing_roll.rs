@@ -1,7 +1,7 @@
 //! Crossed fixings preserve source observations and fail atomically.
 use finstack_quant_cashflows::{
     builder::{CashFlowMeta, CashFlowSchedule, Notional},
-    fixings::{materialize_fixings, ProjectedFixing},
+    fixings::{ProjectedFixing, materialize_fixings},
 };
 use finstack_quant_core::{
     currency::Currency,
@@ -114,34 +114,42 @@ fn production_roll_materializes_once_and_reports_conflicting_or_missing_projecti
 fn production_roll_includes_origin_and_horizon_only_when_advancing() {
     let market = MarketContext::new();
     let unavailable = schedule(&[None]);
-    assert!(materialize_fixings(
-        &market,
-        [&unavailable],
-        date!(2025 - 01 - 01),
-        date!(2025 - 01 - 02)
-    )
-    .is_ok());
-    assert!(materialize_fixings(
-        &market,
-        [&unavailable],
-        date!(2025 - 01 - 03),
-        date!(2025 - 01 - 04)
-    )
-    .is_err());
-    assert!(materialize_fixings(
-        &market,
-        [&unavailable],
-        date!(2025 - 01 - 02),
-        date!(2025 - 01 - 03)
-    )
-    .is_err());
-    assert!(materialize_fixings(
-        &market,
-        [&unavailable],
-        date!(2025 - 01 - 04),
-        date!(2025 - 01 - 03)
-    )
-    .is_err());
+    assert!(
+        materialize_fixings(
+            &market,
+            [&unavailable],
+            date!(2025 - 01 - 01),
+            date!(2025 - 01 - 02)
+        )
+        .is_ok()
+    );
+    assert!(
+        materialize_fixings(
+            &market,
+            [&unavailable],
+            date!(2025 - 01 - 03),
+            date!(2025 - 01 - 04)
+        )
+        .is_err()
+    );
+    assert!(
+        materialize_fixings(
+            &market,
+            [&unavailable],
+            date!(2025 - 01 - 02),
+            date!(2025 - 01 - 03)
+        )
+        .is_err()
+    );
+    assert!(
+        materialize_fixings(
+            &market,
+            [&unavailable],
+            date!(2025 - 01 - 04),
+            date!(2025 - 01 - 03)
+        )
+        .is_err()
+    );
     let projected = schedule(&[Some(0.03)]);
     let advancing = materialize_fixings(
         &market,

@@ -48,7 +48,7 @@
 use std::sync::{Arc, OnceLock};
 
 use super::{PricerRegistry, PricingError};
-use crate::metrics::{register_universal_metrics, MetricRegistry, MetricRegistryError};
+use crate::metrics::{MetricRegistry, MetricRegistryError, register_universal_metrics};
 
 /// Registration function adding a family's pricers to a registry.
 pub type RegisterPricers = fn(&mut PricerRegistry) -> Result<(), PricingError>;

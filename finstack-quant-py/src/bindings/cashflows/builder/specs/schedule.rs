@@ -7,11 +7,11 @@ use finstack_quant_core::dates::BusinessDayConvention;
 use pyo3::prelude::*;
 
 use crate::bindings::core::dates::calendar::{
-    extract_business_day_convention, PyBusinessDayConvention,
+    PyBusinessDayConvention, extract_business_day_convention,
 };
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
-use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
+use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
 use crate::bindings::repr_support::{enum_repr_from_serde as enum_repr, repr_from_serde};
 use crate::errors::core_to_py;
 

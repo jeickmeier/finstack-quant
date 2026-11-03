@@ -139,26 +139,26 @@ impl CoverageRules {
                 "coverage rating haircuts must be decimal fractions in [0, 1]",
             ));
         }
-        if let DefaultedValuation::MarketValue { pct } = self.defaulted_valuation {
-            if !pct.is_finite() || !(0.0..=100.0).contains(&pct) {
-                return Err(invalid(
-                    "defaulted market value must be a percent in [0, 100]",
-                ));
-            }
+        if let DefaultedValuation::MarketValue { pct } = self.defaulted_valuation
+            && (!pct.is_finite() || !(0.0..=100.0).contains(&pct))
+        {
+            return Err(invalid(
+                "defaulted market value must be a percent in [0, 100]",
+            ));
         }
-        if let Some(bucket) = self.ccc_bucket {
-            if !bucket.threshold_pct.is_finite() || !(0.0..=100.0).contains(&bucket.threshold_pct) {
-                return Err(invalid(
-                    "CCC bucket threshold must be a percent in [0, 100]",
-                ));
-            }
+        if let Some(bucket) = self.ccc_bucket
+            && (!bucket.threshold_pct.is_finite() || !(0.0..=100.0).contains(&bucket.threshold_pct))
+        {
+            return Err(invalid(
+                "CCC bucket threshold must be a percent in [0, 100]",
+            ));
         }
-        if let Some(rule) = self.discount_obligation {
-            if !rule.price_threshold_pct.is_finite() || rule.price_threshold_pct <= 0.0 {
-                return Err(invalid(
-                    "discount obligation price threshold must be a positive percent of par",
-                ));
-            }
+        if let Some(rule) = self.discount_obligation
+            && (!rule.price_threshold_pct.is_finite() || rule.price_threshold_pct <= 0.0)
+        {
+            return Err(invalid(
+                "discount obligation price threshold must be a positive percent of par",
+            ));
         }
         Ok(())
     }

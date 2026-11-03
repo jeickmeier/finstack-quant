@@ -7,16 +7,16 @@
 use crate::cms_common::ConvexityAdjustmentRiskCalculator;
 use crate::cms_option::pricer::convexity_adjustment_with_frequency;
 use crate::cms_option::types::CmsOption;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::special_functions::norm_pdf;
-use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::d1_d2_black76;
+use finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 use finstack_quant_valuations_core::metrics::bump_surface_vol_absolute;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
-use finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 
 /// Register CMS option metrics with the registry.

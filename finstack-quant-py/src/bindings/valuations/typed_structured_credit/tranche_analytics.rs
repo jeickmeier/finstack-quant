@@ -10,8 +10,8 @@
 
 use crate::bindings::extract::{extract_instrument, extract_market};
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    ColumnSchema,
+    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
+    serde_rows_to_dataframe_with_schema,
 };
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{

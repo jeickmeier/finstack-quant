@@ -1,7 +1,7 @@
 //! Public naming contract for serialize-only scenario output views.
 
 use finstack_quant_portfolio::scenarios::{
-    apply_scenario_and_revalue, scenario_pnl, ScenarioPnlBatchItem, ScenarioRevalueView,
+    ScenarioPnlBatchItem, ScenarioRevalueView, apply_scenario_and_revalue, scenario_pnl,
 };
 
 #[test]

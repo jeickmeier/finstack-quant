@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use crate::FxHashMap;
+use crate::Result;
 use crate::market_data::scalars::{InflationIndex, MarketScalar, ScalarTimeSeries};
 use crate::market_data::surfaces::{FxDeltaVolSurface, VolCube, VolSurface};
 use crate::market_data::term_structures::{
@@ -9,8 +11,6 @@ use crate::market_data::term_structures::{
     InflationCurve, PriceCurve, PriceCurveKind,
 };
 use crate::types::CurveId;
-use crate::FxHashMap;
-use crate::Result;
 
 use super::{CurveStorage, MarketContext};
 

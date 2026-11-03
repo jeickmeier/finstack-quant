@@ -5,7 +5,7 @@ use crate::api::errors::EnvelopeError;
 use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::api::schema::{CalibrationEnvelope, StepParams};
-use crate::api::validate::{dry_run, validate, CalibrationValidationReport};
+use crate::api::validate::{CalibrationValidationReport, dry_run, validate};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -60,8 +60,8 @@ fn assert_parallel_matches_sequential(
 }
 
 #[test]
-fn swaption_example_has_identical_sequential_and_parallel_outputs(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn swaption_example_has_identical_sequential_and_parallel_outputs()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let envelope = swaption_fixture()?;
     let validation = validate(&envelope);
     assert!(validation.errors.is_empty(), "{:?}", validation.errors);
@@ -72,8 +72,8 @@ fn swaption_example_has_identical_sequential_and_parallel_outputs(
 }
 
 #[test]
-fn prior_projection_does_not_bypass_an_earlier_recalibration_writer(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn prior_projection_does_not_bypass_an_earlier_recalibration_writer()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut envelope = swaption_fixture()?;
     let stale_forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
         .base_date(date!(2026 - 05 - 08))
@@ -88,17 +88,19 @@ fn prior_projection_does_not_bypass_an_earlier_recalibration_writer(
     // plan step must finish before the swaption step reads that same ID.
     let validation = validate(&envelope);
     assert!(validation.errors.is_empty(), "{:?}", validation.errors);
-    assert!(validation
-        .dependency_graph
-        .initial_ids
-        .iter()
-        .any(|id| id == "USD-SOFR-3M"));
+    assert!(
+        validation
+            .dependency_graph
+            .initial_ids
+            .iter()
+            .any(|id| id == "USD-SOFR-3M")
+    );
     assert_parallel_matches_sequential(envelope)
 }
 
 #[test]
-fn xccy_dependencies_include_both_convention_projection_curves(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn xccy_dependencies_include_both_convention_projection_curves()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let base_date = date!(2025 - 01 - 02);
     let mut envelope: CalibrationEnvelope = serde_json::from_value(serde_json::json!({
         "schema": "finstack_quant.calibration/1",
@@ -244,8 +246,8 @@ fn equity_cash_dividends() -> std::result::Result<MarketDatum, Box<dyn std::erro
 }
 
 #[test]
-fn equity_dependencies_require_market_spot_and_carry_unless_overridden(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn equity_dependencies_require_market_spot_and_carry_unless_overridden()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     for kind in ["vol_surface", "svi_surface"] {
         let envelope = equity_dependency_fixture(kind)?;
         let complete = validate(&envelope);
@@ -285,8 +287,8 @@ fn equity_dependencies_require_market_spot_and_carry_unless_overridden(
 }
 
 #[test]
-fn equity_carry_dependency_resolves_schedule_id_and_prefers_existing_yield(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn equity_carry_dependency_resolves_schedule_id_and_prefers_existing_yield()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     for kind in ["vol_surface", "svi_surface"] {
         let mut envelope = equity_dependency_fixture(kind)?;
         envelope.market_data.push(equity_cash_dividends()?);
@@ -321,8 +323,8 @@ fn equity_carry_dependency_resolves_schedule_id_and_prefers_existing_yield(
 }
 
 #[test]
-fn svi_without_discount_requires_yield_even_when_cash_dividends_exist(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn svi_without_discount_requires_yield_even_when_cash_dividends_exist()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut envelope = equity_dependency_fixture("svi_surface")?;
     if let StepParams::SviSurface(params) = &mut envelope.plan.steps[0].params {
         params.discount_curve_id = None;
@@ -340,8 +342,8 @@ fn svi_without_discount_requires_yield_even_when_cash_dividends_exist(
 }
 
 #[test]
-fn hull_white_dependency_outputs_use_canonical_parameter_keys(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn hull_white_dependency_outputs_use_canonical_parameter_keys()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let swaption_params: StepParams = serde_json::from_value(serde_json::json!({
         "kind": "hull_white",
         "curve_id": "USD-OIS",

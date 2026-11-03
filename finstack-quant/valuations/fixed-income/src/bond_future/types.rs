@@ -9,7 +9,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::contract_specs::{
-    repo_annualization_denominator, BondFutureSpecs,
+    BondFutureSpecs, repo_annualization_denominator,
 };
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::ListedFutureTerms;
@@ -419,14 +419,14 @@ Provide it at construction time via BondFutureBuilder::ctd_bond(...) or by using
         }
 
         // If an embedded CTD bond is provided, it must match the CTD id.
-        if let Some(bond) = &self.ctd_bond {
-            if bond.id != resolved_ctd_id {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "ctd_bond.id ({}) must match ctd_bond_id ({})",
-                    bond.id.as_str(),
-                    resolved_ctd_id.as_str()
-                )));
-            }
+        if let Some(bond) = &self.ctd_bond
+            && bond.id != resolved_ctd_id
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "ctd_bond.id ({}) must match ctd_bond_id ({})",
+                bond.id.as_str(),
+                resolved_ctd_id.as_str()
+            )));
         }
 
         // Conversion factors validation

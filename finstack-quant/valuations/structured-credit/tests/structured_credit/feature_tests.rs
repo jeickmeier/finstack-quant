@@ -2011,11 +2011,7 @@ mod controlled_accumulation_tests {
                 weighted += years * amount.amount();
                 total += amount.amount();
             }
-            if total > 0.0 {
-                weighted / total
-            } else {
-                0.0
-            }
+            if total > 0.0 { weighted / total } else { 0.0 }
         };
 
         let wal_breaching = senior_principal_wal(&breaching);

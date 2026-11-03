@@ -13,8 +13,8 @@ use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_core::market::conventions::RateIndexKind;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 
 use finstack_quant_valuations_core::impl_instrument_base;
 

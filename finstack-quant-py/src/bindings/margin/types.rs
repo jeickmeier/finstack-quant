@@ -2,7 +2,7 @@
 
 use crate::bindings::core::config::PyFinstackConfig;
 use crate::bindings::module_utils::parse_currency;
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
+use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_core::money::Money;
 use finstack_quant_margin as fm;

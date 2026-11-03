@@ -16,8 +16,8 @@ use finstack_quant_valuations_structured_credit::structured_credit::{
 };
 use time::macros::date;
 
-use super::instrument_pool_tests::{deal_with, DealSpec};
-use crate::support::revolver_draws::{market, revolver, widening_hazard_curve, HAZARD_ID};
+use super::instrument_pool_tests::{DealSpec, deal_with};
+use crate::support::revolver_draws::{HAZARD_ID, market, revolver, widening_hazard_curve};
 
 const CLOSING: Date = date!(2024 - 01 - 15);
 const MATURITY: Date = date!(2027 - 01 - 15);

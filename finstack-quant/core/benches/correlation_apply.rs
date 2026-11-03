@@ -4,9 +4,9 @@
 //! Carlo, so its cost scales with n (asset count) × paths × steps. Measures the
 //! exact-triangular hot path and the pivoted dense path separately.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_core::math::linalg::cholesky_correlation;
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::math::linalg::CorrelationFactor;
+use finstack_quant_core::math::linalg::cholesky_correlation;
 use std::hint::black_box;
 
 /// Equicorrelated matrix with off-diagonal `rho` — positive definite for the
@@ -15,11 +15,7 @@ fn equicorrelation(n: usize, rho: f64) -> Vec<f64> {
     (0..n * n)
         .map(|k| {
             let (i, j) = (k / n, k % n);
-            if i == j {
-                1.0
-            } else {
-                rho
-            }
+            if i == j { 1.0 } else { rho }
         })
         .collect()
 }

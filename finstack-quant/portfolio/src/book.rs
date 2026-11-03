@@ -53,14 +53,14 @@ pub(crate) fn validate_books<'a>(
                 format!("/portfolio/books/{book_id}/id"),
             ));
         }
-        if let Some(parent_id) = &book.parent_id {
-            if !books.contains_key(parent_id) {
-                emit(issue(
-                    "portfolio/book-missing-parent",
-                    format!("book '{book_id}' references missing parent '{parent_id}'"),
-                    format!("/portfolio/books/{book_id}/parent_id"),
-                ));
-            }
+        if let Some(parent_id) = &book.parent_id
+            && !books.contains_key(parent_id)
+        {
+            emit(issue(
+                "portfolio/book-missing-parent",
+                format!("book '{book_id}' references missing parent '{parent_id}'"),
+                format!("/portfolio/books/{book_id}/parent_id"),
+            ));
         }
         for (index, position_id) in book.position_ids.iter().enumerate() {
             let pointer = format!("/portfolio/books/{book_id}/position_ids/{index}");
@@ -97,7 +97,9 @@ pub(crate) fn validate_books<'a>(
             if let Some(first_parent) = child_parents.insert(child_id, book_id) {
                 emit(issue(
                     "portfolio/book-multiple-parents",
-                    format!("book '{child_id}' is listed more than once by parents '{first_parent}' and '{book_id}'"),
+                    format!(
+                        "book '{child_id}' is listed more than once by parents '{first_parent}' and '{book_id}'"
+                    ),
                     pointer.clone(),
                 ));
             }
@@ -114,16 +116,17 @@ pub(crate) fn validate_books<'a>(
         }
     }
     for (book_id, book) in books {
-        if let Some(parent_id) = &book.parent_id {
-            if books.contains_key(parent_id)
-                && child_parents.get(book_id).copied() != Some(parent_id)
-            {
-                emit(issue(
-                    "portfolio/book-parent-child-mismatch",
-                    format!("book '{book_id}' names parent '{parent_id}', but the parent does not list it as a child"),
-                    format!("/portfolio/books/{book_id}/parent_id"),
-                ));
-            }
+        if let Some(parent_id) = &book.parent_id
+            && books.contains_key(parent_id)
+            && child_parents.get(book_id).copied() != Some(parent_id)
+        {
+            emit(issue(
+                "portfolio/book-parent-child-mismatch",
+                format!(
+                    "book '{book_id}' names parent '{parent_id}', but the parent does not list it as a child"
+                ),
+                format!("/portfolio/books/{book_id}/parent_id"),
+            ));
         }
     }
 

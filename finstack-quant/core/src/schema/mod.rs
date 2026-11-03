@@ -16,15 +16,15 @@ mod registry;
 #[cfg(test)]
 mod tests;
 
-pub use externalize::{externalize_schema_definitions, ExternalSchemaDefinition};
+pub use externalize::{ExternalSchemaDefinition, externalize_schema_definitions};
 pub use generator::{
-    build_schema_index, deterministic_json_bytes, run_schema_generator, schema_index_row,
-    sync_generated_files, SchemaGenerationCommand, SchemaGenerationMode, SCHEMA_INDEX_VERSION,
+    SCHEMA_INDEX_VERSION, SchemaGenerationCommand, SchemaGenerationMode, build_schema_index,
+    deterministic_json_bytes, run_schema_generator, schema_index_row, sync_generated_files,
 };
-pub use llm::{project_llm, LlmProfile, DEFAULT_MAX_INLINE_BYTES, RESOLVES_FROM_KEYWORD};
+pub use llm::{DEFAULT_MAX_INLINE_BYTES, LlmProfile, RESOLVES_FROM_KEYWORD, project_llm};
 pub use registry::{
-    example, example_from_json, find_schema_artifact, SchemaArtifact, SchemaKind, SerdeSchema,
-    COMMON_SCHEMA_BASE, COMMON_SCHEMA_DEFINITIONS, JSON_SCHEMA_DIALECT,
+    COMMON_SCHEMA_BASE, COMMON_SCHEMA_DEFINITIONS, JSON_SCHEMA_DIALECT, SchemaArtifact, SchemaKind,
+    SerdeSchema, example, example_from_json, find_schema_artifact,
 };
 
 /// Register one schema artifact for a contract type under a crate's family.
@@ -73,7 +73,7 @@ macro_rules! schema_artifact {
             title = stringify!($ty)
         )
     };
-    ($ty:ident, $family:literal, $file:literal, $kind:ident, $summary:literal, title = $title:expr) => {
+    ($ty:ident, $family:literal, $file:literal, $kind:ident, $summary:literal, title = $title:expr_2021) => {
         $crate::schema::SchemaArtifact::new::<$ty>(
             concat!("schemas/", $family, "/1/", $file, ".schema.json"),
             concat!(

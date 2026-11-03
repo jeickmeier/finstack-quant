@@ -364,10 +364,12 @@ fn abs_template_does_not_trap_junior_coupon() {
         ],
         "the template places the test after the tested class's coupon"
     );
-    assert!(waterfall
-        .tiers
-        .iter()
-        .all(|tier| tier.effective_funding() == FundingSource::default_for(tier.payment_type)));
+    assert!(
+        waterfall
+            .tiers
+            .iter()
+            .all(|tier| tier.effective_funding() == FundingSource::default_for(tier.payment_type))
+    );
     assert_eq!(waterfall.tiers[0].payment_type, PaymentType::Interest);
     assert_eq!(
         waterfall.tiers[0].recipients.len(),
@@ -411,9 +413,11 @@ fn builder_rejects_invalid_waterfalls() {
         .build();
     assert!(empty.is_err(), "an empty fee tier must be rejected");
 
-    assert!(Waterfall::builder(Currency::USD)
-        .add_tier(fee("a", 1))
-        .add_tier(fee("b", 2))
-        .build()
-        .is_ok());
+    assert!(
+        Waterfall::builder(Currency::USD)
+            .add_tier(fee("a", 1))
+            .add_tier(fee("b", 2))
+            .build()
+            .is_ok()
+    );
 }

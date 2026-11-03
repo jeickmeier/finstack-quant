@@ -34,11 +34,11 @@
 //! but the PV is always anchored at `as_of`. The quote engine handles
 //! settlement-date accrued interest separately.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_valuations_core::instruments::pricing::rates_credit::{
@@ -246,7 +246,7 @@ pub(crate) fn price_raw_with_oas(
 mod tests {
     use super::*;
     use crate::bond::pricing::discount;
-    use crate::bond::pricing::tree::{bond_tree_settings, TreePricer};
+    use crate::bond::pricing::tree::{TreePricer, bond_tree_settings};
     use crate::bond::{BondSettlementConvention, CallPut, CallPutSchedule, CashflowSpec};
     use finstack_quant_cashflows::builder::CouponType;
     use finstack_quant_core::currency::Currency;

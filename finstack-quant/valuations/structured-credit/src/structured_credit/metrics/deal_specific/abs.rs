@@ -141,10 +141,10 @@ impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsCreditEnha
             .checked_add(pool.reserve_account)?
             .checked_add(pool.excess_spread_account)?;
         for asset in &pool.assets {
-            if asset.defaulted {
-                if let Some(recovery) = asset.recovery_amount {
-                    collateral = collateral.checked_add(recovery)?;
-                }
+            if asset.defaulted
+                && let Some(recovery) = asset.recovery_amount
+            {
+                collateral = collateral.checked_add(recovery)?;
             }
         }
         let senior = abs

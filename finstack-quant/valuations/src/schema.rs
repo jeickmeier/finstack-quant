@@ -24,7 +24,7 @@ use finstack_quant_valuations_core::schema::package_valuations_schema;
 /// The JSON is embedded via `include_str!` so the content is always present,
 /// but parsing can still fail if the JSON is malformed.
 macro_rules! try_include_schema {
-    ($path:expr) => {
+    ($path:expr_2021) => {
         serde_json::from_str::<Value>(include_str!($path))
             .map_err(|e| format!("invalid schema JSON at {}: {}", $path, e))
     };
@@ -43,8 +43,8 @@ pub fn instrument_envelope_schema() -> finstack_quant_core::Result<&'static Valu
         .map_err(|e| finstack_quant_core::Error::Validation(e.clone()))
 }
 
-fn instrument_schema_cache(
-) -> &'static std::collections::BTreeMap<&'static str, Result<Value, String>> {
+fn instrument_schema_cache()
+-> &'static std::collections::BTreeMap<&'static str, Result<Value, String>> {
     static CACHE: OnceLock<std::collections::BTreeMap<&'static str, Result<Value, String>>> =
         OnceLock::new();
     CACHE.get_or_init(|| {
@@ -131,8 +131,8 @@ fn common_schema_resources() -> finstack_quant_core::Result<Vec<(String, jsonsch
 }
 
 #[cfg(feature = "jsonschema-validate")]
-fn embedded_instrument_schema_resources(
-) -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
+fn embedded_instrument_schema_resources()
+-> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
     let mut resources = std::collections::BTreeMap::new();
     for (tag, schema_result) in instrument_schema_cache() {
         let schema = schema_result.as_ref().map_err(|e| {
@@ -422,8 +422,8 @@ fn instrument_envelope_validator() -> finstack_quant_core::Result<&'static jsons
 /// than all at once because a validator retains its own copy of the resource
 /// registry (~20 MB measured): compiling all of them up front would cost about
 /// a second and 1.4 GB for callers that touch only a handful of types.
-fn instrument_validator_cache(
-) -> &'static std::collections::BTreeMap<&'static str, OnceLock<CachedValidator>> {
+fn instrument_validator_cache()
+-> &'static std::collections::BTreeMap<&'static str, OnceLock<CachedValidator>> {
     static CACHE: OnceLock<std::collections::BTreeMap<&'static str, OnceLock<CachedValidator>>> =
         OnceLock::new();
     CACHE.get_or_init(|| {
@@ -511,9 +511,9 @@ fn validate_with(
 mod examples;
 
 #[cfg(feature = "json-schema")]
-use crate::instruments::json_loader::instrument_registry;
-#[cfg(feature = "json-schema")]
 use crate::instruments::json_loader::InstrumentEnvelope;
+#[cfg(feature = "json-schema")]
+use crate::instruments::json_loader::instrument_registry;
 #[cfg(feature = "json-schema")]
 use crate::instruments::pricing_overrides::{
     InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
@@ -719,6 +719,8 @@ pub fn artifacts_slice() -> &'static [SchemaArtifact] {
 /// entry with [`SchemaArtifact::generate`].
 #[must_use]
 pub fn artifacts() -> Vec<SchemaArtifact> {
+    use crate::instruments::BondQuoteInput;
+    use crate::instruments::MarketDependencies;
     use crate::instruments::cashflow_export::{CurrencyLadder, InstrumentCashflowEnvelope};
     use crate::instruments::composite::{CompositeHistoryRow, CompositeRebalanceResult};
     use crate::instruments::credit_derivatives::cds_index::CdsIndexParams;
@@ -736,15 +738,13 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         StandardDealParams, TrancheCashflows, TrancheMetrics,
     };
     use crate::instruments::json_loader::InstrumentJson;
-    use crate::instruments::BondQuoteInput;
-    use crate::instruments::MarketDependencies;
     use crate::market::conventions::{
         CdsConventionSpec, InflationSwapConventions, IrFutureConventions, RateIndexConventions,
         SwaptionConventions, XccyConventions,
     };
     use crate::market::listed::ListedProductCoverage;
-    use crate::metrics::risk::var_calculator::VarResult;
     use crate::metrics::risk::MarketHistory;
+    use crate::metrics::risk::var_calculator::VarResult;
     use crate::pricer::{
         EquityMetricsFieldUnits, MetricFieldUnit, MetricMetadata, PoolReportFieldUnits,
         ScenarioTableFieldUnits, SimulationFieldUnits, TrancheSolveFieldUnits,

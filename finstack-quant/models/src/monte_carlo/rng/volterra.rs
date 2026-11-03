@@ -309,10 +309,10 @@ mod tests {
 
     #[test]
     fn reports_two_normals_per_step() {
-        let gen = RiemannLiouvilleVolterra::new(1.0, 32, 0.1).unwrap();
-        assert_eq!(gen.normals_per_step(), 2);
-        assert_eq!(gen.num_steps(), 32);
-        assert!((gen.hurst() - 0.1).abs() < 1e-14);
+        let r#gen = RiemannLiouvilleVolterra::new(1.0, 32, 0.1).unwrap();
+        assert_eq!(r#gen.normals_per_step(), 2);
+        assert_eq!(r#gen.num_steps(), 32);
+        assert!((r#gen.hurst() - 0.1).abs() < 1e-14);
     }
 
     /// Unit test (i): the far-field power-law weight for lag `m` equals
@@ -325,7 +325,7 @@ mod tests {
         let n = 16;
         let t_end = 2.0;
         let dt = t_end / n as f64;
-        let gen = RiemannLiouvilleVolterra::new(t_end, n, h).unwrap();
+        let r#gen = RiemannLiouvilleVolterra::new(t_end, n, h).unwrap();
 
         for m in 2..=n {
             let mf = m as f64;
@@ -334,9 +334,9 @@ mod tests {
             let b_star = raw.powf(1.0 / gamma) - mf;
             let expected = ((mf + b_star) * dt).powf(gamma);
             assert!(
-                (gen.far_weight[m] - expected).abs() < 1e-13,
+                (r#gen.far_weight[m] - expected).abs() < 1e-13,
                 "lag {m}: weight {} != expected {expected}",
-                gen.far_weight[m]
+                r#gen.far_weight[m]
             );
             // The optimal point must lie strictly inside the interval (m−1, m).
             assert!(
@@ -355,12 +355,12 @@ mod tests {
         let n = 20;
         let t_end = 1.0;
         let dt = t_end / n as f64;
-        let gen = RiemannLiouvilleVolterra::new(t_end, n, h).unwrap();
+        let r#gen = RiemannLiouvilleVolterra::new(t_end, n, h).unwrap();
 
         // Reconstruct covariance from the Cholesky factor: C = L·Lᵀ.
-        let var_dw = gen.l00 * gen.l00;
-        let cov = gen.l00 * gen.l10;
-        let var_i = gen.l10 * gen.l10 + gen.l11 * gen.l11;
+        let var_dw = r#gen.l00 * r#gen.l00;
+        let cov = r#gen.l00 * r#gen.l10;
+        let var_i = r#gen.l10 * r#gen.l10 + r#gen.l11 * r#gen.l11;
 
         let expected_var_dw = dt;
         let expected_cov = dt.powf(gamma + 1.0) / (gamma + 1.0);
@@ -385,8 +385,8 @@ mod tests {
         for &h in &[0.1_f64, 0.3, 0.45] {
             let n = 200;
             let t_end = 1.0;
-            let gen = RiemannLiouvilleVolterra::new(t_end, n, h).unwrap();
-            let dt = gen.dt();
+            let r#gen = RiemannLiouvilleVolterra::new(t_end, n, h).unwrap();
+            let dt = r#gen.dt();
             let num_normals = 2 * n;
 
             // Variance of Ỹ_{t_k} = sum over independent normals of (coeff)².
@@ -396,7 +396,7 @@ mod tests {
                 let mut normals = vec![0.0; num_normals];
                 normals[i] = 1.0;
                 let mut out = vec![0.0; n];
-                gen.generate(&normals, &mut out);
+                r#gen.generate(&normals, &mut out);
                 for (k, var_k) in var_at.iter_mut().enumerate().take(n + 1).skip(1) {
                     let c = level_at(&out, k);
                     *var_k += c * c;
@@ -423,8 +423,8 @@ mod tests {
     fn h_half_yields_standard_brownian_motion() {
         let n = 64;
         let t_end = 1.0;
-        let gen = RiemannLiouvilleVolterra::new(t_end, n, 0.5).unwrap();
-        let dt = gen.dt();
+        let r#gen = RiemannLiouvilleVolterra::new(t_end, n, 0.5).unwrap();
+        let dt = r#gen.dt();
         let num_normals = 2 * n;
 
         // For BM the increment Δỹ_k must depend ONLY on the k-th step's
@@ -434,7 +434,7 @@ mod tests {
             let mut normals = vec![0.0; num_normals];
             normals[i] = 1.0;
             let mut out = vec![0.0; n];
-            gen.generate(&normals, &mut out);
+            r#gen.generate(&normals, &mut out);
 
             let step = i / 2;
             let is_driving = i % 2 == 0; // z_a drives ΔW
@@ -471,8 +471,8 @@ mod tests {
     fn h_half_increment_variance_is_dt() {
         let n = 50;
         let t_end = 2.0;
-        let gen = RiemannLiouvilleVolterra::new(t_end, n, 0.5).unwrap();
-        let dt = gen.dt();
+        let r#gen = RiemannLiouvilleVolterra::new(t_end, n, 0.5).unwrap();
+        let dt = r#gen.dt();
         let num_normals = 2 * n;
 
         let mut inc_var = vec![0.0; n];
@@ -480,7 +480,7 @@ mod tests {
             let mut normals = vec![0.0; num_normals];
             normals[i] = 1.0;
             let mut out = vec![0.0; n];
-            gen.generate(&normals, &mut out);
+            r#gen.generate(&normals, &mut out);
             for (s, &v) in out.iter().enumerate() {
                 inc_var[s] += v * v;
             }
@@ -495,12 +495,12 @@ mod tests {
 
     #[test]
     fn generation_is_deterministic() {
-        let gen = RiemannLiouvilleVolterra::new(1.5, 40, 0.12).unwrap();
+        let r#gen = RiemannLiouvilleVolterra::new(1.5, 40, 0.12).unwrap();
         let normals: Vec<f64> = (0..80).map(|i| 0.1 * ((i as f64) - 40.0)).collect();
         let mut out_a = vec![0.0; 40];
         let mut out_b = vec![0.0; 40];
-        gen.generate(&normals, &mut out_a);
-        gen.generate(&normals, &mut out_b);
+        r#gen.generate(&normals, &mut out_a);
+        r#gen.generate(&normals, &mut out_b);
         for (a, b) in out_a.iter().zip(out_b.iter()) {
             assert_eq!(a.to_bits(), b.to_bits(), "generation must be bit-identical");
         }
@@ -508,10 +508,10 @@ mod tests {
 
     #[test]
     fn level_zero_at_origin_and_finite() {
-        let gen = RiemannLiouvilleVolterra::new(1.0, 30, 0.2).unwrap();
+        let r#gen = RiemannLiouvilleVolterra::new(1.0, 30, 0.2).unwrap();
         let normals: Vec<f64> = (0..60).map(|i| 0.3 * (-1.0_f64).powi(i)).collect();
         let mut out = vec![0.0; 30];
-        gen.generate(&normals, &mut out);
+        r#gen.generate(&normals, &mut out);
         assert!(out.iter().all(|x| x.is_finite()));
         // Ỹ_{t_0} = 0 by construction (sum of zero increments).
         assert_eq!(level_at(&out, 0), 0.0);

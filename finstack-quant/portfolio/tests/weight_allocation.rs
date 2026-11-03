@@ -1,7 +1,7 @@
 //! Strategy-level allocation API tests.
 
-use finstack_quant_portfolio::allocation::{allocate_weights, WeightAllocationSpec};
-use serde_json::{json, Value};
+use finstack_quant_portfolio::allocation::{WeightAllocationSpec, allocate_weights};
+use serde_json::{Value, json};
 
 /// Parse a JSON-literal spec, run the typed allocation, and return the result as JSON.
 fn allocate(spec: &Value) -> finstack_quant_portfolio::Result<Value> {
@@ -182,9 +182,11 @@ fn capital_rounding_preserves_sign_and_budget_with_deterministic_ties() {
             .map(|row| row["capital"].as_f64().unwrap())
             .collect();
         assert!(capitals.iter().all(|capital| capital.is_finite()));
-        assert!(capitals
-            .iter()
-            .all(|capital| capital * total_capital >= 0.0));
+        assert!(
+            capitals
+                .iter()
+                .all(|capital| capital * total_capital >= 0.0)
+        );
         assert!((capitals.iter().sum::<f64>() - total_capital).abs() < 1e-12);
         assert_eq!(
             capitals,

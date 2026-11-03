@@ -15,7 +15,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::calendar_by_id_strict;
-use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date, DayCount};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, adjust};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
@@ -543,16 +543,20 @@ mod tests {
             invalid.maturity = invalid.start_date;
             assert!(invalid.value(&market, after_maturity).is_err());
             assert!(invalid.value_raw(&market, after_maturity).is_err());
-            assert!(invalid
-                .base_value_raw_with_currency(&market, after_maturity)
-                .is_err());
+            assert!(
+                invalid
+                    .base_value_raw_with_currency(&market, after_maturity)
+                    .is_err()
+            );
             let mut missing_rate = deposit;
             missing_rate.fixed_rate = None;
             assert!(missing_rate.value(&market, after_maturity).is_err());
             assert!(missing_rate.value_raw(&market, after_maturity).is_err());
-            assert!(missing_rate
-                .base_value_raw_with_currency(&market, after_maturity)
-                .is_err());
+            assert!(
+                missing_rate
+                    .base_value_raw_with_currency(&market, after_maturity)
+                    .is_err()
+            );
         }
     }
 }

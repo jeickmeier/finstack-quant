@@ -5,8 +5,8 @@ use std::fmt::Display;
 use serde::de::DeserializeOwned;
 
 use super::{
-    deserialize_json_value, parse_json_value, ContractError, Diagnostic, LoadLimits, LoadPhase,
-    Severity, ValidationReport,
+    ContractError, Diagnostic, LoadLimits, LoadPhase, Severity, ValidationReport,
+    deserialize_json_value, parse_json_value,
 };
 
 /// Identity and version policy for one persisted contract.

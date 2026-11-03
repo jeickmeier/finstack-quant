@@ -87,8 +87,8 @@ pub use engine::{
     InstrumentMutator, SpringingCondition, ThresholdTest,
 };
 pub use forward::{
-    forecast_breaches_generic, forecast_covenant_generic, CovenantForecast, CovenantForecastConfig,
-    FutureBreach, ModelTimeSeries,
+    CovenantForecast, CovenantForecastConfig, FutureBreach, ModelTimeSeries,
+    forecast_breaches_generic, forecast_covenant_generic,
 };
 pub use json::{
     cov_lite_json, evaluate_engine, evaluate_engine_with_source, lbo_standard_json,
@@ -99,8 +99,8 @@ pub use metric::{CovenantMetricId, CovenantMetricSource, HashMapMetricSource};
 pub use report::CovenantReport;
 pub use schedule::ThresholdSchedule;
 pub use series::{
-    evaluate_series_generic, forecast_breaches, forecast_covenant, DatedCovenantReports,
-    DatedMetricSeries, DatedMetrics,
+    DatedCovenantReports, DatedMetricSeries, DatedMetrics, evaluate_series_generic,
+    forecast_breaches, forecast_covenant,
 };
 
 /// Compiles the crate `README.md` Rust samples as doctests.

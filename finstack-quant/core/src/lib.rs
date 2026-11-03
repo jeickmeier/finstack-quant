@@ -139,7 +139,7 @@ pub mod wire;
 /// Deterministic-hasher map and set used across Finstack (re-exported from `rustc_hash`).
 pub use rustc_hash::{FxHashMap, FxHashSet};
 
-pub use error::{format_chain, Error, ErrorKind, InputError, NonFiniteKind, Result};
+pub use error::{Error, ErrorKind, InputError, NonFiniteKind, Result, format_chain};
 
 /// Recover the inner guard from a mutex or rwlock acquisition result if a previous holder panicked.
 #[inline]

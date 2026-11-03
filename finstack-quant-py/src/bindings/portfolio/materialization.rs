@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_portfolio::{
-    materialization::InstrumentArtifactCache, materialization::MaterializationReport,
-    Portfolio as RustPortfolio,
+    Portfolio as RustPortfolio, materialization::InstrumentArtifactCache,
+    materialization::MaterializationReport,
 };
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;

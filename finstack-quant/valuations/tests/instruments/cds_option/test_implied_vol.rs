@@ -1,8 +1,8 @@
 //! Integration tests for implied volatility solver.
 
 use super::common::*;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 

@@ -276,10 +276,12 @@ fn test_explicit_discounting_with_attached_credit_uses_z_spread_cs01_fallback() 
 
     let aggregate = result.measures["bucketed_dv01"];
     assert!(aggregate.is_finite() && aggregate.abs() > 1e-6);
-    assert!(result
-        .measures
-        .iter()
-        .any(|(key, value)| key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6));
+    assert!(
+        result
+            .measures
+            .iter()
+            .any(|(key, value)| key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6)
+    );
     let cs01 = result.measures["cs01"];
     let bucketed_cs01 = result.measures["bucketed_cs01"];
     assert!(cs01.is_finite() && cs01.abs() > 1e-6);

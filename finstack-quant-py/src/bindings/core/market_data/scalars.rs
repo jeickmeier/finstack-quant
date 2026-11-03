@@ -9,7 +9,7 @@ use finstack_quant_core::market_data::scalars::{
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
 
-use crate::bindings::core::currency::{extract_currency, PyCurrency};
+use crate::bindings::core::currency::{PyCurrency, extract_currency};
 use crate::bindings::core::money::{decimal_from_py, is_python_decimal};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
@@ -327,15 +327,16 @@ impl PyInflationIndex {
     ) -> PyResult<Self> {
         let lag = match lag {
             None => None,
-            Some(value) => Some(if let Ok(months) = value.extract::<u8>() {
-                InflationLag::from(months)
-            } else {
-                let label: String = value.extract().map_err(|_| {
+            Some(value) => Some(match value.extract::<u8>() {
+                Ok(months) => InflationLag::from(months),
+                _ => {
+                    let label: String = value.extract().map_err(|_| {
                     crate::errors::value_error(
                         "lag must be an int number of months or a string like \"3M\", \"90D\" or \"none\"",
                     )
                 })?;
-                label.parse::<InflationLag>().map_err(core_to_py)?
+                    label.parse::<InflationLag>().map_err(core_to_py)?
+                }
             }),
         };
         let seasonality = match seasonality {

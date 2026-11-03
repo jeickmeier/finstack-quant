@@ -17,8 +17,8 @@ use crate::fourier::characteristic_function::{
     BlackScholesCf, CharacteristicFunction, MertonJumpCf, VarianceGammaCf,
 };
 use crate::types::OptionType;
-use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::Result;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use num_complex::Complex64;
 use std::f64::consts::PI;
 
@@ -594,26 +594,38 @@ mod tests {
         };
         let pricer = CosPricer::new(&cf, CosConfig::default());
         for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -100.0, 0.0] {
-            assert!(pricer
-                .price(invalid, 100.0, 0.05, 1.0, OptionType::Call)
-                .is_err());
-            assert!(pricer
-                .price(invalid, 100.0, 0.05, 1.0, OptionType::Put)
-                .is_err());
-            assert!(pricer
-                .price_strip(100.0, &[90.0, invalid], 0.05, 1.0, OptionType::Call)
-                .is_err());
-            assert!(pricer
-                .price_strip(100.0, &[90.0, invalid], 0.05, 1.0, OptionType::Put)
-                .is_err());
-            assert!(pricer
-                .price(100.0, 100.0, 0.05, invalid, OptionType::Call)
-                .is_err());
+            assert!(
+                pricer
+                    .price(invalid, 100.0, 0.05, 1.0, OptionType::Call)
+                    .is_err()
+            );
+            assert!(
+                pricer
+                    .price(invalid, 100.0, 0.05, 1.0, OptionType::Put)
+                    .is_err()
+            );
+            assert!(
+                pricer
+                    .price_strip(100.0, &[90.0, invalid], 0.05, 1.0, OptionType::Call)
+                    .is_err()
+            );
+            assert!(
+                pricer
+                    .price_strip(100.0, &[90.0, invalid], 0.05, 1.0, OptionType::Put)
+                    .is_err()
+            );
+            assert!(
+                pricer
+                    .price(100.0, 100.0, 0.05, invalid, OptionType::Call)
+                    .is_err()
+            );
         }
         for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1000.0, 1000.0] {
-            assert!(pricer
-                .price(100.0, 100.0, invalid, 1.0, OptionType::Call)
-                .is_err());
+            assert!(
+                pricer
+                    .price(100.0, 100.0, invalid, 1.0, OptionType::Call)
+                    .is_err()
+            );
         }
     }
 
@@ -824,8 +836,8 @@ mod tests {
     }
 
     #[test]
-    fn cos_variance_gamma_prices_are_positive(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn cos_variance_gamma_prices_are_positive()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         use crate::fourier::characteristic_function::VarianceGammaCf;
         let vg = VarianceGammaCf {
             r: 0.05,
@@ -992,8 +1004,8 @@ mod tests {
     /// short maturity, low vol) must still price — the rejection only fires
     /// for a truly collapsed window, not for legitimately small ones.
     #[test]
-    fn cos_tiny_but_valid_cumulants_still_price(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn cos_tiny_but_valid_cumulants_still_price()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let sigma = 0.01;
         let r = 0.01;
         let t = 1.0 / 365.0;

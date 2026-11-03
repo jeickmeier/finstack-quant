@@ -2,13 +2,13 @@
 
 use serde::{Deserialize, Serialize};
 
+use finstack_quant_statements::Result;
 use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
     Severity, SignConventionPolicy,
 };
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_statements::Result;
 
 /// Verifies that cash-flow-statement capex equals the sum of PP&E additions
 /// and intangible additions.
@@ -99,13 +99,12 @@ impl Check for CapexReconciliation {
                 .and_then(|n| get_finite_node_value(context.results, n, pid))
                 .unwrap_or(0.0);
 
-            if let Some(node) = self.ppe_additions_node.as_ref() {
-                if let Some(f) =
+            if let Some(node) = self.ppe_additions_node.as_ref()
+                && let Some(f) =
                     self.sign_convention
                         .validate(ppe_add, node.as_str(), Some(*pid), self.id())
-                {
-                    findings.push(f);
-                }
+            {
+                findings.push(f);
             }
 
             let intangible_add = self
@@ -114,15 +113,15 @@ impl Check for CapexReconciliation {
                 .and_then(|n| get_finite_node_value(context.results, n, pid))
                 .unwrap_or(0.0);
 
-            if let Some(node) = self.intangible_additions_node.as_ref() {
-                if let Some(f) = self.sign_convention.validate(
+            if let Some(node) = self.intangible_additions_node.as_ref()
+                && let Some(f) = self.sign_convention.validate(
                     intangible_add,
                     node.as_str(),
                     Some(*pid),
                     self.id(),
-                ) {
-                    findings.push(f);
-                }
+                )
+            {
+                findings.push(f);
             }
 
             let expected = ppe_add + intangible_add;

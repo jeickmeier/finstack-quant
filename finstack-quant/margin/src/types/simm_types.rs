@@ -6,8 +6,8 @@
 
 use super::SimmCurvatureSensitivity;
 use core::hash::Hash;
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::FxHashMap;
+use finstack_quant_core::currency::Currency;
 
 /// The twelve signed-amount maps of [`SimmSensitivities`], listed once so
 /// `is_empty`, `merge`, and `scale_amounts` walk them in one place.
@@ -1472,10 +1472,11 @@ mod tests {
         let mut net = left.clone();
         net.merge(&left.scaled(-1.0)).expect("same base currency");
         assert!(net.credit_qualifying_vega.values().all(|v| v.abs() < 1e-12));
-        assert!(net
-            .credit_non_qualifying_vega
-            .values()
-            .all(|v| v.abs() < 1e-12));
+        assert!(
+            net.credit_non_qualifying_vega
+                .values()
+                .all(|v| v.abs() < 1e-12)
+        );
         assert!(net.commodity_vega.values().all(|v| v.abs() < 1e-12));
     }
 
@@ -1487,9 +1488,11 @@ mod tests {
         eur.add_equity_delta("AAPL", 5.0);
 
         let error = usd.merge(&eur).expect_err("currency mismatch");
-        assert!(error
-            .to_string()
-            .contains("cannot merge SIMM sensitivities in EUR into a USD container"));
+        assert!(
+            error
+                .to_string()
+                .contains("cannot merge SIMM sensitivities in EUR into a USD container")
+        );
         assert_eq!(usd.equity_delta["AAPL"], 10.0);
 
         usd.merge(&eur.scaled_to_currency(Currency::USD, 1.1))

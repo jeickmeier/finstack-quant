@@ -40,11 +40,11 @@
 //!   John Wiley & Sons. Chapters 1-2. `docs/REFERENCES.md#gatheral-volatility-surface`
 
 use crate::volatility::arbitrage::DEFAULT_ARBITRAGE_TOLERANCE;
-use crate::volatility::dupire::{dupire_node, MoneynessLookup};
+use crate::volatility::dupire::{MoneynessLookup, dupire_node};
+use finstack_quant_core::InputError;
 use finstack_quant_core::market_data::surfaces::{
     VolGridOpts, VolQuoteType, VolSurface, VolSurfaceAxis,
 };
-use finstack_quant_core::InputError;
 use finstack_quant_core::{Error, Result};
 
 fn validate_implied_surface(surface: &VolSurface, forwards: &[f64]) -> Result<()> {
@@ -513,9 +513,9 @@ pub(crate) mod test_support {
 
 #[cfg(test)]
 mod tests {
-    use super::test_support::{forwards, linspace, SKEWED};
+    use super::test_support::{SKEWED, forwards, linspace};
     use super::*;
-    use crate::volatility::arbitrage::{check_surface, ArbitrageCheckConfig};
+    use crate::volatility::arbitrage::{ArbitrageCheckConfig, check_surface};
 
     const EXPIRIES: [f64; 4] = [0.25, 0.5, 1.0, 2.0];
     const STRIKES: [f64; 7] = [70.0, 80.0, 90.0, 100.0, 110.0, 120.0, 130.0];

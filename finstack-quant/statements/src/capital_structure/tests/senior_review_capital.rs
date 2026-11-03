@@ -2,34 +2,34 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use crate::capital_structure::waterfall::execute_waterfall;
+use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_core::dates::{build_periods, Date, DayCount, StubKind};
+use finstack_quant_core::dates::{Date, DayCount, StubKind, build_periods};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{
-    calculate_period_flows, CapitalStructureState, CashflowBreakdown, EcfSweepSpec,
-    PaymentPriority, PikToggleSpec, WaterfallSpec,
+    CapitalStructureState, CashflowBreakdown, EcfSweepSpec, PaymentPriority, PikToggleSpec,
+    WaterfallSpec, calculate_period_flows,
 };
 use finstack_quant_statements::evaluator::EvaluationContext;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::FinancialStatementInstrument;
 use finstack_quant_statements::types::{AmountOrScalar, NodeId};
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::DrawEvent;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
     CommitmentFeeBase, DdtlSpec, OidPolicy, TermLoan,
 };
-use finstack_quant_valuations::instruments::PayReceive;
 use indexmap::IndexMap;
 use rust_decimal::Decimal;
 use std::sync::Arc;
@@ -87,11 +87,12 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
             .sum();
         assert!(net != 0.0, "fixture must produce a net payment or receipt");
         if fixed_rate == 0.0 {
-            assert!(raw
-                .get_flows()
-                .iter()
-                .any(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub)
-                    && flow.amount.amount() == 0.0));
+            assert!(
+                raw.get_flows()
+                    .iter()
+                    .any(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub)
+                        && flow.amount.amount() == 0.0)
+            );
         } else {
             // These canonical schedules carry one sign throughout their life,
             // so opposite-sign inference cannot recognize the instrument.
@@ -1176,11 +1177,12 @@ fn named_prepayment_without_its_priority_is_rejected_before_state_changes() {
         } else {
             "voluntary_prepay_node"
         };
-        assert!(spec
-            .validate()
-            .expect_err("sizing nodes require their payment priority")
-            .to_string()
-            .contains(node_name));
+        assert!(
+            spec.validate()
+                .expect_err("sizing nodes require their payment priority")
+                .to_string()
+                .contains(node_name)
+        );
         let error = execute_waterfall(&context, &spec, &mut state, &flows)
             .expect_err("invalid waterfall must not allocate principal");
         assert!(error.to_string().contains(node_name));
@@ -1236,11 +1238,12 @@ fn positive_ecf_requires_sweep_even_with_other_prepayment_priorities() {
             ecf_sweep: Some(ecf_sweep()),
             ..Default::default()
         };
-        assert!(spec
-            .validate()
-            .expect_err("only Sweep executes the ECF bucket")
-            .to_string()
-            .contains("requires the `Sweep`"));
+        assert!(
+            spec.validate()
+                .expect_err("only Sweep executes the ECF bucket")
+                .to_string()
+                .contains("requires the `Sweep`")
+        );
     }
 }
 

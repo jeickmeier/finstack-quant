@@ -20,9 +20,9 @@ use bench_common::{
     base_date, create_attribution_portfolio, create_market_context, create_t1_market_context,
     t1_date,
 };
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_attribution::{
-    default_waterfall_order, AttributionMethod, TaylorAttributionConfig,
+    AttributionMethod, TaylorAttributionConfig, default_waterfall_order,
 };
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_portfolio::attribution::attribute_portfolio_pnl;

@@ -5,8 +5,8 @@
 //! while `MetricContext` provides the execution environment with caching.
 
 use crate::instruments::Instrument;
-use crate::metrics::risk::MarketHistory;
 use crate::metrics::MetricId;
+use crate::metrics::risk::MarketHistory;
 use crate::pricer::PricingDispatch;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CashFlow;

@@ -1,7 +1,7 @@
 //! Integration tests for statement shock functionality.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{build_periods, Date, DayCount};
+use finstack_quant_core::dates::{Date, DayCount, build_periods};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::math::Compounding;

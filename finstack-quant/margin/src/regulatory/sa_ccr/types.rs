@@ -409,7 +409,7 @@ impl SaCcrTrade {
             _ => {
                 return Err(finstack_quant_core::Error::Validation(
                     "SA-CCR requires a supervisory category consistent with the asset class".into(),
-                ))
+                ));
             }
         }
         if self.is_option != self.option_maturity_date.is_some()

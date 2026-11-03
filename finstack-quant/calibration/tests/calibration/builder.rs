@@ -10,12 +10,12 @@ use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::RateQuote;
 use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::FxHashMap;
 use time::Month;
 
 #[test]

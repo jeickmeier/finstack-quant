@@ -2,12 +2,12 @@
 //! at default, the expected loss embedded in the valuation, recovery01 and
 //! jump-to-default.
 
-use crate::revolving_credit::types::{CreditSpreadProcessSpec, DrawRepaySpec};
 use crate::revolving_credit::RevolvingCredit;
+use crate::revolving_credit::types::{CreditSpreadProcessSpec, DrawRepaySpec};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::sensitivities::recovery01::{
-    bumped_recovery, market_with_recovery, recovery01_fd, RecoveryReplayTerms,
+    RecoveryReplayTerms, bumped_recovery, market_with_recovery, recovery01_fd,
 };
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

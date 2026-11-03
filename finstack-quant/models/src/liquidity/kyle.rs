@@ -281,8 +281,8 @@ mod tests {
     }
 
     #[test]
-    fn from_amihud_calibrates_price_space_lambda(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn from_amihud_calibrates_price_space_lambda()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let model = KyleLambdaModel::from_amihud(1e-8, 100.0)?;
         assert!((model.lambda() - 1e-6).abs() < 1e-12);
 
@@ -318,8 +318,8 @@ mod tests {
     }
 
     #[test]
-    fn estimate_cost_matches_price_space_lambda(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn estimate_cost_matches_price_space_lambda()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         // Price impact for a trade of size Q is lambda * Q.
         // For Q=1000 shares at lambda=0.001:
         // price_impact = 0.001 * 1000 = 1.0
@@ -377,8 +377,8 @@ mod tests {
     /// `remaining[n] == 0`, so the last bucket contributed zero: the variance
     /// was exactly `0.0` at `n = 1` and `−15%` biased at `n = 5`.
     #[test]
-    fn trajectory_cost_variance_matches_execution_risk_squared(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn trajectory_cost_variance_matches_execution_risk_squared()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let model = KyleLambdaModel::new(0.001)?;
         let params = test_params(10_000.0)?;
         let expected = model.estimate_cost(&params)?.execution_risk.powi(2);

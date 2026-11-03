@@ -2,11 +2,11 @@
 
 use crate::market::conventions::{RateIndexConventions, RateIndexKind};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_core::Error;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::Error;
-use finstack_quant_core::FxHashMap;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]

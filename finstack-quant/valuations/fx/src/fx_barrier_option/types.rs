@@ -527,7 +527,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxBarrierOption
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        use crate::fx_barrier_option::pricer::{compute_pv, FxBarrierOptionAnalyticalPricer};
+        use crate::fx_barrier_option::pricer::{FxBarrierOptionAnalyticalPricer, compute_pv};
         use finstack_quant_valuations_core::pricer::Pricer;
 
         if matches!(self.monitoring, Monitoring::Discrete { .. }) {

@@ -4,12 +4,12 @@
 
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
@@ -203,9 +203,11 @@ fn static_excess_spread_and_payment_rate_metrics_match_the_hand_computation() {
 
     let mut plain = trust(card(0.05), d(2027, 1, 1));
     plain.credit_model.card = None;
-    assert!(AbsExcessSpreadCalculator
-        .calculate(&mut metric_context(plain))
-        .is_err());
+    assert!(
+        AbsExcessSpreadCalculator
+            .calculate(&mut metric_context(plain))
+            .is_err()
+    );
 }
 
 /// During the revolving period cardholder payments are recycled and the

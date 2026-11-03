@@ -10,9 +10,9 @@ use finstack_quant_analytics::{
     Performance, PeriodStats, RollingGreeks,
 };
 use finstack_quant_core::dates::{Date, PeriodKind};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
 use time::Month;
 
 fn schema(type_name: &str) -> Value {

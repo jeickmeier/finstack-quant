@@ -4,14 +4,14 @@
 //! cloned market context and a borrowed-or-owned portfolio state, then
 //! optionally re-values with the stressed data.
 
+use crate::Portfolio;
 use crate::error::{Error, Result};
 use crate::types::PositionId;
-use crate::Portfolio;
 use crate::{dependencies::MarketFactorKey, evaluation::PositionInvalidation};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
+use finstack_quant_core::ErrorKind;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::ErrorKind;
 use finstack_quant_scenarios::{
     ApplicationReport, ExecutionContext, ScenarioChangeManifest, ScenarioEngine,
     ScenarioMarketTarget,
@@ -95,7 +95,7 @@ fn selective_invalidation(
             // targets have no exact normalized dependency key. Selective reuse
             // cannot conservatively express those changes, so reprice the full book.
             ScenarioMarketTarget::Fx { .. } | ScenarioMarketTarget::VolatilityIndex { .. } => {
-                return Ok(None)
+                return Ok(None);
             }
         };
         changed_factors.push(key);
@@ -212,9 +212,12 @@ fn replace_portfolio_instruments(
     let position_count = portfolio.positions.len();
     let instrument_count = instruments.len();
     if position_count != instrument_count {
-        return Err(Error::scenario(ErrorKind::Validation, format!(
-            "MO-16: scenario engine returned {instrument_count} instruments for {position_count} portfolio positions"
-        )));
+        return Err(Error::scenario(
+            ErrorKind::Validation,
+            format!(
+                "MO-16: scenario engine returned {instrument_count} instruments for {position_count} portfolio positions"
+            ),
+        ));
     }
 
     for (position, modified_inst) in portfolio.positions.iter_mut().zip(instruments) {
@@ -596,13 +599,13 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
     use finstack_quant_scenarios::{CurveKind, OperationSpec};
-    use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use finstack_quant_valuations::instruments::Instrument;
+    use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     };
     use time::macros::date;
 

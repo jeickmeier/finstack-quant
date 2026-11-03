@@ -11,13 +11,13 @@
 //! risky PV01, and leg PVs. Heavy numerical work is delegated to
 //! `crate::cds::pricing::CdsPricer`.
 
-use crate::cds::pricing::{date_from_hazard_time, CdsPricer};
 use crate::cds::CreditDefaultSwap;
+use crate::cds::pricing::{CdsPricer, date_from_hazard_time};
 use crate::cds_index::{CdsIndex, IndexPricing};
 use finstack_quant_cashflows::builder::merge_cashflow_schedules;
 use finstack_quant_cashflows::builder::{CashFlowSchedule, Notional};
 use finstack_quant_cashflows::{
-    schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
+    CashflowProvider, ScheduleBuildOpts, schedule_from_classified_flows,
 };
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DateExt};
@@ -31,7 +31,7 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::credit;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
-    compute_parallel_cs01_with_provider_raw, require_hazard_replay, Cs01Request,
+    Cs01Request, compute_parallel_cs01_with_provider_raw, require_hazard_replay,
 };
 use finstack_quant_valuations_core::recalibration::RecalibrationProvider;
 use std::sync::Arc;
@@ -806,14 +806,18 @@ mod tests {
             .build_projected_schedule(&market, as_of)
             .expect("projected schedule should build");
 
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .any(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub)));
-        assert!(schedule
-            .get_flows()
-            .iter()
-            .any(|cf| cf.kind == CFKind::DefaultedNotional));
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .any(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+        );
+        assert!(
+            schedule
+                .get_flows()
+                .iter()
+                .any(|cf| cf.kind == CFKind::DefaultedNotional)
+        );
     }
 
     #[test]

@@ -59,10 +59,10 @@ use crate::monte_carlo::process::ou::HullWhite1FParams;
 use crate::monte_carlo::results::MoneyEstimate;
 use crate::rates::hw1f::config::Hw1fMcConfig;
 use crate::rates::hw1f::exercise::ExerciseBoundaryPayoff;
-use crate::rates::hw1f::mc::{build_event_aligned_grid, money_estimate_from_pairs, Hw1fPaths};
+use crate::rates::hw1f::mc::{Hw1fPaths, build_event_aligned_grid, money_estimate_from_pairs};
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
-use finstack_quant_core::Result;
 
 /// Generic HW1F LSMC pricer for callable rate exotics.
 pub struct Hw1fLsmcPricer {

@@ -15,7 +15,7 @@
 //! - Recovery-rate empirical context: `docs/REFERENCES.md#altman-et-al-2005-recovery`
 //!
 
-use super::{validate_finite_recovery_input, validate_recovery_input, RecoveryModel, Result};
+use super::{RecoveryModel, Result, validate_finite_recovery_input, validate_recovery_input};
 
 /// Constant recovery rate model.
 ///

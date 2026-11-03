@@ -8,8 +8,8 @@
 //! 1e-10 slack); the cases below span both former divergence directions.
 
 use finstack_quant_core::math::linalg::{
-    nearest_correlation, validate_correlation_matrix as validate, CorrelationError as Error,
-    NearestCorrelationOpts,
+    CorrelationError as Error, NearestCorrelationOpts, nearest_correlation,
+    validate_correlation_matrix as validate,
 };
 use serde_json::json;
 
@@ -122,10 +122,12 @@ fn overflowing_dimensions_report_invalid_size() {
             n,
             |error| matches!(error, Error::InvalidSize { expected, actual: 0 } if *expected == n),
         );
-        assert!(validate(&[], n)
-            .expect_err("overflowing dimensions must be invalid")
-            .to_string()
-            .contains("Invalid matrix size"));
+        assert!(
+            validate(&[], n)
+                .expect_err("overflowing dimensions must be invalid")
+                .to_string()
+                .contains("Invalid matrix size")
+        );
     }
 }
 

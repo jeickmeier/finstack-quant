@@ -1,6 +1,6 @@
 //! Numerical and boundary regressions for analytics kernels.
 use finstack_quant_analytics::{
-    max_drawdown, sharpe, sortino, volatility, CagrDayCount, Performance, ReturnKind,
+    CagrDayCount, Performance, ReturnKind, max_drawdown, sharpe, sortino, volatility,
 };
 use finstack_quant_core::dates::{Date, PeriodKind};
 use serde_json::json;
@@ -229,43 +229,50 @@ fn singleton_ratios_agree_across_entry_points() {
     let rolling = perf.rolling_sharpe(0, 1, 0.0).unwrap();
     assert_eq!(rolling.dates, dates(2));
     assert!(rolling.values.iter().all(|v| v.is_nan()));
-    assert!(perf
-        .rolling_sortino(0, 1, 0.0)
-        .unwrap()
-        .values
-        .iter()
-        .all(|v| v.is_nan()));
+    assert!(
+        perf.rolling_sortino(0, 1, 0.0)
+            .unwrap()
+            .values
+            .iter()
+            .all(|v| v.is_nan())
+    );
 }
 
 #[test]
 fn constructors_reject_duplicate_identity_and_unrepresentable_returns() {
     for prices in [vec![1e-300, 1e300], vec![1e300, 1e-300]] {
-        assert!(Performance::new(
+        assert!(
+            Performance::new(
+                dates(2),
+                vec![prices],
+                vec!["A".into()],
+                None,
+                PeriodKind::Daily
+            )
+            .is_err()
+        );
+    }
+    let names = vec!["A".into(), "A".into()];
+    assert!(
+        Performance::from_returns(
             dates(2),
-            vec![prices],
-            vec!["A".into()],
+            vec![vec![0.01; 2]; 2],
+            names.clone(),
             None,
             PeriodKind::Daily
         )
-        .is_err());
-    }
-    let names = vec!["A".into(), "A".into()];
-    assert!(Performance::from_returns(
-        dates(2),
-        vec![vec![0.01; 2]; 2],
-        names.clone(),
-        None,
-        PeriodKind::Daily
-    )
-    .is_err());
-    assert!(Performance::new(
-        dates(2),
-        vec![vec![100.0, 101.0]; 2],
-        names,
-        None,
-        PeriodKind::Daily
-    )
-    .is_err());
+        .is_err()
+    );
+    assert!(
+        Performance::new(
+            dates(2),
+            vec![vec![100.0, 101.0]; 2],
+            names,
+            None,
+            PeriodKind::Daily
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -435,11 +442,12 @@ fn identical_paths_have_zero_relative_wealth_at_extreme_absolute_wealth() {
             PeriodKind::Daily,
         )
         .unwrap();
-        assert!(perf
-            .cumulative_returns_outperformance()
-            .iter()
-            .flatten()
-            .all(|&relative| relative == 0.0));
+        assert!(
+            perf.cumulative_returns_outperformance()
+                .iter()
+                .flatten()
+                .all(|&relative| relative == 0.0)
+        );
     }
 }
 
@@ -630,12 +638,13 @@ fn aggregation_propagates_unrepresentable_boundaries() {
     ] {
         assert!(perf.periodic_returns(kind).is_err());
         assert!(perf.period_stats(0, kind, None).is_err());
-        assert!(perf
-            .period_stats(
+        assert!(
+            perf.period_stats(
                 0,
                 kind,
                 Some(finstack_quant_core::dates::FiscalConfig::us_federal())
             )
-            .is_err());
+            .is_err()
+        );
     }
 }

@@ -455,7 +455,7 @@ pub fn build_stress_attribution(
 
 // Shared math helpers
 
-use super::{tail_multipliers, VARIANCE_TOLERANCE};
+use super::{VARIANCE_TOLERANCE, tail_multipliers};
 
 use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 

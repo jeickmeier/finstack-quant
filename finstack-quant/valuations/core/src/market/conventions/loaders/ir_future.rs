@@ -2,9 +2,9 @@
 
 use crate::market::conventions::ids::IrFutureContractId;
 use crate::market::conventions::{IrFutureConventions, IrFutureReferencePeriod};
-use finstack_quant_core::types::IndexId;
 use finstack_quant_core::Error;
 use finstack_quant_core::FxHashMap;
+use finstack_quant_core::types::IndexId;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]

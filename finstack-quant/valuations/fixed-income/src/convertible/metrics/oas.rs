@@ -19,12 +19,12 @@
 //! Returned in **decimal** (e.g., 0.01 = 100bp), consistent with other spread
 //! metrics in the library.
 
-use crate::convertible::pricing::{price_convertible_bond, settlement_dirty_price};
 use crate::convertible::ConvertibleBond;
-use finstack_quant_core::math::solver::BrentSolver;
+use crate::convertible::pricing::{price_convertible_bond, settlement_dirty_price};
 use finstack_quant_core::Result;
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_valuations_core::metrics::{
-    bump_discount_curve_parallel, MetricCalculator, MetricContext,
+    MetricCalculator, MetricContext, bump_discount_curve_parallel,
 };
 
 pub(crate) struct OasCalculator;

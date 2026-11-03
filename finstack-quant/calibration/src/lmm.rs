@@ -57,13 +57,13 @@
 //! - Andersen, L. & Piterbarg, V. (2010). *Interest Rate Modeling*, Vol. 2,
 //!   §16.5, Atlantic Financial Press. `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::black_call;
 use finstack_quant_models::volatility::implied_vol_black;
-use finstack_quant_valuations_rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
 use finstack_quant_valuations_rates::swaption::BermudanSwaption;
+use finstack_quant_valuations_rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
 
 /// Inputs describing the co-terminal swap underlying one European swaption
 /// slice of a Bermudan exercise schedule, expressed in LMM forward-rate
@@ -343,8 +343,8 @@ mod tests {
     use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
     use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations_core::pricer::Pricer;
-    use finstack_quant_valuations_rates::swaption::lmm_pricer::lmm_bermudan_mc_config;
     use finstack_quant_valuations_rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
+    use finstack_quant_valuations_rates::swaption::lmm_pricer::lmm_bermudan_mc_config;
     use finstack_quant_valuations_rates::swaption::{BermudanSchedule, BermudanSwaption};
     use time::Month;
 
@@ -835,25 +835,31 @@ mod tests {
         assert!(rebonato_factors(&empty).is_none());
         // Non-positive market vol rejected.
         let live_slice = slice;
-        assert!(super::calibrate_base_vol(
-            &rebonato_factors(&live_slice).expect("valid factors"),
-            0.0,
-            1.0
-        )
-        .is_none());
-        assert!(super::calibrate_base_vol(
-            &rebonato_factors(&live_slice).expect("valid factors"),
-            -0.1,
-            1.0
-        )
-        .is_none());
-        for expiry in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-            assert!(super::calibrate_base_vol(
+        assert!(
+            super::calibrate_base_vol(
                 &rebonato_factors(&live_slice).expect("valid factors"),
-                0.2,
-                expiry
+                0.0,
+                1.0
             )
-            .is_none());
+            .is_none()
+        );
+        assert!(
+            super::calibrate_base_vol(
+                &rebonato_factors(&live_slice).expect("valid factors"),
+                -0.1,
+                1.0
+            )
+            .is_none()
+        );
+        for expiry in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(
+                super::calibrate_base_vol(
+                    &rebonato_factors(&live_slice).expect("valid factors"),
+                    0.2,
+                    expiry
+                )
+                .is_none()
+            );
         }
     }
 

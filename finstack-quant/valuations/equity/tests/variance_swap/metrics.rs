@@ -600,24 +600,36 @@ fn test_all_metrics_pre_start() {
     // Assert - all metrics should be present and finite
     assert!(result.measures.contains_key(MetricId::Vega.as_str()));
     assert!(result.measures.contains_key(MetricId::Dv01.as_str()));
-    assert!(result
-        .measures
-        .contains_key(MetricId::VarianceVega.as_str()));
-    assert!(result
-        .measures
-        .contains_key(MetricId::ExpectedVariance.as_str()));
-    assert!(result
-        .measures
-        .contains_key(MetricId::RealizedVariance.as_str()));
-    assert!(result
-        .measures
-        .contains_key(MetricId::VarianceNotional.as_str()));
-    assert!(result
-        .measures
-        .contains_key(MetricId::VarianceStrikeVol.as_str()));
-    assert!(result
-        .measures
-        .contains_key(MetricId::VarianceTimeToMaturity.as_str()));
+    assert!(
+        result
+            .measures
+            .contains_key(MetricId::VarianceVega.as_str())
+    );
+    assert!(
+        result
+            .measures
+            .contains_key(MetricId::ExpectedVariance.as_str())
+    );
+    assert!(
+        result
+            .measures
+            .contains_key(MetricId::RealizedVariance.as_str())
+    );
+    assert!(
+        result
+            .measures
+            .contains_key(MetricId::VarianceNotional.as_str())
+    );
+    assert!(
+        result
+            .measures
+            .contains_key(MetricId::VarianceStrikeVol.as_str())
+    );
+    assert!(
+        result
+            .measures
+            .contains_key(MetricId::VarianceTimeToMaturity.as_str())
+    );
 
     for (_, &value) in result.measures.iter() {
         assert!(value.is_finite(), "All metrics must be finite");

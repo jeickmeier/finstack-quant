@@ -32,10 +32,11 @@ fn treynor_propagates_invalid_cash_before_zero_beta_sentinels() {
     .expect("constant portfolios have estimable zero beta against a varying benchmark");
 
     for risk_free_rate in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        assert!(perf
-            .treynor(risk_free_rate)
-            .iter()
-            .all(|ratio| ratio.is_nan()));
+        assert!(
+            perf.treynor(risk_free_rate)
+                .iter()
+                .all(|ratio| ratio.is_nan())
+        );
     }
     assert_eq!(
         perf.treynor(0.0),

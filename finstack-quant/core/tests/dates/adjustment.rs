@@ -10,10 +10,10 @@
 //!
 //! Also includes edge cases for consecutive holidays and infinite loop guards.
 
-use super::common::{make_date, TestCal};
-use finstack_quant_core::dates::{adjust, available_calendars};
-use finstack_quant_core::dates::{BusinessDayConvention, CalendarMetadata, HolidayCalendar};
+use super::common::{TestCal, make_date};
 use finstack_quant_core::InputError;
+use finstack_quant_core::dates::{BusinessDayConvention, CalendarMetadata, HolidayCalendar};
+use finstack_quant_core::dates::{adjust, available_calendars};
 use time::Date;
 
 // Basic Holiday Calendar Trait
@@ -378,7 +378,7 @@ fn calendar_metadata_override_is_respected() {
 
 #[test]
 fn joint_business_days_t0_returns_start_unadjusted() {
-    use finstack_quant_core::dates::{resolve_joint_calendar, DateExt};
+    use finstack_quant_core::dates::{DateExt, resolve_joint_calendar};
 
     // Saturday Jan 4, 2025 is not a business day on either calendar, but
     // n_days = 0 pins the documented behavior: return start unadjusted.

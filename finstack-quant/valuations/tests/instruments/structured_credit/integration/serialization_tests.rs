@@ -18,7 +18,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     TriggerConsequence,
 };
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
-use finstack_quant_valuations::instruments::{json_loader::InstrumentEnvelope, PayReceive};
+use finstack_quant_valuations::instruments::{PayReceive, json_loader::InstrumentEnvelope};
 use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
 use time::Month;
 
@@ -903,8 +903,10 @@ fn waterfall_rejects_retired_base_currency_key() {
     let map = json.as_object_mut().unwrap();
     map.remove("currency");
     map.insert("base_currency".into(), serde_json::json!("USD"));
-    assert!(serde_json::from_value::<
-        finstack_quant_valuations::instruments::fixed_income::structured_credit::Waterfall,
-    >(json)
-    .is_err());
+    assert!(
+        serde_json::from_value::<
+            finstack_quant_valuations::instruments::fixed_income::structured_credit::Waterfall,
+        >(json)
+        .is_err()
+    );
 }

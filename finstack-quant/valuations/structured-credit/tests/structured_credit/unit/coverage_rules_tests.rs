@@ -6,13 +6,13 @@
 
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_fixed_income::bond::{Bond, CashflowSpec};
@@ -21,10 +21,10 @@ use finstack_quant_valuations_structured_credit::structured_credit::{
     DiscountObligationRule, InstrumentCollateral, PoolAsset, StructuredCredit, TestContext,
     Tranche, TrancheCashflows, TrancheStructure,
 };
-use time::macros::date;
 use time::Month;
+use time::macros::date;
 
-use super::instrument_pool_tests::{deal_with, DealSpec};
+use super::instrument_pool_tests::{DealSpec, deal_with};
 use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve;
 
 fn d(y: i32, m: u8, day: u8) -> Date {
@@ -60,16 +60,18 @@ fn pool_with_ccc() -> AssetPool {
 }
 
 fn senior(balance: f64) -> TrancheStructure {
-    TrancheStructure::new(vec![Tranche::new(
-        "A",
-        0.0,
-        100.0,
-        TrancheSeniority::Senior,
-        usd(balance),
-        RateSpec::Fixed { rate: 0.05 },
-        maturity(),
-    )
-    .expect("tranche")])
+    TrancheStructure::new(vec![
+        Tranche::new(
+            "A",
+            0.0,
+            100.0,
+            TrancheSeniority::Senior,
+            usd(balance),
+            RateSpec::Fixed { rate: 0.05 },
+            maturity(),
+        )
+        .expect("tranche"),
+    ])
     .expect("structure")
 }
 
@@ -264,11 +266,12 @@ fn out_of_range_rules_are_rejected() {
 #[test]
 fn deal_rules_reach_the_generated_waterfall() {
     let mut deal = StructuredCredit::example().expect("example");
-    assert!(deal
-        .create_waterfall()
-        .expect("waterfall")
-        .coverage_rules
-        .is_none());
+    assert!(
+        deal.create_waterfall()
+            .expect("waterfall")
+            .coverage_rules
+            .is_none()
+    );
 
     deal.coverage_rules = Some(CoverageRules::clo_standard());
     let waterfall = deal.create_waterfall().expect("waterfall");

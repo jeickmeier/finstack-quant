@@ -20,9 +20,9 @@
 
 use std::cmp::Ordering;
 
+use crate::Result;
 use crate::currency::Currency;
 use crate::dates::fx::fx_standard_settlement_days;
-use crate::Result;
 
 /// USD quotation style for a market FX pair.
 ///
@@ -191,7 +191,7 @@ fn fx_pip_size(base: Currency, quote: Currency) -> f64 {
 ///
 /// `1 / rate` when that reciprocal is a valid FX rate.
 pub fn invert_fx_rate(rate: f64) -> Result<f64> {
-    use super::provider::{checked_reciprocal, ReciprocalError};
+    use super::provider::{ReciprocalError, checked_reciprocal};
     checked_reciprocal(rate).map_err(|failure| match failure {
         ReciprocalError::NonFiniteInput(kind) => crate::InputError::NonFiniteValue { kind }.into(),
         ReciprocalError::NonPositiveInput => crate::Error::Validation(format!(

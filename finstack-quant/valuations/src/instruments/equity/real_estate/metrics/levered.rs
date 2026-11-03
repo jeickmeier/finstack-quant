@@ -1,10 +1,10 @@
 //! Metrics for [`LeveredRealEstateEquity`].
 
-use crate::instruments::equity::real_estate::{levered_pricer, pricer, LeveredRealEstateEquity};
 use crate::instruments::Instrument;
+use crate::instruments::equity::real_estate::{LeveredRealEstateEquity, levered_pricer, pricer};
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::cashflow::xirr;
 use finstack_quant_core::Error;
+use finstack_quant_core::cashflow::xirr;
 
 /// Levered equity IRR (XIRR-style) from the levered equity cashflow schedule.
 #[derive(Debug, Default)]

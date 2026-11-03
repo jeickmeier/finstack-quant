@@ -3,8 +3,8 @@
 //! Tests end-to-end waterfall execution and cashflow scheduling
 //! across different deal types.
 
-use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

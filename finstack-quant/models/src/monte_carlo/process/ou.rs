@@ -34,9 +34,9 @@
 use super::super::paths::ProcessParams;
 use super::super::traits::{PathState, StateKey, StochasticProcess};
 use crate::monte_carlo::traits::ProcessMetadata;
-use crate::rates::hull_white::{fd_instantaneous_forward, HullWhiteParams};
-use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
+use crate::rates::hull_white::{HullWhiteParams, fd_instantaneous_forward};
 use finstack_quant_core::Result;
+use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 
 /// Validated Hull-White one-factor process parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -585,14 +585,16 @@ mod tests {
             let bad_initial = |time: f64| if time == 0.0 { 1.0 } else { bad };
             assert!(calibrate_theta_from_curve(0.1, 0.01, bad_initial, &[]).is_err());
             assert!(calibrate_theta_from_curve(0.1, 0.01, bad_initial, &[0.0, 1.0]).is_err());
-            assert!(calibrate_theta_from_curve_with_piecewise_sigma(
-                0.1,
-                vec![0.0],
-                vec![0.01],
-                bad_initial,
-                &[0.0, 1.0]
-            )
-            .is_err());
+            assert!(
+                calibrate_theta_from_curve_with_piecewise_sigma(
+                    0.1,
+                    vec![0.0],
+                    vec![0.01],
+                    bad_initial,
+                    &[0.0, 1.0]
+                )
+                .is_err()
+            );
             let bad_later = |time: f64| {
                 if time < 0.5 {
                     (-0.03 * time).exp()
@@ -601,14 +603,16 @@ mod tests {
                 }
             };
             assert!(calibrate_theta_from_curve(0.1, 0.01, bad_later, &[0.0, 1.0]).is_err());
-            assert!(calibrate_theta_from_curve_with_piecewise_sigma(
-                0.1,
-                vec![0.0],
-                vec![0.01],
-                bad_later,
-                &[0.0, 1.0]
-            )
-            .is_err());
+            assert!(
+                calibrate_theta_from_curve_with_piecewise_sigma(
+                    0.1,
+                    vec![0.0],
+                    vec![0.01],
+                    bad_later,
+                    &[0.0, 1.0]
+                )
+                .is_err()
+            );
         }
     }
 

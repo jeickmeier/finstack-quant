@@ -117,7 +117,12 @@ pub(super) fn validate_forward_rates(
             return Err(crate::Error::Validation(format!(
                 "Forward rate {:.4}% (decimal: {:.6}) between t={:.4} and t={:.4} is below minimum {:.4}% (decimal: {:.6}). \
                  This may indicate a data error or create arbitrage opportunities.",
-                fwd * 100.0, fwd, knot_pair[0], knot_pair[1], min_rate * 100.0, min_rate
+                fwd * 100.0,
+                fwd,
+                knot_pair[0],
+                knot_pair[1],
+                min_rate * 100.0,
+                min_rate
             )));
         }
     }

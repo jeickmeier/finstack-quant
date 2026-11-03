@@ -6,17 +6,17 @@
 
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    execute_waterfall, AssetPool, CoverageTestSpec, DealType, FundingSource, PaymentType,
-    PoolAsset, Recipient, StructuredCredit, Tranche, TrancheCashflows, TrancheStructure, Waterfall,
-    WaterfallContext, WaterfallTier,
+    AssetPool, CoverageTestSpec, DealType, FundingSource, PaymentType, PoolAsset, Recipient,
+    StructuredCredit, Tranche, TrancheCashflows, TrancheStructure, Waterfall, WaterfallContext,
+    WaterfallTier, execute_waterfall,
 };
 use time::Month;
 

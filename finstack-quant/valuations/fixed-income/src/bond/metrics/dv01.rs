@@ -1,7 +1,7 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::bond::metrics::effective::{option_risk_bond_and_base_price, option_risk_curve_id};
 use crate::bond::Bond;
+use crate::bond::metrics::effective::{option_risk_bond_and_base_price, option_risk_curve_id};
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::pricing_overrides::BondRiskBasis;
@@ -174,8 +174,8 @@ mod tests {
         InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingDispatch, PricingError,
     };
     use finstack_quant_valuations_core::results::ValuationResult;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use time::macros::date;
 
     struct FixedHazardBondPricer {

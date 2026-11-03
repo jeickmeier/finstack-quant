@@ -7,11 +7,11 @@
 //! - Custom cashflow schedules
 //! - PIK and step-up structures
 
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_cashflows::builder::AmortizationSpec;
 use finstack_quant_cashflows::builder::{
     CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
 };
-use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;

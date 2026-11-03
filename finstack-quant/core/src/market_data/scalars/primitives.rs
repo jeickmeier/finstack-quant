@@ -9,12 +9,12 @@
 //! Both are integrated into the [`crate::market_data::context::MarketContext`]
 //! so downstream code can reference them by `CurveId` alongside other curves.
 
+use crate::InputError;
+use crate::Result;
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpUnits, Bumpable};
 use crate::types::CurveId;
-use crate::InputError;
-use crate::Result;
 #[cfg(test)]
 use time::Duration as TimeDuration;
 
@@ -811,16 +811,20 @@ mod tests {
         ] {
             assert!(MarketScalar::Unitless(f64::MAX).apply_bump(spec).is_err());
         }
-        assert!(MarketScalar::Unitless(1.0)
-            .apply_bump(BumpSpec::multiplier(f64::NAN))
-            .is_err());
+        assert!(
+            MarketScalar::Unitless(1.0)
+                .apply_bump(BumpSpec::multiplier(f64::NAN))
+                .is_err()
+        );
     }
 
     #[test]
     fn scalar_bumps_reject_bucket_coordinates_without_a_time_axis() {
-        assert!(MarketScalar::Unitless(1.0)
-            .apply_bump(BumpSpec::triangular_key_rate_bp(0.0, 1.0, 2.0, 1.0))
-            .is_err());
+        assert!(
+            MarketScalar::Unitless(1.0)
+                .apply_bump(BumpSpec::triangular_key_rate_bp(0.0, 1.0, 2.0, 1.0))
+                .is_err()
+        );
     }
 
     #[test]

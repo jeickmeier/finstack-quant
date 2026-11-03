@@ -2,9 +2,9 @@
 //!
 #![allow(clippy::expect_used, clippy::panic)]
 
+use super::TreePricerConfig;
 use super::bond_valuator::BondValuator;
 use super::tree_pricer::TreePricer;
-use super::TreePricerConfig;
 use crate::bond::types::{Bond, CallPut, CallPutSchedule};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -660,9 +660,11 @@ fn bond_bdt_tree_reads_bdt_sigma() {
         .market_quotes
         .implied_volatility = Some(0.20);
     let error = bond_tree_price(&option_vol_only).expect_err("BDT needs bdt_sigma");
-    assert!(error
-        .to_string()
-        .contains("instrument_pricing_overrides.model_config.bdt_sigma"));
+    assert!(
+        error
+            .to_string()
+            .contains("instrument_pricing_overrides.model_config.bdt_sigma")
+    );
 }
 
 /// Risk-free (no `credit_curve_id`) callable floating-rate note on the
@@ -827,8 +829,10 @@ fn bond_tree_model_selector_rejects_retired_vol_model_key() {
     );
     // schema-rejection-test: `vol_model` is now `tree_model`
     let retired = serde_json::json!({ "vol_model": "black", "bdt_sigma": 0.20 });
-    assert!(serde_json::from_value::<
-        finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig,
-    >(retired)
-    .is_err());
+    assert!(
+        serde_json::from_value::<
+            finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig,
+        >(retired)
+        .is_err()
+    );
 }

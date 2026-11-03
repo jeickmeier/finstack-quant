@@ -99,12 +99,12 @@ mod spec_support;
 #[cfg(test)]
 mod tests;
 
-pub use history::{history, history_from_spec, CompositeHistoryRow};
+pub use history::{CompositeHistoryRow, history, history_from_spec};
 pub use instrument::CompositeInstrument;
 pub use reporting::{CompositeRebalanceResult, CompositeTrade};
 pub use spec::CompositeSpec;
-pub(crate) use spec_support::{cashflows_between, validate_history};
 pub use spec_support::{
-    CompositeLegSpec, CompositeMarketObservation, CompositeState, RebalanceRule, WeightingMethod,
-    MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS,
+    CompositeLegSpec, CompositeMarketObservation, CompositeState, MAX_COMPOSITE_DEPTH,
+    MAX_COMPOSITE_LEGS, RebalanceRule, WeightingMethod,
 };
+pub(crate) use spec_support::{cashflows_between, validate_history};

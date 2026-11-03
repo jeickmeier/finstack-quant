@@ -1,11 +1,12 @@
 //! Calibration target construction and shared input validation.
 //!
+use crate::CalibrationReport;
 use crate::api::schema::{SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams};
 use crate::config::CalibrationConfig;
 use crate::quotes::MarketQuote;
 use crate::quotes::VolQuote;
-use crate::CalibrationReport;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{
     BusinessDayConvention, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };
@@ -14,7 +15,6 @@ use finstack_quant_core::market_data::surfaces::SabrParameterData;
 use finstack_quant_core::market_data::surfaces::VolCube;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::Result;
 use finstack_quant_models::volatility::sabr::{SabrCalibrator, SabrParameters, SabrShift};
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_rates::swaption::contractual_swap_tenor_years;
@@ -115,12 +115,11 @@ pub(crate) fn solve(
             }) = grouped_quotes
                 .get(&key)
                 .and_then(|bucket| bucket.first().copied())
+                && existing != convention
             {
-                if existing != convention {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "swaption bucket mixes conventions '{existing}' and '{convention}'"
-                    )));
-                }
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "swaption bucket mixes conventions '{existing}' and '{convention}'"
+                )));
             }
             grouped_quotes.entry(key).or_default().push(vol_quote);
         }
@@ -345,15 +344,15 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
 
             let is_clamped = if extrap_policy == SurfaceExtrapolationPolicy::Clamp {
                 let mut clamped = false;
-                if let Some((min_exp, max_exp)) = expiry_bounds {
-                    if texp < min_exp || texp > max_exp {
-                        clamped = true;
-                    }
+                if let Some((min_exp, max_exp)) = expiry_bounds
+                    && (texp < min_exp || texp > max_exp)
+                {
+                    clamped = true;
                 }
-                if let Some((min_ten, max_ten)) = tenor_bounds {
-                    if tten < min_ten || tten > max_ten {
-                        clamped = true;
-                    }
+                if let Some((min_ten, max_ten)) = tenor_bounds
+                    && (tten < min_ten || tten > max_ten)
+                {
+                    clamped = true;
                 }
                 clamped
             } else {
@@ -1097,9 +1096,11 @@ mod tests {
             &CalibrationConfig::default(),
         )
         .expect_err("EUR quotes cannot use a USD step's curve roles");
-        assert!(error
-            .to_string()
-            .contains("currency EUR conflicts with step currency USD"));
+        assert!(
+            error
+                .to_string()
+                .contains("currency EUR conflicts with step currency USD")
+        );
     }
 
     fn params(base_date: Date) -> SwaptionVolParams {
@@ -1127,14 +1128,16 @@ mod tests {
         let params = params(Date::MAX);
         let conventions = default_leg_conventions(&params).expect("leg conventions");
         for expiry_years in [1.0, f64::NAN, f64::INFINITY, f64::MAX] {
-            assert!(calculate_forward_swap_rate_years(
-                &params,
-                expiry_years,
-                5.0,
-                &conventions,
-                &MarketContext::new(),
-            )
-            .is_err());
+            assert!(
+                calculate_forward_swap_rate_years(
+                    &params,
+                    expiry_years,
+                    5.0,
+                    &conventions,
+                    &MarketContext::new(),
+                )
+                .is_err()
+            );
         }
     }
 
@@ -1183,21 +1186,25 @@ mod tests {
         assert!((lognormal - 0.20).abs() < 1e-12);
 
         let shifted_convention = SwaptionVolConvention::ShiftedLognormal { shift: 0.02 };
-        assert!(validate_quoted_vol(
-            0.20,
-            VolQuoteType::ShiftedBlackLognormal,
-            shifted_convention,
-        )
-        .is_ok());
+        assert!(
+            validate_quoted_vol(
+                0.20,
+                VolQuoteType::ShiftedBlackLognormal,
+                shifted_convention,
+            )
+            .is_ok()
+        );
         assert!(
             validate_quoted_vol(0.20, VolQuoteType::BlackLognormal, shifted_convention,).is_err()
         );
-        assert!(validate_quoted_vol(
-            0.20,
-            VolQuoteType::ShiftedBlackLognormal,
-            SwaptionVolConvention::Lognormal,
-        )
-        .is_err());
+        assert!(
+            validate_quoted_vol(
+                0.20,
+                VolQuoteType::ShiftedBlackLognormal,
+                SwaptionVolConvention::Lognormal,
+            )
+            .is_err()
+        );
 
         let mismatch = validate_quoted_vol(
             0.20,
@@ -1205,9 +1212,11 @@ mod tests {
             SwaptionVolConvention::Normal,
         )
         .expect_err("mismatched convention");
-        assert!(mismatch
-            .to_string()
-            .contains("conflicts with plan convention"));
+        assert!(
+            mismatch
+                .to_string()
+                .contains("conflicts with plan convention")
+        );
     }
 
     #[test]
@@ -1273,10 +1282,12 @@ mod tests {
             report.iterations > 1,
             "report must retain actual LM work across deterministic starts"
         );
-        assert!(report
-            .metadata
-            .get("sabr_winning_starts")
-            .is_some_and(|value| value.contains("rho=")));
+        assert!(
+            report
+                .metadata
+                .get("sabr_winning_starts")
+                .is_some_and(|value| value.contains("rho="))
+        );
         assert!(report.metadata.contains_key("sabr_parameters_at_bounds"));
 
         // VolCube stores SABR params; verify calibrated alpha matches ground truth.

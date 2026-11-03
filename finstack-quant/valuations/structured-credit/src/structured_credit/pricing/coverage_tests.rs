@@ -6,13 +6,13 @@ use crate::structured_credit::types::{
     AssetPool, CoverageRules, CoverageTestSpec, CoverageTestType, LiveCollateral, PoolAsset,
     Tranche, TrancheStructure,
 };
+use finstack_quant_core::Error;
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_core::Error;
-use finstack_quant_core::FxHashMap;
-use finstack_quant_core::Result;
 
 use serde::{Deserialize, Serialize};
 
@@ -248,16 +248,14 @@ fn ic_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
                 .tranches
                 .iter()
                 .find(|candidate| candidate.id.as_str() == *payable_id)
-            {
-                if !payable_tranches
+                && !payable_tranches
                     .iter()
                     .any(|(existing, _): &(&Tranche, bool)| existing.id == payable.id)
-                {
-                    let reduces_test_interest = delevering_set
-                        .iter()
-                        .any(|candidate| candidate.id == payable.id);
-                    payable_tranches.push((payable, reduces_test_interest));
-                }
+            {
+                let reduces_test_interest = delevering_set
+                    .iter()
+                    .any(|candidate| candidate.id == payable.id);
+                payable_tranches.push((payable, reduces_test_interest));
             }
         }
     } else {
@@ -1246,16 +1244,18 @@ mod haircut_tests {
     }
 
     fn single_tranche() -> TrancheStructure {
-        TrancheStructure::new(vec![Tranche::new(
-            "A",
-            0.0,
-            100.0,
-            TrancheSeniority::Senior,
-            Money::from((500_000_i64, Currency::USD)),
-            RateSpec::Fixed { rate: 0.05 },
-            maturity(),
-        )
-        .expect("tranche")])
+        TrancheStructure::new(vec![
+            Tranche::new(
+                "A",
+                0.0,
+                100.0,
+                TrancheSeniority::Senior,
+                Money::from((500_000_i64, Currency::USD)),
+                RateSpec::Fixed { rate: 0.05 },
+                maturity(),
+            )
+            .expect("tranche"),
+        ])
         .expect("structure")
     }
 

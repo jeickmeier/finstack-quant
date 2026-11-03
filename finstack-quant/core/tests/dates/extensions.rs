@@ -21,9 +21,11 @@ fn date_arithmetic_rejects_range_overflow() {
     assert!(Date::MIN.add_weekdays(-1).is_err());
     assert!(Date::MAX.add_business_days(1, by_id("target2")).is_err());
     assert!(Date::MIN.add_business_days(-1, by_id("target2")).is_err());
-    assert!(anchor
-        .add_business_days(i32::MAX, by_id("target2"))
-        .is_err());
+    assert!(
+        anchor
+            .add_business_days(i32::MAX, by_id("target2"))
+            .is_err()
+    );
     assert_eq!(Date::MAX.add_days(0).unwrap(), Date::MAX);
 }
 

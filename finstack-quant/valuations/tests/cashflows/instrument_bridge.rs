@@ -1,6 +1,8 @@
 //! Smoke tests for direct `CashflowProvider` coverage.
 
 use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_valuations::instruments::FloatLegSpec;
+use finstack_quant_valuations::instruments::Position;
 use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
 use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
@@ -17,8 +19,6 @@ use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
 use finstack_quant_valuations::instruments::fx::fx_swap::FxSwap;
 use finstack_quant_valuations::instruments::fx::ndf::Ndf;
-use finstack_quant_valuations::instruments::FloatLegSpec;
-use finstack_quant_valuations::instruments::Position;
 fn assert_provider<T: CashflowProvider>(_instrument: &T) {}
 use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
 use finstack_quant_valuations::instruments::rates::cms_swap::CmsSwap;
@@ -82,8 +82,8 @@ fn bond_future_exposes_cashflow_provider_bridge() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_valuations::contract_specs::BondFutureSpecs;
-    use finstack_quant_valuations::instruments::fixed_income::bond_future::DeliverableBond;
     use finstack_quant_valuations::instruments::ListedFutureTerms;
+    use finstack_quant_valuations::instruments::fixed_income::bond_future::DeliverableBond;
     use time::Month;
 
     let future = BondFuture::builder()

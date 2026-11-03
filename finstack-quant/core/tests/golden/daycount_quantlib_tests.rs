@@ -18,7 +18,7 @@
 //! - ICMA (2010). "ICMA Rule Book." Rule 251.
 
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
-use finstack_quant_test_utils::golden::{load_suite_from_path, GoldenSuite};
+use finstack_quant_test_utils::golden::{GoldenSuite, load_suite_from_path};
 use finstack_quant_test_utils::golden_path;
 use serde::Deserialize;
 use time::Month;
@@ -181,15 +181,15 @@ fn test_single_convention(
 
     let tol = case.expected.tolerance;
 
-    if let Some(expected_yf) = case.expected.year_fraction {
-        if (yf - expected_yf).abs() > tol {
-            return Err(format!(
-                "year_fraction mismatch: expected {:.15}, got {:.15} (diff: {:.2e})",
-                expected_yf,
-                yf,
-                (yf - expected_yf).abs()
-            ));
-        }
+    if let Some(expected_yf) = case.expected.year_fraction
+        && (yf - expected_yf).abs() > tol
+    {
+        return Err(format!(
+            "year_fraction mismatch: expected {:.15}, got {:.15} (diff: {:.2e})",
+            expected_yf,
+            yf,
+            (yf - expected_yf).abs()
+        ));
     }
 
     Ok(())
@@ -208,22 +208,22 @@ fn test_us_vs_euro_comparison(case: &DayCountCase, start: Date, end: Date) -> Re
         .year_fraction(start, end, ctx)
         .map_err(|e| format!("Euro year_fraction failed: {}", e))?;
 
-    if let Some(expected_us) = case.expected.us_year_fraction {
-        if (us_yf - expected_us).abs() > tol {
-            return Err(format!(
-                "US year_fraction mismatch: expected {:.15}, got {:.15}",
-                expected_us, us_yf
-            ));
-        }
+    if let Some(expected_us) = case.expected.us_year_fraction
+        && (us_yf - expected_us).abs() > tol
+    {
+        return Err(format!(
+            "US year_fraction mismatch: expected {:.15}, got {:.15}",
+            expected_us, us_yf
+        ));
     }
 
-    if let Some(expected_euro) = case.expected.euro_year_fraction {
-        if (euro_yf - expected_euro).abs() > tol {
-            return Err(format!(
-                "Euro year_fraction mismatch: expected {:.15}, got {:.15}",
-                expected_euro, euro_yf
-            ));
-        }
+    if let Some(expected_euro) = case.expected.euro_year_fraction
+        && (euro_yf - expected_euro).abs() > tol
+    {
+        return Err(format!(
+            "Euro year_fraction mismatch: expected {:.15}, got {:.15}",
+            expected_euro, euro_yf
+        ));
     }
 
     // Verify the difference

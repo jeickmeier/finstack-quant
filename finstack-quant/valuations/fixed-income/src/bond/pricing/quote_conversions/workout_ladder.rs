@@ -6,17 +6,17 @@
 //! each exit instead of discarding all but the worst, so the two cannot
 //! disagree.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use serde::{Deserialize, Serialize};
 
 use super::curve_par_rate;
 use super::yield_price::solve_workout_exits;
-use crate::bond::pricing::settlement::{model_dirty_at_quote_date, QuoteDateContext};
 use crate::bond::Bond;
+use crate::bond::pricing::settlement::{QuoteDateContext, model_dirty_at_quote_date};
 
 /// How the holder leaves the bond on a [`BondWorkoutRow`]'s date.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

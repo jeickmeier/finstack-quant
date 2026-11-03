@@ -8,9 +8,9 @@ use crate::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, DiscountCurveParams, ForwardCurveParams,
     HazardCurveParams, InflationCurveParams, StepParams,
 };
+use crate::build::BuildCtx;
 use crate::build::cds::build_cds_instrument;
 use crate::build::rates::build_rate_instrument;
-use crate::build::BuildCtx;
 use crate::quotes::CdsQuote;
 use crate::quotes::InflationQuote;
 use crate::quotes::MarketQuote;
@@ -18,6 +18,7 @@ use crate::quotes::RateQuote;
 use crate::quotes::{Pillar, QuoteId};
 use crate::recalibration::bump_hazard_spreads;
 use crate::{CalibrationConfig, CalibrationMethod};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -27,13 +28,12 @@ use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId, IrFutureContractId,
 };
-use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_core::recalibration::QuoteBump;
 use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
 use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
@@ -588,12 +588,16 @@ fn forward_curve_future_global_solve_reprices_compounded_settlement_quote() {
         .day_count()
         .year_fraction(curve.base_date(), period_end, DayCountContext::default())
         .expect("end time");
-    assert!(projection_grid
-        .iter()
-        .any(|time| (*time - t_start).abs() < 1e-12));
-    assert!(projection_grid
-        .iter()
-        .any(|time| (*time - t_end).abs() < 1e-12));
+    assert!(
+        projection_grid
+            .iter()
+            .any(|time| (*time - t_start).abs() < 1e-12)
+    );
+    assert!(
+        projection_grid
+            .iter()
+            .any(|time| (*time - t_end).abs() < 1e-12)
+    );
     let settlement_rate = future
         .model_settlement_rate(&context, base_date)
         .expect("compounded futures settlement rate");

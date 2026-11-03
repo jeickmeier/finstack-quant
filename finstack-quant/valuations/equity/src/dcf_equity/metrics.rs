@@ -4,10 +4,10 @@
 //! These metrics are registered under the `DCF` instrument type and integrate
 //! with the unified DV01 framework used across valuations.
 
-use crate::dcf_equity::{pricer, DiscountedCashFlow};
+use crate::dcf_equity::{DiscountedCashFlow, pricer};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{
     MetricCalculator, MetricContext, MetricRegistry, RfComponentPriced,
 };

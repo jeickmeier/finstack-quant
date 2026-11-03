@@ -49,11 +49,13 @@ fn cholesky_solve_solves_system() {
 
 #[wasm_bindgen_test]
 fn cholesky_solve_rejects_wrong_rhs_length() {
-    assert!(cholesky_solve(
-        JsValue::from([1.0, 0.0, 0.0, 1.0].to_vec()),
-        JsValue::from([1.0].to_vec())
-    )
-    .is_err());
+    assert!(
+        cholesky_solve(
+            JsValue::from([1.0, 0.0, 0.0, 1.0].to_vec()),
+            JsValue::from([1.0].to_vec())
+        )
+        .is_err()
+    );
 }
 
 // ---- Statistics ----
@@ -176,9 +178,11 @@ fn symmetric_eigen_returns_values_and_flat_vectors() {
 fn nan_sentinel_statistics_return_nan_for_missing_data() {
     let empty = || JsValue::from(Vec::<f64>::new());
     assert!(mean_or_nan(empty()).unwrap().is_nan());
-    assert!(sample_variance_or_nan(JsValue::from(vec![1.0]))
-        .unwrap()
-        .is_nan());
+    assert!(
+        sample_variance_or_nan(JsValue::from(vec![1.0]))
+            .unwrap()
+            .is_nan()
+    );
     assert!(median_or_nan(empty()).unwrap().is_nan());
     assert_eq!(
         finite_count(JsValue::from(vec![1.0, f64::NAN, f64::INFINITY])).unwrap(),

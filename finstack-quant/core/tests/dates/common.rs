@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::dates::{calendar_by_id_strict, DateExt, HolidayCalendar};
+use finstack_quant_core::dates::{DateExt, HolidayCalendar, calendar_by_id_strict};
 use time::Month;
 
 /// Standard tolerance for day count year fraction comparisons.

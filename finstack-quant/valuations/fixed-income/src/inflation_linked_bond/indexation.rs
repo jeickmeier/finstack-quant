@@ -6,13 +6,13 @@
 //! `RefCPI(d) = CPI(m−L) + (day−1)/D(m) × [CPI(m−L+1) − CPI(m−L)]`, and step
 //! linkers read the first-of-month print of the lagged month.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationLag, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::term_structures::InflationCurve;
-use finstack_quant_core::Result;
 use time::Duration;
 
 use super::types::{IndexationMethod, InflationLinkedBond};
@@ -277,7 +277,7 @@ impl InflationLinkedBond {
                 _ => {
                     return Err(finstack_quant_core::Error::Validation(
                         "unsupported inflation lag".into(),
-                    ))
+                    ));
                 }
             },
         };

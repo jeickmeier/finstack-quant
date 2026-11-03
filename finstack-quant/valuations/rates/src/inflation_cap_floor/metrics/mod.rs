@@ -16,12 +16,12 @@ mod inflation01;
 
 use crate::inflation_cap_floor::InflationCapFloor;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::metrics::bump_surface_vol_absolute;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
 use finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
+use finstack_quant_valuations_core::metrics::bump_surface_vol_absolute;
+use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 
 /// Register all inflation cap/floor metrics with the registry.
 pub(crate) fn register_inflation_cap_floor_metrics(

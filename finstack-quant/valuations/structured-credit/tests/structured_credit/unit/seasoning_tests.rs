@@ -6,7 +6,7 @@
 
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{
-    abs_to_smm, DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+    DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec, abs_to_smm,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -58,16 +58,18 @@ fn abs(rows: impl FnOnce(&mut PoolAsset, &mut PoolAsset)) -> StructuredCredit {
     rows(&mut a, &mut b);
     pool.assets.push(a);
     pool.assets.push(b);
-    let tranches = TrancheStructure::new(vec![Tranche::new(
-        "N",
-        0.0,
-        100.0,
-        TrancheSeniority::Senior,
-        usd(2_000_000.0),
-        RateSpec::Fixed { rate: 0.04 },
-        maturity(),
-    )
-    .expect("N")])
+    let tranches = TrancheStructure::new(vec![
+        Tranche::new(
+            "N",
+            0.0,
+            100.0,
+            TrancheSeniority::Senior,
+            usd(2_000_000.0),
+            RateSpec::Fixed { rate: 0.04 },
+            maturity(),
+        )
+        .expect("N"),
+    ])
     .expect("structure");
     let mut deal = StructuredCredit::new_standard(
         finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,

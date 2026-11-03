@@ -452,7 +452,7 @@ impl EquityOption {
         as_of: finstack_quant_core::dates::Date,
         target_price: f64,
     ) -> finstack_quant_core::Result<f64> {
-        use finstack_quant_core::{math::solver::BrentSolver, Error};
+        use finstack_quant_core::{Error, math::solver::BrentSolver};
         let quantity = self.quantity;
         if !target_price.is_finite()
             || target_price < 0.0
@@ -790,9 +790,9 @@ mod tests {
     };
     use finstack_quant_models::closed_form::bs_price_unchecked;
     use finstack_quant_models::types::{ExerciseStyle, OptionType};
-    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::SettlementType;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     #[test]
     fn canonical_dependencies_preserve_equity_surface_context() {

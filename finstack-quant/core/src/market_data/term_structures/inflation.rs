@@ -72,7 +72,7 @@
 //!   - Fleckenstein, M., Longstaff, F. A., & Lustig, H. (2017). "Deflation Risk."
 //!     *Review of Financial Studies*, 30(8), 2719-2760. `docs/REFERENCES.md#kerkhof-2005`
 
-use super::common::{roll_knots, InterpRollState};
+use super::common::{InterpRollState, roll_knots};
 use crate::dates::DateExt;
 use crate::dates::{Date, DayCount};
 use crate::market_data::bumps::{BumpSpec, Bumpable};

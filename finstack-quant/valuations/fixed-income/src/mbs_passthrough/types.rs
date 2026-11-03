@@ -5,12 +5,12 @@
 //! and payment delay conventions.
 
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PoolId};
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use time::Month;
@@ -462,7 +462,7 @@ impl AgencyMbsPassthrough {
             Some(0) => {
                 return Err(finstack_quant_core::Error::Validation(
                     "MBS stated_delay_days must be at least 1".into(),
-                ))
+                ));
             }
             Some(delay) => {
                 let months_ahead = (delay - 1) / 30;
@@ -541,11 +541,7 @@ impl AgencyMbsPassthrough {
         if diff > 1e-6 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "coupon {} does not match wac {} - servicing_fee_bp {} - guarantee_fee_bp {} (bp) = {}",
-                self.coupon,
-                self.wac,
-                self.servicing_fee_bp,
-                self.guarantee_fee_bp,
-                calculated
+                self.coupon, self.wac, self.servicing_fee_bp, self.guarantee_fee_bp, calculated
             )));
         }
         Ok(())
@@ -610,13 +606,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for AgencyMbsPassth
                 "MBS stated_delay_days must be at least 1".into(),
             ));
         }
-        if let Some(last_paid) = self.last_paid_accrual_end {
-            if last_paid < self.issue_date || last_paid > self.maturity {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "MBS last_paid_accrual_end {last_paid} must fall between issue date {} and maturity {}",
-                    self.issue_date, self.maturity
-                )));
-            }
+        if let Some(last_paid) = self.last_paid_accrual_end
+            && (last_paid < self.issue_date || last_paid > self.maturity)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "MBS last_paid_accrual_end {last_paid} must fall between issue date {} and maturity {}",
+                self.issue_date, self.maturity
+            )));
         }
         Ok(())
     }

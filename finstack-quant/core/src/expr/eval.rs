@@ -13,7 +13,7 @@
 use super::{
     ast::*,
     context::SimpleContext,
-    dag::{build_plan, ExecutionPlan, Operation},
+    dag::{ExecutionPlan, Operation, build_plan},
 };
 use smallvec::SmallVec;
 
@@ -365,11 +365,7 @@ impl CompiledExpr {
                     arg_slices,
                     out,
                     |value| {
-                        if value.is_finite() {
-                            0.0
-                        } else {
-                            1.0
-                        }
+                        if value.is_finite() { 0.0 } else { 1.0 }
                     },
                 );
             }

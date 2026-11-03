@@ -3,11 +3,11 @@
 
 use super::Performance;
 use crate::benchmark::{
-    batting_average, beta, beta_only, capture_ratio, down_capture, greeks, information_ratio,
-    m_squared, r_squared, rolling_greeks, tracking_error, treynor, up_capture, BetaResult,
-    GreeksResult, RollingGreeks,
+    BetaResult, GreeksResult, RollingGreeks, batting_average, beta, beta_only, capture_ratio,
+    down_capture, greeks, information_ratio, m_squared, r_squared, rolling_greeks, tracking_error,
+    treynor, up_capture,
 };
-use crate::multi_factor::{multi_factor_greeks, MultiFactorResult, ReturnKind};
+use crate::multi_factor::{MultiFactorResult, ReturnKind, multi_factor_greeks};
 use crate::risk_metrics;
 
 impl Performance {

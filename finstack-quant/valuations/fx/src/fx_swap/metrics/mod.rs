@@ -12,8 +12,8 @@
 
 mod ir01;
 
-use crate::fx_swap::pricing_helper::FxSwapPricingContext;
 use crate::fx_swap::FxSwap;
+use crate::fx_swap::pricing_helper::FxSwapPricingContext;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;

@@ -28,14 +28,13 @@ pub(crate) mod pricing;
 pub(crate) mod types;
 pub(crate) mod utils;
 
-pub use utils::{validate_tiers, ValidationError};
+pub use utils::{ValidationError, validate_tiers};
 
 pub use types::MarketConditions;
 pub use types::{
-    calculate_pool_stats, pool_report, standard_deal_families, AdvanceRate, AdvancingPolicy,
-    AfcSpec, AllocationMode, AssetPool, AssetType, BalloonSpec, BorrowingBaseReport,
-    BorrowingBaseRules, CallAssumption, CallExercisePolicy, CallScope, CardPortfolioSpec,
-    CccBucketRule, CollateralInstrument, ConcentrationLimit, ConcentrationScope,
+    AdvanceRate, AdvancingPolicy, AfcSpec, AllocationMode, AssetPool, AssetType, BalloonSpec,
+    BorrowingBaseReport, BorrowingBaseRules, CallAssumption, CallExercisePolicy, CallScope,
+    CardPortfolioSpec, CccBucketRule, CollateralInstrument, ConcentrationLimit, ConcentrationScope,
     ControlledAccumulationSpec, CoveragePlacement, CoverageRules, CoverageTestAction,
     CoverageTestSpec, CoverageTestType, CoverageTrigger, CreditModelConfig, DealFees, DealType,
     DefaultedValuation, DelinquencyModel, DiscountObligationRule, DiversionRecord,
@@ -51,7 +50,7 @@ pub use types::{
     SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche, TrancheAccrualPeriod,
     TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance, TrancheStructure,
     TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
-    WaterfallTier,
+    WaterfallTier, calculate_pool_stats, pool_report, standard_deal_families,
 };
 
 pub use pricing::execute_waterfall;
@@ -65,17 +64,6 @@ pub use pricing::{
 };
 
 pub use metrics::{
-    calculate_equity_metrics,
-    calculate_tranche_convexity,
-    calculate_tranche_cs01,
-    calculate_tranche_duration,
-    calculate_tranche_wal,
-    calculate_tranche_z_spread,
-    tranche_breakeven_cdr,
-    tranche_discount_margin,
-    tranche_metrics,
-    tranche_oas,
-    tranche_scenario_table,
     // Deal and pool metric calculators
     AbsChargeOffCalculator,
     AbsCreditEnhancementCalculator,
@@ -92,4 +80,15 @@ pub use metrics::{
     ScenarioGrid,
     ScenarioTable,
     TrancheMetrics,
+    calculate_equity_metrics,
+    calculate_tranche_convexity,
+    calculate_tranche_cs01,
+    calculate_tranche_duration,
+    calculate_tranche_wal,
+    calculate_tranche_z_spread,
+    tranche_breakeven_cdr,
+    tranche_discount_margin,
+    tranche_metrics,
+    tranche_oas,
+    tranche_scenario_table,
 };

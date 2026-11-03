@@ -63,7 +63,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
             .scenario_spread_shock_bp
             .is_none()
     {
-        use crate::bond::pricing::tree::{bond_tree_config, TreePricer};
+        use crate::bond::pricing::tree::{TreePricer, bond_tree_config};
         match model {
             finstack_quant_valuations_core::pricer::ModelKey::Tree => Some(
                 TreePricer::with_config(bond_tree_config(bond, context.curves.as_ref())?),
@@ -181,15 +181,15 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Rate;
-    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::pricer::{
-        expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingDispatch,
-        PricingError,
+        InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingDispatch, PricingError,
+        expect_inst,
     };
     use finstack_quant_valuations_core::results::ValuationResult;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use time::macros::date;
 
     struct LinearOasPricer {

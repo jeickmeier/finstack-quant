@@ -3,7 +3,7 @@
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{
-    serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
+    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, serde_json_to_py, statements_to_py};

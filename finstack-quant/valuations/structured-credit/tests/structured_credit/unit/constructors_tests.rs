@@ -1,7 +1,7 @@
 //! Tests for structured credit constructors and behavioral overrides.
 
-use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
@@ -322,10 +322,12 @@ fn standard_constructor_applies_calendar_and_rejects_unsupported_profiles() {
     assert_eq!(deal.calendar_id.as_deref(), Some("nyse"));
     let mut no_calendar = params.clone();
     no_calendar.calendar_id = None;
-    assert!(StructuredCredit::new_standard(DealType::Abs, no_calendar)
-        .unwrap()
-        .calendar_id
-        .is_none());
+    assert!(
+        StructuredCredit::new_standard(DealType::Abs, no_calendar)
+            .unwrap()
+            .calendar_id
+            .is_none()
+    );
     for unsupported in [DealType::Cbo, DealType::Auto, DealType::Card] {
         assert!(StructuredCredit::new_standard(unsupported, params.clone()).is_err());
     }

@@ -5,11 +5,11 @@ use super::inputs::{
     future_dividends, resolve_lifecycle_value,
 };
 use crate::equity_option::types::EquityOption;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{bs_greeks_unchecked, bs_price_unchecked};
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_models::types::ExerciseStyle;

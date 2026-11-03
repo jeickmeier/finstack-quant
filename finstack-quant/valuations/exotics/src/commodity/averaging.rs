@@ -8,8 +8,8 @@
 //! never observed by two adjacent periods; the final period sets
 //! `include_end = true` so the swap maturity date is observed exactly once.
 
-use finstack_quant_core::dates::{calendar_by_id_strict, Date, DateExt};
 use finstack_quant_core::Result;
+use finstack_quant_core::dates::{Date, DateExt, calendar_by_id_strict};
 
 /// Observation-date filter shared by the swap floating leg and the swaption
 /// forward swap rate: weekends are excluded, plus the holidays of `calendar_id`
@@ -21,7 +21,9 @@ use finstack_quant_core::Result;
 /// # Errors
 ///
 /// Returns an error when `calendar_id` names an unregistered calendar.
-pub(crate) fn business_day_filter(calendar_id: Option<&str>) -> Result<impl Fn(Date) -> bool> {
+pub(crate) fn business_day_filter(
+    calendar_id: Option<&str>,
+) -> Result<impl Fn(Date) -> bool + use<>> {
     let calendar = calendar_id.map(calendar_by_id_strict).transpose()?;
     Ok(
         move |date: Date| {
@@ -45,7 +47,7 @@ pub(crate) fn commodity_periods(
     calendar_id: Option<&str>,
     business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
 ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
-    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind};
     build_periods(BuildPeriodsParams {
         start,

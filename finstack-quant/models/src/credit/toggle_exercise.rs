@@ -818,10 +818,12 @@ mod tests {
         let wire = serde_json::json!({"nested_paths":100, "equity_discount_rate":0.05,
             "asset_vol":0.3, "risk_free_rate":0.03, "horizon":1.0});
         assert!(serde_json::from_value::<OptimalToggle>(wire.clone()).is_err());
-        assert!(serde_json::from_value::<ToggleExerciseModel>(
-            serde_json::json!({"optimal_exercise":wire})
-        )
-        .is_err());
+        assert!(
+            serde_json::from_value::<ToggleExerciseModel>(
+                serde_json::json!({"optimal_exercise":wire})
+            )
+            .is_err()
+        );
     }
 
     #[test]

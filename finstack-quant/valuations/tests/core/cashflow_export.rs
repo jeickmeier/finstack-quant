@@ -9,8 +9,9 @@ use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::cashflow_export::*;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
@@ -20,7 +21,6 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Str
 use finstack_quant_valuations::instruments::fx::fx_swap::FxSwap;
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use finstack_quant_valuations::instruments::pricing_overrides::ScenarioPricingOverrides;
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::pricer::ModelKey;
 use std::sync::Arc;
 use time::Month;
@@ -704,9 +704,11 @@ fn amortizing_term_loan_balances_match_the_schedule_path() {
         .filter(|row| row.kind == CFKind::Amortization)
         .collect();
     assert!(!amortization.is_empty());
-    assert!(amortization
-        .iter()
-        .all(|row| row.ending_balance < row.beginning_balance));
+    assert!(
+        amortization
+            .iter()
+            .all(|row| row.ending_balance < row.beginning_balance)
+    );
 }
 
 #[test]

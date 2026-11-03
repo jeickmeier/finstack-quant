@@ -12,7 +12,7 @@
 //! - ISDA "Small Bang" Protocol (July 27, 2009) - European convention updates
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::dates::{calendar_by_id_strict, DayCount};
+use finstack_quant_core::dates::{DayCount, calendar_by_id_strict};
 use finstack_quant_valuations_core::market::conventions::CdsConvention;
 use time::Month;
 

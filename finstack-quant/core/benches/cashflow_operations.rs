@@ -4,7 +4,7 @@
 //! - Curve-based NPV with Money-typed cashflows on a flat curve
 //! - Curve-based NPV with Money-typed cashflows on a shaped curve
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::cashflow::npv;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};

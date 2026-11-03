@@ -25,7 +25,7 @@
 //! - Analytical correlation-product valuation: `docs/REFERENCES.md#hull-white-2004-cdo`
 //!
 
-use super::{select_quadrature, Copula};
+use super::{Copula, select_quadrature};
 use finstack_quant_core::math::{integration::GaussHermiteQuadrature, special_functions::norm_cdf};
 
 /// CDF argument clipping to prevent overflow.

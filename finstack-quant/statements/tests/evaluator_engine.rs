@@ -101,10 +101,12 @@ fn test_circular_dependency_error() {
     };
 
     assert!(result.is_err());
-    assert!(result
-        .expect_err("should fail with circular dependency")
-        .to_string()
-        .contains("Circular"));
+    assert!(
+        result
+            .expect_err("should fail with circular dependency")
+            .to_string()
+            .contains("Circular")
+    );
 }
 
 #[test]

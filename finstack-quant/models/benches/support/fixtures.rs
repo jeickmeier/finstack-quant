@@ -21,7 +21,7 @@ use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::discretization::schwartz_smith::ExactSchwartzSmith;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig, PathCaptureConfig};
 use finstack_quant_models::monte_carlo::payoff::asian::{
-    default_fixing_steps, Asian, AveragingMethod,
+    Asian, AveragingMethod, default_fixing_steps,
 };
 use finstack_quant_models::monte_carlo::payoff::barrier::{BarrierMonitoring, BarrierOptionPayoff};
 use finstack_quant_models::monte_carlo::payoff::lookback::Lookback;

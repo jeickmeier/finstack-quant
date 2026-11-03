@@ -2,9 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::Result;
 use crate::checks::{Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Severity};
 use crate::types::NodeId;
-use crate::Result;
 
 /// Detects NaN or infinite values in node results.
 ///

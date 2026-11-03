@@ -68,7 +68,9 @@ impl PyEligibilityRule {
     fn __repr__(&self) -> String {
         format!(
             "EligibilityRule(exclude_defaulted={}, max_days_past_due={:?}, exclude_non_performing={})",
-            self.inner.exclude_defaulted, self.inner.max_days_past_due, self.inner.exclude_non_performing
+            self.inner.exclude_defaulted,
+            self.inner.max_days_past_due,
+            self.inner.exclude_non_performing
         )
     }
 }

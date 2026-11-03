@@ -9,8 +9,8 @@ use crate::utils::input::{
     js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_opt_string_seq, js_uint,
 };
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
-use finstack_quant_core::math::linalg::rows_of;
 use finstack_quant_core::Error;
+use finstack_quant_core::math::linalg::rows_of;
 use finstack_quant_models::rates::dtsm::{DieboldLi, YieldPanel, YieldPca};
 use wasm_bindgen::prelude::*;
 

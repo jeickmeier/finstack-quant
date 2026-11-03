@@ -7,10 +7,10 @@ use super::csa::CsaSpec;
 use super::enums::{ClearingStatus, ImMethodology};
 use super::simm_types::SimmCreditSector;
 use crate::registry::{embedded_registry, margin_registry_from_config};
+use finstack_quant_core::Result;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 /// Explicit ISDA SIMM credit risk-class and bucket assignment.
 ///
@@ -285,12 +285,12 @@ impl OtcMarginSpec {
     /// Rejects invalid CSA terms, a clearing-house methodology on a bilateral trade (and vice versa).
     pub fn validate(&self) -> Result<()> {
         self.csa.validate()?;
-        if let Some(methodology) = self.get_im_methodology() {
-            if self.is_cleared() != (methodology == ImMethodology::ClearingHouse) {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Clearing status conflicts with IM methodology".into(),
-                ));
-            }
+        if let Some(methodology) = self.get_im_methodology()
+            && self.is_cleared() != (methodology == ImMethodology::ClearingHouse)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "Clearing status conflicts with IM methodology".into(),
+            ));
         }
         Ok(())
     }

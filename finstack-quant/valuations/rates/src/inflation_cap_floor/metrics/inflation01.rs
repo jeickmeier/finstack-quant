@@ -17,7 +17,7 @@
 //! a ±1bp bump expressed in bp-units).
 
 use crate::inflation_cap_floor::InflationCapFloor;
-use crate::inflation_fd::{bumped_inflation_market, INFLATION_BUMP_PCT};
+use crate::inflation_fd::{INFLATION_BUMP_PCT, bumped_inflation_market};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

@@ -6,7 +6,7 @@
 //! for the default suite; every test here is
 //! `#[ignore = "slow: covered by mise run rust-test --slow"]`.
 
-use finstack_quant_core::schema::{project_llm, LlmProfile, RESOLVES_FROM_KEYWORD};
+use finstack_quant_core::schema::{LlmProfile, RESOLVES_FROM_KEYWORD, project_llm};
 use serde_json::Value;
 
 fn corpus() -> (

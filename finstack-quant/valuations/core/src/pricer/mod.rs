@@ -34,8 +34,8 @@ mod registry;
 
 pub use errors::{PricingError, PricingErrorContext};
 pub use family::{Family, RegisterMetrics, RegisterPricers};
-pub use keys::{parse_model_key, InstrumentType, ModelKey, PricerKey};
-pub use registry::{expect_inst, Pricer, PricerRegistry, PricingDispatch};
+pub use keys::{InstrumentType, ModelKey, PricerKey, parse_model_key};
+pub use registry::{Pricer, PricerRegistry, PricingDispatch, expect_inst};
 
 /// Register a [`GenericInstrumentPricer`](crate::instruments::pricing::GenericInstrumentPricer)
 /// for an instrument type, collapsing the repetitive registration boilerplate
@@ -53,12 +53,12 @@ pub use registry::{expect_inst, Pricer, PricerRegistry, PricingDispatch};
 /// Both forms expand to a single `registry.register(...)` call.
 #[macro_export]
 macro_rules! register_generic {
-    ($registry:expr, $inst:expr, $ty:ty $(,)?) => {
+    ($registry:expr_2021, $inst:expr_2021, $ty:ty $(,)?) => {
         $registry.register(
             $crate::instruments::pricing::GenericInstrumentPricer::<$ty>::discounting($inst),
         )?
     };
-    ($registry:expr, $inst:expr, $ty:ty, $model:expr $(,)?) => {
+    ($registry:expr_2021, $inst:expr_2021, $ty:ty, $model:expr_2021 $(,)?) => {
         $registry.register(
             $crate::instruments::pricing::GenericInstrumentPricer::<$ty>::new($inst, $model),
         )?

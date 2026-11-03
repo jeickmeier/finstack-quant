@@ -15,7 +15,7 @@
 #[path = "support/fixtures.rs"]
 mod fixtures;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::fractional::HurstExponent;
 use finstack_quant_models::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
@@ -32,8 +32,8 @@ use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::heston::HestonParams;
 use fixtures::{
-    discount, european_call, exact_gbm, gbm, heston, lmm_process, lmm_scheme, multi_gbm, philox,
-    qe_heston, serial_engine, RATE, SEED, SPOT, STRIKE,
+    RATE, SEED, SPOT, STRIKE, discount, european_call, exact_gbm, gbm, heston, lmm_process,
+    lmm_scheme, multi_gbm, philox, qe_heston, serial_engine,
 };
 use std::hint::black_box;
 
@@ -277,15 +277,15 @@ fn scaling_volterra_steps(c: &mut Criterion) {
     let mut rng = philox();
 
     for &n in &[64_usize, 128, 256] {
-        let gen = RiemannLiouvilleVolterra::new(1.0, n, 0.1).expect("valid volterra");
-        let mut normals = vec![0.0; gen.num_steps() * gen.normals_per_step()];
+        let r#gen = RiemannLiouvilleVolterra::new(1.0, n, 0.1).expect("valid volterra");
+        let mut normals = vec![0.0; r#gen.num_steps() * r#gen.normals_per_step()];
         rng.fill_std_normals(&mut normals);
-        let mut out = vec![0.0; gen.num_steps()];
+        let mut out = vec![0.0; r#gen.num_steps()];
         let kernel_ops = (n * (n + 1) / 2) as u64;
         group.throughput(Throughput::Elements(kernel_ops));
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
             b.iter(|| {
-                gen.generate(&normals, &mut out);
+                r#gen.generate(&normals, &mut out);
                 black_box(out[0])
             });
         });

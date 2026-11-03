@@ -3,8 +3,8 @@
 //! Validated at the point of construction so the resulting `CdsOption` is
 //! guaranteed to satisfy the Bloomberg CDSO model's preconditions.
 
-use crate::cds_option::strike::CdsOptionStrike;
 use crate::cds_option::ProtectionStartConvention;
+use crate::cds_option::strike::CdsOptionStrike;
 use finstack_quant_core::{dates::Date, money::Money};
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::SettlementType;
@@ -263,13 +263,15 @@ mod tests {
 
     #[test]
     fn negative_strike_rejected() {
-        assert!(CdsOptionParams::call(
-            CdsOptionStrike::Spread(Decimal::new(-5, 3)),
-            date!(2025 - 06 - 20),
-            date!(2030 - 06 - 20),
-            Money::from((10_000_000_i64, Currency::USD)),
-        )
-        .is_err());
+        assert!(
+            CdsOptionParams::call(
+                CdsOptionStrike::Spread(Decimal::new(-5, 3)),
+                date!(2025 - 06 - 20),
+                date!(2030 - 06 - 20),
+                Money::from((10_000_000_i64, Currency::USD)),
+            )
+            .is_err()
+        );
     }
 
     #[test]

@@ -7,8 +7,8 @@ use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{
-    df_from_yield, fixed_leg_annuity, par_rate_and_annuity_from_discount,
-    price_from_ytm_compounded_params, YieldCompounding,
+    YieldCompounding, df_from_yield, fixed_leg_annuity, par_rate_and_annuity_from_discount,
+    price_from_ytm_compounded_params,
 };
 
 #[test]
@@ -171,20 +171,24 @@ fn test_df_from_yield_street() {
 
 #[test]
 fn test_df_from_yield_validation_errors_cover_multiple_compounding_modes() {
-    assert!(df_from_yield(
-        -2.0,
-        1.0,
-        YieldCompounding::Rate(Compounding::Simple),
-        Tenor::annual()
-    )
-    .is_err());
-    assert!(df_from_yield(
-        -1.5,
-        1.0,
-        YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
-        Tenor::annual()
-    )
-    .is_err());
+    assert!(
+        df_from_yield(
+            -2.0,
+            1.0,
+            YieldCompounding::Rate(Compounding::Simple),
+            Tenor::annual()
+        )
+        .is_err()
+    );
+    assert!(
+        df_from_yield(
+            -1.5,
+            1.0,
+            YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
+            Tenor::annual()
+        )
+        .is_err()
+    );
     assert!(df_from_yield(-5.0, 1.0, YieldCompounding::Street, Tenor::semi_annual()).is_err());
 }
 

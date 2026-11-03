@@ -15,7 +15,7 @@ pub mod schedule;
 pub(crate) mod simm;
 
 pub use clearing::{CcpMethodology, ClearingHouseImCalculator};
-pub use haircut::{HaircutImCalculator, HAIRCUT_MPOR_DAYS};
+pub use haircut::{HAIRCUT_MPOR_DAYS, HaircutImCalculator};
 pub use simm::SimmCalculator;
 
 use crate::Marginable;

@@ -13,7 +13,7 @@ use finstack_quant_core::math::interp::*;
 
 // Helper to create interpolator with default Strict validation policy
 macro_rules! new_strict {
-    ($ty:ty, $knots:expr, $dfs:expr, $extrap:expr) => {
+    ($ty:ty, $knots:expr_2021, $dfs:expr_2021, $extrap:expr_2021) => {
         <$ty>::new($knots, $dfs, $extrap, ValidationPolicy::Strict)
     };
 }

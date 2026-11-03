@@ -1,7 +1,7 @@
 //! Core types for Repurchase Agreement (Repo) instruments.
 
 use finstack_quant_cashflows::CashflowProvider;
-use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date, DateExt, DayCount};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, adjust};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -278,13 +278,12 @@ impl Repo {
             rate_adjustment_bp: Some(adjustment),
             ..
         } = &self.collateral.collateral_type
+            && !adjustment.is_finite()
         {
-            if !adjustment.is_finite() {
-                return Err(Error::Validation(format!(
-                    "Repo '{}' special-collateral rate adjustment must be finite, got {}",
-                    self.id, adjustment
-                )));
-            }
+            return Err(Error::Validation(format!(
+                "Repo '{}' special-collateral rate adjustment must be finite, got {}",
+                self.id, adjustment
+            )));
         }
         if self.start_date >= self.maturity {
             return Err(Error::Validation(format!(

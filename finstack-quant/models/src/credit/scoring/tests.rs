@@ -3,8 +3,8 @@
 #[cfg(test)]
 mod altman_tests {
     use crate::credit::scoring::{
-        altman_z_double_prime, altman_z_prime, altman_z_score, AltmanZDoublePrimeInput,
-        AltmanZPrimeInput, AltmanZScoreInput, CreditScoringError, ScoringZone,
+        AltmanZDoublePrimeInput, AltmanZPrimeInput, AltmanZScoreInput, CreditScoringError,
+        ScoringZone, altman_z_double_prime, altman_z_prime, altman_z_score,
     };
 
     /// Textbook example: healthy manufacturing firm.
@@ -220,7 +220,7 @@ mod altman_tests {
 
 #[cfg(test)]
 mod ohlson_tests {
-    use crate::credit::scoring::{ohlson_o_score, CreditScoringError, OhlsonOScoreInput};
+    use crate::credit::scoring::{CreditScoringError, OhlsonOScoreInput, ohlson_o_score};
 
     #[test]
     fn o_score_rejects_non_binary_indicators() {
@@ -354,9 +354,11 @@ mod ohlson_tests {
             net_income_change: 0.90,
         };
         let result = ohlson_o_score(&input).unwrap();
-        assert!(result
-            .implied_pd
-            .is_some_and(|pd| (0.0..=1.0).contains(&pd)));
+        assert!(
+            result
+                .implied_pd
+                .is_some_and(|pd| (0.0..=1.0).contains(&pd))
+        );
     }
 
     /// Verify coefficient signs: higher leverage should increase PD.
@@ -405,7 +407,7 @@ mod ohlson_tests {
 #[cfg(test)]
 mod zmijewski_tests {
     use crate::credit::scoring::{
-        zmijewski_score, CreditScoringError, ScoringZone, ZmijewskiInput,
+        CreditScoringError, ScoringZone, ZmijewskiInput, zmijewski_score,
     };
 
     /// Zmijewski score: healthy firm (positive ROA, moderate leverage, good liquidity).
@@ -456,9 +458,11 @@ mod zmijewski_tests {
             current_assets_to_current_liabilities: 0.01,
         };
         let result = zmijewski_score(&extreme).unwrap();
-        assert!(result
-            .implied_pd
-            .is_some_and(|pd| (0.0..=1.0).contains(&pd)));
+        assert!(
+            result
+                .implied_pd
+                .is_some_and(|pd| (0.0..=1.0).contains(&pd))
+        );
     }
 
     /// Verify coefficient sign: higher leverage increases PD.
@@ -506,7 +510,7 @@ mod zmijewski_tests {
 
 #[cfg(test)]
 mod em_score_tests {
-    use crate::credit::scoring::{altman_em_score, AltmanZDoublePrimeInput, ScoringZone};
+    use crate::credit::scoring::{AltmanZDoublePrimeInput, ScoringZone, altman_em_score};
 
     #[test]
     fn em_score_is_z_double_prime_plus_constant() {

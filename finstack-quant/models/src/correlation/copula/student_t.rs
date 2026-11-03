@@ -60,7 +60,7 @@
 //! - Correlation-dependent credit valuation: `docs/REFERENCES.md#hull-predescu-white-2005`
 //!
 
-use super::{default_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
+use super::{Copula, DEFAULT_QUADRATURE_ORDER, default_quadrature};
 use finstack_quant_core::math::distributions::chi_squared_quantile;
 #[cfg(test)]
 use finstack_quant_core::math::special_functions::student_t_inv_cdf;
@@ -467,10 +467,12 @@ mod tests {
 
     #[test]
     fn tail_dependence_of_nan_is_nan() {
-        assert!(StudentTCopula::new(5.0)
-            .expect("valid df")
-            .tail_dependence(f64::NAN)
-            .is_nan());
+        assert!(
+            StudentTCopula::new(5.0)
+                .expect("valid df")
+                .tail_dependence(f64::NAN)
+                .is_nan()
+        );
     }
 
     #[test]
@@ -497,9 +499,11 @@ mod tests {
         assert!((latent / 1e10 - 1.0).abs() < 1e-12);
         for mixing in [0.0, -1.0, f64::NAN, f64::INFINITY] {
             assert!(copula.latent_variable(0.0, 1.0, mixing, 0.3).is_nan());
-            assert!(copula
-                .conditional_default_prob_given_systematic_and_mixing(0.0, 0.0, mixing, 0.3)
-                .is_nan());
+            assert!(
+                copula
+                    .conditional_default_prob_given_systematic_and_mixing(0.0, 0.0, mixing, 0.3)
+                    .is_nan()
+            );
         }
     }
 

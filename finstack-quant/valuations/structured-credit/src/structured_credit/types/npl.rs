@@ -99,12 +99,12 @@ impl LiquidationSpec {
                 self.reperformance_prob
             )));
         }
-        if let Some(rate) = self.modified_rate {
-            if !rate.is_finite() || rate < 0.0 {
-                return Err(invalid(format!(
-                    "liquidation modified_rate ({rate}) must be a finite non-negative decimal"
-                )));
-            }
+        if let Some(rate) = self.modified_rate
+            && (!rate.is_finite() || rate < 0.0)
+        {
+            return Err(invalid(format!(
+                "liquidation modified_rate ({rate}) must be a finite non-negative decimal"
+            )));
         }
         Ok(())
     }

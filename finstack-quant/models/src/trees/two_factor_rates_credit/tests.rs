@@ -1180,17 +1180,19 @@ fn node_coupon_descriptor_validation_rejects_bad_geometry() {
         payment_step: steps + 1,
         ..base.clone()
     };
-    assert!(tree
-        .price_with_node_coupons(0.0, &valuator, std::slice::from_ref(&beyond))
-        .is_err());
+    assert!(
+        tree.price_with_node_coupons(0.0, &valuator, std::slice::from_ref(&beyond))
+            .is_err()
+    );
 
     let bad_accrual = NodeCoupon {
         accrual: 0.0,
         ..base
     };
-    assert!(tree
-        .price_with_node_coupons(0.0, &valuator, std::slice::from_ref(&bad_accrual))
-        .is_err());
+    assert!(
+        tree.price_with_node_coupons(0.0, &valuator, std::slice::from_ref(&bad_accrual))
+            .is_err()
+    );
 }
 
 #[test]

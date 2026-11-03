@@ -15,17 +15,18 @@ mod tests;
 pub(crate) use effects::ScenarioEffect;
 pub(crate) use types::HazardApplyEnv;
 pub use types::{
-    instrument_envelopes, ApplicationEnvelope, ApplicationReport, AppliedShock, AppliedShockTarget,
-    ExecutionContext, LevelChange, RollForwardReport, ScenarioChangeManifest, ScenarioMarketTarget,
-    ShockMagnitude, ShockNode, ShockUnit,
+    ApplicationEnvelope, ApplicationReport, AppliedShock, AppliedShockTarget, ExecutionContext,
+    LevelChange, RollForwardReport, ScenarioChangeManifest, ScenarioMarketTarget, ShockMagnitude,
+    ShockNode, ShockUnit, instrument_envelopes,
 };
 
 use crate::error::Result;
 use crate::spec::{OperationSpec, RateBindingSpec, ScenarioSpec};
 use crate::warning::Warning;
 use effects::{
-    apply_generated_effects, flush_pending_bumps, generate_replace_curve_effects_parallel,
-    independent_replace_curve_run_len, process_effects, should_parallel_replace_curves, EffectSink,
+    EffectSink, apply_generated_effects, flush_pending_bumps,
+    generate_replace_curve_effects_parallel, independent_replace_curve_run_len, process_effects,
+    should_parallel_replace_curves,
 };
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::dates::HolidayCalendar;
@@ -35,7 +36,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::NodeId;
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
-use hierarchy::{expand_hierarchy_operations, ExpansionOutcome};
+use hierarchy::{ExpansionOutcome, expand_hierarchy_operations};
 use std::sync::Arc;
 
 /// Apply one rate binding, recording a warning instead of a hard error.

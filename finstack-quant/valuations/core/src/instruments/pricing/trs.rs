@@ -47,8 +47,8 @@ use finstack_quant_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
 
 use crate::instruments::pricing::overnight::{
-    adjust_overnight_accrual_boundaries, project_overnight_coupon, OvernightCouponProjectionInput,
-    OvernightProjectionCurve,
+    OvernightCouponProjectionInput, OvernightProjectionCurve, adjust_overnight_accrual_boundaries,
+    project_overnight_coupon,
 };
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_cashflows::fixings::ProjectedFixing;
@@ -843,12 +843,12 @@ impl TrsEngine {
 #[cfg(test)]
 mod tests {
     use super::{
-        financing_period_projection, financing_period_rate, TotalReturnLegParams, TrsEngine,
-        TrsReturnModel,
+        TotalReturnLegParams, TrsEngine, TrsReturnModel, financing_period_projection,
+        financing_period_rate,
     };
-    use crate::instruments::pricing::swap_legs;
     use crate::instruments::FinancingLegSpec;
     use crate::instruments::TrsScheduleSpec;
+    use crate::instruments::pricing::swap_legs;
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_cashflows::builder::ScheduleParams;
     use finstack_quant_core::currency::Currency;
@@ -1635,7 +1635,7 @@ mod tests {
     #[test]
     fn overnight_compounded_matches_shared_overnight_engine() {
         use crate::instruments::pricing::overnight::{
-            project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
+            OvernightCouponProjectionInput, OvernightProjectionCurve, project_overnight_coupon,
         };
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::dates::calendar_by_id_strict;

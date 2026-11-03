@@ -1,13 +1,13 @@
 //! Generic sequential bootstrapping algorithm.
 
 use super::helpers::BracketDiagnostics;
-use super::helpers::{bracket_solve_1d, ScanStrategy};
+use super::helpers::{ScanStrategy, bracket_solve_1d};
 use super::traits::BootstrapTarget;
 use crate::constants::{OBJECTIVE_VALID_ABS_MAX, RESIDUAL_PENALTY_ABS_MIN};
 use crate::report::{CalibrationDiagnostics, QuoteQuality};
 use crate::{CalibrationConfig, CalibrationReport};
-use finstack_quant_core::explain::{ExplanationTrace, TraceEntry};
 use finstack_quant_core::Result;
+use finstack_quant_core::explain::{ExplanationTrace, TraceEntry};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -241,10 +241,7 @@ fn resolve_no_bracket<Q: std::fmt::Debug>(ctx: NoBracketContext<'_, Q>) -> Resul
     Err(finstack_quant_core::Error::Calibration {
         message: format!(
             "Bootstrap failed at t={:.6}: no bracket found despite {} valid evaluations (scan_bounds=[{:.3e}, {:.3e}]).",
-            ctx.time,
-            ctx.diag.valid_eval_count,
-            ctx.diag.scan_bounds.0,
-            ctx.diag.scan_bounds.1
+            ctx.time, ctx.diag.valid_eval_count, ctx.diag.scan_bounds.0, ctx.diag.scan_bounds.1
         ),
         category: "bootstrapping".to_string(),
     })
@@ -1369,13 +1366,13 @@ mod solver_tests {
         }
 
         fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
-            if let Some(th) = quote.infeasible_below {
-                if *curve < th {
-                    return Err(Error::Calibration {
-                        message: format!("infeasible curve value {}", curve),
-                        category: "test".to_string(),
-                    });
-                }
+            if let Some(th) = quote.infeasible_below
+                && *curve < th
+            {
+                return Err(Error::Calibration {
+                    message: format!("infeasible curve value {}", curve),
+                    category: "test".to_string(),
+                });
             }
             // Residual is scaled in f-space to test tolerance enforcement.
             Ok(quote.scale * (*curve - quote.root))

@@ -57,6 +57,7 @@
 //! With `quoted_spot = Some(1.10)`, 1 EUR = 1.10 USD.
 
 use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -64,7 +65,6 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
 
 /// FX Spot instrument (1 unit of `base` priced in `quote`).

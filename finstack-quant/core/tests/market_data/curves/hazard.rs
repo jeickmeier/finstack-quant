@@ -41,13 +41,10 @@ fn from_survival_probs_reproduces_pillars() {
     assert_eq!(curve.knot_points().count(), 3);
 
     // Unsorted input is accepted; increasing survival is not.
-    assert!(HazardCurve::from_survival_probs(
-        "UNSORTED",
-        base_date(),
-        &[(3.0, 0.93), (1.0, 0.98)],
-        0.4
-    )
-    .is_ok());
+    assert!(
+        HazardCurve::from_survival_probs("UNSORTED", base_date(), &[(3.0, 0.93), (1.0, 0.98)], 0.4)
+            .is_ok()
+    );
     assert!(
         HazardCurve::from_survival_probs("UP", base_date(), &[(1.0, 0.9), (2.0, 0.95)], 0.4)
             .is_err()

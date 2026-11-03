@@ -53,20 +53,22 @@ fn portfolio_loss_result_handle_matches_rust() {
         JsPortfolioLossResult::from_losses(losses, JsValue::from(0.75)).expect("valid losses");
     assert_eq!(result.var(), 5.0);
     assert!((result.expected_shortfall() - 9.0).abs() < 1e-12);
-    assert!(result
-        .tranche_loss_statistics(
-            JsValue::from(0.02),
-            JsValue::from(0.06),
-            JsValue::from(100.0)
-        )
-        .is_ok());
+    assert!(
+        result
+            .tranche_loss_statistics(
+                JsValue::from(0.02),
+                JsValue::from(0.06),
+                JsValue::from(100.0)
+            )
+            .is_ok()
+    );
     let json = result.to_json().expect("json");
     let loaded = JsPortfolioLossResult::from_json(JsValue::from(&json)).expect("round trip");
     assert_eq!(loaded.to_json().unwrap(), json);
-    assert!(JsPortfolioLossResult::from_json(JsValue::from(
-        json.replace("\"var\":5.0", "\"var\":6.0")
-    ))
-    .is_err());
+    assert!(
+        JsPortfolioLossResult::from_json(JsValue::from(json.replace("\"var\":5.0", "\"var\":6.0")))
+            .is_err()
+    );
 }
 
 #[wasm_bindgen_test]
@@ -210,38 +212,48 @@ fn wasm_recovery_spec_constant_rejects_out_of_range_and_nan() {
 #[wasm_bindgen_test]
 fn wasm_recovery_spec_market_correlated_validates_inputs() {
     // Mean recovery outside [0, 1] or non-finite must be rejected.
-    assert!(JsRecoverySpec::market_correlated(
-        JsValue::from(1.5),
-        JsValue::from(0.1),
-        JsValue::from(0.3)
-    )
-    .is_err());
-    assert!(JsRecoverySpec::market_correlated(
-        JsValue::from(f64::NAN),
-        JsValue::from(0.1),
-        JsValue::from(0.3)
-    )
-    .is_err());
+    assert!(
+        JsRecoverySpec::market_correlated(
+            JsValue::from(1.5),
+            JsValue::from(0.1),
+            JsValue::from(0.3)
+        )
+        .is_err()
+    );
+    assert!(
+        JsRecoverySpec::market_correlated(
+            JsValue::from(f64::NAN),
+            JsValue::from(0.1),
+            JsValue::from(0.3)
+        )
+        .is_err()
+    );
     // Non-finite vol / correlation must also be rejected.
-    assert!(JsRecoverySpec::market_correlated(
-        JsValue::from(0.4),
-        JsValue::from(f64::NAN),
-        JsValue::from(0.3)
-    )
-    .is_err());
-    assert!(JsRecoverySpec::market_correlated(
-        JsValue::from(0.4),
-        JsValue::from(0.1),
-        JsValue::from(f64::INFINITY)
-    )
-    .is_err());
+    assert!(
+        JsRecoverySpec::market_correlated(
+            JsValue::from(0.4),
+            JsValue::from(f64::NAN),
+            JsValue::from(0.3)
+        )
+        .is_err()
+    );
+    assert!(
+        JsRecoverySpec::market_correlated(
+            JsValue::from(0.4),
+            JsValue::from(0.1),
+            JsValue::from(f64::INFINITY)
+        )
+        .is_err()
+    );
     // A fully valid spec is still accepted.
-    assert!(JsRecoverySpec::market_correlated(
-        JsValue::from(0.4),
-        JsValue::from(0.25),
-        JsValue::from(-0.4)
-    )
-    .is_ok());
+    assert!(
+        JsRecoverySpec::market_correlated(
+            JsValue::from(0.4),
+            JsValue::from(0.25),
+            JsValue::from(-0.4)
+        )
+        .is_ok()
+    );
 }
 
 #[wasm_bindgen_test]

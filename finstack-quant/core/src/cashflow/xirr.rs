@@ -37,10 +37,10 @@
 //! - Brent, R. P. (1973), *Algorithms for Minimization Without Derivatives*. `docs/REFERENCES.md#brent-1973`
 //! - Hull, J. C., *Options, Futures, and Other Derivatives*. `docs/REFERENCES.md#hull-options-futures`
 
+use crate::InputError;
 use crate::dates::{Date, DayCount, DayCountContext};
 use crate::math::solver::BrentSolver;
 use crate::math::summation::NeumaierAccumulator;
-use crate::InputError;
 
 /// Absolute root tolerance in log-growth coordinates, `log(1 + r)`.
 const LOG_RATE_TOLERANCE: f64 = 1e-12;
@@ -487,12 +487,14 @@ mod tests {
         .expect("zero amount does not change the root");
         assert!((actual - expected).abs() < 1e-12);
 
-        assert!(xirr(
-            &[(early, 0.0), (d0, -100.0), (d1, 100.0), (d2, -100.0)],
-            DayCount::Act365F,
-            None
-        )
-        .is_err());
+        assert!(
+            xirr(
+                &[(early, 0.0), (d0, -100.0), (d1, 100.0), (d2, -100.0)],
+                DayCount::Act365F,
+                None
+            )
+            .is_err()
+        );
     }
 
     #[test]

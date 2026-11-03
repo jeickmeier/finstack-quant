@@ -199,11 +199,13 @@ fn step_remaining_increases_require_funding_before_target() {
             Date::from_calendar_date(2025, time::Month::December, 1).unwrap(),
         )
         .amortization(notional.amort);
-    assert!(builder
-        .build(None)
-        .expect_err("unfunded increase must fail at its effective date")
-        .to_string()
-        .contains("exceeds outstanding principal"));
+    assert!(
+        builder
+            .build(None)
+            .expect_err("unfunded increase must fail at its effective date")
+            .to_string()
+            .contains("exceeds outstanding principal")
+    );
 }
 
 #[test]

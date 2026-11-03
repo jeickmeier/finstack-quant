@@ -1,6 +1,6 @@
 //! Publish validation metadata for the facade's bigint-enabled result serializer.
-use finstack_quant_core::schema::{run_schema_generator, SchemaArtifact, SchemaGenerationCommand};
 use finstack_quant_core::Result;
+use finstack_quant_core::schema::{SchemaArtifact, SchemaGenerationCommand, run_schema_generator};
 use serde_json::Value;
 use std::path::Path;
 

@@ -1,8 +1,9 @@
 //! Bootstrapper for base correlation curves built from tranche quotes.
 
+use crate::CalibrationReport;
 use crate::api::schema::BaseCorrelationParams;
 use crate::build::cds::resolve_cds_tenor_maturity;
-use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
+use crate::build::cds_tranche::{CdsTrancheBuildOverrides, build_cds_tranche_instrument};
 use crate::build::context::BuildCtx;
 use crate::config::CalibrationConfig;
 use crate::quotes::CdsTrancheQuote;
@@ -10,13 +11,12 @@ use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap;
 use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::ContextScratch;
-use crate::CalibrationReport;
 use finstack_quant_cashflows::builder::RollRule;
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DateExt, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
-use finstack_quant_core::FxHashMap;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_credit::cds_tranche::CdsTranchePricer;
 use std::sync::Arc;
@@ -590,23 +590,27 @@ mod tests {
         let base_date = Date::from_calendar_date(2025, Month::January, 2).expect("base date");
         let expected = base_date.add_months(60).expect("valid date shift");
         assert!(validate_maturity(expected, base_date, 5.0, RollRule::None).is_ok());
-        assert!(validate_maturity(
-            expected + time::Duration::days(1),
-            base_date,
-            5.0,
-            RollRule::None
-        )
-        .is_err());
+        assert!(
+            validate_maturity(
+                expected + time::Duration::days(1),
+                base_date,
+                5.0,
+                RollRule::None
+            )
+            .is_err()
+        );
         for years in [0.0, -1.0, f64::NAN, f64::INFINITY, 5.1] {
             assert!(validate_maturity(expected, base_date, years, RollRule::None).is_err());
         }
-        assert!(validate_maturity(
-            base_date.add_months(6).expect("six months"),
-            base_date,
-            0.5,
-            RollRule::None
-        )
-        .is_ok());
+        assert!(
+            validate_maturity(
+                base_date.add_months(6).expect("six months"),
+                base_date,
+                0.5,
+                RollRule::None
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -623,13 +627,15 @@ mod tests {
             let maturity = Date::from_calendar_date(maturity_year, maturity_month, 20)
                 .expect("standard maturity");
             assert!(validate_maturity(maturity, trade, 5.0, RollRule::CdsImm).is_ok());
-            assert!(validate_maturity(
-                trade.add_months(60).expect("anniversary"),
-                trade,
-                5.0,
-                RollRule::CdsImm
-            )
-            .is_err());
+            assert!(
+                validate_maturity(
+                    trade.add_months(60).expect("anniversary"),
+                    trade,
+                    5.0,
+                    RollRule::CdsImm
+                )
+                .is_err()
+            );
         }
     }
 

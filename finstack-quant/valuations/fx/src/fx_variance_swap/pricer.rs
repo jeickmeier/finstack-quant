@@ -5,11 +5,12 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::closed_form::bs_price_unchecked;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_quant_core::{
+    Result,
     dates::{Date, DayCountContext},
     market_data::{
         context::MarketContext,
@@ -17,7 +18,6 @@ use finstack_quant_core::{
     },
     math::stats::realized_variance,
     money::Money,
-    Result,
 };
 
 pub(crate) fn compute_pv(
@@ -644,10 +644,12 @@ mod tests {
             .build()
             .expect("surface");
         let market = zero_rate_market(as_of, 0.1).insert_surface(surface);
-        assert!(expected_variance(&swap, &market, as_of)
-            .expect_err("calendar arbitrage")
-            .to_string()
-            .contains("negative forward variation"));
+        assert!(
+            expected_variance(&swap, &market, as_of)
+                .expect_err("calendar arbitrage")
+                .to_string()
+                .contains("negative forward variation")
+        );
     }
 
     #[test]
@@ -677,10 +679,12 @@ mod tests {
         let exact =
             (1.01_f64 / 0.99).ln().powi(2) * annualization_factor(&swap) / (4.0 * 2.0_f64.ln());
         assert!((realized - exact).abs() < 1e-12);
-        assert!(expected_variance(&swap, &market, as_of)
-            .expect_err("no OHLC model")
-            .to_string()
-            .contains("estimator-specific"));
+        assert!(
+            expected_variance(&swap, &market, as_of)
+                .expect_err("no OHLC model")
+                .to_string()
+                .contains("estimator-specific")
+        );
     }
 
     #[test]
@@ -844,9 +848,11 @@ mod tests {
         assert_eq!(annualization_factor(&swap), 126.0);
         assert_eq!(dates[0], date!(2025 - 01 - 03));
         assert_eq!(dates[1], date!(2025 - 01 - 07));
-        assert!(dates
-            .iter()
-            .all(|d| !matches!(d.weekday(), time::Weekday::Saturday | time::Weekday::Sunday)));
+        assert!(
+            dates
+                .iter()
+                .all(|d| !matches!(d.weekday(), time::Weekday::Saturday | time::Weekday::Sunday))
+        );
 
         swap.observation_frequency = Tenor::new(2, TenorUnit::Weeks).expect("valid tenor fixture");
         assert_eq!(annualization_factor(&swap), 26.0);

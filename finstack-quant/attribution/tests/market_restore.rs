@@ -10,9 +10,10 @@
 //! commodity P&L landed 100% in the residual.
 
 use finstack_quant_attribution::{
-    attribute_pnl, default_waterfall_order, AttributionMethod, AttributionRequest, ExecutionPolicy,
-    MarketRestoreFlags, MarketSnapshot,
+    AttributionMethod, AttributionRequest, ExecutionPolicy, MarketRestoreFlags, MarketSnapshot,
+    attribute_pnl, default_waterfall_order,
 };
+use finstack_quant_core::Result;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -26,7 +27,6 @@ use finstack_quant_core::market_data::term_structures::{
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use finstack_quant_models::volatility::get_cube_vol_clamped;
 use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
 use finstack_quant_valuations::metrics::MetricId;

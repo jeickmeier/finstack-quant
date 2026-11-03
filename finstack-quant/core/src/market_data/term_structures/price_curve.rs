@@ -82,7 +82,7 @@
 //!   35(3), 98-105. `docs/REFERENCES.md#whaley-2009-vix`
 //! - CBOE (2019). "VIX White Paper." CBOE Global Markets. `docs/REFERENCES.md#cboe-vix-white-paper`
 
-use super::common::{roll_knots, InterpRollState};
+use super::common::{InterpRollState, roll_knots};
 use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
@@ -252,7 +252,7 @@ impl TryFrom<RawPriceCurve> for PriceCurve {
             _ => {
                 return Err(crate::Error::Validation(
                     "PriceCurve requires exactly one of `spot_price` or `spot_level`".to_string(),
-                ))
+                ));
             }
         };
         PriceCurve::builder(state.id)
@@ -747,16 +747,12 @@ impl PriceCurveBuilder {
             &knots,
             &prices,
         )?;
-        if let Some(state) = &self.roll_transform {
-            if self.kind == PriceCurveKind::VolIndex {
-                let (source_knots, source_levels): (Vec<f64>, Vec<f64>) =
-                    state.source_points.iter().copied().unzip();
-                validate_non_negative_knots(
-                    &source_knots,
-                    &source_levels,
-                    "Volatility index level",
-                )?;
-            }
+        if let Some(state) = &self.roll_transform
+            && self.kind == PriceCurveKind::VolIndex
+        {
+            let (source_knots, source_levels): (Vec<f64>, Vec<f64>) =
+                state.source_points.iter().copied().unzip();
+            validate_non_negative_knots(&source_knots, &source_levels, "Volatility index level")?;
         }
 
         Ok(PriceCurve {
@@ -1139,31 +1135,35 @@ mod tests {
             (Some(2.0), 1.0, Some(3.0)),
             (Some(0.0), 1.0, Some(1.0)),
         ] {
-            assert!(curve
+            assert!(
+                curve
+                    .apply_bump(BumpSpec {
+                        mode: BumpMode::Additive,
+                        units: BumpUnits::Fraction,
+                        value: 10.0,
+                        bump_type: BumpType::TriangularKeyRate {
+                            prev_bucket: previous,
+                            target_bucket: target,
+                            next_bucket: next
+                        }
+                    })
+                    .is_err()
+            );
+        }
+        assert!(
+            curve
                 .apply_bump(BumpSpec {
                     mode: BumpMode::Additive,
                     units: BumpUnits::Fraction,
-                    value: 10.0,
+                    value: f64::NAN,
                     bump_type: BumpType::TriangularKeyRate {
-                        prev_bucket: previous,
-                        target_bucket: target,
-                        next_bucket: next
+                        prev_bucket: None,
+                        target_bucket: 1.0,
+                        next_bucket: None
                     }
                 })
-                .is_err());
-        }
-        assert!(curve
-            .apply_bump(BumpSpec {
-                mode: BumpMode::Additive,
-                units: BumpUnits::Fraction,
-                value: f64::NAN,
-                bump_type: BumpType::TriangularKeyRate {
-                    prev_bucket: None,
-                    target_bucket: 1.0,
-                    next_bucket: None
-                }
-            })
-            .is_err());
+                .is_err()
+        );
     }
 
     #[test]

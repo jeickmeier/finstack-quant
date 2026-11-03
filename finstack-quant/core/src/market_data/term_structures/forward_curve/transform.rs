@@ -110,12 +110,12 @@ impl ForwardCurve {
                 "forward-curve shock produced non-finite rates".into(),
             ));
         }
-        if let BumpType::TriangularKeyRate { target_bucket, .. } = spec.bump_type {
-            if !transform.rate(&self.interp, target_bucket).is_finite() {
-                return Err(crate::Error::Validation(
-                    "forward-curve shock produced a non-finite peak rate".into(),
-                ));
-            }
+        if let BumpType::TriangularKeyRate { target_bucket, .. } = spec.bump_type
+            && !transform.rate(&self.interp, target_bucket).is_finite()
+        {
+            return Err(crate::Error::Validation(
+                "forward-curve shock produced a non-finite peak rate".into(),
+            ));
         }
         self.forwards = forwards;
         self.transform = Some(transform);

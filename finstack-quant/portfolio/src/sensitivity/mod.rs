@@ -23,9 +23,9 @@ mod traits;
 
 pub use compute::{compute_factor_sensitivities, compute_pnl_profiles};
 pub(crate) use compute::{portfolio_rows, uses_assignment_driven_credit_shock};
-pub(crate) use delta_engine::mapping_to_market_bumps;
 pub use delta_engine::DeltaBasedEngine;
-pub use json::{SensitivityMatrixJson, DEFAULT_PNL_SCENARIO_POINTS};
+pub(crate) use delta_engine::mapping_to_market_bumps;
+pub use json::{DEFAULT_PNL_SCENARIO_POINTS, SensitivityMatrixJson};
 pub use repricing_engine::{FactorPnlProfile, FullRepricingEngine};
-pub(crate) use traits::exact_factor_market_keys;
 pub use traits::FactorSensitivityEngine;
+pub(crate) use traits::exact_factor_market_keys;

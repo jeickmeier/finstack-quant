@@ -15,8 +15,8 @@ use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    tranche_metrics, tranche_scenario_table, AssetPool, DealType, PoolAsset, ScenarioGrid,
-    StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, DealType, PoolAsset, ScenarioGrid, StructuredCredit, Tranche, TrancheStructure,
+    tranche_metrics, tranche_scenario_table,
 };
 use time::Month;
 

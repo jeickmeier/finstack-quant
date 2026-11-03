@@ -55,9 +55,11 @@ fn strict_json_rejects_node_identity_that_would_share_another_forecast_cache() {
     let evaluation_error = Evaluator::new()
         .evaluate(&model)
         .expect_err("ordinary evaluation must reject the same node identity collision");
-    assert!(evaluation_error
-        .to_string()
-        .contains("does not match its embedded node_id"));
+    assert!(
+        evaluation_error
+            .to_string()
+            .contains("does not match its embedded node_id")
+    );
 }
 
 #[test]
@@ -86,9 +88,11 @@ fn build_rejects_values_that_evaluation_would_silently_drop() {
             .expect_err("an explicit value outside the timeline cannot reach evaluation")
     };
     assert!(error.to_string().contains("2025Q3"));
-    assert!(error
-        .to_string()
-        .contains("not present in the model timeline"));
+    assert!(
+        error
+            .to_string()
+            .contains("not present in the model timeline")
+    );
 }
 
 #[test]
@@ -118,9 +122,11 @@ fn inferred_import_timeline_includes_gaps_and_checks_interior_columns() {
     assert!(periods[0].is_actual);
     assert!(!periods[1].is_actual);
 
-    assert!(builder
-        .resolve_period_columns(&[quarter(1), quarter(4), quarter(3)], None)
-        .is_err());
+    assert!(
+        builder
+            .resolve_period_columns(&[quarter(1), quarter(4), quarter(3)], None)
+            .is_err()
+    );
     assert!(builder.resolve_period_columns(&[], None).is_err());
 }
 
@@ -163,9 +169,11 @@ fn removing_an_explicit_observation_requires_removing_its_availability_date() {
     let error = model
         .validate_semantics()
         .expect_err("a release date without its explicit observation is invalid");
-    assert!(error
-        .to_string()
-        .contains("no explicit value for that period"));
+    assert!(
+        error
+            .to_string()
+            .contains("no explicit value for that period")
+    );
 }
 
 #[test]
@@ -228,19 +236,23 @@ fn named_capital_structure_formulas_keep_native_instrument_currency() {
 fn model_period_intervals_must_be_positive_and_disjoint() {
     let mut empty = forecast_model();
     empty.periods[0].end = empty.periods[0].start;
-    assert!(empty
-        .validate_semantics()
-        .unwrap_err()
-        .to_string()
-        .contains("start before end"));
+    assert!(
+        empty
+            .validate_semantics()
+            .unwrap_err()
+            .to_string()
+            .contains("start before end")
+    );
 
     let mut overlapping = forecast_model();
     overlapping.periods[1].start = date!(2025 - 03 - 31);
-    assert!(overlapping
-        .validate_semantics()
-        .unwrap_err()
-        .to_string()
-        .contains("must not overlap"));
+    assert!(
+        overlapping
+            .validate_semantics()
+            .unwrap_err()
+            .to_string()
+            .contains("must not overlap")
+    );
 
     let mut sparse = forecast_model();
     sparse.periods[1].start = date!(2025 - 05 - 01);

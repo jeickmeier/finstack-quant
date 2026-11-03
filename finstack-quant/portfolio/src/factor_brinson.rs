@@ -396,7 +396,7 @@ pub fn factor_brinson_attribution(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::brinson::{brinson_fachler, SectorPeriod};
+    use crate::brinson::{SectorPeriod, brinson_fachler};
 
     fn close(actual: f64, expected: f64, tol: f64, label: &str) {
         assert!(

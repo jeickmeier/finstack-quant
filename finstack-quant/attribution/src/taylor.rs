@@ -24,23 +24,23 @@
 //! factor-level explained/unexplained decomposition without sequential market
 //! state construction.
 
+use crate::AttributionRequest;
 use crate::factors::{MarketRestoreFlags, MarketSnapshot};
 use crate::helpers::*;
-use crate::metrics_based::shifts::{extract_credit_keyrates, CreditKeyRateBucket};
-use crate::AttributionRequest;
+use crate::metrics_based::shifts::{CreditKeyRateBucket, extract_credit_keyrates};
 use crate::{AttributionFactor, AttributionMethod, MoveUnit, PnlAttribution};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::diff::{measure_credit_curve_shift, TenorSamplingMethod};
+use finstack_quant_core::market_data::diff::{TenorSamplingMethod, measure_credit_curve_shift};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use finstack_quant_models::volatility::measure_vol_surface_shift;
-use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{bump_surface_vol_absolute, STANDARD_BUCKETS_YEARS};
+use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_valuations::metrics::{STANDARD_BUCKETS_YEARS, bump_surface_vol_absolute};
 use finstack_quant_valuations::recalibration::{
     HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
 };
@@ -1443,10 +1443,12 @@ mod tests {
             serde_json::from_str(&json).expect("deserialize should succeed");
 
         assert_eq!(parsed, config);
-        assert!(serde_json::from_str::<TaylorAttributionConfig>(
-            r#"{"include_gamma":false,"unexpected":true}"#
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<TaylorAttributionConfig>(
+                r#"{"include_gamma":false,"unexpected":true}"#
+            )
+            .is_err()
+        );
 
         let schema = serde_json::to_value(schemars::schema_for!(TaylorAttributionConfig))
             .expect("Taylor attribution config schema");
@@ -1662,8 +1664,8 @@ mod tests {
 
     #[test]
     fn taylor_buckets_fx_exposure_into_fx_pnl() {
-        use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
         use finstack_quant_core::Error;
+        use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 
         // FX provider with a deterministic EUR/USD rate.
         struct FixedFx(f64);
@@ -2037,7 +2039,7 @@ mod tests {
                         _ => {
                             return Err(finstack_quant_core::Error::Validation(
                                 "MockInstrument requires a constant CPR model".into(),
-                            ))
+                            ));
                         }
                     });
                     Ok(Box::new(clone))
@@ -2910,10 +2912,12 @@ mod tests {
             assert_eq!(result.num_repricings, 3);
             assert!(result.result_invalid);
             assert_eq!(result.theta_coupon_income, None);
-            assert!(result
-                .factors
-                .iter()
-                .all(|factor| factor.factor_name != "Theta"));
+            assert!(
+                result
+                    .factors
+                    .iter()
+                    .all(|factor| factor.factor_name != "Theta")
+            );
             assert!(result.notes.iter().any(|note| {
                 note.contains(expected_error)
                     && note.contains("total P&L excludes period cash receipts")
@@ -2937,19 +2941,21 @@ mod tests {
 
             assert!(attribution.result_invalid);
             assert!(attribution.carry_detail.is_none());
-            assert!(attribution
-                .meta
-                .notes
-                .iter()
-                .any(|note| note.contains(expected_error)));
+            assert!(
+                attribution
+                    .meta
+                    .notes
+                    .iter()
+                    .any(|note| note.contains(expected_error))
+            );
         }
     }
 
     /// The FX-exposure factor must run when either side carries an FX matrix.
     #[test]
     fn fx_factor_runs_when_only_t1_has_fx() {
-        use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
         use finstack_quant_core::Error;
+        use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 
         struct FixedFx(f64);
         impl FxProvider for FixedFx {

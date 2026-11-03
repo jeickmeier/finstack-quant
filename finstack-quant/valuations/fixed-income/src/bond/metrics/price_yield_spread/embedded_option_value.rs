@@ -50,8 +50,8 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use crate::bond::metrics::reprice_selected;
 use crate::bond::Bond;
+use crate::bond::metrics::reprice_selected;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_valuations_core::pricer::ModelKey;
 
@@ -133,18 +133,18 @@ impl MetricCalculator for EmbeddedOptionValueCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bond::pricing::quote_conversions::price_from_oas;
-    use crate::bond::pricing::tree::{bond_tree_settings, TreePricer};
     use crate::bond::BondSettlementConvention;
     use crate::bond::CashflowSpec;
+    use crate::bond::pricing::quote_conversions::price_from_oas;
+    use crate::bond::pricing::tree::{TreePricer, bond_tree_settings};
     use crate::bond::{CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorSpec};
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use std::sync::Arc;
     use time::Month;
 

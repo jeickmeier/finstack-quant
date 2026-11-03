@@ -10,7 +10,7 @@ use crate::types::{
     bool_param, finite, mean, op_from_str, reject_unknown_params, scaled_centered,
     validate_lengths, validate_output, window_params,
 };
-use crate::{transform_cross_sectional, CrossSectionalOp};
+use crate::{CrossSectionalOp, transform_cross_sectional};
 use finstack_quant_core::math::stats::{covariance, variance};
 use finstack_quant_core::{Error, Result};
 use nalgebra::{DMatrix, DVector};

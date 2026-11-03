@@ -99,18 +99,17 @@ pub mod schema;
 mod timeseries;
 mod types;
 
-pub use cross_sectional::{transform_cross_sectional, CrossSectionalOp};
+pub use cross_sectional::{CrossSectionalOp, transform_cross_sectional};
 pub use keys::{datetime_order_key, naive_datetime_order_key};
 pub use multi::{
-    neutralize, neutralize_and_zscore, rank_to_weights, risk_scaled_weights,
+    PairwiseOp, neutralize, neutralize_and_zscore, rank_to_weights, risk_scaled_weights,
     rolling_regression_residual, transform_cross_sectional_grouped, transform_timeseries_pairwise,
-    PairwiseOp,
 };
 pub use panel::{
-    transform_panel, transform_panel_json, PanelOperation, PanelTransformColumn,
-    PanelTransformResult, PanelTransformSpec,
+    PanelOperation, PanelTransformColumn, PanelTransformResult, PanelTransformSpec,
+    transform_panel, transform_panel_json,
 };
-pub use timeseries::{transform_timeseries, TimeSeriesOp};
+pub use timeseries::{TimeSeriesOp, transform_timeseries};
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

@@ -5,9 +5,9 @@
 
 use super::enums::{ImMethodology, MarginTenor};
 use super::serde_validation;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 use crate::registry::embedded_registry;
 use crate::registry::margin_registry_from_config;

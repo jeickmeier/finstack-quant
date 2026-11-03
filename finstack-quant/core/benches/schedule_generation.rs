@@ -8,7 +8,7 @@
 //! - Business day adjustment overhead
 //! - Long-tenor schedule scaling (5Y, 10Y, 30Y)
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::dates::{BusinessDayConvention, Schedule, StubKind, Tenor};
 use std::hint::black_box;
 use time::{Date, Month};

@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::Result;
 use crate::checks::helpers::get_finite_node_value;
 use crate::checks::types::effective_tolerance;
 use crate::checks::{
@@ -9,7 +10,6 @@ use crate::checks::{
     Severity,
 };
 use crate::types::NodeId;
-use crate::Result;
 
 /// Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally
 /// TotalCF = CFO + CFI + CFF.

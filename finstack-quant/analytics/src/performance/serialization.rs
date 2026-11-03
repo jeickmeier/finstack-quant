@@ -1,6 +1,6 @@
 //! Serde wire type for [`super::Performance`]; caches are rebuilt on load.
 
-use super::{invalid_return_series, Performance, TickerSpan};
+use super::{Performance, TickerSpan, invalid_return_series};
 use finstack_quant_core::dates::{Date, PeriodKind};
 
 #[derive(serde::Deserialize)]

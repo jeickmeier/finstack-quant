@@ -2,11 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::Result;
 use crate::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, PeriodScope, Severity,
 };
 use crate::types::NodeId;
-use crate::Result;
 
 /// Flags required nodes that lack values in applicable periods.
 ///

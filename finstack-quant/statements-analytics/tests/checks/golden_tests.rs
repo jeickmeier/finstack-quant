@@ -9,7 +9,7 @@ use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, NodeId};
 use finstack_quant_statements_analytics::analysis::{
-    credit_underwriting_checks, three_statement_checks, CreditMapping, ThreeStatementMapping,
+    CreditMapping, ThreeStatementMapping, credit_underwriting_checks, three_statement_checks,
 };
 
 fn q(quarter: u8) -> PeriodId {

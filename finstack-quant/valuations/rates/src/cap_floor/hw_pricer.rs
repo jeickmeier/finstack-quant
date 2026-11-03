@@ -24,23 +24,23 @@
 //!   Chapter 3: One-factor Short-Rate Models, Section 3.3.2 (Gaussian forward-rate
 //!   dynamics underpinning the closed-form caplet normal volatility). `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
 
-use crate::cap_floor::pricing::projection::{
-    resolve_optioned_caplet_inputs, OptionedCouponProjection,
-};
 use crate::cap_floor::pricing::CapletFloorletInputs;
+use crate::cap_floor::pricing::projection::{
+    OptionedCouponProjection, resolve_optioned_caplet_inputs,
+};
 use crate::cap_floor::types::CapFloor;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::rates::hull_white::{
-    capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key,
-    hw1f_term_caplet_price_from_dfs_with_model, hw_b, HullWhiteCalibrationParams, HullWhiteParams,
-};
-use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
-    resolve_hw1f_params, Hw1fParamFamily,
+    HullWhiteCalibrationParams, HullWhiteParams, capfloor_hw1f_scalar_keys,
+    capfloor_hw1f_sigma_schedule_key, hw_b, hw1f_term_caplet_price_from_dfs_with_model,
 };
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
+    Hw1fParamFamily, resolve_hw1f_params,
+};
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -497,14 +497,14 @@ mod tests {
     use finstack_quant_valuations_test_support::discount_forward_curves as discount_forward_curve_support;
 
     use super::*;
-    use crate::cap_floor::pricing::projection::resolve_optioned_coupon;
     use crate::cap_floor::RateOptionType;
+    use crate::cap_floor::pricing::projection::resolve_optioned_coupon;
     use crate::cap_floor::{OvernightCouponConvention, OvernightSpreadCompounding};
     use date_support::date;
     use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{calendar_by_id_strict, DateExt, DayCount, DayCountContext};
+    use finstack_quant_core::dates::{DateExt, DayCount, DayCountContext, calendar_by_id_strict};
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::money::Money;
     use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;

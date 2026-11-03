@@ -10,8 +10,8 @@
 //! ```
 //! Where bump_size is typically 1bp (0.0001) change in weight.
 
-use crate::instruments::exotics::basket::Basket;
 use crate::instruments::Instrument;
+use crate::instruments::exotics::basket::Basket;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 
@@ -48,7 +48,8 @@ impl MetricCalculator for WeightRiskCalculator {
                 .sum();
             if total_other_weight.abs() <= f64::EPSILON {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "WeightRisk cannot fund a {WEIGHT_BUMP} reallocation into '{}' from the other weights", constituent.id
+                    "WeightRisk cannot fund a {WEIGHT_BUMP} reallocation into '{}' from the other weights",
+                    constituent.id
                 )));
             }
             let mut bumped_basket = basket.clone();

@@ -520,7 +520,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{solve_with_bounds, GoalSeekResult};
+    use super::{GoalSeekResult, solve_with_bounds};
 
     #[test]
     fn goal_seek_result_from_json_validates_the_embedded_model() {

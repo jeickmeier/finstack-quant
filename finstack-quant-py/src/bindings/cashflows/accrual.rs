@@ -2,15 +2,15 @@
 
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::accrual::{
-    accrued_interest_amount as rust_accrued_interest_amount, AccrualConfig, AccrualIndex,
-    AccrualMethod, ExCouponRule,
+    AccrualConfig, AccrualIndex, AccrualMethod, ExCouponRule,
+    accrued_interest_amount as rust_accrued_interest_amount,
 };
 use finstack_quant_core::money::Money;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 
 use crate::bindings::cashflows::builder::schedule::PyCashFlowSchedule;
-use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
+use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::wire_methods;

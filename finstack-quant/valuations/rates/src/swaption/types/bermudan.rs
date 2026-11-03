@@ -10,11 +10,11 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 
 use super::definitions::{BermudanSchedule, BermudanType, CashSettlementMethod};
-use super::swaption::{vanilla_underlier, Swaption, VanillaSwaptionUnderlier};
+use super::swaption::{Swaption, VanillaSwaptionUnderlier, vanilla_underlier};
 use finstack_quant_valuations_core::instruments::{SettlementType, VolatilityModel};
 
 // Bermudan Swaption Instrument
@@ -121,11 +121,11 @@ impl BermudanSwaption {
     /// `bermudan_swaption`, or when the parsed swaption fails
     /// [`validate`](Self::validate).
     pub fn from_envelope_json(json: &str) -> Result<Self> {
-        use finstack_quant_core::contract::{deserialize_json_value, parse_json_value, LoadLimits};
-        use finstack_quant_valuations_core::instruments::envelope::{
-            instrument_load_error, InstrumentSchema, MAX_JSON_BYTES,
-        };
+        use finstack_quant_core::contract::{LoadLimits, deserialize_json_value, parse_json_value};
         use finstack_quant_valuations_core::instruments::Instrument;
+        use finstack_quant_valuations_core::instruments::envelope::{
+            InstrumentSchema, MAX_JSON_BYTES, instrument_load_error,
+        };
 
         #[derive(serde::Deserialize)]
         #[serde(deny_unknown_fields)]

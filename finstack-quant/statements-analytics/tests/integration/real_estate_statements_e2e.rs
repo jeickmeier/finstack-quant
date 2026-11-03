@@ -6,14 +6,14 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::{
-    node_to_dated_schedule, Evaluator, PeriodDateConvention,
+    Evaluator, PeriodDateConvention, node_to_dated_schedule,
 };
 use finstack_quant_statements::types::AmountOrScalar;
 use finstack_quant_statements_analytics::templates::real_estate;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::equity::real_estate::{
     RealEstateAsset, RealEstateValuationMethod,
 };
-use finstack_quant_valuations::instruments::Instrument;
 
 #[test]
 fn e2e_statements_to_real_estate_asset_cashflows_prices() {

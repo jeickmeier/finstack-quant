@@ -9,7 +9,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
@@ -53,10 +53,10 @@ impl Pricer for CommoditySpotOptionMcPricer {
         // Instrument-level mc_paths override takes precedence over the pricer
         // registration defaults (consistent with autocallable/asian/lookback/etc.).
         let mut mc_params = self.mc_params.clone();
-        if let Some(n) = option.instrument_pricing_overrides.model_config.mc_paths {
-            if n > 0 {
-                mc_params.num_paths = n;
-            }
+        if let Some(n) = option.instrument_pricing_overrides.model_config.mc_paths
+            && n > 0
+        {
+            mc_params.num_paths = n;
         }
 
         let (pv, diagnostics) = option.price_mc(&mc_params, market, as_of)?;

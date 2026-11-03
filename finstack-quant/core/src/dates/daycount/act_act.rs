@@ -3,9 +3,9 @@
 use time::{Date, Month};
 
 use super::DayCountContext;
+use crate::InputError;
 use crate::dates::date_extensions::DateExt;
 use crate::dates::tenor::TenorUnit;
-use crate::InputError;
 
 const MAX_ACT_ACT_ISMA_PERIODS: usize = 512;
 
@@ -272,12 +272,12 @@ pub(super) fn year_fraction_act_act_afb(start: Date, end: Date) -> f64 {
 /// True when 29 February lies in the half-open interval `[start, end)`.
 fn feb29_in_half_open(start: Date, end: Date) -> bool {
     for year in start.year()..=end.year() {
-        if time::util::is_leap_year(year) {
-            if let Ok(feb_29) = Date::from_calendar_date(year, Month::February, 29) {
-                if feb_29 >= start && feb_29 < end {
-                    return true;
-                }
-            }
+        if time::util::is_leap_year(year)
+            && let Ok(feb_29) = Date::from_calendar_date(year, Month::February, 29)
+            && feb_29 >= start
+            && feb_29 < end
+        {
+            return true;
         }
     }
     false

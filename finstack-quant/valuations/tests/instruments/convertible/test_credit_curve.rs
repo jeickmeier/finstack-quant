@@ -8,8 +8,8 @@
 //! - DV01 and CS01 are distinct (one bumps risk-free, the other bumps credit)
 
 use super::fixtures::*;
-use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
 use finstack_quant_valuations::metrics::MetricId;
 
 const TREE_STEPS: usize = 100;

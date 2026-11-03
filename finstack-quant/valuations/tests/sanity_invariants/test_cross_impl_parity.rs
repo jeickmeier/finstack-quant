@@ -670,11 +670,7 @@ mod asian_geometric {
                                         + tt * (1.488_515_87
                                             + tt * (-0.822_152_23 + tt * 0.170_872_77)))))))))
                 .exp();
-        if x >= 0.0 {
-            ans
-        } else {
-            2.0 - ans
-        }
+        if x >= 0.0 { ans } else { 2.0 - ans }
     }
 
     /// Geometric-Asian MC GBM pricer must match the Kemna-Vorst closed-form

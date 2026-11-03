@@ -2,7 +2,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor, TenorUnit,
@@ -15,6 +15,8 @@ use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
     DeflationProtection, IndexationMethod, InflationLinkedBond,
 };
@@ -22,8 +24,6 @@ use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricing
 use finstack_quant_valuations::instruments::rates::cap_floor::RateOptionType;
 use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationCapFloor;
 use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwap;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 use std::hint::black_box;

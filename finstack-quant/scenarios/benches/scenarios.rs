@@ -8,7 +8,7 @@
 //! - Serde serialization/deserialization
 //! - Time roll-forward operations
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::build_periods;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -16,18 +16,18 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
-use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::Compounding;
+use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::money::fx::SimpleFxProvider;
-use finstack_quant_core::money::Money;
 use finstack_quant_scenarios::{
     CurveKind, ExecutionContext, HazardBumpMode, OperationSpec, RateBindingSpec, ScenarioEngine,
     ScenarioSpec, TenorMatchMode,
 };
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
-use indexmap::{indexmap, IndexMap};
+use indexmap::{IndexMap, indexmap};
 use std::hint::black_box;
 use std::sync::Arc;
 use time::macros::date;

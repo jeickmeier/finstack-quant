@@ -4,7 +4,7 @@
 //! - **Accrued interest**: Pro-rata coupon since last payment date.
 //! - **Clean price**: Settlement dirty price less settlement accrued interest.
 
-use crate::convertible::{calculate_accrued_interest, ConvertibleBond};
+use crate::convertible::{ConvertibleBond, calculate_accrued_interest};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

@@ -74,13 +74,13 @@
 //! - Garman, M. B., & Kohlhagen, S. W. (1983). "Foreign Currency Option Values."
 //!   `docs/REFERENCES.md#garman-kohlhagen-1983`
 
-use finstack_quant_core::{types::CurveId, InputError};
+use finstack_quant_core::{InputError, types::CurveId};
 
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, VolSurface};
 use finstack_quant_core::math::interp::{
     ExtrapolationPolicy, Interpolator, LinearStrategy, ValidationPolicy,
 };
-use finstack_quant_core::Result;
 
 /// Builder that converts FX delta-quoted vols to a standard strike-based [`VolSurface`].
 ///
@@ -707,17 +707,21 @@ mod tests {
         };
         assert!(base().rr_25d(&[0.01]).build().is_err());
         assert!(base().bf_25d(&[0.005]).build().is_err());
-        assert!(base()
-            .rr_25d(&[0.01])
-            .bf_25d(&[0.005])
-            .rr_10d(&[0.02])
-            .build()
-            .is_err());
-        assert!(base()
-            .rr_25d(&[0.01])
-            .bf_25d(&[0.005])
-            .bf_10d(&[0.01])
-            .build()
-            .is_err());
+        assert!(
+            base()
+                .rr_25d(&[0.01])
+                .bf_25d(&[0.005])
+                .rr_10d(&[0.02])
+                .build()
+                .is_err()
+        );
+        assert!(
+            base()
+                .rr_25d(&[0.01])
+                .bf_25d(&[0.005])
+                .bf_10d(&[0.01])
+                .build()
+                .is_err()
+        );
     }
 }

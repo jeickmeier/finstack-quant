@@ -496,8 +496,10 @@ mod tests {
         }
         future.terms.settlement_price = None;
         assert!(future.price_curve_delta(date!(2026 - 01 - 06)).is_err());
-        assert!(future
-            .npv_raw(&flat_market(), date!(2026 - 01 - 06))
-            .is_err());
+        assert!(
+            future
+                .npv_raw(&flat_market(), date!(2026 - 01 - 06))
+                .is_err()
+        );
     }
 }

@@ -179,14 +179,13 @@ pub(crate) fn heston_call_prices_fourier(
     for _ in 0..6 {
         if let Some(pricer) = HestonStripPricer::new(spot, time, params, &grid) {
             if let Ok(prices) = pricer.price_calls(strikes) {
-                if let Some(previous) = &previous {
-                    if prices
+                if let Some(previous) = &previous
+                    && prices
                         .iter()
                         .zip(previous)
                         .all(|(price, old)| (price - old).abs() <= 1e-9 * scale)
-                    {
-                        return Ok(prices);
-                    }
+                {
+                    return Ok(prices);
                 }
                 previous = Some(prices);
             } else {
@@ -204,7 +203,9 @@ pub(crate) fn heston_call_prices_fourier(
     }
     Err(Error::Calibration {
         category: "heston_fourier".to_string(),
-        message: format!("Heston Fourier integration did not converge within the quadrature work budget for spot={spot}, time={time}"),
+        message: format!(
+            "Heston Fourier integration did not converge within the quadrature work budget for spot={spot}, time={time}"
+        ),
     })
 }
 

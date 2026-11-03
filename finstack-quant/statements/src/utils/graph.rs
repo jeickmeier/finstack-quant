@@ -49,7 +49,7 @@ where
     // (Vec + pop) to keep ordering identical.
     let mut stack: Vec<K> = in_degree
         .iter()
-        .filter(|(_, &degree)| degree == 0)
+        .filter(|&(_, &degree)| degree == 0)
         .map(|(id, _)| id.clone())
         .collect();
 

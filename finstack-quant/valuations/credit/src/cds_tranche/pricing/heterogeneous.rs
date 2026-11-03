@@ -1,7 +1,7 @@
 //! Heterogeneous capped loss by exact states for small pools and grid convolution.
 use super::pricer::{
-    CdsTranchePricer, PoolExposure, GRID_STEP, HOMOGENEITY_TOLERANCE, MAX_CONVOLUTION_WORK,
-    MAX_GRID_POINTS,
+    CdsTranchePricer, GRID_STEP, HOMOGENEITY_TOLERANCE, MAX_CONVOLUTION_WORK, MAX_GRID_POINTS,
+    PoolExposure,
 };
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::CreditIndexData;

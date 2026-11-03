@@ -5,14 +5,14 @@
 //! draws. Units are stated on each field and returned at run time by
 //! `finstack_quant_valuations::pricer::pool_report_field_units`.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use super::pool::{
-    calculate_pool_stats, weighted_avg_rating_factor, AssetPool, PoolAsset, PoolStats,
+    AssetPool, PoolAsset, PoolStats, calculate_pool_stats, weighted_avg_rating_factor,
 };
 
 /// Balance held by one obligor, industry or rating, as a row of a [`PoolReport`]

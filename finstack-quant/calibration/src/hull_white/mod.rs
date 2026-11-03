@@ -51,11 +51,11 @@ use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::special_functions::norm_cdf;
 use std::collections::BTreeMap;
 
+use crate::CalibrationReport;
 use crate::config::CalibrationConfig;
 use crate::solver::global;
 use crate::solver::multi_start::MultiStartConfig;
 use crate::solver::traits::GlobalSolveTarget;
-use crate::CalibrationReport;
 
 mod cap_floor;
 mod cap_schedule;

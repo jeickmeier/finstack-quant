@@ -12,13 +12,13 @@ use finstack_quant_core::market_data::bumps::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::types::CurveId;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::equity::equity_option::{
     EquityOption, EquityOptionExercise,
 };
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::{MetricContext, MetricId};
 use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations_test_support::date::date;

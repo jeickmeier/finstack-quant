@@ -5,7 +5,7 @@ use finstack_quant_statements::{
     types::{AmountOrScalar, FinancialModelSpec, ForecastMethod, ForecastSpec},
 };
 use finstack_quant_statements_analytics::analysis::{
-    generate_tornado_entries, run_sensitivity, ParameterSpec, SensitivityConfig, SensitivityMode,
+    ParameterSpec, SensitivityConfig, SensitivityMode, generate_tornado_entries, run_sensitivity,
 };
 
 fn quarter(q: u8) -> PeriodId {

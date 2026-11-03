@@ -12,7 +12,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_calibration::api::market_datum::MarketDatum;
 use finstack_quant_calibration::api::{
     engine,
@@ -26,13 +26,13 @@ use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::RateQuote;
 use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::term_structures::Seniority;
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use std::hint::black_box;
 use time::Month;

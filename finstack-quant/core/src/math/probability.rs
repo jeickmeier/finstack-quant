@@ -287,12 +287,12 @@ fn validate_inputs(p1: f64, p2: f64, correlation: Option<f64>) -> crate::Result<
             "Bernoulli marginal p2 must be finite and in [0, 1], got {p2}"
         )));
     }
-    if let Some(rho) = correlation {
-        if !rho.is_finite() || !(-1.0..=1.0).contains(&rho) {
-            return Err(crate::Error::Validation(format!(
-                "Bernoulli correlation must be finite and in [-1, 1], got {rho}"
-            )));
-        }
+    if let Some(rho) = correlation
+        && (!rho.is_finite() || !(-1.0..=1.0).contains(&rho))
+    {
+        return Err(crate::Error::Validation(format!(
+            "Bernoulli correlation must be finite and in [-1, 1], got {rho}"
+        )));
     }
     Ok(())
 }

@@ -10,21 +10,20 @@
 #[path = "support/fixtures.rs"]
 mod fixtures;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use finstack_quant_attribution::{
-    attribute_pnl, attribute_pnl_metrics_based, attribute_return_contribution,
-    attribute_return_contribution_json, default_waterfall_order,
-    long_rows::pnl_attribution_long_rows, pnl_bridge, translate_to_target_currency,
     AttributionMethod, AttributionRequest, ExecutionPolicy, MarketRestoreFlags, MarketSnapshot,
-    TaylorAttributionConfig,
+    TaylorAttributionConfig, attribute_pnl, attribute_pnl_metrics_based,
+    attribute_return_contribution, attribute_return_contribution_json, default_waterfall_order,
+    long_rows::pnl_attribution_long_rows, pnl_bridge, translate_to_target_currency,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::metrics::MetricId;
 use fixtures::{
-    equity_markets, eur_fx_markets, parallel_spec_envelope, return_contribution_spec, rich_markets,
-    sample_bond, sample_equity, sample_eur_bond, BondMarkets,
+    BondMarkets, equity_markets, eur_fx_markets, parallel_spec_envelope, return_contribution_spec,
+    rich_markets, sample_bond, sample_equity, sample_eur_bond,
 };
 use std::hint::black_box;
 use std::sync::Arc;

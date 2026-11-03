@@ -1,6 +1,6 @@
 //! CDS Tranche specific parameters.
 
-use finstack_quant_core::{dates::Date, money::Money, Error, Result};
+use finstack_quant_core::{Error, Result, dates::Date, money::Money};
 
 /// CDS Tranche specific parameters.
 ///

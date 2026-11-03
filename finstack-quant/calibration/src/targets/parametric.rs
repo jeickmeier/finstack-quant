@@ -3,6 +3,7 @@
 //! Implements `GlobalSolveTarget` to fit parametric yield curves from
 //! market instruments using the Levenberg-Marquardt optimizer.
 
+use crate::CalibrationReport;
 use crate::api::schema::ParametricCurveParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
@@ -12,9 +13,9 @@ use crate::solver::global;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::solver::traits::TimeGridAndGuesses;
 use crate::targets::util::{
-    discount_and_forward_curve_ids, prepare_rate_calibration_quotes, ContextScratch,
+    ContextScratch, discount_and_forward_curve_ids, prepare_rate_calibration_quotes,
 };
-use crate::CalibrationReport;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
@@ -22,7 +23,6 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_rates::deposit::Deposit;
 use std::collections::BTreeSet;
 

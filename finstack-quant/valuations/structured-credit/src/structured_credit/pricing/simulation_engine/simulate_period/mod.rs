@@ -13,7 +13,7 @@ mod period_waterfall;
 mod record;
 
 use cash::{AccumulationPhase, WaterfallCash};
-use period_waterfall::{insert_hedge_payments, PeriodRuleFlags, PeriodRuleFlows};
+use period_waterfall::{PeriodRuleFlags, PeriodRuleFlows, insert_hedge_payments};
 
 /// Deal-level inputs shared by the phases of one period.
 pub(super) struct PeriodInputs<'a> {
@@ -633,32 +633,31 @@ fn apply_tranche_draws(
                 .reinvestment_period
                 .as_ref()
                 .is_some_and(|window| window.is_active && pay_date <= window.end);
-        if revolving {
-            if let Some(rules) = instrument
+        if revolving
+            && let Some(rules) = instrument
                 .coverage_rules
                 .as_ref()
                 .and_then(|rules| rules.borrowing_base.as_ref())
-            {
-                let unresolved_npl = state.unresolved_npl();
-                let base = rules
-                    .evaluate_live(
-                        &state.pool,
-                        Some(&state.pool_state.balances),
-                        Some(state.live_collateral(&unresolved_npl)),
-                    )?
-                    .borrowing_base
-                    .amount();
-                let balance = state
-                    .tranche_balances
-                    .get(readvance.tranche_id.as_str())
-                    .map_or(0.0, Money::amount);
-                let headroom = readvance.commitment.amount().min(base) - balance;
-                if headroom > 1.0 {
-                    draws.push((
-                        readvance.tranche_id.clone(),
-                        Money::new(headroom, state.currency)?,
-                    ));
-                }
+        {
+            let unresolved_npl = state.unresolved_npl();
+            let base = rules
+                .evaluate_live(
+                    &state.pool,
+                    Some(&state.pool_state.balances),
+                    Some(state.live_collateral(&unresolved_npl)),
+                )?
+                .borrowing_base
+                .amount();
+            let balance = state
+                .tranche_balances
+                .get(readvance.tranche_id.as_str())
+                .map_or(0.0, Money::amount);
+            let headroom = readvance.commitment.amount().min(base) - balance;
+            if headroom > 1.0 {
+                draws.push((
+                    readvance.tranche_id.clone(),
+                    Money::new(headroom, state.currency)?,
+                ));
             }
         }
     }

@@ -620,12 +620,14 @@ fn test_get_scalar_returns_none_for_monetary() {
     );
 
     // get_money should work
-    assert!(results
-        .get_money(
-            "revenue",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture")
-        )
-        .is_some());
+    assert!(
+        results
+            .get_money(
+                "revenue",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .is_some()
+    );
 }
 
 #[test]

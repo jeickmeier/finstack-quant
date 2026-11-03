@@ -66,8 +66,8 @@
 //! - **Zero theta**: No time-dependent value change (rare)
 
 use crate::metrics::period_cash::collect_period_cash_cached;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
 use finstack_quant_core::Result;
+use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
 
 /// Theta horizon for a metric context: `metric_pricing_overrides.theta_period`,
 /// else one day.
@@ -116,10 +116,10 @@ pub fn calculate_theta_date(
     let rolled_date = period.add_to_date(base_date, None, BusinessDayConvention::Unadjusted)?;
 
     // Cap at expiry if instrument expires before the rolled date
-    if let Some(expiry) = expiry_date {
-        if rolled_date > expiry {
-            return Ok(expiry);
-        }
+    if let Some(expiry) = expiry_date
+        && rolled_date > expiry
+    {
+        return Ok(expiry);
     }
 
     Ok(rolled_date)
@@ -249,8 +249,8 @@ mod tests {
     use crate::metrics::period_cash::collect_cashflows_from_flows;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
-    use time::macros::date;
     use time::Month;
+    use time::macros::date;
 
     fn test_date() -> Date {
         date!(2025 - 01 - 01)
@@ -369,8 +369,8 @@ mod tests {
 
     #[test]
     fn period_cash_converts_each_payment_at_its_date() {
-        use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
         use finstack_quant_core::money::Money;
+        use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
         struct DatedFx;
         impl FxProvider for DatedFx {
             fn rate(
@@ -407,16 +407,18 @@ mod tests {
         .unwrap();
         assert!((sum.total.amount() - 60.0).abs() < 1e-9);
         let missing_fx = finstack_quant_core::market_data::context::MarketContext::new();
-        assert!(collect_cashflows_from_flows(
-            &flows,
-            &missing_fx,
-            date!(2025 - 01 - 01),
-            date!(2025 - 01 - 10),
-            Currency::USD,
-            None,
-            true
-        )
-        .is_err());
+        assert!(
+            collect_cashflows_from_flows(
+                &flows,
+                &missing_fx,
+                date!(2025 - 01 - 01),
+                date!(2025 - 01 - 10),
+                Currency::USD,
+                None,
+                true
+            )
+            .is_err()
+        );
     }
 
     #[test]

@@ -1,39 +1,39 @@
 //! Bermudan swaption pricer implementations.
 
-use crate::swaption::pricing::BermudanSwaptionTreeValuator;
 use crate::swaption::BermudanSwaption;
+use crate::swaption::pricing::BermudanSwaptionTreeValuator;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::rates::clock::ModelDiscountCurve;
 use finstack_quant_models::rates::hull_white::{
-    fd_instantaneous_forward, HullWhiteCalibrationParams,
+    HullWhiteCalibrationParams, fd_instantaneous_forward,
 };
 use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
 use finstack_quant_models::trees::hull_white_tree::HullWhiteTreeConfig;
-use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
-    resolve_hw1f_params, Hw1fParamFamily,
-};
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
+    Hw1fParamFamily, resolve_hw1f_params,
+};
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 use std::sync::Arc;
 
+use crate::swaption::CashSettlementMethod;
 use crate::swaption::pricing::hw_cashflows::{
-    value_with_exercise_today, HwExerciseTerms, HwSwaptionCashflows,
+    HwExerciseTerms, HwSwaptionCashflows, value_with_exercise_today,
 };
 use crate::swaption::pricing::monte_carlo_lsmc::SwaptionLsmcPricer;
 use crate::swaption::pricing::swap_rate_utils::hw_bond_price;
-use crate::swaption::CashSettlementMethod;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::process::ou::{
-    calibrate_theta_from_curve, HullWhite1FProcess,
+    HullWhite1FProcess, calibrate_theta_from_curve,
 };
-use finstack_quant_models::rates::hw1f::build_event_aligned_grid;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
+use finstack_quant_models::rates::hw1f::build_event_aligned_grid;
 
 /// Pricing method for Bermudan swaptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

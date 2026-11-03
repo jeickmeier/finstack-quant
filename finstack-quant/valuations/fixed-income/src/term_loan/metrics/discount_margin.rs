@@ -25,8 +25,8 @@
 //!   curve is included in the solved DM.
 
 use crate::loan_quotes::{pv_with_discount_margin, solve_discount_margin};
-use crate::term_loan::pricing::TermLoanDiscountingPricer;
 use crate::term_loan::TermLoan;
+use crate::term_loan::pricing::TermLoanDiscountingPricer;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Discount margin calculator for floating rate term loans.

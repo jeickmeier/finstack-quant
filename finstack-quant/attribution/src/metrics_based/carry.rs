@@ -2,8 +2,8 @@ use super::context::MetricsContext;
 use super::note_warning;
 use crate::helpers::*;
 use crate::{CarryDetail, PnlAttribution, SourceLine};
-use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use finstack_quant_core::money::Money;
 use finstack_quant_valuations::metrics::MetricId;
 
 pub(super) fn apply(

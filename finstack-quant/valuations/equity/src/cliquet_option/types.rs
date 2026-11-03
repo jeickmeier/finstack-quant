@@ -150,13 +150,13 @@ impl CliquetOption {
             }
         }
         // Safe: reset_dates is non-empty (checked above).
-        if let Some(&last_reset) = self.reset_dates.last() {
-            if last_reset > self.expiry {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CliquetOption last reset date {} is after expiry {}",
-                    last_reset, self.expiry
-                )));
-            }
+        if let Some(&last_reset) = self.reset_dates.last()
+            && last_reset > self.expiry
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CliquetOption last reset date {} is after expiry {}",
+                last_reset, self.expiry
+            )));
         }
         if self.local_floor > self.local_cap {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -189,13 +189,13 @@ impl CliquetOption {
                 "CliquetOption notional amount must be finite".into(),
             ));
         }
-        if let Some(level) = self.initial_level {
-            if !level.is_finite() || level <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CliquetOption initial_level = {} must be finite and positive",
-                    level
-                )));
-            }
+        if let Some(level) = self.initial_level
+            && (!level.is_finite() || level <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CliquetOption initial_level = {} must be finite and positive",
+                level
+            )));
         }
         crate::past_fixings::validate_positive_fixings(&"CliquetOption", &self.past_fixings)
     }

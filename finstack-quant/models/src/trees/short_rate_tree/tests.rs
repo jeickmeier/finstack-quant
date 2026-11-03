@@ -1,10 +1,10 @@
 use super::black_karasinski::{compute_probabilities, transition_index, transition_offsets};
 use super::*;
 use crate::trees::tree_framework::{NodeState, TreeDiscounting, TreeValuator};
-use crate::volatility::{convert_atm_volatility, VolatilityConvention};
+use crate::volatility::{VolatilityConvention, convert_atm_volatility};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::Compounding;
+use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::{Error, Result};
 use time::Month;
 

@@ -45,27 +45,27 @@
 
 mod curvature;
 
+use crate::Marginable;
 use crate::calculators::traits::{
     ImCalculator, ImResult, SimmBucketDetail, SimmComponentDetail, SimmDetail,
     SimmWeightedSensitivity,
 };
 use crate::registry::{
-    embedded_registry, margin_registry_from_config, validate_simm_params, MarginRegistry,
-    SimmParams,
+    MarginRegistry, SimmParams, embedded_registry, margin_registry_from_config,
+    validate_simm_params,
 };
 use crate::regulatory::frtb::aggregation::{correlated_norm, inter_bucket_pairwise};
 use crate::types::ImMethodology;
 use crate::types::{
-    ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair, SimmCreditSector,
-    SimmRiskClass, SimmSensitivities,
+    SimmCreditSector, SimmRiskClass, SimmSensitivities, ordered_credit_sector_pair,
+    ordered_risk_class_pair, ordered_tenor_pair,
 };
-use crate::Marginable;
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
-use finstack_quant_core::Result;
 use tracing::debug;
 
 /// SIMM version identifier.
@@ -846,9 +846,9 @@ impl SimmCalculator {
             })
             .collect();
         rows.sort_by(|a, b| {
-            a.2 .2
+            a.2.2
                 .abs()
-                .total_cmp(&b.2 .2.abs())
+                .total_cmp(&b.2.2.abs())
                 .then_with(|| a.0.cmp(b.0))
         });
         let margins: Vec<f64> = rows.iter().map(|(_, _, (_, _, ws))| ws.abs()).collect();
@@ -1635,10 +1635,11 @@ mod tests {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
         assert_eq!(calc.version(), SimmVersion::V2_6);
         assert!(calc.params.ir_delta_weights.contains_key("5Y"));
-        assert!(calc
-            .params
-            .cq_bucket_weights
-            .contains_key(&SimmCreditSector::Financial));
+        assert!(
+            calc.params
+                .cq_bucket_weights
+                .contains_key(&SimmCreditSector::Financial)
+        );
     }
 
     #[test]
@@ -2589,8 +2590,10 @@ mod tests {
         );
         let schedule = ImResult::simple(result.amount, ImMethodology::Schedule, as_of, 10);
         assert!(schedule.simm_detail.is_none());
-        assert!(!serde_json::to_string(&schedule)
-            .expect("serialize")
-            .contains("simm_detail"));
+        assert!(
+            !serde_json::to_string(&schedule)
+                .expect("serialize")
+                .contains("simm_detail")
+        );
     }
 }

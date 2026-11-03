@@ -2,8 +2,8 @@
 
 use std::collections::BTreeSet;
 
-use finstack_quant_portfolio::optimization::PortfolioOptimizationResult;
 use finstack_quant_portfolio::PortfolioResult;
+use finstack_quant_portfolio::optimization::PortfolioOptimizationResult;
 use serde_json::Value;
 
 fn schema_value<T: schemars::JsonSchema>() -> Value {
@@ -63,19 +63,23 @@ fn optimization_result_schema_matches_serde_wire_type() {
             "label",
         ])
     );
-    assert!(schema["required"]
-        .as_array()
-        .expect("required is an array")
-        .iter()
-        .any(|field| field == "schema_version"));
+    assert!(
+        schema["required"]
+            .as_array()
+            .expect("required is an array")
+            .iter()
+            .any(|field| field == "schema_version")
+    );
     assert_eq!(
         schema["properties"]["schema_version"]["$ref"],
         "#/$defs/SchemaVersion"
     );
     assert_eq!(schema["$defs"]["SchemaVersion"]["minimum"], 1);
     assert_eq!(schema["$defs"]["SchemaVersion"]["maximum"], 1);
-    assert!(schema
-        .get("properties")
-        .and_then(|properties| properties.get("problem"))
-        .is_none());
+    assert!(
+        schema
+            .get("properties")
+            .and_then(|properties| properties.get("problem"))
+            .is_none()
+    );
 }

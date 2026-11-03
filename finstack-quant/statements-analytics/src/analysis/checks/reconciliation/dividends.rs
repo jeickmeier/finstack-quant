@@ -2,13 +2,13 @@
 
 use serde::{Deserialize, Serialize};
 
+use finstack_quant_statements::Result;
 use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
     Severity, SignConventionPolicy,
 };
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_statements::Result;
 
 /// Verifies that dividends on the cash flow statement equal the dividends
 /// charged against equity.

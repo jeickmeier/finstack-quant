@@ -18,7 +18,7 @@
 use crate::capital_structure::cashflows::CashflowBreakdown;
 use crate::error::Result;
 use crate::evaluator::{CapitalStructureWarning, EvalWarning};
-use finstack_quant_cashflows::accrual::{accrued_interest_amount, AccrualConfig};
+use finstack_quant_cashflows::accrual::{AccrualConfig, accrued_interest_amount};
 use finstack_quant_cashflows::builder::{CashFlowSchedule, CashflowRepresentation};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::cashflow::CashFlow;

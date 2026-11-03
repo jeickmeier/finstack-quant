@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use finstack_quant_portfolio::materialization::PortfolioMaterializationEnvelope;
 use finstack_quant_portfolio::position::PositionUnit;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const INSTRUMENT_SCHEMA_URI: &str =
     "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json";

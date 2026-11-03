@@ -49,8 +49,8 @@ use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
 use super::lmm_bermudan::{build_exercise_aligned_grid, price_bermudan_lmm};
 use super::monte_carlo_lsmc::SwaptionLsmcPricer;
 use super::swap_rate_utils::hw_bond_price;
-use finstack_quant_models::rates::hw1f::build_event_aligned_grid;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
+use finstack_quant_models::rates::hw1f::build_event_aligned_grid;
 
 // LMM / BGM — numéraire-consistent co-terminal European reference
 

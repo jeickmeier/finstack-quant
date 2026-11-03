@@ -1,8 +1,8 @@
 //! I-spread, and the yield-over-a-curve rule it shares with G-spread.
 
+use crate::bond::Bond;
 use crate::bond::pricing::quote_conversions::curve_par_rate;
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::bond::Bond;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 

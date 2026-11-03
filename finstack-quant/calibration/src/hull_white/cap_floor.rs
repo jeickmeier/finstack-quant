@@ -4,9 +4,9 @@ use super::pricing::{
     scheduled_cap_floor_implied_normal_vol, scheduled_cap_floor_price, scheduled_forward_rate,
 };
 use super::targets::{
-    cap_floor_quote_key, cap_floor_quote_label, quote_fit_report, reject_at_bound_params,
-    require_quote_vega, solve_hw1f_two_param, validate_fit_tolerance, HullWhiteCapFloorTarget,
-    PreparedCapFloor, KAPPA_MAX, KAPPA_MIN, SIGMA_MAX, SWAPTION_VEGA_FLOOR,
+    HullWhiteCapFloorTarget, KAPPA_MAX, KAPPA_MIN, PreparedCapFloor, SIGMA_MAX,
+    SWAPTION_VEGA_FLOOR, cap_floor_quote_key, cap_floor_quote_label, quote_fit_report,
+    reject_at_bound_params, require_quote_vega, solve_hw1f_two_param, validate_fit_tolerance,
 };
 use super::*;
 
@@ -439,11 +439,11 @@ pub(super) fn solve_cap_floor_sigma_for_fixed_kappa(
     let mut best_sigma: Option<f64> = None;
     let mut best_sse = f64::INFINITY;
     for &(lo, hi) in &brackets {
-        if let Some((sigma, sse_val)) = golden_section_min(&sse, lo, hi, 1e-12, 200) {
-            if sse_val < best_sse {
-                best_sse = sse_val;
-                best_sigma = Some(sigma);
-            }
+        if let Some((sigma, sse_val)) = golden_section_min(&sse, lo, hi, 1e-12, 200)
+            && sse_val < best_sse
+        {
+            best_sse = sse_val;
+            best_sigma = Some(sigma);
         }
     }
 

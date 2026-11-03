@@ -5,11 +5,11 @@
 //! sequential evaluation and is therefore the runtime counterpart to the
 //! static [`WaterfallSpec`](super::WaterfallSpec).
 
+use crate::capital_structure::CashflowBreakdown;
 use crate::capital_structure::principal::{
     PeriodPrincipalFlows, PrincipalAllocation, PrincipalClaim,
 };
 use crate::capital_structure::residual_schedule::rebuild_residual_interest;
-use crate::capital_structure::CashflowBreakdown;
 use crate::error::Result;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::currency::Currency;

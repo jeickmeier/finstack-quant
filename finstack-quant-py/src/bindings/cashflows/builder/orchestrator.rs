@@ -11,8 +11,8 @@ use crate::errors::core_to_py;
 
 use super::schedule::PyCashFlowSchedule;
 use super::specs::{
-    date_decimal_pairs, PyAmortizationSpec, PyCouponType, PyFeeSpec, PyFixedCouponSpec,
-    PyFloatingCouponSpec, PyPrincipalExchange, PyStepUpCouponSpec,
+    PyAmortizationSpec, PyCouponType, PyFeeSpec, PyFixedCouponSpec, PyFloatingCouponSpec,
+    PyPrincipalExchange, PyStepUpCouponSpec, date_decimal_pairs,
 };
 
 #[doc = pydoc!("finstack_quant.cashflows.builder._orchestrator", "CashFlowBuilder")]

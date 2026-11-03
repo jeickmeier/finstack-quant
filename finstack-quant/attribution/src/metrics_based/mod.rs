@@ -98,12 +98,12 @@ mod volatility;
 use crate::helpers::*;
 use crate::{AttributionMethod, MoveUnit, PnlAttribution};
 use context::MetricsContext;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{collect_period_cash, MetricId};
+use finstack_quant_valuations::metrics::{MetricId, collect_period_cash};
 use finstack_quant_valuations::results::ValuationResult;
 use std::sync::Arc;
 
@@ -261,8 +261,8 @@ pub fn attribute_pnl_metrics_based(
     let inputs = MetricsContext::new(
         instrument, market_t0, market_t1, val_t0, val_t1, as_of_t0, as_of_t1,
     )?;
-    if let Some(error) = &inputs.shifts.vol_shift_error {
-        if inputs.val_t0.measures.keys().any(|id| {
+    if let Some(error) = &inputs.shifts.vol_shift_error
+        && inputs.val_t0.measures.keys().any(|id| {
             matches!(
                 id.as_str(),
                 "vega"
@@ -272,13 +272,13 @@ pub fn attribute_pnl_metrics_based(
                     | "cross_gamma_credit_vol"
                     | "cross_gamma_fx_vol"
             )
-        }) {
-            attribution
-                .meta
-                .notes
-                .push(format!("Volatility attribution failed: {error}"));
-            non_finite_detected = true;
-        }
+        })
+    {
+        attribution
+            .meta
+            .notes
+            .push(format!("Volatility attribution failed: {error}"));
+        non_finite_detected = true;
     }
     carry::apply(&inputs, &mut attribution, &mut non_finite_detected)?;
     rates::apply(&inputs, &mut attribution, &mut non_finite_detected);
@@ -336,18 +336,18 @@ pub(crate) fn attribute_request(request: &crate::AttributionRequest<'_>) -> Resu
     // A zero-day window has no carry (the metrics-based carry step zeroes it),
     // so the theta horizon is only set for a real window.
     let window_days = (as_of_t1 - as_of_t0).whole_days();
-    if window_days > 0 {
-        if let Some(overrides) = metrics_instrument.get_metric_pricing_overrides_mut() {
-            let days = u32::try_from(window_days).map_err(|_| {
-                finstack_quant_core::Error::Validation(format!(
-                    "attribution window of {window_days} days exceeds the theta horizon range"
-                ))
-            })?;
-            overrides.theta_period = Some(finstack_quant_core::dates::Tenor::new(
-                days,
-                finstack_quant_core::dates::TenorUnit::Days,
-            )?);
-        }
+    if window_days > 0
+        && let Some(overrides) = metrics_instrument.get_metric_pricing_overrides_mut()
+    {
+        let days = u32::try_from(window_days).map_err(|_| {
+            finstack_quant_core::Error::Validation(format!(
+                "attribution window of {window_days} days exceeds the theta horizon range"
+            ))
+        })?;
+        overrides.theta_period = Some(finstack_quant_core::dates::Tenor::new(
+            days,
+            finstack_quant_core::dates::TenorUnit::Days,
+        )?);
     }
     let metrics_instrument: Arc<dyn Instrument> = Arc::from(metrics_instrument);
     let metrics = match request.metrics {

@@ -9,7 +9,7 @@ use finstack_quant_valuations_fixed_income::revolving_credit::CreditSpreadProces
 use finstack_quant_valuations_fixed_income::revolving_credit::RevolvingCreditPricer;
 
 use crate::support::revolver_draws::{
-    market, revolver, widening_hazard_curve, AS_OF, HAZARD_ID, MARGIN_BP,
+    AS_OF, HAZARD_ID, MARGIN_BP, market, revolver, widening_hazard_curve,
 };
 
 /// A constant spread process, at any level, prices every draw at fair value:
@@ -74,10 +74,12 @@ fn widening_market_anchored_spread_gives_a_negative_option_cost() {
         result.draw_option_cost.ci_95
     );
     assert_eq!(result.draw_option_cost.num_paths, 32);
-    assert!(result
-        .path_results
-        .iter()
-        .all(|p| p.draw_option_cost.amount().is_finite()));
+    assert!(
+        result
+            .path_results
+            .iter()
+            .all(|p| p.draw_option_cost.amount().is_finite())
+    );
 
     let priced = facility
         .price_with_metrics(

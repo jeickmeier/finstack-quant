@@ -3,9 +3,9 @@
 //! Provides a DRY aggregation helper to iterate caplets/floorlets and sum
 //! contributions for a given functional form (e.g., delta/gamma/vega/theta).
 
-use crate::cap_floor::pricing::pricer::resolve_caplet_volatility;
-use crate::cap_floor::pricing::projection::{unpaid_caplets, UnpaidCaplet};
 use crate::cap_floor::CapFloor;
+use crate::cap_floor::pricing::pricer::resolve_caplet_volatility;
+use crate::cap_floor::pricing::projection::{UnpaidCaplet, unpaid_caplets};
 use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_valuations_core::metrics::MetricContext;
 

@@ -5,7 +5,7 @@
 
 use super::multiples::compute_multiple;
 use super::peer_set::PeerSet;
-use super::stats::{percentile_rank, regression_fair_value, z_score, RegressionResult};
+use super::stats::{RegressionResult, percentile_rank, regression_fair_value, z_score};
 use super::types::{CompanyId, CompanyMetrics, Multiple};
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::{Error, Result};

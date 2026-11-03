@@ -2,11 +2,11 @@
 
 use crate::attribution::attribution_support::calibrated_hazard_curve;
 use finstack_quant_attribution::{
-    default_waterfall_order, AttributionEnvelope, AttributionMethod, AttributionSpec,
-    CreditFactorDetailOptions,
+    AttributionEnvelope, AttributionMethod, AttributionSpec, CreditFactorDetailOptions,
+    default_waterfall_order,
 };
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{create_date, DayCount};
+use finstack_quant_core::dates::{DayCount, create_date};
 use finstack_quant_core::market_data::context::{CurveState, MarketContextState};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
@@ -891,7 +891,7 @@ fn reprice_methods_surface_the_factor_unit_mismatch_note() {
 /// request's credit model.
 #[test]
 fn request_path_back_solves_credit_detail_for_linear_methods() {
-    use finstack_quant_attribution::{attribute_pnl, AttributionRequest, TaylorAttributionConfig};
+    use finstack_quant_attribution::{AttributionRequest, TaylorAttributionConfig, attribute_pnl};
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_valuations::instruments::Instrument;

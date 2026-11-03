@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use finstack_quant_core::dates::{create_date, Date, DateExt};
+use finstack_quant_core::dates::{Date, DateExt, create_date};
 use finstack_quant_core::types::IssuerId;
 use finstack_quant_factor::credit::calibration::{
     BetaShrinkage, BucketSizeThresholds, BucketWeighting, CovarianceStrategy,
@@ -452,9 +452,10 @@ fn all_bucket_only_calibration_succeeds() {
     model.validate().expect("validate succeeds");
     assert!(model.factor_histories.is_some());
     let fh = model.factor_histories.as_ref().unwrap();
-    assert!(fh
-        .values
-        .contains_key(&finstack_quant_factor::FactorId::new("credit::generic")));
+    assert!(
+        fh.values
+            .contains_key(&finstack_quant_factor::FactorId::new("credit::generic"))
+    );
     assert!(!model.vol_state.factors.is_empty());
 
     // M-4: verify tag_taxonomy for a two-level Rating × Region hierarchy.

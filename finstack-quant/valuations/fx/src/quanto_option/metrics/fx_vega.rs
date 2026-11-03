@@ -16,7 +16,7 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::{
-    bump_surface_vol_absolute, MetricCalculator, MetricContext, VOL_POINTS_PER_ABSOLUTE_VOL,
+    MetricCalculator, MetricContext, VOL_POINTS_PER_ABSOLUTE_VOL, bump_surface_vol_absolute,
 };
 
 /// FX Vega calculator for quanto options.

@@ -27,8 +27,8 @@ use std::ops::Neg;
 
 use serde::{Deserialize, Serialize};
 
-use crate::math::units::BASIS_POINTS_PER_UNIT;
 use crate::Result;
+use crate::math::units::BASIS_POINTS_PER_UNIT;
 use crate::{Error, InputError, NonFiniteKind};
 
 /// Scale `value` by a power of ten in decimal arithmetic.
@@ -303,7 +303,9 @@ impl std::str::FromStr for Rate {
     fn from_str(s: &str) -> Result<Self> {
         let trimmed = s.trim();
         let invalid = || {
-            Error::Validation(format!("invalid rate {s:?}: expected a decimal (\"0.05\"), percent (\"5%\") or basis-point (\"25bp\") quote"))
+            Error::Validation(format!(
+                "invalid rate {s:?}: expected a decimal (\"0.05\"), percent (\"5%\") or basis-point (\"25bp\") quote"
+            ))
         };
         if trimmed.is_empty() {
             return Err(invalid());
@@ -564,10 +566,12 @@ mod tests {
         assert!(percent(9.4e-27) < percent(9.49e-27));
         assert!(percent(9.49e-27) < percent(9.5e-27));
         assert!(percent(-0.0).is_sign_negative());
-        assert!(Rate::from_decimal(-0.0)
-            .unwrap()
-            .as_percent()
-            .is_sign_negative());
+        assert!(
+            Rate::from_decimal(-0.0)
+                .unwrap()
+                .as_percent()
+                .is_sign_negative()
+        );
     }
 
     #[test]
@@ -671,8 +675,8 @@ mod tests {
     /// (JSON rejects NaN at the parser level, but binary formats do not).
     #[test]
     fn deserialize_rejects_non_finite() {
-        use serde::de::value::Error as ValueError;
         use serde::de::IntoDeserializer;
+        use serde::de::value::Error as ValueError;
 
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             let rate: std::result::Result<Rate, ValueError> =

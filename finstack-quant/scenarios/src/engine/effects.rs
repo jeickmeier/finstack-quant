@@ -10,11 +10,11 @@ use crate::adapters::curves::CurveApplyCtx;
 use crate::error::Result;
 use crate::spec::{CurveKind, OperationSpec};
 use crate::warning::Warning;
+use finstack_quant_core::FxHashSet;
 use finstack_quant_core::market_data::bumps::{BumpType, MarketBump};
 use finstack_quant_core::market_data::context::CurveStorage;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::{CurveId, PriceId};
-use finstack_quant_core::FxHashSet;
 
 /// Market change or warning an adapter produces for one operation, collected
 /// before mutation.

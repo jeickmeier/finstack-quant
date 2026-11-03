@@ -5,7 +5,7 @@
 //! Every wrapper is a frozen value object: fluent `with_*` setters return a
 //! modified copy, mirroring the consuming Rust builders.
 
-use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
+use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::{label, parse_label};
 use crate::bindings::repr_support::repr_from_serde;
@@ -613,7 +613,11 @@ impl PyCovenant {
                 .cure_period_days
                 .map_or("None".to_string(), |d| d.to_string()),
             label(&self.inner.scope)?,
-            if self.inner.is_active { "True" } else { "False" },
+            if self.inner.is_active {
+                "True"
+            } else {
+                "False"
+            },
         ))
     }
 }

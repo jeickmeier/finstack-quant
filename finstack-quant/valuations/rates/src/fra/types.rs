@@ -7,7 +7,7 @@
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    adjust, calendar_by_id_strict, BusinessDayConvention, Date, DayCount,
+    BusinessDayConvention, Date, DayCount, adjust, calendar_by_id_strict,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;

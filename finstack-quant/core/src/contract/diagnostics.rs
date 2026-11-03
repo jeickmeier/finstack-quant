@@ -278,10 +278,11 @@ impl ValidationReport {
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.severity == Severity::Error);
-        if d.severity == Severity::Error && !has_retained_error {
-            if let Some(replace) = self.diagnostics.last_mut() {
-                *replace = d;
-            }
+        if d.severity == Severity::Error
+            && !has_retained_error
+            && let Some(replace) = self.diagnostics.last_mut()
+        {
+            *replace = d;
         }
     }
 
@@ -326,9 +327,7 @@ pub enum ContractError {
         max: u32,
     },
     /// A strict contract payload omitted its version marker.
-    #[error(
-        "missing contract version for {contract}; strict loading requires an explicit version"
-    )]
+    #[error("missing contract version for {contract}; strict loading requires an explicit version")]
     MissingVersion {
         /// Stable contract identifier whose version was missing.
         contract: String,

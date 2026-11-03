@@ -4,8 +4,8 @@
 //! invokes most public methods with valid parameters.
 
 use finstack_quant_analytics::Performance;
-use finstack_quant_core::dates::{Date, FiscalConfig, PeriodKind};
 use finstack_quant_core::ErrorKind;
+use finstack_quant_core::dates::{Date, FiscalConfig, PeriodKind};
 use time::Month;
 
 fn calendar_days(start: Date, n: usize) -> Vec<Date> {
@@ -175,10 +175,12 @@ fn performance_facade_exercises_broad_api_surface() {
         rolling_volatility.dates.len(),
         rolling_volatility.values.len()
     );
-    assert!(rolling_volatility
-        .values
-        .iter()
-        .all(|value| value.is_finite()));
+    assert!(
+        rolling_volatility
+            .values
+            .iter()
+            .all(|value| value.is_finite())
+    );
 
     let rolling_sortino = perf.rolling_sortino(0, 25, 0.0).expect("rolling sortino");
     assert_eq!(rolling_sortino.values.len(), active_lens[0] - 25 + 1);
@@ -206,16 +208,20 @@ fn performance_facade_exercises_broad_api_surface() {
     assert_finite_panel("cumulative returns", &cumulative, &active_lens);
     let drawdowns = perf.get_drawdown_series();
     assert_finite_panel("drawdown series", &drawdowns, &active_lens);
-    assert!(drawdowns
-        .iter()
-        .flatten()
-        .all(|value| (-1.0..=0.0).contains(value)));
+    assert!(
+        drawdowns
+            .iter()
+            .flatten()
+            .all(|value| (-1.0..=0.0).contains(value))
+    );
 
     let drawdown_episodes = perf.drawdown_details(0, 3).expect("drawdown details");
     assert!(drawdown_episodes.len() <= 3);
-    assert!(drawdown_episodes
-        .iter()
-        .all(|episode| episode.max_drawdown.is_finite() && episode.max_drawdown <= 0.0));
+    assert!(
+        drawdown_episodes
+            .iter()
+            .all(|episode| episode.max_drawdown.is_finite() && episode.max_drawdown <= 0.0)
+    );
 
     let betas = perf.beta();
     assert_eq!(betas.len(), ticker_count);
@@ -301,9 +307,11 @@ fn performance_facade_exercises_broad_api_surface() {
     perf.reset_date_range(d[15], d[d.len() - 1]);
     let windowed_cumulative = perf.cumulative_returns();
     assert_ne!(windowed_cumulative, baseline_cumulative);
-    assert!(windowed_cumulative
-        .iter()
-        .all(|column| column.len() < active_lens[0]));
+    assert!(
+        windowed_cumulative
+            .iter()
+            .all(|column| column.len() < active_lens[0])
+    );
     perf.reset_date_range(d[0], d[d.len() - 1]);
     assert_eq!(perf.cumulative_returns(), baseline_cumulative);
 
@@ -371,10 +379,12 @@ fn performance_smoke_asserts_fiscal_lookback_and_zero_variance_invariants() {
 
     assert_eq!(flat_perf.sharpe(0.0), vec![0.0]);
     assert_eq!(flat_perf.max_drawdown(), vec![0.0]);
-    assert!(flat_perf
-        .drawdown_details(0, 3)
-        .expect("drawdown details on flat series")
-        .is_empty());
+    assert!(
+        flat_perf
+            .drawdown_details(0, 3)
+            .expect("drawdown details on flat series")
+            .is_empty()
+    );
 
     let rising_perf = Performance::new(
         dates,
@@ -454,9 +464,10 @@ fn returns_accessors_reproduce_cumulative_returns_and_zero_rf_excess_returns() {
     );
 
     // Out-of-range indices are rejected rather than silently returning empty.
-    assert!(perf
-        .get_returns_for_ticker(perf.get_ticker_names().len())
-        .is_err());
+    assert!(
+        perf.get_returns_for_ticker(perf.get_ticker_names().len())
+            .is_err()
+    );
 }
 
 #[test]

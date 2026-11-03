@@ -5,10 +5,10 @@
 //! `FIXING:{forward_curve_id}`. This module centralizes that convention and
 //! provides helpers with clear error messages for seasoned instrument pricing.
 
+use crate::Result;
 use crate::dates::Date;
 use crate::market_data::context::MarketContext;
 use crate::market_data::scalars::ScalarTimeSeries;
-use crate::Result;
 
 /// Canonical prefix for fixing series stored in MarketContext.
 pub const FIXING_PREFIX: &str = "FIXING:";

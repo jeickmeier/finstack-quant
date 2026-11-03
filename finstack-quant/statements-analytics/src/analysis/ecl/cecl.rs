@@ -180,12 +180,12 @@ impl CeclConfig {
                 "impaired_time_to_recovery_years must be finite and non-negative".to_string(),
             ));
         }
-        if let ReversionMethod::Linear { reversion_years } = self.reversion_method {
-            if !reversion_years.is_finite() || reversion_years <= 0.0 {
-                return Err(Error::Validation(
-                    "Linear reversion_years must be positive".to_string(),
-                ));
-            }
+        if let ReversionMethod::Linear { reversion_years } = self.reversion_method
+            && (!reversion_years.is_finite() || reversion_years <= 0.0)
+        {
+            return Err(Error::Validation(
+                "Linear reversion_years must be positive".to_string(),
+            ));
         }
         match self.methodology {
             CeclMethodology::Warm => {

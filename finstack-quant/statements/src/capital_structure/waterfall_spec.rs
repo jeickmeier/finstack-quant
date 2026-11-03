@@ -225,14 +225,13 @@ impl WaterfallSpec {
             .priority_of_payments
             .iter()
             .position(|p| *p == PaymentPriority::Equity)
+            && equity_pos != self.priority_of_payments.len() - 1
         {
-            if equity_pos != self.priority_of_payments.len() - 1 {
-                return Err(Error::build(
-                    "WaterfallSpec: `Equity` must be the last entry in `priority_of_payments`; \
+            return Err(Error::build(
+                "WaterfallSpec: `Equity` must be the last entry in `priority_of_payments`; \
                      the engine always distributes residual cash to equity after every other \
                      category, so a non-terminal position would be silently ignored.",
-                ));
-            }
+            ));
         }
 
         if let Some(pik) = &self.pik_toggle {
@@ -721,10 +720,12 @@ mod tests {
             assert!(serde_json::from_value::<PikToggleSpec>(value).is_err());
         }
         let mut value = serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"target_instrument_ids":[]});
-        assert!(serde_json::from_value::<PikToggleSpec>(value.clone())
-            .expect("vector parses")
-            .validate()
-            .is_err());
+        assert!(
+            serde_json::from_value::<PikToggleSpec>(value.clone())
+                .expect("vector parses")
+                .validate()
+                .is_err()
+        );
         value["target_instrument_ids"] = serde_json::json!(["TL"]);
         let spec: PikToggleSpec = serde_json::from_value(value.clone()).expect("explicit targets");
         spec.validate().expect("valid targets");

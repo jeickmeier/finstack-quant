@@ -5,7 +5,7 @@ use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
-use finstack_quant_portfolio::types::{AttributeValue, Entity, DUMMY_ENTITY_ID};
+use finstack_quant_portfolio::types::{AttributeValue, DUMMY_ENTITY_ID, Entity};
 use finstack_quant_portfolio::valuation::value_portfolio;
 use finstack_quant_portfolio::{Error, Portfolio};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
@@ -190,10 +190,12 @@ fn builder_required_fields_and_dummy_auto_create() {
     // Missing base_currency
     assert!(Portfolio::builder("P").as_of(as_of).build().is_err());
     // Missing as_of
-    assert!(Portfolio::builder("P")
-        .base_currency(Currency::USD)
-        .build()
-        .is_err());
+    assert!(
+        Portfolio::builder("P")
+            .base_currency(Currency::USD)
+            .build()
+            .is_err()
+    );
 
     // Dummy should be auto-created because position references it
     let portfolio = Portfolio::builder("P")

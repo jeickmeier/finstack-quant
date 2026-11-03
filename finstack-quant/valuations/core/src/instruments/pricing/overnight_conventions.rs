@@ -5,8 +5,8 @@
 
 use crate::market::conventions::{ConventionRegistry, RateIndexConventions, RateIndexKind};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
-use finstack_quant_core::types::IndexId;
 use finstack_quant_core::Result;
+use finstack_quant_core::types::IndexId;
 
 /// Look up rate-index conventions by index or forward-curve identifier.
 ///

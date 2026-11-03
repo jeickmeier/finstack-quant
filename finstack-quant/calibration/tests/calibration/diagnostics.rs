@@ -90,9 +90,11 @@ fn envelope_error_kind_str_matches_serialized_tag() {
         reason: "rate is NaN".to_string(),
     };
     assert_eq!(err.kind_str(), "quote_data_invalid");
-    assert!(serde_json::to_string(&err)
-        .expect("error JSON")
-        .contains("\"kind\":\"quote_data_invalid\""));
+    assert!(
+        serde_json::to_string(&err)
+            .expect("error JSON")
+            .contains("\"kind\":\"quote_data_invalid\"")
+    );
 }
 
 #[test]

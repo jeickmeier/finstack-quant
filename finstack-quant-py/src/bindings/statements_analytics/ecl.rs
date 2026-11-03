@@ -16,7 +16,7 @@
 
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
-    dict_to_dataframe, serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
+    ColumnSchema, dict_to_dataframe, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::bindings::statements_analytics::{enum_convert, py_bool, py_opt_str};
 use crate::errors::core_to_py;

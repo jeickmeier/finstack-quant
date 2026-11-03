@@ -2,8 +2,8 @@
 //!
 use finstack_quant_core::math::{
     integration::{
-        adaptive_simpson, gauss_legendre_integrate_adaptive, gauss_legendre_integrate_composite,
-        simpson_rule, GaussHermiteQuadrature,
+        GaussHermiteQuadrature, adaptive_simpson, gauss_legendre_integrate_adaptive,
+        gauss_legendre_integrate_composite, simpson_rule,
     },
     special_functions::{erf, norm_cdf},
 };
@@ -397,12 +397,14 @@ fn production_credit_audit_simpson_uses_total_error_budget() {
     )
     .expect("localized discontinuity fits the global error budget");
     assert!((integral - (1.0 - boundary)).abs() <= 1e-6);
-    assert!(adaptive_simpson(
-        |x| if x >= boundary { 1.0 } else { 0.0 },
-        0.0,
-        1.0,
-        1e-12,
-        2,
-    )
-    .is_err());
+    assert!(
+        adaptive_simpson(
+            |x| if x >= boundary { 1.0 } else { 0.0 },
+            0.0,
+            1.0,
+            1e-12,
+            2,
+        )
+        .is_err()
+    );
 }

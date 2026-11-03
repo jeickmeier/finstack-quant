@@ -180,14 +180,16 @@ mod tests {
 
     #[test]
     fn workout_lgd_rejects_noncanonical_collateral_type() {
-        assert!(workout_lgd(
-            100.0,
-            vec![("real-estate".to_string(), 80.0, 0.30)],
-            0.05,
-            0.03,
-            2.0,
-            0.05,
-        )
-        .is_err());
+        assert!(
+            workout_lgd(
+                100.0,
+                vec![("real-estate".to_string(), 80.0, 0.30)],
+                0.05,
+                0.03,
+                2.0,
+                0.05,
+            )
+            .is_err()
+        );
     }
 }

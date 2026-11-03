@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
 
-use finstack_quant_core::math::stats::{mean, OnlineCovariance};
-use finstack_quant_core::types::IssuerId;
 use finstack_quant_core::Result;
+use finstack_quant_core::math::stats::{OnlineCovariance, mean};
+use finstack_quant_core::types::IssuerId;
 
 use super::config::VolModelChoice;
 use super::validation::validation_err;
-use crate::credit::hierarchy::AdderVolSource;
 use crate::FactorId;
+use crate::credit::hierarchy::AdderVolSource;
 
 /// Step 6 (part A): per-issuer adder annualized **vol** (std dev) computed
 /// from the residual series after the last level, for every issuer with at
@@ -156,15 +156,15 @@ pub(super) fn assign_adder_vol(
         for k in (0..num_levels).rev() {
             if k < paths.len() && k < peer_proxy_index.len() {
                 let bucket = &paths[k];
-                if let Some(peer_vols) = peer_proxy_index[k].get(bucket) {
-                    if !peer_vols.is_empty() {
-                        return (
-                            mean(peer_vols),
-                            AdderVolSource::BucketPeerProxy {
-                                peer_bucket: bucket.clone(),
-                            },
-                        );
-                    }
+                if let Some(peer_vols) = peer_proxy_index[k].get(bucket)
+                    && !peer_vols.is_empty()
+                {
+                    return (
+                        mean(peer_vols),
+                        AdderVolSource::BucketPeerProxy {
+                            peer_bucket: bucket.clone(),
+                        },
+                    );
                 }
             }
         }

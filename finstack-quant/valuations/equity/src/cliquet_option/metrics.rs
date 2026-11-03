@@ -6,16 +6,16 @@
 
 use crate::cliquet_option::CliquetOption;
 use crate::spot_pinned::{SpotPinnable, SpotPinnedFd};
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::PriceId;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
+use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
+use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 
 impl SpotPinnable for CliquetOption {
     fn unpinned_spot(&self) -> Option<(&PriceId, Currency)> {
@@ -123,8 +123,8 @@ mod rho_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-    use finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides;
     use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides;
     use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
     use std::sync::Arc;
     use time::Month;

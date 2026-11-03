@@ -12,8 +12,8 @@
 
 #![allow(clippy::unwrap_used)]
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_models::closed_form::{heston_call_price_fourier, HestonPricingParams};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use finstack_quant_models::closed_form::{HestonPricingParams, heston_call_price_fourier};
 use finstack_quant_models::fourier::characteristic_function::BlackScholesCf;
 use finstack_quant_models::fourier::cos::{CosConfig, CosPricer};
 use finstack_quant_models::types::OptionType;

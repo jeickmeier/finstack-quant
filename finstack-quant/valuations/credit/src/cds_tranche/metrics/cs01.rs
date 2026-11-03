@@ -9,8 +9,8 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
-    compute_key_rate_cs01_series_for_hazard, require_hazard_replay, sensitivity_central_diff,
-    Cs01Request,
+    Cs01Request, compute_key_rate_cs01_series_for_hazard, require_hazard_replay,
+    sensitivity_central_diff,
 };
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_valuations_core::recalibration::{

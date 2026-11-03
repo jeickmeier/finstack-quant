@@ -1011,10 +1011,12 @@ mod period_aggregation_tests {
             totals.get_amount("2025Q1", Currency::USD),
             first.get(&Currency::USD).copied()
         );
-        assert!(totals
-            .get_period("2025Q2")
-            .expect("present empty period")
-            .is_empty());
+        assert!(
+            totals
+                .get_period("2025Q2")
+                .expect("present empty period")
+                .is_empty()
+        );
         assert_eq!(totals.get_amount("2025Q2", Currency::USD), None);
         for missing in ["2025Q3", "2025q1", " 2025Q1", "nope", ""] {
             assert!(
@@ -1152,11 +1154,7 @@ mod period_contract_tests {
             self.base
         }
         fn df(&self, t: f64) -> f64 {
-            if t > 0.0 {
-                f64::NAN
-            } else {
-                1.0
-            }
+            if t > 0.0 { f64::NAN } else { 1.0 }
         }
     }
 

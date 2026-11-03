@@ -59,8 +59,10 @@ mod tests {
         let mut registry = MetricRegistry::new();
         register_equity_total_return_future_metrics(&mut registry)
             .expect("equity TRF metric registration");
-        assert!(registry
-            .metrics_for_instrument(InstrumentType::EquityTotalReturnFuture)
-            .contains(&MetricId::Spread01));
+        assert!(
+            registry
+                .metrics_for_instrument(InstrumentType::EquityTotalReturnFuture)
+                .contains(&MetricId::Spread01)
+        );
     }
 }

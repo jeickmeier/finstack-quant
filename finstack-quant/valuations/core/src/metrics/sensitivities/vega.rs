@@ -3,13 +3,13 @@
 //! Provides parallel and key-rate vega calculators for instruments with volatility surfaces.
 
 use crate::instruments::Instrument;
+use crate::metrics::MetricCalculator;
 use crate::metrics::finite_difference::{
-    apply_parallel_surface_bumps_in_place, bumped_volatility_override, min_grid_vol,
-    revert_scratch_bumps, volatility_override, VOL_POINTS_PER_ABSOLUTE_VOL,
+    VOL_POINTS_PER_ABSOLUTE_VOL, apply_parallel_surface_bumps_in_place, bumped_volatility_override,
+    min_grid_vol, revert_scratch_bumps, volatility_override,
 };
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::fd_greeks::clone_with_crn_seed_if_supported;
-use crate::metrics::MetricCalculator;
 use crate::metrics::{MetricContext, MetricId};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use std::marker::PhantomData;

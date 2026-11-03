@@ -1,8 +1,8 @@
 //! Strict serialization tests for dynamic term-structure models.
 
 use finstack_quant_models::rates::dtsm::{
-    nelson_siegel_yields, DieboldLi, FactorTimeSeries, YieldForecast, YieldPanel, YieldPca,
-    YieldPcaView,
+    DieboldLi, FactorTimeSeries, YieldForecast, YieldPanel, YieldPca, YieldPcaView,
+    nelson_siegel_yields,
 };
 use nalgebra::{DMatrix, DVector};
 

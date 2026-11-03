@@ -10,13 +10,13 @@ use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPr
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{
-    bond_workout_ladder, BondWorkoutLadder, BondWorkoutRow, WorkoutExitKind,
+    BondWorkoutLadder, BondWorkoutRow, WorkoutExitKind, bond_workout_ladder,
 };
 use finstack_quant_valuations_fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, MakeWholeSpec, ProtectionWindow, ReturnFloorSpec,
 };
-use time::macros::date;
 use time::Date;
+use time::macros::date;
 
 const AS_OF: Date = date!(2025 - 01 - 15);
 
@@ -228,14 +228,15 @@ fn exercise_rights_without_a_quote_fail_as_the_metric_does() {
         matches!(&error, Error::Input(InputError::NotFound { id }) if id.ends_with("quoted_clean_price_pct")),
         "{error:?}"
     );
-    assert!(bond
-        .price_with_metrics(
+    assert!(
+        bond.price_with_metrics(
             &market(),
             AS_OF,
             &[MetricId::Ytw],
             PricingOptions::default()
         )
-        .is_err());
+        .is_err()
+    );
 }
 
 #[test]

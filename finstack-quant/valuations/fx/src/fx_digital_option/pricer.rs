@@ -1,11 +1,11 @@
 //! FX digital option pricer implementation.
 
 use crate::fx_digital_option::types::{DigitalPayoutType, FxDigitalOption};
-use crate::shared::{collect_fx_option_inputs, FxOptionInputRequest, FxOptionInputs};
+use crate::shared::{FxOptionInputRequest, FxOptionInputs, collect_fx_option_inputs};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::d1_d2;
 use finstack_quant_models::types::OptionType;
 
@@ -401,8 +401,8 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::market_data::traits::Discounting;
-    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_models::types::OptionType;
@@ -633,11 +633,13 @@ mod tests {
             DigitalPayoutType::AssetOrNothing,
         ] {
             option.payout_type = payout_type;
-            assert!(option
-                .value(&market, as_of)
-                .expect("price")
-                .amount()
-                .is_finite());
+            assert!(
+                option
+                    .value(&market, as_of)
+                    .expect("price")
+                    .amount()
+                    .is_finite()
+            );
             let error = option
                 .price_with_metrics(
                     &market,
@@ -646,9 +648,11 @@ mod tests {
                     finstack_quant_valuations_core::instruments::PricingOptions::default(),
                 )
                 .expect_err("undefined greeks");
-            assert!(error
-                .to_string()
-                .contains("deterministic forward equals the strike"));
+            assert!(
+                error
+                    .to_string()
+                    .contains("deterministic forward equals the strike")
+            );
         }
     }
 

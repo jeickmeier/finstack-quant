@@ -291,18 +291,18 @@ pub(super) fn prune_unreachable_defs(value: &mut Value) {
     collect_local_def_refs(&root, &mut pending);
     let mut reachable = BTreeSet::new();
     while let Some(name) = pending.pop_first() {
-        if reachable.insert(name.clone()) {
-            if let Some(definition) = defs.get(&name) {
-                collect_local_def_refs(definition, &mut pending);
-            }
+        if reachable.insert(name.clone())
+            && let Some(definition) = defs.get(&name)
+        {
+            collect_local_def_refs(definition, &mut pending);
         }
     }
     if let Some(defs) = value.get_mut("$defs").and_then(Value::as_object_mut) {
         defs.retain(|name, _| reachable.contains(name));
-        if defs.is_empty() {
-            if let Some(value) = value.as_object_mut() {
-                value.remove("$defs");
-            }
+        if defs.is_empty()
+            && let Some(value) = value.as_object_mut()
+        {
+            value.remove("$defs");
         }
     }
 }

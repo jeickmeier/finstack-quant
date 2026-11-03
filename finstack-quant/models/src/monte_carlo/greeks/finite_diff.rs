@@ -35,9 +35,9 @@ use super::super::engine::McEngine;
 use crate::monte_carlo::engine::{PathInputs, PathScratch};
 use crate::monte_carlo::traits::Payoff;
 use crate::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::stats::OnlineStats;
-use finstack_quant_core::Result;
 
 const MIN_SPOT_FOR_BUMP: f64 = 1.0e-12;
 const MIN_BUMP_AMOUNT: f64 = 1.0e-8;

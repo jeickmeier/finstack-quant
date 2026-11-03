@@ -344,12 +344,16 @@ fn test_multiple_namespaces() {
     registry.load_from_json_str(json1).unwrap();
     registry.load_from_json_str(json2).unwrap();
 
-    assert!(registry
-        .all_metrics()
-        .any(|(id, _)| id.starts_with("test1.")));
-    assert!(registry
-        .all_metrics()
-        .any(|(id, _)| id.starts_with("test2.")));
+    assert!(
+        registry
+            .all_metrics()
+            .any(|(id, _)| id.starts_with("test1."))
+    );
+    assert!(
+        registry
+            .all_metrics()
+            .any(|(id, _)| id.starts_with("test2."))
+    );
 }
 
 #[test]

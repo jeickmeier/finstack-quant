@@ -10,13 +10,13 @@
 //! leaves one 20-node Gaussian quadrature over the long rate.
 
 use crate::cms_spread_option::CmsSpreadOption;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurfaceAxis;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::integration::GaussHermiteQuadrature;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{black_call, black_put};
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::VolSource;
@@ -425,9 +425,9 @@ fn validate_flat_marginal(
 ) -> Result<()> {
     let unsupported = || {
         finstack_quant_core::Error::Validation(format!(
-        "CmsSpreadOption requires a flat-strike Black volatility surface; source {} has an unsupported smile (SABR/payment-measure smile mapping is not implemented)",
-        provider.get_id()
-    ))
+            "CmsSpreadOption requires a flat-strike Black volatility surface; source {} has an unsupported smile (SABR/payment-measure smile mapping is not implemented)",
+            provider.get_id()
+        ))
     };
     let VolSource::Surface(surface) = provider else {
         return Err(unsupported());
@@ -770,9 +770,11 @@ mod tests {
             .with_displacements(&[0.02])
             .expect("displacement");
         let source = VolSource::Surface(std::sync::Arc::new(surface));
-        assert!(clean_volatility(&source, 1.0, 5.0, 0.03)
-            .expect_err("unshifted marginal rejects displaced quote")
-            .to_string()
-            .contains("unshifted Black"));
+        assert!(
+            clean_volatility(&source, 1.0, 5.0, 0.03)
+                .expect_err("unshifted marginal rejects displaced quote")
+                .to_string()
+                .contains("unshifted Black")
+        );
     }
 }

@@ -3,15 +3,15 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::dates::{
-    build_fiscal_periods, build_periods, DayCount, DayCountContext, FiscalConfig, Period,
+    DayCount, DayCountContext, FiscalConfig, Period, build_fiscal_periods, build_periods,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::dsl::parse_and_compile;
-use finstack_quant_statements::evaluator::evaluate_formula;
 use finstack_quant_statements::evaluator::EvaluationContext;
 use finstack_quant_statements::evaluator::Evaluator;
+use finstack_quant_statements::evaluator::evaluate_formula;
 use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec};
 use indexmap::IndexMap;
 use std::sync::Arc;
@@ -332,9 +332,11 @@ fn daily_ttm_sums_twelve_calendar_months_of_calendar_and_business_days() {
         let year_end = PeriodId::day(2025, 365).unwrap();
         close(result.get("ltm", &year_end).unwrap(), expected);
         // 2024-12-30 has one uncovered day (2023-12-31) in its window.
-        assert!(result
-            .get("ltm", &PeriodId::day(2024, 365).unwrap())
-            .unwrap()
-            .is_nan());
+        assert!(
+            result
+                .get("ltm", &PeriodId::day(2024, 365).unwrap())
+                .unwrap()
+                .is_nan()
+        );
     }
 }

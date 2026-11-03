@@ -8,8 +8,8 @@ use finstack_quant_valuations::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
 };
 use finstack_quant_valuations::results::ValuationDetails;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Minimal flat discount curve anchored at `base_date`.
 fn flat_discount_curve(
@@ -255,10 +255,12 @@ fn metric_attachment_preserves_the_model_result_envelope() {
             }
         ))
     ));
-    assert!(result
-        .covenants
-        .as_ref()
-        .is_some_and(|reports| reports.contains_key("rich-result")));
+    assert!(
+        result
+            .covenants
+            .as_ref()
+            .is_some_and(|reports| reports.contains_key("rich-result"))
+    );
     assert_eq!(
         result
             .explanation

@@ -10,19 +10,19 @@
 //!
 //! Market Standards Review (Week 5)
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_cashflows::builder::RateSpec;
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
 use std::hint::black_box;

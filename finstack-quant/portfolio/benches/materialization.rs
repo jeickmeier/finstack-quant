@@ -8,12 +8,12 @@ use std::hint::black_box;
 use std::path::Path;
 use std::time::Instant;
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
+use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_portfolio::{
-    materialization::InstrumentArtifactCache, materialization::MaterializationReport, Portfolio,
+    Portfolio, materialization::InstrumentArtifactCache, materialization::MaterializationReport,
 };
-use materialization_fixtures::{fixture_a, fixture_b, BenchmarkFixture};
+use materialization_fixtures::{BenchmarkFixture, fixture_a, fixture_b};
 use materialization_gate::{evaluate_latency_gates, p95_millis, parse_sample_count};
 
 #[derive(Default)]
@@ -293,11 +293,7 @@ fn nanos_to_millis(nanos: u64) -> f64 {
 }
 
 fn pass_miss(value: bool) -> &'static str {
-    if value {
-        "PASS"
-    } else {
-        "MISS"
-    }
+    if value { "PASS" } else { "MISS" }
 }
 
 fn criterion_config() -> Criterion {

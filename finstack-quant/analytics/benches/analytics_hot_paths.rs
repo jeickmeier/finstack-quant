@@ -9,7 +9,7 @@ mod fixtures;
 
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use finstack_quant_analytics::Performance;
 use finstack_quant_core::dates::PeriodKind;
 use fixtures::{perf_from_returns, perf_panel, synthetic_dates, synthetic_returns};

@@ -14,7 +14,7 @@ use finstack_quant_core::market_data::term_structures::HazardCurve as RustHazard
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
-use crate::api::core::curve_args::{flat_pairs, flatten_pairs, js_time_point, TimePoint};
+use crate::api::core::curve_args::{TimePoint, flat_pairs, flatten_pairs, js_time_point};
 
 /// Credit hazard-rate curve for default-probability modelling.
 ///

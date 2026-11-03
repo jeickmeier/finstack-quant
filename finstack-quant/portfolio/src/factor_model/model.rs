@@ -20,26 +20,26 @@
 //! - Parametric VaR conventions: `docs/REFERENCES.md#jpmorgan1996RiskMetrics`
 //!
 
-use super::assignment::{assign_position_factors, FactorAssignmentReport};
+use super::assignment::{FactorAssignmentReport, assign_position_factors};
 use super::dependencies::factor_dependencies;
 use crate::error::{Error, Result};
 use crate::sensitivity::{
-    exact_factor_market_keys, portfolio_rows, uses_assignment_driven_credit_shock,
-    DeltaBasedEngine, FactorSensitivityEngine,
+    DeltaBasedEngine, FactorSensitivityEngine, exact_factor_market_keys, portfolio_rows,
+    uses_assignment_driven_credit_shock,
 };
-use crate::{dependencies::MarketFactorKey, Portfolio};
+use crate::{Portfolio, dependencies::MarketFactorKey};
 use finstack_quant_calibration::api::schema::HazardCurveParams;
 use finstack_quant_calibration::recalibration::bump_hazard_spreads;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
-use finstack_quant_factor::risk::{
-    apply_residual_contributions, decompose_factors, PositionResidualContribution,
-    ResidualContributionSource, RiskDecomposition,
-};
-use finstack_quant_factor::SensitivityMatrix;
 use finstack_quant_factor::ISSUER_ID_META_KEY;
+use finstack_quant_factor::SensitivityMatrix;
+use finstack_quant_factor::risk::{
+    PositionResidualContribution, ResidualContributionSource, RiskDecomposition,
+    apply_residual_contributions, decompose_factors,
+};
 use finstack_quant_factor::{
     BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, MarketDependency,
     MatchingConfig, RiskMeasure, UnmatchedPolicy,
@@ -863,10 +863,10 @@ fn shift_credit_curves(
 #[cfg(test)]
 pub(super) mod tests {
     use super::*;
+    use crate::Portfolio;
     use crate::position::{Position, PositionUnit};
     use crate::sensitivity::FactorSensitivityEngine;
-    use crate::types::{PositionId, DUMMY_ENTITY_ID};
-    use crate::Portfolio;
+    use crate::types::{DUMMY_ENTITY_ID, PositionId};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::bumps::BumpUnits;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -883,8 +883,8 @@ pub(super) mod tests {
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     };
     use time::macros::date;
 
@@ -1780,11 +1780,11 @@ pub(super) mod tests {
 
     #[test]
     fn credit_hierarchy_sensitivities_scale_cs01_by_calibrated_betas() {
+        use finstack_quant_factor::CreditHierarchicalConfig;
         use finstack_quant_factor::credit::hierarchy::{
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use finstack_quant_factor::CreditHierarchicalConfig;
         use std::collections::BTreeMap;
 
         let as_of = date!(2024 - 01 - 01);
@@ -2020,11 +2020,11 @@ pub(super) mod tests {
 
     #[test]
     fn credit_factor_stress_scales_curve_shift_by_calibrated_beta() {
+        use finstack_quant_factor::CreditHierarchicalConfig;
         use finstack_quant_factor::credit::hierarchy::{
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use finstack_quant_factor::CreditHierarchicalConfig;
         use std::collections::BTreeMap;
 
         let as_of = date!(2024 - 01 - 01);
@@ -2138,11 +2138,11 @@ pub(super) mod tests {
     /// betas, `adder_vol_annualized = 3.0`) used by the idiosyncratic
     /// residual-variance tests.
     fn credit_hierarchy_model() -> FactorModel {
+        use finstack_quant_factor::CreditHierarchicalConfig;
         use finstack_quant_factor::credit::hierarchy::{
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use finstack_quant_factor::CreditHierarchicalConfig;
         use std::collections::BTreeMap;
 
         let mut tags = BTreeMap::new();
@@ -2249,9 +2249,11 @@ pub(super) mod tests {
         let error = model
             .compute_sensitivities(&huge_portfolio, &market, as_of)
             .expect_err("finite endpoints and finite quantity must not return infinite risk");
-        assert!(error
-            .to_string()
-            .contains("non-finite weighted credit sensitivity"));
+        assert!(
+            error
+                .to_string()
+                .contains("non-finite weighted credit sensitivity")
+        );
 
         let mut assignments = model
             .assign_factors(&unit_portfolio, &market)
@@ -2277,9 +2279,11 @@ pub(super) mod tests {
                 &mut exposures,
             )
             .expect_err("finite cached exposure times finite beta must not overflow the matrix");
-        assert!(error
-            .to_string()
-            .contains("non-finite assignment-weighted credit sensitivity"));
+        assert!(
+            error
+                .to_string()
+                .contains("non-finite assignment-weighted credit sensitivity")
+        );
     }
 
     #[test]

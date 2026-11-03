@@ -6,9 +6,9 @@
 
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
+use finstack_quant_core::Error;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error;
 
 /// Final payoff type for autocallable products.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
