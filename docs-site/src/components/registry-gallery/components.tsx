@@ -63,6 +63,7 @@ import { Example as ExampleQuoteConverter } from "./examples/quote-converter";
 import { Example as ExampleWaccCalculator } from "./examples/wacc-calculator";
 import { Example as ExampleStatementExport } from "./examples/statement-export";
 import { Example as Example74 } from "./examples/liability-management-card";
+import { Example as ExampleRecoveryWaterfall } from "./examples/recovery-waterfall";
 import { Example as Example75 } from "./examples/pool-report";
 import { Example as Example76 } from "./examples/waterfall-report";
 import { Example as Example77 } from "./examples/coverage-test-chart";
@@ -151,6 +152,7 @@ const examples = {
   "wacc-calculator": ExampleWaccCalculator,
   "statement-export": ExampleStatementExport,
   "liability-management-card": Example74,
+  "recovery-waterfall": ExampleRecoveryWaterfall,
   "waterfall-report": Example76,
   "coverage-test-chart": Example77,
   "credit-enhancement-chart": Example78,

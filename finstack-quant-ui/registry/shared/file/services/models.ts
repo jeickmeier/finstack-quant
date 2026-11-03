@@ -11,9 +11,10 @@ import type {
   OptionCalculatorResult,
   PositionRisk,
   ScoringResult,
+  SeniorityRecoveryStats,
 } from "../finstack-contract";
 import { attempt, type ServiceContext } from "./context";
-/** The closed-form option functions, models.volatility evaluators and the surface arbitrage check, the core surface handles they read, models.credit.migration, the Merton model, the credit-scoring functions, the PD master scale, the liability-management analyses and the models.factor.risk position decompositions. */
+/** The closed-form option functions, models.volatility evaluators and the surface arbitrage check, the core surface handles they read, models.credit.migration, the Merton model, the credit-scoring functions, the PD master scale, the liability-management analyses, the recovery waterfall, workout LGD and seniority recovery statistics, and the models.factor.risk position decompositions. */
 export type ModelsNative = {
   core: Pick<typeof core, "FxDeltaVolSurface" | "VolCube" | "VolSurface">;
   models: Pick<
@@ -51,6 +52,14 @@ export type ModelsNative = {
       liabilityManagement: Pick<
         typeof models.credit.liabilityManagement,
         "analyzeExchangeOffer" | "analyzeLme" | "tenderRecommendationHurdle"
+      >;
+      lgd: Pick<
+        typeof models.credit.lgd,
+        "workoutLgd" | "seniorityRecoveryStats" | "seniorityCalibrationIds"
+      >;
+      recoveryWaterfall: Pick<
+        typeof models.credit.recoveryWaterfall,
+        "allocateRecovery"
       >;
       scoring: Pick<
         typeof models.credit.scoring,
@@ -562,6 +571,49 @@ export function createModelsService(
       context.result(() =>
         native.models.credit.liabilityManagement.tenderRecommendationHurdle(),
       ),
+    allocateRecovery(request) {
+      return context.result(() =>
+        native.models.credit.recoveryWaterfall.allocateRecovery(
+          request.estateValue,
+          request.claims,
+        ),
+      );
+    },
+    workoutLgd(request) {
+      return context.result(() =>
+        native.models.credit.lgd.workoutLgd(
+          request.ead,
+          request.collateral,
+          request.directCostPct,
+          request.indirectCostPct,
+          request.timeToResolutionYears,
+          request.discountRate,
+        ),
+      );
+    },
+    seniorityRecoveryStats(request) {
+      return context.result((): SeniorityRecoveryStats => {
+        const recovery = native.models.credit.lgd.seniorityRecoveryStats(
+          request.seniority,
+          request.calibrationId,
+        );
+        try {
+          return {
+            mean: recovery.mean,
+            std_dev: recovery.stdDev,
+            variance: recovery.variance,
+            alpha: recovery.alpha,
+            beta_param: recovery.betaParam,
+            mode: recovery.mode,
+            mean_lgd: recovery.meanLgd,
+          };
+        } finally {
+          recovery.free();
+        }
+      });
+    },
+    seniorityCalibrationIds: () =>
+      context.result(() => native.models.credit.lgd.seniorityCalibrationIds()),
     optionCalculator(request) {
       return context.result((): OptionCalculatorResult => {
         const { model } = request;

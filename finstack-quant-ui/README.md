@@ -174,11 +174,11 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the thirty native fixture generators under
+`mise run ui-fixtures` runs the thirty-one native fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
 portfolio → portfolio margin; curves → market-browser → curve-query; cubes, calibration,
-scenario-table; statements → covenants; WACC rates; statement tables; analytics; models credit, risk, options and liability management;
+scenario-table; statements → covenants; WACC rates; statement tables; analytics; models credit, risk, options, liability management and recovery;
 margin), then
 refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
@@ -1145,6 +1145,27 @@ input means a price, an extension fee or a transferred-asset fraction by structu
 An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset,
 which leaves the leverage block out. Leverage covers the target instrument's debt
 only. The native fixture is `tests/models/liability-management/cases.json`.
+
+## Recovery waterfall
+
+`useAllocateRecovery`, `useWorkoutLgd`, `useSeniorityRecoveryStats` and
+`useSeniorityCalibrationIds` (`@finstack/use-recovery-waterfall`) call
+`models.credit.recoveryWaterfall.allocateRecovery`, `models.credit.lgd.workoutLgd`,
+`seniorityRecoveryStats` and `seniorityCalibrationIds`, one native call each; the
+worker reads the returned `BetaRecovery` handle's getters into plain data and frees
+it. `RecoveryWaterfall` has a form and a table per analysis. The waterfall table is
+Rust's `allocations` in its priority-then-entry order, with each claim's total,
+collateral and general recovery, recovery rate and deficiency, and the estate's
+`total_distributed`, `undistributed_estate` and `apr_satisfied` below it: nothing is
+summed or divided here. A claim's seniority is a free-text reporting label, as Rust
+documents; priority orders the stack. The workout collateral types and the seniority
+classes come from the generated `workout_lgd` and `seniority_calibration`
+contracts, and the calibration choices from `seniorityCalibrationIds`, which lists
+the registry's default first. A class a calibration lacks, such as first-lien
+under `sp_recovery_historical`, shows Rust's error. An empty amount is sent as NaN
+for Rust to reject and an empty collateral value is an unsecured claim. The item is
+standalone: claims are entered, not read from a statements model. The native
+fixture is `tests/models/recovery/cases.json`.
 
 ## Credit scorecard
 

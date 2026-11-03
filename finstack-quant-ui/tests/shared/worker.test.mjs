@@ -171,6 +171,10 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "analyzeExchangeOffer",
     "analyzeLme",
     "tenderRecommendationHurdle",
+    "allocateRecovery",
+    "workoutLgd",
+    "seniorityRecoveryStats",
+    "seniorityCalibrationIds",
     "positionRisk",
     "decomposeFactors",
     // StatementsApi

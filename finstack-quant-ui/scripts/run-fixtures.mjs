@@ -43,6 +43,7 @@ const generators = [
   "tests/models/risk/generate.mjs",
   "tests/models/options/generate.mjs",
   "tests/models/liability-management/generate.mjs",
+  "tests/models/recovery/generate.mjs",
   "tests/margin/generate.mjs",
   "scripts/gen-gallery.mjs",
 ];

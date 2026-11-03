@@ -124,6 +124,8 @@ export async function generate(repo = repoRoot) {
           "altman_z_double_prime_input",
           "ohlson_o_score_input",
           "zmijewski_input",
+          "workout_lgd",
+          "seniority_calibration",
           "credit_assessment",
           "capital_structure_summary",
           "capital_structure_summary_config",

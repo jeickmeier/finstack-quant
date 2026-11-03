@@ -2517,6 +2517,32 @@
       }
     },
     {
+      "id": "recovery-waterfall",
+      "route": "returned-model",
+      "convention": "Returned models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.workoutLgd and seniorityRecoveryStats results as Rust returned them. Allocations are in Rust's priority-then-entry order; each claim's total, collateral and general recovery, recovery rate and deficiency, and the estate's distributed and undistributed totals, are Rust's fields, never summed or divided here. Amounts are in one caller-defined unit with no currency conversion; rates are fractions. Seniority classes and collateral types are the generated SeniorityClass and WorkoutCollateralType contracts; calibration ids are seniorityCalibrationIds, default first. A class a calibration lacks shows Rust's error.",
+      "api": {
+        "name": "models.credit.recoveryWaterfall.allocateRecovery",
+        "source": "finstack-quant-wasm/index.d.ts",
+        "owner": "CreditRecoveryWaterfallNamespace",
+        "member": "allocateRecovery",
+        "inputs": [
+          {
+            "name": "estateValue",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "claims",
+            "type": "readonly generated.models.RecoveryClaim[] | string",
+            "optional": false
+          }
+        ],
+        "returns": "generated.models.RecoveryWaterfallResult",
+        "declaration": "/**\n   * Allocate a bankruptcy estate across claims under the absolute priority rule.\n   *\n   * Secured claims first recover from their own collateral (after the haircut);\n   * the remaining estate is then distributed by `priority`, pro rata within a\n   * priority level.\n   * @param estateValue - Distributable estate value in monetary units; non-negative.\n   * @param claims - Array of `RecoveryClaim` objects, or its JSON text. Each claim holds `id`, `seniority`, `priority` (lower is more senior), `principal`, `accrued`, `penalties`, `collateral_value` (or `null`) and `collateral_haircut` in `[0, 1]`.\n   * @returns The `RecoveryWaterfallResult` object (`allocations`, `total_distributed`, `undistributed_estate`, `apr_satisfied`).\n   * @throws Error - Throws a `TypeError` if `claims` is neither a string nor a plain array, and a `validation` error if the estate or a claim amount is negative or non-finite, a haircut is out of range, or claim identifiers repeat.\n   */\n  allocateRecovery(\n    estateValue: number,\n    claims: readonly generated.models.RecoveryClaim[] | string\n  ): generated.models.RecoveryWaterfallResult;",
+        "sha256": "e36f8e8495fbaaccafccc0da24acdafe328f1c85358a5229f02bb68400d39f05"
+      }
+    },
+    {
       "id": "option-calculator",
       "route": "returned-model",
       "convention": "Returned closed-form results of one European option: models.bsPrice, black76Price or bachelierPrice of an entered volatility, or bsImpliedVol, black76ImpliedVol or models.volatility.impliedVolBachelier of an entered price, then bsGreeks, black76Greeks or bachelierGreeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",

@@ -797,6 +797,44 @@ export interface LmeRequest {
   /** Unset leaves the leverage block out. */
   readonly ebitda?: number | null;
 }
+/** One absolute-priority recovery waterfall; amounts in one caller-defined unit, no currency conversion. */
+export interface RecoveryWaterfallRequest {
+  /** Distributable estate, including pledged collateral. */
+  readonly estateValue: number;
+  /** The claims as Rust takes them; seniority is a caller-defined reporting label. */
+  readonly claims: readonly modelsWire.RecoveryClaim[];
+}
+/** One workout LGD in the facade's positional order; costs and rates are decimals. */
+export interface WorkoutLgdRequest {
+  /** Exposure at default, positive, in the collateral's unit. */
+  readonly ead: number;
+  /** Collateral pieces, highest priority first. */
+  readonly collateral: readonly (readonly [
+    collateralType: modelsWire.WorkoutCollateralType,
+    bookValue: number,
+    haircut: number,
+  ])[];
+  readonly directCostPct: number;
+  readonly indirectCostPct: number;
+  readonly timeToResolutionYears: number;
+  readonly discountRate: number;
+}
+/** One seniority class under one exact registry calibration id. */
+export interface SeniorityRecoveryRequest {
+  readonly seniority: modelsWire.SeniorityClass;
+  readonly calibrationId: string;
+}
+/** The getters of the BetaRecovery handle seniorityRecoveryStats returns, under their Rust names; rates are fractions. */
+export interface SeniorityRecoveryStats {
+  readonly mean: number;
+  readonly std_dev: number;
+  readonly variance: number;
+  readonly alpha: number;
+  readonly beta_param: number;
+  /** Undefined when the distribution has no interior mode. */
+  readonly mode: number | undefined;
+  readonly mean_lgd: number;
+}
 /** Terms of one European option; each model takes its own, as the facade function documents them. */
 export type OptionTerms =
   | {
@@ -1452,6 +1490,20 @@ export interface ModelsApi {
   analyzeLme(request: LmeRequest): Promise<Envelope<modelsWire.LmeAnalysis>>;
   /** models.credit.liabilityManagement.tenderRecommendationHurdle. */
   tenderRecommendationHurdle(): Promise<Envelope<number>>;
+  /** models.credit.recoveryWaterfall.allocateRecovery: per-claim allocations, totals and the undistributed estate. */
+  allocateRecovery(
+    request: RecoveryWaterfallRequest,
+  ): Promise<Envelope<modelsWire.RecoveryWaterfallResult>>;
+  /** models.credit.lgd.workoutLgd: net recovery, LGD and recovery rate. */
+  workoutLgd(
+    request: WorkoutLgdRequest,
+  ): Promise<Envelope<modelsWire.WorkoutLgdResult>>;
+  /** models.credit.lgd.seniorityRecoveryStats, read into plain data; the handle is freed. */
+  seniorityRecoveryStats(
+    request: SeniorityRecoveryRequest,
+  ): Promise<Envelope<SeniorityRecoveryStats>>;
+  /** models.credit.lgd.seniorityCalibrationIds: the registry's calibration ids, default first. */
+  seniorityCalibrationIds(): Promise<Envelope<string[]>>;
   /** One closed-form price (bsPrice, black76Price, bachelierPrice) or implied-volatility solve (bsImpliedVol, black76ImpliedVol, models.volatility.impliedVolBachelier) in the facade's positional order, then the model's Greeks at that volatility, kept as an envelope. */
   optionCalculator(
     request: OptionCalculatorRequest,
