@@ -38,6 +38,7 @@ const generators = [
   "tests/statements/wacc/generate.mjs",
   "tests/statements/normalization/generate.mjs",
   "tests/statements/capital-structure/generate.mjs",
+  "tests/statements/relative-value/generate.mjs",
   "tests/statements/export/generate.mjs",
   "tests/covenants/generate.mjs",
   "tests/analytics/generate.mjs",

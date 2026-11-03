@@ -1107,6 +1107,55 @@
       }
     },
     {
+      "name": "relative-value-table",
+      "type": "registry:component",
+      "title": "Relative value table",
+      "description": "Compare a subject with its filtered peers: Rust's comps table, each multiple's peer statistics and percentile, each scoring dimension's regression scatter and signal, and the composite rich/cheap score.",
+      "docs": "Answers how a name compares with its peers. Takes the host-supplied subject and universe (CompanyMetrics serde documents; Rust rejects a misspelt key) and edits a RelativeValueReportConfig with the schema form over the generated relative_value_report_config contract: the PeerFilter (every field optional; GICS sectors, industries, countries, ratings, tags and selectors are free text, since Rust declares no list of them), the period basis, the scoring dimensions and the multiple columns, whose choices come from the contract. Compare passes the subject, universe and structurally valid config JSON to the caller (usually the useRelativeValueReport request) and Rust validates them. The native statements_analytics.relativeValueReport result is shown as returned, above the form: the subject, period basis, peer and excluded counts and the composite score and confidence, or Rust's reason for no composite; the comps table with the subject first, marked from Rust's is_subject, and one column per multiple; per multiple, the subject value, percentile, z-score and peer statistics, with a bar per multiple drawn at Rust's percentile; per dimension, its weight, direction, subject values, percentile, z-score, signal (positive meaning cheap), regression and peer statistics, Rust's exclusion reason when the composite leaves it out, and a scatter of Rust's points with the subject found by its id and the line drawn through Rust's fitted values. A null or a live NaN shows as Undefined and -0 as 0. Nothing is computed here. Accepts subject, universe, defaultConfig, onSubmit, report, loading, error, formatNumber, formatPercentile and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/relative-value-table/relative-value-table.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/statements/components/relative-value-table/relative-value-table.tsx"
+        },
+        {
+          "path": "components/relative-value-table/relative-value-config.ts",
+          "type": "registry:lib",
+          "target": "components/finstack/statements/components/relative-value-table/relative-value-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-codec",
+        "@finstack/finstack-worker",
+        "@finstack/schema-form",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/contract-relative-value-report-config",
+        "@finstack/contract-relative-value-report",
+        "badge"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_report_config.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "statement-export",
       "type": "registry:component",
       "title": "Statement export",
@@ -1228,6 +1277,32 @@
           "path": "hooks/use-capital-structure-summary/use-capital-structure-summary.ts",
           "type": "registry:hook",
           "target": "hooks/statements/use-capital-structure-summary/use-capital-structure-summary.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-relative-value-report",
+      "type": "registry:hook",
+      "title": "useRelativeValueReport",
+      "description": "Compares a subject with its filtered peers through the WASM worker.",
+      "docs": "Native statements_analytics.relativeValueReport of the subject's CompanyMetrics JSON, the universe's CompanyMetrics JSON array and RelativeValueReportConfig JSON: the comps table, peer statistics and percentiles, regression scatter and composite rich/cheap score. Keyed by the complete immutable request and worker session; null disables the query. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-relative-value-report/use-relative-value-report.ts",
+          "type": "registry:hook",
+          "target": "hooks/statements/use-relative-value-report/use-relative-value-report.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Comps: relative value table in the UI
+
+The `relative-value-table` registry component, with the `use-relative-value-report` hook, takes a host-supplied subject and universe of `CompanyMetrics`, edits a `RelativeValueReportConfig` (peer filter, period basis, scoring dimensions, multiples) with a schema form over the generated contract, and draws `statements_analytics.relativeValueReport` as returned: the comps table with the subject marked, each multiple's subject value, percentile bar, z-score and peer statistics, each dimension's regression scatter through Rust's fitted values with its signal, z-score and exclusion reason, and the composite score or Rust's reason for none. `labelFor` upper-cases `ev`, `fcf`, `ntm`, `pb`, `pe` and `ptbv`, so a multiple reads "EV EBITDA" or "PE".
+
 ### Comps: partial and strict peer filters
 
 Every `PeerFilter` field may now be omitted from its serde document, an omitted list or bound screening on nothing, so `{"gics_sectors": ["Energy"]}` is a complete filter and `{}` accepts every company; until now a filter had to list all nine fields. `PeerFilter` and `CompanyMetrics` reject unknown keys, so a misspelt criterion (`gics_sector`) or metric (`ebidta`) is a validation error instead of being dropped. This applies to every host that passes either as JSON (`relative_value_report`, `PeerSet`, `PeerFilter.from_json`, `CompanyMetrics.from_json`, WASM `relativeValueReport` and `peerSetFromUniverse`); the flat-dict constructors, which file an unknown name under `custom`, are unchanged. No value moves.
@@ -1657,7 +1661,7 @@ User-visible changes from merging master into the WASM binding audit branch.
   `european_with_market_data(id, ticker, option_params, market_data)`);
   `EquityOptionParams::european_call` / `european_put` (now `call` / `put`).
   Python: `EquityOption.european_call(...)` (now `EquityOption.european(...,
-  option_type, ...)`).
+option_type, ...)`).
 - `CdsTranchePricer::with_params` (now `with_config`); `BasketCalculator::new(config)`
   (now `with_config(config)`) and `BasketCalculator::with_defaults` (now `new`).
 - Constructor id parameters take `impl Into<InstrumentId>` (FxSpot, the
@@ -1736,7 +1740,7 @@ User-visible changes from merging master into the WASM binding audit branch.
   JSON). Swap-family float legs, TRS financing legs and cross-currency legs reject
   `simple_average`.
 - `FloatingRateSpec.overnight_compounding` (now `compounding:
-  Option<FloatingLegCompounding>`) on every bond / loan / structured-credit coupon
+Option<FloatingLegCompounding>`) on every bond / loan / structured-credit coupon
   (Rust, Python, JSON). `compounded_in_arrears` (now
   `{"compounded_in_arrears": {"lookback_days": 0}}`),
   `compounded_with_lookback{lookback_days}` (now `compounded_in_arrears{lookback_days}`),
@@ -2047,7 +2051,7 @@ bit-for-bit to the value the equivalent old input gave
   `SoftCallTrigger` (now `PriceTrigger`, same fields);
   `ConversionEvent::PriceTrigger { threshold, lookback_days }` (now
   `PriceTrigger(PriceTrigger { threshold_pct, observation_days,
-  required_days_above })`: the level is a percent of the conversion price,
+required_days_above })`: the level is a percent of the conversion price,
   not an absolute share price; the observation window is not modeled for
   contingent conversion); Rust/Python/WASM/JSON.
 
@@ -2504,7 +2508,7 @@ beyond float re-association.
 - `InterestRateFuture.notional`, `.expiry`, `.quoted_price`,
   `.settlement_price` and `.position` (now `terms: ListedFutureTerms`:
   `contracts = notional / contract_specs.face_value`, `multiplier =
-  tick_value / tick_size` — $2,500 for CME SR3 —, `entry_price`,
+tick_value / tick_size` — $2,500 for CME SR3 —, `entry_price`,
   `last_trading_date`, `settlement_date` — the last trading date for term
   contracts, the reference-period end for overnight contracts —,
   `settlement_price`, `position`). `fixing_date` defaults to
@@ -2518,7 +2522,7 @@ beyond float re-association.
   trading date). Rust.
 - `BondFuture.notional`, `.expiry`, `.delivery_end`, `.quoted_price` and
   `.position` (now `terms: ListedFutureTerms` with `multiplier = contract face
-  / 100`, `last_trading_date`, `settlement_date` = last delivery date);
+/ 100`, `last_trading_date`, `settlement_date` = last delivery date);
   `delivery_start` stays. The official `terms.settlement_price` is required
   after the last trading date. Rust, JSON.
 - `BondFutureSpecs.contract_size` (removed; now `terms.multiplier × 100`).
@@ -2528,7 +2532,7 @@ beyond float re-association.
   metric is the lifecycle mark. Rust.
 - `VolatilityIndexFuture.notional`, `.expiry`, `.settlement_date`,
   `.quoted_price`, `.position` and `.contract_specs` (now `terms:
-  ListedFutureTerms`), `.settlement_fixing` (now `terms.settlement_price`,
+ListedFutureTerms`), `.settlement_fixing` (now `terms.settlement_price`,
   required on the settlement date), `::forward_vol(context)` (now
   `fair_price(context, as_of)`), `::delta_vol()` now returns `Result<f64>`.
   Rust, JSON.
@@ -2703,7 +2707,7 @@ before.
   JSON.
 - `CouponType::Split { cash_pct, pik_pct }` (now
   `{ cash_fraction, pik_fraction }`) and Python `CouponType.split(cash_pct,
-  pik_pct)` / `.cash_pct` / `.pik_pct` (now `cash_fraction` / `pik_fraction`).
+pik_pct)` / `.cash_pct` / `.pik_pct` (now `cash_fraction` / `pik_fraction`).
   Rust, Python, JSON.
 - `AmortizationEvent::CumulativeLoss { max_pct }` (now
   `{ max_cumulative_loss }`, a decimal fraction of the original collateral in
@@ -2865,7 +2869,7 @@ below.
   ConvertibleBond now sets the lattice for pricing, the bond floor, greeks,
   implied vol and OAS; before, it was validated and ignored.
 - `EquityOption.theta_day_basis` (now `metric_pricing_overrides.theta_day_basis:
-  Option<ThetaDayBasis>`, default calendar-365). `ThetaDayBasis` moves to
+Option<ThetaDayBasis>`, default calendar-365). `ThetaDayBasis` moves to
   `instruments::ThetaDayBasis`. Rust, Python (`EquityOption.theta_day_basis`
   getter and builder setter removed; `MetricPricingOverrides(theta_day_basis=...)`
   and its getter added), JSON.
@@ -2987,8 +2991,8 @@ Numbers change only where a deal relied on a retired channel:
   `rmbs_trustee_fee_annual` (now `clo_trustee_fee`, `abs_trustee_fee`,
   `cmbs_trustee_fee`, `rmbs_trustee_fee`); Rust.
 - `AssetType::{FirstLienLoan, SecondLienLoan, RevolverLoan, BridgeLoan,
-  MezzanineLoan, HighYieldBond, InvestmentGradeBond, DistressedBond,
-  EmergingMarketsBond}` carry no `industry` payload (`{"type": "first_lien_loan"}`);
+MezzanineLoan, HighYieldBond, InvestmentGradeBond, DistressedBond,
+EmergingMarketsBond}` carry no `industry` payload (`{"type": "first_lien_loan"}`);
   an `industry` key inside `asset_type` is rejected. Rust, JSON, Python/WASM
   `asset_type` dicts.
 - `CDSTranchePricerConfig.recovery_spec` (now `stochastic_recovery_spec`,
@@ -3363,7 +3367,7 @@ pinned by `tests/metrics/bump_config_routing.rs`.
   `valuations.sensitivities.v1` layered with `metric_pricing_overrides.bump_config`.
 - `ConvertibleBond::greeks(curves, tree_type, bump_size, as_of)` (now
   `greeks(curves, tree_type, as_of)`) and Python `ConvertibleBond.greeks(market,
-  as_of, bump_size=None)` (now `greeks(market, as_of)`). Bumps come from the
+as_of, bump_size=None)` (now `greeks(market, as_of)`). Bumps come from the
   bond's `metric_pricing_overrides.bump_config`. `calculate_convertible_greeks`
   takes `bumps: GreekBumps` in place of `bump_size: Option<f64>`.
 - `CDSTranchePricer::calculate_cs01` takes `credit_spread_bump_bp: f64`;
@@ -3488,12 +3492,12 @@ pinned by a regression test against an independent hand calculation.
 #### Changed (BREAKING)
 
 - Removed: `TreePricer::calculate_oas`, `TreePricerConfig::{high_precision,
-  mean_reversion}`, the LSMC exercise-provider hook,
+mean_reversion}`, the LSMC exercise-provider hook,
   `price_from_ytm_compounded`, `par_rate_and_annuity_from_forward`,
   `CashflowSpec::{fixed_with_conventions, floating_with_conventions}`,
   `FloatingConventionParams`, `calculate_conversion_premium`,
   `IndexationMethod::{standard_lag_modern, uses_daily_interpolation,
-  uses_daily_interpolation_modern}`.
+uses_daily_interpolation_modern}`.
 - Bond futures: `determine_ctd`, `determine_ctd_by_implied_repo`,
   `implied_repo_rate` and `invoice_price` take the current futures price
   (`DeliverableQuote`); `calculate_conversion_factor(bond, &specs, month)`;
@@ -3546,7 +3550,7 @@ pinned by a regression test against an independent hand calculation.
 - `AgencyTba` and `DollarRoll` gain an optional `prepayment_model` wire field.
 - Removed `mbs_passthrough::delay`, `MbsCashflow::sifma_date`,
   `cmo::waterfall::{execute_waterfall, execute_waterfall_with_pac,
-  allocate_io_cashflow}`; `execute_waterfall_with_principal_breakdown` takes a
+allocate_io_cashflow}`; `execute_waterfall_with_principal_breakdown` takes a
   collateral survival ratio and an accrual fraction.
 - PSA lives in `finstack_quant_cashflows::builder::psa_cpr`.
 
@@ -3622,7 +3626,7 @@ pinned by a regression test against an independent hand calculation.
   `annualize` and `fiscal_ytd` folded their trailing count, window, offset,
   smoothing-factor or month argument into the dimension check, so every one of
   them was rejected on a USD-denominated node with `Dimensional mismatch in
-  lag: cannot combine scalar and USD`. A debt corkscrew written the natural way
+lag: cannot combine scalar and USD`. A debt corkscrew written the natural way
   (`lag(closing_debt, 1) + drawdowns - repayments`) could not be expressed and
   had to be rebuilt with `cumsum`. Those functions now take their dimension
   from the series argument alone; an argument that is a count, window, offset,
@@ -3714,7 +3718,7 @@ pinned by a regression test against an independent hand calculation.
 #### Added
 
 - Collateral terms: `PoolAsset.{origination_date, amortization_term_months,
-  io_months, index_floor}` (per-asset seasoning on PSA/ABS/vector/SDA curves,
+io_months, index_floor}` (per-asset seasoning on PSA/ABS/vector/SDA curves,
   level payment over the amortization term, IO windows, index floors),
   `BalloonSpec.{extension_prob, loss_prob, severity_pct, workout_months}` with
   workout claims, NPL timelines anchored on `acquisition_date`, DSCR on the live
@@ -3726,12 +3730,12 @@ pinned by a regression test against an independent hand calculation.
   `Tranche.non_deferrable`, `AdvancingPolicy::PrincipalAndInterest.reimburse_from_collections`,
   `DealFees::{workout_fee_pct, liquidation_fee_pct}` with dynamic special
   servicing, `PrepaymentPenalty::{Lockout, StepDown, YieldMaintenance {
-  discount_curve_id, floor_pct }}`, `CreditModelConfig.stochastic_recovery_spec`.
+discount_curve_id, floor_pct }}`, `CreditModelConfig.stochastic_recovery_spec`.
 - Facilities: `EarlyAmortizationSpec.max_cumulative_loss`,
   `CallAssumption.after_early_amortization_months`, `StructuredCredit::{tranche_draws,
-  tranche_readvance}`, `EligibilityRule::{max_days_past_due, exclude_non_performing}`
+tranche_readvance}`, `EligibilityRule::{max_days_past_due, exclude_non_performing}`
   on live collateral, `AssetBackedFacility::{fees, draw_schedule,
-  readvance_to_borrowing_base}`, `FacilityProjection.draws`,
+readvance_to_borrowing_base}`, `FacilityProjection.draws`,
   `SimulationDiagnostics::{early_amortization_date, tranche_draws}`,
   `PeriodDiagnostics.servicer_advances_outstanding`.
 - Analytics: `TrancheMetrics::{spread_convexity, dm_bp}` and effective
@@ -3763,7 +3767,7 @@ pinned by a regression test against an independent hand calculation.
 - `LossAllocationPolicy` (`WriteDown` / `ParPreserving`) on the deal, with
   deal-type defaults; par-preserving notes realize shortfalls at legal final.
 - Deal-level reinvestment: `ReinvestmentPeriod { amortizing_tranches,
-  assumptions: ReinvestmentAssumptions }` books synthetic `REINVEST-{n}` rows
+assumptions: ReinvestmentAssumptions }` books synthetic `REINVEST-{n}` rows
   (spread, price, maturity, coupon floor); notes are held flat unless listed.
 - Waterfall funding sources (`WaterfallTier.funding`,
   `StructuredCredit.principal_covers_senior_interest`), hedge swaps as
@@ -3771,7 +3775,7 @@ pinned by a regression test against an independent hand calculation.
   fees with a subordinated management fee and an equity-IRR incentive fee
   (`TemplateFees`, `IncentiveFeeSpec`).
 - `CoverageRules { rating_haircuts, defaulted_valuation, ccc_bucket,
-  discount_obligation, borrowing_base }` for the OC numerator;
+discount_obligation, borrowing_base }` for the OC numerator;
   `CoverageRules::clo_standard()`; `PoolAsset.market_price_pct`.
 - Behavioral model library: `PrepaymentCurve::{Abs, Vector}`,
   `DefaultCurve::{Vector, CumulativeLoss, Timing}`,
@@ -3782,7 +3786,7 @@ pinned by a regression test against an independent hand calculation.
   `abs_excess_spread`, `abs_payment_rate`, `abs_delinquency` metrics).
 - Deal terms and analytics: `CallAssumption` (deal or tranche scope) with
   `liquidation_price_pct`, `TrancheMetrics.{wal_to_call, z_spread_to_call_bp,
-  dm_to_call_bp}`; `SimulationDiagnostics.periods` (per-period pool,
+dm_to_call_bp}`; `SimulationDiagnostics.periods` (per-period pool,
   collections, accounts and coverage-test record); `calculate_equity_metrics`
   (`EquityMetrics`); CMBS terms (`BalloonSpec`, `PrepaymentPenalty`,
   `SpecialServicingSpec`, loan-level `noi` DSCR,
@@ -4076,7 +4080,7 @@ attributes and no `serde(alias)`, so none of this was annotation-visible.
 **Breaking (Rust, JSON, Python) — wave 12: the waterfall can now report insolvency**
 
 - `WaterfallSpec.available_cash_node` is **required** and `impl Default for
-  WaterfallSpec` is removed. With `None` the engine skipped its entire Step-5
+WaterfallSpec` is removed. With `None` the engine skipped its entire Step-5
   block: every scheduled fee, coupon and amortization was reported paid in full
   regardless of whether the model generated the cash — uses exceeded sources,
   cash was created from nothing, and no shortfall could ever be raised. The
@@ -4141,7 +4145,7 @@ attributes and no `serde(alias)`, so none of this was annotation-visible.
 - `Instrument::market_dependencies` is now a **required** method. Its old
   default returned an empty set, so emptiness could not be distinguished from
   "never declared" — the portfolio therefore treated every empty set as
-  *unresolved* and repriced those positions for every factor. All 79 real
+  _unresolved_ and repriced those positions for every factor. All 79 real
   instruments already declared their dependencies; only test mocks relied on
   the default. An empty set now means the instrument genuinely reads no market
   data, and such positions are repriced for no factor.
@@ -4264,7 +4268,7 @@ previous string output is available by calling `.to_json()` on the result.
   `crate::utils::to_js_value`. Rust maps previously arrived as ES `Map`s in
   those returns, which `JSON.stringify` silently drops; they are now plain
   objects, matching `index.d.ts` and the Python dict shapes. `mise run
-  wasm-lint` now fails if the raw serializer reappears.
+wasm-lint` now fails if the raw serializer reappears.
 - 47 exports converted from JSON strings to structured objects: the four
   `priceInstrument*` entry points and `calibrate`; 31 portfolio exports
   (valuation, aggregation, attribution, optimization, risk decomposition,
@@ -4281,7 +4285,7 @@ previous string output is available by calling `.to_json()` on the result.
 - Numeric vectors cross as `Float64Array` instead of boxed-`Number` arrays
   (`correlationBounds`, `jointProbabilities`, `nearestCorrelation`,
   `generateSmile`, the two coupon profiles, `expiries`, `pillarVols`). Three
-  of these were already *declared* `Float64Array` in `index.d.ts` and had been
+  of these were already _declared_ `Float64Array` in `index.d.ts` and had been
   lying about their runtime type.
 - `Portfolio.toSpecJson` → `toJson`; `margin.calculateVm` takes an ISO-8601
   date string instead of three integers; the comps functions and
@@ -4293,7 +4297,7 @@ previous string output is available by calling `.to_json()` on the result.
 ### Known gap
 
 Some entry points still return bare JSON strings under unsuffixed names in
-*both* Python and WASM (parts of statements-analytics, factor-model, and the
+_both_ Python and WASM (parts of statements-analytics, factor-model, and the
 scenario spec builders). They are consistent with each other but not with the
 contract; converting one side alone would create the cross-language divergence
 this work removes, so they are listed as paired follow-ups in
@@ -4355,8 +4359,8 @@ this work removes, so they are listed as paired follow-ups in
   surface point into that additive hazard volatility. The surface is queried
   strictly at the strike's **native displayed** coordinate — a decimal spread for
   CDX IG and iTraxx, a clean price in percentage points (`107.0`, never `1.07`
-  and never a spread equivalent) for CDX HY — and the index-derived *fractional*
-  vol is anchored on the *target* curve's own reference hazard, so a single-name
+  and never a spread equivalent) for CDX HY — and the index-derived _fractional_
+  vol is anchored on the _target_ curve's own reference hazard, so a single-name
   bond is never anchored to the index's hazard level. Selectors are `Strike`,
   `Moneyness` (against the native ATM-forward coordinate) and `Delta`.
 
@@ -4381,6 +4385,7 @@ this work removes, so they are listed as paired follow-ups in
   `strike_index_factor` as inert. `effective_underlying_cds_coupon` is now
   fallible, since a clean-price strike can never serve as the running coupon, and
   `settlement` is explicit on `CDSOptionParams` (default `Cash`).
+
 - **Breaking (Rust behavior):** the callable rates-credit path reads only
   `hw1f_sigma` / `hw1f_mean_reversion` and **rejects** the legacy
   `implied_volatility` / `mean_reversion` channel when its canonical counterpart
@@ -4419,7 +4424,7 @@ this work removes, so they are listed as paired follow-ups in
   wanted. `instrument_cashflows_json` is unchanged and still returns `str`.
 - **Breaking (Python):** `ModelBuilder` / `MixedNodeBuilder` configuration
   methods return the builder instead of `None`, so calls chain. Statement-per-line
-  code is unaffected (the object is mutated in place and the returned value *is*
+  code is unaffected (the object is mutated in place and the returned value _is_
   the same builder); the only visible change is that a notebook cell ending on a
   setter now echoes a builder repr. `build()` and `mixed()` remain terminal.
 - **Python:** every date-valued `as_of` parameter accepts a `datetime.date` /
@@ -4427,7 +4432,7 @@ this work removes, so they are listed as paired follow-ups in
   points, the `structured_credit_tranche_*` family, the portfolio sensitivity,
   stress, what-if and aggregation functions, `accrued_interest_json`,
   `evaluate_engine`, `decompose_levels` and `run_corporate_analysis`. The two
-  functions that take a fiscal *period* rather than a date
+  functions that take a fiscal _period_ rather than a date
   (`credit_assessment`, `credit_assessment_report`, e.g. `"2025Q4"`) still take
   a string, since a calendar date has no meaning there. A malformed date string
   is now rejected by the shared extractor, so the `ValueError` names the

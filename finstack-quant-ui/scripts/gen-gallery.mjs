@@ -101,6 +101,7 @@ const sources = {
   waccCalculator: "tests/statements/wacc/cases.json",
   normalizationEditor: "tests/statements/normalization/cases.json",
   capitalStructureReport: "tests/statements/capital-structure/cases.json",
+  relativeValueTable: "tests/statements/relative-value/cases.json",
   statementExport: "tests/statements/export/cases.json",
   covenantSeries: "src/fixtures/covenants/analyst-covenant-series.json",
   covenantEngine: "src/fixtures/covenants/analyst-covenants.json",

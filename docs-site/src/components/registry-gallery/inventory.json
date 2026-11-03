@@ -655,6 +655,12 @@
       "worker": "none"
     },
     {
+      "name": "relative-value-table",
+      "type": "registry:component",
+      "docs": "Answers how a name compares with its peers. Takes the host-supplied subject and universe (CompanyMetrics serde documents; Rust rejects a misspelt key) and edits a RelativeValueReportConfig with the schema form over the generated relative_value_report_config contract: the PeerFilter (every field optional; GICS sectors, industries, countries, ratings, tags and selectors are free text, since Rust declares no list of them), the period basis, the scoring dimensions and the multiple columns, whose choices come from the contract. Compare passes the subject, universe and structurally valid config JSON to the caller (usually the useRelativeValueReport request) and Rust validates them. The native statements_analytics.relativeValueReport result is shown as returned, above the form: the subject, period basis, peer and excluded counts and the composite score and confidence, or Rust's reason for no composite; the comps table with the subject first, marked from Rust's is_subject, and one column per multiple; per multiple, the subject value, percentile, z-score and peer statistics, with a bar per multiple drawn at Rust's percentile; per dimension, its weight, direction, subject values, percentile, z-score, signal (positive meaning cheap), regression and peer statistics, Rust's exclusion reason when the composite leaves it out, and a scatter of Rust's points with the subject found by its id and the line drawn through Rust's fitted values. A null or a live NaN shows as Undefined and -0 as 0. Nothing is computed here. Accepts subject, universe, defaultConfig, onSubmit, report, loading, error, formatNumber, formatPercentile and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "statement-export",
       "type": "registry:component",
       "docs": "Answers what the statement numbers are as a file a spreadsheet can open. Presents a native statements.statementResultToTableWide or statementResultToTableLong TableEnvelope (useStatementResultTable) in Rust's order, with a wide or long switch the host follows. Download CSV writes exactly those cells: RFC 4180 quoting, native column names as the header, every number as its plain String form. A cell Rust holds with no value shows as undefined and is an empty field. Nothing is computed. Accepts layout, onLayoutChange, table, loading, error and density props; no worker or query provider required.",
@@ -994,6 +1000,10 @@
     },
     {
       "name": "use-capital-structure-summary",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-relative-value-report",
       "type": "registry:hook"
     },
     {
@@ -1877,6 +1887,10 @@
     {
       "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
       "sha256": "965ec88a37428138f17d1dc8d4edb8d0bb5375cddaf50c269462b96fb4709051"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/relative-value/cases.json",
+      "sha256": "1c9dce3cc804a2fb9b58b5569b1f0fb76bb966ee896fa4fe1197cfa1f59f6361"
     },
     {
       "path": "finstack-quant-ui/tests/statements/export/cases.json",

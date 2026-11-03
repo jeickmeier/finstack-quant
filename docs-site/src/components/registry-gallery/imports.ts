@@ -559,6 +559,13 @@ export const importHarnesses = {
       name: "use-capital-structure-summary",
       modules: modules.length,
     })),
+  "use-relative-value-report": () =>
+    Promise.all([
+      import("@/hooks/statements/use-relative-value-report/use-relative-value-report"),
+    ]).then((modules) => ({
+      name: "use-relative-value-report",
+      modules: modules.length,
+    })),
   "use-normalization-config-validator": () =>
     Promise.all([
       import("@/hooks/statements/use-normalization-config-validator/use-normalization-config-validator"),
