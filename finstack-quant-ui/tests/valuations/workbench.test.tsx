@@ -225,6 +225,10 @@ beforeEach(() => {
         return native.defaultWaterfallOrder();
       case "calendars":
         return native.availableCalendars();
+      case "priceDriverFields":
+        return native.priceDriverFields();
+      case "cashflowLadder":
+        return native.calendarYearLadderByCurrency(request);
       case "formatMoney":
         return formatMoney(request.value, request.rounding, native);
       case "cashflows":
