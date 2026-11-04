@@ -58,7 +58,7 @@ fn test_ytc_callable_loan() {
     let result = loan.price_with_metrics(
         &market,
         as_of,
-        &[MetricId::custom("ytc")],
+        &[MetricId::Ytc],
         finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
@@ -110,7 +110,7 @@ fn test_ytc_uses_quoted_clean_price_pct_when_present() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::custom("ytc")],
+            &[MetricId::Ytc],
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
@@ -122,7 +122,7 @@ fn test_ytc_uses_quoted_clean_price_pct_when_present() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::custom("ytc")],
+            &[MetricId::Ytc],
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();

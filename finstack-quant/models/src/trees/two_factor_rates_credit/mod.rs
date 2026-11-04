@@ -152,6 +152,9 @@ use crate::monte_carlo::traits::RandomStream;
 
 use super::tree_framework::{NodeState, TreeValuator};
 
+pub use band_table::BandTable;
+
+mod band_table;
 mod calibration;
 mod pricing;
 mod sampling;
@@ -389,9 +392,9 @@ pub struct RatesCreditTree {
     /// Explicit calibration coordinates. Empty until calibration succeeds.
     calibration_times: Vec<f64>,
     /// One-step rate terms of the nodes sampled paths usually visit.
-    rate_terms: NodeTermsTable,
+    rate_terms: BandTable<NodeTerms>,
     /// One-step hazard terms of the nodes sampled paths usually visit.
-    hazard_terms: NodeTermsTable,
+    hazard_terms: BandTable<NodeTerms>,
 }
 
 /// How much of the calibrated hazard lattice sits on the zero floor.
@@ -662,74 +665,48 @@ struct NodeTerms {
     complement_to_next: f64,
 }
 
-/// [`NodeTerms`] of the nodes sampled paths usually visit.
+/// Nodes of row `step` that sampled paths usually visit.
 ///
 /// A daily lattice has about `steps² / 2` nodes per factor, but a binomial walk
 /// stays near the centre of each row, so sampling a path spends almost all its
-/// time in a band about `4√step` nodes wide, each node visited by many paths.
-/// Holding the terms of that band turns three transcendental calls per path
-/// step into a lookup. A node outside the band is computed on the spot from the
-/// same expressions, so the table changes speed and never a value. A factor with
-/// zero volatility has one level per row and needs one entry per row.
-#[derive(Debug, Clone, Default)]
-struct NodeTermsTable {
-    /// First entry of each row in `terms`.
-    starts: Vec<usize>,
-    /// Lowest node index held for each row.
-    lows: Vec<usize>,
-    /// Row entries, concatenated.
-    terms: Vec<NodeTerms>,
+/// time in a band four standard deviations of a driftless walk (`√step / 2`)
+/// either side of the centre, plus a small margin. A factor with zero
+/// volatility has one level per row, held at node zero.
+fn usual_band(row: FactorRow, step: usize) -> std::ops::Range<usize> {
+    if row.shift == 0.0 {
+        return 0..1;
+    }
+    let half_width = 2 * (step as f64).sqrt().ceil() as usize + 2;
+    let centre = step / 2;
+    centre.saturating_sub(half_width)..(centre + half_width + 1).min(row.nodes)
 }
 
-impl NodeTermsTable {
-    /// Half-width of the band held for a row, in nodes: four standard
-    /// deviations of a driftless walk (`√step / 2`) plus a small margin.
-    fn half_width(step: usize) -> usize {
-        2 * (step as f64).sqrt().ceil() as usize + 2
-    }
+/// [`NodeTerms`] of every row's [`usual_band`], three transcendental calls per
+/// path step turned into a lookup.
+fn node_terms_table(
+    rows: &[FactorRow],
+    terms_at: impl Fn(usize, f64) -> NodeTerms,
+) -> BandTable<NodeTerms> {
+    let bands = rows
+        .iter()
+        .enumerate()
+        .map(|(step, &row)| usual_band(row, step));
+    let Ok(table) = BandTable::build::<std::convert::Infallible>(bands, |step, node| {
+        Ok(terms_at(step, rows[step].value_unchecked(node)))
+    });
+    table
+}
 
-    /// Node range held for row `step` of a factor with `rows[step]`.
-    fn band(row: FactorRow, step: usize) -> std::ops::Range<usize> {
-        if row.shift == 0.0 {
-            return 0..1;
-        }
-        let half_width = Self::half_width(step);
-        let centre = step / 2;
-        centre.saturating_sub(half_width)..(centre + half_width + 1).min(row.nodes)
-    }
-
-    fn build(rows: &[FactorRow], terms_at: impl Fn(usize, f64) -> NodeTerms) -> Self {
-        let mut table = Self {
-            starts: Vec::with_capacity(rows.len()),
-            lows: Vec::with_capacity(rows.len()),
-            terms: Vec::new(),
-        };
-        for (step, &row) in rows.iter().enumerate() {
-            let band = Self::band(row, step);
-            table.starts.push(table.terms.len());
-            table.lows.push(band.start);
-            table
-                .terms
-                .extend(band.map(|node| terms_at(step, row.value_unchecked(node))));
-        }
-        table
-    }
-
-    /// Terms of `node` on row `step`, or `None` outside the band.
-    #[inline]
-    fn get(&self, row: FactorRow, step: usize, node: usize) -> Option<NodeTerms> {
-        if row.shift == 0.0 {
-            return self.terms.get(self.starts[step]).copied();
-        }
-        let offset = node.checked_sub(self.lows[step])?;
-        let end = self
-            .starts
-            .get(step + 1)
-            .copied()
-            .unwrap_or(self.terms.len());
-        let index = self.starts[step] + offset;
-        (index < end).then(|| self.terms[index])
-    }
+/// Terms of `node` on a row of `table`; a zero-volatility row holds its one
+/// level at node zero.
+#[inline]
+fn held_node_terms(
+    table: &BandTable<NodeTerms>,
+    row: FactorRow,
+    step: usize,
+    node: usize,
+) -> Option<NodeTerms> {
+    table.get(step, if row.shift == 0.0 { 0 } else { node })
 }
 
 /// Per-factor lattice geometry and calibration target shared by the rate and
@@ -761,8 +738,8 @@ impl RatesCreditTree {
             hazard_ref: 0.0,
             hazard_floor_saturation: HazardFloorSaturation::default(),
             calibration_times: Vec::new(),
-            rate_terms: NodeTermsTable::default(),
-            hazard_terms: NodeTermsTable::default(),
+            rate_terms: BandTable::default(),
+            hazard_terms: BandTable::default(),
         }
     }
 

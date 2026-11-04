@@ -1,17 +1,11 @@
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { checking, emit } from "../../scripts/fixture-output.mjs";
+import { native, readRepoSource } from "../../scripts/fixture-inputs.mjs";
 import { serializeHost } from "../../src/codec.mjs";
-const repository = new URL("../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
 // Convertible credit widening 150bp -> 300bp over one day (attribution crate fixture).
 const sourcePath =
   "finstack-quant/attribution/tests/fixtures/production_convertible_credit.json";
-const sourceBytes = await readFile(new URL(sourcePath, repository));
-const source = JSON.parse(sourceBytes);
+const sourceInput = await readRepoSource(sourcePath);
+const source = sourceInput.value;
 const methods = [
   { name: "parallel", method: "parallel" },
   // Rust's default factor order; the waterfall steps chain in it.
@@ -45,12 +39,12 @@ const cases = methods.map(({ name, method }) => {
 // worker's AttributionApi from its market and date (the pinned T0) to the
 // market a SCN-1 scenario returns (T1), canonical market texts spliced.
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
-const bondBytes = await readFile(new URL(bondPath, repository));
-const bond = JSON.parse(bondBytes).request;
+const bondInput = await readRepoSource(bondPath);
+const bond = bondInput.value.request;
 const scenariosPath =
   "finstack-quant-ui/tests/scenarios/application/cases.json";
-const scenariosBytes = await readFile(new URL(scenariosPath, repository));
-const scenarios = JSON.parse(scenariosBytes).cases;
+const scenariosInput = await readRepoSource(scenariosPath);
+const scenarios = scenariosInput.value.cases;
 function canonicalMarket(json) {
   const market = native.MarketContext.fromJson(json);
   try {
@@ -121,20 +115,7 @@ await emit(
   serializeHost({
     description:
       "Native single-instrument P&L attribution of a convertible bond whose credit spreads widen from 150bp to 300bp over one day, under the four Rust methods (attributePnlMany), with Rust's explain text, residual check and share of total per factor. `workbench` attributes the results-fixture bond from its market and date to the market of a market-scenario case (the workbench P&L explain); the markets themselves are not stored.",
-    sources: [
-      {
-        path: sourcePath,
-        sha256: createHash("sha256").update(sourceBytes).digest("hex"),
-      },
-      {
-        path: bondPath,
-        sha256: createHash("sha256").update(bondBytes).digest("hex"),
-      },
-      {
-        path: scenariosPath,
-        sha256: createHash("sha256").update(scenariosBytes).digest("hex"),
-      },
-    ],
+    sources: [sourceInput.source, bondInput.source, scenariosInput.source],
     cases,
     workbench,
   }),

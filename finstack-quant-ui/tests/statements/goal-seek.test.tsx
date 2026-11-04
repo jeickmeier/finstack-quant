@@ -52,7 +52,7 @@ const request: GoalSeekRequest = {
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => harness?.close());
 afterEach(cleanup);
 

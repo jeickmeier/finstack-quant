@@ -1,7 +1,7 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { CovenantReportWire } from "@/lib/finstack/generated/types/covenant_report";
-import { groupDecimal } from "@/lib/finstack/format/format";
+import { formatExact } from "@/lib/finstack/format/format";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
@@ -11,10 +11,6 @@ export type CovenantReports = Readonly<Record<string, CovenantReportWire>>;
 /** Numeric CovenantReport fields, in the metric's own units as Rust returns them. */
 export type CovenantReportNumber = "actual_value" | "threshold" | "headroom";
 type Row = { key: string; report: CovenantReportWire };
-/** Every supplied digit, grouped; a non-finite native value shows as itself. */
-function exactValue(_field: CovenantReportNumber, value: number): string {
-  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
-}
 export interface CovenantReportProps {
   /** Native reports (CovenantEngine#evaluate, a dated series row, or a valuation result's covenants). */
   reports: CovenantReports;
@@ -34,7 +30,7 @@ export function CovenantReport({
   reports,
   caption = "Covenant reports",
   captionVisibility,
-  formatValue = exactValue,
+  formatValue = (_field, value) => formatExact(value),
   density,
 }: CovenantReportProps) {
   const numeric = { className: "text-right finstack-numeric" };

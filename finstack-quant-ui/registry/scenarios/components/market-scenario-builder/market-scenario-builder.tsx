@@ -3,7 +3,6 @@ import { useState } from "react";
 import type { ScenarioSpec, TemplateMetadata } from "finstack-quant-wasm";
 import type { scenarios as scenarioWire } from "finstack-quant-wasm/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { errorText } from "@/lib/finstack/form";
 import {
   SchemaForm,
@@ -14,11 +13,11 @@ import {
   EnumField,
   type EnumOption,
 } from "@/components/finstack/shared/primitives/enum-field/enum-field";
-import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/field-frame";
 import { IdCombobox } from "@/components/finstack/shared/primitives/id-combobox/id-combobox";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
 import { scenarioSpecModule } from "./scenario-spec";
+import { TextField } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** Operations to build in Rust; the same shape useBuildMarketScenario accepts. */
 export interface MarketScenarioOperationsRequest {
@@ -105,33 +104,6 @@ function initial(defaultJson: string | undefined): Doc {
   } catch (failure) {
     return { revision: 0, error: message(failure) };
   }
-}
-function TextField({
-  label,
-  value,
-  onValueChange,
-  disabled,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onValueChange: (value: string) => void;
-  disabled?: boolean;
-  placeholder?: string;
-}) {
-  return (
-    <FieldFrame label={label}>
-      {(control) => (
-        <Input
-          {...control}
-          value={value}
-          placeholder={placeholder}
-          disabled={disabled}
-          onChange={(event) => onValueChange(event.currentTarget.value)}
-        />
-      )}
-    </FieldFrame>
-  );
 }
 /** The selected template's returned metadata, shown as returned. */
 function TemplateDetails({ template }: { template: TemplateMetadata }) {

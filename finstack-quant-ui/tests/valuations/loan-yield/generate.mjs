@@ -1,19 +1,18 @@
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import {
+  native,
+  readRepoJson,
+  withSpec,
+  sourceRecord,
+} from "../../../scripts/fixture-inputs.mjs";
 const paths = [
   "finstack-quant/valuations/tests/instruments/json_examples/term_loan.json",
   "finstack-quant/valuations/tests/instruments/json_examples/revolving_credit.json",
   "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
 ];
-const read = async (path) =>
-  JSON.parse(await readFile(new URL(path, repository), "utf8"));
-const [termLoan, revolver, baseMarket] = await Promise.all(paths.map(read));
+const [termLoan, revolver, baseMarket] = await Promise.all(
+  paths.map(readRepoJson),
+);
 const asOf = "2023-12-28";
 // Seasoned floating coupons read their past resets from this series.
 const market = JSON.stringify({
@@ -29,13 +28,6 @@ const market = JSON.stringify({
       interpolation: "step",
     },
   ],
-});
-const withSpec = (instrument, spec) => ({
-  ...instrument,
-  instrument: {
-    ...instrument.instrument,
-    spec: { ...instrument.instrument.spec, ...spec },
-  },
 });
 // A seasoned term loan B: SOFR + 375 with a 50 bp floor, 1.5% upfront fee, a
 // soft call at 101 stepping to par a year later, and 0.25% quarterly amortization.
@@ -162,14 +154,7 @@ try {
 } catch (error) {
   wholeRequestError = error.message;
 }
-const sources = await Promise.all(
-  paths.map(async (path) => ({
-    path,
-    sha256: createHash("sha256")
-      .update(await readFile(new URL(path, repository)))
-      .digest("hex"),
-  })),
-);
+const sources = await Promise.all(paths.map(sourceRecord));
 await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({

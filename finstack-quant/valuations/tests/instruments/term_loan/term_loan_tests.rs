@@ -288,7 +288,7 @@ fn term_loan_oid_eir_amortization_schedule() {
         .price_with_metrics(
             &market,
             issue,
-            &[MetricId::custom("oid_eir_amortization")],
+            &[MetricId::OidEirAmortization],
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
         .unwrap();

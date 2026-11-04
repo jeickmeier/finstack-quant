@@ -351,33 +351,6 @@ pub(super) struct IntervalTerms {
     pub(super) frp_weight: f64,
 }
 
-/// [`IntervalTerms`] of the rate nodes paths usually visit, when survival over
-/// each interval does not depend on the path. Each interval pays two logarithms
-/// and an `expm1`, and tens of thousands of paths cross the same few nodes.
-pub(super) struct IntervalTable {
-    starts: Vec<usize>,
-    lows: Vec<usize>,
-    terms: Vec<IntervalTerms>,
-}
-
-impl IntervalTable {
-    #[inline]
-    fn get(&self, step: usize, rate_node: usize) -> Option<IntervalTerms> {
-        let offset = rate_node.checked_sub(*self.lows.get(step)?)?;
-        let end = self
-            .starts
-            .get(step + 1)
-            .copied()
-            .unwrap_or(self.terms.len());
-        let index = self.starts[step] + offset;
-        // A NaN weight marks a node whose weight failed; recomputing it on
-        // demand reports that failure only if a path reaches the node.
-        (index < end)
-            .then(|| self.terms[index])
-            .filter(|terms| !terms.frp_weight.is_nan())
-    }
-}
-
 /// Everything one pricing run reuses across paths: the replay's arithmetic with
 /// the run's OAS, minus whatever depends on the sampled path.
 pub(super) struct ReplayTerms {
@@ -386,9 +359,11 @@ pub(super) struct ReplayTerms {
     /// Product state per step, when no coupon re-fixes on the path: a fixed
     /// coupon bond's balance and cash are the same on every path.
     static_steps: Option<Vec<StepReplay>>,
-    /// Tabulated interval weights, when hazard is deterministic and rates are
-    /// not.
-    intervals: Option<IntervalTable>,
+    /// [`IntervalTerms`] of the rate nodes paths usually visit, when hazard is
+    /// deterministic and rates are not, so survival over each interval does not
+    /// depend on the path. Each interval pays two logarithms and an `expm1`,
+    /// and tens of thousands of paths cross the same few nodes.
+    intervals: Option<BandTable<IntervalTerms>>,
 }
 
 impl ReplayTerms {
@@ -416,26 +391,16 @@ impl ReplayTerms {
         };
         let model = tree.get_config();
         let intervals = if model.hazard_vol == 0.0 && model.rate_vol > 0.0 {
-            let mut table = IntervalTable {
-                starts: Vec::with_capacity(oas_df.len()),
-                lows: Vec::with_capacity(oas_df.len()),
-                terms: Vec::new(),
-            };
-            for (step, &oas_df) in oas_df.iter().enumerate() {
-                let nodes = tree.usual_rate_nodes(step);
-                table.starts.push(table.terms.len());
-                table.lows.push(nodes.start);
-                for node in nodes {
-                    let factor = tree.state_at(step, node, 0)?;
-                    let interval_df = factor.discount_to_next * oas_df;
-                    table.terms.push(IntervalTerms {
-                        risky_df: interval_df * factor.survival_to_next,
-                        frp_weight: continuous_frp_weight(interval_df, factor.survival_to_next)
-                            .unwrap_or(f64::NAN),
-                    });
-                }
-            }
-            Some(table)
+            let bands = (0..oas_df.len()).map(|step| tree.usual_rate_nodes(step));
+            Some(BandTable::build(bands, |step, node| {
+                let factor = tree.state_at(step, node, 0)?;
+                let interval_df = factor.discount_to_next * oas_df[step];
+                Ok::<_, finstack_quant_core::Error>(IntervalTerms {
+                    risky_df: interval_df * factor.survival_to_next,
+                    frp_weight: continuous_frp_weight(interval_df, factor.survival_to_next)
+                        .unwrap_or(f64::NAN),
+                })
+            })?)
         } else {
             None
         };
@@ -497,6 +462,9 @@ impl ReplayTerms {
             .intervals
             .as_ref()
             .and_then(|table| table.get(factor.step, factor.rate_node))
+            // A NaN weight marks a node whose weight failed; recomputing it on
+            // demand reports that failure only if a path reaches the node.
+            .filter(|terms| !terms.frp_weight.is_nan())
         {
             return Ok(terms);
         }

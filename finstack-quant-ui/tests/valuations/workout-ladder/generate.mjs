@@ -1,27 +1,17 @@
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import {
+  native,
+  readRepoJson,
+  sourceRecord,
+  withSpec,
+} from "../../../scripts/fixture-inputs.mjs";
 const paths = [
   "finstack-quant/valuations/tests/instruments/json_examples/bond.json",
   "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
 ];
-const read = async (path) =>
-  JSON.parse(await readFile(new URL(path, repository), "utf8"));
-const [bullet, baseMarket] = await Promise.all(paths.map(read));
+const [bullet, baseMarket] = await Promise.all(paths.map(readRepoJson));
 const marketJson = JSON.stringify(baseMarket);
 const asOf = "2024-07-15";
-const withSpec = (spec) => ({
-  ...bullet,
-  instrument: {
-    ...bullet.instrument,
-    spec: { ...bullet.instrument.spec, ...spec },
-  },
-});
 const quote = (clean) => ({
   instrument_pricing_overrides: {
     market_quotes: { quoted_clean_price_pct: clean },
@@ -43,7 +33,7 @@ const stepDown = {
 };
 /** The native ladder and the ytw and i_spread metrics of one bond, the values its worst row must hold. */
 function ladderCase(spec) {
-  const instrumentJson = JSON.stringify(withSpec(spec));
+  const instrumentJson = JSON.stringify(withSpec(bullet, spec));
   const bond = native.Bond.fromJson(instrumentJson);
   const metric = (id) =>
     native.priceInstrument(instrumentJson, marketJson, asOf, "default", [id])
@@ -101,7 +91,7 @@ const cases = {
 };
 // A bond with exercise rights needs a quote; the native error is shown as returned.
 const unquoted = {
-  instrumentJson: JSON.stringify(withSpec({ call_put: stepDown })),
+  instrumentJson: JSON.stringify(withSpec(bullet, { call_put: stepDown })),
   marketJson,
   asOf,
 };
@@ -118,14 +108,7 @@ try {
 } finally {
   unquotedBond.free();
 }
-const sources = await Promise.all(
-  paths.map(async (path) => ({
-    path,
-    sha256: createHash("sha256")
-      .update(await readFile(new URL(path, repository)))
-      .digest("hex"),
-  })),
-);
+const sources = await Promise.all(paths.map(sourceRecord));
 await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({

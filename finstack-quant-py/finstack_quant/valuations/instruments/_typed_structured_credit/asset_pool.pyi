@@ -860,11 +860,13 @@ class AssetPool:
         -------
         float | None
             Diversity score over the assets that name an obligor; ``None`` when
-            none does or the pool balance cannot be summed.
+            the pool balance is zero or no asset names an obligor.
 
-        Notes
-        -----
-        This method does not raise.
+        Raises
+        ------
+        ValueError
+            If the pool balances are inconsistent (an asset in a currency
+            other than the pool's).
         """
         ...
 

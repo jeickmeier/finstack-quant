@@ -213,6 +213,24 @@ export default [
     "format": "int64"
   },
   {
+    "path": "#/$defs/d_090e21e61cdf3e0563e2/oneOf/8",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/TableColumnData/oneOf/8",
+    "description": "Non-null boolean column."
+  },
+  {
+    "path": "#/$defs/d_090e21e61cdf3e0563e2/oneOf/8/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/TableColumnData/oneOf/8/properties/type",
+    "const": "boolean"
+  },
+  {
+    "path": "#/$defs/d_090e21e61cdf3e0563e2/oneOf/8/properties/values",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/TableColumnData/oneOf/8/properties/values"
+  },
+  {
+    "path": "#/$defs/d_090e21e61cdf3e0563e2/oneOf/8/properties/values/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/TableColumnData/oneOf/8/properties/values/items"
+  },
+  {
     "path": "#/$defs/d_2f3bf3b3f13fb41b2ca2",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/TableColumn",
     "description": "A single named column in a [`TableEnvelope`]."

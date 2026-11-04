@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { EvaluateDcfRequest } from "@/workers/finstack-contract";
@@ -16,14 +15,13 @@ export function evaluateDcfOptions(
   session: number,
   request: EvaluateDcfRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "evaluateDcf", key] as const,
-    ready: snapshot !== null,
-    missing: "The DCF requires an explicit request and ready worker",
-    queryFn: (ready) => ready.call("evaluateDcf", snapshot!),
-  });
+    session,
+    "evaluateDcf",
+    request,
+    "The DCF requires an explicit request and ready worker",
+  );
 }
 /** Native statements_analytics.evaluateDcf CorporateValuationResult or structured failure. */
 export function useEvaluateDcf(request: EvaluateDcfRequest | null) {

@@ -1,17 +1,5 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -37,38 +25,15 @@ import contracts from "@/lib/finstack/generated/primitive-contracts.json";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { unwrap } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
 
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "bondQuoteSetFieldUnits")
-        return unwrap(
-          await harness.proxy.bondQuoteSetFieldUnits(request as string),
-        );
-      if (method === "computeQuotes")
-        return unwrap(
-          await harness.proxy.computeQuotes(request as ComputeQuotesRequest),
-        );
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
+const harness = useWorkerHarness(["bondQuoteSetFieldUnits", "computeQuotes"]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -84,19 +49,6 @@ const valueOf = (field: string) =>
   within(screen.getByRole("row", { name: new RegExp(`^${labelFor(field)}`) }));
 
 // Values are regenerated and compared by `mise run ui-fixtures --check`.
-it("pins the JSON inputs the fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../..",
-  );
-  for (const source of fixture.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/valuations/quote-converter/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it.each(Object.entries(cases))(
   "the worker returns the native set of %s",
   async (_name, entry) => {

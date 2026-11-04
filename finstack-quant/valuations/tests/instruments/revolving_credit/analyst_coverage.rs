@@ -1104,11 +1104,7 @@ fn yield_to_maturity_moves_inversely_with_the_quote() {
 #[test]
 fn all_in_rate_is_cash_cost_over_time_weighted_drawn_balance() {
     let facility = quote_facility(RateSpec::Fixed { rate: 0.07 }, 5_000_000.0, None, None);
-    let rate = quote_metric(
-        &facility,
-        &flat_consistent_market(),
-        MetricId::custom("all_in_rate"),
-    );
+    let rate = quote_metric(&facility, &flat_consistent_market(), MetricId::AllInRate);
     // (5M × 7% + 5M × 0.5%) / 5M = 7.5%, both legs on ACT/360.
     assert!((rate - 0.075).abs() < 1e-6, "all-in {rate}");
 }
@@ -1332,13 +1328,13 @@ fn oid_effective_rate_exceeds_the_running_rate_with_an_upfront_fee() {
                 ModelKey::Discounting,
                 &m,
                 AS_OF,
-                &[MetricId::custom("oid_eir_amortization")],
+                &[MetricId::OidEirAmortization],
                 Default::default(),
             )
             .expect("metrics")
     };
     let result = run(&with_fee);
-    let eir = result.measures[&MetricId::custom("oid_eir_rate")];
+    let eir = result.measures[&MetricId::OidEirRate];
     // 7% ACT/360 quarterly coupon: the money-weighted running rate is a
     // little above 7% on an annual basis; a 2% discount adds ~70 bp a year
     // over three years.
@@ -1350,7 +1346,7 @@ fn oid_effective_rate_exceeds_the_running_rate_with_an_upfront_fee() {
             include_fees: false,
         },
     );
-    let plain = run(&without_fees).measures[&MetricId::custom("oid_eir_rate")];
+    let plain = run(&without_fees).measures[&MetricId::OidEirRate];
     assert!(
         plain < eir && plain > 0.069 && plain < 0.075,
         "plain {plain}"
@@ -1379,8 +1375,8 @@ fn oid_effective_rate_is_requestable_directly() {
             .expect("metrics")
             .measures
     };
-    let rate = MetricId::custom("oid_eir_rate");
-    let total = MetricId::custom("oid_eir_amortization");
+    let rate = MetricId::OidEirRate;
+    let total = MetricId::OidEirAmortization;
     let direct = run(&["oid_eir_rate"]);
     let side = run(&["oid_eir_amortization"]);
     assert_eq!(direct[&rate], side[&rate]);

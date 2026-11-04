@@ -2,12 +2,11 @@
 //! capital structure. The request is the Rust serde form, a dict or JSON text,
 //! the same document WASM takes.
 
-use super::extract_serde_any;
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::valuations::convert::enum_to_py_string;
 use crate::errors::statements_to_py;
@@ -159,43 +158,7 @@ impl PyCapitalStructureSummary {
     #[doc = pydoc!("finstack_quant.statements_analytics._capital_structure", "CapitalStructureSummary.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .tranches
-            .iter()
-            .map(|tranche| {
-                serde_json::json!({
-                    "id": tranche.id,
-                    "kind": tranche.kind,
-                    "rank": tranche.rank,
-                    "payment_class": tranche.payment_class,
-                    "balance": tranche.balance.amount(),
-                    "share_of_debt": tranche.share_of_debt,
-                    "maturity": tranche.maturity.to_string(),
-                    "cumulative_debt": tranche.cumulative_debt.amount(),
-                    "leverage": tranche.leverage,
-                    "interest_coverage": tranche.interest_coverage,
-                    "ltm_interest": tranche.ltm_interest.map(|interest| interest.amount()),
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &rows,
-            &[
-                ("id", "str"),
-                ("kind", "str"),
-                ("rank", "int64"),
-                ("payment_class", "str"),
-                ("balance", "float64"),
-                ("share_of_debt", "float64"),
-                ("maturity", "str"),
-                ("cumulative_debt", "float64"),
-                ("leverage", "float64"),
-                ("interest_coverage", "float64"),
-                ("ltm_interest", "float64"),
-            ],
-        )
+        envelope_to_pandas(py, &self.inner.to_table())
     }
 
     /// Return ``repr(self)``.
@@ -271,7 +234,8 @@ fn capital_structure_summary<'py>(
 ) -> PyResult<PyCapitalStructureSummary> {
     let results = extract_results_ref(results)?;
     let model = extract_model_ref(model)?;
-    let config: CapitalStructureSummaryConfig = extract_serde_any(py, config, "config")?;
+    let config: CapitalStructureSummaryConfig =
+        crate::bindings::module_utils::spec_from_py(py, config, "config")?;
     let inner =
         analysis::capital_structure_summary(&results, &model, &config).map_err(statements_to_py)?;
     Ok(PyCapitalStructureSummary { inner })

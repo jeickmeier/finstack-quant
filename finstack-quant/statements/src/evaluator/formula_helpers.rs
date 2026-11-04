@@ -138,6 +138,7 @@ mod tests {
 
         EvaluationContext::new(
             current_period,
+            &[],
             Arc::new(node_to_column),
             Arc::new(historical),
         )

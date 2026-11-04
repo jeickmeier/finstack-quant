@@ -18,7 +18,7 @@ const native = createRequire(import.meta.url)(
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => harness?.close());
 const base = bond.request;
 type Method = AttributePnlManyRequest["method"];

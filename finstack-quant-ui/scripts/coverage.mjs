@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import ts from "typescript";
 import { emit } from "./fixture-output.mjs";
+import { byCodeUnit } from "./order.mjs";
 
 // Facade coverage ledger. One unit is a function or class key of
 // finstack-quant-wasm/facade-surface.json; a class is covered when the worker
@@ -38,7 +39,6 @@ export const listedReasons = new Set([
 ]);
 const unitKinds = new Set(["function", "class"]);
 const leafName = (key) => key.split(".").at(-1);
-const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const fix = "run `npm --prefix finstack-quant-ui run coverage`";
 
 /** True for a facade function or class key. */

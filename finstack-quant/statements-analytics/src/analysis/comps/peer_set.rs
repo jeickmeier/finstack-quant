@@ -141,26 +141,37 @@ impl PeerSet {
     /// * `filter` - Criteria a candidate must satisfy to become a peer.
     /// * `period_basis` - Period basis recorded on the set; it labels the
     ///   metrics and changes no value.
+    ///
+    /// # Returns
+    ///
+    /// The peer set and the number of universe members the filter dropped; a
+    /// member with the subject's id is not counted.
     pub fn from_universe(
         subject: CompanyMetrics,
         universe: &[CompanyMetrics],
         filter: &PeerFilter,
         period_basis: PeriodBasis,
-    ) -> Self {
-        let peers: Vec<CompanyMetrics> = universe
-            .iter()
-            .filter(|c| c.id != subject.id && filter.accepts(c))
-            .cloned()
-            .collect();
-
-        Self {
+    ) -> (Self, usize) {
+        let candidates = universe.iter().filter(|c| c.id != subject.id);
+        let (accepted, dropped): (Vec<&CompanyMetrics>, Vec<&CompanyMetrics>) =
+            candidates.partition(|c| filter.accepts(c));
+        let peer_set = Self {
             subject,
-            peers,
+            peers: accepted.into_iter().cloned().collect(),
             period_basis,
-        }
+        };
+        (peer_set, dropped.len())
     }
 
     /// Construct directly from a subject and an explicit peer list.
+    ///
+    /// # Arguments
+    ///
+    /// * `subject` - Company being evaluated, stored apart from the peers.
+    /// * `peers` - Comparison companies, used as given: no filter is applied
+    ///   and a peer with the subject's id is kept.
+    /// * `period_basis` - Period basis recorded on the set; it labels the
+    ///   metrics and changes no value.
     pub fn new(
         subject: CompanyMetrics,
         peers: Vec<CompanyMetrics>,

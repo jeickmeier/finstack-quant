@@ -15,6 +15,10 @@ import {
 import { groupDecimal } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import {
+  UndefinedValue,
+  yesNo,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
 type SimulationRun = ReturnType<StructuredCredit["runSimulation"]>;
 type Period = NonNullable<SimulationRun["diagnostics"]["periods"]>[number];
@@ -22,10 +26,10 @@ type Waterfall = Period["waterfall"];
 type Money = Waterfall["total_available"];
 type TierAllocation = Waterfall["tier_allocations"][number];
 type PaymentRecord = Waterfall["payment_records"][number];
-type Diversion = Waterfall["diverted_amounts"][number];
+type Diversion = NonNullable<Waterfall["diverted_amounts"]>[number];
 type NonWaterfallPayment = Period["non_waterfall_payments"][number];
 
-/** The PeriodWaterfall amounts a period row shows, as cash in, then cash moved, then cash carried. */
+/** The WaterfallDistribution amounts a period row shows, as cash in, then cash moved, then cash carried. */
 const amounts = [
   "total_available",
   "recovery_proceeds",
@@ -44,7 +48,6 @@ const headers: { id: string; label?: string; className?: string }[] = [
   },
 ];
 const numeric = { className: "text-right finstack-numeric" };
-const yesNo = (flag: boolean) => (flag ? "Yes" : "No");
 /** A detail column over one field of a row, headed by the field's name. */
 function column<Row extends RowData>(
   id: string,
@@ -136,14 +139,17 @@ function PeriodRows({
             {period.payment_date}
           </Button>
         </TableHead>
-        {amounts.map((field) => (
-          <TableCell
-            key={field}
-            className="h-[var(--row-height)] py-0 text-right finstack-numeric"
-          >
-            {groupDecimal(waterfall[field].amount)}
-          </TableCell>
-        ))}
+        {amounts.map((field) => {
+          const money = waterfall[field];
+          return (
+            <TableCell
+              key={field}
+              className="h-[var(--row-height)] py-0 text-right finstack-numeric"
+            >
+              {money ? groupDecimal(money.amount) : <UndefinedValue />}
+            </TableCell>
+          );
+        })}
         <TableCell className="h-[var(--row-height)] py-0">
           {yesNo(waterfall.had_diversions)}
         </TableCell>
@@ -174,12 +180,18 @@ function PeriodRows({
                 columns={recordColumns}
                 density={density}
               />
-              <DetailTable
-                caption="Diversions"
-                rows={waterfall.diverted_amounts}
-                columns={diversionColumns}
-                density={density}
-              />
+              {waterfall.diverted_amounts ? (
+                <DetailTable
+                  caption="Diversions"
+                  rows={waterfall.diverted_amounts}
+                  columns={diversionColumns}
+                  density={density}
+                />
+              ) : (
+                <p className="m-0 text-sm">
+                  Diversions: <UndefinedValue />
+                </p>
+              )}
               <DetailTable
                 caption="Non-waterfall payments"
                 rows={period.non_waterfall_payments}
@@ -241,7 +253,7 @@ export function WaterfallReport({
       data-density={density}
     >
       <Table>
-        {/* Every amount of a period is in the deal currency, per PeriodWaterfall and NonWaterfallPayment. */}
+        {/* Every amount of a period is in the deal currency, per WaterfallDistribution and NonWaterfallPayment. */}
         <TableCaption>
           By payment period, amounts in{" "}
           {periods[0]!.waterfall.total_available.currency}

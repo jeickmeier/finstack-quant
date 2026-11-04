@@ -466,7 +466,8 @@ fn executor_allocates_floating_interest_on_the_shifted_path() {
             equity_history: None,
         };
         let dist = execute_waterfall(&waterfall, &tranches, &pool, ctx).expect("execute");
-        dist.distributions
+        dist.distributions()
+            .expect("distributions")
             .get(&RecipientType::Tranche("FLOAT".to_string()))
             .map(|m| m.amount())
             .unwrap_or(0.0)

@@ -13,6 +13,10 @@ import { formatRaw } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import {
+  ReportSection,
+  shownValue,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** A native result or the native error of that one call. */
 type Outcome<T> =
@@ -48,11 +52,6 @@ export interface PortfolioRiskReportProps {
   density?: "compact" | "comfortable";
 }
 type Format = (value: number) => string;
-/** Finite numbers through the host format; anything else as returned. */
-function shown(value: unknown, format: Format) {
-  if (typeof value === "number" && Number.isFinite(value)) return format(value);
-  return formatRaw(value as string | number | null | undefined);
-}
 /** One column per returned field, labelled from its Rust name; position ids stay text. */
 function fieldColumns<Row extends object>(
   fields: readonly (keyof Row & string)[],
@@ -65,7 +64,7 @@ function fieldColumns<Row extends object>(
     cell: ({ getValue }) =>
       typeof getValue() === "string"
         ? (getValue() as string)
-        : shown(getValue(), format),
+        : shownValue(getValue(), format),
     meta: {
       className:
         typeof field === "string" && field.endsWith("_id")
@@ -73,14 +72,6 @@ function fieldColumns<Row extends object>(
           : "text-right finstack-numeric",
     },
   }));
-}
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
 }
 function Tile({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -254,20 +245,20 @@ export function PortfolioRiskReport({
     >
       <div className="grid grid-cols-1 gap-2 @lg:grid-cols-3">
         <Tile label={labelFor("portfolio_var")}>
-          {shown(decomposition.portfolio_var, format)}
+          {shownValue(decomposition.portfolio_var, format)}
         </Tile>
         <Tile label={labelFor("portfolio_es")}>
-          {shown(decomposition.portfolio_es, format)}
+          {shownValue(decomposition.portfolio_es, format)}
         </Tile>
         <Tile label={labelFor("confidence")}>
-          {shown(decomposition.confidence, format)}
+          {shownValue(decomposition.confidence, format)}
         </Tile>
         <Tile label={labelFor("method")}>{decomposition.method}</Tile>
         <Tile label={labelFor("n_positions")}>
           {formatRaw(decomposition.n_positions)}
         </Tile>
         <Tile label={labelFor("euler_residual")}>
-          {shown(decomposition.euler_residual, format)}
+          {shownValue(decomposition.euler_residual, format)}
         </Tile>
       </div>
       <p className="text-xs text-muted-foreground">
@@ -275,7 +266,7 @@ export function PortfolioRiskReport({
         supplied weights or P&amp;L; relative shares as fractions. Rust reports
         no Euler residual for a historical decomposition.
       </p>
-      <Section title="Component VaR">
+      <ReportSection title="Component VaR">
         {chart && (
           <figure className="min-w-0">
             <FinstackChart
@@ -294,8 +285,8 @@ export function PortfolioRiskReport({
           density={density}
           emptyState="No VaR contributions returned"
         />
-      </Section>
-      <Section title="ES contributions">
+      </ReportSection>
+      <ReportSection title="ES contributions">
         <FinstackTable
           data={decomposition.es_contributions}
           columns={esColumns}
@@ -305,9 +296,9 @@ export function PortfolioRiskReport({
           density={density}
           emptyState="No ES contributions returned"
         />
-      </Section>
+      </ReportSection>
       {budget && (
-        <Section title="Risk budget">
+        <ReportSection title="Risk budget">
           {budget.ok ? (
             <>
               <div className="grid grid-cols-1 gap-2 @lg:grid-cols-3">
@@ -315,7 +306,7 @@ export function PortfolioRiskReport({
                   {String(budget.value.has_breach)}
                 </Tile>
                 <Tile label={labelFor("total_overbudget")}>
-                  {shown(budget.value.total_overbudget, format)}
+                  {shownValue(budget.value.total_overbudget, format)}
                 </Tile>
               </div>
               <FinstackTable
@@ -331,10 +322,10 @@ export function PortfolioRiskReport({
           ) : (
             <Failure outcome={budget} />
           )}
-        </Section>
+        </ReportSection>
       )}
       {stress && (
-        <Section title="Stress attribution">
+        <ReportSection title="Stress attribution">
           {stress.ok ? (
             <StressView
               stress={stress.value}
@@ -345,7 +336,7 @@ export function PortfolioRiskReport({
           ) : (
             <Failure outcome={stress} />
           )}
-        </Section>
+        </ReportSection>
       )}
       {factorSection}
     </section>
@@ -378,7 +369,7 @@ function StressView({
         id: "portfolio_pnl",
         header: labelFor("portfolio_pnl"),
         accessorFn: (row) => row.portfolio_pnl,
-        cell: ({ getValue }) => shown(getValue(), format),
+        cell: ({ getValue }) => shownValue(getValue(), format),
         meta: { className: "text-right finstack-numeric" },
       },
       ...stress.position_ids.map(
@@ -386,7 +377,7 @@ function StressView({
           id: `position:${index}`,
           header: id,
           accessorFn: (row) => row.position_pnls[index],
-          cell: ({ getValue }) => shown(getValue(), format),
+          cell: ({ getValue }) => shownValue(getValue(), format),
           meta: { className: "text-right finstack-numeric" },
         }),
       ),
@@ -397,7 +388,7 @@ function StressView({
     <>
       <div className="grid grid-cols-1 gap-2 @lg:grid-cols-3">
         <Tile label={labelFor("var_threshold")}>
-          {shown(stress.var_threshold, format)}
+          {shownValue(stress.var_threshold, format)}
         </Tile>
         <Tile label={labelFor("n_tail_scenarios")}>
           {formatRaw(stress.n_tail_scenarios)}
@@ -479,7 +470,7 @@ function FactorSection({
                 id: `factor:${index}`,
                 header: id,
                 accessorFn: (row) => row.values[index],
-                cell: ({ getValue }) => shown(getValue(), format),
+                cell: ({ getValue }) => shownValue(getValue(), format),
                 meta: { className: "text-right finstack-numeric" },
               }),
             ),
@@ -489,25 +480,25 @@ function FactorSection({
   );
   if (error || !factors)
     return (
-      <Section title="Factor contributions">
+      <ReportSection title="Factor contributions">
         <p role="alert" className="text-xs text-error">
           {error ?? "No factor decomposition"}
         </p>
-      </Section>
+      </ReportSection>
     );
   const { decomposition } = factors;
   const measure = decomposition.measure;
   return (
-    <Section title="Factor contributions">
+    <ReportSection title="Factor contributions">
       <div className="grid grid-cols-1 gap-2 @lg:grid-cols-3">
         <Tile label={labelFor("total_risk")}>
-          {shown(decomposition.total_risk, format)}
+          {shownValue(decomposition.total_risk, format)}
         </Tile>
         <Tile label={labelFor("measure")}>
           {typeof measure === "string" ? measure : JSON.stringify(measure)}
         </Tile>
         <Tile label={labelFor("residual_risk")}>
-          {shown(decomposition.residual_risk, format)}
+          {shownValue(decomposition.residual_risk, format)}
         </Tile>
       </div>
       <FinstackTable
@@ -552,6 +543,6 @@ function FactorSection({
         volatility positive, VaR and ES losses negative); sensitivities in the
         book&apos;s base currency per factor bump.
       </p>
-    </Section>
+    </ReportSection>
   );
 }

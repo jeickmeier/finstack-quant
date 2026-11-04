@@ -6,9 +6,7 @@ use crate::revolving_credit::RevolvingCredit;
 use crate::revolving_credit::types::{CreditSpreadProcessSpec, DrawRepaySpec};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::recovery01::{
-    RecoveryReplayTerms, bumped_recovery, market_with_recovery, recovery01_fd,
-};
+use finstack_quant_valuations_core::metrics::sensitivities::recovery01::hazard_recovery01;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 use super::{drawn_at, undrawn_at};
@@ -100,22 +98,18 @@ impl MetricCalculator for Recovery01Calculator {
         let facility: &RevolvingCredit = context.instrument_as()?;
         let hazard_id = hazard_curve_id(facility, "recovery01")?;
         let as_of = context.as_of;
-        let terms = RecoveryReplayTerms::on_discount_curve(facility.discount_curve_id.clone());
-        let curve_recovery = context.curves.get_hazard(&hazard_id)?.recovery_rate();
-        let base_recovery = facility.recovery_rate;
-        recovery01_fd(base_recovery, context.base_value.amount(), |recovery| {
-            let mut bumped = facility.clone();
-            bumped.recovery_rate = recovery;
-            let market = market_with_recovery(
-                context,
-                &context.curves,
-                hazard_id.as_str(),
-                bumped_recovery(curve_recovery, recovery - base_recovery),
-                &terms,
-                "Revolving credit Recovery01",
-            )?;
-            bumped.value_raw(&market, as_of)
-        })
+        hazard_recovery01(
+            context,
+            hazard_id.as_str(),
+            facility.discount_curve_id.clone(),
+            Some(facility.recovery_rate),
+            "Revolving credit Recovery01",
+            |market, recovery| {
+                let mut bumped = facility.clone();
+                bumped.recovery_rate = recovery;
+                bumped.value_raw(market, as_of)
+            },
+        )
     }
 }
 

@@ -199,8 +199,8 @@ def test_a_line_declares_its_rollup_method_on_the_node() -> None:
     # A spec entry overrides the declaration.
     assert quarterly.rollup(model, RollupSpec("annual", {"cash": "sum"})).get("cash", "2025") == pytest.approx(100.0)
 
-    # default_for lists declarations only and rolls up to the same numbers.
-    listed = RollupSpec.default_for(model, "annual")
+    # declared_methods lists declarations only and rolls up to the same numbers.
+    listed = RollupSpec.declared_methods(model, "annual")
     assert listed.methods == {"cash": "period_end", "margin": "formula"}
     assert quarterly.rollup(model, listed).get("margin", "2025") == annual.get("margin", "2025")
 

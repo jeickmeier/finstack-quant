@@ -576,8 +576,8 @@ class CapitalStructureSummary:
 
         Raises
         ------
-        ValueError
-            If a row cannot be serialized.
+        ImportError
+            If ``pyarrow`` is not installed.
         """
         ...
 

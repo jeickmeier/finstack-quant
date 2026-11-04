@@ -10,6 +10,7 @@ use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::instruments::{ConversionPolicy, GreekBumps, Instrument};
 use finstack_quant_valuations_core::metrics::sensitivities::config as sensitivities;
@@ -50,6 +51,16 @@ pub enum ConvertibleRegime {
 }
 
 impl ConvertibleRegime {
+    /// Wire name of the regime (`busted`, `balanced` or `equity_sensitive`), the serde spelling.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Busted => "busted",
+            Self::Balanced => "balanced",
+            Self::EquitySensitive => "equity_sensitive",
+        }
+    }
+
     fn from_hedge_ratio(hedge_ratio: f64) -> Self {
         if hedge_ratio < BUSTED_BELOW {
             Self::Busted
@@ -115,6 +126,53 @@ pub struct ConvertibleSpotLadder {
     pub market_spot: f64,
     /// One row per share price, in ascending order.
     pub rows: Vec<ConvertibleSpotRow>,
+}
+
+impl ConvertibleSpotLadder {
+    /// Export one row per share price, in ladder order, as a [`TableEnvelope`].
+    ///
+    /// Columns: `spot` (float), `is_market_spot` (bool), `price` (float),
+    /// `delta` and `hedge_ratio` (nullable float), `regime` (nullable string:
+    /// `busted`, `balanced` or `equity_sensitive`), `conversion_value` and
+    /// `parity` (float), `conversion_premium` (nullable float) and
+    /// `bond_floor` (float); money columns are in [`currency`](Self::currency).
+    /// The columns remain when there are no rows.
+    #[must_use]
+    pub fn to_table(&self) -> TableEnvelope {
+        let rows = &self.rows;
+        let float = |f: fn(&ConvertibleSpotRow) -> f64| {
+            TableColumnData::Float64(rows.iter().map(f).collect())
+        };
+        let nullable = |f: fn(&ConvertibleSpotRow) -> Option<f64>| {
+            TableColumnData::NullableFloat64(rows.iter().map(f).collect())
+        };
+        TableEnvelope {
+            row_count: rows.len(),
+            columns: vec![
+                TableColumn::new("spot", float(|r| r.spot)),
+                TableColumn::new(
+                    "is_market_spot",
+                    TableColumnData::Boolean(rows.iter().map(|r| r.is_market_spot).collect()),
+                ),
+                TableColumn::new("price", float(|r| r.price)),
+                TableColumn::new("delta", nullable(|r| r.delta)),
+                TableColumn::new("hedge_ratio", nullable(|r| r.hedge_ratio)),
+                TableColumn::new(
+                    "regime",
+                    TableColumnData::NullableString(
+                        rows.iter()
+                            .map(|r| r.regime.map(|regime| regime.as_str().to_string()))
+                            .collect(),
+                    ),
+                ),
+                TableColumn::new("conversion_value", float(|r| r.conversion_value)),
+                TableColumn::new("parity", float(|r| r.parity)),
+                TableColumn::new("conversion_premium", nullable(|r| r.conversion_premium)),
+                TableColumn::new("bond_floor", float(|r| r.bond_floor)),
+            ],
+            metadata: Default::default(),
+        }
+    }
 }
 
 /// Value a convertible at a ladder of share prices.
@@ -183,9 +241,8 @@ pub fn convertible_spot_ladder(
         .map(|spot| {
             let moved = inputs.market_at_spot(market, spot)?;
             let price = price_convertible_bond(bond, &moved, as_of)?.amount();
-            let moved_inputs = prepare_for_pricing(bond, &moved, as_of)?;
             let delta =
-                spot_bump_prices(bond, &moved, &moved_inputs, bumps.spot_bump_decimal, as_of)?
+                spot_bump_prices(bond, &moved, &inputs, spot, bumps.spot_bump_decimal, as_of)?
                     .map(|bump| bump.delta())
                     .filter(|delta| delta.is_finite());
             let hedge_ratio = delta

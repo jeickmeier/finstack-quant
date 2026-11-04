@@ -1,4 +1,5 @@
 use finstack_quant_core::math::Compounding;
+use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
 use serde::{Deserialize, Serialize};
 
 /// Full quote set produced by the quote engine; the return value of
@@ -46,6 +47,42 @@ pub struct BondQuoteSet {
     /// Moosmüller yield to maturity (decimal): simple interest to the next
     /// coupon, then periodic compounding.
     pub moosmuller_ytm: Option<f64>,
+}
+
+impl BondQuoteSet {
+    /// Export the quote set as a one-row [`TableEnvelope`], one column per field
+    /// in declaration order.
+    ///
+    /// `clean_price_currency`, `clean_price_pct` and `dirty_price_currency` are
+    /// float columns; every optional quote is a nullable float column holding
+    /// null where the quote does not apply. Units are the fields'.
+    #[must_use]
+    pub fn to_table(&self) -> TableEnvelope {
+        let float =
+            |name: &str, value: f64| TableColumn::new(name, TableColumnData::Float64(vec![value]));
+        let nullable = |name: &str, value: Option<f64>| {
+            TableColumn::new(name, TableColumnData::NullableFloat64(vec![value]))
+        };
+        TableEnvelope {
+            row_count: 1,
+            columns: vec![
+                float("clean_price_currency", self.clean_price_currency),
+                float("clean_price_pct", self.clean_price_pct),
+                float("dirty_price_currency", self.dirty_price_currency),
+                nullable("ytm", self.ytm),
+                nullable("ytw", self.ytw),
+                nullable("z_spread", self.z_spread),
+                nullable("discount_margin", self.discount_margin),
+                nullable("oas", self.oas),
+                nullable("asw_par", self.asw_par),
+                nullable("asw_market", self.asw_market),
+                nullable("i_spread", self.i_spread),
+                nullable("japanese_simple_yield", self.japanese_simple_yield),
+                nullable("moosmuller_ytm", self.moosmuller_ytm),
+            ],
+            metadata: Default::default(),
+        }
+    }
 }
 
 /// Yield Compounding enumeration.

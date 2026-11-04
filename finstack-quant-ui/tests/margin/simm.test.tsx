@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -27,13 +19,13 @@ import { SimmSensitivityTable } from "@/components/finstack/margin/components/si
 import { SimmReport } from "@/components/finstack/margin/components/simm-report/simm-report";
 import { SimmCalculator } from "@/components/finstack/margin/components/simm-calculator/simm-calculator";
 import { unwrap } from "@/workers/finstack-contract";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import fixture from "@/lib/finstack/fixtures/margin/simm.json";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 type Resources = Record<
   | "simmSensitivitiesConstructed"
   | "simmSensitivitiesFreed"
@@ -41,7 +33,7 @@ type Resources = Record<
   | "simmCalculatorFreed",
   number
 > & { simmCalculatorArgs: boolean[] };
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness(["simmIm", "validateSimmSensitivities"]);
 const resources = () =>
   (harness.proxy as unknown as { resources(): Promise<Resources> }).resources();
 /** Handles constructed and freed by one call. */
@@ -62,27 +54,6 @@ async function counted<T>(call: () => Promise<T>) {
     ],
   };
 }
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "simmIm")
-        return unwrap(await harness.proxy.simmIm(request as SimmImRequest));
-      if (method === "validateSimmSensitivities")
-        return unwrap(
-          await harness.proxy.validateSimmSensitivities(request as string),
-        );
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

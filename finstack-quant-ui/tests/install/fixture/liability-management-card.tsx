@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
-import {
-  LiabilityManagementCard,
-  type ExchangeOfferTerms,
-  type LmeTerms,
-} from "@/components/finstack/models/components/liability-management-card/liability-management-card";
+import { ExchangeOfferCard } from "@/components/finstack/models/components/liability-management-card/exchange-offer-card";
+import { LiabilityManagementCard } from "@/components/finstack/models/components/liability-management-card/liability-management-card";
+import type {
+  ExchangeOfferRequest,
+  LmeRequest,
+} from "@/workers/finstack-contract";
 import type { models } from "finstack-quant-wasm/types";
 
 import data from "./data.json";
@@ -15,17 +16,19 @@ export function InstalledItem() {
   return (
     <>
       <p>Supplied valid fixture; standalone liability management card.</p>
-      <LiabilityManagementCard
-        defaultExchange={exchange.recommended.request as ExchangeOfferTerms}
-        defaultLme={lme.tender.request as LmeTerms}
-        onExchangeSubmit={() => setCount((n) => n + 1)}
-        onLmeSubmit={() => setCount((n) => n + 1)}
-        exchange={{
+      <ExchangeOfferCard
+        defaultTerms={exchange.recommended.request as ExchangeOfferRequest}
+        onSubmit={() => setCount((n) => n + 1)}
+        state={{
           result: exchange.recommended.result
             .value as models.ExchangeOfferAnalysis,
         }}
-        lme={{ result: lme.tender.result.value as models.LmeAnalysis }}
         hurdle={hurdle}
+      />
+      <LiabilityManagementCard
+        defaultTerms={lme.tender.request as LmeRequest}
+        onSubmit={() => setCount((n) => n + 1)}
+        state={{ result: lme.tender.result.value as models.LmeAnalysis }}
       />
       <output aria-label="Submission count">{count}</output>
     </>

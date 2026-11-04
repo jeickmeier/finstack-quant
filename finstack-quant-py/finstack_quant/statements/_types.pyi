@@ -392,7 +392,10 @@ class ForecastSpec:
         Raises
         ------
         ValueError
-            If ``params`` is not a valid parameter mapping for the method.
+            If ``params`` is not a JSON object / dict, names a parameter the
+            method does not accept, omits a required one, sets one to
+            ``null``/``None``, or carries a value of the wrong type (a string
+            ``rate``, a non-list ``curve``).
 
         """
         ...

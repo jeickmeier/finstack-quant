@@ -14,10 +14,11 @@ import result from "../../src/fixtures/statements/analyst-result.json";
 import suite from "../../src/fixtures/statements/analyst-checks.json";
 import { StatementChecks } from "@/components/finstack/statements/components/statement-diagnostics/statement-checks";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+import { createClient } from "../shared/worker/client";
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -55,7 +56,7 @@ beforeEach(() => {
         throw new Error(`Unexpected worker call: ${method}`);
     }
   });
-  mock.createClient.mockReset().mockReturnValue({ call, close: vi.fn() });
+  createClient.mockReset().mockReturnValue({ call, close: vi.fn() });
 });
 afterEach(() => {
   cleanup();

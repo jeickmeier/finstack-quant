@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -29,35 +21,14 @@ import {
   type OptionCalculationResult,
 } from "@/components/finstack/models/components/option-calculator/option-calculator";
 import { unwrap, type Envelope } from "@/workers/finstack-contract";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "optionCalculator")
-        return unwrap(
-          await harness.proxy.optionCalculator(
-            request as OptionCalculatorRequest,
-          ),
-        );
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
+const harness = useWorkerHarness(["optionCalculator"]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

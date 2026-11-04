@@ -146,6 +146,7 @@
         "@finstack/finstack-chart",
         "@finstack/finstack-table",
         "@finstack/metric-values-table",
+        "@finstack/native-display",
         "button",
         "input"
       ],
@@ -237,6 +238,7 @@
         "@finstack/primitive-contracts",
         "@finstack/decimal-input",
         "@finstack/enum-field",
+        "@finstack/native-display",
         "button"
       ],
       "dependencies": [
@@ -810,7 +812,7 @@
       "type": "registry:component",
       "title": "Waterfall report",
       "description": "One row per simulated structured-credit period showing the waterfall's cash, with tier allocations, payment records, diversions and non-waterfall payments on expand.",
-      "docs": "Present a native StructuredCredit.runSimulation result: one row per SimulationDiagnostics.periods entry in Rust's order with PeriodWaterfall's total available, recovery proceeds, diverted cash, carried interest and principal, whether a coverage test failed, and how many payments went outside the waterfall. Expanding a period shows the principal used for interest, its tier allocations and payment records in execution order, its diversions and its non-waterfall payments with their own dates. A settlement-only deal has one row, whose release is in that row's non-waterfall payments, and a note says so. The non-waterfall column is a count; the caption names the deal currency Rust states on each amount, and each amount shows every digit. Nothing is summed, joined by date, sorted or classified. No worker is required.",
+      "docs": "Present a native StructuredCredit.runSimulation result: one row per SimulationDiagnostics.periods entry in Rust's order with WaterfallDistribution's total available, recovery proceeds, diverted cash, carried interest and principal, whether a coverage test failed, and how many payments went outside the waterfall. Expanding a period shows the principal used for interest, its tier allocations and payment records in execution order, its diversions and its non-waterfall payments with their own dates. A settlement-only deal has one row, whose release is in that row's non-waterfall payments, and a note says so. The non-waterfall column is a count; the caption names the deal currency Rust states on each amount, and each amount shows every digit. Nothing is summed, joined by date, sorted or classified. No worker is required.",
       "files": [
         {
           "path": "components/waterfall-report/waterfall-report.tsx",
@@ -823,6 +825,7 @@
         "@finstack/finstack-theme",
         "@finstack/finstack-format",
         "@finstack/finstack-table",
+        "@finstack/native-display",
         "button",
         "table"
       ],
@@ -859,7 +862,8 @@
         "@finstack/finstack-format",
         "@finstack/finstack-chart",
         "@finstack/finstack-table",
-        "@finstack/enum-field"
+        "@finstack/enum-field",
+        "@finstack/native-display"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",
@@ -896,7 +900,8 @@
         "@finstack/finstack-theme",
         "@finstack/finstack-format",
         "@finstack/finstack-chart",
-        "@finstack/finstack-table"
+        "@finstack/finstack-table",
+        "@finstack/native-display"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",

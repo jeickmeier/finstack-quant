@@ -224,7 +224,7 @@ impl PyAppliedAdjustment {
         self.inner.is_capped
     }
 
-    /// Target value through this adjustment.
+    #[doc = pydoc!("finstack_quant.statements._adjustments", "AppliedAdjustment.adjusted_value")]
     #[getter]
     fn adjusted_value(&self) -> f64 {
         self.inner.adjusted_value

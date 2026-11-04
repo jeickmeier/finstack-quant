@@ -1,17 +1,5 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -27,17 +15,14 @@ import {
 } from "@/components/finstack/portfolio/blocks/portfolio-workbench/portfolio-workbench";
 import { unwrap, type WorkerApi } from "@/workers/finstack-contract";
 import { serializeHost } from "../../src/codec.mjs";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import fixture from "./workbench/cases.json";
 import pricingMarket from "../valuations/instruments/pricing-market.json";
-const mock = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  calls: [] as string[],
-}));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 // Figures are drawn by the shared chart in the browser gates; here each one
 // is a labelled placeholder.
 vi.mock(
@@ -49,23 +34,8 @@ vi.mock(
     ),
   }),
 );
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness("any");
 const proxy = () => harness.proxy as unknown as WorkerApi;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.calls.length = 0;
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      mock.calls.push(method);
-      return unwrap(await (proxy() as any)[method](request));
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -92,19 +62,6 @@ const rowsOf = (table: HTMLElement) =>
   (within(table).getAllByRole("row") as HTMLTableRowElement[]).slice(1);
 // The fixture is regenerated and compared by `mise run ui-fixtures --check`
 // (tests/portfolio/workbench/generate.mjs).
-it("pins the JSON inputs the workbench fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../..",
-  );
-  for (const source of fixture.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/portfolio/workbench/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it(
   "returns through the real worker every native result the generator recorded",
   async () => {
@@ -180,8 +137,8 @@ it(
       ),
     ).toEqual(fixture.report.positionIds);
     // The Scenarios and Margin calls wait for their tabs.
-    expect(mock.calls).not.toContain("scenarioPnlBatch");
-    expect(mock.calls).not.toContain("portfolioMargin");
+    expect(harness.methods()).not.toContain("scenarioPnlBatch");
+    expect(harness.methods()).not.toContain("portfolioMargin");
     expect(screen.queryAllByRole("alert")).toEqual([]);
   },
   budget(20000),
@@ -222,12 +179,12 @@ it(
     expect(
       within(margin).getAllByTitle(fixture.margin.total_margin.amount).length,
     ).toBeGreaterThan(0);
-    expect(mock.calls.filter((call) => call === "scenarioPnlBatch")).toEqual([
-      "scenarioPnlBatch",
-    ]);
-    expect(mock.calls.filter((call) => call === "portfolioMargin")).toEqual([
-      "portfolioMargin",
-    ]);
+    expect(
+      harness.methods().filter((call) => call === "scenarioPnlBatch"),
+    ).toEqual(["scenarioPnlBatch"]);
+    expect(
+      harness.methods().filter((call) => call === "portfolioMargin"),
+    ).toEqual(["portfolioMargin"]);
     expect(screen.queryAllByRole("alert")).toEqual([]);
   },
   budget(30000),
@@ -287,7 +244,7 @@ it(
         (row) => row.cells[0]!.textContent,
       ),
     ).toEqual(["DEP-1"]);
-    expect(mock.calls).toContain("validatePortfolio");
+    expect(harness.methods()).toContain("validatePortfolio");
   },
   budget(30000),
 );

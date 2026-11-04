@@ -33,6 +33,7 @@ fn results(leverage: [f64; 4], coverage: [f64; 4]) -> StatementResult {
             ("leverage".to_string(), series(leverage)),
             ("interest_coverage".to_string(), series(coverage)),
         ]),
+        periods: model().periods,
         ..StatementResult::default()
     }
 }
@@ -76,7 +77,7 @@ const COVERAGE: [f64; 4] = [4.5, 4.9, 5.1, 6.0];
 #[test]
 fn window_keeps_early_non_finite_leverage_out_of_the_evaluation() {
     let results = results([f64::NAN, f64::NAN, 2.2, 3.9], COVERAGE);
-    let series = evaluate_covenants(&results, &engine(date!(2024 - 07 - 01)), &model()).unwrap();
+    let series = evaluate_covenants(&results, &engine(date!(2024 - 07 - 01))).unwrap();
 
     let dates: Vec<Date> = series.iter().map(|row| row.as_of).collect();
     assert_eq!(
@@ -103,7 +104,6 @@ fn window_keeps_early_non_finite_leverage_out_of_the_evaluation() {
     let breaches = forecast_breaches(
         &results,
         &engine(date!(2024 - 07 - 01)),
-        &model(),
         CovenantForecastConfig::default(),
     )
     .unwrap();
@@ -116,7 +116,7 @@ fn window_keeps_early_non_finite_leverage_out_of_the_evaluation() {
 fn a_required_non_finite_metric_fails_the_evaluation() {
     // The window opens in 2024Q2, where leverage is still NaN.
     let results = results([f64::NAN, f64::NAN, 2.2, 3.9], COVERAGE);
-    let err = evaluate_covenants(&results, &engine(date!(2024 - 04 - 01)), &model()).unwrap_err();
+    let err = evaluate_covenants(&results, &engine(date!(2024 - 04 - 01))).unwrap_err();
     assert!(matches!(err, Error::Validation(_)), "{err:?}");
     assert!(err.to_string().contains("'leverage'"), "{err}");
     assert!(err.to_string().contains("2024Q2"), "{err}");
@@ -125,7 +125,6 @@ fn a_required_non_finite_metric_fails_the_evaluation() {
         forecast_breaches(
             &results,
             &engine(date!(2024 - 04 - 01)),
-            &model(),
             CovenantForecastConfig::default()
         )
         .is_err()
@@ -140,7 +139,7 @@ fn a_missing_required_metric_is_not_found() {
         .get_mut("leverage")
         .unwrap()
         .shift_remove(&quarters()[3]);
-    let err = evaluate_covenants(&results, &engine(date!(2024 - 07 - 01)), &model()).unwrap_err();
+    let err = evaluate_covenants(&results, &engine(date!(2024 - 07 - 01))).unwrap_err();
     assert!(
         matches!(&err, Error::Input(InputError::NotFound { id }) if id.contains("leverage") && id.contains("2024Q4")),
         "{err:?}"
@@ -148,15 +147,16 @@ fn a_missing_required_metric_is_not_found() {
 }
 
 #[test]
-fn a_result_period_outside_the_model_calendar_fails() {
+fn only_the_result_periods_are_tested() {
     let mut results = results([1.0, 1.0, 2.2, 3.9], COVERAGE);
     results
         .nodes
         .get_mut("interest_coverage")
         .unwrap()
         .insert(PeriodId::quarter(2025, 1).unwrap(), 6.1);
-    let err = evaluate_covenants(&results, &engine(date!(2024 - 07 - 01)), &model()).unwrap_err();
-    assert!(err.to_string().contains("2025Q1"), "{err}");
+    let series = evaluate_covenants(&results, &engine(date!(2024 - 07 - 01))).unwrap();
+    assert_eq!(series.len(), 4);
+    assert_eq!(series[3].as_of, date!(2024 - 12 - 31));
 }
 
 #[test]
@@ -181,18 +181,14 @@ fn finite_results_match_the_engine_series_over_period_end_rows() {
         .collect();
 
     assert_eq!(
-        evaluate_covenants(&results, &engine, &model()).unwrap(),
+        evaluate_covenants(&results, &engine).unwrap(),
         engine.evaluate_series(&rows).unwrap()
     );
 }
 
 #[test]
 fn empty_results_evaluate_to_an_empty_series() {
-    let series = evaluate_covenants(
-        &StatementResult::default(),
-        &engine(date!(2024 - 07 - 01)),
-        &model(),
-    )
-    .unwrap();
+    let series =
+        evaluate_covenants(&StatementResult::default(), &engine(date!(2024 - 07 - 01))).unwrap();
     assert!(series.is_empty());
 }

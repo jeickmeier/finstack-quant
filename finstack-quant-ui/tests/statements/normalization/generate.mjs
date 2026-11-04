@@ -1,19 +1,11 @@
 // Native statements.normalize results and rejections for normalization-editor,
 // over the analyst statement result. Rerun with `mise run ui-fixtures` after
 // rebuilding the WASM package.
-import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
+import { native, readRepoText } from "../../../scripts/fixture-inputs.mjs";
 
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
-const resultJson = await readFile(
-  new URL(
-    "../../../src/fixtures/statements/analyst-result.json",
-    import.meta.url,
-  ),
-  "utf8",
+const resultJson = await readRepoText(
+  "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
 );
 const rejection = (run) => {
   try {

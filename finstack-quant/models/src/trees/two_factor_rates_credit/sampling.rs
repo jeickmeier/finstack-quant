@@ -237,8 +237,9 @@ impl RatesCreditTree {
     /// Rate nodes of row `step` that sampled paths usually visit.
     ///
     /// A consumer that derives an expensive per-node quantity can tabulate it
-    /// over this range, sized about `4√step` nodes, and compute the rare node
-    /// outside it on demand. An uncalibrated tree returns an empty range.
+    /// over this range, sized about `4√step` nodes, in a [`BandTable`] and
+    /// compute the rare node outside it on demand. An uncalibrated tree
+    /// returns an empty range.
     ///
     /// # Arguments
     ///
@@ -246,7 +247,7 @@ impl RatesCreditTree {
     pub fn usual_rate_nodes(&self, step: usize) -> std::ops::Range<usize> {
         self.calibrated_rates
             .get(step)
-            .map_or(0..0, |&row| NodeTermsTable::band(row, step))
+            .map_or(0..0, |&row| usual_band(row, step))
     }
 
     /// One-step rate terms of a node at short rate `rate` on row `step`.
@@ -298,16 +299,14 @@ impl RatesCreditTree {
     #[inline]
     fn cached_rate_terms(&self, step: usize, node: usize, dt: f64) -> NodeTerms {
         let row = self.calibrated_rates[step];
-        self.rate_terms
-            .get(row, step, node)
+        held_node_terms(&self.rate_terms, row, step, node)
             .unwrap_or_else(|| self.rate_node_terms(step, row.value_unchecked(node), dt))
     }
 
     #[inline]
     fn cached_hazard_terms(&self, step: usize, node: usize, dt: f64) -> NodeTerms {
         let row = self.calibrated_hazards[step];
-        self.hazard_terms
-            .get(row, step, node)
+        held_node_terms(&self.hazard_terms, row, step, node)
             .unwrap_or_else(|| self.hazard_node_terms(step, row.value_unchecked(node), dt))
     }
 

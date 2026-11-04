@@ -533,7 +533,7 @@ fn test_pool_diversity_score_single_obligor() {
     });
 
     // Act
-    let diversity = pool.diversity_score();
+    let diversity = pool.diversity_score().expect("summable pool");
 
     // Assert: Same obligor = score of 1
     assert!((diversity.expect("named obligors") - 1.0).abs() < 0.01);
@@ -567,7 +567,7 @@ fn test_pool_diversity_score_multiple_obligors() {
     });
 
     // Act
-    let diversity = pool.diversity_score();
+    let diversity = pool.diversity_score().expect("summable pool");
 
     // Assert: Two equal obligors = score of 2
     assert!((diversity.expect("named obligors") - 2.0).abs() < 0.01);
@@ -596,11 +596,18 @@ fn test_pool_diversity_score_is_independent_of_asset_order() {
         forward.assets.push(asset(i));
         reverse.assets.push(asset(39 - i));
     }
-    let score = forward.diversity_score().expect("named obligors");
+    let score = forward
+        .diversity_score()
+        .expect("summable pool")
+        .expect("named obligors");
     assert!(score > 1.0 && score < 40.0);
     assert_eq!(
         score.to_bits(),
-        reverse.diversity_score().expect("named obligors").to_bits()
+        reverse
+            .diversity_score()
+            .expect("summable pool")
+            .expect("named obligors")
+            .to_bits()
     );
 }
 
@@ -610,7 +617,7 @@ fn test_pool_diversity_score_empty_pool() {
     let pool = AssetPool::new("EMPTY", DealType::Clo, Currency::USD);
 
     // Act
-    let diversity = pool.diversity_score();
+    let diversity = pool.diversity_score().expect("summable pool");
 
     // Assert
     assert_eq!(diversity, None);

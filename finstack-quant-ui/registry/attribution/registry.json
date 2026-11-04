@@ -23,6 +23,7 @@
         "@finstack/money-value",
         "@finstack/stamp-badge",
         "@finstack/json-viewer",
+        "@finstack/native-display",
         "badge"
       ],
       "dependencies": [

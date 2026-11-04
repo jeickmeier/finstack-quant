@@ -15,6 +15,10 @@ import { EnumField } from "@/components/finstack/shared/primitives/enum-field/en
 import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/field-frame";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { mertonModule } from "./merton";
+import {
+  ReportSection,
+  typedNumber,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** The request the calculator submits; the worker's MertonReportRequest. */
 export type MertonCalculatorRequest = modelsWire.MertonReportRequest;
@@ -63,17 +67,6 @@ const equityFields = [
 ] as const;
 type EquityKey = (typeof equityFields)[number][0];
 const text = (value: number) => String(value);
-/** Typed text as a number; an empty field is NaN, never 0, so Rust rejects it. */
-const typed = (value: string) =>
-  value.trim() === "" ? Number.NaN : Number(value);
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
-}
 /**
  * Calculates a Merton structural-credit report: the model is edited with the
  * generated MertonModel form or calibrated from equity (KMV default point),
@@ -125,9 +118,9 @@ export function MertonCalculator({
       .split(",")
       .map((part) => part.trim())
       .filter((part) => part !== "")
-      .map(typed),
-    maturity: typed(maturity),
-    recovery: typed(recovery),
+      .map(typedNumber),
+    maturity: typedNumber(maturity),
+    recovery: typedNumber(recovery),
   });
   if ("error" in modelValues) return <p role="alert">{modelValues.error}</p>;
   return (
@@ -199,7 +192,7 @@ export function MertonCalculator({
               source: {
                 kind: "equity",
                 ...(Object.fromEntries(
-                  equityFields.map(([key]) => [key, typed(equity[key])]),
+                  equityFields.map(([key]) => [key, typedNumber(equity[key])]),
                 ) as Record<EquityKey, number>),
               },
               ...terms(),
@@ -406,7 +399,7 @@ function MertonReportView({
         Decimals as Rust returned them: spreads per year, probabilities and
         volatilities as fractions; grades from the default PD master scale.
       </p>
-      <Section title="Term structure">
+      <ReportSection title="Term structure">
         <FinstackTable
           data={report.horizons.map((horizon, index) => ({ horizon, index }))}
           columns={horizonColumns}
@@ -421,8 +414,8 @@ function MertonReportView({
             {message}
           </p>
         ))}
-      </Section>
-      <Section title="Model">
+      </ReportSection>
+      <ReportSection title="Model">
         <FinstackTable
           data={parameters}
           columns={parameterColumns}
@@ -432,7 +425,7 @@ function MertonReportView({
           density={density}
           emptyState="No parameters returned"
         />
-      </Section>
+      </ReportSection>
     </div>
   );
 }

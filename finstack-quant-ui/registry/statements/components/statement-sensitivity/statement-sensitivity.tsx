@@ -8,7 +8,7 @@ import type {
   RunSensitivityRequest,
   StatementSensitivity,
 } from "@/workers/finstack-contract";
-import { groupDecimal } from "@/lib/finstack/format/format";
+import { formatExact } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/field-frame";
@@ -48,10 +48,6 @@ interface ScenarioRow {
   parameters: string;
   value: unknown;
 }
-/** Every supplied digit, grouped; a non-finite native value shows as itself. */
-function exactValue(value: number): string {
-  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
-}
 /** Typed moves as numbers; an empty entry is NaN, never 0, so Rust rejects it. */
 function moves(text: string): number[] {
   return (text.trim() === "" ? [""] : text.split(",")).map((item) =>
@@ -68,7 +64,7 @@ function parameterLabel(key: string): string {
 }
 /** A returned cell as text: grouped digits for a number, the sentinel or a dash otherwise. */
 function cellText(value: unknown): string {
-  if (typeof value === "number") return exactValue(value);
+  if (typeof value === "number") return formatExact(value);
   return value === undefined ? "—" : String(value);
 }
 export interface StatementSensitivityProps {
@@ -170,7 +166,8 @@ export function StatementSensitivity({
           label: `Scenario ${index + 1}`,
           parameters: Object.entries(scenario.parameter_values)
             .map(
-              ([key, value]) => `${parameterLabel(key)} = ${exactValue(value)}`,
+              ([key, value]) =>
+                `${parameterLabel(key)} = ${formatExact(value)}`,
             )
             .join("; "),
           value: scenario.results.nodes[shown.targetMetric]?.[shown.period],

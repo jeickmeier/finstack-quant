@@ -823,6 +823,71 @@
         "currency"
       ],
       "type": "object"
+    },
+    "PnlBucket": {
+      "description": "A money bucket of an attribution result, named by the result field holding\nit; the instrument and portfolio results use the same fields.",
+      "oneOf": [
+        {
+          "const": "carry",
+          "description": "Time decay and accrual (`carry`).",
+          "type": "string"
+        },
+        {
+          "const": "rates_curves_pnl",
+          "description": "Discount and forward curve moves (`rates_curves_pnl`).",
+          "type": "string"
+        },
+        {
+          "const": "credit_curves_pnl",
+          "description": "Credit curve moves (`credit_curves_pnl`).",
+          "type": "string"
+        },
+        {
+          "const": "inflation_curves_pnl",
+          "description": "Inflation curve moves (`inflation_curves_pnl`).",
+          "type": "string"
+        },
+        {
+          "const": "correlations_pnl",
+          "description": "Correlation moves (`correlations_pnl`).",
+          "type": "string"
+        },
+        {
+          "const": "fx_pnl",
+          "description": "FX rate moves on the instrument's pricing (`fx_pnl`).",
+          "type": "string"
+        },
+        {
+          "const": "fx_translation_pnl",
+          "description": "Translation of the result into the reporting currency (`fx_translation_pnl`).",
+          "type": "string"
+        },
+        {
+          "const": "vol_pnl",
+          "description": "Volatility surface moves (`vol_pnl`).",
+          "type": "string"
+        },
+        {
+          "const": "cross_factor_pnl",
+          "description": "Interaction between factors (`cross_factor_pnl`).",
+          "type": "string"
+        },
+        {
+          "const": "model_params_pnl",
+          "description": "Model parameter changes (`model_params_pnl`).",
+          "type": "string"
+        },
+        {
+          "const": "market_scalars_pnl",
+          "description": "Market scalar moves (`market_scalars_pnl`).",
+          "type": "string"
+        },
+        {
+          "const": "residual",
+          "description": "Unexplained remainder (`residual`).",
+          "type": "string"
+        }
+      ]
     }
   },
   "$id": "https://finstack_quant.dev/schemas/attribution/1/pnl_bucket_share.schema.json",
@@ -845,8 +910,8 @@
       "description": "The bucket's P&L as attributed, in the `total_pnl` currency."
     },
     "field": {
-      "description": "Wire name of the result field holding this bucket (`carry`,\n`rates_curves_pnl`, ..., `residual`); the instrument and portfolio\nresults use the same names.",
-      "type": "string"
+      "$ref": "#/$defs/PnlBucket",
+      "description": "Result field holding this bucket (`carry`, `rates_curves_pnl`, ...,\n`residual`); the instrument and portfolio results use the same names."
     },
     "pct_of_total": {
       "description": "Signed share of total P&L in percentage points (`25.0` = 25%); `None`\nwhen `total_pnl` is effectively zero and the share is undefined.",

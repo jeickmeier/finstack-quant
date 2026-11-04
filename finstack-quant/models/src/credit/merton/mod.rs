@@ -61,6 +61,7 @@ mod spreads;
 pub use dynamics::{AssetDynamics, MertonBarrierType};
 pub use model::MertonModel;
 pub use report::{
-    MertonImpliedEquity, MertonReport, MertonReportRequest, MertonReportSource, merton_report,
+    MertonImpliedEquity, MertonReport, MertonReportMeasure, MertonReportRequest,
+    MertonReportSource, merton_report,
 };
 pub use simulation::SimulatedPaths;

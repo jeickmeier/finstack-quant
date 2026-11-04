@@ -87,7 +87,7 @@ test('statements matches the cross-host golden', () => {
   const registry = statements.Registry.withBuiltins();
   const first = registry.metricIds()[0];
 
-  const rollupSpec = statements.rollupSpecDefaultFor(INPUTS.rollup_model, 'annual');
+  const rollupSpec = statements.rollupSpecDeclaredMethods(INPUTS.rollup_model, 'annual');
 
   const rolledUp = statements.statementResultRollup(
     evaluate(INPUTS.rollup_model),
@@ -96,7 +96,7 @@ test('statements matches the cross-host golden', () => {
   );
 
   const actual = {
-    'rollup.default_for': rollupSpec,
+    'rollup.declared_methods': rollupSpec,
     'rollup.annual': rolledUp.nodes,
     'rollup.empty_spec': statements.statementResultRollup(
       evaluate(INPUTS.rollup_model),

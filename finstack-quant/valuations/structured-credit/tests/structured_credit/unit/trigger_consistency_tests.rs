@@ -242,7 +242,8 @@ fn diverted_and_equity(deal: &StructuredCredit, waterfall: &Waterfall) -> (f64, 
     let result =
         execute_waterfall(waterfall, &deal.tranches, &deal.pool, context).expect("waterfall");
     let equity = result
-        .distributions
+        .distributions()
+        .expect("distributions")
         .get(&RecipientType::Equity)
         .map_or(0.0, |amount| amount.amount());
     (result.diverted_cash.amount(), equity)

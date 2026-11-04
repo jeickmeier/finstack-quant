@@ -38,7 +38,7 @@ beforeAll(async () => {
   transport.call.mockImplementation(async (_method, arg) =>
     unwrap(await worker.proxy.sampleCube(arg)),
   );
-}, budget(30000));
+});
 afterAll(async () => worker?.close());
 afterEach(() => {
   cleanup();

@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
@@ -26,20 +18,17 @@ import {
 } from "@/components/finstack/portfolio/blocks/portfolio-workbench/portfolio-workbench";
 import { unwrap, type WorkerApi } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import fixture from "./correlation/cases.json";
 import { failures, panel } from "./correlation/panels.mjs";
 import workbench from "../portfolio/workbench/cases.json";
 import pricingMarket from "../valuations/instruments/pricing-market.json";
 
-const mock = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  calls: [] as string[],
-}));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 // Figures are drawn by the shared chart in the browser gates.
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
@@ -50,23 +39,8 @@ vi.mock(
     ),
   }),
 );
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness("any");
 const proxy = () => harness.proxy as unknown as WorkerApi;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.calls.length = 0;
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      mock.calls.push(method);
-      return unwrap(await (proxy() as any)[method](request));
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -183,7 +157,7 @@ it(
   async () => {
     const user = userEvent.setup();
     renderWorkbench();
-    expect(mock.calls).not.toContain("correlationMatrix");
+    expect(harness.methods()).not.toContain("correlationMatrix");
     await user.click(screen.getByRole("tab", { name: "Risk" }));
     const table = await screen.findByRole(
       "table",
@@ -194,7 +168,7 @@ it(
       within(table).getAllByTitle(String(result.matrix[0]![2])).length,
     ).toBeGreaterThan(0);
     expect(
-      mock.calls.filter((name) => name === "correlationMatrix"),
+      harness.methods().filter((name) => name === "correlationMatrix"),
     ).toHaveLength(1);
   },
   budget(30000),
@@ -213,7 +187,7 @@ it(
     expect(
       screen.queryByRole("region", { name: "Return correlation" }),
     ).toBeNull();
-    expect(mock.calls).not.toContain("correlationMatrix");
+    expect(harness.methods()).not.toContain("correlationMatrix");
   },
   budget(30000),
 );

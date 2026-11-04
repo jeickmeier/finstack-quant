@@ -1,15 +1,9 @@
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { native, readRepoSource } from "../../../scripts/fixture-inputs.mjs";
 // The priced bond of the results fixture: a USD-OIS discount curve and an HZ hazard curve.
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
-const bondBytes = await readFile(new URL(bondPath, repository));
-const base = JSON.parse(bondBytes).request;
+const bondInput = await readRepoSource(bondPath);
+const base = bondInput.value.request;
 const templateId = "rate_shock_2022";
 const ratesId = "rate_shock_2022_rates";
 const equityId = "rate_shock_2022_equity";
@@ -62,12 +56,7 @@ await emit(
   JSON.stringify({
     description:
       "Native built-in scenario templates: the template metadata list, the rate_shock_2022 template and its rates and equity components, the rates component remapped from USD-SOFR to USD-OIS composed with the equity component, and each applied to the results-fixture bond market at its valuation date (the native error, or the report with its warnings).",
-    sources: [
-      {
-        path: bondPath,
-        sha256: createHash("sha256").update(bondBytes).digest("hex"),
-      },
-    ],
+    sources: [bondInput.source],
     asOf: base.asOf,
     curveIds: ["USD-OIS", "HZ"],
     templateId,

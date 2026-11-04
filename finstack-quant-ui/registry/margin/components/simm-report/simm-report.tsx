@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { ImResult, MoneyValue as Money } from "finstack-quant-wasm";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { MoneyValue } from "@/components/finstack/core/primitives/money-value/money-value";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import { ReportSection } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 export interface SimmReportProps {
   /** The returned ImResult of SimmCalculator#calculateFromSensitivities; null while none is available. */
@@ -70,14 +71,6 @@ function sensitivityColumns(
   }));
 }
 type MarginRow = { riskClass: string; margin: number };
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
-}
 /**
  * Presents a native SIMM initial-margin result: the headline amount with its
  * stamps, an always-shown indicative badge beside the returned approximation
@@ -145,7 +138,7 @@ function ReportView({
         {detail ? ` · MPOR scale ${formatValue(detail.mpor_scale)}` : ""}.
         Indicative only: not a reconciliation of a counterparty margin call.
       </p>
-      <Section title="Breakdown">
+      <ReportSection title="Breakdown">
         <FinstackTable
           data={breakdown}
           columns={breakdownColumns}
@@ -155,10 +148,10 @@ function ReportView({
           density={density}
           emptyState="No breakdown returned"
         />
-      </Section>
+      </ReportSection>
       {detail ? (
         <>
-          <Section title="Risk class margins">
+          <ReportSection title="Risk class margins">
             <FinstackTable
               data={Object.entries(detail.risk_class_margins).map(
                 ([riskClass, margin]) => ({ riskClass, margin }),
@@ -184,8 +177,8 @@ function ReportView({
               captionVisibility="sr-only"
               density={density}
             />
-          </Section>
-          <Section title="Component detail">
+          </ReportSection>
+          <ReportSection title="Component detail">
             <div className="min-w-48 max-w-sm">
               <EnumField
                 label="Component"
@@ -232,7 +225,7 @@ function ReportView({
             ) : (
               <p role="status">No component detail returned</p>
             )}
-          </Section>
+          </ReportSection>
         </>
       ) : (
         <p role="status" className="text-muted-foreground">

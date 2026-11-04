@@ -37,11 +37,12 @@ import { createAttributionService } from "@/workers/services/attribution";
 import { createModelsService } from "@/workers/services/models";
 import calibrationCases from "../calibration/cases.json";
 import marketScenarios from "../scenarios/application/cases.json";
+import { createClient } from "../shared/worker/client";
 const bondDisplay = formatRawMoney(fixture.result.value);
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 // jsdom has no Canvas/ResizeObserver. The installed Chromium test owns figure rendering.
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
@@ -250,7 +251,7 @@ beforeEach(() => {
     }
   });
   close = vi.fn();
-  mock.createClient.mockReset().mockReturnValue({ call, close });
+  createClient.mockReset().mockReturnValue({ call, close });
 });
 afterEach(() => {
   cleanup();
@@ -359,7 +360,7 @@ it(
       (screen.getByRole("textbox", { name: "Amount" }) as HTMLInputElement)
         .value,
     ).toBe("1000000.123456789");
-    expect(mock.createClient).toHaveBeenCalledTimes(1);
+    expect(createClient).toHaveBeenCalledTimes(1);
     view.unmount();
     expect(close).toHaveBeenCalledTimes(1);
   },
@@ -924,7 +925,13 @@ it(
     details.open = true;
     fireEvent(details, new Event("toggle"));
     const entry = within(details);
-    fireEvent.click(await entry.findByRole("radio", { name: "RMBS" }));
+    fireEvent.click(
+      await entry.findByRole(
+        "radio",
+        { name: "RMBS" },
+        { timeout: budget(10000) },
+      ),
+    );
     expect(entry.getByText(family.profileId)).toBeTruthy();
     const build = entry.getByRole("button", {
       name: "Build deal",

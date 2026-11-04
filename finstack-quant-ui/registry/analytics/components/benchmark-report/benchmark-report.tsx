@@ -2,9 +2,9 @@
 import type { BenchmarkReportData } from "@/components/finstack/analytics/lib/analytics-report-types";
 import {
   datedPoints,
-  ReportSection,
   type DatedPoint,
 } from "@/components/finstack/analytics/lib/analytics-report-presentation";
+import { ReportSection } from "@/components/finstack/shared/primitives/native-display/native-display";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { areaY, defineChart, lineY } from "@tanstack/charts";

@@ -1,5 +1,5 @@
 "use client";
-import type { ExampleProps } from "./props";
+import { sixPlaces, type ExampleProps } from "./props";
 import {
   workoutLadderMetrics,
   YieldWorkoutLadder,
@@ -10,8 +10,6 @@ import { useMetricMetadata } from "@/hooks/valuations/use-price-instrument/use-p
 import data from "../data.json";
 import { WorkerPreview } from "../worker-preview";
 const { premium, quoteDateCall } = data.workoutLadder.cases;
-// Host display choice: six decimal places of the returned values.
-const sixPlaces = (value: number) => value.toFixed(6);
 function Live({ density }: ExampleProps) {
   const ladder = useBondWorkoutLadder(premium.request);
   const metadata = useMetricMetadata(workoutLadderMetrics);

@@ -362,10 +362,16 @@ pub struct CreditAssessmentPoint {
 ///
 /// ```rust
 /// # use finstack_quant_statements::evaluator::StatementResult;
-/// # use finstack_quant_core::dates::PeriodId;
+/// # use finstack_quant_core::dates::{Period, PeriodId};
 /// # use finstack_quant_statements_analytics::analysis::CreditAssessment;
 /// let q4 = PeriodId::quarter(2025, 4)?;
 /// let mut results = StatementResult::new();
+/// results.periods.push(Period {
+///     id: q4,
+///     start: time::macros::date!(2025 - 10 - 01),
+///     end: time::macros::date!(2026 - 01 - 01),
+///     is_actual: false,
+/// });
 /// results.nodes.entry("total_debt".into()).or_default().insert(q4, 300.0);
 /// let assessment = CreditAssessment::compute(&results, q4)?;
 /// assert_eq!(assessment.period, "2025Q4");
@@ -391,9 +397,8 @@ pub struct CreditAssessment {
 impl CreditAssessment {
     /// Compute a structured credit assessment from statement results.
     ///
-    /// The series spans every period (≤ `period`) present on any of the driver
-    /// nodes (`ebitda`, `total_debt`, `interest_expense`, `free_cash_flow`),
-    /// in ascending order. Ratios are unavailable for incompatible node types
+    /// The series spans every period of [`StatementResult::periods`] up to and
+    /// including `period`, in timeline order. Ratios are unavailable for incompatible node types
     /// or currencies, incomplete trailing years, or non-positive denominators.
     /// Gregorian daily windows use a calendar year including leap days.
     /// Fiscal fixed-frequency windows are supported; weekly and fiscal daily
@@ -404,47 +409,37 @@ impl CreditAssessment {
     /// * `results` - Evaluated statement values with monetary/scalar metadata
     ///   preserved so ratios only compare like units and currencies.
     /// * `period` - Inclusive reporting period ending each trailing-year window.
-    ///   It must be a period of `results` (a period at which some node has a
-    ///   value), in the model's own frequency: `2025` is the annual period, not
+    ///   It must be one of [`StatementResult::periods`], in the model's own
+    ///   frequency: `2025` is the annual period, not
     ///   the last quarter of a quarterly model.
     ///
     /// # Errors
     ///
-    /// Returns an invalid-input error when no node of `results` has a value at
-    /// `period`, so an unknown or wrong-frequency period never yields an
+    /// Returns an invalid-input error when `period` is not one of
+    /// [`StatementResult::periods`], so an unknown or wrong-frequency period never yields an
     /// all-null assessment or a series truncated at a foreign period.
     pub fn compute(
         results: &StatementResult,
         period: PeriodId,
     ) -> finstack_quant_statements::Result<Self> {
-        if !results
-            .nodes
-            .values()
-            .any(|periods| periods.contains_key(&period))
-        {
+        if !results.periods.iter().any(|p| p.id == period) {
             return Err(finstack_quant_statements::Error::invalid_input(format!(
                 "Credit assessment period '{period}' is not a period of the statement results"
             )));
         }
-        let mut periods: std::collections::BTreeSet<PeriodId> = std::collections::BTreeSet::new();
-        for node in ["ebitda", "total_debt", "interest_expense", "free_cash_flow"] {
-            if let Some(series) = results.get_node(node) {
-                for (observed, _) in series.iter() {
-                    if *observed <= period {
-                        periods.insert(*observed);
-                    }
-                }
-            }
-        }
+        let periods = results
+            .periods
+            .iter()
+            .map(|p| p.id)
+            .filter(|observed| *observed <= period);
 
         let series: Vec<CreditAssessmentPoint> = periods
-            .iter()
             .map(|period| CreditAssessmentPoint {
                 period: period.to_string(),
-                leverage_ratio: leverage_at(results, period),
-                interest_coverage: interest_coverage_at(results, period),
+                leverage_ratio: leverage_at(results, &period),
+                interest_coverage: interest_coverage_at(results, &period),
                 free_cash_flow: results
-                    .get("free_cash_flow", period)
+                    .get("free_cash_flow", &period)
                     .filter(|value| value.is_finite()),
             })
             .collect();
@@ -532,6 +527,27 @@ impl fmt::Display for CreditAssessmentReport<'_> {
 mod tests {
     use super::*;
     use finstack_quant_core::dates::PeriodKind;
+
+    /// Record every period a node has a value in as a result period; only the
+    /// ids matter to fixed-frequency windows.
+    fn record_periods(results: &mut StatementResult) {
+        let mut ids: Vec<PeriodId> = results
+            .nodes
+            .values()
+            .flat_map(|values| values.keys().copied())
+            .collect();
+        ids.sort();
+        ids.dedup();
+        results.periods = ids
+            .into_iter()
+            .map(|id| finstack_quant_core::dates::Period {
+                id,
+                start: time::macros::date!(2000 - 01 - 01),
+                end: time::macros::date!(2000 - 01 - 02),
+                is_actual: false,
+            })
+            .collect();
+    }
 
     #[test]
     fn test_empty_table() {
@@ -637,6 +653,7 @@ mod tests {
                 300.0,
             );
 
+        record_periods(&mut results);
         let period = PeriodId::quarter(2025, 4).expect("valid period fixture");
         let assessment = CreditAssessment::compute(&results, period).expect("known period");
 
@@ -668,6 +685,7 @@ mod tests {
                 300.0,
             );
 
+        record_periods(&mut results);
         let assessment = CreditAssessment::compute(
             &results,
             PeriodId::quarter(2025, 4).expect("valid period fixture"),
@@ -784,6 +802,7 @@ mod tests {
             .entry("total_debt".into())
             .or_default()
             .insert(at, 4.0);
+        record_periods(&mut results);
         let assessment = CreditAssessment::compute(&results, at).expect("known period");
         assert_eq!(assessment.leverage_ratio, Some(1.0));
         assert_eq!(assessment.interest_coverage, Some(2.0));

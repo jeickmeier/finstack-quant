@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { colorLegend, defineChart, dot, lineY, ruleX } from "@tanstack/charts";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
@@ -15,6 +15,7 @@ import {
   MetricValuesTable,
   type MetricValuesTableProps,
 } from "@/components/finstack/valuations/components/metric-values-table/metric-values-table";
+import { UndefinedValue } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 type Ladder = ReturnType<typeof valuations.instruments.convertibleSpotLadder>;
 type Row = Ladder["rows"][number];
@@ -54,11 +55,6 @@ export interface ConvertibleCardProps extends Omit<
   /** Receives the share prices entered, or null for Rust's default ladder; omit to hide the form. */
   onSpotsChange?: (spots: readonly number[] | null) => void;
 }
-const undefinedValue = (
-  <span className="finstack-na" title="Rust returned no value for this cell">
-    Undefined
-  </span>
-);
 /** Share prices as entered, unchecked: Rust rejects, sorts and dedupes them. */
 const parseSpots = (text: string) => {
   const entries = text.split(/[\s,]+/).filter(Boolean);
@@ -205,25 +201,30 @@ export function ConvertibleCard({
   ladderLoading,
   ladderError,
   onSpotsChange,
-  formatValue = String,
+  formatValue,
   ...table
 }: ConvertibleCardProps) {
   const [spots, setSpots] = useState("");
-  const unit = (metric: string) => {
-    const declared = ladderMetadata?.find(
-      (entry) => entry.key === metric,
-    )?.unit;
-    return declared ? ` (${declared})` : "";
-  };
+  const unit = useCallback(
+    (metric: string) => {
+      const declared = ladderMetadata?.find(
+        (entry) => entry.key === metric,
+      )?.unit;
+      return declared ? ` (${declared})` : "";
+    },
+    [ladderMetadata],
+  );
   const columns = useMemo<ColumnDef<{}, Row, any>[]>(() => {
     const number = (value: number | null | undefined) =>
       value == null ? (
-        undefinedValue
+        <UndefinedValue reason="Rust returned no value for this cell" />
       ) : (
-        <span title={String(value)}>{formatValue(value)}</span>
+        <span title={String(value)}>{(formatValue ?? String)(value)}</span>
       );
     const money = (value: number) => (
-      <span title={String(value)}>{groupDecimal(formatValue(value))}</span>
+      <span title={String(value)}>
+        {formatValue ? formatValue(value) : groupDecimal(String(value))}
+      </span>
     );
     const numeric = { className: "text-right finstack-numeric" };
     return [
@@ -268,7 +269,11 @@ export function ConvertibleCard({
         accessorFn: (row) => row.regime,
         cell: ({ getValue }) => {
           const regime = getValue() as string | null;
-          return regime ? labelFor(regime) : undefinedValue;
+          return regime ? (
+            labelFor(regime)
+          ) : (
+            <UndefinedValue reason="Rust returned no value for this cell" />
+          );
         },
         meta: { className: "" },
       },
@@ -287,9 +292,7 @@ export function ConvertibleCard({
         meta: numeric,
       },
     ];
-    // `unit` reads only ladderMetadata.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formatValue, ladderMetadata]);
+  }, [formatValue, unit]);
   const charts = useMemo(
     () =>
       ladder && ladder.rows.length > 1

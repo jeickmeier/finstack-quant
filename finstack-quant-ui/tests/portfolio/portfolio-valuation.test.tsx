@@ -1,15 +1,7 @@
 // @vitest-environment jsdom
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -40,7 +32,7 @@ import {
 } from "@/components/finstack/portfolio/components/portfolio-metrics/portfolio-metrics";
 import { unwrap, type WorkerApi } from "@/workers/finstack-contract";
 import { serializeHost } from "../../src/codec.mjs";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import gallery from "./gallery.json";
 import hostParity from "./host-parity.json";
@@ -56,10 +48,10 @@ const { inputs } = read(
   "../../../finstack-quant/portfolio/tests/fixtures/host_parity.json",
 );
 const parityMarket = JSON.stringify(inputs.market_t0);
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 // Figures are drawn by the shared chart in the browser gates; here each one
 // is a labelled placeholder.
 vi.mock(
@@ -75,23 +67,10 @@ type Resources = Record<
   "portfolioConstructed" | "portfolioFreed" | "constructed" | "freed",
   number
 >;
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness("any");
 const proxy = () =>
   harness.proxy as unknown as WorkerApi & { resources(): Promise<Resources> };
 const resources = (): Promise<Resources> => proxy().resources();
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) =>
-      unwrap(await (proxy() as any)[method](request)),
-    ),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

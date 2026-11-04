@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 export interface DatedPoint {
   series: string;
   iso: string;
@@ -19,19 +17,4 @@ export function datedPoints(
       ? [{ series, iso, date: utc(iso), value }]
       : [];
   });
-}
-/** Named report region with its shared heading and spacing. */
-export function ReportSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
 }

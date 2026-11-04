@@ -2,11 +2,14 @@
 import { useState, type ReactNode } from "react";
 import type { models as modelsWire } from "finstack-quant-wasm/types";
 import { Button } from "@/components/ui/button";
-import { formatRaw } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { scoringModels, type ScoringContract } from "./scoring";
+import {
+  shownValue,
+  typedNumber,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** A native result or the native error of that one call. */
 type Outcome<T> =
@@ -48,9 +51,6 @@ export interface CreditScorecardProps {
   formatValue?: (value: number) => string;
   density?: "compact" | "comfortable";
 }
-/** Typed text as a number; an empty field is NaN, never 0, so Rust rejects it. */
-const typed = (value: string) =>
-  value.trim() === "" ? Number.NaN : Number(value);
 /** The first paragraph of a Rust field description. */
 const summary = (text: string | undefined) => text?.split("\n\n")[0];
 const contractOf = (model: CreditScorecardModel): ScoringContract =>
@@ -108,7 +108,7 @@ export function CreditScorecard({
             input: Object.fromEntries(
               contract.required.map((field) => [
                 field,
-                typed(entries[model][field] ?? ""),
+                typedNumber(entries[model][field] ?? ""),
               ]),
             ),
           } as CreditScorecardRequest);
@@ -151,15 +151,6 @@ export function CreditScorecard({
       />
     </section>
   );
-}
-/** Finite numbers through the host format; anything else as returned. */
-function shown(
-  value: number | null | undefined,
-  format: (v: number) => string,
-) {
-  return typeof value === "number" && Number.isFinite(value)
-    ? format(value)
-    : formatRaw(value);
 }
 function Tile({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -210,13 +201,13 @@ function ScoreView({
       <h3 className="text-sm font-medium">{result.model}</h3>
       <div className="grid grid-cols-1 gap-2 @lg:grid-cols-3">
         <Tile label={labelFor("score")}>
-          {value(shown(result.score, format))}
+          {value(shownValue(result.score, format))}
         </Tile>
         <Tile label={labelFor("zone")}>
           <p className="text-base">{result.zone}</p>
         </Tile>
         <Tile label={labelFor("implied_pd")}>
-          {value(shown(result.implied_pd, format))}
+          {value(shownValue(result.implied_pd, format))}
         </Tile>
         <Tile label={labelFor("grade")}>
           {grade.ok ? (
@@ -228,7 +219,7 @@ function ScoreView({
           )}
         </Tile>
         <Tile label={labelFor("central_pd")}>
-          {value(grade.ok ? shown(grade.value.central_pd, format) : "—")}
+          {value(grade.ok ? shownValue(grade.value.central_pd, format) : "—")}
         </Tile>
       </div>
       <p className="text-xs text-muted-foreground">

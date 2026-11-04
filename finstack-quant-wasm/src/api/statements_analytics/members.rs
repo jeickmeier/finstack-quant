@@ -272,7 +272,7 @@ pub fn peer_filter_accepts(filter: JsValue, company: JsValue) -> Result<bool, Js
 /// @param universe - Array of candidate `CompanyMetrics` (array or JSON).
 /// @param filter - `PeerFilter` applied to the universe (object or JSON).
 /// @param period_basis - `"ltm"`, `"ntm"`, or `{custom: "<label>"}` for another basis such as `"FY2025E"`.
-/// @returns `PeerSet` plain object: `subject`, the accepted `peers` and `period_basis`.
+/// @returns `[peerSet, excludedCount]`: the `PeerSet` plain object (`subject`, the accepted `peers` and `period_basis`) and the number of universe members the filter dropped, a member with the subject's id not counted.
 ///
 /// # Errors
 ///

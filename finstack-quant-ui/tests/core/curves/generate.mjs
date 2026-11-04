@@ -1,9 +1,6 @@
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
+import { native } from "../../../scripts/fixture-inputs.mjs";
 import { pricingCases } from "../../browser/cases.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
 const market = JSON.parse((await pricingCases()).bond.marketJson);
 const base = {
   base: "2025-01-01",

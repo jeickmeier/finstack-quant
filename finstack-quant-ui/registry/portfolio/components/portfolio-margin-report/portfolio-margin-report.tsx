@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import type { ColumnDef, RowData } from "@tanstack/react-table";
 import type {
   MoneyValue as Money,
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { MoneyValue } from "@/components/finstack/core/primitives/money-value/money-value";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { SimmSensitivityTable } from "@/components/finstack/margin/components/simm-sensitivity-table/simm-sensitivity-table";
+import { ReportSection } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 export interface PortfolioMarginReportProps {
   /** portfolio.portfolioMargin as returned; null while none is available. */
@@ -142,15 +143,6 @@ const breakdownColumns: ColumnDef<
   ),
 ];
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
 /**
  * Display of a native portfolio margin run: the returned totals and counts,
  * every netting set in returned order with its approximation flag, IM
@@ -263,7 +255,7 @@ function ReportView({
           </dd>
         </div>
       </dl>
-      <Section title="Netting sets">
+      <ReportSection title="Netting sets">
         <FinstackTable
           data={sets}
           columns={setColumns}
@@ -274,8 +266,8 @@ function ReportView({
           emptyState="No netting sets returned"
           onRowActivate={(row) => setSelected(row.key)}
         />
-      </Section>
-      <Section title="IM collateral by CSA">
+      </ReportSection>
+      <ReportSection title="IM collateral by CSA">
         <FinstackTable
           data={csaIds.map((id) => ({ id, csa: result.by_csa[id]! }))}
           columns={csaColumns}
@@ -285,8 +277,8 @@ function ReportView({
           density={density}
           emptyState="No CSA collateral returned"
         />
-      </Section>
-      <Section title="Degraded positions">
+      </ReportSection>
+      <ReportSection title="Degraded positions">
         {result.degraded_positions.length ? (
           <ul className="space-y-1">
             {result.degraded_positions.map((position) => (
@@ -302,7 +294,7 @@ function ReportView({
         ) : (
           <p className="text-muted-foreground">No position was degraded.</p>
         )}
-      </Section>
+      </ReportSection>
       {set && (
         <section
           aria-label={`Netting set ${nettingSetLabel(set.netting_set_id)}`}
@@ -311,7 +303,7 @@ function ReportView({
           <h3 className="text-sm font-medium">
             Netting set {nettingSetLabel(set.netting_set_id)}
           </h3>
-          <Section title="IM breakdown">
+          <ReportSection title="IM breakdown">
             <FinstackTable
               data={Object.entries(set.im_breakdown).map(
                 ([component, amount]) => ({ component, amount }),
@@ -323,7 +315,7 @@ function ReportView({
               density={density}
               emptyState="No IM breakdown returned"
             />
-          </Section>
+          </ReportSection>
           {/* simm-sensitivity-table is itself the "SIMM sensitivities" region. */}
           <div className="min-w-0 space-y-2">
             <h3 className="text-sm font-medium">SIMM sensitivities</h3>

@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { BenchmarkReportRequest } from "@/workers/finstack-contract";
@@ -17,14 +16,13 @@ export function benchmarkReportOptions(
   session: number,
   request: BenchmarkReportRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "benchmarkReport", key] as const,
-    ready: snapshot !== null,
-    missing: "No benchmark panel supplied",
-    queryFn: (ready) => ready.call("benchmarkReport", snapshot!),
-  });
+    session,
+    "benchmarkReport",
+    request,
+    "No benchmark panel supplied",
+  );
 }
 /** Native analytics.Performance benchmark-relative results of a host-supplied panel, or the actual native error; supply a Finstack/Query provider. */
 export function useBenchmarkReport(request: BenchmarkReportRequest | null) {

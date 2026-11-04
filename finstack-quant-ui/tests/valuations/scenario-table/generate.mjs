@@ -1,22 +1,11 @@
-import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { checking, emit } from "../../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { checking, emit, sha256 } from "../../../scripts/fixture-output.mjs";
+import { native, readRepoText } from "../../../scripts/fixture-inputs.mjs";
 const instrumentSource =
     "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
   marketSource =
     "finstack-quant-ui/tests/valuations/instruments/pricing-market.json";
-const instrumentJson = await readFile(
-    new URL(`../../../../${instrumentSource}`, import.meta.url),
-    "utf8",
-  ),
-  marketJson = await readFile(
-    new URL(`../../../../${marketSource}`, import.meta.url),
-    "utf8",
-  );
+const instrumentJson = await readRepoText(instrumentSource),
+  marketJson = await readRepoText(marketSource);
 const instrument = JSON.parse(instrumentJson),
   factor = structuredClone(instrument);
 factor.instrument.spec.tranches.tranches[0].current_balance.amount = "50000000";
@@ -54,9 +43,9 @@ await emit(
   new URL("./cases.json", import.meta.url),
   JSON.stringify({
     instrumentSource,
-    instrumentSha256: createHash("sha256").update(instrumentJson).digest("hex"),
+    instrumentSha256: sha256(instrumentJson),
     marketSource,
-    marketSha256: createHash("sha256").update(marketJson).digest("hex"),
+    marketSha256: sha256(marketJson),
     asOf,
     trancheId,
     grid,
@@ -75,10 +64,7 @@ if (!checking)
 // whose market is its calibration envelope's final_market.
 const goldenSource =
   "finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/structured_credit/clo_mezzanine_base_case.json";
-const goldenText = await readFile(
-  new URL(`../../../../${goldenSource}`, import.meta.url),
-  "utf8",
-);
+const goldenText = await readRepoText(goldenSource);
 const golden = JSON.parse(goldenText);
 const calibrated = native.calibrate(JSON.stringify(golden.market.envelope))
   .result.final_market;
@@ -97,7 +83,7 @@ const trancheCases = [
   {
     name: "fixed",
     source: instrumentSource,
-    sha256: createHash("sha256").update(instrumentJson).digest("hex"),
+    sha256: sha256(instrumentJson),
     instrument,
     market: JSON.parse(marketJson),
     asOf,
@@ -107,7 +93,7 @@ const trancheCases = [
   {
     name: "floating",
     source: goldenSource,
-    sha256: createHash("sha256").update(goldenText).digest("hex"),
+    sha256: sha256(goldenText),
     instrument: golden.instrument,
     market: calibrated,
     asOf: golden.metadata.valuation_date,
@@ -229,7 +215,7 @@ await emit(
   new URL("./standard-deals.json", import.meta.url),
   JSON.stringify({
     marketSource,
-    marketSha256: createHash("sha256").update(marketJson).digest("hex"),
+    marketSha256: sha256(marketJson),
     asOf: standardFamilies[0].example.closing_date,
     grid: dealGrid,
     cases: dealCases,
@@ -310,7 +296,7 @@ await emit(
   JSON.stringify({
     instrumentSource,
     marketSource,
-    marketSha256: createHash("sha256").update(marketJson).digest("hex"),
+    marketSha256: sha256(marketJson),
     asOf,
     cases: waterfallCases,
   }),
@@ -401,7 +387,7 @@ await emit(
   JSON.stringify({
     instrumentSource,
     marketSource,
-    marketSha256: createHash("sha256").update(marketJson).digest("hex"),
+    marketSha256: sha256(marketJson),
     asOf,
     units: native.simulationFieldUnits("USD"),
     cases: chartCases,
@@ -488,7 +474,7 @@ await emit(
   JSON.stringify({
     instrumentSource,
     marketSource,
-    marketSha256: createHash("sha256").update(marketJson).digest("hex"),
+    marketSha256: sha256(marketJson),
     asOf,
     units: native.equityMetricsFieldUnits("USD"),
     cases: equityCases,

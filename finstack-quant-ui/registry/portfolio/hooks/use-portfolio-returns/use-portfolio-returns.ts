@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type {
@@ -22,14 +21,13 @@ export function twrrLinkedOptions(
   session: number,
   request: TwrrLinkedRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "twrrLinked", key] as const,
-    ready: snapshot !== null,
-    missing: "No sub-period returns supplied",
-    queryFn: (ready) => ready.call("twrrLinked", snapshot!),
-  });
+    session,
+    "twrrLinked",
+    request,
+    "No sub-period returns supplied",
+  );
 }
 /** Key the return on the snapshotted period; omitted flows stay omitted. */
 export function twrrModifiedDietzOptions(
@@ -37,14 +35,13 @@ export function twrrModifiedDietzOptions(
   session: number,
   period: TwrrPeriod | null,
 ) {
-  const { snapshot, key } = requestSnapshot(period);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "twrrModifiedDietz", key] as const,
-    ready: snapshot !== null,
-    missing: "No period supplied",
-    queryFn: (ready) => ready.call("twrrModifiedDietz", snapshot!),
-  });
+    session,
+    "twrrModifiedDietz",
+    period,
+    "No period supplied",
+  );
 }
 /** Key the return on the snapshotted flows, in the order supplied; Rust sorts and nets them. */
 export function mwrXirrOptions(
@@ -52,14 +49,13 @@ export function mwrXirrOptions(
   session: number,
   cashflows: readonly DatedCashflow[] | null,
 ) {
-  const { snapshot, key } = requestSnapshot(cashflows);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "mwrXirr", key] as const,
-    ready: snapshot !== null,
-    missing: "No cash flows supplied",
-    queryFn: (ready) => ready.call("mwrXirr", snapshot!),
-  });
+    session,
+    "mwrXirr",
+    cashflows,
+    "No cash flows supplied",
+  );
 }
 /** Native portfolio.twrrLinked of host-supplied returns over a horizon, or its native error; null disables the call. Supply a Finstack/Query provider. */
 export function useTwrrLinked(request: TwrrLinkedRequest | null) {

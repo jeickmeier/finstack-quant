@@ -3,17 +3,13 @@
 // after tests/statements/generate.mjs, whose analyst-result.json it reads.
 // Rerun with `mise run ui-fixtures` after rebuilding the WASM package.
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { serializeHost } from "../../src/codec.mjs";
 import { emit } from "../../scripts/fixture-output.mjs";
+import { native } from "../../scripts/fixture-inputs.mjs";
 
-const native = createRequire(import.meta.url)(
-  "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
 const fixtures = new URL("../../src/fixtures/", import.meta.url);
 const read = (name) => readFile(new URL(name, fixtures), "utf8");
 
-const modelJson = await read("statements/analyst-model.json");
 const resultJson = await read("statements/analyst-result.json");
 const engineJson = await read("covenants/analyst-covenants.json");
 
@@ -28,7 +24,7 @@ const engineJson = await read("covenants/analyst-covenants.json");
 const engine = native.CovenantEngine.fromJson(engineJson);
 let series;
 try {
-  series = native.evaluateCovenants(resultJson, engine, modelJson);
+  series = native.evaluateCovenants(resultJson, engine);
 } finally {
   engine.free();
 }
@@ -51,13 +47,8 @@ const forecast = (config) => {
   const tight = native.CovenantEngine.fromJson(tightJson);
   try {
     return config === undefined
-      ? native.statementsAnalyticsForecastBreaches(resultJson, tight, modelJson)
-      : native.statementsAnalyticsForecastBreaches(
-          resultJson,
-          tight,
-          modelJson,
-          config,
-        );
+      ? native.statementsAnalyticsForecastBreaches(resultJson, tight)
+      : native.statementsAnalyticsForecastBreaches(resultJson, tight, config);
   } finally {
     tight.free();
   }

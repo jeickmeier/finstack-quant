@@ -1374,8 +1374,7 @@ templates                   = { python = "finstack_quant.statements_analytics", 
 #   CorporateAnalysisBuilder.ltv_value_node (the last is bound on
 #   run_corporate_analysis), and the StatementsAdapter type itself. The two
 #   statement covenant entry points built on StatementsAdapter are bound in
-#   both hosts (plan RT-23 reversed the earlier Rust-only decision, so a host
-#   no longer zips statement rows itself): evaluate_covenants /
+#   both hosts: evaluate_covenants /
 #   evaluateCovenants (compliance at every result period end; covenant windows
 #   decide which metrics a date requires) and forecast_breaches /
 #   forecastBreaches. Python returns the evaluation as the long DataFrame of
@@ -2261,6 +2260,10 @@ valuationResultToJson = "twin of Python ValuationResult.to_json (WASM results ar
 
 [parity.js."valuations.instruments".wasm_only]
 trancheCashflowsTable = "twin of Python TrancheCashflows.to_dataframe (WASM cashflows are a plain object, so Rust TrancheCashflows::to_table is a function taking it)"
+bondWorkoutLadderTable = "twin of Python BondWorkoutLadder.to_dataframe (WASM ladders are plain objects, so Rust BondWorkoutLadder::to_table is a function taking it)"
+convertibleSpotLadderTable = "twin of Python ConvertibleSpotLadder.to_dataframe (WASM ladders are plain objects, so Rust ConvertibleSpotLadder::to_table is a function taking it)"
+bondQuoteSetTable = "twin of Python BondQuoteSet.to_dataframe (WASM quote sets are plain objects, so Rust BondQuoteSet::to_table is a function taking it)"
+poolReportTable = "twin of Python PoolReport.to_dataframe (WASM reports are plain objects, so Rust PoolReport::to_table is a function taking it)"
 FxBarrierOption = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"
 FxDigitalOption = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"
 FxSpot = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"
@@ -2359,6 +2362,8 @@ renames = { synthesized_deal = { js = "synthesizedDealJson", reason = "the Rust 
 [parity.js."statements_analytics".wasm_only]
 explainFormulaText = "Text rendering of explain_formula in one call; Python calls Explanation.to_text on the returned explanation"
 plSummaryReportText = "Text rendering of a PLSummaryReport in one call; Python calls PLSummaryReport.to_text on the returned report"
+capitalStructureSummaryTable = "twin of Python CapitalStructureSummary.to_dataframe (WASM summaries are plain objects, so Rust CapitalStructureSummary::to_table is a function taking it)"
+relativeValueReportTable = "twin of Python RelativeValueReport.to_dataframe (WASM reports are plain objects, so Rust RelativeValueReport::to_table is a function taking it)"
 
 [parity.members."finstack_quant.analytics.Performance"]
 renames = { from_arrays = { js = "constructor", reason = "Python distinguishes its pandas constructor from the Rust-shaped array adapter; WASM's constructor already accepts arrays (Rust Performance::new)" }, from_returns_arrays = { js = "fromReturns", reason = "Python distinguishes pandas and array input adapters; WASM fromReturns already accepts arrays (Rust Performance::from_returns)" } }
@@ -2675,7 +2680,7 @@ renames = { add_adjustment = { js = "statements.normalizationConfigAddAdjustment
 renames = { validate = { js = "statements.validatePikToggleSpecJson", reason = "WASM specs are plain objects; the Rust PikToggleSpec::validate method runs inside the JSON validation function" } }
 
 [parity.members."finstack_quant.statements.RollupSpec"]
-renames = { default_for = { js = "statements.rollupSpecDefaultFor", reason = "WASM rollup specs are plain objects; the Rust RollupSpec::default_for associated function is a free function" } }
+renames = { declared_methods = { js = "statements.rollupSpecDeclaredMethods", reason = "WASM rollup specs are plain objects; the Rust RollupSpec::declared_methods associated function is a free function" } }
 
 [parity.members."finstack_quant.statements.StatementResult"]
 renames = { rollup = { js = "statements.statementResultRollup", reason = "WASM statement results are plain objects; the Rust StatementResult::rollup method is a free function taking the object" }, get = { js = "statements.statementResultGet", reason = "WASM statement results are plain objects; the Rust StatementResult::get method is a free function taking the object" }, get_money = { js = "statements.statementResultGetMoney", reason = "WASM statement results are plain objects; the Rust StatementResult::get_money method is a free function taking the object" }, get_scalar = { js = "statements.statementResultGetScalar", reason = "WASM statement results are plain objects; the Rust StatementResult::get_scalar method is a free function taking the object" }, get_or = { js = "statements.statementResultGetOr", reason = "WASM statement results are plain objects; the Rust StatementResult::get_or method is a free function taking the object" }, all_periods = { js = "statements.statementResultAllPeriods", reason = "WASM statement results are plain objects; the Rust StatementResult::all_periods method is a free function taking the object" }, get_node = { js = "statements.statementResultGetNode", reason = "WASM statement results are plain objects; the Rust StatementResult::get_node method is a free function taking the object" }, node_ids = { js = "statements.statementResultNodeIds", reason = "WASM statement results are plain objects; the Rust StatementResult node-id accessor is a free function taking the object" }, to_dated_schedule = { js = "statements.nodeToDatedSchedule", reason = "WASM statement results are plain objects; the Rust evaluator::node_to_dated_schedule function is a free function taking the object" }, to_arrow_long = { js = "statements.statementResultToTableLong", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_long returns the TableEnvelope that Python wraps as an Arrow table" }, to_arrow_wide = { js = "statements.statementResultToTableWide", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_wide returns the TableEnvelope that Python wraps as an Arrow table" } }
@@ -2705,7 +2710,7 @@ renames = { with_percentages = { js = "statements_analytics.parameterSpecWithPer
 renames = { accepts = { js = "statements_analytics.peerFilterAccepts", reason = "WASM peer filters are plain objects; the Rust PeerFilter::accepts method is a free function taking the object" } }
 
 [parity.members."finstack_quant.statements_analytics.PeerSet"]
-renames = { from_universe = { js = "statements_analytics.peerSetFromUniverse", reason = "WASM peer sets are plain objects; the Rust PeerSet::from_universe constructor is a free function returning the object" } }
+renames = { from_universe = { js = "statements_analytics.peerSetFromUniverse", reason = "WASM peer sets are plain objects; the Rust PeerSet::from_universe constructor is a free function returning [peerSet, excludedCount]" } }
 
 [parity.members."finstack_quant.statements_analytics.RenewalSpec"]
 renames = { validate = { js = "statements_analytics.validateRenewalSpecJson", reason = "WASM renewal specs are plain objects; the Rust RenewalSpec::validate method runs inside the JSON validation function" } }

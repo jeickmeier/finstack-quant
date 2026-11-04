@@ -33,20 +33,16 @@ pub(super) fn forward_fill(
 /// The recurrence relation is `v[t] = v[t-1] * (1 + rate)`, where `rate`
 /// represents the fractional growth between consecutive periods.
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// * `rate` - Growth rate per period (e.g., 0.05 for 5% growth)
+/// * `base_value` - Value compounded from
+/// * `forecast_periods` - Periods that require projected values
+/// * `rate` - Growth rate per period as a decimal (e.g., 0.05 for 5% growth)
 pub(super) fn growth_pct(
     base_value: f64,
     forecast_periods: &[PeriodId],
-    params: &IndexMap<String, serde_json::Value>,
+    rate: f64,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    let rate = params.get("rate").and_then(|v| v.as_f64()).ok_or_else(|| {
-        Error::forecast(
-            "Missing or invalid 'rate' parameter for GrowthPct forecast. \
-             Expected a number (e.g., 0.05 for 5% growth).",
-        )
-    })?;
     if !base_value.is_finite() || !rate.is_finite() {
         return Err(Error::forecast(
             "GrowthPct forecast requires finite base_value and rate",
@@ -99,27 +95,16 @@ pub(super) fn growth_pct(
 /// The recurrence relation is `v[t] = v[t-1] * (1 + curve[t])`, where `curve`
 /// contains the growth factor for the *t*-th forecast period.
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// * `curve` - Array of growth rates, one per forecast period
+/// * `base_value` - Value compounded from
+/// * `forecast_periods` - Periods that require projected values
+/// * `curve` - Growth rates as decimals, one per forecast period in order
 pub(super) fn curve_pct(
     base_value: f64,
     forecast_periods: &[PeriodId],
-    params: &IndexMap<String, serde_json::Value>,
+    curve: &[f64],
 ) -> Result<IndexMap<PeriodId, f64>> {
-    let curve_json = params.get("curve").ok_or_else(|| {
-        Error::forecast(
-            "Missing 'curve' parameter for CurvePct forecast. \
-             Expected an array of growth rates (e.g., [0.05, 0.06, 0.05]).",
-        )
-    })?;
-
-    let curve: Vec<f64> = serde_json::from_value(curve_json.clone()).map_err(|e| {
-        Error::forecast(format!(
-            "Invalid 'curve' parameter: expected array of numbers. Error: {}",
-            e
-        ))
-    })?;
     if !base_value.is_finite() {
         return Err(Error::forecast(
             "CurvePct forecast requires a finite base_value",
@@ -205,10 +190,9 @@ mod tests {
             PeriodId::quarter(2025, 3).expect("valid period fixture"),
         ];
 
-        let mut params = IndexMap::new();
-        params.insert("rate".to_string(), serde_json::json!(0.05));
+        let rate = 0.05;
 
-        let results = growth_pct(100.0, &periods, &params).expect("growth_pct should succeed");
+        let results = growth_pct(100.0, &periods, rate).expect("growth_pct should succeed");
 
         assert_eq!(results.len(), 3);
         assert!(
@@ -229,10 +213,9 @@ mod tests {
     fn test_growth_pct_negative() {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
-        let mut params = IndexMap::new();
-        params.insert("rate".to_string(), serde_json::json!(-0.1)); // -10% decline
+        let rate = -0.1;
 
-        let results = growth_pct(100.0, &periods, &params).expect("growth_pct should succeed");
+        let results = growth_pct(100.0, &periods, rate).expect("growth_pct should succeed");
 
         assert!(
             (results[&PeriodId::quarter(2025, 1).expect("valid period fixture")] - 90.0).abs()
@@ -241,11 +224,10 @@ mod tests {
     }
 
     #[test]
-    fn test_growth_pct_missing_rate_error() {
+    fn test_growth_pct_non_finite_rate_error() {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
-        let params = IndexMap::new();
 
-        let result = growth_pct(100.0, &periods, &params);
+        let result = growth_pct(100.0, &periods, f64::NAN);
         assert!(result.is_err());
     }
 
@@ -257,10 +239,9 @@ mod tests {
             PeriodId::quarter(2025, 3).expect("valid period fixture"),
         ];
 
-        let mut params = IndexMap::new();
-        params.insert("curve".to_string(), serde_json::json!([0.05, 0.06, 0.05]));
+        let curve = [0.05, 0.06, 0.05];
 
-        let results = curve_pct(100.0, &periods, &params).expect("curve_pct should succeed");
+        let results = curve_pct(100.0, &periods, &curve).expect("curve_pct should succeed");
 
         assert_eq!(results.len(), 3);
         assert!(
@@ -285,19 +266,17 @@ mod tests {
             PeriodId::quarter(2025, 3).expect("valid period fixture"),
         ];
 
-        let mut params = IndexMap::new();
-        params.insert("curve".to_string(), serde_json::json!([0.05, 0.06])); // Too short
+        let curve = [0.05, 0.06];
 
-        let result = curve_pct(100.0, &periods, &params);
+        let result = curve_pct(100.0, &periods, &curve);
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_curve_pct_missing_curve_error() {
+    fn test_curve_pct_non_finite_rate_error() {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
-        let params = IndexMap::new();
 
-        let result = curve_pct(100.0, &periods, &params);
+        let result = curve_pct(100.0, &periods, &[f64::INFINITY]);
         assert!(result.is_err());
     }
 
@@ -305,10 +284,9 @@ mod tests {
     fn test_curve_pct_rejects_non_finite_output() {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
-        let mut params = IndexMap::new();
-        params.insert("curve".to_string(), serde_json::json!([1.0]));
+        let curve = [1.0];
 
-        let result = curve_pct(f64::MAX, &periods, &params);
+        let result = curve_pct(f64::MAX, &periods, &curve);
         assert!(result.is_err(), "non-finite forecasts must be rejected");
     }
 
@@ -324,10 +302,9 @@ mod tests {
             })
             .collect();
 
-        let mut params = IndexMap::new();
-        params.insert("rate".to_string(), serde_json::json!(100.0)); // 10000% per period
+        let rate = 100.0;
 
-        let err = growth_pct(1e10, &periods, &params).expect_err("overflow should error");
+        let err = growth_pct(1e10, &periods, rate).expect_err("overflow should error");
         assert!(err.to_string().contains("Overflow"));
     }
 
@@ -336,10 +313,9 @@ mod tests {
     fn test_growth_pct_high_rate_no_error() {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
-        let mut params = IndexMap::new();
-        params.insert("rate".to_string(), serde_json::json!(1.5)); // 150% per period
+        let rate = 1.5;
 
-        let result = growth_pct(100.0, &periods, &params).expect("150% growth should succeed");
+        let result = growth_pct(100.0, &periods, rate).expect("150% growth should succeed");
         assert!(
             (result[&PeriodId::quarter(2025, 1).expect("valid period fixture")] - 250.0).abs()
                 < 0.01

@@ -7,12 +7,13 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
 use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
 use finstack_quant_statements::evaluator::StatementResult;
-use finstack_quant_statements::types::{
-    FinancialModelSpec, FinancialStatementInstrument, NodeValueType,
-};
+use finstack_quant_statements::types::{FinancialModelSpec, FinancialStatementInstrument};
 use finstack_quant_statements::{Error, Result};
+
+use crate::analysis::units::{finite_ratio, require_currency};
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use serde::{Deserialize, Serialize};
 
@@ -45,6 +46,20 @@ pub enum DebtInstrumentKind {
     TermLoan,
     /// Revolving credit facility, counted at its drawn balance.
     RevolvingCredit,
+}
+
+impl DebtInstrumentKind {
+    /// Wire name of the kind (`bond`, `convertible_bond`, `term_loan` or
+    /// `revolving_credit`), the serde spelling.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Bond => "bond",
+            Self::ConvertibleBond => "convertible_bond",
+            Self::TermLoan => "term_loan",
+            Self::RevolvingCredit => "revolving_credit",
+        }
+    }
 }
 
 /// One debt instrument's row in a [`CapitalStructureSummary`].
@@ -150,6 +165,73 @@ pub struct CapitalStructureSummary {
     /// balance at the reporting period and ignores any scheduled amortization
     /// after it.
     pub maturity_wall: Vec<MaturityWallBucket>,
+}
+
+impl CapitalStructureSummary {
+    /// Export one row per tranche, in [`tranches`](Self::tranches) order, as a
+    /// [`TableEnvelope`].
+    ///
+    /// Columns: `id` (string), `kind` (`bond`, `convertible_bond`, `term_loan`
+    /// or `revolving_credit`), `rank` (integer), `payment_class` (nullable
+    /// string), `balance` (float), `share_of_debt` (nullable float, decimal),
+    /// `maturity` (ISO date string), `cumulative_debt` (float), `leverage` and
+    /// `interest_coverage` (nullable float, turns) and `ltm_interest`
+    /// (nullable float). Amounts are in [`currency`](Self::currency). The
+    /// columns remain when there are no tranches.
+    #[must_use]
+    pub fn to_table(&self) -> TableEnvelope {
+        let rows = &self.tranches;
+        let nullable = |f: fn(&CapitalStructureTranche) -> Option<f64>| {
+            TableColumnData::NullableFloat64(rows.iter().map(f).collect())
+        };
+        TableEnvelope {
+            row_count: rows.len(),
+            columns: vec![
+                TableColumn::new(
+                    "id",
+                    TableColumnData::String(rows.iter().map(|t| t.id.clone()).collect()),
+                ),
+                TableColumn::new(
+                    "kind",
+                    TableColumnData::String(
+                        rows.iter().map(|t| t.kind.as_str().to_string()).collect(),
+                    ),
+                ),
+                TableColumn::new(
+                    "rank",
+                    TableColumnData::Int64(rows.iter().map(|t| i64::from(t.rank)).collect()),
+                ),
+                TableColumn::new(
+                    "payment_class",
+                    TableColumnData::NullableString(
+                        rows.iter().map(|t| t.payment_class.clone()).collect(),
+                    ),
+                ),
+                TableColumn::new(
+                    "balance",
+                    TableColumnData::Float64(rows.iter().map(|t| t.balance.amount()).collect()),
+                ),
+                TableColumn::new("share_of_debt", nullable(|t| t.share_of_debt)),
+                TableColumn::new(
+                    "maturity",
+                    TableColumnData::String(rows.iter().map(|t| t.maturity.to_string()).collect()),
+                ),
+                TableColumn::new(
+                    "cumulative_debt",
+                    TableColumnData::Float64(
+                        rows.iter().map(|t| t.cumulative_debt.amount()).collect(),
+                    ),
+                ),
+                TableColumn::new("leverage", nullable(|t| t.leverage)),
+                TableColumn::new("interest_coverage", nullable(|t| t.interest_coverage)),
+                TableColumn::new(
+                    "ltm_interest",
+                    nullable(|t| t.ltm_interest.map(|interest| interest.amount())),
+                ),
+            ],
+            metadata: Default::default(),
+        }
+    }
 }
 
 /// One tranche's contract terms and seniority, before reading cashflows.
@@ -312,7 +394,7 @@ pub fn capital_structure_summary(
     let currency = single_currency(&stack, &balances)?;
     let mut total_debt = Money::zero(currency);
     for balance in &balances {
-        total_debt = add(total_debt, *balance)?;
+        total_debt = total_debt.checked_add(*balance)?;
     }
 
     let ltm = finstack_quant_core::dates::ltm_window(period, &model.periods)
@@ -331,7 +413,7 @@ pub fn capital_structure_summary(
         .then(|| finite_sum(&ebitda_values, &config.ebitda_node))
         .transpose()?;
     let ltm_ebitda = ltm_ebitda_amount
-        .map(|amount| money(amount, currency))
+        .map(|amount| Money::new(amount, currency))
         .transpose()?;
     // Ratios need a positive LTM EBITDA; a negative one is no multiple.
     let earnings = ltm_ebitda_amount.filter(|amount| *amount > 0.0);
@@ -359,41 +441,42 @@ pub fn capital_structure_summary(
         })
         .collect::<Result<Vec<_>>>()?;
 
+    let rows: Vec<(&StackEntry<'_>, Money, Option<Money>)> = stack
+        .iter()
+        .zip(balances.iter().copied())
+        .zip(interests)
+        .map(|((entry, balance), interest)| (entry, balance, interest))
+        .collect();
     let mut tranches = Vec::with_capacity(stack.len());
     let mut cumulative_debt = Money::zero(currency);
     let mut cumulative_interest = Some(Money::zero(currency));
-    let mut start = 0;
-    while start < stack.len() {
-        let rank = stack[start].rank;
-        let end = start + stack[start..].partition_point(|entry| entry.rank == rank);
-        for index in start..end {
-            cumulative_debt = add(cumulative_debt, balances[index])?;
-            cumulative_interest = match (cumulative_interest, interests[index]) {
-                (Some(sum), Some(interest)) => Some(add(sum, interest)?),
+    for rank_rows in rows.chunk_by(|a, b| a.0.rank == b.0.rank) {
+        for (_, balance, interest) in rank_rows {
+            cumulative_debt = cumulative_debt.checked_add(*balance)?;
+            cumulative_interest = match (cumulative_interest, interest) {
+                (Some(sum), Some(interest)) => Some(sum.checked_add(*interest)?),
                 _ => None,
             };
         }
         let leverage = earnings
-            .map(|ebitda| ratio(cumulative_debt.amount(), ebitda))
+            .map(|ebitda| finite_ratio(cumulative_debt.amount(), ebitda))
             .transpose()?;
         let interest_coverage = coverage(earnings, cumulative_interest)?;
-        for index in start..end {
-            let entry = &stack[index];
+        for (entry, balance, interest) in rank_rows {
             tranches.push(CapitalStructureTranche {
                 id: entry.id.to_string(),
                 kind: entry.kind,
-                rank,
+                rank: entry.rank,
                 payment_class: entry.payment_class.map(str::to_string),
-                balance: balances[index],
-                share_of_debt: share(balances[index], total_debt)?,
+                balance: *balance,
+                share_of_debt: share(*balance, total_debt)?,
                 maturity: entry.maturity,
                 cumulative_debt,
                 leverage,
                 interest_coverage,
-                ltm_interest: interests[index],
+                ltm_interest: *interest,
             });
         }
-        start = end;
     }
 
     Ok(CapitalStructureSummary {
@@ -407,11 +490,11 @@ pub fn capital_structure_summary(
             .map_err(|_| Error::invalid_input("LTM window is too long"))?,
         ltm_periods_found: found as u32,
         total_leverage: earnings
-            .map(|ebitda| ratio(total_debt.amount(), ebitda))
+            .map(|ebitda| finite_ratio(total_debt.amount(), ebitda))
             .transpose()?,
         net_leverage: earnings
             .zip(net_debt)
-            .map(|(ebitda, net_debt)| ratio(net_debt.amount(), ebitda))
+            .map(|(ebitda, net_debt)| finite_ratio(net_debt.amount(), ebitda))
             .transpose()?,
         total_coverage: coverage(earnings, cumulative_interest)?,
         maturity_wall: maturity_wall(&tranches, total_debt)?,
@@ -443,11 +526,7 @@ fn debt_stack(model: &FinancialModelSpec) -> Result<Vec<StackEntry<'_>>> {
 
     let mut stack = Vec::with_capacity(capital_structure.debt_instruments.len());
     for debt in &capital_structure.debt_instruments {
-        // `Instrument::expiry` is `None` for loans, revolvers and convertibles,
-        // so the maturity comes from each contract. The hedges are not borrowed
-        // debt; the enum is non-exhaustive, so a variant added later is an error
-        // here until it is classified, as in the statements crate's
-        // `is_debt_kind`.
+        // The enum is non-exhaustive: a later instrument kind must be classified here.
         let (kind, maturity) = match &debt.spec {
             FinancialStatementInstrument::Bond(bond) => (DebtInstrumentKind::Bond, bond.maturity),
             FinancialStatementInstrument::ConvertibleBond(bond) => {
@@ -548,7 +627,7 @@ fn node_values(
 ) -> Result<Vec<f64>> {
     let mut values = Vec::with_capacity(slots.len());
     for slot in slots {
-        require_node_currency(results, node, slot, currency)?;
+        require_currency(results, node, slot, currency)?;
         let Some(value) = results.get(node, slot) else {
             continue;
         };
@@ -562,25 +641,6 @@ fn node_values(
     Ok(values)
 }
 
-/// Reject a monetary node in a currency other than the debt's.
-fn require_node_currency(
-    results: &StatementResult,
-    node: &str,
-    period: &PeriodId,
-    currency: Currency,
-) -> Result<()> {
-    if let Some(NodeValueType::Monetary { currency: found }) =
-        crate::analysis::units::node_unit_at(results, node, period)?
-        && found != currency
-    {
-        return Err(Error::invalid_input(format!(
-            "Capital structure summary node '{node}' is in {found} while the debt is in \
-                 {currency}; no implicit FX is applied"
-        )));
-    }
-    Ok(())
-}
-
 /// Cash balance at the reporting period, as the node's typed amount when it has one.
 fn cash_at(
     results: &StatementResult,
@@ -588,7 +648,7 @@ fn cash_at(
     period: PeriodId,
     currency: Currency,
 ) -> Result<Money> {
-    require_node_currency(results, node, &period, currency)?;
+    require_currency(results, node, &period, currency)?;
     let value = results.get(node, &period).ok_or_else(|| {
         Error::invalid_input(format!(
             "Capital structure summary cash node '{node}' has no value in period {period}"
@@ -601,7 +661,7 @@ fn cash_at(
     }
     match results.get_money(node, &period) {
         Some(amount) => Ok(amount),
-        None => money(value, currency),
+        None => Ok(Money::new(value, currency)?),
     }
 }
 
@@ -632,7 +692,7 @@ fn ltm_interest(
         let interest = row
             .interest_expense_total()
             .map_err(|error| Error::invalid_input(error.to_string()))?;
-        total = add(total, interest)?;
+        total = total.checked_add(interest)?;
     }
     Ok(Some(total))
 }
@@ -652,7 +712,7 @@ fn maturity_wall(
             .get(&year)
             .copied()
             .unwrap_or_else(|| Money::zero(tranche.balance.currency()));
-        by_year.insert(year, add(amount, tranche.balance)?);
+        by_year.insert(year, amount.checked_add(tranche.balance)?);
     }
     by_year
         .into_iter()
@@ -666,17 +726,6 @@ fn maturity_wall(
         .collect()
 }
 
-/// Sum same-currency amounts.
-fn add(left: Money, right: Money) -> Result<Money> {
-    left.checked_add(right)
-        .map_err(|error| Error::eval(error.to_string()))
-}
-
-/// Construct an amount from a finite evaluated value.
-fn money(amount: f64, currency: Currency) -> Result<Money> {
-    Money::new(amount, currency).map_err(|error| Error::eval(error.to_string()))
-}
-
 /// Compensated sum over a window, which finite inputs can still overflow.
 fn finite_sum(values: &[f64], node: &str) -> Result<f64> {
     let sum = neumaier_sum(values.iter().copied());
@@ -688,23 +737,12 @@ fn finite_sum(values: &[f64], node: &str) -> Result<f64> {
     Ok(sum)
 }
 
-/// A finite ratio; finite inputs can still overflow on a tiny denominator.
-fn ratio(numerator: f64, denominator: f64) -> Result<f64> {
-    let value = numerator / denominator;
-    if !value.is_finite() {
-        return Err(Error::invalid_input(format!(
-            "Capital structure summary: ratio of {numerator} over {denominator} is non-finite"
-        )));
-    }
-    Ok(value)
-}
-
 /// LTM EBITDA over LTM interest, when both are available and interest is positive.
 fn coverage(earnings: Option<f64>, interest: Option<Money>) -> Result<Option<f64>> {
     earnings
         .zip(interest.map(|interest| interest.amount()))
         .filter(|(_, interest)| *interest > 0.0)
-        .map(|(ebitda, interest)| ratio(ebitda, interest))
+        .map(|(ebitda, interest)| finite_ratio(ebitda, interest))
         .transpose()
 }
 
@@ -713,7 +751,7 @@ fn share(part: Money, total: Money) -> Result<Option<f64>> {
     if total.amount() <= 0.0 {
         return Ok(None);
     }
-    ratio(part.amount(), total.amount()).map(Some)
+    finite_ratio(part.amount(), total.amount()).map(Some)
 }
 
 #[cfg(test)]
@@ -723,6 +761,7 @@ mod tests {
     use finstack_quant_statements::capital_structure::{
         CashflowBreakdown, PaymentClassSpec, WaterfallSpec,
     };
+    use finstack_quant_statements::types::NodeValueType;
     use finstack_quant_statements::types::{CapitalStructureSpec, DebtInstrumentSpec};
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;

@@ -40,7 +40,7 @@ pub use dynamic_recovery::{DynamicRecoveryModel, DynamicRecoverySpec};
 pub use endogenous_hazard::{EndogenousHazardSpec, LeverageHazardMap};
 pub use merton::{
     AssetDynamics, MertonBarrierType, MertonImpliedEquity, MertonModel, MertonReport,
-    MertonReportRequest, MertonReportSource, SimulatedPaths, merton_report,
+    MertonReportMeasure, MertonReportRequest, MertonReportSource, SimulatedPaths, merton_report,
 };
 pub use rating_factors::{RatingFactorTable, moodys_warf_factor};
 pub use toggle_exercise::{

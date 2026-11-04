@@ -6,9 +6,10 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Period, PeriodId};
 use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
 use finstack_quant_statements::evaluator::StatementResult;
-use finstack_quant_statements::types::NodeValueType;
 use finstack_quant_statements::{Error, Result};
 use serde::{Deserialize, Serialize};
+
+use crate::analysis::units::{finite_ratio, require_currency};
 
 /// Per-instrument credit context metrics derived from statement data.
 ///
@@ -198,13 +199,6 @@ pub fn compute_credit_context(
 
     let reference_by_period: HashMap<PeriodId, f64> =
         reference_values.unwrap_or(&[]).iter().copied().collect();
-    for node_id in [numerators.cfads, numerators.interest_coverage] {
-        if let Some(NodeValueType::Monetary { currency }) = statement.node_value_types.get(node_id)
-            && *currency != reporting_currency
-        {
-            return Err(Error::CurrencyMismatch(reporting_currency, *currency));
-        }
-    }
 
     let mut dscr = Vec::new();
     let mut dscr_total = Vec::new();
@@ -214,18 +208,13 @@ pub fn compute_credit_context(
     let mut skipped_periods = Vec::new();
 
     for period in periods {
+        for node in [numerators.cfads, numerators.interest_coverage] {
+            require_currency(statement, node, &period.id, reporting_currency)?;
+        }
         let Some(cf) = inst_data.get(&period.id) else {
             skipped_periods.push(period.id);
             continue;
         };
-        for node in [numerators.cfads, numerators.interest_coverage] {
-            if let Some(NodeValueType::Monetary { currency }) =
-                crate::analysis::units::node_unit_at(statement, node, &period.id)?
-                && currency != reporting_currency
-            {
-                return Err(Error::CurrencyMismatch(reporting_currency, currency));
-            }
-        }
         cf.validate_currency_invariant()?;
         let instrument_currency = cf.interest_expense_cash.currency();
         if instrument_currency != reporting_currency {
@@ -261,14 +250,7 @@ pub fn compute_credit_context(
             if denominator <= 0.0 {
                 return Ok(None);
             }
-            let value = numerator / denominator;
-            if !value.is_finite() {
-                return Err(Error::eval(format!(
-                    "Credit ratio for instrument '{instrument_id}' is non-finite in period {}",
-                    period.id
-                )));
-            }
-            Ok(Some(value))
+            finite_ratio(numerator, denominator).map(Some)
         };
 
         if let Some(&reference_value) = reference_by_period.get(&period.id) {

@@ -24,7 +24,8 @@
         "@finstack/enum-field",
         "@finstack/contract-table-envelope",
         "@finstack/analytics-report-presentation",
-        "@finstack/analytics-report-types"
+        "@finstack/analytics-report-types",
+        "@finstack/native-display"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",
@@ -65,7 +66,8 @@
         "@finstack/finstack-table",
         "@finstack/enum-field",
         "@finstack/analytics-report-presentation",
-        "@finstack/analytics-report-types"
+        "@finstack/analytics-report-types",
+        "@finstack/native-display"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",
@@ -196,7 +198,7 @@
       "name": "analytics-report-presentation",
       "type": "registry:lib",
       "title": "Analytics report presentation",
-      "description": "Shared dated point projection and named section markup for analytics reports.",
+      "description": "Shared dated point projection for analytics reports.",
       "files": [
         {
           "path": "lib/analytics-report-presentation.tsx",

@@ -1350,6 +1350,32 @@ pub fn bond_workout_ladder(
     )
 }
 
+/// One row per exit of a bond workout ladder (mirrors Rust `BondWorkoutLadder::to_table`).
+///
+/// Python reaches the same table through `BondWorkoutLadder.to_dataframe`.
+/// @param ladder - `BondWorkoutLadder` plain object or JSON string, as `bondWorkoutLadder` returns it.
+/// @returns `TableEnvelope` in date order with columns `date` (ISO string), `kind` (`call`, `put` or `maturity`), `redemption_price_pct` (percent of the principal redeemed), `redemption_amount` (float), `currency` (ISO code of the amount), `make_whole` (boolean), `yield_rate` and `i_spread` (nullable decimals) and `is_worst` (boolean). The columns remain when there are no rows.
+/// @throws Error - Throws with kind `validation` if `ladder` does not match the `BondWorkoutLadder` schema.
+#[wasm_bindgen(js_name = bondWorkoutLadderTable)]
+pub fn bond_workout_ladder_table(ladder: JsValue) -> Result<JsValue, JsValue> {
+    let ladder: finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondWorkoutLadder =
+        crate::utils::input::from_js_json(&ladder, "ladder")?;
+    to_js_value(&ladder.to_table())
+}
+
+/// The quote set of a bond as a one-row table (mirrors Rust `BondQuoteSet::to_table`).
+///
+/// Python reaches the same table through `BondQuoteSet.to_dataframe`.
+/// @param quotes - `BondQuoteSet` plain object or JSON string, as `computeQuotes` returns it.
+/// @returns `TableEnvelope` with one row and one column per field in declaration order: float `clean_price_currency`, `clean_price_pct` and `dirty_price_currency`, then nullable float `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_par`, `asw_market`, `i_spread`, `japanese_simple_yield` and `moosmuller_ytm`, null where the quote does not apply.
+/// @throws Error - Throws with kind `validation` if `quotes` does not match the `BondQuoteSet` schema.
+#[wasm_bindgen(js_name = bondQuoteSetTable)]
+pub fn bond_quote_set_table(quotes: JsValue) -> Result<JsValue, JsValue> {
+    let quotes: finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteSet =
+        crate::utils::input::from_js_json(&quotes, "quotes")?;
+    to_js_value(&quotes.to_table())
+}
+
 /// Every price, yield and spread quote of a bond, solved from any one of them (mirrors Rust `compute_quotes`).
 ///
 /// The quote is normalized to a clean price and every other field is the metric of the same name at that price, in one call. The bond's default pricing model runs (tree when it has exercise rights) on the bond family's registries; any quote the bond carries is replaced.

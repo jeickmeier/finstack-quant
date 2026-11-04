@@ -58,7 +58,7 @@ use pool_flows::{
 use simulate_period::simulate_period;
 pub use state::{
     CoverageTestBreach, CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource,
-    PeriodDiagnostics, PeriodWaterfall, SimulationDiagnostics, TrancheCreditEnhancement,
+    PeriodDiagnostics, SimulationDiagnostics, TrancheCreditEnhancement,
 };
 use state::{SimulationState, StateTemplate, WRITEDOWN_DE_MINIMIS, step_down_metrics};
 

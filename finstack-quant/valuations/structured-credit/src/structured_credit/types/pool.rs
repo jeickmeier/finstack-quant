@@ -1218,13 +1218,16 @@ impl AssetPool {
     ///
     /// # Returns
     ///
-    /// The score over the assets that name an obligor, or `None` when none does
-    /// or the pool balance cannot be summed: no obligor is named, so no diversity
-    /// is measured.
-    pub fn diversity_score(&self) -> Option<f64> {
-        let total_balance = self.total_balance().ok()?.amount();
-        if total_balance == 0.0 {
-            return None;
+    /// The score over the assets that name an obligor, or `None` when the pool
+    /// balance is zero or no asset names an obligor, so no diversity is measured.
+    ///
+    /// # Errors
+    ///
+    /// Returns a currency-mismatch error when the pool balance cannot be summed
+    /// (a row in a currency other than the pool's base currency).
+    pub fn diversity_score(&self) -> finstack_quant_core::Result<Option<f64>> {
+        if self.total_balance()?.amount() == 0.0 {
+            return Ok(None);
         }
 
         // Group balances by obligor in key order: the two f64 sums below are
@@ -1243,7 +1246,7 @@ impl AssetPool {
         let sum_balances: f64 = obligor_balances.values().sum();
         let sum_squares: f64 = obligor_balances.values().map(|b| b * b).sum();
 
-        (sum_squares > 0.0).then(|| (sum_balances * sum_balances) / sum_squares)
+        Ok((sum_squares > 0.0).then(|| (sum_balances * sum_balances) / sum_squares))
     }
 
     /// Base currency of the pool.
@@ -1406,7 +1409,7 @@ pub fn calculate_pool_stats(
         wac: pool.wac(),
         weighted_avg_spread_bp: pool.weighted_avg_spread_bp(),
         weighted_avg_maturity: pool.weighted_avg_maturity(as_of)?,
-        diversity_score: pool.diversity_score(),
+        diversity_score: pool.diversity_score()?,
         num_obligors: obligors.len(),
         num_industries: industries.len(),
         defaulted_balance_pct,

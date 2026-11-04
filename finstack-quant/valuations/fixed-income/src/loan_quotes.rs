@@ -291,14 +291,13 @@ impl OidEirSchedule {
 
         context
             .computed
-            .insert(MetricId::custom("oid_eir_rate"), self.effective_rate);
-        context.computed.insert(
-            MetricId::custom("oid_eir_amortization"),
-            self.total_amortization(),
-        );
+            .insert(MetricId::OidEirRate, self.effective_rate);
+        context
+            .computed
+            .insert(MetricId::OidEirAmortization, self.total_amortization());
         if !self.periods.is_empty() {
             context.store_bucketed_series(
-                MetricId::custom("oid_eir_amortization"),
+                MetricId::OidEirAmortization,
                 self.periods
                     .iter()
                     .map(|p| (p.date.to_string(), p.oid_amortization.amount())),

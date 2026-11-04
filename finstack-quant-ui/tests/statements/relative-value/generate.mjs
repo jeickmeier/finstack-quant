@@ -1,12 +1,9 @@
 // Native statements_analytics.relativeValueReport results and a rejection for
 // relative-value-table, over a host-supplied universe of ten issuers in two
 // sectors. Rerun with `mise run ui-fixtures` after rebuilding the WASM package.
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
+import { native } from "../../../scripts/fixture-inputs.mjs";
 
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
 const rejection = (run) => {
   try {
     run();

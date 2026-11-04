@@ -188,6 +188,8 @@ pub enum TableColumnData {
     Int64(Vec<i64>),
     /// Nullable signed 64-bit integer column.
     NullableInt64(Vec<Option<i64>>),
+    /// Non-null boolean column.
+    Boolean(Vec<bool>),
 }
 
 impl TableColumnData {
@@ -203,6 +205,7 @@ impl TableColumnData {
             Self::NullableUInt32(values) => values.len(),
             Self::Int64(values) => values.len(),
             Self::NullableInt64(values) => values.len(),
+            Self::Boolean(values) => values.len(),
         }
     }
 

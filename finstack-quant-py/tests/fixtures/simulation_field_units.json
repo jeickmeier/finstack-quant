@@ -19,7 +19,7 @@
   "diverted_cash": {
     "field": "diverted_cash",
     "label": "EUR",
-    "source": "valuations::PeriodWaterfall::diverted_cash"
+    "source": "valuations::WaterfallDistribution::diverted_cash"
   },
   "credit_enhancement": {
     "field": "credit_enhancement",

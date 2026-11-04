@@ -1,8 +1,4 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import {
   cleanup,
@@ -29,7 +25,7 @@ import fixture from "./cases.json";
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => harness?.close());
 afterEach(cleanup);
 const { cases, available } = fixture;
@@ -48,19 +44,6 @@ const rowFor = (metric: string) =>
   screen.getByRole("rowheader", { name: labelFor(metric) }).closest("tr")!;
 
 // Values are regenerated and compared by `mise run ui-fixtures --check`.
-it("pins the JSON inputs the fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../..",
-  );
-  for (const source of fixture.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/valuations/bond-credit/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it("Rust lists every id of the card for a bond", () => {
   expect(cases.bullet.request.metrics).toEqual([...bondCreditMetrics]);
   expect(applicableMetrics(bondCreditMetrics, available)).toEqual([

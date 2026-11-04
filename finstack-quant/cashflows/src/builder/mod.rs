@@ -78,6 +78,7 @@ pub use rate_helpers::{
 };
 pub use schedule::{
     CashFlowMeta, CashFlowSchedule, CashflowRepresentation, merge_cashflow_schedules,
+    outstanding_on,
 };
 pub use specs::{
     AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase, FeeSpec, FeeTier,

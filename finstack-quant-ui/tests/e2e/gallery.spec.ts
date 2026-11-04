@@ -20,8 +20,9 @@ async function open(
   density = "compact",
   extra: Record<string, string> = {},
 ) {
+  // Focus mode shows the whole item, uncropped.
   await page.goto(
-    `/registry-gallery?${new URLSearchParams({ item: name, theme, density, ...extra })}`,
+    `/registry-gallery?${new URLSearchParams({ item: name, theme, density, focus: "1", ...extra })}`,
   );
   await page.waitForLoadState("networkidle");
   const item = page.locator(`[data-item="${name}"]`);
@@ -50,6 +51,8 @@ async function open(
   expect(pageErrors.get(page)).toEqual([]);
   return item;
 }
+// Axe runs in all four modes; these two cover both themes and both densities in pixels.
+const screenshotModes = ["light-compact", "dark-comfortable"];
 for (const item of inventory.visual)
   for (const theme of ["light", "dark"])
     for (const density of ["compact", "comfortable"]) {
@@ -72,6 +75,7 @@ for (const item of inventory.visual)
             }));
         }, item.name);
         expect(violations).toEqual([]);
+        if (!screenshotModes.includes(`${theme}-${density}`)) return;
         await expect(preview).toHaveScreenshot(
           `${item.name}-${theme}-${density}.png`,
           {
@@ -107,47 +111,8 @@ test("shifted cube", async ({ page }) => {
   });
   await expect(item).toHaveScreenshot("shifted-cube.png");
 });
-test("fx strike grid", async ({ page }) => {
-  const item = await open(page, "fx-surface-chart", "light", "comfortable");
-  // The four item baselines stop at the preview's scroll height, above the grid.
-  const grid = item.getByRole("region", {
-    name: "EURUSD strike grid",
-    exact: true,
-  });
-  await expect(
-    grid.getByRole("region", { name: "EURUSD strike grid evaluated surface" }),
-  ).toBeVisible();
-  await expect(grid).toHaveScreenshot("fx-strike-grid.png");
-});
-test("cube node smile", async ({ page }) => {
-  const item = await open(page, "vol-cube-slice", "light", "comfortable");
-  // The four item baselines stop at the preview's scroll height, above the smile.
-  const smile = item.getByRole("region", {
-    name: "USD-SWAPTION-NORMAL-VOL node smile",
-    exact: true,
-  });
-  await expect(
-    smile.getByRole("table", { name: "Node smile values" }),
-  ).toBeVisible();
-  await expect(smile).toHaveScreenshot("cube-node-smile.png");
-});
-test("performance-report monthly returns", async ({ page }) => {
-  const item = await open(page, "performance-report", "light", "comfortable");
-  // The four item baselines stop at the preview's scroll height, above the heatmap.
-  const monthly = item.getByRole("region", {
-    name: "Global Macro Composite monthly returns",
-    exact: true,
-  });
-  await expect(
-    monthly.getByRole("img", {
-      name: "Global Macro Composite monthly returns heatmap",
-    }),
-  ).toBeVisible();
-  await expect(monthly).toHaveScreenshot("performance-report-monthly.png");
-});
 test("positions-table selected swap", async ({ page }) => {
   const item = await open(page, "positions-table", "light", "comfortable");
-  // The four item baselines stop inside the first position's measures.
   await item.getByRole("row", { name: /IRS-1/ }).click();
   const swap = item.getByRole("region", {
     name: "Position IRS-1",
@@ -156,93 +121,14 @@ test("positions-table selected swap", async ({ page }) => {
   await expect(swap.getByText("IRS-5Y-USD-STD").first()).toBeVisible();
   await expect(swap).toHaveScreenshot("positions-table-swap.png");
 });
-test("portfolio-metrics by position", async ({ page }) => {
-  const item = await open(page, "portfolio-metrics", "light", "comfortable");
-  // The four item baselines stop inside the aggregated table, above this section.
-  const byPosition = item.getByRole("region", {
-    name: "Metrics by position",
-    exact: true,
-  });
-  await expect(
-    byPosition.getByRole("table", { name: "Metrics of position BOND-1" }),
-  ).toBeVisible();
-  await expect(byPosition).toHaveScreenshot(
-    "portfolio-metrics-by-position.png",
-  );
-});
-test("pnl-attribution-report waterfall", async ({ page }) => {
-  const item = await open(
-    page,
-    "pnl-attribution-report",
-    "light",
-    "comfortable",
-  );
-  // The four item baselines stop above the waterfall drawn from Rust's steps.
-  const waterfall = item.getByRole("region", {
-    name: "Waterfall",
-    exact: true,
-  });
-  await expect(
-    waterfall.getByRole("table", { name: "Waterfall steps" }),
-  ).toBeVisible();
-  await expect(waterfall).toHaveScreenshot(
-    "pnl-attribution-report-waterfall.png",
-  );
-});
-test("horizon-return-report attribution", async ({ page }) => {
-  const item = await open(
-    page,
-    "horizon-return-report",
-    "light",
-    "comfortable",
-  );
-  // The four item baselines stop above the embedded factor attribution.
-  const attribution = item.getByRole("region", {
-    name: "Attribution",
-    exact: true,
-  });
-  await expect(
-    attribution.getByRole("table", { name: "P&L by factor" }),
-  ).toBeVisible();
-  await expect(attribution).toHaveScreenshot(
-    "horizon-return-report-attribution.png",
-  );
-});
-test("benchmark-report multi-factor regression", async ({ page }) => {
-  const item = await open(page, "benchmark-report", "light", "comfortable");
-  // The four item baselines stop at the preview's scroll height, above this table.
-  const multi = item.getByRole("region", {
-    name: "Global Macro Composite multi-factor regression",
-    exact: true,
-  });
-  await expect(multi.getByRole("table")).toBeVisible();
-  await expect(multi).toHaveScreenshot("benchmark-report-multi-factor.png");
-});
 test("curve-query selected surface", async ({ page }) => {
   const item = await open(page, "curve-query", "light", "comfortable");
-  // The four item baselines show the browser's first selection, a discount curve.
   await item.getByRole("button", { name: /^Inspect EQ-VOL, / }).click();
   const lookup = item.getByRole("region", {
     name: "Point lookup for EQ-VOL",
   });
   await expect(lookup.getByRole("table")).toBeVisible();
   await expect(lookup).toHaveScreenshot("curve-query-surface.png");
-});
-test("liability-management-card exercise economics", async ({ page }) => {
-  const item = await open(
-    page,
-    "liability-management-card",
-    "light",
-    "comfortable",
-  );
-  // The four item baselines stop above the exercise's table.
-  const exercise = item.getByRole("region", {
-    name: "Liability management exercise",
-  });
-  await expect(exercise.getByRole("table")).toBeVisible();
-  await expect(exercise).toHaveScreenshot(
-    "liability-management-card-exercise.png",
-  );
 });
 test("waterfall-report period detail", async ({ page }) => {
   const item = await open(page, "waterfall-report", "light", "comfortable");
@@ -271,14 +157,10 @@ test("relative-value-table regression and a narrower peer filter", async ({
   page,
 }) => {
   const item = await open(page, "relative-value-table", "light", "comfortable");
-  // The four item baselines stop inside the multiples; this is the first dimension.
   const regression = item.getByRole("region", { name: "Spread vs leverage" });
   await expect(
     regression.getByRole("img", { name: /OAS bp on Leverage/ }),
   ).toBeVisible();
-  await expect(regression).toHaveScreenshot(
-    "relative-value-table-regression.png",
-  );
   // Screen on the utilities instead: two peers, too few for the regression.
   const sector = item.getByRole("textbox", { name: "Gics sectors 1" });
   await sector.fill("Utilities");
@@ -292,27 +174,6 @@ test("relative-value-table regression and a narrower peer filter", async ({
     regression.getByText(/Excluded from the composite: Regression unusable/),
   ).toBeVisible();
 });
-test("recovery-waterfall allocations and seniority statistics", async ({
-  page,
-}) => {
-  const item = await open(page, "recovery-waterfall", "light", "comfortable");
-  // The four item baselines stop at the top of the allocation table.
-  const allocations = item.getByRole("table", { name: "Recovery by claim" });
-  await expect(allocations).toBeVisible();
-  await expect(allocations).toHaveScreenshot(
-    "recovery-waterfall-allocations.png",
-  );
-  const seniority = item.getByRole("region", { name: "Seniority recovery" });
-  await expect(seniority.getByRole("table")).toBeVisible();
-  await expect(seniority).toHaveScreenshot("recovery-waterfall-seniority.png");
-});
-test("merton-calculator model parameters", async ({ page }) => {
-  const item = await open(page, "merton-calculator", "light", "comfortable");
-  // The four item baselines stop inside the term structure, above this table.
-  const model = item.getByRole("region", { name: "Model", exact: true });
-  await expect(model.getByRole("table")).toBeVisible();
-  await expect(model).toHaveScreenshot("merton-calculator-model.png");
-});
 test("portfolio-margin-report selected netting set", async ({ page }) => {
   const item = await open(
     page,
@@ -320,7 +181,6 @@ test("portfolio-margin-report selected netting set", async ({ page }) => {
     "light",
     "comfortable",
   );
-  // The four item baselines stop inside the first set's sensitivities.
   await item
     .getByRole("row", { name: /bilateral · CSA USD-REGULATORY-CSA/ })
     .click();
@@ -339,31 +199,12 @@ test("csa-editor loads a Rust preset and its initial margin terms", async ({
   await expect(item.getByLabel("Id", { exact: true })).toHaveValue(
     "EUR-REGULATORY-CSA",
   );
-  // The four item baselines stop inside the eligible collateral, above these terms.
   const im = item.getByRole("group", { name: "Im params" });
   await expect(im).toBeVisible();
   await expect(im).toHaveScreenshot("csa-editor-im-params.png");
 });
-test("credit-assessment-report P&L summary", async ({ page }) => {
-  const item = await open(
-    page,
-    "credit-assessment-report",
-    "light",
-    "comfortable",
-  );
-  // The four item baselines stop inside the native P&L summary table.
-  const summary = item.getByRole("region", {
-    name: "P&L summary",
-    exact: true,
-  });
-  await expect(summary.getByRole("table")).toBeVisible();
-  await expect(summary).toHaveScreenshot(
-    "credit-assessment-report-pl-summary.png",
-  );
-});
 test("dcf-assumptions-form options", async ({ page }) => {
   const item = await open(page, "dcf-assumptions-form", "light", "comfortable");
-  // The four item baselines show the options disclosure collapsed.
   await item.getByText("DCF options", { exact: true }).click();
   const options = item.locator("details").filter({ hasText: "DCF options" });
   await expect(
@@ -377,19 +218,6 @@ test("dcf-assumptions-form options", async ({ page }) => {
   ).toBeVisible();
   await expect(options).toHaveScreenshot("dcf-assumptions-form-options.png");
 });
-test("lbo-report returns and checks", async ({ page }) => {
-  const item = await open(page, "lbo-report", "light", "comfortable");
-  // The four item baselines stop inside the entry and exit list, above the checks.
-  const returns = item.getByRole("region", {
-    name: "Entry and exit",
-    exact: true,
-  });
-  await expect(returns.getByText("MOIC")).toBeVisible();
-  await expect(returns).toHaveScreenshot("lbo-report-entry-exit.png");
-  const checks = item.getByRole("region", { name: "LBO checks", exact: true });
-  await expect(checks).toBeVisible();
-  await expect(checks).toHaveScreenshot("lbo-report-checks.png");
-});
 test("statement-monte-carlo results", async ({ page }) => {
   const item = await open(
     page,
@@ -397,8 +225,6 @@ test("statement-monte-carlo results", async ({ page }) => {
     "light",
     "comfortable",
   );
-  // The four item baselines stop inside the fan, above the percentile table,
-  // the breach readout and the warnings.
   const results = item.getByRole("group", {
     name: "Returned Monte Carlo results",
   });
@@ -410,34 +236,6 @@ test("statement-monte-carlo results", async ({ page }) => {
   await expect(
     results.getByRole("region", { name: "Breach probability" }),
   ).toContainText("16.5%");
-  await expect(results).toHaveScreenshot("statement-monte-carlo-results.png");
-});
-test("portfolio-risk-report risk budget", async ({ page }) => {
-  const item = await open(
-    page,
-    "portfolio-risk-report",
-    "light",
-    "comfortable",
-  );
-  // The four item baselines stop above the budget table.
-  const budget = item.getByRole("region", { name: "Risk budget", exact: true });
-  await expect(budget.getByRole("table")).toBeVisible();
-  await expect(budget).toHaveScreenshot("portfolio-risk-report-budget.png");
-});
-test("portfolio-risk-report factor contributions", async ({ page }) => {
-  const item = await open(
-    page,
-    "portfolio-risk-report",
-    "light",
-    "comfortable",
-  );
-  // Below the preview cut: the host-parity book's factor decomposition.
-  const factors = item.getByRole("region", {
-    name: "Factor contributions",
-    exact: true,
-  });
-  await expect(factors.getByRole("table").first()).toBeVisible();
-  await expect(factors).toHaveScreenshot("portfolio-risk-report-factors.png");
 });
 test("portfolio-risk-report historical stress attribution", async ({
   page,
@@ -458,32 +256,8 @@ test("portfolio-risk-report historical stress attribution", async ({
   await expect(stress.getByRole("table").first()).toBeVisible();
   await expect(stress).toHaveScreenshot("portfolio-risk-report-stress.png");
 });
-test("transition-matrix-heatmap cumulative default probability", async ({
-  page,
-}) => {
-  const item = await open(
-    page,
-    "transition-matrix-heatmap",
-    "light",
-    "comfortable",
-  );
-  // The four item baselines stop inside the generator heatmap, above this section.
-  const cumulative = item.getByRole("region", {
-    name: "Cumulative default probability",
-    exact: true,
-  });
-  await expect(
-    cumulative.getByRole("img", {
-      name: "Cumulative default probability by horizon",
-    }),
-  ).toBeVisible();
-  await expect(cumulative).toHaveScreenshot(
-    "transition-matrix-heatmap-cumulative.png",
-  );
-});
 test("simm-calculator validated set and initial margin", async ({ page }) => {
   const item = await open(page, "simm-calculator", "light", "comfortable");
-  // The four item baselines stop inside the sensitivity form, above these sections.
   const sensitivities = item.getByRole("region", {
     name: "SIMM sensitivities",
     exact: true,
@@ -491,9 +265,6 @@ test("simm-calculator validated set and initial margin", async ({ page }) => {
   await expect(
     sensitivities.getByRole("region", { name: "Interest rate" }),
   ).toBeVisible();
-  await expect(sensitivities).toHaveScreenshot(
-    "simm-calculator-sensitivities.png",
-  );
   const report = item.getByRole("region", {
     name: "SIMM initial margin",
     exact: true,
@@ -501,7 +272,6 @@ test("simm-calculator validated set and initial margin", async ({ page }) => {
   await expect(report.getByLabel("Initial margin")).toHaveText(
     "USD 13,958,205.61533609",
   );
-  await expect(report).toHaveScreenshot("simm-calculator-report.png");
 });
 test("every nonvisual item imports without initializing WASM", async ({
   page,

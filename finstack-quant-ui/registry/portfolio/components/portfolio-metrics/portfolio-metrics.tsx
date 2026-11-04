@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { barY, defineChart } from "@tanstack/charts";
 import { scaleBand } from "@tanstack/charts/scales/band";
@@ -16,6 +16,7 @@ import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import { ReportSection } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** The parts of a returned portfolio valuation the metrics view presents. */
 export interface PortfolioMetricsData {
@@ -46,14 +47,6 @@ export interface PortfolioMetricsProps {
   /** The native error message, shown instead of metrics. */
   error?: string;
   density?: "compact" | "comfortable";
-}
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
 }
 /** Host display text for finite numbers; anything else is shown as returned. */
 function display(value: unknown, format: (value: number) => string) {
@@ -238,7 +231,7 @@ function MetricsView({
       className="@container space-y-6 font-sans text-sm text-foreground"
     >
       {series && (
-        <Section title={`${baseLabel} by bucket`}>
+        <ReportSection title={`${baseLabel} by bucket`}>
           {groups.length ? (
             <div className="grid gap-4 @3xl:grid-cols-2">
               {groups.map(({ group, definition }) => (
@@ -263,9 +256,9 @@ function MetricsView({
             Buckets appear in the order Rust returned them; no tenor sort is
             applied.
           </p>
-        </Section>
+        </ReportSection>
       )}
-      <Section title="Aggregation notes">
+      <ReportSection title="Aggregation notes">
         <dl className="grid gap-2 @lg:grid-cols-3">
           <div className="space-y-1">
             <dt className="text-xs text-muted-foreground">
@@ -304,8 +297,8 @@ function MetricsView({
             </dd>
           </div>
         </dl>
-      </Section>
-      <Section title="Aggregated metrics">
+      </ReportSection>
+      <ReportSection title="Aggregated metrics">
         <FinstackTable
           data={Object.values(metrics.aggregated)}
           columns={aggregatedColumns}
@@ -315,8 +308,8 @@ function MetricsView({
           density={density}
           emptyState="No aggregated metrics returned"
         />
-      </Section>
-      <Section title="Metrics by position">
+      </ReportSection>
+      <ReportSection title="Metrics by position">
         <div className="max-w-xs">
           <EnumField
             label="Position"
@@ -347,7 +340,7 @@ function MetricsView({
         ) : (
           <p role="status">No metrics returned for this position</p>
         )}
-      </Section>
+      </ReportSection>
     </section>
   );
 }

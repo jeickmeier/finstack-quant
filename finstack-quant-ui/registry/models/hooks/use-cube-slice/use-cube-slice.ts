@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { CubeSliceRequest } from "@/workers/finstack-contract";
@@ -13,15 +12,13 @@ export function cubeSliceOptions(
   session: number,
   request: CubeSliceRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "cubeSlice", key] as const,
-    ready: snapshot !== null,
-    missing:
-      "Cube slicing requires a ready worker, an axis value, strikes and a convention",
-    queryFn: (ready) => ready.call("cubeSlice", snapshot!),
-  });
+    session,
+    "cubeSlice",
+    request,
+    "Cube slicing requires a ready worker, an axis value, strikes and a convention",
+  );
 }
 /** Native materialized cube slice JSON; errors are unchanged. */
 export function useCubeSlice(request: CubeSliceRequest | null) {

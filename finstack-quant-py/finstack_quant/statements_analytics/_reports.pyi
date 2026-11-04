@@ -319,7 +319,8 @@ def credit_assessment(results: Any, period: str) -> CreditAssessment:
     Returns
     -------
     CreditAssessment
-        Point-in-time ratios at ``period`` plus the ascending ``series``.
+        Point-in-time ratios at ``period`` plus the ``series`` over every
+        period of ``results.periods`` up to ``period``, in timeline order.
         Ratios are ``None`` when their inputs have mixed scalar/money
         representations, different currencies, or non-finite arithmetic.
         Trailing-year ratios require all annual, semiannual, quarterly or monthly
@@ -330,8 +331,8 @@ def credit_assessment(results: Any, period: str) -> CreditAssessment:
     Raises
     ------
     ValueError
-        If ``period`` is not a valid period identifier, no node of ``results``
-        has a value at ``period``, or ``results`` is malformed JSON.
+        If ``period`` is not a valid period identifier, is not one of
+        ``results.periods``, or ``results`` is malformed JSON.
 
     Examples
     --------

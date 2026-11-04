@@ -74,7 +74,8 @@
         "@finstack/finstack-table",
         "@finstack/contract-covenant-forecast-config",
         "@finstack/contract-future-breach",
-        "@finstack/finstack-codec"
+        "@finstack/finstack-codec",
+        "@finstack/native-display"
       ],
       "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
       "categories": ["Individual Components"],
@@ -210,7 +211,7 @@
       "type": "registry:hook",
       "title": "useEvaluateCovenants",
       "description": "Tests a covenant engine against evaluated statements through the WASM worker.",
-      "docs": "covenants.CovenantEngine.fromJson(engineJson), then statements_analytics.evaluateCovenants(resultsJson, engine, modelJson): DatedCovenantReports rows, one per result period tested on its last day with the covenants applicable on that date. The handle is freed. A metric an applicable covenant reads that the results lack returns the native not_found error, a non-finite one the validation error, unchanged. Keyed on the complete request and worker session; null disables. Requires the shared Finstack/Query provider.",
+      "docs": "covenants.CovenantEngine.fromJson(engineJson), then statements_analytics.evaluateCovenants(resultsJson, engine): DatedCovenantReports rows, one per result period tested on its last day with the covenants applicable on that date. The handle is freed. A metric an applicable covenant reads that the results lack returns the native not_found error, a non-finite one the validation error, unchanged. Keyed on the complete request and worker session; null disables. Requires the shared Finstack/Query provider.",
       "files": [
         {
           "path": "hooks/use-evaluate-covenants/use-evaluate-covenants.ts",
@@ -236,7 +237,7 @@
       "type": "registry:hook",
       "title": "useForecastBreaches",
       "description": "Forecasts covenant breaches of evaluated statements through the WASM worker.",
-      "docs": "covenants.CovenantEngine.fromJson(engineJson), then statements_analytics.forecastBreaches(resultsJson, engine, modelJson, configJson?): FutureBreach rows sorted by breach date, then covenant id. Every result period is a test date and, without reference_date, the horizon starts the day before the first period. An omitted configJson is Rust's deterministic maintenance-scope default; the config crosses as JSON text so a uint64 random_seed stays exact. The handle is freed. A missing required metric returns the native not_found error, a non-finite one or an invalid config the validation error, unchanged. Keyed on the complete request and worker session; null disables. Requires the shared Finstack/Query provider.",
+      "docs": "covenants.CovenantEngine.fromJson(engineJson), then statements_analytics.forecastBreaches(resultsJson, engine, configJson?): FutureBreach rows sorted by breach date, then covenant id. Every result period is a test date and, without reference_date, the horizon starts the day before the first period. An omitted configJson is Rust's deterministic maintenance-scope default; the config crosses as JSON text so a uint64 random_seed stays exact. The handle is freed. A missing required metric returns the native not_found error, a non-finite one or an invalid config the validation error, unchanged. Keyed on the complete request and worker session; null disables. Requires the shared Finstack/Query provider.",
       "files": [
         {
           "path": "hooks/use-forecast-breaches/use-forecast-breaches.ts",

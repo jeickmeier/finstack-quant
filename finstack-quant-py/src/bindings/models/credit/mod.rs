@@ -630,8 +630,12 @@ impl PyMertonReport {
 
     #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.errors")]
     #[getter]
-    fn errors(&self) -> std::collections::BTreeMap<String, String> {
-        self.inner.errors.clone()
+    fn errors(&self) -> std::collections::BTreeMap<&'static str, String> {
+        self.inner
+            .errors
+            .iter()
+            .map(|(measure, message)| (measure.as_str(), message.clone()))
+            .collect()
     }
 
     #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.to_dataframe")]
@@ -690,16 +694,8 @@ wire_methods!(
 #[pyfunction]
 #[pyo3(text_signature = "(request)")]
 fn merton_report(request: &Bound<'_, PyAny>) -> PyResult<PyMertonReport> {
-    let text = match request.extract::<String>() {
-        Ok(text) => text,
-        Err(_) => crate::bindings::module_utils::py_to_json_string(
-            request.py(),
-            request,
-            "merton_report request",
-        )?,
-    };
-    let request: MertonReportRequest = serde_json::from_str(&text)
-        .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+    let request: MertonReportRequest =
+        crate::bindings::module_utils::spec_from_py(request.py(), request, "MertonReportRequest")?;
     Ok(PyMertonReport {
         inner: rust_merton_report(&request).map_err(core_to_py)?,
     })

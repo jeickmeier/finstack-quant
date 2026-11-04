@@ -1,9 +1,5 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import {
   cleanup,
@@ -31,7 +27,7 @@ const native = createRequire(import.meta.url)(
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => harness?.close());
 afterEach(cleanup);
 const entry = (name: string) =>
@@ -51,19 +47,6 @@ const rowsOf = (table: HTMLElement) =>
   (within(table).getAllByRole("row") as HTMLTableRowElement[]).slice(1);
 // Margin runs are regenerated and compared by `mise run ui-fixtures --check`
 // (tests/portfolio/margin/generate.mjs).
-it("pins the JSON inputs the margin fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../..",
-  );
-  for (const source of fixture.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/portfolio/margin/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it.each(["no-collateral", "usd-collateral-held"])(
   "runs the %s portfolio margin through the real worker exactly as the native fixture",
   async (name) => {

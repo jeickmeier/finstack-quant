@@ -17,6 +17,10 @@ import { SchemaForm } from "@/components/finstack/core/components/schema-form/sc
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { relativeValueConfigModule } from "./relative-value-config";
+import {
+  passThrough,
+  UndefinedValue,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
 type Company = RelativeValueReport["companies"][number];
 type MultipleRow = RelativeValueReport["multiples"][number];
@@ -34,13 +38,6 @@ const defaultPercentile = new Intl.NumberFormat("en-US", {
   style: "percent",
   maximumFractionDigits: 1,
 }).format;
-/**
- * No standalone native RelativeValueReportConfig parse exists; Rust
- * validates the config (unknown keys included) when it builds the report and
- * the caller shows its error. Kept stable so the form does not revalidate on
- * every render.
- */
-const passThrough = async (json: string) => json;
 /** Rust's description of a returned field or enum value, from the generated contract. */
 function described(suffix: string, value?: string): string | undefined {
   return resultMetadata.find((entry) =>
@@ -51,11 +48,6 @@ function described(suffix: string, value?: string): string | undefined {
         entry.const === value,
   )?.description;
 }
-const undefinedValue = (reason: string | undefined) => (
-  <span className="finstack-na" title={reason}>
-    Undefined
-  </span>
-);
 /**
  * A number Rust returned, or Undefined for its null; a live worker may
  * deliver a missing number as NaN. -0 is shown as 0.
@@ -65,7 +57,8 @@ function shown(
   format: (value: number) => string,
   reason?: string,
 ): ReactNode {
-  if (value == null || Number.isNaN(value)) return undefinedValue(reason);
+  if (value == null || Number.isNaN(value))
+    return <UndefinedValue reason={reason} />;
   return format(Object.is(value, -0) ? 0 : value);
 }
 /** The metric an extractor names: a named field, a multiple or a custom key. */
@@ -224,15 +217,19 @@ function RelativeValueResults({
     ["excluded_count", String(report.excluded_count)],
     [
       "composite_score",
-      composite
-        ? shown(composite.composite_score, formatNumber)
-        : undefinedValue(undefined),
+      composite ? (
+        shown(composite.composite_score, formatNumber)
+      ) : (
+        <UndefinedValue />
+      ),
     ],
     [
       "confidence",
-      composite
-        ? shown(composite.confidence, formatNumber)
-        : undefinedValue(undefined),
+      composite ? (
+        shown(composite.confidence, formatNumber)
+      ) : (
+        <UndefinedValue />
+      ),
     ],
   ];
   const columns: ColumnDef<{}, Company, any>[] = [
@@ -325,9 +322,9 @@ function StatsList({
     return (
       <p className="text-xs text-muted-foreground">
         Peer statistics:{" "}
-        {undefinedValue(
-          described("RelativeValueMultiple/properties/peer_stats"),
-        )}
+        <UndefinedValue
+          reason={described("RelativeValueMultiple/properties/peer_stats")}
+        />
       </p>
     );
   return (
@@ -482,6 +479,7 @@ function DimensionPanel({
   const reason = dimension.excluded_reason;
   const xLabel = dimension.x ? extractorLabel(dimension.x) : undefined;
   const yLabel = extractorLabel(dimension.y);
+  const axes = xLabel ? `${yLabel} on ${xLabel}` : `${yLabel} against peers`;
   const figures: readonly (readonly [string, ReactNode])[] = [
     ["weight", shown(dimension.weight, formatNumber)],
     ["direction", labelFor(dimension.direction)],
@@ -545,7 +543,9 @@ function DimensionPanel({
                 ? [
                     {
                       label: point.company_id,
-                      value: `${xLabel} ${formatNumber(point.x)}, ${yLabel} ${formatNumber(point.y)}`,
+                      value: xLabel
+                        ? `${xLabel} ${formatNumber(point.x)}, ${yLabel} ${formatNumber(point.y)}`
+                        : `${yLabel} ${formatNumber(point.y)}`,
                     },
                   ]
                 : [];
@@ -563,7 +563,7 @@ function DimensionPanel({
       <h3 className="text-sm font-medium">
         {dimension.label}
         <span className="ml-2 text-xs font-normal text-muted-foreground">
-          {xLabel ? `${yLabel} on ${xLabel}` : `${yLabel} against peers`}
+          {axes}
         </span>
       </h3>
       {reason && (
@@ -594,7 +594,7 @@ function DimensionPanel({
           </figcaption>
           <FinstackChart
             definition={definition}
-            ariaLabel={`${dimension.label}: ${yLabel} on ${xLabel}`}
+            ariaLabel={`${dimension.label}: ${axes}`}
             height={320}
           />
         </figure>

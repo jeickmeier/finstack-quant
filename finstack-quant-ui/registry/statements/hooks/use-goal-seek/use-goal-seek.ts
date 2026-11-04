@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { GoalSeekRequest } from "@/workers/finstack-contract";
@@ -14,14 +13,13 @@ export function goalSeekOptions(
   session: number,
   request: GoalSeekRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "goalSeek", key] as const,
-    ready: snapshot !== null,
-    missing: "The goal seek requires an explicit request and ready worker",
-    queryFn: (ready) => ready.call("goalSeek", snapshot!),
-  });
+    session,
+    "goalSeek",
+    request,
+    "The goal seek requires an explicit request and ready worker",
+  );
 }
 /** Native statements_analytics.goalSeek GoalSeekResult or structured failure; the caller sets the request on an explicit Solve. */
 export function useGoalSeek(request: GoalSeekRequest | null) {

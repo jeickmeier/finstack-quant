@@ -26,6 +26,18 @@ impl MetricId {
         MetricId::EmbeddedOptionValue,
     ];
 
+    /// Standard metrics a calculator stores alongside the metric requested,
+    /// reported in the result even when not requested themselves: the
+    /// bucketed-vega reconciliation residual, the theta horizon and carry
+    /// diagnostics, and the two outputs of one loan effective-interest solve.
+    pub const SIDE_OUTPUT_METRICS: &'static [MetricId] = &[
+        MetricId::BucketedVegaResidual,
+        MetricId::ThetaPeriodDays,
+        MetricId::CarryDecompositionDegenerate,
+        MetricId::OidEirRate,
+        MetricId::OidEirAmortization,
+    ];
+
     /// Return all standard metric IDs in group display order.
     ///
     /// The catalogue is derived from named group membership, including diagnostic

@@ -53,7 +53,7 @@
             "$id": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
             "type_name": "TableEnvelope",
             "kind": "output",
-            "bytes": 7382
+            "bytes": 7846
           }
         ]
       },
@@ -133,7 +133,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/pnl_bucket_share.schema.json",
             "type_name": "PnlBucketShare",
             "kind": "output",
-            "bytes": 21934
+            "bytes": 24055
           }
         ]
       },
@@ -2154,7 +2154,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
             "type_name": "MonteCarloResults",
             "kind": "output",
-            "bytes": 31713
+            "bytes": 32177
           },
           {
             "path": "schemas/statements/1/normalization_config.schema.json",
@@ -3423,7 +3423,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
             "type_name": "FacilityProjection",
             "kind": "output",
-            "bytes": 56287
+            "bytes": 57370
           },
           {
             "path": "schemas/results/1/instrument_cashflow.schema.json",
@@ -3514,21 +3514,21 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
             "type_name": "SimulationDiagnostics",
             "kind": "output",
-            "bytes": 26628
+            "bytes": 27711
           },
           {
             "path": "schemas/results/1/simulation_field_units.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_field_units.schema.json",
             "type_name": "SimulationFieldUnits",
             "kind": "output",
-            "bytes": 2970
+            "bytes": 2982
           },
           {
             "path": "schemas/results/1/simulation_run.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
             "type_name": "SimulationRun",
             "kind": "output",
-            "bytes": 53198
+            "bytes": 54281
           },
           {
             "path": "schemas/results/1/standard_deal_family.schema.json",
@@ -3735,7 +3735,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/pnl_bucket_share.schema.json",
             "type_name": "PnlBucketShare",
             "kind": "output",
-            "bytes": 21934
+            "bytes": 24055
           },
           {
             "domain": "calibration",
@@ -4023,7 +4023,7 @@
             "$id": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
             "type_name": "TableEnvelope",
             "kind": "output",
-            "bytes": 7382
+            "bytes": 7846
           },
           {
             "domain": "factor_model",
@@ -4695,7 +4695,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
             "type_name": "MonteCarloResults",
             "kind": "output",
-            "bytes": 31713
+            "bytes": 32177
           },
           {
             "domain": "statements",
@@ -5679,7 +5679,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
             "type_name": "FacilityProjection",
             "kind": "output",
-            "bytes": 56287
+            "bytes": 57370
           },
           {
             "domain": "valuations",
@@ -5783,7 +5783,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
             "type_name": "SimulationDiagnostics",
             "kind": "output",
-            "bytes": 26628
+            "bytes": 27711
           },
           {
             "domain": "valuations",
@@ -5791,7 +5791,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_field_units.schema.json",
             "type_name": "SimulationFieldUnits",
             "kind": "output",
-            "bytes": 2970
+            "bytes": 2982
           },
           {
             "domain": "valuations",
@@ -5799,7 +5799,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
             "type_name": "SimulationRun",
             "kind": "output",
-            "bytes": 53198
+            "bytes": 54281
           },
           {
             "domain": "valuations",

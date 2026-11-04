@@ -21,7 +21,6 @@ use crate::bindings::statements_analytics::checks::{
     PyCreditMapping, PyThreeStatementMapping, extract_check_suite_spec, extract_credit_mapping,
     extract_three_statement_mapping,
 };
-use crate::bindings::statements_analytics::extract_serde_any;
 use crate::bindings::statements_analytics::typed::PyTornadoEntry;
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::{
@@ -360,13 +359,13 @@ fn extract_terminal_value(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Te
     if let Ok(typed) = obj.extract::<PyRef<'_, PyTerminalValueSpec>>() {
         return Ok(typed.inner.clone());
     }
-    extract_serde_any(py, obj, "terminal_value")
+    crate::bindings::module_utils::spec_from_py(py, obj, "terminal_value")
 }
 
 /// Rust `DcfOptions` from its serde form (a dict or JSON string, missing
 /// fields taking their Rust defaults); `None` is `DcfOptions::default()`.
 fn extract_dcf_options(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResult<DcfOptions> {
-    obj.map(|obj| extract_serde_any(py, obj, "options"))
+    obj.map(|obj| crate::bindings::module_utils::spec_from_py(py, obj, "options"))
         .transpose()
         .map(Option::unwrap_or_default)
 }
@@ -1255,7 +1254,7 @@ fn evaluate_lbo<'py>(
     config: &Bound<'py, PyAny>,
 ) -> PyResult<PyLboResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let config: LboConfig = extract_serde_any(py, config, "config")?;
+    let config: LboConfig = crate::bindings::module_utils::spec_from_py(py, config, "config")?;
 
     let inner = py
         .detach(move || {

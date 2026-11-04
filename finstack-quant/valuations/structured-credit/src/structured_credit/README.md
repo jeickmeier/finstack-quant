@@ -711,11 +711,12 @@ outstanding: the notes it covers are retired or owe no interest, and it passes.
 `wac`, `weighted_avg_spread_bp` and `warf` are `None` where their population is
 empty.
 
-`PeriodDiagnostics::waterfall` (`PeriodWaterfall`) says who was paid: the tier
+`PeriodDiagnostics::waterfall` (`WaterfallDistribution`) says who was paid: the tier
 allocations, each recipient's `PaymentRecord` (requested, paid, shortfall,
-`diverted`, `is_principal`), the diversions and what was carried forward. It is
-the serializable projection of `WaterfallDistribution`, whose recipient-keyed
-maps cannot be JSON. Cash that reaches a tranche outside the waterfall is on
+`diverted`, `is_principal`), the coverage ratios as the executor computed them,
+the diversions and what was carried forward. Per-recipient totals are
+`WaterfallDistribution::distributions` and `principal_distributions`, summed from
+the payment records. Cash that reaches a tranche outside the waterfall is on
 `PeriodDiagnostics::non_waterfall_payments` (`NonWaterfallPayment`, tagged with a
 `NonWaterfallSource`): reserve interest routed to a tranche on the period that
 earned it, and the redemption and terminal releases on the deal's last period.

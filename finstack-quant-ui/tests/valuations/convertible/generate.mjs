@@ -1,18 +1,15 @@
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import {
+  native,
+  readRepoJson,
+  sourceRecord,
+  withSpec,
+} from "../../../scripts/fixture-inputs.mjs";
 const paths = [
   "finstack-quant/valuations/tests/fixtures/production_convertible.json",
   "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
 ];
-const read = async (path) =>
-  JSON.parse(await readFile(new URL(path, repository), "utf8"));
-const [production, baseMarket] = await Promise.all(paths.map(read));
+const [production, baseMarket] = await Promise.all(paths.map(readRepoJson));
 const asOf = "2024-07-15";
 // The share and its volatility on the shared market. A flat hazard curve from
 // rates: it has no calibration recipe, so cs01 keeps Rust's error.
@@ -56,16 +53,9 @@ const plain = {
     },
   },
 };
-const withSpec = (spec) => ({
-  ...plain,
-  instrument: {
-    ...plain.instrument,
-    spec: { ...plain.instrument.spec, ...spec },
-  },
-});
 // Quoted, so oas and implied_vol solve, and callable at par from year three once
 // the share trades at 130% of the conversion price.
-const quoted = withSpec({
+const quoted = withSpec(plain, {
   call_put: {
     calls: [{ start: "2026-08-15", end: "2028-08-15", price_pct_of_par: 100 }],
     puts: [],
@@ -80,7 +70,7 @@ const quoted = withSpec({
   },
 });
 // Delivers a moving share count: Rust gives no hedge ratio or regime.
-const mandatory = withSpec({
+const mandatory = withSpec(plain, {
   conversion: {
     ...plain.instrument.spec.conversion,
     policy: {
@@ -166,14 +156,7 @@ const cases = {
   supplied: card(plain, [150, 50, 100, 150]),
   mandatory: card(mandatory),
 };
-const sources = await Promise.all(
-  paths.map(async (path) => ({
-    path,
-    sha256: createHash("sha256")
-      .update(await readFile(new URL(path, repository)))
-      .digest("hex"),
-  })),
-);
+const sources = await Promise.all(paths.map(sourceRecord));
 await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({

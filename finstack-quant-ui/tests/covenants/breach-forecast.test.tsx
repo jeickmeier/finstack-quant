@@ -2,15 +2,7 @@
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -29,7 +21,7 @@ import { CovenantBreachForecast } from "@/components/finstack/covenants/componen
 import type { FutureBreachWire } from "@/lib/finstack/generated/types/future_breach";
 import { unwrap } from "@/workers/finstack-contract";
 import { serializeHost } from "../../src/codec.mjs";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import captured from "../../src/fixtures/covenants/analyst-breach-forecast.json";
 
@@ -41,7 +33,6 @@ const read = (name: string) =>
     resolve(import.meta.dirname, "../../src/fixtures/", name),
     "utf8",
   );
-const modelJson = read("statements/analyst-model.json");
 const resultsJson = read("statements/analyst-result.json");
 const engineJson = read("covenants/analyst-covenants.json");
 const tightJson = read("covenants/analyst-covenants-tight.json");
@@ -51,15 +42,15 @@ const forecast = captured as unknown as Record<
   "deterministic" | "stochastic",
   FutureBreachWire[]
 >;
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 type Resources = Record<
   "covenantEngineConstructed" | "covenantEngineFreed",
   number
 >;
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness(["forecastBreaches"]);
 const resources = () =>
   (harness.proxy as unknown as { resources(): Promise<Resources> }).resources();
 async function counted<T>(call: () => Promise<T>) {
@@ -74,30 +65,12 @@ async function counted<T>(call: () => Promise<T>) {
     ],
   };
 }
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: never) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "forecastBreaches")
-        return unwrap(await harness.proxy.forecastBreaches(request));
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
 const request = (configJson?: string) => ({
   engineJson: tightJson,
-  modelJson,
   resultsJson,
   ...(configJson === undefined ? {} : { configJson }),
 });
@@ -107,15 +80,10 @@ it("captures Rust's deterministic and stochastic breach forecasts of the tighten
     const engine = native.CovenantEngine.fromJson(tightJson);
     try {
       return config === undefined
-        ? native.statementsAnalyticsForecastBreaches(
-            resultsJson,
-            engine,
-            modelJson,
-          )
+        ? native.statementsAnalyticsForecastBreaches(resultsJson, engine)
         : native.statementsAnalyticsForecastBreaches(
             resultsJson,
             engine,
-            modelJson,
             config,
           );
     } finally {

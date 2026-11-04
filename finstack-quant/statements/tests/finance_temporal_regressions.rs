@@ -199,6 +199,7 @@ fn parser_produced_cs_references_work_in_historical_functions() {
     // statement rows for every cashflow snapshot.
     let mut context = EvaluationContext::new(
         current,
+        &[],
         Arc::new(IndexMap::new()),
         Arc::new(IndexMap::new()),
     );
@@ -243,6 +244,7 @@ fn cashflow_period_aggregates_resolve_only_the_requested_window() {
     let old = PeriodId::month(2024, 12).unwrap();
     let mut context = EvaluationContext::new(
         current,
+        &[],
         Arc::new(IndexMap::new()),
         Arc::new(IndexMap::new()),
     );

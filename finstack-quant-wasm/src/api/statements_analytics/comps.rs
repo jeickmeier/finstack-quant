@@ -169,3 +169,15 @@ pub fn relative_value_report(
     let config: fc::RelativeValueReportConfig = from_js_json(&config, "config")?;
     to_js_value(&fc::relative_value_report(&subject, &universe, &config).map_err(to_js_err)?)
 }
+
+/// Comps table of a relative value report, one row per company (mirrors Rust `RelativeValueReport::to_table`).
+///
+/// Python reaches the same table through `RelativeValueReport.to_dataframe`.
+/// @param report - `RelativeValueReport` plain object or JSON string, as `relativeValueReport` returns it.
+/// @returns `TableEnvelope` with `id` (string) and `is_subject` (boolean) columns, then one nullable float column per configured multiple named by its wire form (`ev_ebitda`, `pe`, ...), in config order; rows are the subject first, then the peers in universe order, and a value Rust cannot compute is null.
+/// @throws Error - Throws with kind `validation` if `report` does not match the `RelativeValueReport` schema, a multiple appears twice, or a company row does not hold one value per multiple.
+#[wasm_bindgen(js_name = relativeValueReportTable)]
+pub fn relative_value_report_table(report: JsValue) -> Result<JsValue, JsValue> {
+    let report: fc::RelativeValueReport = from_js_json(&report, "report")?;
+    to_js_value(&report.to_table().map_err(to_js_err)?)
+}

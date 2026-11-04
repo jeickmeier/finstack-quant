@@ -1,8 +1,4 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import {
   cleanup,
@@ -22,7 +18,7 @@ import bond from "../../src/fixtures/results/bond.json";
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => harness?.close());
 // Figures are drawn by the shared chart in the browser gates; here each one
 // is a labelled placeholder.
@@ -57,19 +53,6 @@ const buckets = (name: string) =>
   entry(name).attributionBuckets as unknown as PnlBucketShare[];
 // Horizon returns are regenerated and compared by `mise run ui-fixtures --check`
 // (tests/scenarios/horizon/generate.mjs).
-it("pins the JSON inputs the horizon fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../..",
-  );
-  for (const source of fixture.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/scenarios/horizon/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it.each(
   fixture.cases.filter((candidate) => "report" in candidate).map((c) => c.name),
 )(

@@ -10,7 +10,6 @@ use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_c
 use super::instruments::PyBond;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::extract::extract_market;
-use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::errors::core_to_py;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._bond_quotes", "BondQuoteSet")]
@@ -39,27 +38,7 @@ impl PyBondQuoteSet {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._bond_quotes", "BondQuoteSet.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::to_value(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid BondQuoteSet"))?;
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &[row],
-            &[
-                ("clean_price_currency", "float64"),
-                ("clean_price_pct", "float64"),
-                ("dirty_price_currency", "float64"),
-                ("ytm", "float64"),
-                ("ytw", "float64"),
-                ("z_spread", "float64"),
-                ("discount_margin", "float64"),
-                ("oas", "float64"),
-                ("asw_par", "float64"),
-                ("asw_market", "float64"),
-                ("i_spread", "float64"),
-                ("japanese_simple_yield", "float64"),
-                ("moosmuller_ytm", "float64"),
-            ],
-        )
+        crate::bindings::core::table::envelope_to_pandas(py, &self.inner.to_table())
     }
 
     /// Return ``repr(self)``.
@@ -124,11 +103,8 @@ fn compute_quotes(
 ) -> PyResult<PyBondQuoteSet> {
     let market = extract_market(py, market)?;
     let as_of = py_to_date(as_of)?;
-    let quote_input: BondQuoteInput = match quote_input.extract::<String>() {
-        Ok(text) => serde_json::from_str(&text)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid BondQuoteInput"))?,
-        Err(_) => crate::bindings::module_utils::py_to_serde(py, quote_input, "BondQuoteInput")?,
-    };
+    let quote_input: BondQuoteInput =
+        crate::bindings::module_utils::spec_from_py(py, quote_input, "BondQuoteInput")?;
     let bond = bond.inner.clone();
     let inner = py
         .detach(move || {

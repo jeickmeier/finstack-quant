@@ -2,14 +2,10 @@
 // for capital-structure-report, over a quarterly model with a debt stack in two
 // payment classes. Rerun with `mise run ui-fixtures` after rebuilding the WASM
 // package.
-import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { serializeHost } from "../../../src/codec.mjs";
 import { emit } from "../../../scripts/fixture-output.mjs";
+import { native, readRepoJson } from "../../../scripts/fixture-inputs.mjs";
 
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
 const rejection = (run) => {
   try {
     run();
@@ -127,15 +123,9 @@ const summary = (config, evaluated = { modelJson, resultJson }) => ({
 const netCash = evaluate(modelWithCash([980000, 980000, 980000, 980000]));
 // The statements workbench's analyst model with its debt stack removed.
 const noCapitalStructure = evaluate({
-  ...JSON.parse(
-    await readFile(
-      new URL(
-        "../../../src/fixtures/statements/analyst-model.json",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-  ),
+  ...(await readRepoJson(
+    "finstack-quant-ui/src/fixtures/statements/analyst-model.json",
+  )),
   capital_structure: null,
 });
 const full = { period: "2025Q4", ebitda_node: "ebitda", cash_node: "cash" };

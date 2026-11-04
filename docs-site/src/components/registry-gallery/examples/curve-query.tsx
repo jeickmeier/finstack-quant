@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import type { ExampleProps } from "./props";
+import { sixPlaces, type ExampleProps } from "./props";
 import { MarketContextBrowser } from "@/components/finstack/core/components/market-context-browser/market-context-browser";
 import { StoredCurveView } from "@/components/finstack/core/components/curve-chart/stored-curve-view";
 import {
@@ -11,10 +11,10 @@ import {
   type CurveQueryTarget,
 } from "@/components/finstack/core/components/curve-query/curve-query";
 import { useCurveQuery } from "@/hooks/core/use-curve-query/use-curve-query";
-import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import data from "../data.json";
+import { curveQueryMarket } from "../fixtures";
 import { WorkerPreview } from "../worker-preview";
-const market = data.curveQuery.market as unknown as MarketContextStateWire;
+const market = curveQueryMarket;
 const marketJson = JSON.stringify(market);
 const cases = data.curveQuery.cases;
 // Starting text of each kind, from the fixture's lookups.
@@ -33,8 +33,6 @@ const startText = {
       .join("\n"),
   },
 };
-// Host display choice: six decimal places of the returned decimals.
-const sixPlaces = (value: number) => value.toFixed(6);
 function Lookup({
   target,
   density,

@@ -490,14 +490,11 @@ pub struct TestContext<'a> {
     /// Trust-held collateral cash outside the asset balances — currently the
     /// controlled-accumulation funding account.
     ///
-    /// N2: during accumulation, collected principal leaves the asset balances
-    /// and is diverted into the funding account, so it appeared in NEITHER the
-    /// collateral term NOR the cash term of the test. The OC ratio decayed by
-    /// exactly the accumulated amount while the denominator stayed flat,
-    /// producing a breach that does not exist — which then overrode the
-    /// accumulation lockout, since a diverted pass zeroes principal targets.
-    /// Real indentures count principal-collection-account cash in par-value
-    /// tests.
+    /// During accumulation, collected principal leaves the asset balances for
+    /// the funding account while the notes stay outstanding; without this term
+    /// the OC ratio would fall by the accumulated amount and report a breach
+    /// that does not exist. Indentures count principal-collection-account cash
+    /// in par-value tests.
     pub restricted_cash: Money,
     /// Recovery value of defaulted collateral whose recovery cash has not yet
     /// arrived (the pending recovery claims). Counted in the OC numerator so

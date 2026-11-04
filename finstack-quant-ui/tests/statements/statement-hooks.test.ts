@@ -83,7 +83,7 @@ const configJson = JSON.stringify({
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => harness?.close());
 
 /** Client over the real worker that records every operation and argument it forwards. */

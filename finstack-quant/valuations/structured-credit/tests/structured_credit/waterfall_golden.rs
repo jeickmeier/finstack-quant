@@ -447,7 +447,10 @@ fn test_golden_clo_oc_breach_diversion() {
         .find(|(name, _, _)| name.contains("OC_CLASS_A"));
 
     if let Some((_, ratio, passed)) = oc_test {
-        assert!(*ratio < 1.25, "OC ratio should be below trigger");
+        assert!(
+            ratio.is_some_and(|ratio| ratio < 1.25),
+            "OC ratio should be below trigger"
+        );
         assert!(!passed, "OC test should have failed");
     }
 
@@ -757,12 +760,16 @@ fn test_golden_cre_pro_rata_distribution() {
 
     // Check that LP gets ~80% and GP gets ~20% of residual
     let lp_dist = result
-        .distributions
+        .distributions()
+        .expect("distributions")
         .get(&RecipientType::Tranche("LP".into()))
+        .copied()
         .expect("LP distribution");
     let gp_dist = result
-        .distributions
+        .distributions()
+        .expect("distributions")
         .get(&RecipientType::ManagerFee(ManagementFeeType::Incentive))
+        .copied()
         .expect("GP promote distribution");
 
     let expected_gp = residual_amount.amount() * 0.20;

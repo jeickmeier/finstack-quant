@@ -1328,7 +1328,7 @@
             "t0": "2025-01-01",
             "t1": "2025-04-01",
             "instrument_id": "US912828XG33",
-            "num_repricings": 3,
+            "num_repricings": 2,
             "tolerance_abs": 10,
             "tolerance_pct": 1,
             "residual_pct": 0.8659541891389033,
@@ -1345,7 +1345,7 @@
               "Rates attribution computed using key-rate (per-tenor) DV01 across 1 curve(s); non-parallel curve moves are attributed per tenor",
               "Credit attribution skipped: no Cs01/BucketedCs01 metric in the T0 valuation while the credit curves moved; credit P&L set to zero (move flows to residual)",
               "Volatility attribution has Vega but no measurable volatility-surface shift; vol P&L set to zero",
-              "Metrics-based attribution dropped cs01, bucketed_cs01, cross_gamma_rates_credit from the default metric menu: hazard curve(s) 'HZ' carry no calibration recipe (built directly from hazard rates), so quote-space credit risk is unavailable (Model failure: Metric 'cs01' calculation failed: Calibration error: quote-space CS01 requires a lossless calibration recipe for hazard curve 'HZ' (a curve produced by the calibration pipeline, not one built directly from hazard rates) [instrument=US912828XG33, type=Bond, model=RatesCredit]); credit-curve P&L flows to residual. Calibrate the hazard curve, or use parallel or waterfall attribution, to attribute it."
+              "Metrics-based attribution dropped cs01, bucketed_cs01, cross_gamma_rates_credit from the default metric menu: hazard curve(s) 'HZ' carry no calibration recipe (built directly from hazard rates), so quote-space credit risk is unavailable; credit-curve P&L flows to residual. Calibrate the hazard curve, or use parallel or waterfall attribution, to attribute it."
             ]
           },
           "result_invalid": false

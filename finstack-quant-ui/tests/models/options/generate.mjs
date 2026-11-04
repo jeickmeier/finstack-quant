@@ -1,8 +1,5 @@
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { native } from "../../../scripts/fixture-inputs.mjs";
 // The worker's ModelsApi.optionCalculator over the raw package (the facade's
 // models namespace re-exports these functions unchanged).
 function price(r, vol) {

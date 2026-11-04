@@ -1,11 +1,10 @@
 "use client";
 import type { ExampleProps } from "./props";
-import type { TableEnvelopeWire } from "@/lib/finstack/generated/types/table_envelope";
 import { TableEnvelope } from "@/components/finstack/shared/table/table-envelope/table-envelope";
-import data from "../data.json";
+import { statementPlSummary } from "../fixtures";
 
 // Captured native statements_analytics.plSummaryReport over the analyst model; this item needs no worker.
-const envelope = data.statementPlSummary as unknown as TableEnvelopeWire;
+const envelope = statementPlSummary;
 
 export function Example({ density = "compact" }: ExampleProps) {
   return (

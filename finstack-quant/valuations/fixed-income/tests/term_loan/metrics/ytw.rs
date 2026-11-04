@@ -60,7 +60,7 @@ fn test_ytw_is_minimum_of_ytm_and_ytc() {
     let result = loan.price_with_metrics(
         &market,
         as_of,
-        &[MetricId::Ytm, MetricId::Ytw, MetricId::custom("ytc")],
+        &[MetricId::Ytm, MetricId::Ytw, MetricId::Ytc],
         finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
@@ -127,7 +127,7 @@ fn test_ytw_callable_amortizing_loan_coupon_on_call_date() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Ytm, MetricId::Ytw, MetricId::custom("ytc")],
+            &[MetricId::Ytm, MetricId::Ytw, MetricId::Ytc],
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("pricing should succeed");
@@ -325,7 +325,7 @@ fn test_ytw_includes_standing_call_for_seasoned_callable_loan() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Ytm, MetricId::Ytw, MetricId::custom("ytc")],
+            &[MetricId::Ytm, MetricId::Ytw, MetricId::Ytc],
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("pricing should succeed");
@@ -443,7 +443,7 @@ fn yields(loan: &TermLoan, as_of: Date) -> (f64, f64, f64) {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Ytm, MetricId::Ytw, MetricId::custom("ytc")],
+            &[MetricId::Ytm, MetricId::Ytw, MetricId::Ytc],
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("pricing should succeed");
@@ -522,7 +522,7 @@ fn test_yt2y_capped_at_weekend_maturity_equals_ytm() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Ytm, MetricId::custom("yt2y")],
+            &[MetricId::Ytm, MetricId::Yt2y],
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("pricing should succeed");

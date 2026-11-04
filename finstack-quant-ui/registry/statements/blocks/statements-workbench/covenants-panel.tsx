@@ -17,15 +17,12 @@ import { useForecastBreaches } from "@/hooks/covenants/use-forecast-breaches/use
  * (statements_analytics.forecastBreaches) over the same periods.
  */
 export function CovenantsPanel({
-  modelJson,
   resultsJson,
   nodeIds,
   defaultEngineJson,
   density,
 }: {
-  /** Canonical model JSON the workbench evaluated. */
-  modelJson: string;
-  /** Host-serialized StatementResult of that model. */
+  /** Host-serialized StatementResult the workbench evaluated. */
   resultsJson: string;
   /** The model's node ids, offered for every covenant metric id. */
   nodeIds: readonly string[];
@@ -39,12 +36,12 @@ export function CovenantsPanel({
     defaultEngineJson ?? null,
   );
   const compliance = useEvaluateCovenants(
-    engineJson ? { engineJson, modelJson, resultsJson } : null,
+    engineJson ? { engineJson, resultsJson } : null,
   );
   const [configJson, setConfigJson] = useState<string | null>(null);
   const forecast = useForecastBreaches(
     engineJson && configJson !== null
-      ? { engineJson, modelJson, resultsJson, configJson }
+      ? { engineJson, resultsJson, configJson }
       : null,
   );
   return (

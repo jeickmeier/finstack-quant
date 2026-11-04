@@ -1,8 +1,4 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterEach, it, expect, vi } from "vitest";
 import {
   render,
@@ -75,18 +71,7 @@ const priceSentence = (severity: number) =>
   `Price (clean, % of current balance). Par reference: 100. Severity: ${severity}.`;
 // The native scenario tables are regenerated and compared by
 // `mise run ui-fixtures --check` (tests/valuations/scenario-table/generate.mjs).
-it("records its sources and keeps current-face prices across the factor-adjusted tranche", () => {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-  for (const [source, hash] of [
-    [fixture.instrumentSource, fixture.instrumentSha256],
-    [fixture.marketSource, fixture.marketSha256],
-  ])
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(root, source!)))
-        .digest("hex"),
-      `${source} changed since tests/valuations/scenario-table/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(hash);
+it("keeps current-face prices across the factor-adjusted tranche", () => {
   const adjusted =
     fixture.cases[1]!.instrument.instrument.spec.tranches.tranches[0]!;
   expect(adjusted.current_balance.amount).toBe("50000000");

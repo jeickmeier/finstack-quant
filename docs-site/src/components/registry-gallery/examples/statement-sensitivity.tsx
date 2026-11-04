@@ -1,19 +1,18 @@
 "use client";
 import { useState } from "react";
 import type { ExampleProps } from "./props";
-import type { StatementResult } from "finstack-quant-wasm";
-import type { StatementSensitivity as Sensitivity } from "@/workers/finstack-contract";
 import {
   StatementSensitivity,
   type StatementSensitivityDefaults,
 } from "@/components/finstack/statements/components/statement-sensitivity/statement-sensitivity";
 import data from "../data.json";
+import { statementSensitivity, statementResult } from "../fixtures";
 
 // Captured native runSensitivity and generateTornadoEntries of the analyst
 // model under an illustrative run; this item needs no worker.
 const run = data.statementSensitivityRun as StatementSensitivityDefaults;
-const captured = data.statementSensitivity as unknown as Sensitivity;
-const result = data.statementResult as unknown as StatementResult;
+const captured = statementSensitivity;
+const result = statementResult;
 const nodeIds = Object.keys(data.statementModel.nodes);
 const periods = data.statementModel.periods.map((period) => period.id);
 

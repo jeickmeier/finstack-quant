@@ -19883,9 +19883,11 @@ export interface PeriodDiagnostics {
    */
   warf?: number | null;
   /**
-   * How this period's waterfall ran.
+   * How this period's waterfall ran: who was paid, how much, and what was
+   * left. Its recipient-keyed totals are not serialized; `payment_records`
+   * carries the same cash.
    */
-  waterfall: PeriodWaterfall;
+  waterfall: WaterfallDistribution;
   /**
    * Balance-weighted spread of the performing floating-rate collateral (basis
    * points). `None` when no performing floating-rate balance remains.
@@ -19949,56 +19951,67 @@ export interface NonWaterfallPayment {
   [k: string]: unknown;
 }
 /**
- * How one period's waterfall ran: who was paid, how much, and what was left.
- *
- * The serializable projection of [`WaterfallDistribution`]: its two
- * recipient-keyed maps cannot be JSON (a `RecipientType::Tranche` is not a
- * string key) and hold nothing `payment_records` does not, and its payment
- * date and coverage tests are already on [`PeriodDiagnostics`].
+ * Result of waterfall distribution
  */
-export interface PeriodWaterfall {
+export interface WaterfallDistribution {
   /**
-   * Coverage-test diversions that moved cash, in execution order.
+   * Coverage test results as `(test id, ratio, passed)`. The ratio is
+   * `None` when the test has no claim outstanding (a zero denominator);
+   * such a test passes.
    */
-  diverted_amounts: DiversionRecord[];
+  coverage_tests: [string, number | null, boolean][];
   /**
-   * Total cash failing coverage tests diverted this period.
+   * Detailed diverted payment records.
+   */
+  diverted_amounts?: DiversionRecord[];
+  /**
+   * Total diverted cash
    */
   diverted_cash: Money;
   /**
-   * Whether any coverage-test tier failed this period, even with no cash
-   * left to divert.
+   * Whether any diversions occurred
    */
   had_diversions: boolean;
   /**
-   * Every recipient payment, in execution order.
+   * Payment date
+   */
+  payment_date: DateWire;
+  /**
+   * Detailed payment records
    */
   payment_records: PaymentRecord[];
   /**
-   * Principal proceeds spent on fee or interest tiers.
+   * Principal proceeds spent on fee or interest tiers whose
+   * [`FundingSource`] is `InterestThenPrincipal`. Already netted out of
+   * `remaining_principal`; reported so the principal account's use is
+   * visible.
    */
   principal_used_for_interest: Money;
   /**
-   * Recovery cash included in `total_available`.
+   * Recovery proceeds included in this period's available cash.
+   * Tracked separately from principal collections for trustee report reconciliation.
    */
-  recovery_proceeds: Money;
+  recovery_proceeds?: Money;
   /**
-   * Interest proceeds left undistributed, carried to the next period.
+   * Remaining undistributed cash
+   */
+  remaining_cash: Money;
+  /**
+   * Undistributed interest retained for subsequent interest-waterfall periods.
    */
   remaining_interest: Money;
   /**
-   * Principal proceeds left undistributed, carried to the next period.
+   * Undistributed principal retained for reinvestment or debt repayment.
    */
   remaining_principal: Money;
   /**
-   * Cash each tier allocated, as `(tier id, amount)` in execution order.
+   * Tier-level allocations
    */
   tier_allocations: [string, Money][];
   /**
-   * Cash entering the waterfall (interest plus principal proceeds).
+   * Total available cash at start
    */
   total_available: Money;
-  [k: string]: unknown;
 }
 /**
  * One recipient's payment as the waterfall executor made it.
@@ -20873,7 +20886,7 @@ export interface SimulationFieldUnits {
    */
   credit_enhancement: MetricFieldUnit;
   /**
-   * Unit of `PeriodWaterfall::diverted_cash` and of each diversion's amount.
+   * Unit of `WaterfallDistribution::diverted_cash` and of each diversion's amount.
    */
   diverted_cash: MetricFieldUnit;
   /**

@@ -74,6 +74,10 @@ syn = { version = "3", features = ["full", "visit-mut"] }
 wasm-bindgen-test = "0.3"
 # `Currency::iter()` in the currency-statics coverage test
 strum = { workspace = true }
+# `boundary_signatures.rs` parses the `src/api` exports
+syn = { version = "2", default-features = false, features = ["full", "parsing", "printing"] }
+quote = { version = "1", default-features = false }
+proc-macro2 = { version = "1", default-features = false }
 
 # Features
 #

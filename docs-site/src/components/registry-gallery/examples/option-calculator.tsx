@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { ExampleProps } from "./props";
+import { sixPlaces, type ExampleProps } from "./props";
 import {
   OptionCalculator,
   type OptionCalculation,
@@ -18,8 +18,6 @@ export function Example({ density = "compact" }: ExampleProps) {
     </WorkerPreview>
   );
 }
-// Host display choice: six decimal places of the returned decimals.
-const sixPlaces = (value: number) => value.toFixed(6);
 function Calculator({ density }: ExampleProps) {
   // Starts from the fixture's terms; Calculate replaces the request.
   const [request, setRequest] = useState(

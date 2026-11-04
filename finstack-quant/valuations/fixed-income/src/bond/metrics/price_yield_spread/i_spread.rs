@@ -1,7 +1,7 @@
 //! I-spread, and the yield-over-a-curve rule it shares with G-spread.
 
 use crate::bond::Bond;
-use crate::bond::pricing::quote_conversions::curve_par_rate;
+use crate::bond::pricing::quote_conversions::{curve_par_rate, i_spread_horizon};
 use crate::bond::pricing::settlement::QuoteDateContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
@@ -43,9 +43,9 @@ pub(super) fn yield_over_curve_par_rate(
     let (yield_rate, horizon) = match workout {
         Some(path) => (
             path.yield_rate,
-            path.flows.last().map_or(bond.maturity, |(date, _)| *date),
+            i_spread_horizon(bond, path.flows.last().map(|(date, _)| *date)),
         ),
-        None => (ytm, bond.maturity),
+        None => (ytm, i_spread_horizon(bond, None)),
     };
     Ok(yield_rate - curve_par_rate(bond, curve.as_ref(), quote_ctx.quote_date, horizon)?)
 }

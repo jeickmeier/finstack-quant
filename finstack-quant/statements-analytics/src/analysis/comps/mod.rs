@@ -368,11 +368,13 @@ mod tests {
         let subject = universe[0].clone(); // Company A
         let filter = PeerFilter::default();
 
-        let peer_set = PeerSet::from_universe(subject, &universe, &filter, PeriodBasis::Ltm);
+        let (peer_set, excluded) =
+            PeerSet::from_universe(subject, &universe, &filter, PeriodBasis::Ltm);
 
-        // Subject should not appear in peers
+        // Subject should not appear in peers, nor count as excluded
         assert!(!peer_set.peers.iter().any(|p| p.id.as_str() == "A"));
         assert_eq!(peer_set.peer_count(), universe.len() - 1);
+        assert_eq!(excluded, 0);
     }
 
     #[test]
@@ -385,9 +387,11 @@ mod tests {
             ..Default::default()
         };
 
-        let peer_set = PeerSet::from_universe(subject, &universe, &filter, PeriodBasis::Ltm);
+        let (peer_set, excluded) =
+            PeerSet::from_universe(subject, &universe, &filter, PeriodBasis::Ltm);
         // Energy + BB: A, B, D, F, I
         assert_eq!(peer_set.peer_count(), 5);
+        assert_eq!(excluded, universe.len() - 5);
     }
 
     // Multiples computation tests

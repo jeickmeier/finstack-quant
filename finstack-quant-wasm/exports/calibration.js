@@ -1,10 +1,7 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
 import { schema } from './calibration/schema.js';
 
-// The cap/floor Hull-White calibrators take an optional projection curve
-// (`forward`). wasm-bindgen cannot borrow an optional handle, so the two raw
-// exports of each are one Rust call each (`forward: None` and `Some(forward)`) and
-// the published function picks between them.
+// wasm-bindgen cannot borrow the optional `forward`: picks between the two raw exports.
 const calibrateHullWhiteToCapFloors = (discount, quotes, config, forward = undefined) =>
   forward === undefined || forward === null
     ? wasm.calibrateHullWhiteToCapFloorsWithoutForward(discount, quotes, config)

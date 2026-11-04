@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -36,18 +28,24 @@ import {
   type CsaPresetRequest,
   type MarginCallsRequest,
 } from "@/workers/finstack-contract";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import fixture from "@/lib/finstack/fixtures/margin/vm.json";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 type Resources = Record<
   "vmCalculatorConstructed" | "vmCalculatorFreed",
   number
 >;
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness([
+  "csaPreset",
+  "validateCsa",
+  "vm",
+  "marginCalls",
+  "marginCallDates",
+]);
 const resources = () =>
   (harness.proxy as unknown as { resources(): Promise<Resources> }).resources();
 /** VmCalculator handles constructed and freed by one call. */
@@ -63,35 +61,6 @@ async function counted<T>(call: () => Promise<T>) {
     ],
   };
 }
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  const proxy = harness.proxy as unknown as Record<
-    string,
-    (request: unknown) => Promise<never>
-  >;
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (
-        [
-          "csaPreset",
-          "validateCsa",
-          "vm",
-          "marginCalls",
-          "marginCallDates",
-        ].includes(method)
-      )
-        return unwrap(await proxy[method]!(request));
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

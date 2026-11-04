@@ -23643,12 +23643,15 @@ export interface ValuationInstrumentsNamespace {
    * @returns Weighted average maturity in years (ACT/365F from `asOf`); `undefined` when the pool balance is zero.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
    */
-  assetPoolWeightedAvgMaturity(pool: generated.valuations.AssetPool | string, asOf: string): number | undefined;
+  assetPoolWeightedAvgMaturity(
+    pool: generated.valuations.AssetPool | string,
+    asOf: string
+  ): number | undefined;
   /**
    * Moody's diversity score of the pool (mirrors Rust `AssetPool::diversity_score`).
    * @param pool - `AssetPool` plain object or JSON string.
-   * @returns Diversity score over the assets that name an obligor; `undefined` when none does or the pool balance cannot be summed.
-   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
+   * @returns Diversity score over the assets that name an obligor; `undefined` when the pool balance is zero or no asset names an obligor.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or the pool balances are inconsistent.
    */
   assetPoolDiversityScore(pool: generated.valuations.AssetPool | string): number | undefined;
   /**
@@ -23681,9 +23684,7 @@ export interface ValuationInstrumentsNamespace {
    * @returns `TableEnvelope` with a `date` column in ascending order and float `cashflow`, `interest`, `principal`, `pik`, `deferred` and `writedown` columns in the flows' one currency, which the table does not state (read `total_interest.currency`). Flows on one date are summed per kind; a kind with no flow on a date is zero; the columns remain when there are no rows.
    * @throws Error - Throws with kind `validation` if `cashflows` does not match the `TrancheCashflows` schema or mixes currencies.
    */
-  trancheCashflowsTable(
-    cashflows: generated.valuations.TrancheCashflows | string
-  ): TableEnvelope;
+  trancheCashflowsTable(cashflows: generated.valuations.TrancheCashflows | string): TableEnvelope;
   /**
    * Yield and I-spread to every call, put and maturity exit of a bond at one market price, with the worst marked (mirrors Rust `bond_workout_ladder`).
    * @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights must carry `quoted_clean_price_pct`; one with none falls back to its model price.
@@ -23697,6 +23698,13 @@ export interface ValuationInstrumentsNamespace {
     marketJson: string,
     asOf: string
   ): generated.valuations.BondWorkoutLadder;
+  /**
+   * One row per exit of a bond workout ladder (mirrors Rust `BondWorkoutLadder::to_table`).
+   * @param ladder - `BondWorkoutLadder` plain object or JSON string, as `bondWorkoutLadder` returns it.
+   * @returns `TableEnvelope` in date order with columns `date` (ISO string), `kind` (`call`, `put` or `maturity`), `redemption_price_pct` (percent of the principal redeemed), `redemption_amount` (float), `currency` (ISO code of the amount), `make_whole` (boolean), `yield_rate` and `i_spread` (nullable decimals) and `is_worst` (boolean). The columns remain when there are no rows.
+   * @throws Error - Throws with kind `validation` if `ladder` does not match the `BondWorkoutLadder` schema.
+   */
+  bondWorkoutLadderTable(ladder: generated.valuations.BondWorkoutLadder | string): TableEnvelope;
   /**
    * Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices (mirrors Rust `convertible_spot_ladder`).
    * @param bond - Borrowed `ConvertibleBond` handle; it is not consumed. Its `metric_pricing_overrides.bump_config` sets the spot bump behind delta (default 1% of each row's share price).
@@ -23713,6 +23721,15 @@ export interface ValuationInstrumentsNamespace {
     spots?: readonly number[] | null
   ): generated.valuations.ConvertibleSpotLadder;
   /**
+   * One row per share price of a convertible spot ladder (mirrors Rust `ConvertibleSpotLadder::to_table`).
+   * @param ladder - `ConvertibleSpotLadder` plain object or JSON string, as `convertibleSpotLadder` returns it.
+   * @returns `TableEnvelope` in ascending share price with columns `spot` (float), `is_market_spot` (boolean), `price` (float), `delta` and `hedge_ratio` (nullable float), `regime` (nullable string: `busted`, `balanced` or `equity_sensitive`), `conversion_value` and `parity` (float), `conversion_premium` (nullable float) and `bond_floor` (float); money columns are in the ladder's `currency`, which the table does not state. The columns remain when there are no rows.
+   * @throws Error - Throws with kind `validation` if `ladder` does not match the `ConvertibleSpotLadder` schema.
+   */
+  convertibleSpotLadderTable(
+    ladder: generated.valuations.ConvertibleSpotLadder | string
+  ): TableEnvelope;
+  /**
    * Every price, yield and spread quote of a bond, solved from any one of them (mirrors Rust `compute_quotes`).
    * @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights needs HW1F parameters on the bond or in the market, because its `oas` is part of the set.
    * @param marketJson - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index curve.
@@ -23728,6 +23745,13 @@ export interface ValuationInstrumentsNamespace {
     quoteInput: generated.valuations.BondQuoteInput | string
   ): generated.valuations.BondQuoteSet;
   /**
+   * The quote set of a bond as a one-row table (mirrors Rust `BondQuoteSet::to_table`).
+   * @param quotes - `BondQuoteSet` plain object or JSON string, as `computeQuotes` returns it.
+   * @returns `TableEnvelope` with one row and one column per field in declaration order: float `clean_price_currency`, `clean_price_pct` and `dirty_price_currency`, then nullable float `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_par`, `asw_market`, `i_spread`, `japanese_simple_yield` and `moosmuller_ytm`, null where the quote does not apply.
+   * @throws Error - Throws with kind `validation` if `quotes` does not match the `BondQuoteSet` schema.
+   */
+  bondQuoteSetTable(quotes: generated.valuations.BondQuoteSet | string): TableEnvelope;
+  /**
    * Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).
    * @param pool - `AssetPool` plain object or JSON string, in any of its three representations.
    * @param asOf - ISO-8601 date the remaining maturities are measured from. It also stands in for the closing date when a pool is normalized: it ages representative lines and counts the delayed draws already funded on instrument collateral.
@@ -23738,6 +23762,13 @@ export interface ValuationInstrumentsNamespace {
     pool: generated.valuations.AssetPool | string,
     asOf: string
   ): generated.valuations.PoolReport;
+  /**
+   * The three concentration tables of a pool report stacked as one long table (mirrors Rust `PoolReport::to_table`).
+   * @param report - `PoolReport` plain object or JSON string, as `poolReport` returns it.
+   * @returns `TableEnvelope` with the obligor rows, then industry, then rating, each in report order, and columns `dimension` (`obligor`, `industry` or `rating`), `key` (nullable string, null for the assets with no value on the dimension), `balance` (float), `currency` (ISO code of the balance), `balance_pct` (percent points) and `asset_count` (integer). The columns remain when every table is empty.
+   * @throws Error - Throws with kind `validation` if `report` does not match the `PoolReport` schema.
+   */
+  poolReportTable(report: generated.valuations.PoolReport | string): TableEnvelope;
   /**
    * Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).
    * @param pool - `AssetPool` plain object or JSON string.
@@ -27205,7 +27236,9 @@ export interface ModelCreditNamespace {
    * @returns `MertonReport` plain object; per-horizon arrays align with `horizons`, and a measure Rust rejects for this model is `null` with its message under its field name in `errors`.
    * @throws Error - Throws with kind `validation` if the request is malformed or has an unknown field, a horizon is non-finite or not positive, or the equity calibration rejects its inputs.
    */
-  mertonReport(request: generated.models.MertonReportRequest | string): generated.models.MertonReport;
+  mertonReport(
+    request: generated.models.MertonReportRequest | string
+  ): generated.models.MertonReport;
   /**
    * Moody's WARF rating factor for one credit rating.
    * @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`; agency notches are normalized by the Rust parser.
@@ -31414,7 +31447,7 @@ export interface ModelBuilder extends WasmOwned {
    *
    * Twin of Python `ModelBuilder.forecast` (Rust `ModelBuilder::forecast`).
    * @param nodeId - Node whose forecast periods the spec fills.
-   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
+   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
    * @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
    */
   forecast(nodeId: string, forecastSpec: generated.statements.ForecastSpec | string): void;
@@ -31689,7 +31722,7 @@ export interface MixedNodeBuilder extends WasmOwned {
    *
    * Twin of Python `MixedNodeBuilder.forecast` (Rust
    * `MixedNodeBuilder::forecast`).
-   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
+   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
    * @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
    */
   forecast(forecastSpec: generated.statements.ForecastSpec | string): void;
@@ -32042,7 +32075,7 @@ export interface StatementsNamespace {
    * @returns `RollupSpec` plain object with the `frequency` and every declared node with its method in model order; `methods` is omitted when no node declares one.
    * @throws Error - Throws with kind `validation` if the model is malformed or `frequency` is not a recognized label.
    */
-  rollupSpecDefaultFor(
+  rollupSpecDeclaredMethods(
     model: JsonInput,
     frequency: 'quarterly' | 'semi_annual' | 'annual'
   ): generated.statements.RollupSpec;
@@ -32801,7 +32834,7 @@ export interface StatementsAnalyticsNamespace {
    * @returns Credit-assessment result object from the statement results.
    * @param resultsJson - Evaluated statement-result JSON.
    * @param period - Statement period identifier, such as `2025Q4`, that is a period of the results in the model's own frequency: `2025` is the annual period, not the last quarter of a quarterly model.
-   * @throws Error - Rejects malformed `results_json`, a `period` value that is not a valid statement period identifier, a `period` at which no node of the results has a value (kind `validation`), or failure to serialize the assessment to JavaScript.
+   * @throws Error - Rejects malformed `results_json`, a `period` value that is not a valid statement period identifier, a `period` that is not one of the results' `periods` (kind `validation`), or failure to serialize the assessment to JavaScript.
    */
   creditAssessment(resultsJson: JsonInput, period: string): CreditAssessment;
   /**
@@ -32818,11 +32851,19 @@ export interface StatementsAnalyticsNamespace {
     config: generated.statements_analytics.CapitalStructureSummaryConfig | string
   ): generated.statements_analytics.CapitalStructureSummary;
   /**
+   * One row per tranche of a capital structure summary (mirrors Rust `CapitalStructureSummary::to_table`).
+   * @param summary - `CapitalStructureSummary` plain object or JSON string, as `capitalStructureSummary` returns it.
+   * @returns `TableEnvelope` in tranche order (rank, then model declaration order) with columns `id`, `kind` (`bond`, `convertible_bond`, `term_loan` or `revolving_credit`), `rank` (integer), `payment_class` (nullable string), `balance`, `share_of_debt` (nullable decimal), `maturity` (ISO date string), `cumulative_debt`, `leverage` and `interest_coverage` (nullable, in turns) and `ltm_interest` (nullable); amounts are floats in the summary's `currency`, which the table does not state. The columns remain when there are no tranches.
+   * @throws Error - Throws with kind `validation` if `summary` does not match the `CapitalStructureSummary` schema.
+   */
+  capitalStructureSummaryTable(
+    summary: generated.statements_analytics.CapitalStructureSummary | string
+  ): TableEnvelope;
+  /**
    * Evaluate covenant compliance at the end of every statement result period.
    *
-   * Each period that carries a value in `results` is tested on its last
-   * calendar day (from the model calendar) with the covenants applicable on
-   * that date: a covenant window covering the date replaces the engine's
+   * Each period of `results.periods` is tested on its last calendar day with
+   * the covenants applicable on that date: a covenant window covering the date replaces the engine's
    * top-level specifications, and waivers and threshold schedules apply. A
    * node is read only when an applicable covenant needs it, so a node that is
    * missing or non-finite in a period where no applicable covenant reads it
@@ -32832,20 +32873,18 @@ export interface StatementsAnalyticsNamespace {
    *
    * @param results - Evaluated `StatementResult` (object or JSON). Node ids are the covenant metric ids (`metric_id`, or each covenant type's conventional name); ratios in turns (`3.5` means 3.5x), amounts in the model currency.
    * @param covenants - `CovenantEngine` handle whose specifications, windows, waivers and threshold schedules are evaluated.
-   * @param model - `FinancialModelSpec` (object or JSON) whose period calendar gives each result period's test date.
-   * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per result period in ascending period order, with the reports of the covenants applicable on that date keyed by covenant instance key in engine order. (Python returns the same reports as a long DataFrame.)
-   * @throws If `results` or `model` is malformed, a result period is missing from the model calendar, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).
+   * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per result period in timeline order, with the reports of the covenants applicable on that date keyed by covenant instance key in engine order. (Python returns the same reports as a long DataFrame.)
+   * @throws If `results` is malformed, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).
    */
   evaluateCovenants(
     results: StatementResult | string,
-    covenants: CovenantEngine,
-    model: JsonInput
+    covenants: CovenantEngine
   ): generated.covenants.DatedCovenantReports[];
   /**
    * Forecast covenant breaches over every statement result period.
    *
-   * Every period that carries a value in `results` is a test date (its last
-   * calendar day). Effective windows, waivers and threshold schedules are
+   * Every period of `results.periods` is a test date (its last calendar day).
+   * Effective windows, waivers and threshold schedules are
    * honored and non-numeric covenants are skipped. Deterministic breaches are
    * always listed; in stochastic mode dates whose breach probability reaches
    * `config.breach_probability_threshold` are listed too. Without
@@ -32854,16 +32893,14 @@ export interface StatementsAnalyticsNamespace {
    *
    * @param results - Evaluated `StatementResult` (object or JSON) holding every metric the active numeric covenants read on each test date (ratios in turns).
    * @param covenants - `CovenantEngine` handle whose effective specifications are forecast.
-   * @param model - `FinancialModelSpec` (object or JSON) whose period calendar gives the test dates and the default horizon start.
-   * @param config - Optional `CovenantForecastConfig` wire object; omitted means deterministic maintenance-scope forecasting.
+   * @param config - Optional `CovenantForecastConfig` object or JSON text (JSON text keeps a uint64 `random_seed` exact); omitted means deterministic maintenance-scope forecasting.
    * @returns `FutureBreach` wire objects sorted by breach date, then covenant id.
-   * @throws If `metrics` is empty or repeats a date, the engine or configuration is invalid or an observation is non-finite (kind `validation`), or a required metric is missing on a date (kind `not_found`).
+   * @throws If `results` or `config` is malformed, the engine or configuration is invalid or a metric an active covenant reads is non-finite (kind `validation`), or such a metric has no value in a period (kind `not_found`).
    */
   forecastBreaches(
     results: StatementResult | string,
     covenants: CovenantEngine,
-    model: JsonInput,
-    config?: generated.covenants.CovenantForecastConfig | null
+    config?: generated.covenants.CovenantForecastConfig | string | null
   ): generated.covenants.FutureBreach[];
   /**
    * Run checks from a suite spec against a model.
@@ -33010,6 +33047,15 @@ export interface StatementsAnalyticsNamespace {
     universe: generated.statements_analytics.CompanyMetrics[] | string,
     config: generated.statements_analytics.RelativeValueReportConfig | string
   ): generated.statements_analytics.RelativeValueReport;
+  /**
+   * Comps table of a relative value report, one row per company (mirrors Rust `RelativeValueReport::to_table`).
+   * @param report - `RelativeValueReport` plain object or JSON string, as `relativeValueReport` returns it.
+   * @returns `TableEnvelope` with `id` (string) and `is_subject` (boolean) columns, then one nullable float column per configured multiple named by its wire form (`ev_ebitda`, `pe`, ...), in config order; rows are the subject first, then the peers in universe order, and a value Rust cannot compute is null.
+   * @throws Error - Throws with kind `validation` if `report` does not match the `RelativeValueReport` schema, a multiple appears twice, or a company row does not hold one value per multiple.
+   */
+  relativeValueReportTable(
+    report: generated.statements_analytics.RelativeValueReport | string
+  ): TableEnvelope;
   /**
    * Reusable dependency tracer for a financial model.
    */
@@ -33392,7 +33438,7 @@ export interface StatementsAnalyticsNamespace {
    * @param universe - Array of candidate `CompanyMetrics` (array or JSON).
    * @param filter - `PeerFilter` applied to the universe (object or JSON).
    * @param periodBasis - `"ltm"`, `"ntm"`, or `{custom: "<label>"}` for another basis such as `"FY2025E"`.
-   * @returns `PeerSet` plain object: `subject`, the accepted `peers` and `period_basis`.
+   * @returns `[peerSet, excludedCount]`: the `PeerSet` plain object (`subject`, the accepted `peers` and `period_basis`) and the number of universe members the filter dropped, a member with the subject's id not counted.
    * @throws Error - Throws with kind `validation` if an input is malformed or `periodBasis` is not a period basis.
    */
   peerSetFromUniverse(
@@ -33400,7 +33446,7 @@ export interface StatementsAnalyticsNamespace {
     universe: generated.statements_analytics.CompanyMetrics[] | string,
     filter: generated.statements_analytics.PeerFilter | string,
     periodBasis: generated.statements_analytics.PeriodBasis
-  ): generated.statements_analytics.PeerSet;
+  ): [generated.statements_analytics.PeerSet, number];
   /**
    * Statement result of one scenario.
    *
@@ -34596,7 +34642,9 @@ export interface PortfolioNamespace {
    * @returns One `PnlBucketShare` per bucket: the attribute's wire `field`, its `amount` in the base currency and `pct_of_total` in signed percentage points, `null` when `total_pnl` is effectively zero.
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `attribution` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `PortfolioAttribution` schema.
    */
-  portfolioAttributionPctOfTotalByBucket(attribution: PortfolioAttribution | string): PnlBucketShare[];
+  portfolioAttributionPctOfTotalByBucket(
+    attribution: PortfolioAttribution | string
+  ): PnlBucketShare[];
   /**
    * Check that a portfolio attribution's factor buckets sum to its total P&L.
    *

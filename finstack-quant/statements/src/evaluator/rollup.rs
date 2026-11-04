@@ -14,7 +14,7 @@
 //! Each line declares its method on the node ([`NodeSpec::rollup`]), so every
 //! host gets the same numbers from the same model. A line resolves as: its
 //! entry in [`RollupSpec::methods`], then its declaration, then `sum`. Tags
-//! never choose a method. [`RollupSpec::default_for`] lists the declarations
+//! never choose a method. [`RollupSpec::declared_methods`] lists the declarations
 //! for a host that shows or edits them.
 //!
 //! [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
@@ -110,7 +110,7 @@ impl RollupSpec {
     /// declare("cash", RollupMethod::PeriodEnd);
     /// declare("margin", RollupMethod::Formula);
     ///
-    /// let spec = RollupSpec::default_for(&model, PeriodKind::Annual);
+    /// let spec = RollupSpec::declared_methods(&model, PeriodKind::Annual);
     /// assert_eq!(spec.methods.get("cash"), Some(&RollupMethod::PeriodEnd));
     /// assert_eq!(spec.methods.get("margin"), Some(&RollupMethod::Formula));
     /// assert_eq!(spec.methods.get("revenue"), None);
@@ -120,7 +120,7 @@ impl RollupSpec {
     ///
     /// [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
     #[must_use]
-    pub fn default_for(model: &FinancialModelSpec, frequency: PeriodKind) -> Self {
+    pub fn declared_methods(model: &FinancialModelSpec, frequency: PeriodKind) -> Self {
         let methods = model
             .nodes
             .iter()
@@ -247,7 +247,10 @@ impl StatementResult {
                 EvaluationContext::new_with_history(target, Arc::clone(&history), Arc::default());
             for node_id in eval_order {
                 let node = node_id.as_str();
-                let value = match methods.get(node).copied().unwrap_or(RollupMethod::Sum) {
+                let method = methods.get(node).copied().ok_or_else(|| {
+                    Error::eval(format!("No rollup method was resolved for node '{node}'"))
+                })?;
+                let value = match method {
                     RollupMethod::Sum => bucket
                         .sources
                         .iter()

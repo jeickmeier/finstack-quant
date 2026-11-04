@@ -4370,7 +4370,9 @@ export interface MertonReport {
    */
   distance_to_default: number[];
   /**
-   * Message of each rejected measure, by field name; empty when all computed.
+   * Message of each rejected measure, keyed by the measure's field name
+   * (`implied_spread`, `debt_spread`, `cds_par_spread`, `implied_equity`);
+   * empty when all computed.
    */
   errors: {
     [k: string]: string;

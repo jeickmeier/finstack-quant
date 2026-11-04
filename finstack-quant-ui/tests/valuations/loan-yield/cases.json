@@ -33,19 +33,17 @@
           "theta_roll_down"
         ],
         "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
-        "Instrument Specific": [
+        "Pricing": [
           "all_in_rate",
+          "discount_margin",
+          "embedded_option_value",
+          "oas",
           "oid_eir_amortization",
           "oid_eir_rate",
           "yt2y",
           "yt3y",
           "yt4y",
-          "ytc"
-        ],
-        "Pricing": [
-          "discount_margin",
-          "embedded_option_value",
-          "oas",
+          "ytc",
           "ytm",
           "ytw"
         ],
@@ -97,7 +95,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -106,7 +104,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -115,7 +113,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -124,7 +122,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -142,7 +140,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -151,7 +149,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -160,7 +158,7 @@
           "components": [],
           "coordinates": [],
           "unit": "currency",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -310,19 +308,17 @@
           "theta_roll_down"
         ],
         "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
-        "Instrument Specific": [
+        "Pricing": [
           "all_in_rate",
+          "discount_margin",
+          "embedded_option_value",
+          "oas",
           "oid_eir_amortization",
           "oid_eir_rate",
           "yt2y",
           "yt3y",
           "yt4y",
-          "ytc"
-        ],
-        "Pricing": [
-          "discount_margin",
-          "embedded_option_value",
-          "oas",
+          "ytc",
           "ytm",
           "ytw"
         ],
@@ -374,7 +370,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -383,7 +379,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -392,7 +388,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -401,7 +397,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -419,7 +415,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -428,7 +424,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -437,7 +433,7 @@
           "components": [],
           "coordinates": [],
           "unit": "currency",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -591,19 +587,17 @@
           "theta_roll_down"
         ],
         "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
-        "Instrument Specific": [
+        "Pricing": [
           "all_in_rate",
+          "discount_margin",
+          "embedded_option_value",
+          "oas",
           "oid_eir_amortization",
           "oid_eir_rate",
           "yt2y",
           "yt3y",
           "yt4y",
-          "ytc"
-        ],
-        "Pricing": [
-          "discount_margin",
-          "embedded_option_value",
-          "oas",
+          "ytc",
           "ytm",
           "ytw"
         ],
@@ -655,7 +649,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -664,7 +658,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -673,7 +667,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -682,7 +676,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -700,7 +694,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -709,7 +703,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -718,7 +712,7 @@
           "components": [],
           "coordinates": [],
           "unit": "currency",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -872,19 +866,17 @@
           "theta_roll_down"
         ],
         "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
-        "Instrument Specific": [
+        "Pricing": [
           "all_in_rate",
+          "discount_margin",
+          "embedded_option_value",
+          "oas",
           "oid_eir_amortization",
           "oid_eir_rate",
           "yt2y",
           "yt3y",
           "yt4y",
-          "ytc"
-        ],
-        "Pricing": [
-          "discount_margin",
-          "embedded_option_value",
-          "oas",
+          "ytc",
           "ytm",
           "ytw"
         ],
@@ -936,7 +928,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -945,7 +937,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -954,7 +946,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -963,7 +955,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -981,7 +973,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -990,7 +982,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -999,7 +991,7 @@
           "components": [],
           "coordinates": [],
           "unit": "currency",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -1161,17 +1153,20 @@
         ],
         "Instrument Specific": [
           "accrued_interest",
-          "all_in_rate",
           "available_capacity",
           "draw_option_cost",
           "exposure_at_default",
-          "oid_eir_amortization",
-          "oid_eir_rate",
           "price_from_dm",
           "utilization_rate",
           "weighted_average_cost"
         ],
-        "Pricing": ["discount_margin", "ytm"],
+        "Pricing": [
+          "all_in_rate",
+          "discount_margin",
+          "oid_eir_amortization",
+          "oid_eir_rate",
+          "ytm"
+        ],
         "Sensitivity": ["bucketed_dv01", "dv01"]
       },
       "request": {
@@ -1214,7 +1209,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -1223,7 +1218,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -1232,7 +1227,7 @@
           "components": [],
           "coordinates": [],
           "unit": "currency",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -1331,19 +1326,17 @@
           "theta_roll_down"
         ],
         "Credit": ["bucketed_cs01", "cs01", "jump_to_default", "recovery01"],
-        "Instrument Specific": [
+        "Pricing": [
           "all_in_rate",
+          "discount_margin",
+          "embedded_option_value",
+          "oas",
           "oid_eir_amortization",
           "oid_eir_rate",
           "yt2y",
           "yt3y",
           "yt4y",
-          "ytc"
-        ],
-        "Pricing": [
-          "discount_margin",
-          "embedded_option_value",
-          "oas",
+          "ytc",
           "ytm",
           "ytw"
         ],
@@ -1395,7 +1388,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -1404,7 +1397,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -1413,7 +1406,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -1422,7 +1415,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -1440,7 +1433,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -1449,7 +1442,7 @@
           "components": [],
           "coordinates": [],
           "unit": "decimal",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {
@@ -1458,7 +1451,7 @@
           "components": [],
           "coordinates": [],
           "unit": "currency",
-          "group": "Instrument Specific",
+          "group": "Pricing",
           "bucketed": false
         },
         {

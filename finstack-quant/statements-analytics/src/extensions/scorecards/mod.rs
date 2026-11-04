@@ -476,6 +476,7 @@ impl CreditScorecardExtension {
 
         let mut eval_context = finstack_quant_statements::evaluator::EvaluationContext::new(
             target_period.id,
+            &model.periods,
             std::sync::Arc::new(node_to_column),
             std::sync::Arc::new(historical_results),
         );

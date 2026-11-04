@@ -6,7 +6,7 @@ import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import type { BridgeChart } from "@/workers/finstack-contract";
-import { groupDecimal } from "@/lib/finstack/format/format";
+import { formatExact } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
@@ -17,10 +17,6 @@ interface Bar {
   label: string;
   kind: "Level" | "Driver contribution" | "Unexplained";
   value: number;
-}
-/** Every supplied digit, grouped; a non-finite native value shows as itself. */
-function exactValue(value: number): string {
-  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
 }
 export interface VarianceBridgeChartProps {
   /** Native BridgeChart; steps are shown in Rust's order. */
@@ -42,7 +38,7 @@ export interface VarianceBridgeChartProps {
 export function VarianceBridgeChart({
   bridge,
   metricLabel = labelFor,
-  formatValue = exactValue,
+  formatValue = formatExact,
   density = "compact",
 }: VarianceBridgeChartProps) {
   const caption = `${metricLabel(bridge.target_metric)} bridge, ${bridge.period}`;

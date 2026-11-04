@@ -278,7 +278,12 @@ fn interest_then_principal_tier_tops_up_the_senior_coupon_from_principal() {
     // Both runs conserve cash and report the same IC ratio: the test is
     // evaluated on interest collections, not on what funded the coupon.
     for result in [&separate, &funded] {
-        let distributed: f64 = result.distributions.values().map(|m| m.amount()).sum();
+        let distributed: f64 = result
+            .distributions()
+            .expect("distributions")
+            .values()
+            .map(|m| m.amount())
+            .sum();
         assert!(
             (distributed + result.remaining_cash.amount() - (interest + principal)).abs() < 1.0
         );

@@ -80,6 +80,26 @@ pub enum Multiple {
     YieldPerCoverage,
 }
 
+impl Multiple {
+    /// Wire name of the multiple, the snake_case form [`FromStr`] parses.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::EvEbitda => "ev_ebitda",
+            Self::EvRevenue => "ev_revenue",
+            Self::EvEbit => "ev_ebit",
+            Self::EvFcf => "ev_fcf",
+            Self::Pe => "pe",
+            Self::Pb => "pb",
+            Self::Ptbv => "ptbv",
+            Self::PFcf => "p_fcf",
+            Self::DividendYield => "dividend_yield",
+            Self::SpreadPerTurn => "spread_per_turn",
+            Self::YieldPerCoverage => "yield_per_coverage",
+        }
+    }
+}
+
 impl FromStr for Multiple {
     type Err = String;
 

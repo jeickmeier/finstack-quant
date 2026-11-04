@@ -387,8 +387,8 @@ class BondWorkoutLadder:
 
         Raises
         ------
-        ValueError
-            If the rows cannot be converted to a frame.
+        ImportError
+            If ``pyarrow`` is not installed.
         """
         ...
 

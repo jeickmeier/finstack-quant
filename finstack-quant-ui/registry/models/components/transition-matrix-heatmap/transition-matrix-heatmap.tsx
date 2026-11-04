@@ -9,9 +9,13 @@ import {
   FinstackChart,
   heatmap,
 } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
-import type { HeatmapColors } from "@/components/finstack/shared/chart/finstack-chart/heatmap";
+import {
+  heatmapDomain,
+  type HeatmapColors,
+} from "@/components/finstack/shared/chart/finstack-chart/heatmap";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import { ReportSection } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** A native models.credit.migration.TransitionMatrix as the worker's migrationMatrix returns it. */
 export interface MigrationMatrixData {
@@ -81,17 +85,6 @@ function cells(
     row.map((value, j) => ({ from: labels[i]!, to: labels[j]!, value })),
   );
 }
-/** Presentation extent of the drawn intensities; null when they hold no range. */
-function generatorDomain(values: readonly number[]): HeatmapColors | null {
-  // finstack-arith: colour-scale extent of the drawn values
-  const min = Math.min(...values),
-    // finstack-arith: colour-scale extent of the drawn values
-    max = Math.max(...values);
-  if (!(min < max)) return null;
-  return min < 0 && max > 0
-    ? { palette: "diverging", domain: [min, 0, max] }
-    : { palette: "sequential", domain: [min, max] };
-}
 function matrixHeatmap(
   data: readonly Cell[],
   colors: HeatmapColors,
@@ -136,14 +129,6 @@ function matrixColumns(
       meta: { className: "text-right finstack-numeric" },
     })),
   ];
-}
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
 }
 function Status({ children }: { children: ReactNode }) {
   return (
@@ -212,7 +197,7 @@ function MatrixView({
   const generator = useMemo(() => {
     if (!projection) return null;
     const data = cells(projection.labels, projection.generator.rows);
-    const colors = generatorDomain(data.map((c) => c.value));
+    const colors = heatmapDomain(data.map((c) => c.value));
     return colors
       ? matrixHeatmap(data, colors, "Intensity per year", formatValue)
       : null;
@@ -289,7 +274,7 @@ function MatrixView({
           state {defaultLabel ?? "none"}
         </p>
       </div>
-      <Section title={`Transition probabilities over ${matrix.horizon}y`}>
+      <ReportSection title={`Transition probabilities over ${matrix.horizon}y`}>
         {view === "figure" ? (
           <FinstackChart
             {...transition}
@@ -306,7 +291,7 @@ function MatrixView({
             density={density}
           />
         )}
-      </Section>
+      </ReportSection>
       {projectionError ? (
         <p role="alert" className="text-error">
           {projectionError}
@@ -317,7 +302,7 @@ function MatrixView({
         <Status>No generator projection</Status>
       ) : (
         <>
-          <Section title="Generator (intensity per year)">
+          <ReportSection title="Generator (intensity per year)">
             <p
               aria-label="Generator fit"
               className="text-xs text-muted-foreground"
@@ -350,8 +335,8 @@ function MatrixView({
                 density={density}
               />
             )}
-          </Section>
-          <Section title="Cumulative default probability">
+          </ReportSection>
+          <ReportSection title="Cumulative default probability">
             {!cumulative ? (
               <Status>The scale has no default state</Status>
             ) : view === "figure" ? (
@@ -379,7 +364,7 @@ function MatrixView({
                 density={density}
               />
             )}
-          </Section>
+          </ReportSection>
         </>
       )}
     </section>

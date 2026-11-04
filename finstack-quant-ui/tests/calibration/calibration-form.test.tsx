@@ -33,7 +33,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../.."),
 let worker: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   worker = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => worker?.close());
 afterEach(cleanup);
 const validate = async (json: string) =>

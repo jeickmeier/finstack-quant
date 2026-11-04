@@ -1,6 +1,5 @@
 "use client";
-import type { MetricMetadata } from "finstack-quant-wasm";
-import type { ExampleProps } from "./props";
+import { sixPlaces, type ExampleProps } from "./props";
 import {
   LoanYieldCard,
   loanYieldMetrics,
@@ -14,13 +13,11 @@ import {
   useMetrics,
 } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
 import { useMetricValues } from "@/hooks/valuations/use-metric-values/use-metric-values";
-import data from "../data.json";
+import { loanYield } from "../fixtures";
 import { WorkerPreview } from "../worker-preview";
-const { type, request } = data.loanYield.cases.quotedTree;
+const { type, request } = loanYield.cases.quotedTree;
 // The same loan under discounting: Rust rejects the call value and keeps the rest.
-const discounting = data.loanYield.cases.quotedDiscounting;
-// Host display choice: six decimal places of the returned values.
-const sixPlaces = (value: number) => value.toFixed(6);
+const discounting = loanYield.cases.quotedDiscounting;
 function Card({ density }: ExampleProps) {
   const available = useMetrics(type);
   const metrics = available.data
@@ -47,8 +44,8 @@ export function Example({ density = "compact" }: ExampleProps) {
       <div className="space-y-6">
         <Card density={density} />
         <LoanYieldCard
-          rows={discounting.rows as unknown as MetricValueRow[]}
-          metadata={discounting.metadata as unknown as MetricMetadata[]}
+          rows={discounting.rows}
+          metadata={discounting.metadata}
           formatValue={sixPlaces}
           density={density}
         />

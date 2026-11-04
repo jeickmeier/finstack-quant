@@ -55,6 +55,7 @@
         "@finstack/finstack-table",
         "@finstack/money-value",
         "@finstack/enum-field",
+        "@finstack/native-display",
         "badge"
       ],
       "dependencies": [
@@ -222,6 +223,7 @@
         "@finstack/finstack-format",
         "@finstack/finstack-table",
         "@finstack/money-value",
+        "@finstack/native-display",
         "badge"
       ],
       "dependencies": [

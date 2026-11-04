@@ -1,9 +1,5 @@
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { native, readRepoJson } from "../../../scripts/fixture-inputs.mjs";
 // The worker's ModelsApi.positionRisk over the raw package
 // (models.factor.risk re-exports these raw functions unchanged).
 function envelope(call) {
@@ -144,14 +140,8 @@ function factorRisk(request) {
 // The Py/WASM host-parity book (two USD deposits) and market at t0 with its
 // factor_model_config: one usd_rates factor (parallel USD-OIS shift in bp)
 // and a 1x1 covariance; the risk measure is left to Rust (variance).
-const { inputs } = JSON.parse(
-  readFileSync(
-    new URL(
-      "../../../../finstack-quant/portfolio/tests/fixtures/host_parity.json",
-      import.meta.url,
-    ),
-    "utf8",
-  ),
+const { inputs } = await readRepoJson(
+  "finstack-quant/portfolio/tests/fixtures/host_parity.json",
 );
 const factorRequest = {
   specJson: JSON.stringify(inputs.portfolio_spec),

@@ -1,16 +1,10 @@
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
+import { native, readRepoSource } from "../../../scripts/fixture-inputs.mjs";
 import { serializeHost } from "../../../src/codec.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
 // The priced bond of the results fixture is the base, as for the scenario application.
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
-const bondBytes = await readFile(new URL(bondPath, repository));
-const base = JSON.parse(bondBytes).request;
+const bondInput = await readRepoSource(bondPath);
+const base = bondInput.value.request;
 // Builder drafts as the workbench edits them; blank options are omitted so Rust applies its defaults.
 const roll3m = {
   id: "roll-3m-50bp",
@@ -104,12 +98,7 @@ await emit(
   serializeHost({
     description:
       "Native horizon total returns of the results-fixture bond: the Rust-built spec, scenarios.computeHorizonReturn (omitted method, config and calendar left to Rust) horizonResultExplainText and pnlAttributionPctOfTotalByBucket, or the native error.",
-    sources: [
-      {
-        path: bondPath,
-        sha256: createHash("sha256").update(bondBytes).digest("hex"),
-      },
-    ],
+    sources: [bondInput.source],
     base: { asOf: base.asOf },
     cases,
   }),

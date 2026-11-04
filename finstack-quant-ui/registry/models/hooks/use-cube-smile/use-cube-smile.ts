@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { CubeSmileRequest } from "@/workers/finstack-contract";
@@ -13,15 +12,13 @@ export function cubeSmileOptions(
   session: number,
   request: CubeSmileRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "cubeSmile", key] as const,
-    ready: snapshot !== null,
-    missing:
-      "A cube smile requires a ready worker, a node, strikes and an explicit rate",
-    queryFn: (ready) => ready.call("cubeSmile", snapshot!),
-  });
+    session,
+    "cubeSmile",
+    request,
+    "A cube smile requires a ready worker, a node, strikes and an explicit rate",
+  );
 }
 /** Native SABR smile, arbitrage check and optional repair of one cube node; errors are unchanged. */
 export function useCubeSmile(request: CubeSmileRequest | null) {

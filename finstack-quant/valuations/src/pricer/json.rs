@@ -10,7 +10,7 @@ use crate::instruments::Instrument;
 use crate::instruments::envelope::{MAX_JSON_BYTES, instrument_load_error};
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use crate::instruments::pricing_overrides::MetricPricingOverrides;
-use crate::metrics::{MetricId, parse_key_rate_label};
+use crate::metrics::{MetricId, MetricUnit, parse_key_rate_label};
 use crate::results::ValuationResult;
 use finstack_quant_core::Error;
 use finstack_quant_core::contract::{LoadLimits, parse_json_value};
@@ -755,26 +755,30 @@ pub fn pool_report_field_units(currency: Currency) -> PoolReportFieldUnits {
 ///
 /// One record per field of `BondQuoteSet`.
 pub fn bond_quote_set_field_units(currency: Currency) -> Vec<MetricFieldUnit> {
-    let currency = currency.to_string();
+    let label = |metric: Option<MetricId>| match metric.map(|metric| metric.unit()) {
+        None => "% of par".to_string(),
+        Some(MetricUnit::Currency) => currency.to_string(),
+        Some(unit) => unit.as_str().to_string(),
+    };
     [
-        ("clean_price_currency", currency.as_str()),
-        ("clean_price_pct", "% of par"),
-        ("dirty_price_currency", currency.as_str()),
-        ("ytm", "decimal"),
-        ("ytw", "decimal"),
-        ("z_spread", "decimal"),
-        ("discount_margin", "decimal"),
-        ("oas", "decimal"),
-        ("asw_par", "decimal"),
-        ("asw_market", "decimal"),
-        ("i_spread", "decimal"),
-        ("japanese_simple_yield", "decimal"),
-        ("moosmuller_ytm", "decimal"),
+        ("clean_price_currency", Some(MetricId::CleanPrice)),
+        ("clean_price_pct", None),
+        ("dirty_price_currency", Some(MetricId::DirtyPrice)),
+        ("ytm", Some(MetricId::Ytm)),
+        ("ytw", Some(MetricId::Ytw)),
+        ("z_spread", Some(MetricId::ZSpread)),
+        ("discount_margin", Some(MetricId::DiscountMargin)),
+        ("oas", Some(MetricId::Oas)),
+        ("asw_par", Some(MetricId::ASWPar)),
+        ("asw_market", Some(MetricId::ASWMarket)),
+        ("i_spread", Some(MetricId::ISpread)),
+        ("japanese_simple_yield", Some(MetricId::JapaneseSimpleYield)),
+        ("moosmuller_ytm", Some(MetricId::MoosmullerYtm)),
     ]
     .into_iter()
-    .map(|(field, label)| MetricFieldUnit {
+    .map(|(field, metric)| MetricFieldUnit {
         field: field.to_string(),
-        label: label.to_string(),
+        label: label(metric),
         source: format!("valuations::BondQuoteSet::{field}"),
     })
     .collect()
@@ -788,7 +792,7 @@ pub struct SimulationFieldUnits {
     /// Unit of each numeric `CoverageTestDiagnostic` field, in the order the
     /// struct declares them.
     pub coverage_tests: Vec<MetricFieldUnit>,
-    /// Unit of `PeriodWaterfall::diverted_cash` and of each diversion's amount.
+    /// Unit of `WaterfallDistribution::diverted_cash` and of each diversion's amount.
     pub diverted_cash: MetricFieldUnit,
     /// Unit of `TrancheCreditEnhancement::credit_enhancement`.
     pub credit_enhancement: MetricFieldUnit,
@@ -822,7 +826,11 @@ pub fn simulation_field_units(currency: Currency) -> SimulationFieldUnits {
             .into_iter()
             .map(|field| unit("CoverageTestDiagnostic", field, "times covered".to_string()))
             .collect(),
-        diverted_cash: unit("PeriodWaterfall", "diverted_cash", currency.to_string()),
+        diverted_cash: unit(
+            "WaterfallDistribution",
+            "diverted_cash",
+            currency.to_string(),
+        ),
         credit_enhancement: unit(
             "TrancheCreditEnhancement",
             "credit_enhancement",
@@ -1387,30 +1395,6 @@ mod tests {
     }
 
     #[test]
-    fn bond_quote_set_field_units_agree_with_metric_metadata() {
-        let units = bond_quote_set_field_units(Currency::EUR);
-        let mut checked = 0;
-        for unit in &units {
-            let metric = match unit.field.as_str() {
-                "clean_price_pct" => continue,
-                "clean_price_currency" => "clean_price",
-                "dirty_price_currency" => "dirty_price",
-                field => field,
-            };
-            let metadata = metric_metadata(&[metric.to_string()]).expect("metadata");
-            let declared = metadata[0].unit;
-            let expected = match declared {
-                crate::metrics::MetricUnit::Currency => "EUR",
-                other => other.as_str(),
-            };
-            assert_eq!(unit.label, expected, "{metric}: {declared:?}");
-            checked += 1;
-        }
-        // Every field but clean_price_pct has a metric.
-        assert_eq!(checked, units.len() - 1);
-    }
-
-    #[test]
     fn pool_report_field_units_list_every_numeric_field_in_struct_order() {
         use finstack_quant_valuations_structured_credit::structured_credit::{
             AssetPool, DealType, PoolAsset, pool_report,
@@ -1964,13 +1948,12 @@ mod tests {
                 .remove(MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME)
                 .unwrap_or_default()
         };
-        assert!(ungrouped("term_loan").contains(&"all_in_rate".to_string()));
-        assert!(ungrouped("term_loan").contains(&"yt3y".to_string()));
         assert!(ungrouped("revolving_credit").contains(&"utilization_rate".to_string()));
-        assert!(ungrouped("convertible_bond").contains(&"parity".to_string()));
+        assert!(ungrouped("fx_swap").contains(&"carry_pv".to_string()));
 
-        let metadata = metric_metadata(&["all_in_rate".to_string(), "no_such_metric".to_string()])
-            .expect("metadata");
+        let metadata =
+            metric_metadata(&["utilization_rate".to_string(), "no_such_metric".to_string()])
+                .expect("metadata");
         assert_eq!(
             metadata[0].group.as_deref(),
             Some(MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME)

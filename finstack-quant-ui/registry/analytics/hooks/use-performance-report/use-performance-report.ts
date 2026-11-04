@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { PerformanceReportRequest } from "@/workers/finstack-contract";
@@ -18,14 +17,13 @@ export function performanceReportOptions(
   session: number,
   request: PerformanceReportRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "performanceReport", key] as const,
-    ready: snapshot !== null,
-    missing: "No performance panel supplied",
-    queryFn: (ready) => ready.call("performanceReport", snapshot!),
-  });
+    session,
+    "performanceReport",
+    request,
+    "No performance panel supplied",
+  );
 }
 /** Native analytics.Performance results of a host-supplied panel, or the actual native error; supply a Finstack/Query provider. */
 export function usePerformanceReport(request: PerformanceReportRequest | null) {

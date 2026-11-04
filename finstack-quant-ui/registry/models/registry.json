@@ -5,13 +5,23 @@
       "name": "liability-management-card",
       "type": "registry:component",
       "title": "Liability management card",
-      "description": "Forms and native economics of a distressed exchange offer and a liability management exercise, with Rust's own tender recommendation.",
-      "docs": "Two forms. Exchange offer, the holder's view: hold-out PV, new instrument PV, consent fee, equity sweetener and offer structure, with the returned tender total, NPV pickup, breakeven recovery and tender_recommended, which is Rust's field and never compared here; the hurdle Rust applies shows beside it as supplied. Liability management exercise, the issuer's view: structure, notional, participation, EBITDA and a price input that Rust reads as a price, an extension fee or a transferred-asset fraction by structure, with the returned cost, par retired, discount capture, holder impact and, for a positive EBITDA, the leverage block. Amounts use one unit you choose, with no currency conversion; percentages are fractions. An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset. Each analysis shows its own native error. Accepts defaultExchange, defaultLme, onExchangeSubmit, onLmeSubmit, exchange, lme, hurdle, formatValue and density props; no worker or query provider required.",
+      "description": "Forms and native economics of a distressed exchange offer (ExchangeOfferCard) and a liability management exercise (LiabilityManagementCard), with Rust's own tender recommendation.",
+      "docs": "Two components, one form each. ExchangeOfferCard, the holder's view: hold-out PV, new instrument PV, consent fee, equity sweetener and offer structure, with the returned tender total, NPV pickup, breakeven recovery and tender_recommended, which is Rust's field and never compared here; the hurdle Rust applies shows beside it as supplied. LiabilityManagementCard, the issuer's view: structure, notional, participation, EBITDA and a price input that Rust reads as a price, an extension fee or a transferred-asset fraction by structure, with the returned cost, par retired, discount capture, holder impact and, for a positive EBITDA, the leverage block. Amounts use one unit you choose, with no currency conversion; percentages are fractions. An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset. Each analysis shows its own native error. Each accepts defaultTerms, onSubmit, state, formatValue and density props (ExchangeOfferCard also hurdle), typed by the worker's ExchangeOfferRequest and LmeRequest contracts; no worker or query provider required.",
       "files": [
         {
           "path": "components/liability-management-card/liability-management-card.tsx",
           "type": "registry:component",
           "target": "components/finstack/models/components/liability-management-card/liability-management-card.tsx"
+        },
+        {
+          "path": "components/liability-management-card/exchange-offer-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/liability-management-card/exchange-offer-card.tsx"
+        },
+        {
+          "path": "components/liability-management-card/liability-fields.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/liability-management-card/liability-fields.tsx"
         }
       ],
       "registryDependencies": [
@@ -21,6 +31,8 @@
         "@finstack/finstack-table",
         "@finstack/decimal-input",
         "@finstack/enum-field",
+        "@finstack/native-display",
+        "@finstack/finstack-worker",
         "badge",
         "button"
       ],
@@ -34,7 +46,9 @@
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -68,13 +82,28 @@
       "name": "recovery-waterfall",
       "type": "registry:component",
       "title": "Recovery waterfall",
-      "description": "Allocate an estate down a stack of claims under absolute priority, calculate a workout LGD and read seniority recovery statistics, all as Rust returns them.",
-      "docs": "Three forms. Recovery waterfall: an estate value and claims (id, a free-text seniority label, integer priority, principal, accrued, penalties, an optional collateral value and its haircut), with Rust's allocations in its priority-then-entry order (total claim, collateral and general recovery, total recovery, recovery rate and deficiency per claim) and the estate's total distributed, undistributed estate and apr_satisfied. Workout LGD: EAD, direct and indirect cost fractions, years to resolution, a discount rate and collateral pieces whose types come from the generated WorkoutCollateralType contract, with the returned net recovery, LGD and recovery rate. Recovery by seniority: a class from the generated SeniorityClass contract and a calibration from the supplied calibrationIds (Rust's seniorityCalibrationIds, default first), with the Beta distribution's mean, standard deviation, variance, shape parameters, mode and mean LGD. Nothing is summed, divided or ranked here; amounts use one unit you choose and rates are fractions. An empty amount is sent as NaN for Rust to reject, an empty collateral value is an unsecured claim, and each analysis shows its own native error, including a class a calibration lacks. Accepts defaultWaterfall, defaultWorkout, defaultSeniority, onWaterfallSubmit, onWorkoutSubmit, onStatsSubmit, waterfall, workout, stats, calibrationIds, formatValue and density props; no worker or query provider required.",
+      "description": "Allocate an estate down a stack of claims under absolute priority (RecoveryWaterfall), calculate a workout LGD (WorkoutLgdCard) and read seniority recovery statistics (SeniorityRecoveryCard), all as Rust returns them.",
+      "docs": "Three components, one form each. RecoveryWaterfall: an estate value and claims (id, a free-text seniority label, integer priority, principal, accrued, penalties, an optional collateral value and its haircut), with Rust's allocations in its priority-then-entry order (total claim, collateral and general recovery, total recovery, recovery rate and deficiency per claim) and the estate's total distributed, undistributed estate and apr_satisfied. WorkoutLgdCard: EAD, direct and indirect cost fractions, years to resolution, a discount rate and collateral pieces whose types come from the generated WorkoutCollateralType contract, with the returned net recovery, LGD and recovery rate. SeniorityRecoveryCard: a class from the generated SeniorityClass contract and a calibration from the supplied calibrationIds (Rust's seniorityCalibrationIds, default first), with the Beta distribution's mean, standard deviation, variance, shape parameters, mode and mean LGD. Nothing is summed, divided or ranked here; amounts use one unit you choose and rates are fractions. An empty amount is sent as NaN for Rust to reject, an empty collateral value is an unsecured claim, and each analysis shows its own native error, including a class a calibration lacks. Each accepts defaultTerms (SeniorityRecoveryCard: defaultSeniority and calibrationIds), onSubmit, state, formatValue and density props, typed by the worker's RecoveryWaterfallRequest, WorkoutLgdRequest and SeniorityRecoveryRequest contracts; no worker or query provider required.",
       "files": [
         {
           "path": "components/recovery-waterfall/recovery-waterfall.tsx",
           "type": "registry:component",
           "target": "components/finstack/models/components/recovery-waterfall/recovery-waterfall.tsx"
+        },
+        {
+          "path": "components/recovery-waterfall/workout-lgd-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/recovery-waterfall/workout-lgd-card.tsx"
+        },
+        {
+          "path": "components/recovery-waterfall/seniority-recovery-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/recovery-waterfall/seniority-recovery-card.tsx"
+        },
+        {
+          "path": "components/recovery-waterfall/recovery-fields.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/recovery-waterfall/recovery-fields.tsx"
         },
         {
           "path": "components/recovery-waterfall/recovery-contracts.ts",
@@ -89,12 +118,12 @@
         "@finstack/finstack-table",
         "@finstack/decimal-input",
         "@finstack/enum-field",
-        "@finstack/field-frame",
         "@finstack/contract-workout-lgd",
         "@finstack/contract-seniority-calibration",
         "@finstack/contract-recovery-claim",
-        "button",
-        "input"
+        "@finstack/native-display",
+        "@finstack/finstack-worker",
+        "button"
       ],
       "dependencies": [
         "@tanstack/react-table@9.2.4",
@@ -106,10 +135,12 @@
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json",
           "https://finstack_quant.dev/schemas/models/1/seniority_calibration.schema.json",
           "https://finstack_quant.dev/schemas/models/1/workout_lgd.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -159,6 +190,7 @@
         "@finstack/finstack-table",
         "@finstack/decimal-input",
         "@finstack/enum-field",
+        "@finstack/native-display",
         "button"
       ],
       "dependencies": [
@@ -537,7 +569,8 @@
         "@finstack/finstack-format",
         "@finstack/finstack-chart",
         "@finstack/finstack-table",
-        "@finstack/enum-field"
+        "@finstack/enum-field",
+        "@finstack/native-display"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",
@@ -582,6 +615,7 @@
         "@finstack/field-frame",
         "@finstack/contract-merton-model",
         "@finstack/finstack-codec",
+        "@finstack/native-display",
         "button",
         "input"
       ],
@@ -629,6 +663,7 @@
         "@finstack/contract-altman-z-double-prime-input",
         "@finstack/contract-ohlson-o-score-input",
         "@finstack/contract-zmijewski-input",
+        "@finstack/native-display",
         "button"
       ],
       "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
@@ -664,7 +699,8 @@
         "@finstack/finstack-theme",
         "@finstack/finstack-format",
         "@finstack/finstack-table",
-        "@finstack/finstack-chart"
+        "@finstack/finstack-chart",
+        "@finstack/native-display"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",

@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
@@ -27,19 +19,16 @@ import {
 } from "@/components/finstack/portfolio/blocks/portfolio-workbench/portfolio-workbench";
 import { unwrap, type WorkerApi } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import fixture from "./exposures/cases.json";
 import workbench from "./workbench/cases.json";
 import pricingMarket from "../valuations/instruments/pricing-market.json";
 
-const mock = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  calls: [] as string[],
-}));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 // Figures are drawn by the shared chart in the browser gates.
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
@@ -50,23 +39,8 @@ vi.mock(
     ),
   }),
 );
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness("any");
 const proxy = () => harness.proxy as unknown as WorkerApi;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.calls.length = 0;
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      mock.calls.push(method);
-      return unwrap(await (proxy() as any)[method](request));
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -93,14 +67,6 @@ const region = (name: string) => within(screen.getByRole("region", { name }));
 const shows = (scope: ReturnType<typeof region>, value: number | string) =>
   expect(scope.getAllByTitle(String(value)).length).toBeGreaterThan(0);
 
-it("pins the JSON inputs the exposure fixture was built from", () => {
-  expect(fixture.sources.map((source) => source.path)).toEqual([
-    "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-    "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-    "finstack-quant/portfolio/tests/fixtures/host_parity.json",
-  ]);
-  expect(asOf).toBe(workbench.request.asOf);
-});
 it(
   "the worker returns the native exposures of the book with and without metrics",
   async () => {
@@ -312,7 +278,7 @@ it(
   async () => {
     const user = userEvent.setup();
     renderWorkbench();
-    expect(mock.calls).not.toContain("primitiveExposures");
+    expect(harness.methods()).not.toContain("primitiveExposures");
     await user.click(screen.getByRole("tab", { name: "Risk" }));
     const exposures = await screen.findByRole(
       "table",
@@ -329,10 +295,10 @@ it(
     ).toBeTruthy();
     expect(screen.queryAllByRole("alert")).toEqual([]);
     expect(
-      mock.calls.filter((name) => name === "primitiveExposures"),
+      harness.methods().filter((name) => name === "primitiveExposures"),
     ).toHaveLength(1);
     expect(
-      mock.calls.filter((name) => name === "computeFactorSensitivities"),
+      harness.methods().filter((name) => name === "computeFactorSensitivities"),
     ).toHaveLength(1);
   },
   budget(30000),
@@ -360,7 +326,7 @@ it(
     expect(
       screen.queryByRole("region", { name: "Factor sensitivities" }),
     ).toBeNull();
-    expect(mock.calls).not.toContain("computeFactorSensitivities");
+    expect(harness.methods()).not.toContain("computeFactorSensitivities");
   },
   budget(30000),
 );

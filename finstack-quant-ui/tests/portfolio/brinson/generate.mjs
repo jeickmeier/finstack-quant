@@ -1,22 +1,13 @@
-import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
 import { emit } from "../../../scripts/fixture-output.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
+import { native, readRepoSource } from "../../../scripts/fixture-inputs.mjs";
+const { value: parity, source } = await readRepoSource(
+  "finstack-quant/portfolio/tests/fixtures/host_parity.json",
 );
-const path = "finstack-quant/portfolio/tests/fixtures/host_parity.json";
-const bytes = await readFile(new URL(path, repository));
-const source = {
-  path,
-  sha256: createHash("sha256").update(bytes).digest("hex"),
-};
 // Host data, as a performance system would supply it: the cross-host golden's
 // three periods of Tech, Energy and Cash rows, with Cash held only by the
 // benchmark in the first two. Weights are decimal fractions summing to one on
 // each side; returns are decimal period returns.
-const periods = JSON.parse(bytes).inputs.brinson_periods;
+const periods = parity.inputs.brinson_periods;
 const periodLabels = ["2024-Q1", "2024-Q2", "2024-Q3"];
 const result = native.brinsonLinked(periods);
 function failure(request) {

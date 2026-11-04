@@ -472,7 +472,7 @@ pub(super) fn simulate_period(
         special_serviced: Some(&special_serviced_open),
         deferred_interest: Some(&state.deferred_interest),
         reserve_balance: state.reserve_balance,
-        // N2: funding-account principal is still collateral for the notes.
+        // Funding-account principal is still collateral for the notes.
         restricted_cash: state.principal_funding_account,
         defaulted_collateral_value,
         recovery_proceeds: released_recoveries,
@@ -494,7 +494,8 @@ pub(super) fn simulate_period(
     state.undistributed_principal = snap_de_minimis(waterfall_result.remaining_principal);
 
     // Update reserve balance from waterfall distributions to ReserveAccount recipients.
-    for (recipient, amount) in &waterfall_result.distributions {
+    let distributions = waterfall_result.distributions()?;
+    for (recipient, amount) in &distributions {
         if let RecipientType::ReserveAccount(_) = recipient {
             state.reserve_balance = state.reserve_balance.checked_add(*amount)?;
         }
@@ -510,8 +511,7 @@ pub(super) fn simulate_period(
     // Realized excess spread this period, annualized on the opening pool
     // balance: interest collections less the debt coupons due, the fees paid
     // and the net charge-off. Feeds the early-amortization excess-spread test.
-    let waterfall_fees: f64 = waterfall_result
-        .distributions
+    let waterfall_fees: f64 = distributions
         .iter()
         .filter(|(recipient, _)| {
             matches!(
@@ -572,9 +572,7 @@ pub(super) fn simulate_period(
                 .get(test_id.as_str())
                 .copied()
                 .unwrap_or(f64::NAN);
-            // The executor's infinite ratio is its zero denominator: no claim
-            // is outstanding for the test, so no ratio exists to report.
-            let ratio = ratio.is_finite().then_some(*ratio);
+            let ratio = *ratio;
             super::state::CoverageTestDiagnostic {
                 test_id: test_id.clone(),
                 ratio,
@@ -595,7 +593,7 @@ pub(super) fn simulate_period(
         fees_paid: Money::new(fees_paid, state.currency)?,
         excess_spread: state.excess_spread_history.last().copied().unwrap_or(0.0),
         coverage_tests,
-        waterfall: waterfall_result.into(),
+        waterfall: waterfall_result,
         // Reserve interest routed to a tranche this period.
         non_waterfall_payments: std::mem::take(&mut state.pending_non_waterfall_payments),
         ..super::state::PeriodDiagnostics::from_state(state, pay_date)?

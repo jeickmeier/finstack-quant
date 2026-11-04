@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
 import type { ExampleProps } from "./props";
-import {
-  LiabilityManagementCard,
-  type ExchangeOfferTerms,
-  type LmeTerms,
-} from "@/components/finstack/models/components/liability-management-card/liability-management-card";
+import type {
+  ExchangeOfferRequest,
+  LmeRequest,
+} from "@/workers/finstack-contract";
+import { ExchangeOfferCard } from "@/components/finstack/models/components/liability-management-card/exchange-offer-card";
+import { LiabilityManagementCard } from "@/components/finstack/models/components/liability-management-card/liability-management-card";
 import {
   useExchangeOffer,
   useLme,
@@ -14,9 +15,9 @@ import {
 import data from "../data.json";
 import { WorkerPreview } from "../worker-preview";
 const defaultExchange = data.liabilityManagement.exchange.recommended
-  .request as ExchangeOfferTerms;
-const defaultLme = data.liabilityManagement.lme.tender.request as LmeTerms;
-function Card({ density }: ExampleProps) {
+  .request as ExchangeOfferRequest;
+const defaultLme = data.liabilityManagement.lme.tender.request as LmeRequest;
+function Cards({ density }: ExampleProps) {
   // Starts from the fixture's terms; each form replaces its request.
   const [offer, setOffer] = useState(defaultExchange);
   const [exercise, setExercise] = useState(defaultLme);
@@ -24,24 +25,29 @@ function Card({ density }: ExampleProps) {
   const lme = useLme(exercise);
   const hurdle = useTenderRecommendationHurdle();
   return (
-    <LiabilityManagementCard
-      defaultExchange={defaultExchange}
-      defaultLme={defaultLme}
-      onExchangeSubmit={setOffer}
-      onLmeSubmit={setExercise}
-      exchange={{
-        result: exchange.data ?? null,
-        loading: exchange.isFetching,
-        error: exchange.error?.message,
-      }}
-      lme={{
-        result: lme.data ?? null,
-        loading: lme.isFetching,
-        error: lme.error?.message,
-      }}
-      hurdle={hurdle.data}
-      density={density}
-    />
+    <div className="space-y-8">
+      <ExchangeOfferCard
+        defaultTerms={defaultExchange}
+        onSubmit={setOffer}
+        state={{
+          result: exchange.data,
+          loading: exchange.isFetching,
+          error: exchange.error?.message,
+        }}
+        hurdle={hurdle.data}
+        density={density}
+      />
+      <LiabilityManagementCard
+        defaultTerms={defaultLme}
+        onSubmit={setExercise}
+        state={{
+          result: lme.data,
+          loading: lme.isFetching,
+          error: lme.error?.message,
+        }}
+        density={density}
+      />
+    </div>
   );
 }
 // The hooks sit outside the item's install closure, so the example mounts its
@@ -49,7 +55,7 @@ function Card({ density }: ExampleProps) {
 export function Example({ density = "compact" }: ExampleProps) {
   return (
     <WorkerPreview>
-      <Card density={density} />
+      <Cards density={density} />
     </WorkerPreview>
   );
 }

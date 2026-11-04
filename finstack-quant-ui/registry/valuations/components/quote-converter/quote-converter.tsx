@@ -9,6 +9,7 @@ import contracts from "@/lib/finstack/generated/primitive-contracts.json";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import { typedNumber } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** One market quote, as the schema's single-key object. */
 export type QuoteInput = valuations.BondQuoteInput;
@@ -21,9 +22,6 @@ const kinds = contracts.bond_quote_input.schema.oneOf.map((branch) => ({
   description: branch.description,
 }));
 type Row = readonly [field: string, value: number | null | undefined];
-/** An empty field is NaN, which Rust rejects, not the zero `Number("")` would send. */
-const typed = (value: string) =>
-  value.trim() === "" ? Number.NaN : Number(value);
 export interface QuoteConverterProps {
   /** The quote the form starts from. */
   defaultInput: QuoteInput;
@@ -110,7 +108,7 @@ export function QuoteConverter({
         className="space-y-4"
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit({ [kind]: typed(value) } as QuoteInput);
+          onSubmit({ [kind]: typedNumber(value) } as QuoteInput);
         }}
       >
         <div className="grid gap-4 @lg:grid-cols-2">

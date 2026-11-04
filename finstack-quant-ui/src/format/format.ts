@@ -30,6 +30,10 @@ export function groupDecimal(value: string): string {
     (fraction === undefined ? "" : `.${fraction}`)
   );
 }
+/** Every digit of a native number; non-finite values keep their `NaN` / `Infinity` text. */
+export function formatExact(value: number): string {
+  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
+}
 /** Native `core.Currency` / `core.Money` surface used for prepared display formatting; injected, never imported at render time. */
 export type MoneyApi = Pick<CoreNamespace, "Currency" | "Money">;
 /**

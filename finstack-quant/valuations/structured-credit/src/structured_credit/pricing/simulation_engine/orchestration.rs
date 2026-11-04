@@ -1,7 +1,5 @@
 use super::*;
 
-/// Release the unused spread-account balance to equity at deal end.
-///
 /// Record a residual principal distribution to a tranche at deal end: appends
 /// the flow to the tranche's cashflows and principal flows and bumps its
 /// `total_principal`. No-op if the tranche has no results entry. Shared by the
@@ -49,12 +47,8 @@ fn append_residual_principal(
     state
         .pending_non_waterfall_payments
         .push(NonWaterfallPayment {
-            payment_date: date,
-            tranche_id: tranche_id.to_string(),
-            source,
-            interest: zero,
-            principal: amount,
             incentive_fee,
+            ..NonWaterfallPayment::new(date, tranche_id, source, zero, amount)
         });
     Ok(())
 }
@@ -148,14 +142,13 @@ fn append_terminal_interest(
     let zero = Money::from((0_i64, state.currency));
     state
         .pending_non_waterfall_payments
-        .push(NonWaterfallPayment {
-            payment_date: date,
-            tranche_id: id.to_string(),
-            source: NonWaterfallSource::SpreadAccountRelease,
-            interest: amount,
-            principal: zero,
-            incentive_fee: zero,
-        });
+        .push(NonWaterfallPayment::new(
+            date,
+            id,
+            NonWaterfallSource::SpreadAccountRelease,
+            amount,
+            zero,
+        ));
     Ok(())
 }
 
@@ -362,14 +355,13 @@ fn redeem(
 
         state
             .pending_non_waterfall_payments
-            .push(NonWaterfallPayment {
-                payment_date: pay_date,
-                tranche_id: tranche_id_str.to_string(),
-                source: NonWaterfallSource::Redemption,
-                interest: Money::new(interest_paid, state.currency)?,
-                principal: Money::new(principal_paid, state.currency)?,
-                incentive_fee: zero,
-            });
+            .push(NonWaterfallPayment::new(
+                pay_date,
+                tranche_id_str,
+                NonWaterfallSource::Redemption,
+                Money::new(interest_paid, state.currency)?,
+                Money::new(principal_paid, state.currency)?,
+            ));
         if let Some(res) = state.results.get_mut(tranche_id_str) {
             res.cashflows
                 .push((pay_date, Money::new(redemption_amt, state.currency)?));

@@ -227,14 +227,14 @@ fn sampled_states_match_direct_node_terms_bit_for_bit() {
         for step in 0..=steps {
             for node in 0..=step {
                 let rate_row = tree.calibrated_rates[step];
-                if let Some(held) = tree.rate_terms.get(rate_row, step, node) {
+                if let Some(held) = held_node_terms(&tree.rate_terms, rate_row, step, node) {
                     assert_eq!(
                         held,
                         tree.rate_node_terms(step, rate_row.value_unchecked(node), dt)
                     );
                 }
                 let hazard_row = tree.calibrated_hazards[step];
-                if let Some(held) = tree.hazard_terms.get(hazard_row, step, node) {
+                if let Some(held) = held_node_terms(&tree.hazard_terms, hazard_row, step, node) {
                     assert_eq!(
                         held,
                         tree.hazard_node_terms(step, hazard_row.value_unchecked(node), dt)

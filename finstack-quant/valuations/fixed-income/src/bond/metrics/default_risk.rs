@@ -16,9 +16,7 @@ use crate::bond::Bond;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::metrics::sensitivities::recovery01::{
-    RecoveryReplayTerms, market_with_recovery, recovery01_fd,
-};
+use finstack_quant_valuations_core::metrics::sensitivities::recovery01::hazard_recovery01;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::pricer::ModelKey;
 
@@ -77,19 +75,14 @@ impl MetricCalculator for BondRecovery01Calculator {
             let bond: &Bond = context.instrument_as()?;
             let model = super::active_model(context, bond);
             let as_of = context.as_of;
-            let terms = RecoveryReplayTerms::on_discount_curve(bond.discount_curve_id.clone());
-            let base_recovery = context.curves.get_hazard(&hazard_id)?.recovery_rate();
-            recovery01_fd(base_recovery, context.base_value.amount(), |recovery| {
-                let market = market_with_recovery(
-                    context,
-                    &context.curves,
-                    hazard_id.as_str(),
-                    recovery,
-                    &terms,
-                    "Bond Recovery01",
-                )?;
-                reprice_on(context, bond, model, &market, as_of)
-            })
+            hazard_recovery01(
+                context,
+                hazard_id.as_str(),
+                bond.discount_curve_id.clone(),
+                None,
+                "Bond Recovery01",
+                |market, _| reprice_on(context, bond, model, market, as_of),
+            )
         })
     }
 }
@@ -118,7 +111,7 @@ impl MetricCalculator for BondJumpToDefaultCalculator {
             .clamp(0.0, 1.0);
         let schedule = bond.full_cashflow_schedule(&context.curves)?;
         let path = crate::bond::pricing::settlement::recovery_principal_path(&schedule)?;
-        let principal = crate::bond::pricing::settlement::balance_on(
+        let principal = finstack_quant_cashflows::builder::outstanding_on(
             &path,
             context.as_of,
             schedule.get_notional().initial.amount(),

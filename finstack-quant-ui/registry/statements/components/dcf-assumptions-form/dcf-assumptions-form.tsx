@@ -11,6 +11,10 @@ import { DecimalInput } from "@/components/finstack/core/primitives/decimal-inpu
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { IdCombobox } from "@/components/finstack/shared/primitives/id-combobox/id-combobox";
 import { dcfOptionsModule } from "./dcf-options";
+import {
+  passThrough,
+  typedNumber,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** Rust TerminalValueSpec: Gordon growth, exit multiple or H-model. */
 export type TerminalValueSpec = wire.TerminalValueSpec;
@@ -68,17 +72,8 @@ export interface DcfAssumptionsFormProps {
   disabled?: boolean;
   density?: "compact" | "comfortable";
 }
-/**
- * No standalone native DcfOptions parse exists; Rust validates the options
- * (unknown keys included) when it values the model. Kept stable so the
- * options form does not revalidate on every edit elsewhere.
- */
-const passThrough = async (json: string) => json;
 const text = (value: number | undefined) =>
   value === undefined ? "" : String(value);
-/** Typed text as a number; an empty required field is NaN, never 0, so Rust rejects it. */
-const typed = (value: string) =>
-  value.trim() === "" ? Number.NaN : Number(value);
 /**
  * Edits the arguments of statements_analytics.evaluateDcf: WACC, the
  * terminal-value variant and its fields, the UFCF node, an optional net-debt
@@ -136,18 +131,20 @@ export function DcfAssumptionsForm({
   const submit = () => {
     if (optionsJson === null) return;
     onSubmit({
-      wacc: typed(wacc),
+      wacc: typedNumber(wacc),
       terminalValue: {
         type,
         ...Object.fromEntries(
           terminalFields[type].map((field) => [
             field,
-            typed(terminal[`${type}.${field}`] ?? ""),
+            typedNumber(terminal[`${type}.${field}`] ?? ""),
           ]),
         ),
       } as TerminalValueSpec,
       ...(ufcfNode.trim() === "" ? {} : { ufcfNode }),
-      ...(netDebt.trim() === "" ? {} : { netDebtOverride: typed(netDebt) }),
+      ...(netDebt.trim() === ""
+        ? {}
+        : { netDebtOverride: typedNumber(netDebt) }),
       ...(optionsJson === "{}" ? {} : { optionsJson }),
     });
   };

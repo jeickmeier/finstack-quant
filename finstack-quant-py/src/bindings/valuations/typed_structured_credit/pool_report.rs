@@ -8,7 +8,6 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 
 use super::pool_stats::PyPoolStats;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::valuations::convert::money_to_py;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_report", "PoolConcentrationEntry")]
@@ -92,37 +91,7 @@ impl PyPoolReport {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_report", "PoolReport.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = [
-            ("obligor", &self.inner.by_obligor),
-            ("industry", &self.inner.by_industry),
-            ("rating", &self.inner.by_rating),
-        ]
-        .into_iter()
-        .flat_map(|(dimension, table)| {
-            table.iter().map(move |row| {
-                serde_json::json!({
-                    "dimension": dimension,
-                    "key": row.key,
-                    "balance": row.balance.amount(),
-                    "currency": row.balance.currency().to_string(),
-                    "balance_pct": row.balance_pct,
-                    "asset_count": row.asset_count,
-                })
-            })
-        })
-        .collect();
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &rows,
-            &[
-                ("dimension", "str"),
-                ("key", "str"),
-                ("balance", "float64"),
-                ("currency", "str"),
-                ("balance_pct", "float64"),
-                ("asset_count", "int64"),
-            ],
-        )
+        crate::bindings::core::table::envelope_to_pandas(py, &self.inner.to_table())
     }
 
     /// Return ``repr(self)``.

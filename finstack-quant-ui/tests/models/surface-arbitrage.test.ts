@@ -19,7 +19,7 @@ const resources = () =>
   (worker.proxy as unknown as { resources(): Promise<Resources> }).resources();
 beforeAll(async () => {
   worker = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => worker?.close());
 /** AAPL-EQUITY-VOL as calibrated from market_bootstrap/08_equity_vol_surface.json. */
 const surface = (

@@ -14,9 +14,7 @@ use super::risk_view::{uses_credit_tree, with_term_loan_risk_view};
 use crate::term_loan::TermLoan;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::recovery01::{
-    RecoveryReplayTerms, market_with_recovery, recovery01_fd,
-};
+use finstack_quant_valuations_core::metrics::sensitivities::recovery01::hazard_recovery01;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// The hazard curve of a loan on the credit tree, or the error saying it is not.
@@ -53,19 +51,14 @@ impl MetricCalculator for TermLoanRecovery01Calculator {
         with_term_loan_risk_view(context, |context| {
             let loan: &TermLoan = context.instrument_as()?;
             let as_of = context.as_of;
-            let terms = RecoveryReplayTerms::on_discount_curve(loan.discount_curve_id.clone());
-            let base_recovery = context.curves.get_hazard(&hazard_id)?.recovery_rate();
-            recovery01_fd(base_recovery, context.base_value.amount(), |recovery| {
-                let market = market_with_recovery(
-                    context,
-                    &context.curves,
-                    hazard_id.as_str(),
-                    recovery,
-                    &terms,
-                    "Term loan Recovery01",
-                )?;
-                loan.value_raw(&market, as_of)
-            })
+            hazard_recovery01(
+                context,
+                hazard_id.as_str(),
+                loan.discount_curve_id.clone(),
+                None,
+                "Term loan Recovery01",
+                |market, _| loan.value_raw(market, as_of),
+            )
         })
     }
 }
@@ -94,7 +87,7 @@ impl MetricCalculator for TermLoanJumpToDefaultCalculator {
             .recovery_rate()
             .clamp(0.0, 1.0);
         let schedule = cached_full_schedule(context)?;
-        let balance = crate::bond::pricing::settlement::balance_on(
+        let balance = finstack_quant_cashflows::builder::outstanding_on(
             &schedule.outstanding_by_date()?,
             context.as_of,
             schedule.get_notional().initial.amount(),

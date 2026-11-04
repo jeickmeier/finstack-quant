@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { BacktestForecastRequest } from "@/workers/finstack-contract";
@@ -14,15 +13,13 @@ export function backtestForecastOptions(
   session: number,
   request: BacktestForecastRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "backtestForecast", key] as const,
-    ready: snapshot !== null,
-    missing:
-      "The forecast backtest requires an explicit request and ready worker",
-    queryFn: (ready) => ready.call("backtestForecast", snapshot!),
-  });
+    session,
+    "backtestForecast",
+    request,
+    "The forecast backtest requires an explicit request and ready worker",
+  );
 }
 /** Native statements_analytics.backtestForecast ForecastMetrics or structured failure. */
 export function useBacktestForecast(request: BacktestForecastRequest | null) {

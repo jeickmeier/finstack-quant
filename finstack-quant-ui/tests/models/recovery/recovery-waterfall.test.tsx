@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -30,52 +22,38 @@ import {
   useWorkoutLgd,
   workoutLgdOptions,
 } from "@/hooks/models/use-recovery-waterfall/use-recovery-waterfall";
-import {
-  RecoveryWaterfall,
-  type SeniorityStats,
-  type SeniorityTerms,
-  type WaterfallTerms,
-  type WorkoutTerms,
-} from "@/components/finstack/models/components/recovery-waterfall/recovery-waterfall";
+import { RecoveryWaterfall } from "@/components/finstack/models/components/recovery-waterfall/recovery-waterfall";
+import { SeniorityRecoveryCard } from "@/components/finstack/models/components/recovery-waterfall/seniority-recovery-card";
+import { WorkoutLgdCard } from "@/components/finstack/models/components/recovery-waterfall/workout-lgd-card";
+import type { OutcomeState } from "@/components/finstack/shared/primitives/native-display/native-display";
 import {
   collateralTypes,
   seniorityClasses,
 } from "@/components/finstack/models/components/recovery-waterfall/recovery-contracts";
-import { unwrap, type Envelope } from "@/workers/finstack-contract";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import {
+  unwrap,
+  type Envelope,
+  type RecoveryWaterfallRequest,
+  type SeniorityRecoveryRequest,
+  type SeniorityRecoveryStats,
+  type WorkoutLgdRequest,
+} from "@/workers/finstack-contract";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
 import recoveryClaim from "../../../src/generated/schemas/recovery_claim.json";
 import workoutLgd from "../../../src/generated/schemas/workout_lgd.json";
 import { labelFor } from "../../../src/format/label.mjs";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: never) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "allocateRecovery")
-        return unwrap(await harness.proxy.allocateRecovery(request));
-      if (method === "workoutLgd")
-        return unwrap(await harness.proxy.workoutLgd(request));
-      if (method === "seniorityRecoveryStats")
-        return unwrap(await harness.proxy.seniorityRecoveryStats(request));
-      if (method === "seniorityCalibrationIds")
-        return unwrap(await harness.proxy.seniorityCalibrationIds());
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
+const harness = useWorkerHarness([
+  "allocateRecovery",
+  "workoutLgd",
+  "seniorityRecoveryStats",
+  "seniorityCalibrationIds",
+]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -92,9 +70,12 @@ const expectOutcome = (actual: Envelope<unknown>, result: unknown) => {
 };
 const value = <T,>(entry: { result: unknown }) =>
   (entry.result as { ok: true; value: T }).value;
-const waterfallTerms = fixture.waterfall.shortfall.request as WaterfallTerms;
-const workoutTerms = fixture.workout.secured.request as WorkoutTerms;
-const statsTerms = fixture.stats.seniorUnsecured.request as SeniorityTerms;
+const waterfallTerms = fixture.waterfall.shortfall
+  .request as RecoveryWaterfallRequest;
+const workoutTerms = fixture.workout.secured
+  .request as unknown as WorkoutLgdRequest;
+const statsTerms = fixture.stats.seniorUnsecured
+  .request as SeniorityRecoveryRequest;
 const shortfall = value<modelsWire.RecoveryWaterfallResult>(
   fixture.waterfall.shortfall,
 );
@@ -103,28 +84,56 @@ const shown = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 4,
   signDisplay: "negative",
 }).format;
-function view(props: Partial<Parameters<typeof RecoveryWaterfall>[0]>) {
-  return render(
-    <RecoveryWaterfall
-      defaultWaterfall={waterfallTerms}
-      defaultWorkout={workoutTerms}
-      defaultSeniority={statsTerms.seniority}
-      onWaterfallSubmit={() => {}}
-      onWorkoutSubmit={() => {}}
-      onStatsSubmit={() => {}}
-      waterfall={{ result: null }}
-      workout={{ result: null }}
-      stats={{ result: null }}
-      calibrationIds={fixture.calibrationIds}
-      {...props}
-    />,
+interface ViewProps {
+  onWaterfallSubmit?: (terms: RecoveryWaterfallRequest) => void;
+  onWorkoutSubmit?: (terms: WorkoutLgdRequest) => void;
+  onStatsSubmit?: (request: SeniorityRecoveryRequest) => void;
+  waterfall?: OutcomeState<modelsWire.RecoveryWaterfallResult>;
+  workout?: OutcomeState<modelsWire.WorkoutLgdResult>;
+  stats?: OutcomeState<SeniorityRecoveryStats>;
+  calibrationIds?: readonly string[] | null;
+}
+/** The item's three cards, each fed its own analysis. */
+function Cards({
+  onWaterfallSubmit = () => {},
+  onWorkoutSubmit = () => {},
+  onStatsSubmit = () => {},
+  waterfall = { result: null },
+  workout = { result: null },
+  stats = { result: null },
+  calibrationIds = fixture.calibrationIds,
+}: ViewProps) {
+  return (
+    <>
+      <RecoveryWaterfall
+        defaultTerms={waterfallTerms}
+        onSubmit={onWaterfallSubmit}
+        state={waterfall}
+      />
+      <WorkoutLgdCard
+        defaultTerms={workoutTerms}
+        onSubmit={onWorkoutSubmit}
+        state={workout}
+      />
+      <SeniorityRecoveryCard
+        defaultSeniority={statsTerms.seniority}
+        calibrationIds={calibrationIds}
+        onSubmit={onStatsSubmit}
+        state={stats}
+      />
+    </>
   );
+}
+function view(props: ViewProps) {
+  return render(<Cards {...props} />);
 }
 it.each(Object.entries(fixture.waterfall))(
   "the worker returns the native waterfall of %s",
   async (_name, entry) => {
     expectOutcome(
-      await harness.proxy.allocateRecovery(entry.request as WaterfallTerms),
+      await harness.proxy.allocateRecovery(
+        entry.request as RecoveryWaterfallRequest,
+      ),
       entry.result,
     );
   },
@@ -133,7 +142,9 @@ it.each(Object.entries(fixture.workout))(
   "the worker returns the native workout LGD of %s",
   async (_name, entry) => {
     expectOutcome(
-      await harness.proxy.workoutLgd(entry.request as WorkoutTerms),
+      await harness.proxy.workoutLgd(
+        entry.request as unknown as WorkoutLgdRequest,
+      ),
       entry.result,
     );
   },
@@ -143,7 +154,7 @@ it.each(Object.entries(fixture.stats))(
   async (_name, entry) => {
     expectOutcome(
       await harness.proxy.seniorityRecoveryStats(
-        entry.request as SeniorityTerms,
+        entry.request as SeniorityRecoveryRequest,
       ),
       entry.result,
     );
@@ -334,7 +345,7 @@ it("labels each field by its wire name and describes it from the generated contr
 });
 it("tables the workout and seniority results as returned", () => {
   const workout = value<modelsWire.WorkoutLgdResult>(fixture.workout.secured);
-  const stats = value<SeniorityStats>(fixture.stats.seniorUnsecured);
+  const stats = value<SeniorityRecoveryStats>(fixture.stats.seniorUnsecured);
   view({ workout: { result: workout }, stats: { result: stats } });
   const lgd = screen.getByRole("table", { name: "Workout" });
   expect(
@@ -393,25 +404,22 @@ function Connected() {
   const statsQuery = useSeniorityRecoveryStats(seniority);
   const ids = useSeniorityCalibrationIds();
   return (
-    <RecoveryWaterfall
-      defaultWaterfall={waterfallTerms}
-      defaultWorkout={workoutTerms}
-      defaultSeniority={statsTerms.seniority}
+    <Cards
       onWaterfallSubmit={setEstate}
       onWorkoutSubmit={setWorkout}
       onStatsSubmit={setSeniority}
       waterfall={{
-        result: waterfallQuery.data ?? null,
+        result: waterfallQuery.data,
         loading: waterfallQuery.isFetching,
         error: waterfallQuery.error?.message,
       }}
       workout={{
-        result: workoutQuery.data ?? null,
+        result: workoutQuery.data,
         loading: workoutQuery.isFetching,
         error: workoutQuery.error?.message,
       }}
       stats={{
-        result: statsQuery.data ?? null,
+        result: statsQuery.data,
         loading: statsQuery.isFetching,
         error: statsQuery.error?.message,
       }}

@@ -1,15 +1,7 @@
 // @vitest-environment jsdom
 import type { BenchmarkReportData } from "@/components/finstack/analytics/lib/analytics-report-types";
 import { createRequire } from "node:module";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -29,7 +21,7 @@ import {
 } from "@/hooks/analytics/use-benchmark-report/use-benchmark-report";
 import { BenchmarkReport } from "@/components/finstack/analytics/components/benchmark-report/benchmark-report";
 import { unwrap } from "@/workers/finstack-contract";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import tearSheet from "./benchmark.json";
 import invariantsCase from "./benchmark-invariants.json";
@@ -38,10 +30,10 @@ import data from "../../../finstack-quant/analytics/tests/data/api_invariants_da
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 // Figures are drawn by the shared chart in the browser gates; here each one
 // is a labelled placeholder.
 vi.mock(
@@ -54,30 +46,9 @@ vi.mock(
   }),
 );
 type Resources = Record<"performanceConstructed" | "performanceFreed", number>;
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness(["benchmarkReport"]);
 const resources = () =>
   (harness.proxy as unknown as { resources(): Promise<Resources> }).resources();
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "benchmarkReport")
-        return unwrap(
-          await harness.proxy.benchmarkReport(
-            request as BenchmarkReportRequest,
-          ),
-        );
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

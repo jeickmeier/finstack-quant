@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { MonteCarloBreachRequest } from "@/workers/finstack-contract";
@@ -13,20 +12,13 @@ export function monteCarloBreachProbabilityOptions(
   session: number,
   request: MonteCarloBreachRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: [
-      "finstack",
-      session,
-      "monteCarloBreachProbability",
-      key,
-    ] as const,
-    ready: snapshot !== null,
-    missing:
-      "The breach probability requires an explicit request and ready worker",
-    queryFn: (ready) => ready.call("monteCarloBreachProbability", snapshot!),
-  });
+    session,
+    "monteCarloBreachProbability",
+    request,
+    "The breach probability requires an explicit request and ready worker",
+  );
 }
 /** Native statements.monteCarloBreachProbability: a fraction of paths, null when the results carry no path data for the metric, or a structured failure. */
 export function useMonteCarloBreachProbability(

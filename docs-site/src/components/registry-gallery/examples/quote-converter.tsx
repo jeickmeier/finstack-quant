@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { ExampleProps } from "./props";
+import { sixPlaces, type ExampleProps } from "./props";
 import {
   QuoteConverter,
   type QuoteConverterProps,
@@ -15,8 +15,6 @@ import { WorkerPreview } from "../worker-preview";
 const { currency, cases } = data.quoteConverter;
 const { callable } = cases;
 const start = callable.request.quoteInput as QuoteInput;
-// Host display choice: six decimal places of the returned values.
-const sixPlaces = (value: number) => value.toFixed(6);
 function Live({ density }: ExampleProps) {
   const [quoteInput, setQuoteInput] = useState<QuoteInput>(start);
   const quotes = useComputeQuotes({ ...callable.request, quoteInput });

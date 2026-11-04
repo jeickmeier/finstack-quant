@@ -41,7 +41,7 @@ function expectFinite(value: unknown, path = "result"): void {
 let worker: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   worker = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => worker?.close());
 it(
   "preserves every native scenario cell and failure through the real worker",

@@ -56,7 +56,7 @@
       "diverted_cash": {
         "field": "diverted_cash",
         "label": "USD",
-        "source": "valuations::PeriodWaterfall::diverted_cash"
+        "source": "valuations::WaterfallDistribution::diverted_cash"
       },
       "excess_spread": {
         "field": "excess_spread",
@@ -79,7 +79,7 @@
     },
     "diverted_cash": {
       "$ref": "#/$defs/MetricFieldUnit",
-      "description": "Unit of `PeriodWaterfall::diverted_cash` and of each diversion's amount."
+      "description": "Unit of `WaterfallDistribution::diverted_cash` and of each diversion's amount."
     },
     "excess_spread": {
       "$ref": "#/$defs/MetricFieldUnit",

@@ -1,16 +1,14 @@
 "use client";
 import { useState } from "react";
 import type { ExampleProps } from "./props";
-import {
-  WaccCalculator,
-  type WaccInputs,
-} from "@/components/finstack/statements/components/wacc-calculator/wacc-calculator";
+import { WaccCalculator } from "@/components/finstack/statements/components/wacc-calculator/wacc-calculator";
+import type { WaccRequest } from "@/workers/finstack-contract";
 import { useWacc } from "@/hooks/statements/use-wacc/use-wacc";
 import data from "../data.json";
 import { WorkerPreview } from "../worker-preview";
-const start = data.waccCalculator.cases.blended.inputs as WaccInputs;
+const start = data.waccCalculator.cases.blended.inputs as WaccRequest;
 function Live({ density }: ExampleProps) {
-  const [inputs, setInputs] = useState<WaccInputs>(start);
+  const [inputs, setInputs] = useState<WaccRequest>(start);
   const [applied, setApplied] = useState<number | null>(null);
   const rate = useWacc(inputs);
   return (

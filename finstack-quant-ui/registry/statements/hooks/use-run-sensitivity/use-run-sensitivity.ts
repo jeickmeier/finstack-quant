@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { RunSensitivityRequest } from "@/workers/finstack-contract";
@@ -17,15 +16,13 @@ export function runSensitivityOptions(
   session: number,
   request: RunSensitivityRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "runSensitivity", key] as const,
-    ready: snapshot !== null,
-    missing:
-      "The sensitivity run requires an explicit request and ready worker",
-    queryFn: (ready) => ready.call("runSensitivity", snapshot!),
-  });
+    session,
+    "runSensitivity",
+    request,
+    "The sensitivity run requires an explicit request and ready worker",
+  );
 }
 /** Native statements_analytics.runSensitivity result with its generateTornadoEntries tornado, or structured failure. */
 export function useRunSensitivity(request: RunSensitivityRequest | null) {

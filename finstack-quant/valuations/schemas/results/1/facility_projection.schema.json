@@ -624,8 +624,8 @@
           ]
         },
         "waterfall": {
-          "$ref": "#/$defs/PeriodWaterfall",
-          "description": "How this period's waterfall ran."
+          "$ref": "#/$defs/WaterfallDistribution",
+          "description": "How this period's waterfall ran: who was paid, how much, and what was\nleft. Its recipient-keyed totals are not serialized; `payment_records`\ncarries the same cash."
         },
         "weighted_avg_spread_bp": {
           "description": "Balance-weighted spread of the performing floating-rate collateral (basis\npoints). `None` when no performing floating-rate balance remains.",
@@ -656,83 +656,6 @@
         "waterfall",
         "non_waterfall_payments",
         "credit_enhancement"
-      ],
-      "type": "object"
-    },
-    "PeriodWaterfall": {
-      "description": "How one period's waterfall ran: who was paid, how much, and what was left.\n\nThe serializable projection of [`WaterfallDistribution`]: its two\nrecipient-keyed maps cannot be JSON (a `RecipientType::Tranche` is not a\nstring key) and hold nothing `payment_records` does not, and its payment\ndate and coverage tests are already on [`PeriodDiagnostics`].",
-      "properties": {
-        "diverted_amounts": {
-          "description": "Coverage-test diversions that moved cash, in execution order.",
-          "items": {
-            "$ref": "#/$defs/DiversionRecord"
-          },
-          "type": "array"
-        },
-        "diverted_cash": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Total cash failing coverage tests diverted this period."
-        },
-        "had_diversions": {
-          "description": "Whether any coverage-test tier failed this period, even with no cash\nleft to divert.",
-          "type": "boolean"
-        },
-        "payment_records": {
-          "description": "Every recipient payment, in execution order.",
-          "items": {
-            "$ref": "#/$defs/PaymentRecord"
-          },
-          "type": "array"
-        },
-        "principal_used_for_interest": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Principal proceeds spent on fee or interest tiers."
-        },
-        "recovery_proceeds": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Recovery cash included in `total_available`."
-        },
-        "remaining_interest": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Interest proceeds left undistributed, carried to the next period."
-        },
-        "remaining_principal": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Principal proceeds left undistributed, carried to the next period."
-        },
-        "tier_allocations": {
-          "description": "Cash each tier allocated, as `(tier id, amount)` in execution order.",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "type": "string"
-              },
-              {
-                "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        },
-        "total_available": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Cash entering the waterfall (interest plus principal proceeds)."
-        }
-      },
-      "required": [
-        "total_available",
-        "tier_allocations",
-        "payment_records",
-        "diverted_amounts",
-        "diverted_cash",
-        "had_diversions",
-        "remaining_interest",
-        "remaining_principal",
-        "principal_used_for_interest",
-        "recovery_proceeds"
       ],
       "type": "object"
     },
@@ -1135,6 +1058,122 @@
       "required": [
         "tranche_id",
         "credit_enhancement"
+      ],
+      "type": "object"
+    },
+    "WaterfallDistribution": {
+      "additionalProperties": false,
+      "description": "Result of waterfall distribution",
+      "properties": {
+        "coverage_tests": {
+          "description": "Coverage test results as `(test id, ratio, passed)`. The ratio is\n`None` when the test has no claim outstanding (a zero denominator);\nsuch a test passes.",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "diverted_amounts": {
+          "default": [],
+          "description": "Detailed diverted payment records.",
+          "items": {
+            "$ref": "#/$defs/DiversionRecord"
+          },
+          "type": "array"
+        },
+        "diverted_cash": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Total diverted cash"
+        },
+        "had_diversions": {
+          "description": "Whether any diversions occurred",
+          "type": "boolean"
+        },
+        "payment_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Payment date"
+        },
+        "payment_records": {
+          "description": "Detailed payment records",
+          "items": {
+            "$ref": "#/$defs/PaymentRecord"
+          },
+          "type": "array"
+        },
+        "principal_used_for_interest": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Principal proceeds spent on fee or interest tiers whose\n[`FundingSource`] is `InterestThenPrincipal`. Already netted out of\n`remaining_principal`; reported so the principal account's use is\nvisible."
+        },
+        "recovery_proceeds": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "default": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "description": "Recovery proceeds included in this period's available cash.\nTracked separately from principal collections for trustee report reconciliation."
+        },
+        "remaining_cash": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Remaining undistributed cash"
+        },
+        "remaining_interest": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Undistributed interest retained for subsequent interest-waterfall periods."
+        },
+        "remaining_principal": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Undistributed principal retained for reinvestment or debt repayment."
+        },
+        "tier_allocations": {
+          "description": "Tier-level allocations",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "total_available": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Total available cash at start"
+        }
+      },
+      "required": [
+        "payment_date",
+        "total_available",
+        "tier_allocations",
+        "payment_records",
+        "coverage_tests",
+        "diverted_cash",
+        "remaining_cash",
+        "remaining_interest",
+        "remaining_principal",
+        "principal_used_for_interest",
+        "had_diversions"
       ],
       "type": "object"
     }

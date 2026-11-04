@@ -1,17 +1,5 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -23,7 +11,6 @@ import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack"
 import {
   bondWorkoutLadderOptions,
   useBondWorkoutLadder,
-  type BondWorkoutLadderRequest,
 } from "@/hooks/valuations/use-bond-workout-ladder/use-bond-workout-ladder";
 import {
   YieldWorkoutLadder,
@@ -31,36 +18,15 @@ import {
 } from "@/components/finstack/valuations/components/yield-workout-ladder/yield-workout-ladder";
 import { unwrap } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
 
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "bondWorkoutLadder")
-        return unwrap(
-          await harness.proxy.bondWorkoutLadder(
-            request as BondWorkoutLadderRequest,
-          ),
-        );
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
+const harness = useWorkerHarness(["bondWorkoutLadder"]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -72,19 +38,6 @@ const ladderOf = (entry: { ladder: unknown }) => entry.ladder as Ladder;
 const bodyRows = () => screen.getAllByRole("row").slice(1);
 
 // Values are regenerated and compared by `mise run ui-fixtures --check`.
-it("pins the JSON inputs the fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../..",
-  );
-  for (const source of fixture.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/valuations/workout-ladder/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it.each(Object.entries(cases))(
   "the worker returns the native ladder of %s",
   async (_name, entry) => {

@@ -775,7 +775,7 @@ fn test_moving_average_requires_window() {
 
 #[test]
 fn test_seasonal_requires_mode() {
-    let model = {
+    let result = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder
             .periods("2025Q1..2025Q4", Some("2025Q1"))
@@ -798,11 +798,8 @@ fn test_seasonal_requires_mode() {
                 },
             },
         );
-        model_builder.build().unwrap()
+        model_builder.build()
     };
-
-    let mut evaluator = Evaluator::new();
-    let result = evaluator.evaluate(&model);
 
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("mode"));
@@ -810,7 +807,7 @@ fn test_seasonal_requires_mode() {
 
 #[test]
 fn test_seasonal_decomposition_requires_season_length() {
-    let model = {
+    let result = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder
             .periods("2025Q1..2025Q4", Some("2025Q1"))
@@ -833,11 +830,8 @@ fn test_seasonal_decomposition_requires_season_length() {
                 },
             },
         );
-        model_builder.build().unwrap()
+        model_builder.build()
     };
-
-    let mut evaluator = Evaluator::new();
-    let result = evaluator.evaluate(&model);
 
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("season_length"));
@@ -1071,7 +1065,7 @@ fn test_seasonal_mode_enum_multiplicative() {
 #[test]
 fn test_seasonal_mode_typo_errors() {
     // Typo in mode should error, not silently default
-    let model = {
+    let result = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder
             .periods("2025Q1..2025Q4", Some("2025Q1"))
@@ -1094,11 +1088,8 @@ fn test_seasonal_mode_typo_errors() {
                 },
             },
         );
-        model_builder.build().unwrap()
+        model_builder.build()
     };
-
-    let mut evaluator = Evaluator::new();
-    let result = evaluator.evaluate(&model);
 
     // Should error on typo, not silently default
     assert!(result.is_err());

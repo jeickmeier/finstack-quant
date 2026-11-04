@@ -21,11 +21,12 @@ import { formatRawMoney, groupDecimal } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { TranchePanel } from "@/components/finstack/valuations/blocks/pricing-workbench/tranche-panel";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
+import { createClient } from "../shared/worker/client";
 
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -80,7 +81,7 @@ beforeEach(() => {
       deal.free();
     }
   });
-  mock.createClient.mockReset().mockReturnValue({ call, close: vi.fn() });
+  createClient.mockReset().mockReturnValue({ call, close: vi.fn() });
 });
 afterEach(() => {
   cleanup();

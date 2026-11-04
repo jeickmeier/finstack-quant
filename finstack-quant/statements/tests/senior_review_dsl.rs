@@ -244,6 +244,7 @@ fn rank_rejects_invalid_arity_at_compilation_and_standalone_evaluation() {
     for args in [Vec::new(), vec![Expr::literal(1.0); 3]] {
         let mut context = EvaluationContext::new(
             PeriodId::quarter(2025, 1).expect("quarter"),
+            &[],
             Arc::new(IndexMap::new()),
             Arc::new(IndexMap::new()),
         );

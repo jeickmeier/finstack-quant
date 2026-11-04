@@ -341,8 +341,10 @@ impl PyAssetPool {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.diversity_score")]
     #[pyo3(text_signature = "($self)")]
-    fn diversity_score(&self) -> Option<f64> {
-        self.inner.diversity_score()
+    fn diversity_score(&self) -> PyResult<Option<f64>> {
+        self.inner
+            .diversity_score()
+            .map_err(crate::errors::core_to_py)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.assets_by_obligor")]

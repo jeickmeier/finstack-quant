@@ -3,10 +3,8 @@
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
 use crate::forecast;
-use crate::forecast::statistical::{
-    CorrelatedMonteCarloSeries, monte_carlo_correlated_series, parse_correlation_params,
-};
-use crate::types::{FinancialModelSpec, ForecastMethod, NodeId, NodeSpec};
+use crate::forecast::statistical::{CorrelatedMonteCarloSeries, monte_carlo_correlated_series};
+use crate::types::{FinancialModelSpec, NodeId, NodeSpec};
 use finstack_quant_core::dates::{Date, PeriodId};
 use indexmap::IndexMap;
 
@@ -91,38 +89,34 @@ pub(crate) fn evaluate_forecast(
         visibility_cutoff,
     )?;
 
+    let parameters = forecast_spec.parameters()?;
     let forecast_results = if let Some(offset) = seed_offset {
-        let correlation = if mc_z_cache.is_some()
-            && matches!(
-                forecast_spec.method,
-                ForecastMethod::Normal | ForecastMethod::LogNormal | ForecastMethod::MeanReverting
-            ) {
-            parse_correlation_params(&forecast_spec.params)?
+        let correlation = if mc_z_cache.is_some() {
+            forecast::statistical::correlation(&parameters)?
         } else {
             None
         };
         let (mut series, shocks) =
             if let (Some(cache), Some((peer, rho))) = (mc_z_cache.as_deref(), correlation) {
-                if model.get_node(peer.as_str()).is_none() {
+                if model.get_node(peer).is_none() {
                     return Err(Error::forecast(format!(
                         "correlation_with references unknown node '{peer}'"
                     )));
                 }
                 let (series, shocks) = monte_carlo_correlated_series(CorrelatedMonteCarloSeries {
-                    method: forecast_spec.method,
-                    params: &forecast_spec.params,
+                    parameters: &parameters,
                     base_value,
                     forecast_periods: &forecast_periods,
                     seed_offset: offset,
                     node_id: node_spec.node_id.as_str(),
-                    peer_id: peer.as_str(),
+                    peer_id: peer,
                     rho,
                     mc_z_cache: cache,
                 })?;
                 (series, Some(shocks))
             } else {
                 forecast::apply_forecast(
-                    forecast_spec,
+                    &parameters,
                     base_value,
                     &forecast_periods,
                     node_spec.node_id.as_str(),
@@ -137,11 +131,11 @@ pub(crate) fn evaluate_forecast(
         }
         // Cache sampled shocks before applying output bounds. Clipping the
         // reported levels does not change the latent correlation process.
-        forecast::apply_bounds(&forecast_spec.params, &mut series)?;
+        forecast::apply_bounds(&parameters, &mut series)?;
         series
     } else {
         forecast::apply_forecast_for_node(
-            forecast_spec,
+            &parameters,
             base_value,
             &forecast_periods,
             node_spec.node_id.as_str(),

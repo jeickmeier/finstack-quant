@@ -306,21 +306,24 @@ impl SpotBumpPrices {
     }
 }
 
-/// Reprice `bond` either side of a relative bump of the share price in `inputs`,
-/// or `None` when the share price is zero and has no relative bump.
+/// Reprice `bond` either side of a relative bump of share price `spot`, or
+/// `None` when the share price is zero and has no relative bump. Only the spot
+/// identity and scalar variant of `inputs` are read, so they may come from a
+/// market at another share price.
 pub(super) fn spot_bump_prices(
     bond: &ConvertibleBond,
     market: &MarketContext,
     inputs: &PricingInputs,
+    spot: f64,
     bump_pct: f64,
     as_of: Date,
 ) -> Result<Option<SpotBumpPrices>> {
-    let spot_bump = bump_pct * inputs.spot;
+    let spot_bump = bump_pct * spot;
     if spot_bump <= 0.0 {
         return Ok(None);
     }
-    let market_up = inputs.market_at_spot(market, inputs.spot + spot_bump)?;
-    let market_down = inputs.market_at_spot(market, inputs.spot - spot_bump)?;
+    let market_up = inputs.market_at_spot(market, spot + spot_bump)?;
+    let market_down = inputs.market_at_spot(market, spot - spot_bump)?;
     Ok(Some(SpotBumpPrices {
         spot_bump,
         price_up: price_convertible_bond(bond, &market_up, as_of)?.amount(),
@@ -686,7 +689,7 @@ pub fn calculate_convertible_greeks(
     };
 
     // ---- Delta & Gamma: bump equity spot (central differences) ----
-    if let Some(bump) = spot_bump_prices(bond, market, &inputs, bump_pct, as_of)? {
+    if let Some(bump) = spot_bump_prices(bond, market, &inputs, inputs.spot, bump_pct, as_of)? {
         greeks.delta = bump.delta();
         greeks.gamma = (bump.price_up - 2.0 * greeks.price + bump.price_down)
             / (bump.spot_bump * bump.spot_bump);

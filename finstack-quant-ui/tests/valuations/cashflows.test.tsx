@@ -1,17 +1,6 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  beforeAll,
-  beforeEach,
-  afterAll,
-  afterEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { resolve } from "node:path";
+import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -39,41 +28,23 @@ import {
   type CashflowEnvelope,
   type CashflowRequest,
 } from "@/workers/finstack-contract";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import fixture from "./cashflows/cases.json";
 const envelope = (value: unknown) => value as InstrumentCashflowWire;
 import { budget } from "../shared/budget";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-let call: ReturnType<typeof vi.fn>;
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 const exportRequest = (request: CashflowRequest): CashflowRequest => ({
   instrumentJson: request.instrumentJson,
   marketJson: request.marketJson,
   asOf: request.asOf,
   model: request.model,
 });
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-async function invoke(
-  method: "initialize" | "cashflows" | "cashflowLadder",
-  request: unknown,
-) {
-  if (method === "initialize") return unwrap(await harness.proxy.initialize());
-  if (method === "cashflowLadder")
-    return unwrap(
-      await harness.proxy.cashflowLadder(request as CashflowEnvelope),
-    );
-  return unwrap(await harness.proxy.cashflows(request as CashflowRequest));
-}
+const harness = useWorkerHarness(["cashflows", "cashflowLadder"]);
+const { call } = harness;
 beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  call = vi.fn(invoke);
-  mock.createClient.mockReturnValue({ call, close() {} });
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
     value: { writeText: vi.fn().mockResolvedValue(undefined) },
@@ -85,19 +56,6 @@ afterEach(() => {
 });
 // Prices and cashflow exports are regenerated and compared by
 // `mise run ui-fixtures --check` (tests/valuations/cashflows/generate.mjs).
-it("pins the JSON inputs the cashflow fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../..",
-  );
-  for (const source of fixture.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/valuations/cashflows/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it.each(fixture.cases.filter((c) => c.cashflows !== null))(
   "tables and copies the native $type envelope at both densities",
   async (entry) => {
@@ -155,12 +113,13 @@ it("shows loading, then the actual unsupported error without changing caller val
   const entry = fixture.cases.find((c) => c.error)!;
 
   let finish!: () => void;
+  const route = call.getMockImplementation()!;
   call.mockImplementation(async (method, request) => {
     if (method === "cashflows")
       await new Promise<void>((resolve) => {
         finish = resolve;
       });
-    return invoke(method, request);
+    return route(method, request);
   });
   const print = vi.spyOn(window, "print").mockImplementation(() => {});
   render(

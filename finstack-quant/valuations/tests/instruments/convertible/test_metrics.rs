@@ -21,7 +21,7 @@ fn test_parity_metric() {
     let result = bond.price_with_metrics(
         &market,
         as_of,
-        &[MetricId::custom("parity")],
+        &[MetricId::Parity],
         finstack_quant_valuations::instruments::PricingOptions::default(),
     );
 
@@ -62,7 +62,7 @@ fn test_conversion_premium_metric() {
     let result = bond.price_with_metrics(
         &market,
         as_of,
-        &[MetricId::custom("conversion_premium")],
+        &[MetricId::ConversionPremium],
         finstack_quant_valuations::instruments::PricingOptions::default(),
     );
 
@@ -237,8 +237,8 @@ fn test_multiple_metrics() {
     let as_of = dates::base_date();
 
     let metrics = vec![
-        MetricId::custom("parity"),
-        MetricId::custom("conversion_premium"),
+        MetricId::Parity,
+        MetricId::ConversionPremium,
         MetricId::Delta,
         MetricId::Gamma,
         MetricId::Vega,
@@ -273,7 +273,7 @@ fn test_metrics_with_callable_bond() {
     let market = create_market_context();
     let as_of = dates::base_date();
 
-    let metrics = vec![MetricId::custom("parity"), MetricId::Delta, MetricId::Gamma];
+    let metrics = vec![MetricId::Parity, MetricId::Delta, MetricId::Gamma];
 
     let result = bond.price_with_metrics(
         &market,
@@ -295,7 +295,7 @@ fn test_metrics_with_puttable_bond() {
     let market = create_market_context();
     let as_of = dates::base_date();
 
-    let metrics = vec![MetricId::custom("parity"), MetricId::Delta, MetricId::Vega];
+    let metrics = vec![MetricId::Parity, MetricId::Delta, MetricId::Vega];
 
     let result = bond.price_with_metrics(
         &market,
@@ -316,7 +316,7 @@ fn test_metrics_with_zero_coupon() {
     let market = create_market_context();
     let as_of = dates::base_date();
 
-    let metrics = vec![MetricId::custom("parity"), MetricId::Delta];
+    let metrics = vec![MetricId::Parity, MetricId::Delta];
 
     let result = bond.price_with_metrics(
         &market,
@@ -419,7 +419,7 @@ fn test_metrics_consistency_with_direct_calculation() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::custom("parity")],
+            &[MetricId::Parity],
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
         .unwrap();
@@ -464,10 +464,7 @@ fn test_custom_metrics_only() {
     let market = create_market_context();
     let as_of = dates::base_date();
 
-    let metrics = vec![
-        MetricId::custom("parity"),
-        MetricId::custom("conversion_premium"),
-    ];
+    let metrics = vec![MetricId::Parity, MetricId::ConversionPremium];
 
     let result = bond
         .price_with_metrics(

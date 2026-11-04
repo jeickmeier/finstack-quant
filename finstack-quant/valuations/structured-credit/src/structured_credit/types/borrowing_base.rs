@@ -355,7 +355,7 @@ impl BorrowingBaseRules {
 
 /// Grouping key of `asset` under `scope`, or `None` when the asset carries
 /// no value on that dimension (it then escapes the limit).
-fn concentration_key(scope: ConcentrationScope, asset: &PoolAsset) -> Option<String> {
+pub(super) fn concentration_key(scope: ConcentrationScope, asset: &PoolAsset) -> Option<String> {
     match scope {
         ConcentrationScope::Obligor => asset.obligor_id.clone(),
         ConcentrationScope::Industry => asset.industry.clone(),

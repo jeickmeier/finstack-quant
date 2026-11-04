@@ -1,17 +1,12 @@
 "use client";
 import type { ExampleProps } from "./props";
-import {
-  DcfReport,
-  type CorporateValuationResultWire,
-} from "@/components/finstack/statements/components/dcf-report/dcf-report";
-import type { DcfSensitivityResultWire } from "@/lib/finstack/generated/types/dcf_sensitivity_result";
-import data from "../data.json";
+import { DcfReport } from "@/components/finstack/statements/components/dcf-report/dcf-report";
+import { statementDcf, statementDcfSensitivity } from "../fixtures";
 
 // Captured native statements_analytics.evaluateDcf and dcfSensitivity of the
 // analyst model under illustrative assumptions; this item needs no worker.
-const result = data.statementDcf as unknown as CorporateValuationResultWire;
-const sensitivity =
-  data.statementDcfSensitivity as unknown as DcfSensitivityResultWire;
+const result = statementDcf;
+const sensitivity = statementDcfSensitivity;
 
 export function Example({ density = "compact" }: ExampleProps) {
   return (

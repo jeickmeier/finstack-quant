@@ -74,11 +74,9 @@ impl MetricId {
 
     /// Unit family of this metric's value.
     ///
-    /// Composite keys inherit the unit of their base metric. A custom metric
-    /// has a unit only when listed in `explicit_unit`, as the loan yields are;
-    /// any other custom metric, and a standard metric whose unit is
-    /// calculator-dependent (for example `ir_convexity`, `inflation_convexity`),
-    /// returns [`MetricUnit::Unknown`].
+    /// Composite keys inherit the unit of their base metric. A custom metric,
+    /// and a standard metric whose unit is calculator-dependent (for example
+    /// `ir_convexity`, `inflation_convexity`), returns [`MetricUnit::Unknown`].
     pub fn unit(&self) -> MetricUnit {
         let base = self.base();
         if let Some(unit) = explicit_unit(base.as_str()) {
@@ -135,18 +133,13 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "expense_ratio"
         | "variance_expected"
         | "variance_realized"
-        // Custom loan yields.
         | "ytc"
         | "yt2y"
         | "yt3y"
         | "yt4y"
         | "all_in_rate"
         | "oid_eir_rate"
-        // A custom convertible price over conversion value, less one.
         | "conversion_premium" => Decimal,
-        // A custom loan total in the facility currency, and custom convertible
-        // position values.
-        "oid_eir_amortization" | "conversion_value" | "bond_floor" => Currency,
         // Basis points.
         "par_spread"
         | "basis_par_spread"
@@ -191,7 +184,6 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "theta_period_days"
         | "carry_decomposition_degenerate"
         | "index_delta"
-        // A custom convertible conversion value over notional.
         | "parity" => Dimensionless,
         // Calculator-dependent second-order measures and the breakeven shift
         // (whose unit follows the configured target).
@@ -221,26 +213,22 @@ mod tests {
     }
 
     #[test]
-    fn custom_loan_metrics_declare_their_units() {
-        for id in ["ytc", "yt2y", "yt3y", "yt4y", "all_in_rate", "oid_eir_rate"] {
-            assert_eq!(MetricId::custom(id).unit(), MetricUnit::Decimal, "{id}");
-        }
-        assert_eq!(
-            MetricId::custom("oid_eir_amortization").unit(),
-            MetricUnit::Currency
-        );
-        assert_eq!(MetricId::custom("my_metric").unit(), MetricUnit::Unknown);
-    }
-
-    #[test]
-    fn custom_convertible_metrics_declare_their_units() {
+    fn loan_and_convertible_metrics_carry_their_units() {
         for (id, unit) in [
-            ("parity", MetricUnit::Dimensionless),
-            ("conversion_premium", MetricUnit::Decimal),
-            ("conversion_value", MetricUnit::Currency),
-            ("bond_floor", MetricUnit::Currency),
+            (MetricId::Ytc, MetricUnit::Decimal),
+            (MetricId::Yt2y, MetricUnit::Decimal),
+            (MetricId::Yt3y, MetricUnit::Decimal),
+            (MetricId::Yt4y, MetricUnit::Decimal),
+            (MetricId::AllInRate, MetricUnit::Decimal),
+            (MetricId::OidEirRate, MetricUnit::Decimal),
+            (MetricId::OidEirAmortization, MetricUnit::Currency),
+            (MetricId::Parity, MetricUnit::Dimensionless),
+            (MetricId::ConversionPremium, MetricUnit::Decimal),
+            (MetricId::ConversionValue, MetricUnit::Currency),
+            (MetricId::BondFloor, MetricUnit::Currency),
         ] {
-            assert_eq!(MetricId::custom(id).unit(), unit, "{id}");
+            assert!(!id.is_custom(), "{id}");
+            assert_eq!(id.unit(), unit, "{id}");
         }
     }
 

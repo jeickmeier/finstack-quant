@@ -96,10 +96,9 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 ///
 /// # Registered Metrics
 ///
-/// - Standard: YTM, Discount Margin, DV01, BucketedDV01, CS01, BucketedCS01, Theta,
-///   Recovery01, Jump to Default
-/// - Custom: YTW (`"ytw"`), YTC (`"ytc"`), YT2Y/3Y/4Y, All-In Rate (`"all_in_rate"`),
-///   OID EIR amortization (`"oid_eir_amortization"`), OID effective rate (`"oid_eir_rate"`)
+/// YTM, YTW, YTC, YT2Y/3Y/4Y, Discount Margin, All-In Rate, OID EIR amortization
+/// and effective rate, OAS, embedded option value, DV01, BucketedDV01, CS01,
+/// BucketedCS01, Recovery01 and Jump to Default.
 ///
 /// # Examples
 ///
@@ -131,17 +130,13 @@ pub(crate) fn register_term_loan_metrics(
             // Callable-tree metrics
             (Oas, OasCalculator),
             (EmbeddedOptionValue, EmbeddedOptionValueCalculator),
-        ],
-        custom: [
-            ("all_in_rate", AllInRateCalculator),
-            ("oid_eir_amortization", OidEirAmortizationCalculator),
-            ("oid_eir_rate", OidEirRateCalculator),
-            // Yield to first call (custom id: ytc)
-            ("ytc", YtcCalculator),
-            // Yields to fixed horizons
-            ("yt2y", Yt2yCalculator),
-            ("yt3y", Yt3yCalculator),
-            ("yt4y", Yt4yCalculator),
+            (AllInRate, AllInRateCalculator),
+            (OidEirAmortization, OidEirAmortizationCalculator),
+            (OidEirRate, OidEirRateCalculator),
+            (Ytc, YtcCalculator),
+            (Yt2y, Yt2yCalculator),
+            (Yt3y, Yt3yCalculator),
+            (Yt4y, Yt4yCalculator),
         ]
     }
 

@@ -2,15 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { useState } from "react";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -39,7 +31,7 @@ import {
 } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
 
@@ -54,28 +46,11 @@ vi.mock(
     ),
   }),
 );
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, arg: never) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "relativeValueReport")
-        return unwrap(await harness.proxy.relativeValueReport(arg));
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
+const harness = useWorkerHarness(["relativeValueReport"]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

@@ -1,7 +1,4 @@
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import { startWorker } from "../shared/worker/harness.mjs";
@@ -21,7 +18,7 @@ const native = createRequire(import.meta.url)(
 let worker: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   worker = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => worker?.close());
 const cubes = fixture.market.vol_cubes as CubeSampleRequest["cube"][];
 const request = (
@@ -65,16 +62,6 @@ const resources = () =>
   ).resources();
 // The 07 calibration output is regenerated and compared by
 // `mise run ui-fixtures --check` (tests/core/cubes/generate.mjs).
-it("records the 07 calibration source its cube fixture was generated from", () => {
-  const source = readFileSync(
-    fileURLToPath(new URL(`../../../${fixture.source}`, import.meta.url)),
-    "utf8",
-  );
-  expect(
-    createHash("sha256").update(source).digest("hex"),
-    `${fixture.source} changed since tests/core/cubes/generate.mjs ran; rerun mise run ui-fixtures`,
-  ).toBe(fixture.sha256);
-});
 it("matches both checked evaluators for absent/present shifts and complete state/coordinate changes", async () => {
   const before = await resources();
   const variants: CubeSampleRequest[] = [];

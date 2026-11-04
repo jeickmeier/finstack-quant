@@ -43,7 +43,7 @@ it("shows one row per returned period in Rust's order", () => {
       ({ payment_date, waterfall, non_waterfall_payments }) => [
         `▸${payment_date}`,
         digits(waterfall.total_available),
-        digits(waterfall.recovery_proceeds),
+        digits(waterfall.recovery_proceeds!),
         digits(waterfall.diverted_cash),
         digits(waterfall.remaining_interest),
         digits(waterfall.remaining_principal),
@@ -57,7 +57,7 @@ it("shows one row per returned period in Rust's order", () => {
 it("expands a period to its tiers, records and diversions as returned", () => {
   const run = runOf("diverting");
   const [first] = periodsOf(run);
-  expect(first!.waterfall.diverted_amounts.length).toBeGreaterThan(0);
+  expect(first!.waterfall.diverted_amounts!.length).toBeGreaterThan(0);
   render(<WaterfallReport run={run} />);
   expect(screen.queryByRole("table", { name: "Payment records" })).toBeNull();
   const toggle = screen.getByRole("button", {
@@ -84,7 +84,7 @@ it("expands a period to its tiers, records and diversions as returned", () => {
     ]),
   );
   expect(bodyRows("Diversions")).toEqual(
-    first!.waterfall.diverted_amounts.map((diversion) => [
+    first!.waterfall.diverted_amounts!.map((diversion) => [
       diversion.source_tier,
       diversion.target_tranche,
       digits(diversion.amount),
@@ -168,6 +168,31 @@ it("says so when a run holds no period at all", () => {
   );
   expect(screen.getByRole("status").textContent).toBe(
     "The simulation returned no periods",
+  );
+});
+
+it("shows an amount or diversion list Rust did not return as undefined, not zero", () => {
+  const run = runOf("diverting");
+  const [first] = periodsOf(run);
+  const { recovery_proceeds, diverted_amounts, ...waterfall } =
+    first!.waterfall;
+  render(
+    <WaterfallReport
+      run={{
+        ...run,
+        diagnostics: {
+          ...run.diagnostics,
+          periods: [{ ...first!, waterfall }],
+        },
+      }}
+    />,
+  );
+  const [row] = bodyRows("By payment period, amounts in USD");
+  expect(row![2]).toBe("Undefined");
+  fireEvent.click(screen.getByRole("button", { name: first!.payment_date }));
+  expect(screen.queryByRole("table", { name: "Diversions" })).toBeNull();
+  expect(screen.getByText(/^Diversions:/).textContent).toBe(
+    "Diversions: Undefined",
   );
 });
 

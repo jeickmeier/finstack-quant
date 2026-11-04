@@ -303,8 +303,8 @@ class PoolReport:
 
         Raises
         ------
-        ValueError
-            If the report cannot be serialized.
+        ImportError
+            If ``pyarrow`` is not installed.
         """
         ...
 

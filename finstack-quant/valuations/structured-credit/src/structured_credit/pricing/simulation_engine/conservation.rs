@@ -71,7 +71,7 @@ pub(super) fn assert_cash_conserved(
 
     // Identity 2: the waterfall neither creates nor destroys cash.
     let distributed: f64 = waterfall_result
-        .distributions
+        .distributions()?
         .values()
         .map(|m| m.amount())
         .sum();

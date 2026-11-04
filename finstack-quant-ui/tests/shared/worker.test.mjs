@@ -71,7 +71,7 @@ function same(actual, expected) {
 beforeAll(async () => {
   harness = await startWorker();
   proxy = harness.proxy;
-}, budget(30000));
+});
 afterAll(async () => harness?.close());
 it("exposes exactly initialize plus every crate slice's methods", async () => {
   const expected = [

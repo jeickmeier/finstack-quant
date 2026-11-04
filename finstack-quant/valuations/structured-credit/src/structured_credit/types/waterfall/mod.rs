@@ -16,6 +16,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 
 use serde::{Deserialize, Serialize};
 
@@ -562,7 +563,7 @@ impl WaterfallTier {
 }
 
 /// Result of waterfall distribution
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct WaterfallDistribution {
@@ -578,27 +579,13 @@ pub struct WaterfallDistribution {
     /// Tier-level allocations
     pub tier_allocations: Vec<(String, Money)>,
 
-    /// Distributions by recipient
-    pub distributions: BTreeMap<RecipientType, Money>,
-    /// The PRINCIPAL portion of `distributions`, per recipient.
-    ///
-    /// `distributions` aggregates a tranche's interest and principal
-    /// into one number, because `RecipientType::Tranche(id)` is the same key
-    /// for both. Step 5 therefore had to RE-DERIVE the split by assuming
-    /// interest is satisfied first — which silently reclassified a diverted
-    /// OC-cure principal payment as interest whenever that tranche carried a
-    /// shortfall, leaving the balance unretired so the cure could not reduce
-    /// the very denominator it was sized to fix.
-    ///
-    /// The waterfall already knows the answer: `PaymentCalculation`
-    /// distinguishes `TranchePrincipal` from `TrancheInterest`. Reporting it
-    /// here makes the classification authoritative instead of reconstructed.
-    pub principal_distributions: BTreeMap<RecipientType, Money>,
     /// Detailed payment records
     pub payment_records: Vec<PaymentRecord>,
 
-    /// Coverage test results (test_name, value, passed)
-    pub coverage_tests: Vec<(String, f64, bool)>,
+    /// Coverage test results as `(test id, ratio, passed)`. The ratio is
+    /// `None` when the test has no claim outstanding (a zero denominator);
+    /// such a test passes.
+    pub coverage_tests: Vec<(String, Option<f64>, bool)>,
 
     /// Total diverted cash
     pub diverted_cash: Money,
@@ -628,6 +615,72 @@ pub struct WaterfallDistribution {
 impl WaterfallDistribution {
     fn zero_usd() -> Money {
         Money::from((0_i64, finstack_quant_core::currency::Currency::USD))
+    }
+
+    /// A waterfall that moved nothing on `payment_date`, for a settlement with
+    /// no waterfall run.
+    pub(crate) fn empty(payment_date: Date, currency: Currency) -> Self {
+        let zero = Money::from((0_i64, currency));
+        Self {
+            payment_date,
+            total_available: zero,
+            tier_allocations: Vec::new(),
+            payment_records: Vec::new(),
+            coverage_tests: Vec::new(),
+            diverted_cash: zero,
+            remaining_cash: zero,
+            remaining_interest: zero,
+            remaining_principal: zero,
+            principal_used_for_interest: zero,
+            had_diversions: false,
+            diverted_amounts: Vec::new(),
+            recovery_proceeds: zero,
+        }
+    }
+
+    /// Cash paid to each recipient, summed over `payment_records` in
+    /// execution order. A tranche's interest and principal share one
+    /// `RecipientType::Tranche` key.
+    ///
+    /// # Errors
+    ///
+    /// Returns a currency-mismatch error when a recipient's payments are in
+    /// different currencies.
+    pub fn distributions(&self) -> finstack_quant_core::Result<BTreeMap<RecipientType, Money>> {
+        self.paid_by_recipient(|_| true)
+    }
+
+    /// The principal portion of [`distributions`](Self::distributions): the
+    /// payments the executor classified as capital
+    /// (`PaymentRecord::is_principal`), per recipient.
+    ///
+    /// # Errors
+    ///
+    /// Returns a currency-mismatch error when a recipient's payments are in
+    /// different currencies.
+    pub fn principal_distributions(
+        &self,
+    ) -> finstack_quant_core::Result<BTreeMap<RecipientType, Money>> {
+        self.paid_by_recipient(|record| record.is_principal)
+    }
+
+    fn paid_by_recipient(
+        &self,
+        include: impl Fn(&PaymentRecord) -> bool,
+    ) -> finstack_quant_core::Result<BTreeMap<RecipientType, Money>> {
+        let mut totals: BTreeMap<RecipientType, Money> = BTreeMap::new();
+        for record in self.payment_records.iter().filter(|record| include(record)) {
+            match totals.entry(record.recipient.clone()) {
+                Entry::Occupied(mut total) => {
+                    let next = total.get().checked_add(record.paid_amount)?;
+                    total.insert(next);
+                }
+                Entry::Vacant(total) => {
+                    total.insert(record.paid_amount);
+                }
+            }
+        }
+        Ok(totals)
     }
 }
 

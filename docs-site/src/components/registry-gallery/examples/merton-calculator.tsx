@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { ExampleProps } from "./props";
+import { sixPlaces, type ExampleProps } from "./props";
 import {
   MertonCalculator,
   type MertonCalculatorRequest,
@@ -18,8 +18,6 @@ export function Example({ density = "compact" }: ExampleProps) {
     </WorkerPreview>
   );
 }
-// Host display choice: six decimal places of the returned decimals.
-const sixPlaces = (value: number) => value.toFixed(6);
 function Calculator({ density }: ExampleProps) {
   const validate = useMertonModelValidator();
   // Starts from the facade example firm; Calculate replaces the request.

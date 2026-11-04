@@ -41,20 +41,6 @@ where
         .map_err(|e| crate::errors::serde_json_to_py(e, "enum conversion"))
 }
 
-/// Deserialize a canonical serde payload from a JSON string or a plain
-/// Python object (dict/list) with the same shape.
-pub(crate) fn extract_serde_any<'py, T: serde::de::DeserializeOwned + Send>(
-    py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-    label: &str,
-) -> PyResult<T> {
-    if let Ok(json) = obj.extract::<String>() {
-        return serde_json::from_str(&json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, &format!("invalid {label}")));
-    }
-    crate::bindings::module_utils::py_to_serde(py, obj, label)
-}
-
 /// Python-style rendering of a bool for `__repr__`.
 pub(crate) fn py_bool(value: bool) -> &'static str {
     if value { "True" } else { "False" }

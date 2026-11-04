@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { CheckSurfaceRequest } from "@/workers/finstack-contract";
@@ -16,15 +15,13 @@ export function checkSurfaceOptions(
   session: number,
   request: CheckSurfaceRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "checkSurface", key] as const,
-    ready: snapshot !== null,
-    missing:
-      "The surface arbitrage check requires a ready worker, a stored surface and forwards",
-    queryFn: (ready) => ready.call("checkSurface", snapshot!),
-  });
+    session,
+    "checkSurface",
+    request,
+    "The surface arbitrage check requires a ready worker, a stored surface and forwards",
+  );
 }
 /** Native models.volatility.checkSurface report; errors (such as a rejected quote convention) are unchanged. */
 export function useCheckSurface(request: CheckSurfaceRequest | null) {

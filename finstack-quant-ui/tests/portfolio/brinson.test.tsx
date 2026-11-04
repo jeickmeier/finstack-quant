@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
@@ -24,19 +16,16 @@ import {
 } from "@/components/finstack/portfolio/blocks/portfolio-workbench/portfolio-workbench";
 import { unwrap, type WorkerApi } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import fixture from "./brinson/cases.json";
 import workbench from "./workbench/cases.json";
 import pricingMarket from "../valuations/instruments/pricing-market.json";
 
-const mock = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  calls: [] as string[],
-}));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 // Figures are drawn by the shared chart in the browser gates.
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
@@ -47,23 +36,8 @@ vi.mock(
     ),
   }),
 );
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness("any");
 const proxy = () => harness.proxy as unknown as WorkerApi;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.calls.length = 0;
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      mock.calls.push(method);
-      return unwrap(await (proxy() as any)[method](request));
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -237,7 +211,7 @@ it("offers the Brinson tab only when the host supplies periods", () => {
     "Margin",
     "Book",
   ]);
-  expect(mock.calls).not.toContain("brinsonLinked");
+  expect(harness.methods()).not.toContain("brinsonLinked");
 });
 it(
   "links the host's periods natively once when the tab opens",
@@ -260,9 +234,9 @@ it(
       }),
     ).toBeTruthy();
     expect(screen.queryAllByRole("alert")).toEqual([]);
-    expect(mock.calls.filter((name) => name === "brinsonLinked")).toHaveLength(
-      1,
-    );
+    expect(
+      harness.methods().filter((name) => name === "brinsonLinked"),
+    ).toHaveLength(1);
   },
   budget(30000),
 );

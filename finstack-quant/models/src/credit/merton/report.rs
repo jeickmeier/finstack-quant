@@ -72,6 +72,35 @@ pub struct MertonImpliedEquity {
     pub vol: f64,
 }
 
+/// A [`MertonReport`] measure that Rust can reject for a model, keyed in
+/// [`MertonReport::errors`] by its field name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum MertonReportMeasure {
+    /// [`MertonReport::cds_par_spread`].
+    CdsParSpread,
+    /// [`MertonReport::debt_spread`].
+    DebtSpread,
+    /// [`MertonReport::implied_equity`].
+    ImpliedEquity,
+    /// [`MertonReport::implied_spread`].
+    ImpliedSpread,
+}
+
+impl MertonReportMeasure {
+    /// Return the canonical snake-case serde value, the report field's name.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::CdsParSpread => "cds_par_spread",
+            Self::DebtSpread => "debt_spread",
+            Self::ImpliedEquity => "implied_equity",
+            Self::ImpliedSpread => "implied_spread",
+        }
+    }
+}
+
 /// The result of one [`merton_report`].
 ///
 /// Every per-horizon field aligns with `horizons`. A first-passage model has no
@@ -106,16 +135,22 @@ pub struct MertonReport {
     pub cds_par_spread: Option<f64>,
     /// [`MertonModel::implied_equity`] at `maturity`.
     pub implied_equity: Option<MertonImpliedEquity>,
-    /// Message of each rejected measure, by field name; empty when all computed.
-    pub errors: BTreeMap<String, String>,
+    /// Message of each rejected measure, keyed by the measure's field name
+    /// (`implied_spread`, `debt_spread`, `cds_par_spread`, `implied_equity`);
+    /// empty when all computed.
+    pub errors: BTreeMap<MertonReportMeasure, String>,
 }
 
-/// The measure's value, or `None` with its message recorded under `name`.
-fn recorded<T>(errors: &mut BTreeMap<String, String>, name: &str, result: Result<T>) -> Option<T> {
+/// The measure's value, or `None` with its message recorded under `measure`.
+fn recorded<T>(
+    errors: &mut BTreeMap<MertonReportMeasure, String>,
+    measure: MertonReportMeasure,
+    result: Result<T>,
+) -> Option<T> {
     match result {
         Ok(value) => Some(value),
         Err(error) => {
-            errors.insert(name.to_string(), error.to_string());
+            errors.insert(measure, error.to_string());
             None
         }
     }
@@ -136,7 +171,7 @@ fn recorded<T>(errors: &mut BTreeMap<String, String>, name: &str, result: Result
 /// # Returns
 ///
 /// The full report. A spread or implied-equity measure Rust rejects for this
-/// model is `None`, with its message under its field name in
+/// model is `None`, with its message under its [`MertonReportMeasure`] in
 /// [`MertonReport::errors`].
 ///
 /// # Errors
@@ -205,7 +240,7 @@ pub fn merton_report(request: &MertonReportRequest) -> Result<MertonReport> {
     let mut errors = BTreeMap::new();
     let implied_spread = recorded(
         &mut errors,
-        "implied_spread",
+        MertonReportMeasure::ImpliedSpread,
         horizons
             .iter()
             .map(|horizon| model.implied_spread(*horizon, recovery))
@@ -213,7 +248,7 @@ pub fn merton_report(request: &MertonReportRequest) -> Result<MertonReport> {
     );
     let debt_spread = recorded(
         &mut errors,
-        "debt_spread",
+        MertonReportMeasure::DebtSpread,
         horizons
             .iter()
             .map(|horizon| model.debt_spread(*horizon))
@@ -221,12 +256,12 @@ pub fn merton_report(request: &MertonReportRequest) -> Result<MertonReport> {
     );
     let cds_par_spread = recorded(
         &mut errors,
-        "cds_par_spread",
+        MertonReportMeasure::CdsParSpread,
         model.cds_par_spread(maturity, recovery),
     );
     let implied_equity = recorded(
         &mut errors,
-        "implied_equity",
+        MertonReportMeasure::ImpliedEquity,
         model
             .implied_equity(maturity)
             .map(|(value, vol)| MertonImpliedEquity { value, vol }),
@@ -342,7 +377,7 @@ mod tests {
         .expect("model");
         let report = merton_report(&terms(MertonReportSource::Model { model })).expect("report");
         assert_eq!(report.debt_spread, None);
-        assert!(report.errors["debt_spread"].contains("Terminal only"));
+        assert!(report.errors[&MertonReportMeasure::DebtSpread].contains("Terminal only"));
         assert_eq!(report.errors.len(), 1);
         assert!(report.implied_spread.is_some());
         assert!(report.cds_par_spread.is_some());

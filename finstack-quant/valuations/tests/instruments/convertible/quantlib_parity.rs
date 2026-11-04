@@ -705,7 +705,7 @@ fn quantlib_parity_conversion_premium() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::custom("conversion_premium")],
+            &[MetricId::ConversionPremium],
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
         .unwrap();
