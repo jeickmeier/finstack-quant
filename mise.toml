@@ -100,7 +100,8 @@ run = "scripts/materialization_bench.sh doc-check"
 description = "Audit dependencies: cargo deny, then OSV-Scanner over the Cargo, uv and npm lockfiles"
 run = [
   { task = "rust-audit" },
-  "osv-scanner scan --lockfile=Cargo.lock --lockfile=uv.lock --lockfile=finstack-quant-wasm/package-lock.json",
+  # The default Maven pom.xml resolver warns on every run; this workspace has no Maven manifests.
+  "osv-scanner scan --experimental-disable-plugins=transitivedependency/pomxml --lockfile=Cargo.lock --lockfile=uv.lock --lockfile=finstack-quant-wasm/package-lock.json",
 ]
 
 [tasks.all-ci]
@@ -517,7 +518,7 @@ flag "--doctest" help="Run only the .pyi stub and module doctests"
 flag "--coverage" help="Write HTML (target/python-cov) and Cobertura (coverage/python/coverage.xml) reports"
 '''
 run = '''
-set -- -v -n auto
+set -- -v -n auto --benchmark-disable
 if [ "${usage_slow:-false}" = "true" ]; then
   set -- "$@" -m slow
 elif [ "${usage_doctest:-false}" = "true" ]; then

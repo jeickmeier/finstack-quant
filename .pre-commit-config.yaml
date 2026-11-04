@@ -156,7 +156,7 @@ repos:
 
       - id: osv-scanner
         name: Supply-chain security (OSV-Scanner)
-        entry: osv-scanner scan --lockfile=Cargo.lock --lockfile=uv.lock --lockfile=finstack-quant-wasm/package-lock.json
+        entry: osv-scanner scan --experimental-disable-plugins=transitivedependency/pomxml --lockfile=Cargo.lock --lockfile=uv.lock --lockfile=finstack-quant-wasm/package-lock.json
         language: system
         files: ^(Cargo\.lock|uv\.lock|finstack-quant-wasm/package-lock\.json|osv-scanner\.toml)$
         pass_filenames: false
