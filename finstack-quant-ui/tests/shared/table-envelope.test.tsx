@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { axe } from "vitest-axe";
+import { axe } from "./axe";
 import { TableEnvelope } from "@/components/finstack/shared/table/table-envelope/table-envelope";
 import type { TableEnvelopeWire } from "@/lib/finstack/generated/types/table_envelope";
 import analystPlSummary from "../../src/fixtures/statements/analyst-pl-summary.json";

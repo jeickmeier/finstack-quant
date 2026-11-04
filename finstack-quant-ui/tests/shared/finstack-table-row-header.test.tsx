@@ -3,7 +3,7 @@ import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { axe } from "vitest-axe";
+import { axe } from "./axe";
 import {
   FinstackTable,
   type CellActivation,

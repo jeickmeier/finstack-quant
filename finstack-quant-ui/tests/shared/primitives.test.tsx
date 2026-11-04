@@ -9,7 +9,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { axe } from "vitest-axe";
+import { axe } from "./axe";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { MoneyInput } from "@/components/finstack/core/primitives/money-input/money-input";
 import { TenorInput } from "@/components/finstack/core/primitives/tenor-input/tenor-input";
@@ -529,10 +529,7 @@ it.each([
   <KnotTable value={[[1, 2]]} rowIds={["a"]} onValueChange={() => {}} />,
 ])("primitive %# has no DOM accessibility violations", async (element) => {
   const { container } = render(element);
-  const result = await axe(container, {
-    rules: { "color-contrast": { enabled: false } },
-  });
-  expect(result.violations).toEqual([]);
+  expect((await axe(container)).violations).toEqual([]);
 });
 
 it("JSON viewer supports undefined and error states without claiming a copy", () => {
