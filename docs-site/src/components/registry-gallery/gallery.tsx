@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { PrimitiveDemo } from "./primitives";
 import { ComponentDemo } from "./components";
 import { WorkerPreview } from "./worker-preview";
 import { importHarnesses } from "./imports";
@@ -68,22 +67,14 @@ export function RegistryGallery() {
   const href = (item: string, nextTheme = theme, nextDensity = density) =>
     `?${new URLSearchParams({ item, theme: nextTheme, density: nextDensity, ...(focused ? { focus: "1" } : {}), ...(variant !== "default" ? { variant } : {}), ...(item === "pricing-workbench" && instrument ? { instrument } : {}) })}`;
   const content = item ? (
-    item.type === "registry:ui" || item.type === "registry:theme" ? (
-      <PrimitiveDemo
-        name={name}
-        density={density}
-        width={width}
-        publication={publication}
-      />
-    ) : (
-      <ComponentDemo
-        name={name}
-        density={density}
-        width={width}
-        variant={variant}
-        instrument={instrument}
-      />
-    )
+    <ComponentDemo
+      name={name}
+      density={density}
+      width={width}
+      publication={publication}
+      variant={variant}
+      instrument={instrument}
+    />
   ) : null;
   return (
     <main
@@ -192,10 +183,12 @@ export function RegistryGallery() {
                 className={
                   block
                     ? "min-w-0 border border-border"
-                    : "max-h-[1100px] overflow-auto border border-border p-4"
+                    : focused
+                      ? "border border-border p-4"
+                      : "max-h-[1100px] overflow-auto border border-border p-4"
                 }
                 data-preview
-                tabIndex={block ? undefined : 0}
+                tabIndex={block || focused ? undefined : 0}
                 role="region"
                 aria-label={`${name} preview`}
               >

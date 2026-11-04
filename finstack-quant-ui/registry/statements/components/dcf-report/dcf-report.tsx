@@ -4,49 +4,19 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { MoneyValue as Money } from "finstack-quant-wasm";
 import type { statements_analytics as wire } from "finstack-quant-wasm/types";
 import type { DcfSensitivityResultWire } from "@/lib/finstack/generated/types/dcf_sensitivity_result";
-import { groupDecimal } from "@/lib/finstack/format/format";
+import { formatExact } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { MoneyValue } from "@/components/finstack/core/primitives/money-value/money-value";
 import { TornadoChart } from "@/components/finstack/statements/components/tornado-chart/tornado-chart";
+import {
+  Pairs,
+  ReportSection,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** Native statements_analytics CorporateValuationResult, as evaluateDcf returns it. */
 export type CorporateValuationResultWire = wire.CorporateValuationResult;
 type PeriodRow = wire.DcfPeriodRow;
-/** Every supplied digit, grouped; a non-finite native value shows as itself. */
-function exactValue(value: number): string {
-  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
-}
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
-}
-/** Label/value pairs in the order given, as a two-column list. */
-function Pairs({
-  label,
-  rows,
-}: {
-  label: string;
-  rows: readonly (readonly [string, ReactNode])[];
-}) {
-  return (
-    <dl
-      aria-label={label}
-      className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-1"
-    >
-      {rows.map(([name, value]) => (
-        <div key={name} className="contents">
-          <dt className="text-muted-foreground">{name}</dt>
-          <dd className="finstack-numeric text-right">{value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
 export interface DcfReportProps {
   /** Native CorporateValuationResult; null while none is available. */
   result: CorporateValuationResultWire | null | undefined;
@@ -79,7 +49,7 @@ export function DcfReport({
   sensitivityLoading,
   sensitivityError,
   sensitivityNote,
-  formatValue = exactValue,
+  formatValue = formatExact,
   density = "compact",
 }: DcfReportProps) {
   const money = (value: Money | null | undefined) => (
@@ -155,7 +125,7 @@ export function DcfReport({
                 </span>,
               )}
           </div>
-          <Section title="Enterprise value to equity value">
+          <ReportSection title="Enterprise value to equity value">
             <Pairs
               label="Returned bridge"
               rows={[
@@ -194,8 +164,8 @@ export function DcfReport({
               Fields in the order Rust returns them; the bridge inputs are the
               model currency amounts Rust used.
             </p>
-          </Section>
-          <Section title="Explicit forecast periods">
+          </ReportSection>
+          <ReportSection title="Explicit forecast periods">
             <FinstackTable
               data={result.periods ?? []}
               columns={periodColumns}
@@ -209,8 +179,8 @@ export function DcfReport({
               label="Explicit present value"
               rows={[[labelFor("pv_explicit"), money(result.pv_explicit)]]}
             />
-          </Section>
-          <Section title="Terminal value">
+          </ReportSection>
+          <ReportSection title="Terminal value">
             <Pairs
               label="Returned terminal value"
               rows={[
@@ -226,12 +196,12 @@ export function DcfReport({
                 [`${labelFor("wacc")} (decimal)`, number(result.wacc)],
               ]}
             />
-          </Section>
+          </ReportSection>
         </>
       )}
       {sensitivity !== undefined &&
         (sensitivity || sensitivityError || sensitivityLoading) && (
-          <Section title="Enterprise value sensitivity">
+          <ReportSection title="Enterprise value sensitivity">
             {sensitivityNote && (
               <p className="text-xs text-muted-foreground">{sensitivityNote}</p>
             )}
@@ -275,7 +245,7 @@ export function DcfReport({
                 </p>
               </>
             )}
-          </Section>
+          </ReportSection>
         )}
     </section>
   );

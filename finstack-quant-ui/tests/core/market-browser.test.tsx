@@ -1,8 +1,4 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
@@ -43,20 +39,6 @@ function showOriginal(viewer: HTMLElement) {
 }
 // The CDX calibration and the canonical supplemental market are regenerated and
 // compared by `mise run ui-fixtures --check` (tests/core/market-browser/generate.mjs).
-it("records the CDX calibration source its fixture was generated from", () => {
-  const source = readFileSync(
-    resolve(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../..",
-      fixture.source,
-    ),
-    "utf8",
-  );
-  expect(
-    createHash("sha256").update(source).digest("hex"),
-    `${fixture.source} changed since tests/core/market-browser/generate.mjs ran; rerun mise run ui-fixtures`,
-  ).toBe(fixture.sha256);
-});
 it(
   "navigates every supplied leaf with exact displayed and copied values",
   async () => {

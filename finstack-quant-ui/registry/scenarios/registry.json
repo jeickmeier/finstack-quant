@@ -27,12 +27,11 @@
         "@finstack/finstack-codec",
         "@finstack/finstack-form",
         "@finstack/enum-field",
-        "@finstack/field-frame",
         "@finstack/id-combobox",
         "@finstack/decimal-input",
         "@finstack/json-viewer",
-        "button",
-        "input"
+        "@finstack/native-display",
+        "button"
       ],
       "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
       "categories": ["Individual Components"],

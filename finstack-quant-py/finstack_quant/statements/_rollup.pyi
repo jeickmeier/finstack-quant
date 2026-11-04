@@ -53,7 +53,7 @@ class RollupSpec:
         ...
 
     @staticmethod
-    def default_for(model: FinancialModelSpec | str, frequency: str) -> RollupSpec:
+    def declared_methods(model: FinancialModelSpec | str, frequency: str) -> RollupSpec:
         """
         List the rollup methods a model's lines declare.
 
@@ -97,7 +97,7 @@ class RollupSpec:
         >>> model = json.loads(b.build().to_json())
         >>> model["nodes"]["cash"]["rollup"] = "period_end"
         >>> model["nodes"]["margin"]["rollup"] = "formula"
-        >>> RollupSpec.default_for(json.dumps(model), "annual").methods
+        >>> RollupSpec.declared_methods(json.dumps(model), "annual").methods
         {'cash': 'period_end', 'margin': 'formula'}
 
         """

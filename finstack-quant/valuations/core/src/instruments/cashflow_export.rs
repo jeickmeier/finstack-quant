@@ -413,9 +413,7 @@ pub struct CashflowExportTerms {
     /// Inflation index ratio per flow date for index-linked flows; a date
     /// without a ratio exports an empty cell.
     pub index_ratios: Option<HashMap<Date, f64>>,
-    /// Outstanding principal `(before, after)` per flow, aligned with
-    /// `schedule`; see [`Self::with_schedule_balances`].
-    pub flow_balances: Option<Vec<(f64, f64)>>,
+    flow_balances: Option<Vec<(f64, f64)>>,
 }
 
 impl CashflowExportTerms {
@@ -441,17 +439,30 @@ impl CashflowExportTerms {
     /// Export the balance path of `schedule` on each row, for an instrument
     /// whose notional is an outstanding principal balance.
     ///
-    /// A schedule that cannot replay balances, such as custom flows with no
-    /// issue date, leaves the balance columns empty.
+    /// A schedule with no issue date, such as custom flows, cannot replay
+    /// balances and leaves the balance columns empty.
+    ///
+    /// # Errors
+    ///
+    /// Propagates currency mismatches or decimal overflow from balance replay.
+    pub fn with_schedule_balances(mut self) -> Result<Self> {
+        if self.schedule.get_meta().issue_date.is_some() {
+            self.flow_balances = Some(
+                self.schedule
+                    .balances_by_flow()?
+                    .into_iter()
+                    .map(|(before, after)| (before.amount(), after.amount()))
+                    .collect(),
+            );
+        }
+        Ok(self)
+    }
+
+    /// Outstanding principal `(before, after)` per flow, aligned with
+    /// `schedule`; `None` unless [`Self::with_schedule_balances`] replayed them.
     #[must_use]
-    pub fn with_schedule_balances(mut self) -> Self {
-        self.flow_balances = self.schedule.balances_by_flow().ok().map(|balances| {
-            balances
-                .into_iter()
-                .map(|(before, after)| (before.amount(), after.amount()))
-                .collect()
-        });
-        self
+    pub fn get_flow_balances(&self) -> Option<&[(f64, f64)]> {
+        self.flow_balances.as_deref()
     }
 }
 
@@ -656,7 +667,16 @@ fn envelope_for_priced(
         let row_balance = terms
             .flow_balances
             .as_ref()
-            .map(|balances| balances[row_index]);
+            .map(|balances| {
+                balances.get(row_index).copied().ok_or_else(|| {
+                    Error::Validation(format!(
+                        "cashflow export: {} flow balances for {} flows",
+                        balances.len(),
+                        schedule.get_flows().len()
+                    ))
+                })
+            })
+            .transpose()?;
 
         // A missing inflation index ratio is indistinguishable from a data
         // outage when it lands in the export as a blank cell, so log loudly

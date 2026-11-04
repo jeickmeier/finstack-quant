@@ -74,19 +74,19 @@ pub(crate) fn register_revolving_credit_metrics(
             // quote applies to the drawn balance plus accrued).
             (DiscountMargin, quotes::DiscountMarginCalculator),
             (Ytm, quotes::YtmCalculator),
+            (AllInRate, quotes::AllInRateCalculator),
+            (OidEirAmortization, oid_eir::OidEirAmortizationCalculator),
+            (OidEirRate, oid_eir::OidEirRateCalculator),
         ],
         custom: [
             ("utilization_rate", UtilizationRateCalculator),
             ("available_capacity", AvailableCapacityCalculator),
             ("weighted_average_cost", ApproxWeightedAverageCostCalculator),
             ("draw_option_cost", DrawOptionCostCalculator),
-            ("all_in_rate", quotes::AllInRateCalculator),
             ("accrued_interest", quotes::AccruedInterestCalculator),
             ("price_from_dm", quotes::PriceFromDmCalculator),
             ("exposure_at_default", exposure::ExposureAtDefaultCalculator),
             ("expected_loss", exposure::ExpectedLossCalculator),
-            ("oid_eir_amortization", oid_eir::OidEirAmortizationCalculator),
-            ("oid_eir_rate", oid_eir::OidEirRateCalculator),
         ]
     }
 

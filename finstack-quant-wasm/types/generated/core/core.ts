@@ -1185,6 +1185,11 @@ export type TableColumnData =
       type: "nullable_int64";
       values: (number | null)[];
       [k: string]: unknown;
+    }
+  | {
+      type: "boolean";
+      values: boolean[];
+      [k: string]: unknown;
     };
 /**
  * Optional semantic hint for a column.

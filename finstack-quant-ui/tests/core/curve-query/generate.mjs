@@ -1,16 +1,9 @@
-import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
 import { emit } from "../../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { native, readRepoJson } from "../../../scripts/fixture-inputs.mjs";
 // The market-browser snapshot, cut to one curve of each lookup kind and one
 // kind with no lookup, plus a stored surface, which that snapshot does not hold.
-const { supplemental } = JSON.parse(
-  await readFile(
-    new URL("../market-browser/cases.json", import.meta.url),
-    "utf8",
-  ),
+const { supplemental } = await readRepoJson(
+  "finstack-quant-ui/tests/core/market-browser/cases.json",
 );
 const kept = ["USD-OIS", "FORWARD", "HZ", "PRICE"];
 const handle = native.MarketContext.fromJson(

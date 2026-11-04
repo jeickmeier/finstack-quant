@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -31,13 +23,13 @@ import {
 import { MarketContextBrowser } from "@/components/finstack/core/components/market-context-browser/market-context-browser";
 import type { MarketContextStateWire } from "../../../src/generated/types/market_context_state";
 import { unwrap } from "@/workers/finstack-contract";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
   async (importOriginal) => ({
@@ -47,26 +39,7 @@ vi.mock(
     FinstackChart: () => <div>Native chart</div>,
   }),
 );
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "curveQuery")
-        return unwrap(
-          await harness.proxy.curveQuery(request as CurveQueryRequest),
-        );
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+const harness = useWorkerHarness(["curveQuery"]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

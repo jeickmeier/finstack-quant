@@ -51,13 +51,13 @@ impl PyRollupSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.statements._rollup", "RollupSpec.default_for")]
+    #[doc = pydoc!("finstack_quant.statements._rollup", "RollupSpec.declared_methods")]
     #[staticmethod]
-    fn default_for(model: &Bound<'_, PyAny>, frequency: &str) -> PyResult<Self> {
+    fn declared_methods(model: &Bound<'_, PyAny>, frequency: &str) -> PyResult<Self> {
         let model = extract_model_ref(model)?;
         let frequency: PeriodKind = frequency.parse().map_err(core_to_py)?;
         Ok(Self {
-            inner: RustRollupSpec::default_for(&model, frequency),
+            inner: RustRollupSpec::declared_methods(&model, frequency),
         })
     }
 

@@ -99,11 +99,14 @@ impl PeriodHistory {
     ///
     /// * `node_to_column` - Column layout for interned nodes. Extra keys in
     ///   `named` are appended so historical lookups still resolve them.
+    /// * `periods` - The model's periods with their dates, in timeline order,
+    ///   retained for calendar-window lookups; may be empty
     /// * `named` - Period → (node name → value) maps, typically built by
     ///   tests or by converting a completed [`StatementResult`](super::StatementResult).
     #[must_use]
     pub fn from_named_maps(
         node_to_column: Arc<IndexMap<NodeId, usize>>,
+        periods: &[Period],
         named: &IndexMap<PeriodId, IndexMap<String, f64>>,
     ) -> Self {
         let mut col_map = (*node_to_column).clone();
@@ -117,7 +120,7 @@ impl PeriodHistory {
         }
         let node_to_column = Arc::new(col_map);
         let n = node_to_column.len();
-        let mut history = Self::new(Arc::clone(&node_to_column));
+        let mut history = Self::with_periods(Arc::clone(&node_to_column), periods);
         history.rows.reserve(named.len());
         history.period_index.reserve(named.len());
         for (period, values) in named {
@@ -254,7 +257,7 @@ mod tests {
         named.insert(q1, IndexMap::from_iter([("revenue".to_string(), 10.0)]));
         named.insert(q2, IndexMap::from_iter([("revenue".to_string(), 12.0)]));
 
-        let history = PeriodHistory::from_named_maps(Arc::clone(&cols), &named);
+        let history = PeriodHistory::from_named_maps(Arc::clone(&cols), &[], &named);
         assert_eq!(history.get_value("revenue", &q1), Some(10.0));
         assert_eq!(history.get_value("revenue", &q2), Some(12.0));
         let keys: Vec<_> = history.keys().copied().collect();

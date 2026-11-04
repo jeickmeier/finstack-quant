@@ -40,6 +40,17 @@ export interface HeatmapOptions<T> {
 export type HeatmapColors =
   | { palette: "sequential"; domain: readonly [number, number] }
   | { palette: "diverging"; domain: readonly [number, number, number] };
+/** Presentation extent of the drawn values, diverging about 0 when they straddle it; null when they hold no range. */
+export function heatmapDomain(values: readonly number[]): HeatmapColors | null {
+  // finstack-arith: colour-scale extent of the drawn values
+  const min = Math.min(...values),
+    // finstack-arith: colour-scale extent of the drawn values
+    max = Math.max(...values);
+  if (!(min < max)) return null;
+  return min < 0 && max > 0
+    ? { palette: "diverging", domain: [min, 0, max] }
+    : { palette: "sequential", domain: [min, max] };
+}
 
 /** Native cell/text marks for supplied grids. Spread the result into FinstackChart. */
 export function heatmap<T>(options: HeatmapOptions<T> & HeatmapColors) {

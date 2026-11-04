@@ -19,6 +19,7 @@ export default defineConfig({
     testTimeout: budget(5000),
     hookTimeout: budget(10000),
     setupFiles: ["./tests/shared/setup.ts"],
+    globalSetup: ["./tests/shared/worker/build.ts"],
     exclude: [...configDefaults.exclude, "tests/e2e/**"],
   },
   resolve: { alias },

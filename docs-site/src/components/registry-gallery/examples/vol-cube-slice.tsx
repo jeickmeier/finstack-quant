@@ -1,9 +1,8 @@
 "use client";
 import type { ExampleProps } from "./props";
 import { VolCubeSlice } from "@/components/finstack/models/components/vol-cube-slice/vol-cube-slice";
-import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
-import data from "../data.json";
-const cubes = data.cubes.market as unknown as MarketContextStateWire;
+import { cubesMarket } from "../fixtures";
+const cubes = cubesMarket;
 export function Example({ width = 880 }: ExampleProps) {
   return (
     <VolCubeSlice

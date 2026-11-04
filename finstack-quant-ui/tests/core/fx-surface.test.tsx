@@ -39,7 +39,7 @@ beforeAll(async () => {
   transport.call.mockImplementation(async (method, arg) =>
     unwrap(await worker.proxy[method as "sampleFxDelta"](arg)),
   );
-}, budget(30000));
+});
 afterAll(async () => worker?.close());
 afterEach(() => {
   cleanup();

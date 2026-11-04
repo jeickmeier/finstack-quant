@@ -227,8 +227,12 @@ mod period_flow_waterfall_integration {
         for (idx, (name, _)) in values.iter().enumerate() {
             node_to_column.insert(NodeId::new(*name), idx);
         }
-        let mut ctx =
-            EvaluationContext::new(period, Arc::new(node_to_column), Arc::new(IndexMap::new()));
+        let mut ctx = EvaluationContext::new(
+            period,
+            &[],
+            Arc::new(node_to_column),
+            Arc::new(IndexMap::new()),
+        );
         for (name, value) in values {
             ctx.set_value(name, *value).expect("context accepts value");
         }

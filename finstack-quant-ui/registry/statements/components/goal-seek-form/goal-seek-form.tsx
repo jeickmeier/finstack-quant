@@ -3,11 +3,12 @@ import { useState } from "react";
 import type { GoalSeekResult } from "finstack-quant-wasm";
 import { Button } from "@/components/ui/button";
 import type { GoalSeekRequest } from "@/workers/finstack-contract";
-import { groupDecimal } from "@/lib/finstack/format/format";
+import { formatExact } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { IdCombobox } from "@/components/finstack/shared/primitives/id-combobox/id-combobox";
+import { typedNumber } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** The solve as submitted, without the model and update flag the caller supplies. */
 export type GoalSeekSubmission = Omit<
@@ -16,15 +17,8 @@ export type GoalSeekSubmission = Omit<
 >;
 /** Initial form values; every omitted field starts empty. */
 export type GoalSeekDefaults = Partial<GoalSeekSubmission>;
-/** Every supplied digit, grouped; a non-finite native value shows as itself. */
-function exactValue(value: number): string {
-  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
-}
 const text = (value: number | undefined) =>
   value === undefined ? "" : String(value);
-/** Typed text as a number; an empty required field is NaN, never 0, so Rust rejects it. */
-const typed = (value: string) =>
-  value.trim() === "" ? Number.NaN : Number(value);
 export interface GoalSeekFormProps {
   /** Model node ids offered for the target and driver nodes. */
   nodeIds: readonly string[];
@@ -95,13 +89,13 @@ export function GoalSeekForm({
     onSubmit({
       targetNode,
       targetPeriod,
-      targetValue: typed(targetValue),
+      targetValue: typedNumber(targetValue),
       driverNode,
       driverPeriod,
       // Both empty leaves the bracket unset; one empty is sent as NaN.
       ...(lower.trim() === "" && upper.trim() === ""
         ? {}
-        : { bounds: [typed(lower), typed(upper)] as const }),
+        : { bounds: [typedNumber(lower), typedNumber(upper)] as const }),
     });
   };
   const apply = async () => {
@@ -187,9 +181,9 @@ export function GoalSeekForm({
           >
             {(
               [
-                ["solved_value", exactValue(result.solved_value)],
-                ["residual", exactValue(result.residual ?? Number.NaN)],
-                ["tolerance", exactValue(result.tolerance ?? Number.NaN)],
+                ["solved_value", formatExact(result.solved_value)],
+                ["residual", formatExact(result.residual ?? Number.NaN)],
+                ["tolerance", formatExact(result.tolerance ?? Number.NaN)],
                 ["evaluations", String(result.evaluations ?? "—")],
                 ["converged", result.converged ? "Yes" : "No"],
               ] as const

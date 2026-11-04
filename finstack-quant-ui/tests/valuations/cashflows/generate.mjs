@@ -1,24 +1,20 @@
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const read = async (path) =>
-  JSON.parse(await readFile(new URL(path, repository), "utf8"));
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import {
+  native,
+  readRepoJson,
+  sourceRecord,
+} from "../../../scripts/fixture-inputs.mjs";
 const manifestPath =
   "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json";
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
-const manifest = await read(manifestPath);
+const manifest = await readRepoJson(manifestPath);
 // Pinned inputs: the JSON files this fixture is built from. The manifest also
 // supplies request fields and patches; drift there is caught by `--check`, not
 // by this pin list, so its other cases do not invalidate these flows.
 const paths = new Set([bondPath]);
 async function source(source) {
   paths.add(source.path);
-  let value = await read(source.path);
+  let value = await readRepoJson(source.path);
   for (const key of source.pointer) value = value[key];
   return value;
 }
@@ -30,7 +26,9 @@ function patch(value, patches) {
   }
   return value;
 }
-const inputs = [{ type: "bond", request: (await read(bondPath)).request }];
+const inputs = [
+  { type: "bond", request: (await readRepoJson(bondPath)).request },
+];
 // A PIK loan shows how the balance accretes; the agency pool shows per-period balances.
 const pikLoan = [
   { path: ["instrument", "spec", "id"], value: "TERM-LOAN-USD-5Y-PIK" },
@@ -97,14 +95,7 @@ const cases = inputs.map(({ type, request }) => {
     error,
   };
 });
-const sources = await Promise.all(
-  [...paths].map(async (path) => ({
-    path,
-    sha256: createHash("sha256")
-      .update(await readFile(new URL(path, repository)))
-      .digest("hex"),
-  })),
-);
+const sources = await Promise.all([...paths].map(sourceRecord));
 await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({

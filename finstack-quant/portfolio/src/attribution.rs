@@ -12,7 +12,7 @@ use crate::valuation::{
     PortfolioValuation, PortfolioValuationOptions, PositionValue, RequestedMetrics,
 };
 use finstack_quant_attribution::{
-    AttributionMethod, AttributionRequest, PnlAttribution, PnlBucketShare,
+    AttributionMethod, AttributionRequest, PnlAttribution, PnlBucket, PnlBucketShare,
     attribute_pnl_metrics_based, default_attribution_metrics, translate_to_target_currency,
 };
 use finstack_quant_core::config::{FinstackConfig, RoundingContext, ZeroKind};
@@ -794,6 +794,7 @@ impl PortfolioAttribution {
     /// # Examples
     ///
     /// ```rust
+    /// use finstack_quant_attribution::PnlBucket;
     /// use finstack_quant_core::{currency::Currency, money::Money};
     /// use finstack_quant_portfolio::attribution::PortfolioAttribution;
     /// use indexmap::IndexMap;
@@ -817,7 +818,7 @@ impl PortfolioAttribution {
     ///     result_invalid: false,
     /// };
     /// let buckets = attribution.pct_of_total_by_bucket();
-    /// assert_eq!(buckets[0].field, "carry");
+    /// assert_eq!(buckets[0].field, PnlBucket::Carry);
     /// assert_eq!(buckets[0].pct_of_total, Some(25.0));
     /// ```
     #[must_use]
@@ -825,22 +826,22 @@ impl PortfolioAttribution {
         let total = self.total_pnl.amount();
         let total_is_zero = self.total_is_effectively_zero();
         [
-            ("carry", &self.carry),
-            ("rates_curves_pnl", &self.rates_curves_pnl),
-            ("credit_curves_pnl", &self.credit_curves_pnl),
-            ("inflation_curves_pnl", &self.inflation_curves_pnl),
-            ("correlations_pnl", &self.correlations_pnl),
-            ("fx_pnl", &self.fx_pnl),
-            ("fx_translation_pnl", &self.fx_translation_pnl),
-            ("cross_factor_pnl", &self.cross_factor_pnl),
-            ("vol_pnl", &self.vol_pnl),
-            ("model_params_pnl", &self.model_params_pnl),
-            ("market_scalars_pnl", &self.market_scalars_pnl),
-            ("residual", &self.residual),
+            (PnlBucket::Carry, &self.carry),
+            (PnlBucket::RatesCurvesPnl, &self.rates_curves_pnl),
+            (PnlBucket::CreditCurvesPnl, &self.credit_curves_pnl),
+            (PnlBucket::InflationCurvesPnl, &self.inflation_curves_pnl),
+            (PnlBucket::CorrelationsPnl, &self.correlations_pnl),
+            (PnlBucket::FxPnl, &self.fx_pnl),
+            (PnlBucket::FxTranslationPnl, &self.fx_translation_pnl),
+            (PnlBucket::CrossFactorPnl, &self.cross_factor_pnl),
+            (PnlBucket::VolPnl, &self.vol_pnl),
+            (PnlBucket::ModelParamsPnl, &self.model_params_pnl),
+            (PnlBucket::MarketScalarsPnl, &self.market_scalars_pnl),
+            (PnlBucket::Residual, &self.residual),
         ]
         .into_iter()
         .map(|(field, amount)| PnlBucketShare {
-            field: field.to_string(),
+            field,
             amount: *amount,
             pct_of_total: (!total_is_zero).then(|| amount.amount() / total * 100.0),
         })
@@ -1789,12 +1790,12 @@ mod tests {
         assert_eq!(listed, money_fields);
 
         let rates = &buckets[1];
-        assert_eq!(rates.field, "rates_curves_pnl");
+        assert_eq!(rates.field, PnlBucket::RatesCurvesPnl);
         assert_eq!(rates.amount, usd(-50));
         assert_eq!(rates.pct_of_total, Some(-25.0));
         let translation = buckets
             .iter()
-            .find(|bucket| bucket.field == "fx_translation_pnl")
+            .find(|bucket| bucket.field == PnlBucket::FxTranslationPnl)
             .expect("fx translation is a bucket");
         assert_eq!(translation.pct_of_total, Some(80.0));
         // The buckets are the amounts reconciliation sums: they net to the total.

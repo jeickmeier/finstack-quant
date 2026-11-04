@@ -2,15 +2,7 @@
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -34,7 +26,7 @@ import {
 } from "@/components/finstack/models/components/credit-scorecard/credit-scorecard";
 import { scoringModels } from "@/components/finstack/models/components/credit-scorecard/scoring";
 import { unwrap } from "@/workers/finstack-contract";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./scorecard.json";
 const native = createRequire(import.meta.url)(
@@ -44,33 +36,14 @@ const declarations = readFileSync(
   resolve(import.meta.dirname, "../../../../finstack-quant-wasm/index.d.ts"),
   "utf8",
 );
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
 type Resources = Record<"masterScaleConstructed" | "masterScaleFreed", number>;
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness(["creditScore"]);
 const resources = () =>
   (harness.proxy as unknown as { resources(): Promise<Resources> }).resources();
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "creditScore")
-        return unwrap(
-          await harness.proxy.creditScore(request as CreditScoreRequest),
-        );
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

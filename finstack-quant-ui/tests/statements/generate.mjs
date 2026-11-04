@@ -2,13 +2,10 @@
 // presentation-only gallery examples. Rerun with `mise run ui-fixtures` after
 // rebuilding the WASM package.
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { serializeHost } from "../../src/codec.mjs";
 import { emit } from "../../scripts/fixture-output.mjs";
+import { native } from "../../scripts/fixture-inputs.mjs";
 
-const native = createRequire(import.meta.url)(
-  "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
 const fixtures = new URL("../../src/fixtures/statements/", import.meta.url);
 const read = (name) => readFile(new URL(name, fixtures), "utf8");
 const write = (name, json) => emit(new URL(name, fixtures), json);

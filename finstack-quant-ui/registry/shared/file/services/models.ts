@@ -165,8 +165,10 @@ function score(
         r.current_assets_to_current_liabilities,
       );
     }
-    default:
-      throw new RangeError("Unsupported scoring model");
+    default: {
+      const unhandled: never = request;
+      throw new RangeError("Unsupported scoring model", { cause: unhandled });
+    }
   }
 }
 /**
@@ -207,8 +209,10 @@ function optionPrice(
         r.expiry,
         r.isCall,
       );
-    default:
-      throw new RangeError("Unsupported option model");
+    default: {
+      const unhandled: never = r;
+      throw new RangeError("Unsupported option model", { cause: unhandled });
+    }
   }
 }
 function optionImpliedVol(
@@ -244,8 +248,10 @@ function optionImpliedVol(
         r.expiry,
         r.isCall,
       );
-    default:
-      throw new RangeError("Unsupported option model");
+    default: {
+      const unhandled: never = r;
+      throw new RangeError("Unsupported option model", { cause: unhandled });
+    }
   }
 }
 function optionGreeks(
@@ -276,8 +282,10 @@ function optionGreeks(
         r.expiry,
         r.isCall,
       );
-    default:
-      throw new RangeError("Unsupported option model");
+    default: {
+      const unhandled: never = r;
+      throw new RangeError("Unsupported option model", { cause: unhandled });
+    }
   }
 }
 const orNull = (values: Float64Array | undefined) =>

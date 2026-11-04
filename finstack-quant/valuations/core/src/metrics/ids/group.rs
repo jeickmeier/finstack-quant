@@ -62,7 +62,7 @@ impl MetricGroup {
     /// Display name listing a registered metric that belongs to no group.
     ///
     /// Such a metric is registered under its own id for specific instrument
-    /// types (`all_in_rate`, `parity`, `yt3y`), so no [`MetricGroup`] holds it.
+    /// types (`utilization_rate`, `carry_pv`), so no [`MetricGroup`] holds it.
     /// [`MetricGroup::ALL`] never produces this name.
     pub const INSTRUMENT_SPECIFIC_DISPLAY_NAME: &'static str = "Instrument Specific";
 
@@ -98,6 +98,17 @@ impl MetricGroup {
                 MetricId::MoicToWorst,
                 MetricId::Xirr,
                 MetricId::XirrToWorst,
+                MetricId::Ytc,
+                MetricId::Yt2y,
+                MetricId::Yt3y,
+                MetricId::Yt4y,
+                MetricId::AllInRate,
+                MetricId::OidEirRate,
+                MetricId::OidEirAmortization,
+                MetricId::Parity,
+                MetricId::ConversionPremium,
+                MetricId::ConversionValue,
+                MetricId::BondFloor,
                 MetricId::ZSpread,
                 MetricId::Oas,
                 MetricId::ISpread,

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { ExampleProps } from "./props";
+import { sixPlaces, type ExampleProps } from "./props";
 import {
   ConvertibleCard,
   convertibleMetrics,
@@ -21,8 +21,6 @@ import data from "../data.json";
 import { WorkerPreview } from "../worker-preview";
 const { type, cases } = data.convertibleCard;
 const { quoted } = cases;
-// Host display choice: six decimal places of the returned values.
-const sixPlaces = (value: number) => value.toFixed(6);
 function Card({ density }: ExampleProps) {
   const [spots, setSpots] = useState<readonly number[] | null>(null);
   const ladder = useConvertibleSpotLadder({ ...quoted.request, spots });

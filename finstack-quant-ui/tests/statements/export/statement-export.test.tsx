@@ -1,14 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from "react";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -30,35 +22,19 @@ import {
 } from "@/components/finstack/statements/components/statement-export/statement-export";
 import { unwrap } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import analystResult from "../../../src/fixtures/statements/analyst-result.json";
 import fixture from "./cases.json";
 
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, json: string) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "statementResultToTableWide")
-        return unwrap(await harness.proxy.statementResultToTableWide(json));
-      if (method === "statementResultToTableLong")
-        return unwrap(await harness.proxy.statementResultToTableLong(json));
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
+const harness = useWorkerHarness([
+  "statementResultToTableWide",
+  "statementResultToTableLong",
+]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

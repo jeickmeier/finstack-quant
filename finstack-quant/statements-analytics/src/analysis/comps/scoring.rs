@@ -328,7 +328,18 @@ pub fn score_relative_value(
     peer_set: &PeerSet,
     dimensions: &[ScoringDimension],
 ) -> Result<RelativeValueResult> {
-    let result = score_relative_value_unchecked(peer_set, dimensions)?;
+    if dimensions.is_empty() {
+        return Err(Error::Validation(
+            "at least one scoring dimension is required".into(),
+        ));
+    }
+    validate_dimension_weights(dimensions)?;
+    let evaluations: Vec<_> = dimensions
+        .iter()
+        .map(|dim| evaluate_dimension(peer_set, dim))
+        .collect();
+    let result = composite_score(peer_set, dimensions, &evaluations)
+        .ok_or_else(|| Error::Validation("no usable positive-weight scoring dimension".into()))?;
     if !is_finite_score(&result) {
         return Err(Error::Validation(
             "relative value score must be finite".into(),
@@ -338,35 +349,29 @@ pub fn score_relative_value(
 }
 
 /// Whether a score's composite and confidence are both finite, the one
-/// condition [`score_relative_value`] adds to [`score_relative_value_unchecked`].
+/// condition [`score_relative_value`] adds to [`composite_score`].
 pub(super) fn is_finite_score(result: &RelativeValueResult) -> bool {
     result.composite_score.is_finite() && result.confidence.is_finite()
 }
 
-/// [`score_relative_value`] without its final finiteness check: the composite
-/// and confidence may be non-finite. Every other error is the same.
+/// Combine evaluated dimensions into the composite score of
+/// [`score_relative_value`], without its validation or final finiteness
+/// check: the composite and confidence may be non-finite.
 ///
 /// # Arguments
 ///
 /// * `peer_set` - Peer universe containing the subject and its peers.
-/// * `dimensions` - Non-empty scoring dimensions with finite, non-negative
-///   weights.
-pub(super) fn score_relative_value_unchecked(
+/// * `dimensions` - Scoring dimensions with finite, non-negative weights.
+/// * `evaluations` - [`evaluate_dimension`] of each of `dimensions`, in order.
+///
+/// # Returns
+///
+/// `None` when no dimension is usable.
+pub(super) fn composite_score(
     peer_set: &PeerSet,
     dimensions: &[ScoringDimension],
-) -> Result<RelativeValueResult> {
-    if dimensions.is_empty() {
-        return Err(Error::Validation(
-            "at least one scoring dimension is required".into(),
-        ));
-    }
-    validate_dimension_weights(dimensions)?;
-    if !dimensions.iter().any(|dim| dim.weight > 0.0) {
-        return Err(Error::Validation(
-            "at least one usable positive-weight scoring dimension is required".into(),
-        ));
-    }
-
+    evaluations: &[DimensionEvaluation<'_>],
+) -> Option<RelativeValueResult> {
     let mut dim_scores = Vec::with_capacity(dimensions.len());
     let mut weighted_sum = 0.0;
     let mut total_weight = 0.0;
@@ -375,8 +380,7 @@ pub(super) fn score_relative_value_unchecked(
     let mut weight_scale = 0.0;
     let mut confidence_scale = 0.0;
 
-    for dim in dimensions {
-        let evaluation = evaluate_dimension(peer_set, dim);
+    for (dim, evaluation) in dimensions.iter().zip(evaluations) {
         let (Some(score), Some(pctile), Some(zs)) =
             (evaluation.signal, evaluation.percentile, evaluation.z_score)
         else {
@@ -422,9 +426,7 @@ pub(super) fn score_relative_value_unchecked(
     }
 
     if total_weight <= 0.0 {
-        return Err(Error::Validation(
-            "no usable positive-weight scoring dimension".into(),
-        ));
+        return None;
     }
     let composite = weighted_sum / total_weight;
     let confidence = if confidence_den > 0.0 {
@@ -432,7 +434,7 @@ pub(super) fn score_relative_value_unchecked(
     } else {
         0.0
     };
-    Ok(RelativeValueResult {
+    Some(RelativeValueResult {
         company_id: peer_set.subject.id.clone(),
         composite_score: composite,
         dimensions: dim_scores,
@@ -663,19 +665,25 @@ mod tests {
             vec![company("a", None, Some(1.0)), company("b", None, Some(2.0))],
             PeriodBasis::Ltm,
         );
+        let unchecked = |set: &PeerSet, dimensions: &[ScoringDimension]| {
+            let evaluations: Vec<_> = dimensions
+                .iter()
+                .map(|dim| evaluate_dimension(set, dim))
+                .collect();
+            composite_score(set, dimensions, &evaluations)
+        };
         let dimensions = [dimension(false, 1.0), dimension(false, 1.0)];
-        let unchecked =
-            score_relative_value_unchecked(&set, &dimensions).expect("only the composite fails");
-        assert!(!is_finite_score(&unchecked));
+        let overflowing = unchecked(&set, &dimensions).expect("only the composite fails");
+        assert!(!is_finite_score(&overflowing));
         assert!(score_relative_value(&set, &dimensions).is_err());
 
-        // Every other rejection is an error of both, never a non-finite score.
+        // No usable dimension is never a non-finite score.
         for dimensions in [
             vec![],
             vec![dimension(false, 0.0)],
             vec![dimension(true, 1.0)],
         ] {
-            assert!(score_relative_value_unchecked(&set, &dimensions).is_err());
+            assert!(unchecked(&set, &dimensions).is_none());
             assert!(score_relative_value(&set, &dimensions).is_err());
         }
 
@@ -685,10 +693,10 @@ mod tests {
             PeriodBasis::Ltm,
         );
         let dimensions = [dimension(false, 1.0)];
-        let unchecked = score_relative_value_unchecked(&finite, &dimensions).expect("finite");
-        assert!(is_finite_score(&unchecked));
+        let finite_score = unchecked(&finite, &dimensions).expect("finite");
+        assert!(is_finite_score(&finite_score));
         assert_eq!(
-            Some(unchecked),
+            Some(finite_score),
             score_relative_value(&finite, &dimensions).ok()
         );
     }

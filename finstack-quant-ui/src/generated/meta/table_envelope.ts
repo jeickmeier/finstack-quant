@@ -193,6 +193,24 @@ export default [
     "format": "int64"
   },
   {
+    "path": "#/$defs/d_1ae146054330a667eefc/oneOf/8",
+    "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/TableColumnData/oneOf/8",
+    "description": "Non-null boolean column."
+  },
+  {
+    "path": "#/$defs/d_1ae146054330a667eefc/oneOf/8/properties/type",
+    "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/TableColumnData/oneOf/8/properties/type",
+    "const": "boolean"
+  },
+  {
+    "path": "#/$defs/d_1ae146054330a667eefc/oneOf/8/properties/values",
+    "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/TableColumnData/oneOf/8/properties/values"
+  },
+  {
+    "path": "#/$defs/d_1ae146054330a667eefc/oneOf/8/properties/values/items",
+    "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/TableColumnData/oneOf/8/properties/values/items"
+  },
+  {
     "path": "#/$defs/d_29b848ae6d2c610b175e",
     "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/TableColumn",
     "description": "A single named column in a [`TableEnvelope`]."

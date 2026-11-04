@@ -70,8 +70,8 @@ pub enum ValidationError {
         recipient_id: String,
         /// Tranche the recipient pays.
         tranche_id: String,
-        /// Name of the rejected calculation.
-        calculation: &'static str,
+        /// Wire name of the rejected calculation (`fixed_amount`).
+        calculation: String,
     },
     /// A recipient pays one tranche the interest or principal of another.
     #[error(
@@ -97,20 +97,29 @@ pub enum ValidationError {
 /// A note is owed interest at its rate and the return of its balance. A fixed or
 /// percentage amount is a fee formula with no basis as either, and paid to a note
 /// it would be cash booked as neither interest nor principal.
-fn non_note_calculation(calculation: &PaymentCalculation) -> Result<Option<&str>, &'static str> {
+fn non_note_calculation(calculation: &PaymentCalculation) -> Result<Option<&str>, String> {
     match calculation {
         PaymentCalculation::TrancheInterest { tranche_id, .. }
         | PaymentCalculation::CappedTrancheInterest { tranche_id, .. }
         | PaymentCalculation::TranchePrincipal { tranche_id, .. }
         | PaymentCalculation::NetWacCarryover { tranche_id, .. } => Ok(Some(tranche_id)),
         PaymentCalculation::ResidualCash => Ok(None),
-        PaymentCalculation::FixedAmount { .. } => Err("fixed_amount"),
-        PaymentCalculation::PercentageOfCollateral { .. } => Err("percentage_of_collateral"),
-        PaymentCalculation::PercentageOfSpecialServiced { .. } => {
-            Err("percentage_of_special_serviced")
+        PaymentCalculation::FixedAmount { .. }
+        | PaymentCalculation::PercentageOfCollateral { .. }
+        | PaymentCalculation::PercentageOfSpecialServiced { .. }
+        | PaymentCalculation::IncentiveFee { .. }
+        | PaymentCalculation::ReserveReplenishment { .. } => Err(wire_name(calculation)),
+    }
+}
+
+/// The serde tag of `calculation`'s variant, as it is written in JSON.
+fn wire_name(calculation: &PaymentCalculation) -> String {
+    match serde_json::to_value(calculation) {
+        Ok(serde_json::Value::String(name)) => name,
+        Ok(serde_json::Value::Object(variant)) if variant.len() == 1 => {
+            variant.into_iter().map(|(name, _)| name).collect()
         }
-        PaymentCalculation::IncentiveFee { .. } => Err("incentive_fee"),
-        PaymentCalculation::ReserveReplenishment { .. } => Err("reserve_replenishment"),
+        _ => format!("{calculation:?}"),
     }
 }
 
@@ -356,7 +365,7 @@ mod tests {
             let errors = paying_class_b(calculation);
             assert_eq!(errors.len(), 1, "{name}");
             assert!(matches!(
-                errors[0],
+                &errors[0],
                 ValidationError::NonNoteCalculation { calculation, .. } if calculation == name
             ));
             let message = errors[0].to_string();

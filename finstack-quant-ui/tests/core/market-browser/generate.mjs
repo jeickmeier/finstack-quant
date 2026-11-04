@@ -1,25 +1,15 @@
-import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { emit } from "../../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { emit, sha256 } from "../../../scripts/fixture-output.mjs";
+import {
+  native,
+  readRepoJson,
+  readRepoText,
+} from "../../../scripts/fixture-inputs.mjs";
 const source =
   "finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json";
-const input = await readFile(
-  new URL(`../../../../${source}`, import.meta.url),
-  "utf8",
-);
+const input = await readRepoText(source);
 const calibrated = native.calibrate(input).result.final_market;
-const variants = JSON.parse(
-  await readFile(
-    new URL(
-      "../../../registry/core/components/curve-link-example/market.json",
-      import.meta.url,
-    ),
-    "utf8",
-  ),
+const variants = await readRepoJson(
+  "finstack-quant-ui/registry/core/components/curve-link-example/market.json",
 );
 const curves = [
   ...calibrated.curves,
@@ -76,7 +66,7 @@ try {
     new URL("./cases.json", import.meta.url),
     JSON.stringify({
       source,
-      sha256: createHash("sha256").update(input).digest("hex"),
+      sha256: sha256(input),
       calibrated,
       supplemental: JSON.parse(handle.toJson()),
     }),

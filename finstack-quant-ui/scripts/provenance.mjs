@@ -389,7 +389,7 @@ const displays = [
     ],
     route: "returned-report",
     convention:
-      "Returned SimulationDiagnostics.periods in payment order, in the deal currency each Money states: the period's PeriodWaterfall, and on expand its tier allocations and payment records in execution order, diversions and non-waterfall payments with their own dates. The is_principal, diverted and had_diversions flags are Rust's. Nothing is summed, joined by date, sorted or classified here.",
+      "Returned SimulationDiagnostics.periods in payment order, in the deal currency each Money states: the period's WaterfallDistribution, and on expand its tier allocations and payment records in execution order, diversions and non-waterfall payments with their own dates. The is_principal, diverted and had_diversions flags are Rust's. Nothing is summed, joined by date, sorted or classified here.",
   },
   {
     id: "coverage-test-chart",

@@ -1,10 +1,12 @@
 //! Debt stack by seniority over an evaluated capital structure.
 
 use super::parse_model;
-use super::parse_results;
 use crate::utils::input::from_js_json;
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_statements_analytics::analysis::CapitalStructureSummaryConfig;
+use finstack_quant_statements::evaluator::StatementResult;
+use finstack_quant_statements_analytics::analysis::{
+    CapitalStructureSummary, CapitalStructureSummaryConfig,
+};
 use wasm_bindgen::prelude::*;
 
 /// Summarize the debt stack by seniority at one period (mirrors Rust `capital_structure_summary`).
@@ -34,7 +36,7 @@ pub fn capital_structure_summary(
     model: JsValue,
     config: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let results = parse_results(&results)?;
+    let results: StatementResult = from_js_json(&results, "results")?;
     let model = parse_model(&model)?;
     let config: CapitalStructureSummaryConfig = from_js_json(&config, "config")?;
     to_js_value(
@@ -43,4 +45,16 @@ pub fn capital_structure_summary(
         )
         .map_err(to_js_err)?,
     )
+}
+
+/// One row per tranche of a capital structure summary (mirrors Rust `CapitalStructureSummary::to_table`).
+///
+/// Python reaches the same table through `CapitalStructureSummary.to_dataframe`.
+/// @param summary - `CapitalStructureSummary` plain object or JSON string, as `capitalStructureSummary` returns it.
+/// @returns `TableEnvelope` in tranche order (rank, then model declaration order) with columns `id`, `kind` (`bond`, `convertible_bond`, `term_loan` or `revolving_credit`), `rank` (integer), `payment_class` (nullable string), `balance`, `share_of_debt` (nullable decimal), `maturity` (ISO date string), `cumulative_debt`, `leverage` and `interest_coverage` (nullable, in turns) and `ltm_interest` (nullable); amounts are floats in the summary's `currency`, which the table does not state. The columns remain when there are no tranches.
+/// @throws Error - Throws with kind `validation` if `summary` does not match the `CapitalStructureSummary` schema.
+#[wasm_bindgen(js_name = capitalStructureSummaryTable)]
+pub fn capital_structure_summary_table(summary: JsValue) -> Result<JsValue, JsValue> {
+    let summary: CapitalStructureSummary = from_js_json(&summary, "summary")?;
+    to_js_value(&summary.to_table())
 }

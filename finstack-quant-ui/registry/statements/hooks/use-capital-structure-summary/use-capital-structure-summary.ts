@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { CapitalStructureSummaryRequest } from "@/workers/finstack-contract";
@@ -16,15 +15,13 @@ export function capitalStructureSummaryOptions(
   session: number,
   request: CapitalStructureSummaryRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "capitalStructureSummary", key] as const,
-    ready: snapshot !== null,
-    missing:
-      "The capital structure summary requires an explicit request and ready worker",
-    queryFn: (ready) => ready.call("capitalStructureSummary", snapshot!),
-  });
+    session,
+    "capitalStructureSummary",
+    request,
+    "The capital structure summary requires an explicit request and ready worker",
+  );
 }
 /** Native statements_analytics.capitalStructureSummary: the debt stack at one period, or the native error. */
 export function useCapitalStructureSummary(

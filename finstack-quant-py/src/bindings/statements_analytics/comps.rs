@@ -28,7 +28,6 @@ use crate::bindings::pandas_utils::{
     ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
     serde_rows_to_dataframe_with_schema,
 };
-use crate::bindings::statements_analytics::extract_serde_any;
 use crate::errors::{core_to_py, display_to_py};
 
 /// Column schema for `RelativeValueResult.to_dataframe`.
@@ -58,7 +57,7 @@ fn parse_extractor(name: &str) -> PyResult<MetricExtractor> {
     name.parse().map_err(display_to_py)
 }
 
-pub(super) fn extractor_label(extractor: &MetricExtractor) -> String {
+fn extractor_label(extractor: &MetricExtractor) -> String {
     match extractor {
         MetricExtractor::Named(name) | MetricExtractor::Custom(name) => name.clone(),
         MetricExtractor::Multiple(multiple) => {
@@ -210,7 +209,7 @@ pub(super) fn extract_company_metrics(
     if let Ok(metrics) = obj.extract::<PyRef<'_, PyCompanyMetrics>>() {
         return Ok(metrics.inner.clone());
     }
-    extract_serde_any(py, obj, "company_metrics")
+    crate::bindings::module_utils::spec_from_py(py, obj, "company_metrics")
 }
 
 /// Screening criteria for building a peer set from a universe.
@@ -424,6 +423,12 @@ impl PyPeerSet {
     ///     Screening criteria.
     /// period_basis : str
     ///     ``"ltm"``, ``"ntm"`` or a custom label (required).
+    ///
+    /// Returns
+    /// -------
+    /// tuple[PeerSet, int]
+    ///     The peer set and the number of universe members the filter dropped;
+    ///     a member with the subject's id is not counted.
     #[staticmethod]
     #[pyo3(signature = (subject, universe, filter, period_basis))]
     fn from_universe(
@@ -432,20 +437,19 @@ impl PyPeerSet {
         universe: Vec<Bound<'_, PyAny>>,
         filter: &PyPeerFilter,
         period_basis: &str,
-    ) -> PyResult<Self> {
+    ) -> PyResult<(Self, usize)> {
         let subject = extract_company_metrics(py, subject)?;
         let universe = universe
             .iter()
             .map(|company| extract_company_metrics(py, company))
             .collect::<PyResult<Vec<_>>>()?;
-        Ok(Self {
-            inner: PeerSet::from_universe(
-                subject,
-                &universe,
-                &filter.inner,
-                parse_period_basis(period_basis),
-            ),
-        })
+        let (inner, excluded_count) = PeerSet::from_universe(
+            subject,
+            &universe,
+            &filter.inner,
+            parse_period_basis(period_basis),
+        );
+        Ok((Self { inner }, excluded_count))
     }
 
     /// Build a peer set from a pandas ``DataFrame`` (rows = companies).
@@ -1180,12 +1184,12 @@ fn extract_dimensions(
             .map(
                 |item| match item.extract::<PyRef<'_, PyScoringDimension>>() {
                     Ok(typed) => Ok(typed.inner.clone()),
-                    _ => extract_serde_any(py, &item, "dimensions"),
+                    _ => crate::bindings::module_utils::spec_from_py(py, &item, "dimensions"),
                 },
             )
             .collect();
     }
-    extract_serde_any(py, dimensions, "dimensions")
+    crate::bindings::module_utils::spec_from_py(py, dimensions, "dimensions")
 }
 
 /// Score a subject against its peers across weighted dimensions.
@@ -1233,7 +1237,7 @@ fn score_relative_value(
 ) -> PyResult<PyRelativeValueResult> {
     let peer_set: PeerSet = match peer_set.extract::<PyRef<'_, PyPeerSet>>() {
         Ok(typed) => typed.inner.clone(),
-        _ => extract_serde_any(py, peer_set, "peer_set")?,
+        _ => crate::bindings::module_utils::spec_from_py(py, peer_set, "peer_set")?,
     };
     let dims = extract_dimensions(py, dimensions)?;
     let inner = core_score(&peer_set, &dims).map_err(core_to_py)?;

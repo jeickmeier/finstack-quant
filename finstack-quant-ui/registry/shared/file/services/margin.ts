@@ -84,6 +84,12 @@ export function createMarginService(
               request.id,
               request.collateralCurve,
             );
+          default: {
+            const unhandled: never = request;
+            throw new RangeError("Unsupported CSA preset", {
+              cause: unhandled,
+            });
+          }
         }
       });
     },

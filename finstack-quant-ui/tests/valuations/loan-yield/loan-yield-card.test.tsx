@@ -1,17 +1,5 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -37,33 +25,14 @@ import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { unwrap, type PriceRequest } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { MetricMetadata } from "finstack-quant-wasm";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "metricValues")
-        return unwrap(
-          await harness.proxy.metricValues(request as MetricValuesRequest),
-        );
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
+const harness = useWorkerHarness(["metricValues"]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -79,19 +48,6 @@ const rowFor = (metric: string) =>
   screen.getByRole("rowheader", { name: labelFor(metric) }).closest("tr")!;
 
 // Values are regenerated and compared by `mise run ui-fixtures --check`.
-it("pins the JSON inputs the fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../..",
-  );
-  for (const source of fixture.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/valuations/loan-yield/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it.each(Object.entries(cases))(
   "the worker returns the native values and errors of %s",
   async (_name, entry) => {
@@ -188,8 +144,8 @@ it("labels by labelFor and states only the unit and group Rust declares", () => 
   const cells = (metric: string) =>
     [...rowFor(metric).children].map((cell) => cell.textContent);
   expect(cells("yt3y")[0]).toBe("YT3Y");
-  expect(cells("yt3y").slice(2)).toEqual(["decimal", "Instrument Specific"]);
-  expect(cells("ytm").slice(2)).toEqual(["decimal", "Pricing"]);
+  expect(cells("yt3y").slice(2)).toEqual(["decimal", "Pricing"]);
+  expect(cells("recovery01").slice(2)).toEqual(["currency", "Credit"]);
   expect(cells("embedded_option_value").slice(2)).toEqual([
     "currency",
     "Pricing",

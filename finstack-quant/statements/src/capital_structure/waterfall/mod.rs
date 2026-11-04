@@ -808,6 +808,7 @@ mod tests {
         }
         let mut ctx = EvaluationContext::new(
             period,
+            &[],
             std::sync::Arc::new(node_to_column),
             std::sync::Arc::new(IndexMap::new()),
         );

@@ -7,7 +7,7 @@ import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import type { MonteCarloResults } from "finstack-quant-wasm";
 import { Button } from "@/components/ui/button";
-import { formatPercent, groupDecimal } from "@/lib/finstack/format/format";
+import { formatPercent, formatExact } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
@@ -15,19 +15,10 @@ import { EnumField } from "@/components/finstack/shared/primitives/enum-field/en
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { monteCarloConfigModule } from "./monte-carlo-config";
+import { passThrough } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** Rust documents MonteCarloConfig percentiles and breach probabilities as fractions in [0, 1]; shown as percents. */
 const percent = (value: number) => `${formatPercent(value)}%`;
-/** Every supplied digit, grouped; a non-finite native value shows as itself. */
-function exactValue(value: number): string {
-  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
-}
-/**
- * No standalone native MonteCarloConfig parse exists; Rust validates the
- * config (unknown keys included) when it simulates and the caller shows its
- * error. Kept stable so the form does not revalidate on every render.
- */
-const passThrough = async (json: string) => json;
 type Pairs = readonly (readonly [number, number])[];
 /** The value Rust returned for one percentile, or undefined. */
 function at(pairs: Pairs | undefined, percentile: number) {
@@ -103,7 +94,7 @@ export function StatementMonteCarlo({
   breachProbability,
   breachLoading,
   breachError,
-  formatValue = exactValue,
+  formatValue = formatExact,
   density = "compact",
 }: StatementMonteCarloProps) {
   const [initial] = useState(() => defaultConfig);

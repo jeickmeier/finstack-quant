@@ -64,7 +64,7 @@ fn pnl_bucket_share_examples() -> finstack_quant_core::Result<Vec<serde_json::Va
     use finstack_quant_core::money::Money;
 
     finstack_quant_core::schema::example(&PnlBucketShare {
-        field: "carry".to_string(),
+        field: crate::PnlBucket::Carry,
         amount: Money::from((12500_i64, Currency::USD)),
         pct_of_total: Some(100.0),
     })

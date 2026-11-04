@@ -1,19 +1,9 @@
-import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
 import { checking, emit } from "../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { native, readRepoJson } from "../../scripts/fixture-inputs.mjs";
 // The Rust example of the simm_sensitivities_json contract (IR, equity and FX
 // deltas in USD) and a single USD 5Y IR delta of 1000.
-const schema = JSON.parse(
-  await readFile(
-    new URL(
-      "../../../finstack-quant/margin/schemas/margin/1/simm_sensitivities_json.schema.json",
-      import.meta.url,
-    ),
-    "utf8",
-  ),
+const schema = await readRepoJson(
+  "finstack-quant/margin/schemas/margin/1/simm_sensitivities_json.schema.json",
 );
 const asOf = "2025-01-15";
 const cases = [

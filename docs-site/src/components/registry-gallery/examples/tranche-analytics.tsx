@@ -1,21 +1,18 @@
 "use client";
 import type { ExampleProps } from "./props";
-import {
-  TrancheAnalytics,
-  type TrancheScheduleValue,
-} from "@/components/finstack/valuations/components/tranche-analytics/tranche-analytics";
+import { TrancheAnalytics } from "@/components/finstack/valuations/components/tranche-analytics/tranche-analytics";
 import type {
   MetricFieldUnit,
   TrancheSolveFieldUnits,
   OasResult,
   TrancheMetrics,
 } from "finstack-quant-wasm";
-import data from "../data.json";
+import { trancheAnalytics } from "../fixtures";
 
 // Captured native valuations.instruments results for the floating SENIOR note
 // of the CLO mezzanine regression golden at a 25% clean price; this item needs
 // no worker.
-const floating = data.trancheAnalytics.cases.find(
+const floating = trancheAnalytics.cases.find(
   (entry) => entry.name === "floating",
 )!;
 const results = floating.results;
@@ -35,7 +32,7 @@ export function Example({ density = "compact" }: ExampleProps) {
       // so this static example discards an applied configuration.
       onOasConfigChange={() => {}}
       schedule={{
-        value: results.schedule.value as unknown as TrancheScheduleValue,
+        value: results.schedule.value,
       }}
       density={density}
     />

@@ -110,7 +110,7 @@ const choose = (id: string) =>
   fireEvent.change(screen.getByLabelText("Test"), { target: { value: id } });
 const diverted = (run: Run) =>
   run.diagnostics.periods!.flatMap((period) =>
-    period.waterfall.diverted_amounts.map((row) => [
+    period.waterfall.diverted_amounts!.map((row) => [
       period.payment_date,
       row.source_tier,
       row.target_tranche,

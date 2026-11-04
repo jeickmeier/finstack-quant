@@ -2,15 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { useState } from "react";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -34,7 +26,7 @@ import {
 import { unwrap, type NormalizationResult } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import { groupDecimal } from "@/lib/finstack/format/format";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import analystResult from "../../../src/fixtures/statements/analyst-result.json";
 import fixture from "./cases.json";
@@ -50,38 +42,18 @@ vi.mock(
     ),
   }),
 );
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-/** Native validations the form has run in the current test. */
-let validated = 0;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  validated = 0;
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, arg: never) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "validateNormalizationConfig") {
-        const canonical = unwrap(
-          await harness.proxy.validateNormalizationConfig(arg),
-        );
-        validated += 1;
-        return canonical;
-      }
-      if (method === "normalize")
-        return unwrap(await harness.proxy.normalize(arg));
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
+const harness = useWorkerHarness(["validateNormalizationConfig", "normalize"]);
+/** Native validations the form has completed in the current test. */
+const validated = () =>
+  harness.call.mock.settledResults.filter(
+    (result, index) =>
+      result.type === "fulfilled" &&
+      harness.call.mock.calls[index]![0] === "validateNormalizationConfig",
+  ).length;
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -213,7 +185,7 @@ it("switches the bridge to another returned period", async () => {
   await userEvent.click(
     screen.getByRole("combobox", { name: "Bridge period" }),
   );
-  await userEvent.click(screen.getByRole("option", { name: last }));
+  await userEvent.click(await screen.findByRole("option", { name: last }));
   expect(
     await screen.findByRole("img", { name: `Base to adjusted, ${last}` }),
   ).toBeTruthy();
@@ -278,7 +250,7 @@ it("edits the target as a node combobox, validates natively and normalizes throu
   // Submit waits for the form's first native validation; a click before it
   // settles is not a submission, so click once validation has run.
   const submit = screen.getByRole("button", { name: "Normalize" });
-  await waitFor(() => expect(validated).toBeGreaterThan(0), {
+  await waitFor(() => expect(validated()).toBeGreaterThan(0), {
     timeout: budget(10000),
   });
   fireEvent.click(submit);

@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -21,7 +13,6 @@ import {
   migrationMatrixOptions,
   useMigrationMatrix,
   type MigrationMatrix,
-  type MigrationMatrixRequest,
 } from "@/hooks/models/use-migration-matrix/use-migration-matrix";
 import {
   migrationProjectionOptions,
@@ -35,13 +26,13 @@ import {
   type MigrationProjectionData,
 } from "@/components/finstack/models/components/transition-matrix-heatmap/transition-matrix-heatmap";
 import { unwrap } from "@/workers/finstack-contract";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./migration.json";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
 // Figures are drawn by the shared chart in the browser gates; here each one
 // is a labelled placeholder (the heatmap preset still validates its domain).
 vi.mock(
@@ -62,7 +53,7 @@ type Resources = Record<
   | "scaleFreed",
   number
 >;
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness(["migrationMatrix", "migrationProjection"]);
 const resources = () =>
   (harness.proxy as unknown as { resources(): Promise<Resources> }).resources();
 /** Handles constructed and freed by one call. */
@@ -78,33 +69,6 @@ async function counted<T>(call: () => Promise<T>) {
   ) as Resources;
   return { value, delta };
 }
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "migrationMatrix")
-        return unwrap(
-          await harness.proxy.migrationMatrix(
-            request as MigrationMatrixRequest,
-          ),
-        );
-      if (method === "migrationProjection")
-        return unwrap(
-          await harness.proxy.migrationProjection(
-            request as MigrationProjectionRequest,
-          ),
-        );
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

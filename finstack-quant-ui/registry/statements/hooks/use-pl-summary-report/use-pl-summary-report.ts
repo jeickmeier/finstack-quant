@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { PlSummaryReportRequest } from "@/workers/finstack-contract";
@@ -13,14 +12,13 @@ export function plSummaryReportOptions(
   session: number,
   request: PlSummaryReportRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "plSummaryReport", key] as const,
-    ready: snapshot !== null,
-    missing: "P&L summary requires an explicit request and ready worker",
-    queryFn: (ready) => ready.call("plSummaryReport", snapshot!),
-  });
+    session,
+    "plSummaryReport",
+    request,
+    "P&L summary requires an explicit request and ready worker",
+  );
 }
 /** Native P&L summary TableEnvelope (one row per line item and period) or structured failure. */
 export function usePlSummaryReport(request: PlSummaryReportRequest | null) {

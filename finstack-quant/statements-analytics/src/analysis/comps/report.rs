@@ -7,12 +7,13 @@ use super::peer_set::{PeerFilter, PeerSet};
 #[cfg(doc)]
 use super::scoring::score_relative_value;
 use super::scoring::{
-    DimensionExclusion, MetricExtractor, RelativeValueResult, ScoreDirection, ScoringDimension,
-    evaluate_dimension, is_finite_score, score_relative_value_unchecked,
+    DimensionEvaluation, DimensionExclusion, MetricExtractor, RelativeValueResult, ScoreDirection,
+    ScoringDimension, composite_score, evaluate_dimension, is_finite_score,
     validate_dimension_weights,
 };
 use super::stats::{PeerStats, RegressionResult, peer_stats, percentile_rank, z_score};
 use super::types::{CompanyId, CompanyMetrics, Multiple, PeriodBasis};
+use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
@@ -176,6 +177,52 @@ pub struct RelativeValueReport {
     pub composite_excluded_reason: Option<CompositeExclusion>,
 }
 
+impl RelativeValueReport {
+    /// Export the comps table, one row per company in
+    /// [`companies`](Self::companies) order, as a [`TableEnvelope`].
+    ///
+    /// Columns: `id` (string), `is_subject` (bool), then one nullable float
+    /// column per multiple named by its wire form (`ev_ebitda`, `pe`, ...), in
+    /// [`multiples`](Self::multiples) order.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when a multiple appears twice, or a company
+    /// row does not hold one value per multiple.
+    pub fn to_table(&self) -> Result<TableEnvelope> {
+        let rows = &self.companies;
+        let mut columns = vec![
+            TableColumn::new(
+                "id",
+                TableColumnData::String(rows.iter().map(|c| c.id.as_str().to_string()).collect()),
+            ),
+            TableColumn::new(
+                "is_subject",
+                TableColumnData::Boolean(rows.iter().map(|c| c.is_subject).collect()),
+            ),
+        ];
+        for (index, column) in self.multiples.iter().enumerate() {
+            let values = rows
+                .iter()
+                .map(|company| {
+                    company.values.get(index).copied().ok_or_else(|| {
+                        Error::Validation(format!(
+                            "company '{}' has no value for multiple '{}'",
+                            company.id.as_str(),
+                            column.multiple.as_str()
+                        ))
+                    })
+                })
+                .collect::<Result<_>>()?;
+            columns.push(TableColumn::new(
+                column.multiple.as_str(),
+                TableColumnData::NullableFloat64(values),
+            ));
+        }
+        TableEnvelope::new(columns, Default::default())
+    }
+}
+
 /// Compare one subject with its filtered peers: comps table, peer statistics,
 /// regression scatter and composite rich/cheap score in one result.
 ///
@@ -265,16 +312,12 @@ pub fn relative_value_report(
     }
     validate_dimension_weights(&config.dimensions)?;
 
-    let peer_set = PeerSet::from_universe(
+    let (peer_set, excluded_count) = PeerSet::from_universe(
         subject.clone(),
         universe,
         &config.filter,
         config.period_basis.clone(),
     );
-    let excluded_count = universe
-        .iter()
-        .filter(|company| company.id != subject.id && !config.filter.accepts(company))
-        .count();
 
     let companies = std::iter::once(subject)
         .chain(&peer_set.peers)
@@ -294,24 +337,25 @@ pub fn relative_value_report(
         .iter()
         .map(|&multiple| multiple_summary(&peer_set, multiple))
         .collect();
-    let dimensions: Vec<_> = config
+    let evaluations: Vec<_> = config
         .dimensions
         .iter()
-        .map(|dim| dimension_row(&peer_set, dim))
+        .map(|dim| evaluate_dimension(&peer_set, dim))
+        .collect();
+    let dimensions = config
+        .dimensions
+        .iter()
+        .zip(&evaluations)
+        .map(|(dim, evaluation)| dimension_row(&peer_set, dim, evaluation))
         .collect();
 
     let (composite, composite_excluded_reason) = if config.dimensions.is_empty() {
         (None, Some(CompositeExclusion::NoDimensions))
-    } else if dimensions.iter().all(|dim| dim.excluded_reason.is_some()) {
-        (None, Some(CompositeExclusion::NoUsableDimension))
     } else {
-        // Only a non-finite composite becomes a reason; any other score error
-        // is returned.
-        let result = score_relative_value_unchecked(&peer_set, &config.dimensions)?;
-        if is_finite_score(&result) {
-            (Some(result), None)
-        } else {
-            (None, Some(CompositeExclusion::NonFiniteScore))
+        match composite_score(&peer_set, &config.dimensions, &evaluations) {
+            None => (None, Some(CompositeExclusion::NoUsableDimension)),
+            Some(result) if is_finite_score(&result) => (Some(result), None),
+            Some(_) => (None, Some(CompositeExclusion::NonFiniteScore)),
         }
     };
 
@@ -346,8 +390,11 @@ fn multiple_summary(peer_set: &PeerSet, multiple: Multiple) -> RelativeValueMult
 }
 
 /// Report one dimension from its shared evaluation, adding the scatter points.
-fn dimension_row(peer_set: &PeerSet, dim: &ScoringDimension) -> RelativeValueDimension {
-    let evaluation = evaluate_dimension(peer_set, dim);
+fn dimension_row(
+    peer_set: &PeerSet,
+    dim: &ScoringDimension,
+    evaluation: &DimensionEvaluation<'_>,
+) -> RelativeValueDimension {
     let fitted = |x: f64| {
         evaluation
             .regression
@@ -628,7 +675,8 @@ mod tests {
             &config(dimensions.clone(), vec![Multiple::EvEbitda]),
         )
         .expect("valid request");
-        let peer_set = PeerSet::from_universe(subject(), &universe(), &energy(), PeriodBasis::Ltm);
+        let (peer_set, _) =
+            PeerSet::from_universe(subject(), &universe(), &energy(), PeriodBasis::Ltm);
         let score = score_relative_value(&peer_set, &dimensions).expect("usable dimensions");
 
         assert_eq!(report.composite.as_ref(), Some(&score));

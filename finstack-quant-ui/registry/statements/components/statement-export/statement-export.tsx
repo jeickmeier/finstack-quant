@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { TableEnvelope } from "@/components/finstack/shared/table/table-envelope/table-envelope";
+import { UndefinedValue } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** The two StatementResult table layouts: a column per node, or a row per node and period. */
 export type StatementTableLayout = "wide" | "long";
@@ -11,11 +12,6 @@ const layouts = (["wide", "long"] as const).map((value) => ({
   value,
   label: labelFor(value),
 }));
-const undefinedValue = (
-  <span className="finstack-na" title="Rust returned no value for this cell">
-    Undefined
-  </span>
-);
 /**
  * One RFC 4180 field. Rust holds a cell with no value as NaN, which a worker
  * delivers as NaN and JSON stores as null: both are an empty field. Anything
@@ -124,7 +120,9 @@ export function StatementExport({
           envelope={table}
           caption={`Statement result, ${layout} layout`}
           density={density}
-          missingCell={undefinedValue}
+          missingCell={
+            <UndefinedValue reason="Rust returned no value for this cell" />
+          }
         />
       )}
     </section>

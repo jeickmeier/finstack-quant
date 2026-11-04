@@ -37,7 +37,7 @@ const market = readFileSync(
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => harness?.close());
 
 it("validates and evaluates the canonical model through the real worker", async () => {
@@ -356,7 +356,7 @@ it("routes scenario sets, rollups and data-gap checks to WASM", async () => {
         frequency: "annual",
       }),
     ),
-  ).toEqual(native.rollupSpecDefaultFor(canonical, "annual"));
+  ).toEqual(native.rollupSpecDeclaredMethods(canonical, "annual"));
 
   const report = unwrap(
     await harness.proxy.runStatementChecks({

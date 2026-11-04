@@ -30,6 +30,8 @@ pub(super) fn record_tranche_flows(
         (inputs.context, inputs.claim_caps, inputs.period_start);
     let (pay_date, as_of) = (inputs.period.payment, inputs.period.valuation);
     let mut debt_interest_due = 0.0_f64;
+    let distributions = waterfall_result.distributions()?;
+    let principal_distributions = waterfall_result.principal_distributions()?;
     for (idx, tranche) in state.tranches.tranches.iter().enumerate() {
         let recipient_key = &state.tranche_recipient_keys[idx];
         let tranche_id_str = tranche.id.as_str();
@@ -96,36 +98,19 @@ pub(super) fn record_tranche_flows(
                 .sum::<f64>(),
             state.currency,
         )?;
-        let payment_received = waterfall_result
-            .distributions
+        let payment_received = distributions
             .get(recipient_key)
             .copied()
             .unwrap_or(Money::from((0_i64, state.currency)));
 
-        // Take the waterfall's OWN interest/principal classification
-        // rather than re-deriving it from the aggregate.
-        //
-        // `distributions` keys a tranche's interest and principal under the
-        // same `RecipientType::Tranche(id)`, so this used to reconstruct the
-        // split by assuming interest is satisfied FIRST:
-        //     interest_paid = min(payment_received, total_interest_claim)
-        //     principal     = remainder
-        //
-        // That silently reclassified principal as interest whenever a tranche
-        // carried a shortfall — which is exactly the state an OC cure exists to
-        // address. A cure diverted to senior PRINCIPAL was booked as interest,
-        // the balance was never retired, and the next period's OC denominator
-        // was unchanged: the cure could not de-lever the ratio it was sized to
-        // fix. The defect bound precisely in the stress scenarios the cure
-        // mechanics were built for.
-        //
-        // The waterfall already knows which payments were `TranchePrincipal`;
-        // `principal_distributions` reports it. Interest is then the remainder:
-        // validation leaves a debt class only its coupon, carryover and
-        // principal, so what is not principal is its coupon, and every unit of
-        // cash is booked as one or the other.
-        let principal_from_waterfall = waterfall_result
-            .principal_distributions
+        // Take the waterfall's own interest/principal classification: an
+        // interest-first split of `payment_received` would book a cure
+        // diverted to principal while the tranche carries a shortfall as
+        // interest, leaving the balance the cure was sized to retire.
+        // Interest is the remainder: validation leaves a debt class only its
+        // coupon, carryover and principal, so what is not principal is its
+        // coupon, and every unit of cash is booked as one or the other.
+        let principal_from_waterfall = principal_distributions
             .get(recipient_key)
             .copied()
             .unwrap_or(Money::from((0_i64, state.currency)));

@@ -342,7 +342,15 @@ function candidateDocumentation(node, interfaceName, file, raw) {
     return source?.members.get(`${scope}:${name}`) ?? null;
   }
   if (interfaceName.endsWith('Namespace')) {
-    return ts.isMethodSignature(node) ? (raw.functions.get(name) ?? null) : null;
+    if (!ts.isMethodSignature(node)) return null;
+    // When another namespace owns the bare raw name, this member's raw export
+    // carries its namespace as a prefix (`statementsAnalyticsForecastBreaches`).
+    const namespace = interfaceName.slice(0, -'Namespace'.length);
+    const prefixed = `${namespace[0].toLowerCase()}${namespace.slice(1)}${name[0].toUpperCase()}${name.slice(1)}`;
+    if (raw.functions.has(name) && raw.functions.has(prefixed)) {
+      return raw.functions.get(prefixed) ?? null;
+    }
+    return raw.functions.get(name) ?? null;
   }
   const source = raw.classes.get(rawClassName(interfaceName));
   return source?.members.get(`instance:${name}`) ?? null;

@@ -272,7 +272,7 @@ fn make_whole_yields_use_reference_redemption() {
         .price_with_metrics(
             &make_whole_market(loan.issue_date, 0.0),
             loan.issue_date,
-            &[MetricId::custom("ytc"), MetricId::Ytw],
+            &[MetricId::Ytc, MetricId::Ytw],
             PricingOptions::default(),
         )
         .expect("yield metrics");
@@ -299,7 +299,7 @@ fn mid_coupon_make_whole_yield_includes_accrued_exactly_once() {
         .price_with_metrics(
             &make_whole_market(loan.issue_date, 0.0),
             loan.issue_date,
-            &[MetricId::custom("ytc")],
+            &[MetricId::Ytc],
             PricingOptions::default(),
         )
         .expect("mid-coupon yield");

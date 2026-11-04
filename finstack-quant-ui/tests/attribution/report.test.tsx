@@ -1,9 +1,5 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import type { PnlAttribution, PnlBucketShare } from "finstack-quant-wasm";
@@ -32,19 +28,6 @@ const buckets = (name: string) =>
   entry(name).buckets as unknown as PnlBucketShare[];
 // Attributions are regenerated and compared by `mise run ui-fixtures --check`
 // (tests/attribution/generate.mjs).
-it("pins the JSON inputs the attribution fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../..",
-  );
-  for (const source of fixture.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/attribution/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it("lists every factor field the Rust report knows", () => {
   // Each listed field is a returned Money bucket, shown as returned.
   for (const bucket of entry("parallel").buckets)

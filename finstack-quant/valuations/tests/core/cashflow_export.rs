@@ -800,7 +800,12 @@ fn balances_stay_empty_for_instruments_without_an_outstanding_principal() {
         )
         .expect("schedule"),
     );
-    assert!(terms.flow_balances.is_none(), "not requested at {as_of}");
-    let no_issue_date = terms.with_schedule_balances();
-    assert!(no_issue_date.flow_balances.is_none());
+    assert!(
+        terms.get_flow_balances().is_none(),
+        "not requested at {as_of}"
+    );
+    let no_issue_date = terms
+        .with_schedule_balances()
+        .expect("no issue date is not an error");
+    assert!(no_issue_date.get_flow_balances().is_none());
 }

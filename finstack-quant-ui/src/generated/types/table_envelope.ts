@@ -73,6 +73,11 @@ export interface D_29B848Ae6D2C610B175E {
         type: "nullable_int64";
         values: (number | null)[];
         [k: string]: unknown;
+      }
+    | {
+        type: "boolean";
+        values: boolean[];
+        [k: string]: unknown;
       };
   /**
    * Optional per-column metadata.

@@ -135,6 +135,59 @@ impl AttributionFactor {
     }
 }
 
+/// A money bucket of an attribution result, named by the result field holding
+/// it; the instrument and portfolio results use the same fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum PnlBucket {
+    /// Time decay and accrual (`carry`).
+    Carry,
+    /// Discount and forward curve moves (`rates_curves_pnl`).
+    RatesCurvesPnl,
+    /// Credit curve moves (`credit_curves_pnl`).
+    CreditCurvesPnl,
+    /// Inflation curve moves (`inflation_curves_pnl`).
+    InflationCurvesPnl,
+    /// Correlation moves (`correlations_pnl`).
+    CorrelationsPnl,
+    /// FX rate moves on the instrument's pricing (`fx_pnl`).
+    FxPnl,
+    /// Translation of the result into the reporting currency (`fx_translation_pnl`).
+    FxTranslationPnl,
+    /// Volatility surface moves (`vol_pnl`).
+    VolPnl,
+    /// Interaction between factors (`cross_factor_pnl`).
+    CrossFactorPnl,
+    /// Model parameter changes (`model_params_pnl`).
+    ModelParamsPnl,
+    /// Market scalar moves (`market_scalars_pnl`).
+    MarketScalarsPnl,
+    /// Unexplained remainder (`residual`).
+    Residual,
+}
+
+impl PnlBucket {
+    /// Return the canonical snake-case serde value, the result field's name.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Carry => "carry",
+            Self::RatesCurvesPnl => "rates_curves_pnl",
+            Self::CreditCurvesPnl => "credit_curves_pnl",
+            Self::InflationCurvesPnl => "inflation_curves_pnl",
+            Self::CorrelationsPnl => "correlations_pnl",
+            Self::FxPnl => "fx_pnl",
+            Self::FxTranslationPnl => "fx_translation_pnl",
+            Self::VolPnl => "vol_pnl",
+            Self::CrossFactorPnl => "cross_factor_pnl",
+            Self::ModelParamsPnl => "model_params_pnl",
+            Self::MarketScalarsPnl => "market_scalars_pnl",
+            Self::Residual => "residual",
+        }
+    }
+}
+
 /// One money bucket of an attribution result with its share of total P&L.
 ///
 /// Returned by [`PnlAttribution::pct_of_total_by_bucket`] and by the portfolio
@@ -144,10 +197,9 @@ impl AttributionFactor {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PnlBucketShare {
-    /// Wire name of the result field holding this bucket (`carry`,
-    /// `rates_curves_pnl`, ..., `residual`); the instrument and portfolio
-    /// results use the same names.
-    pub field: String,
+    /// Result field holding this bucket (`carry`, `rates_curves_pnl`, ...,
+    /// `residual`); the instrument and portfolio results use the same names.
+    pub field: PnlBucket,
     /// The bucket's P&L as attributed, in the `total_pnl` currency.
     pub amount: Money,
     /// Signed share of total P&L in percentage points (`25.0` = 25%); `None`
@@ -1115,7 +1167,7 @@ impl PnlAttribution {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_attribution::{AttributionMethod, PnlAttribution};
+    /// use finstack_quant_attribution::{AttributionMethod, PnlAttribution, PnlBucket};
     /// use finstack_quant_core::{currency::Currency, money::Money};
     /// use time::macros::date;
     ///
@@ -1128,28 +1180,28 @@ impl PnlAttribution {
     /// );
     /// pnl.carry = Money::from((50_i64, Currency::USD));
     /// let buckets = pnl.pct_of_total_by_bucket();
-    /// assert_eq!(buckets[0].field, "carry");
+    /// assert_eq!(buckets[0].field, PnlBucket::Carry);
     /// assert_eq!(buckets[0].pct_of_total, Some(25.0));
     /// ```
     #[must_use]
     pub fn pct_of_total_by_bucket(&self) -> Vec<PnlBucketShare> {
         [
-            ("carry", &self.carry),
-            ("rates_curves_pnl", &self.rates_curves_pnl),
-            ("credit_curves_pnl", &self.credit_curves_pnl),
-            ("inflation_curves_pnl", &self.inflation_curves_pnl),
-            ("correlations_pnl", &self.correlations_pnl),
-            ("fx_pnl", &self.fx_pnl),
-            ("fx_translation_pnl", &self.fx_translation_pnl),
-            ("vol_pnl", &self.vol_pnl),
-            ("cross_factor_pnl", &self.cross_factor_pnl),
-            ("model_params_pnl", &self.model_params_pnl),
-            ("market_scalars_pnl", &self.market_scalars_pnl),
-            ("residual", &self.residual),
+            (PnlBucket::Carry, &self.carry),
+            (PnlBucket::RatesCurvesPnl, &self.rates_curves_pnl),
+            (PnlBucket::CreditCurvesPnl, &self.credit_curves_pnl),
+            (PnlBucket::InflationCurvesPnl, &self.inflation_curves_pnl),
+            (PnlBucket::CorrelationsPnl, &self.correlations_pnl),
+            (PnlBucket::FxPnl, &self.fx_pnl),
+            (PnlBucket::FxTranslationPnl, &self.fx_translation_pnl),
+            (PnlBucket::VolPnl, &self.vol_pnl),
+            (PnlBucket::CrossFactorPnl, &self.cross_factor_pnl),
+            (PnlBucket::ModelParamsPnl, &self.model_params_pnl),
+            (PnlBucket::MarketScalarsPnl, &self.market_scalars_pnl),
+            (PnlBucket::Residual, &self.residual),
         ]
         .into_iter()
         .map(|(field, amount)| PnlBucketShare {
-            field: field.to_string(),
+            field,
             amount: *amount,
             pct_of_total: self.pct_of_total(amount.amount()),
         })
@@ -1439,7 +1491,7 @@ mod tests {
         assert_eq!(listed, expected);
 
         let rates = &buckets[1];
-        assert_eq!(rates.field, "rates_curves_pnl");
+        assert_eq!(rates.field, PnlBucket::RatesCurvesPnl);
         assert_eq!(rates.amount, pnl.rates_curves_pnl);
         assert_eq!(rates.pct_of_total, Some(-25.0));
 

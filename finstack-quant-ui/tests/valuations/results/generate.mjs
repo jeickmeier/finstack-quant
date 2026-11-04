@@ -1,9 +1,6 @@
-import { createRequire } from "node:module";
 import { pricingCases } from "../../browser/cases.mjs";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { native } from "../../../scripts/fixture-inputs.mjs";
 const request = (await pricingCases()).bond;
 request.metrics = ["ytm", "dv01", "duration_mod", "bucketed_dv01"];
 const result = native.priceInstrument(

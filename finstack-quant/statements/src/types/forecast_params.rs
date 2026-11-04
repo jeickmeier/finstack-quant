@@ -1,14 +1,16 @@
 //! Typed parameter contract of every forecast method.
 //!
 //! [`ForecastSpec`](super::ForecastSpec) stores its parameters as a free-form
-//! map, which suits long-lived model documents. [`ForecastParameters`] states
-//! the same wire shape per method, so a host can read which parameters a method
-//! takes from the published schema. Conditional rules, such as `half_life` being
-//! legal only with the exponential shape, stay with the method and are reported
-//! when the forecast is evaluated.
+//! map, which suits long-lived model documents; [`ForecastSpec::parameters`]
+//! reads that map into [`ForecastParameters`], the form every forecast method
+//! runs on and the published schema describes. Conditional rules, such as
+//! `half_life` being legal only with the exponential shape, stay with the
+//! method and are reported when the forecast is evaluated.
+//!
+//! [`ForecastSpec::parameters`]: super::ForecastSpec::parameters
 
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use super::SeasonalMode;
 
@@ -47,6 +49,75 @@ pub enum ForecastParameters {
     Bootstrap(BootstrapParams),
     /// Glide toward a target level over the forecast horizon.
     FadeToTarget(FadeToTargetParams),
+}
+
+impl ForecastParameters {
+    /// The `(min, max)` bounds clamped onto generated values.
+    pub(crate) fn bounds(&self) -> (Option<f64>, Option<f64>) {
+        match self {
+            Self::ForwardFill(p) => (p.min, p.max),
+            Self::GrowthPct(p) => (p.min, p.max),
+            Self::CurvePct(p) => (p.min, p.max),
+            Self::Normal(p) | Self::LogNormal(p) => (p.min, p.max),
+            Self::Override(p) => (p.min, p.max),
+            Self::TimeSeries(p) => (p.min, p.max),
+            Self::Seasonal(p) => (p.min, p.max),
+            Self::MeanReverting(p) => (p.min, p.max),
+            Self::Bootstrap(p) => (p.min, p.max),
+            Self::FadeToTarget(p) => (p.min, p.max),
+        }
+    }
+
+    /// The random seed of a stochastic method; `None` for deterministic methods.
+    pub(crate) fn seed_mut(&mut self) -> Option<&mut u64> {
+        match self {
+            Self::Normal(p) | Self::LogNormal(p) => Some(&mut p.seed),
+            Self::MeanReverting(p) => Some(&mut p.seed),
+            Self::Bootstrap(p) => Some(&mut p.seed),
+            Self::ForwardFill(_)
+            | Self::GrowthPct(_)
+            | Self::CurvePct(_)
+            | Self::Override(_)
+            | Self::TimeSeries(_)
+            | Self::Seasonal(_)
+            | Self::FadeToTarget(_) => None,
+        }
+    }
+}
+
+/// Read a seed written as an integer or as an integer-valued float such as `42.0`.
+///
+/// A float at or above 2^64 is rejected rather than saturated to `u64::MAX`.
+fn deserialize_seed<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
+    struct SeedVisitor;
+
+    impl serde::de::Visitor<'_> for SeedVisitor {
+        type Value = u64;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("a non-negative integer representable as u64")
+        }
+
+        fn visit_u64<E: serde::de::Error>(self, value: u64) -> Result<u64, E> {
+            Ok(value)
+        }
+
+        fn visit_i64<E: serde::de::Error>(self, value: i64) -> Result<u64, E> {
+            u64::try_from(value)
+                .map_err(|_| E::invalid_value(serde::de::Unexpected::Signed(value), &self))
+        }
+
+        fn visit_f64<E: serde::de::Error>(self, value: f64) -> Result<u64, E> {
+            if value.is_finite() && value.fract() == 0.0 && value >= 0.0 && value < u64::MAX as f64
+            {
+                Ok(value as u64)
+            } else {
+                Err(E::invalid_value(serde::de::Unexpected::Float(value), &self))
+            }
+        }
+    }
+
+    deserializer.deserialize_any(SeedVisitor)
 }
 
 /// Parameters of a method with only the cross-cutting bounds.
@@ -117,6 +188,7 @@ pub struct DistributionParams {
     /// Standard deviation of the shock per period; non-negative.
     pub std_dev: f64,
     /// Random seed; the same seed reproduces the same path.
+    #[serde(deserialize_with = "deserialize_seed")]
     pub seed: u64,
     /// Node whose shocks this one correlates with; Monte Carlo evaluation only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -144,6 +216,7 @@ pub struct MeanRevertingParams {
     /// Standard deviation of the shock per period; non-negative.
     pub std_dev: f64,
     /// Random seed; the same seed reproduces the same path.
+    #[serde(deserialize_with = "deserialize_seed")]
     pub seed: u64,
     /// Node whose shocks this one correlates with; Monte Carlo evaluation only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -182,6 +255,7 @@ pub struct BootstrapParams {
     #[serde(default)]
     pub mode: ForecastBootstrapMode,
     /// Random seed; the same seed reproduces the same path.
+    #[serde(deserialize_with = "deserialize_seed")]
     pub seed: u64,
     /// Lower bound clamped onto generated values, in the line's base units.
     #[serde(default, skip_serializing_if = "Option::is_none")]

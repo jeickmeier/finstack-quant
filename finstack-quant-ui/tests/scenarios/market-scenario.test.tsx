@@ -1,18 +1,6 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 import {
   marketScenarioOptions,
@@ -23,38 +11,18 @@ import {
   unwrap,
   type MarketScenarioApplicationRequest,
 } from "@/workers/finstack-contract";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import fixture from "./application/cases.json";
 import bond from "../../src/fixtures/results/bond.json";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-let call: ReturnType<typeof vi.fn>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  call = vi.fn(async (method: string, request: unknown) => {
-    if (method === "initialize")
-      return unwrap(await harness.proxy.initialize());
-    if (method === "buildMarketScenario")
-      return unwrap(
-        await harness.proxy.buildMarketScenario(
-          request as MarketScenarioRequest,
-        ),
-      );
-    throw new Error(`Unexpected worker call ${method}`);
-  });
-  mock.createClient.mockReturnValue({ call, close() {} });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
+const harness = useWorkerHarness(["buildMarketScenario"]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -102,19 +70,6 @@ const application = (
 });
 // Applications and shocked prices are regenerated and compared by
 // `mise run ui-fixtures --check` (tests/scenarios/application/generate.mjs).
-it("pins the JSON inputs the scenario fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../..",
-  );
-  for (const source of fixture.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/scenarios/application/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it.each(drafts)(
   "builds and applies $name through the real worker exactly as the native fixture",
   async (entry) => {

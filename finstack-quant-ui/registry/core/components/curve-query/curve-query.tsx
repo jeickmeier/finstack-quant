@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatRaw } from "@/lib/finstack/format/format";
 import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/field-frame";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import { typedNumber } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** A native result or the native error of that one point. */
 type Outcome<T> =
@@ -98,9 +99,6 @@ function curvePoint(text: string): CurvePoint {
   const number = Number(text);
   return Number.isNaN(number) ? text : number;
 }
-/** Typed text as a number; a missing or malformed one is NaN, never 0, so Rust rejects it. */
-const typed = (text: string | undefined) =>
-  !text || text.trim() === "" ? Number.NaN : Number(text);
 const pointList = (text: string) =>
   text
     .split(",")
@@ -113,7 +111,7 @@ const pairs = (text: string) =>
     .filter((line) => line.trim() !== "")
     .map((line): [number, number] => {
       const [first, second] = line.split(",");
-      return [typed(first), typed(second)];
+      return [typedNumber(first), typedNumber(second)];
     });
 type Column = readonly [key: string, header: string];
 /** The input and measure columns of one table; the headers state the units the facade documents. */

@@ -273,7 +273,7 @@ pub fn forecast_breaches(
 /// use finstack_quant_core::dates::{create_date, Tenor};
 /// use time::Month;
 /// use finstack_quant_covenants::{
-///     evaluate_series_generic, Covenant, CovenantEngine, CovenantSpec, CovenantType,
+///     evaluate_series_from_model, Covenant, CovenantEngine, CovenantSpec, CovenantType,
 ///     DatedMetricSeries, DatedMetrics,
 /// };
 ///
@@ -292,30 +292,47 @@ pub fn forecast_breaches(
 ///     metrics: [("debt_to_ebitda".to_string(), 4.8)].into_iter().collect(),
 /// }])?;
 ///
-/// let evaluated = evaluate_series_generic(&engine, &series, series.periods())?;
+/// let evaluated = evaluate_series_from_model(&engine, &series, series.periods())?;
 /// assert!(!evaluated[0].reports["max_leverage"].passed);
 /// # Ok(())
 /// # }
 /// ```
-pub fn evaluate_series_generic<MTS: ModelTimeSeries>(
+pub fn evaluate_series_from_model<MTS: ModelTimeSeries>(
     engine: &CovenantEngine,
     model: &MTS,
     periods: &[PeriodId],
 ) -> Result<Vec<DatedCovenantReports>> {
-    if !periods.is_empty() {
+    evaluate_dated(
+        engine,
+        periods.iter().map(|period| {
+            Ok((
+                model.period_end_date(period)?,
+                PeriodMetricSource { model, period },
+            ))
+        }),
+    )
+}
+
+/// Evaluate the engine on each `(test date, metric source)` row, in order.
+///
+/// The engine is validated only when there is at least one row; breach
+/// history is not updated.
+fn evaluate_dated<S, I>(engine: &CovenantEngine, rows: I) -> Result<Vec<DatedCovenantReports>>
+where
+    S: CovenantMetricSource,
+    I: ExactSizeIterator<Item = Result<(Date, S)>>,
+{
+    if rows.len() > 0 {
         engine.validate()?;
     }
-    periods
-        .iter()
-        .map(|period| {
-            let as_of = model.period_end_date(period)?;
-            let source = PeriodMetricSource { model, period };
-            Ok(DatedCovenantReports {
-                as_of,
-                reports: engine.evaluate_specs(&engine.applicable_specs(as_of), &source, as_of)?,
-            })
+    rows.map(|row| {
+        let (as_of, source) = row?;
+        Ok(DatedCovenantReports {
+            as_of,
+            reports: engine.evaluate_specs(&engine.applicable_specs(as_of), &source, as_of)?,
         })
-        .collect()
+    })
+    .collect()
 }
 
 /// Metric values of one model period, read on demand.
@@ -366,25 +383,17 @@ impl CovenantEngine {
         &self,
         observations: &[DatedMetrics],
     ) -> Result<Vec<DatedCovenantReports>> {
-        if !observations.is_empty() {
-            self.validate()?;
-        }
-        observations
-            .iter()
-            .map(|row| {
-                let source = HashMapMetricSource::from_pairs(
-                    row.metrics.iter().map(|(id, value)| (id.as_str(), *value)),
-                );
-                Ok(DatedCovenantReports {
-                    as_of: row.date,
-                    reports: self.evaluate_specs(
-                        &self.applicable_specs(row.date),
-                        &source,
-                        row.date,
-                    )?,
-                })
-            })
-            .collect()
+        evaluate_dated(
+            self,
+            observations.iter().map(|row| {
+                Ok((
+                    row.date,
+                    HashMapMetricSource::from_pairs(
+                        row.metrics.iter().map(|(id, value)| (id.as_str(), *value)),
+                    ),
+                ))
+            }),
+        )
     }
 }
 

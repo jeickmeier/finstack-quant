@@ -86,7 +86,7 @@ fn metric(loan: &TermLoan, id: MetricId, key: &str) -> f64 {
 #[test]
 fn test_all_in_rate_equals_coupon_for_plain_loan() {
     let loan = term_loan(None, false);
-    let all_in = metric(&loan, MetricId::custom("all_in_rate"), "all_in_rate");
+    let all_in = metric(&loan, MetricId::AllInRate, "all_in_rate");
 
     assert!(
         all_in.is_finite() && all_in > 0.0,
@@ -106,17 +106,13 @@ fn test_all_in_rate_unchanged_by_upfront_fee_oid_eir_captures_it() {
     // *periodic* fees over time-weighted outstanding and intentionally excludes
     // the one-time origination/upfront fee (which is dated at issue). So it is
     // unchanged by an upfront fee...
-    let plain = metric(
-        &term_loan(None, false),
-        MetricId::custom("all_in_rate"),
-        "all_in_rate",
-    );
+    let plain = metric(&term_loan(None, false), MetricId::AllInRate, "all_in_rate");
     let with_fee = metric(
         &term_loan(
             Some(Money::new(200_000.0, Currency::USD).expect("valid money fixture")),
             false,
         ),
-        MetricId::custom("all_in_rate"),
+        MetricId::AllInRate,
         "all_in_rate",
     );
     assert!(
@@ -133,7 +129,7 @@ fn test_all_in_rate_unchanged_by_upfront_fee_oid_eir_captures_it() {
             Some(Money::new(200_000.0, Currency::USD).expect("valid money fixture")),
             false,
         ),
-        MetricId::custom("oid_eir_amortization"),
+        MetricId::OidEirAmortization,
         "oid_eir_rate",
     );
     assert!(
@@ -149,12 +145,8 @@ fn test_oid_eir_rate_is_requestable_and_equals_the_amortization_side_output() {
         false,
     );
     assert!(loan.oid_eir.is_none());
-    let direct = metric(&loan, MetricId::custom("oid_eir_rate"), "oid_eir_rate");
-    let via_amortization = metric(
-        &loan,
-        MetricId::custom("oid_eir_amortization"),
-        "oid_eir_rate",
-    );
+    let direct = metric(&loan, MetricId::OidEirRate, "oid_eir_rate");
+    let via_amortization = metric(&loan, MetricId::OidEirAmortization, "oid_eir_rate");
     assert_eq!(direct, via_amortization);
     assert!(
         direct > 0.06,
@@ -163,16 +155,8 @@ fn test_oid_eir_rate_is_requestable_and_equals_the_amortization_side_output() {
 
     // One solve fills both, so the amortization is already there on a
     // rate-only request and the registry does not run its calculator.
-    let total_on_rate_request = metric(
-        &loan,
-        MetricId::custom("oid_eir_rate"),
-        "oid_eir_amortization",
-    );
-    let total_requested = metric(
-        &loan,
-        MetricId::custom("oid_eir_amortization"),
-        "oid_eir_amortization",
-    );
+    let total_on_rate_request = metric(&loan, MetricId::OidEirRate, "oid_eir_amortization");
+    let total_requested = metric(&loan, MetricId::OidEirAmortization, "oid_eir_amortization");
     assert_eq!(total_on_rate_request, total_requested);
 }
 

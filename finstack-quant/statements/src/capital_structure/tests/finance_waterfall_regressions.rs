@@ -37,7 +37,8 @@ fn context_for(period: PeriodId, values: &[(&str, f64)]) -> EvaluationContext {
         .enumerate()
         .map(|(index, (name, _))| (NodeId::new(*name), index))
         .collect();
-    let mut context = EvaluationContext::new(period, Arc::new(columns), Arc::new(IndexMap::new()));
+    let mut context =
+        EvaluationContext::new(period, &[], Arc::new(columns), Arc::new(IndexMap::new()));
     for (name, value) in values {
         context.set_value(name, *value).expect("declared node");
     }

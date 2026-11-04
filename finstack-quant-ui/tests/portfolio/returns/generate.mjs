@@ -1,8 +1,5 @@
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { native } from "../../../scripts/fixture-inputs.mjs";
 // Host data, as a performance system would supply it. Linked: three annual
 // sub-period returns over a three-year horizon, and three monthly returns over
 // a quarter (0.25 of a 365-day year), which Rust reports cumulatively. Dietz:

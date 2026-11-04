@@ -1194,12 +1194,10 @@ impl finstack_quant_valuations_core::instruments::Instrument for RevolvingCredit
         finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms,
     > {
         use finstack_quant_cashflows::CashflowProvider;
-        Ok(
-            finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+        finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms::from_schedule(
                 self.cashflow_schedule(market, as_of)?,
             )
-            .with_schedule_balances(),
-        )
+            .with_schedule_balances()
     }
 
     impl_instrument_base!(

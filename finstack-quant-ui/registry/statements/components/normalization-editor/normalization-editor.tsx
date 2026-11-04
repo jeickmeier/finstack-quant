@@ -6,7 +6,7 @@ import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import type { NormalizationResult } from "@/workers/finstack-contract";
-import { groupDecimal } from "@/lib/finstack/format/format";
+import { formatExact } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import {
   SchemaForm,
@@ -18,10 +18,6 @@ import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { normalizationConfigModule } from "./normalization-config";
 
-/** Every supplied digit, grouped; a non-finite native value shows as itself. */
-function exactValue(value: number): string {
-  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
-}
 /** Config fields that name a statement node, offered as the model's node ids. */
 const nodeFieldPath = /(^|\.)(target_node|node_id|base_node)$/;
 /** One bar of the bridge: a level from zero, or a step between two returned values. */
@@ -115,7 +111,7 @@ export function NormalizationEditor({
   results,
   loading,
   error,
-  formatValue = exactValue,
+  formatValue = formatExact,
   density = "compact",
 }: NormalizationEditorProps) {
   const [initial] = useState(() => defaultConfig);

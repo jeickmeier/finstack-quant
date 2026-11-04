@@ -2,15 +2,7 @@
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -37,7 +29,7 @@ import {
   type CovenantTemplateRequest,
 } from "@/workers/finstack-contract";
 import { serializeHost } from "../../src/codec.mjs";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import series from "../../src/fixtures/covenants/analyst-covenant-series.json";
 
@@ -53,15 +45,19 @@ const modelJson = read("statements/analyst-model.json");
 const resultsJson = read("statements/analyst-result.json");
 const engineJson = read("covenants/analyst-covenants.json");
 const nodeIds = Object.keys(JSON.parse(modelJson).nodes);
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 type Resources = Record<
   "covenantEngineConstructed" | "covenantEngineFreed",
   number
 >;
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness([
+  "covenantTemplate",
+  "validateCovenantEngine",
+  "evaluateCovenants",
+]);
 const resources = () =>
   (harness.proxy as unknown as { resources(): Promise<Resources> }).resources();
 /** CovenantEngine handles constructed and freed by one call. */
@@ -77,33 +73,6 @@ async function counted<T>(call: () => Promise<T>) {
     ],
   };
 }
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  const proxy = harness.proxy as unknown as Record<
-    string,
-    (request: unknown) => Promise<never>
-  >;
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (
-        [
-          "covenantTemplate",
-          "validateCovenantEngine",
-          "evaluateCovenants",
-        ].includes(method)
-      )
-        return unwrap(await proxy[method]!(request));
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -173,7 +142,6 @@ it("evaluates the analyst engine over every result period and frees the engine",
     async () =>
       await harness.proxy.evaluateCovenants({
         engineJson,
-        modelJson,
         resultsJson,
       }),
   );
@@ -200,7 +168,6 @@ it("returns Rust's not_found for a template metric the model lacks, freeing the 
     async () =>
       await harness.proxy.evaluateCovenants({
         engineJson: JSON.stringify({ specs }),
-        modelJson,
         resultsJson,
       }),
   );
@@ -217,7 +184,6 @@ it("returns Rust's not_found for a template metric the model lacks, freeing the 
     async () =>
       await harness.proxy.evaluateCovenants({
         engineJson: "{}",
-        modelJson,
         resultsJson,
       }),
   );
@@ -226,7 +192,7 @@ it("returns Rust's not_found for a template metric the model lacks, freeing the 
 });
 
 it("keys the evaluation on the worker session and the complete snapshotted request", () => {
-  const request = { engineJson, modelJson, resultsJson };
+  const request = { engineJson, resultsJson };
   const options = evaluateCovenantsOptions(null, 4, request);
   expect(options.queryKey).toEqual([
     "finstack",
@@ -325,7 +291,7 @@ function Connected({ defaultJson }: { defaultJson?: string }) {
   const loadTemplate = useCovenantTemplate();
   const [engine, setEngine] = useState<string | null>(null);
   const compliance = useEvaluateCovenants(
-    engine ? { engineJson: engine, modelJson, resultsJson } : null,
+    engine ? { engineJson: engine, resultsJson } : null,
   );
   return (
     <>

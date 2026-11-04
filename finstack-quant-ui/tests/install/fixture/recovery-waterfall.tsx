@@ -1,11 +1,13 @@
 "use client";
-import {
-  RecoveryWaterfall,
-  type SeniorityStats,
-  type SeniorityTerms,
-  type WaterfallTerms,
-  type WorkoutTerms,
-} from "@/components/finstack/models/components/recovery-waterfall/recovery-waterfall";
+import { RecoveryWaterfall } from "@/components/finstack/models/components/recovery-waterfall/recovery-waterfall";
+import { SeniorityRecoveryCard } from "@/components/finstack/models/components/recovery-waterfall/seniority-recovery-card";
+import { WorkoutLgdCard } from "@/components/finstack/models/components/recovery-waterfall/workout-lgd-card";
+import type {
+  RecoveryWaterfallRequest,
+  SeniorityRecoveryRequest,
+  SeniorityRecoveryStats,
+  WorkoutLgdRequest,
+} from "@/workers/finstack-contract";
 import type { models } from "finstack-quant-wasm/types";
 
 import data from "./data.json";
@@ -16,25 +18,29 @@ export function InstalledItem() {
     <>
       <p>Supplied valid fixture; standalone recovery waterfall.</p>
       <RecoveryWaterfall
-        defaultWaterfall={waterfall.shortfall.request as WaterfallTerms}
-        defaultWorkout={workout.secured.request as WorkoutTerms}
-        defaultSeniority={
-          (stats.seniorUnsecured.request as SeniorityTerms).seniority
-        }
-        onWaterfallSubmit={() => {}}
-        onWorkoutSubmit={() => {}}
-        onStatsSubmit={() => {}}
-        waterfall={{
+        defaultTerms={waterfall.shortfall.request as RecoveryWaterfallRequest}
+        onSubmit={() => {}}
+        state={{
           result: waterfall.shortfall.result
             .value as models.RecoveryWaterfallResult,
         }}
-        workout={{
+      />
+      <WorkoutLgdCard
+        defaultTerms={workout.secured.request as WorkoutLgdRequest}
+        onSubmit={() => {}}
+        state={{
           result: workout.secured.result.value as models.WorkoutLgdResult,
         }}
-        stats={{
-          result: stats.seniorUnsecured.result.value as SeniorityStats,
-        }}
+      />
+      <SeniorityRecoveryCard
+        defaultSeniority={
+          (stats.seniorUnsecured.request as SeniorityRecoveryRequest).seniority
+        }
         calibrationIds={calibrationIds}
+        onSubmit={() => {}}
+        state={{
+          result: stats.seniorUnsecured.result.value as SeniorityRecoveryStats,
+        }}
       />
     </>
   );

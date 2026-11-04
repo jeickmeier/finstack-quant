@@ -1,8 +1,8 @@
 "use client";
-import { useCallback, useState, type ReactNode } from "react";
-import type { CheckReport, MoneyValue as Money } from "finstack-quant-wasm";
+import { useCallback, useState } from "react";
+import type { MoneyValue as Money } from "finstack-quant-wasm";
 import type { LboResultWire } from "@/lib/finstack/generated/types/lbo_result";
-import { groupDecimal } from "@/lib/finstack/format/format";
+import { formatExact } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import {
   SchemaForm,
@@ -12,47 +12,13 @@ import { IdCombobox } from "@/components/finstack/shared/primitives/id-combobox/
 import { MoneyValue } from "@/components/finstack/core/primitives/money-value/money-value";
 import { StatementCheckReport } from "@/components/finstack/statements/components/statement-diagnostics/statement-check-report";
 import { lboConfigModule } from "./lbo-config";
+import {
+  Pairs,
+  passThrough,
+  ReportSection,
+  yesNo,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
-/** Every supplied digit, grouped; a non-finite native value shows as itself. */
-function exactValue(value: number): string {
-  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
-}
-/**
- * No standalone native LboConfig parse exists; Rust validates the config
- * (unknown keys included) when it evaluates the LBO and the caller shows its
- * error. Kept stable so the form does not revalidate on every render.
- */
-const passThrough = async (json: string) => json;
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
-}
-/** Label/value pairs in the order given. */
-function Pairs({
-  label,
-  rows,
-}: {
-  label: string;
-  rows: readonly (readonly [string, ReactNode])[];
-}) {
-  return (
-    <dl
-      aria-label={label}
-      className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-1"
-    >
-      {rows.map(([name, value]) => (
-        <div key={name} className="contents">
-          <dt className="text-muted-foreground">{name}</dt>
-          <dd className="finstack-numeric text-right">{value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
 export interface LboReportProps {
   /** Initial LboConfig; remount to load another. Omitted starts empty. */
   defaultConfig?: Record<string, unknown>;
@@ -83,7 +49,7 @@ export function LboReport({
   result,
   loading,
   error,
-  formatValue = exactValue,
+  formatValue = formatExact,
   density = "compact",
 }: LboReportProps) {
   const [initial] = useState(() => defaultConfig);
@@ -164,7 +130,7 @@ export function LboReport({
             with the equity check in portfolio.mwrXirr).
           </p>
           <div className="grid gap-6 @lg:grid-cols-2">
-            <Section title="Sources and uses">
+            <ReportSection title="Sources and uses">
               <Pairs
                 label="Returned sources and uses"
                 rows={[
@@ -178,12 +144,12 @@ export function LboReport({
                   [labelFor("uses_total"), money(result.uses_total)],
                   [
                     labelFor("sources_uses_balanced"),
-                    result.sources_uses_balanced ? "Yes" : "No",
+                    yesNo(result.sources_uses_balanced),
                   ],
                 ]}
               />
-            </Section>
-            <Section title="Entry and exit">
+            </ReportSection>
+            <ReportSection title="Entry and exit">
               <Pairs
                 label="Returned entry and exit"
                 rows={[
@@ -205,7 +171,7 @@ export function LboReport({
                   [labelFor("moic"), formatValue(result.moic)],
                 ]}
               />
-            </Section>
+            </ReportSection>
           </div>
           {result.sources_uses_balanced === false && (
             <p role="alert" className="text-sm text-error">
@@ -213,18 +179,15 @@ export function LboReport({
               structure is numerically degenerate.
             </p>
           )}
-          <Section title="LBO checks">
+          <ReportSection title="LBO checks">
             {result.checks ? (
-              <StatementCheckReport
-                report={result.checks as unknown as CheckReport}
-                density={density}
-              />
+              <StatementCheckReport report={result.checks} density={density} />
             ) : (
               <p className="text-sm text-muted-foreground">
                 No check report: the config maps no LBO checks (check_mappings).
               </p>
             )}
-          </Section>
+          </ReportSection>
         </>
       )}
     </section>

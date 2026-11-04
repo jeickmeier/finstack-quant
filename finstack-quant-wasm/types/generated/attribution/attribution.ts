@@ -5079,6 +5079,23 @@ export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor
  * amount per one such unit.
  */
 export type MoveUnit = "basis_point" | "vol_point" | "percent" | "price_unit";
+/**
+ * A money bucket of an attribution result, named by the result field holding
+ * it; the instrument and portfolio results use the same fields.
+ */
+export type PnlBucket =
+  | "carry"
+  | "rates_curves_pnl"
+  | "credit_curves_pnl"
+  | "inflation_curves_pnl"
+  | "correlations_pnl"
+  | "fx_pnl"
+  | "fx_translation_pnl"
+  | "vol_pnl"
+  | "cross_factor_pnl"
+  | "model_params_pnl"
+  | "market_scalars_pnl"
+  | "residual";
 
 /**
  * Advance rate applied to one collateral class.
@@ -21461,11 +21478,10 @@ export interface PnlBucketShare {
    */
   amount: Money;
   /**
-   * Wire name of the result field holding this bucket (`carry`,
-   * `rates_curves_pnl`, ..., `residual`); the instrument and portfolio
-   * results use the same names.
+   * Result field holding this bucket (`carry`, `rates_curves_pnl`, ...,
+   * `residual`); the instrument and portfolio results use the same names.
    */
-  field: string;
+  field: PnlBucket;
   /**
    * Signed share of total P&L in percentage points (`25.0` = 25%); `None`
    * when `total_pnl` is effectively zero and the share is undefined.

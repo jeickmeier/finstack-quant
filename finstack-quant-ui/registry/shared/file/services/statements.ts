@@ -11,7 +11,7 @@ export type StatementsNative = {
     | "parseFormula"
     | "Evaluator"
     | "statementResultRollup"
-    | "rollupSpecDefaultFor"
+    | "rollupSpecDeclaredMethods"
     | "monteCarloBreachProbability"
     | "statementResultToTableWide"
     | "statementResultToTableLong"
@@ -113,8 +113,8 @@ export function createStatementsService(
     },
     runStatementChecks(request) {
       return context.result(() => {
-        const { modelJson, resultsJson, configJson } = request;
-        switch (request.kind) {
+        const { modelJson, resultsJson, configJson, kind } = request;
+        switch (kind) {
           case "suite":
             return native.statements_analytics.runChecks(
               modelJson,
@@ -133,6 +133,10 @@ export function createStatementsService(
               configJson,
               resultsJson,
             );
+          default: {
+            const unhandled: never = kind;
+            throw new RangeError(String(unhandled));
+          }
         }
       });
     },
@@ -388,7 +392,7 @@ export function createStatementsService(
     },
     defaultRollupSpec(request) {
       return context.result(() =>
-        native.statements.rollupSpecDefaultFor(
+        native.statements.rollupSpecDeclaredMethods(
           request.modelJson,
           request.frequency,
         ),

@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { StatementScenarioDiffRequest } from "@/workers/finstack-contract";
@@ -17,14 +16,13 @@ export function diffStatementScenariosOptions(
   session: number,
   request: StatementScenarioDiffRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "diffStatementScenarios", key] as const,
-    ready: snapshot !== null,
-    missing: "Scenario diffs require an explicit request and ready worker",
-    queryFn: (ready) => ready.call("diffStatementScenarios", snapshot!),
-  });
+    session,
+    "diffStatementScenarios",
+    request,
+    "Scenario diffs require an explicit request and ready worker",
+  );
 }
 /** One native ScenarioDiff per requested pair, in pair order, or a structured failure. */
 export function useDiffStatementScenarios(

@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -27,13 +19,13 @@ import {
   type PositionRiskData,
 } from "@/components/finstack/models/components/portfolio-risk-report/portfolio-risk-report";
 import { unwrap } from "@/workers/finstack-contract";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
 // Figures are drawn by the shared chart in the browser gates; here each one
 // is a labelled placeholder.
 vi.mock(
@@ -45,26 +37,7 @@ vi.mock(
     ),
   }),
 );
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "positionRisk")
-        return unwrap(
-          await harness.proxy.positionRisk(request as PositionRiskRequest),
-        );
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close() {},
-  });
-});
+const harness = useWorkerHarness(["positionRisk"]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

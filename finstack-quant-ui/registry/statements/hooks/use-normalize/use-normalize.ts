@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { NormalizeRequest } from "@/workers/finstack-contract";
@@ -16,14 +15,13 @@ export function normalizeOptions(
   session: number,
   request: NormalizeRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "normalize", key] as const,
-    ready: snapshot !== null,
-    missing: "Normalization requires an explicit request and ready worker",
-    queryFn: (ready) => ready.call("normalize", snapshot!),
-  });
+    session,
+    "normalize",
+    request,
+    "Normalization requires an explicit request and ready worker",
+  );
 }
 /** Native statements.normalize: one NormalizationResult per period of the target node, or the native error. */
 export function useNormalize(request: NormalizeRequest | null) {

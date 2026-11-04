@@ -508,20 +508,6 @@ impl<'a> RedemptionBasis<'a> {
         })
     }
 
-    /// Outstanding principal after every balance event on or before `date`
-    /// (amortization, PIK, later draws and repayments).
-    fn outstanding_at(&self, date: Date) -> f64 {
-        let index = self
-            .outstanding_by_date
-            .partition_point(|(event_date, _)| *event_date <= date);
-        if index == 0 {
-            self.schedule.get_notional().initial.amount()
-        } else {
-            self.outstanding_by_date[index - 1].1.amount()
-        }
-        .max(0.0)
-    }
-
     /// Resolve the principal struck by an exercise right and any contractual
     /// redemption that the exercise proceeds replace on the same date.
     ///
@@ -535,7 +521,11 @@ impl<'a> RedemptionBasis<'a> {
         exercise_date: Date,
         maturity: Date,
     ) -> (f64, f64) {
-        let after_events = self.outstanding_at(exercise_date);
+        let after_events = finstack_quant_cashflows::builder::outstanding_on(
+            &self.outstanding_by_date,
+            exercise_date,
+            self.schedule.get_notional().initial.amount(),
+        );
         let (principal_redeemed, replaced_redemption) = if exercise_date == maturity {
             self.schedule
                 .get_flows()

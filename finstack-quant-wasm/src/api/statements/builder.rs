@@ -306,7 +306,7 @@ impl JsModelBuilder {
     /// Twin of Python `ModelBuilder.forecast` (Rust `ModelBuilder::forecast`).
     ///
     /// @param node_id - Node whose forecast periods the spec fills.
-    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
+    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
     /// @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
     pub fn forecast(&mut self, node_id: JsValue, forecast_spec: JsValue) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
@@ -733,7 +733,7 @@ impl JsMixedNodeBuilder {
     /// Twin of Python `MixedNodeBuilder.forecast` (Rust
     /// `MixedNodeBuilder::forecast`).
     ///
-    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
+    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
     /// @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
     pub fn forecast(&mut self, forecast_spec: JsValue) -> Result<(), JsValue> {
         let spec: ForecastSpec = from_js_json(&forecast_spec, "forecastSpec")?;

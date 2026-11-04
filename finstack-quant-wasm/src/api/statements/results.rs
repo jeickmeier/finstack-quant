@@ -74,8 +74,8 @@ pub fn statement_result_rollup(
 
 /// List the rollup methods a model's lines declare.
 ///
-/// Free-function twin of Python `RollupSpec.default_for` (Rust
-/// `RollupSpec::default_for`). Only each node's `rollup` field is read: a line
+/// Free-function twin of Python `RollupSpec.declared_methods` (Rust
+/// `RollupSpec::declared_methods`). Only each node's `rollup` field is read: a line
 /// that declares nothing is not listed and sums, whatever its tags say.
 /// @param model - The `FinancialModelSpec` whose node declarations are listed (object or JSON); nothing is evaluated.
 /// @param frequency - Target frequency stored on the spec: `"quarterly"`, `"semi_annual"` or `"annual"`. `statementResultRollup` checks it against the model's periods.
@@ -85,11 +85,14 @@ pub fn statement_result_rollup(
 ///
 /// Throws with kind `validation` if the model is malformed or `frequency` is
 /// not a recognized label.
-#[wasm_bindgen(js_name = rollupSpecDefaultFor)]
-pub fn rollup_spec_default_for(model: JsValue, frequency: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = rollupSpecDeclaredMethods)]
+pub fn rollup_spec_declared_methods(
+    model: JsValue,
+    frequency: JsValue,
+) -> Result<JsValue, JsValue> {
     let model = FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
     let frequency: PeriodKind = js_wire(&frequency, "frequency")?;
-    to_js_value(&RollupSpec::default_for(&model, frequency))
+    to_js_value(&RollupSpec::declared_methods(&model, frequency))
 }
 
 /// Monetary value of one node in one period.

@@ -9,9 +9,9 @@ use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_c
 use super::convert::{enum_to_py_string, money_to_py};
 use super::instruments::PyBond;
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
-use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::errors::core_to_py;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._bond_workout", "BondWorkoutRow")]
@@ -116,39 +116,7 @@ impl PyBondWorkoutLadder {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._bond_workout", "BondWorkoutLadder.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .rows
-            .iter()
-            .map(|row| {
-                serde_json::json!({
-                    "date": row.date.to_string(),
-                    "kind": row.kind,
-                    "redemption_price_pct": row.redemption_price_pct,
-                    "redemption_amount": row.redemption_amount.amount(),
-                    "currency": row.redemption_amount.currency().to_string(),
-                    "make_whole": row.make_whole,
-                    "yield_rate": row.yield_rate,
-                    "i_spread": row.i_spread,
-                    "is_worst": row.is_worst,
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &rows,
-            &[
-                ("date", "str"),
-                ("kind", "str"),
-                ("redemption_price_pct", "float64"),
-                ("redemption_amount", "float64"),
-                ("currency", "str"),
-                ("make_whole", "bool"),
-                ("yield_rate", "float64"),
-                ("i_spread", "float64"),
-                ("is_worst", "bool"),
-            ],
-        )
+        envelope_to_pandas(py, &self.inner.to_table())
     }
 
     /// Return ``repr(self)``.

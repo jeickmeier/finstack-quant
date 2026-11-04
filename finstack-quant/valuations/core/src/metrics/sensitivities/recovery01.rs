@@ -188,3 +188,44 @@ pub fn market_with_recovery(
         .clone()
         .insert(recalibrated.as_ref().clone()))
 }
+
+/// Recovery01 of a non-CDS instrument priced on hazard curve `hazard_id`, by
+/// [`recovery01_fd`] with each bumped market built by [`market_with_recovery`].
+///
+/// # Arguments
+///
+/// * `context` - Metric context holding the market and the base PV in currency.
+/// * `hazard_id` - Hazard curve the instrument prices on.
+/// * `discount_curve_id` - Instrument discount curve the re-bootstrap uses.
+/// * `instrument_recovery` - Recovery the instrument's own terms apply, as a
+///   decimal, when it carries one; the curve is then moved by the same amount.
+///   `None` bumps the curve's recovery directly.
+/// * `label` - Prefix of the re-bootstrap error message.
+/// * `reprice` - Full reprice in currency on a bumped market at the bumped
+///   instrument recovery.
+///
+/// # Errors
+///
+/// Returns not-found when the hazard curve is missing, and the first error
+/// from the re-bootstrap or `reprice`.
+pub fn hazard_recovery01(
+    context: &MetricContext,
+    hazard_id: &str,
+    discount_curve_id: CurveId,
+    instrument_recovery: Option<f64>,
+    label: &str,
+    mut reprice: impl FnMut(&MarketContext, f64) -> Result<f64>,
+) -> Result<f64> {
+    let curve_recovery = context.curves.get_hazard(hazard_id)?.recovery_rate();
+    let base_recovery = instrument_recovery.unwrap_or(curve_recovery);
+    let terms = RecoveryReplayTerms::on_discount_curve(discount_curve_id);
+    recovery01_fd(base_recovery, context.base_value.amount(), |recovery| {
+        let curve_at = match instrument_recovery {
+            Some(base) => bumped_recovery(curve_recovery, recovery - base),
+            None => recovery,
+        };
+        let market =
+            market_with_recovery(context, &context.curves, hazard_id, curve_at, &terms, label)?;
+        reprice(&market, recovery)
+    })
+}

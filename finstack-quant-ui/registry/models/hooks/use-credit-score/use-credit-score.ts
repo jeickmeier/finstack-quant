@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { CreditScoreRequest } from "@/workers/finstack-contract";
@@ -18,14 +17,13 @@ export function creditScoreOptions(
   session: number,
   request: CreditScoreRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "creditScore", key] as const,
-    ready: snapshot !== null,
-    missing: "No scoring input supplied",
-    queryFn: (ready) => ready.call("creditScore", snapshot!),
-  });
+    session,
+    "creditScore",
+    request,
+    "No scoring input supplied",
+  );
 }
 /** A native models.credit.scoring result graded on the default PD master scale, or the actual native error; supply a Finstack/Query provider. */
 export function useCreditScore(request: CreditScoreRequest | null) {

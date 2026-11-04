@@ -1,8 +1,6 @@
 "use client";
-import {
-  WaccCalculator,
-  type WaccInputs,
-} from "@/components/finstack/statements/components/wacc-calculator/wacc-calculator";
+import { WaccCalculator } from "@/components/finstack/statements/components/wacc-calculator/wacc-calculator";
+import type { WaccRequest } from "@/workers/finstack-contract";
 
 import data from "./data.json";
 // The rate is the supplied native fixture: the item installs without a worker.
@@ -12,7 +10,7 @@ export function InstalledItem() {
     <>
       <p>Supplied valid fixture; standalone WACC calculator.</p>
       <WaccCalculator
-        defaultInputs={blended.inputs as WaccInputs}
+        defaultInputs={blended.inputs as WaccRequest}
         onSubmit={() => {}}
         rate={blended.rate}
         onApply={() => {}}

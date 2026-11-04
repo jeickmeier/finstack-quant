@@ -1053,6 +1053,30 @@ fn merge_matching_option<T: Copy + PartialEq>(current: &mut Option<Option<T>>, v
     });
 }
 
+/// Outstanding principal on `date` from a balance path, floored at zero.
+///
+/// The balance is the last after-event balance dated on or before `date`, so
+/// an event on `date` counts, or `initial` before the first event. A replayed
+/// balance below zero (an over-repayment) reads as no principal outstanding.
+///
+/// # Arguments
+///
+/// * `path` - After-event balances in date order, as returned by
+///   [`CashFlowSchedule::outstanding_by_date`].
+/// * `date` - Date the balance is read at.
+/// * `initial` - Balance before the first event, in the path's currency.
+///
+/// # Returns
+///
+/// The outstanding amount in the path's currency, never negative.
+pub fn outstanding_on(path: &[(Date, Money)], date: Date, initial: f64) -> f64 {
+    path.partition_point(|(event_date, _)| *event_date <= date)
+        .checked_sub(1)
+        .and_then(|last| path.get(last))
+        .map_or(initial, |(_, balance)| balance.amount())
+        .max(0.0)
+}
+
 /// Merge multiple schedules into one deterministic composite schedule.
 ///
 /// Concatenates flows from every input schedule, including mixed-currency
@@ -1376,6 +1400,19 @@ mod tests {
             0.0,
             None,
         )
+    }
+
+    #[test]
+    fn outstanding_on_reads_last_event_on_or_before_date_floored_at_zero() {
+        let day = |d: u8| Date::from_calendar_date(2025, Month::January, d).expect("valid date");
+        let usd = |amount: f64| Money::new(amount, Currency::USD).expect("valid money");
+        let path = vec![(day(10), usd(60.0)), (day(20), usd(-5.0))];
+
+        assert_eq!(outstanding_on(&path, day(5), 100.0), 100.0);
+        assert_eq!(outstanding_on(&path, day(10), 100.0), 60.0);
+        assert_eq!(outstanding_on(&path, day(15), 100.0), 60.0);
+        assert_eq!(outstanding_on(&path, day(20), 100.0), 0.0);
+        assert_eq!(outstanding_on(&[], day(20), 100.0), 100.0);
     }
 
     fn assert_every_row_order_is_canonical(rows: Vec<CashFlow>) {

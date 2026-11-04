@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { MetricMetadata } from "finstack-quant-wasm";
-import type { ExampleProps } from "./props";
+import { sixPlaces, type ExampleProps } from "./props";
 import {
   BondCreditCard,
   bondCreditMetrics,
@@ -15,14 +14,12 @@ import {
   useMetrics,
 } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
 import { useMetricValues } from "@/hooks/valuations/use-metric-values/use-metric-values";
-import data from "../data.json";
+import { bondCredit } from "../fixtures";
 import { WorkerPreview } from "../worker-preview";
-const { type, metadata: fixtureMetadata, cases } = data.bondCredit;
+const { type, metadata: fixtureMetadata, cases } = bondCredit;
 const { request } = cases.quoted;
 // A bond with no quote, curve or config: those rows keep Rust's error.
 const bullet = cases.bullet;
-// Host display choice: six decimal places of the returned values.
-const sixPlaces = (value: number) => value.toFixed(6);
 function Card({ density }: ExampleProps) {
   const [overrides, setOverrides] = useState(request.metricPricingOverrides);
   const available = useMetrics(type);
@@ -54,8 +51,8 @@ export function Example({ density = "compact" }: ExampleProps) {
       <div className="space-y-6">
         <Card density={density} />
         <BondCreditCard
-          rows={bullet.rows as unknown as MetricValueRow[]}
-          metadata={fixtureMetadata as unknown as MetricMetadata[]}
+          rows={bullet.rows}
+          metadata={fixtureMetadata}
           formatValue={sixPlaces}
           density={density}
         />

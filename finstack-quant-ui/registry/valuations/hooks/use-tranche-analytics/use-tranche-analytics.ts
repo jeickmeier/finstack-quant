@@ -1,8 +1,8 @@
 "use client";
 import { useCallback } from "react";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
   workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
@@ -71,14 +71,13 @@ export function trancheMetricsOptions(
   session: number,
   request: TrancheMetricsRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "trancheMetrics", key] as const,
-    ready: snapshot !== null,
-    missing: "Tranche metrics require an explicit request and ready worker",
-    queryFn: (ready) => ready.call("trancheMetrics", snapshot!),
-  });
+    session,
+    "trancheMetrics",
+    request,
+    "Tranche metrics require an explicit request and ready worker",
+  );
 }
 /** Snapshot the deal, tranche, market, date, explicit price and optional OasConfig. Null disables the solve. */
 export function trancheOasOptions(
@@ -86,14 +85,13 @@ export function trancheOasOptions(
   session: number,
   request: TrancheOasRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "trancheOas", key] as const,
-    ready: snapshot !== null,
-    missing: "Tranche OAS requires an explicit price and ready worker",
-    queryFn: (ready) => ready.call("trancheOas", snapshot!),
-  });
+    session,
+    "trancheOas",
+    request,
+    "Tranche OAS requires an explicit price and ready worker",
+  );
 }
 /** Native units of the TrancheMetrics fields for a result's currency. Null disables the call. */
 export function useTrancheMetricFieldUnits(currency: string | null) {
@@ -130,15 +128,13 @@ export function trancheDiscountMarginOptions(
   session: number,
   request: TranchePriceRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "trancheDiscountMargin", key] as const,
-    ready: snapshot !== null,
-    missing:
-      "Tranche discount margin requires an explicit price and ready worker",
-    queryFn: (ready) => ready.call("trancheDiscountMargin", snapshot!),
-  });
+    session,
+    "trancheDiscountMargin",
+    request,
+    "Tranche discount margin requires an explicit price and ready worker",
+  );
 }
 /** Snapshot the deal, tranche, market and date. Null disables the solve. */
 export function trancheBreakevenCdrOptions(
@@ -146,15 +142,13 @@ export function trancheBreakevenCdrOptions(
   session: number,
   request: TrancheRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "trancheBreakevenCdr", key] as const,
-    ready: snapshot !== null,
-    missing:
-      "Tranche break-even CDR requires an explicit request and ready worker",
-    queryFn: (ready) => ready.call("trancheBreakevenCdr", snapshot!),
-  });
+    session,
+    "trancheBreakevenCdr",
+    request,
+    "Tranche break-even CDR requires an explicit request and ready worker",
+  );
 }
 /** Native TrancheMetrics or a structured failure. */
 export function useTrancheMetrics(request: TrancheMetricsRequest | null) {
@@ -164,16 +158,15 @@ export function useTrancheMetrics(request: TrancheMetricsRequest | null) {
 }
 /** Native flows and date table of one tranche, or a structured failure. Null disables the call. */
 export function useTrancheSchedule(request: TrancheRequest | null) {
-  return useWorkerQuery((worker) => {
-    const { snapshot, key } = requestSnapshot(request);
-    return workerQueryOptions({
-      client: worker.client,
-      queryKey: ["finstack", worker.session, "trancheSchedule", key] as const,
-      ready: snapshot !== null,
-      missing: "Tranche schedule requires an explicit request and ready worker",
-      queryFn: (ready) => ready.call("trancheSchedule", snapshot!),
-    });
-  });
+  return useWorkerQuery((worker) =>
+    snapshotQueryOptions(
+      worker.client,
+      worker.session,
+      "trancheSchedule",
+      request,
+      "Tranche schedule requires an explicit request and ready worker",
+    ),
+  );
 }
 /** Native OasResult under the supplied OasConfig, else Rust's default; pass null until the user asks for the solve. */
 export function useTrancheOas(request: TrancheOasRequest | null) {

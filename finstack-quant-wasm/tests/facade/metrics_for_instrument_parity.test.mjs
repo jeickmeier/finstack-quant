@@ -27,7 +27,10 @@ test('metricsForInstrument ungrouped ids match the values pinned for both hosts'
 });
 
 test('metricMetadata reports the same group', () => {
-  const metadata = facade.valuations.instruments.metricMetadata(['all_in_rate', 'no_such_metric']);
+  const metadata = facade.valuations.instruments.metricMetadata([
+    'utilization_rate',
+    'no_such_metric',
+  ]);
   assert.deepEqual(
     plain(metadata).map((entry) => entry.group ?? null),
     [PINNED.group, null]

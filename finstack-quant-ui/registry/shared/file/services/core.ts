@@ -98,8 +98,12 @@ export function createCoreService(
               surface.free();
             }
           }
-          default:
-            throw new RangeError("Unsupported curve query kind");
+          default: {
+            const unhandled: never = request;
+            throw new RangeError("Unsupported curve query kind", {
+              cause: unhandled,
+            });
+          }
         }
       });
     },

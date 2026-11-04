@@ -497,7 +497,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/merton_report.schema.json",
-      "bytes": 11329,
+      "bytes": 11421,
       "kind": "output",
       "path": "schemas/models/1/merton_report.schema.json",
       "summary": "One-call Merton report: model, term structure, grades and CDS terms.",

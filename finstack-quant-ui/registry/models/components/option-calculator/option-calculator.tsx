@@ -3,11 +3,14 @@ import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { models as modelsWire } from "finstack-quant-wasm/types";
 import { Button } from "@/components/ui/button";
-import { formatRaw } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import {
+  shownValue,
+  typedNumber,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** A native result or the native error of that one call. */
 type Outcome<T> =
@@ -148,9 +151,6 @@ function fieldText(request: OptionCalculation) {
     ),
   );
 }
-/** Typed text as a number; an empty field is NaN, never 0, so Rust rejects it. */
-const typed = (value: string | undefined) =>
-  !value || value.trim() === "" ? Number.NaN : Number(value);
 /**
  * Prices a European option or solves its implied volatility under Black-Scholes,
  * Black-76 or Bachelier, with the Greeks at that volatility. Rust validates every
@@ -185,11 +185,11 @@ export function OptionCalculator({
   const definition = optionModels[model];
   const submit = () => {
     const terms = Object.fromEntries(
-      definition.fields.map(([key]) => [key, typed(values[key])]),
+      definition.fields.map(([key]) => [key, typedNumber(values[key])]),
     );
     // An empty theta denominator stays unset so Rust applies its own.
     const theta = values.thetaDaysPerYear?.trim()
-      ? { thetaDaysPerYear: typed(values.thetaDaysPerYear) }
+      ? { thetaDaysPerYear: typedNumber(values.thetaDaysPerYear) }
       : {};
     onSubmit({
       model,
@@ -198,8 +198,8 @@ export function OptionCalculator({
       ...terms,
       ...(model === "black_scholes" ? theta : {}),
       ...(mode === "price"
-        ? { vol: typed(values.vol) }
-        : { price: typed(values.price) }),
+        ? { vol: typedNumber(values.vol) }
+        : { price: typedNumber(values.price) }),
     } as OptionCalculation);
   };
   return (
@@ -278,12 +278,6 @@ interface GreekRow {
   name: string;
   value: unknown;
 }
-/** Finite numbers through the host format; anything else as returned. */
-function shown(value: unknown, format: (value: number) => string) {
-  return typeof value === "number" && Number.isFinite(value)
-    ? format(value)
-    : formatRaw(value as string | number | null | undefined);
-}
 function OptionResultView({
   result,
   loading,
@@ -309,7 +303,7 @@ function OptionResultView({
         id: "value",
         header: "Value",
         accessorFn: (row) => row.value,
-        cell: ({ getValue }) => shown(getValue(), format),
+        cell: ({ getValue }) => shownValue(getValue(), format),
         meta: { className: "text-right finstack-numeric" },
       },
     ],
@@ -350,7 +344,9 @@ function OptionResultView({
         className="flex min-w-0 flex-col gap-1 rounded-md border border-border p-2"
       >
         <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
-        <p className="finstack-numeric text-base">{shown(value, format)}</p>
+        <p className="finstack-numeric text-base">
+          {shownValue(value, format)}
+        </p>
         <p className="text-xs text-muted-foreground">{note}</p>
       </section>
       <section aria-label="Greeks" className="min-w-0 space-y-2">

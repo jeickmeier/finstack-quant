@@ -5,10 +5,8 @@ import {
   type DcfAssumptionsSubmission,
 } from "@/components/finstack/statements/components/dcf-assumptions-form/dcf-assumptions-form";
 import { DcfReport } from "@/components/finstack/statements/components/dcf-report/dcf-report";
-import {
-  WaccCalculator,
-  type WaccInputs,
-} from "@/components/finstack/statements/components/wacc-calculator/wacc-calculator";
+import { WaccCalculator } from "@/components/finstack/statements/components/wacc-calculator/wacc-calculator";
+import type { WaccRequest } from "@/workers/finstack-contract";
 import { useWacc } from "@/hooks/statements/use-wacc/use-wacc";
 import { useEvaluateDcf } from "@/hooks/statements/use-evaluate-dcf/use-evaluate-dcf";
 import { useDcfSensitivity } from "@/hooks/statements/use-dcf-sensitivity/use-dcf-sensitivity";
@@ -49,7 +47,7 @@ export function ValuationPanel({
   // Undefined until the calculator or an edit sets it, so the form holds the
   // WACC field until then (an empty string would hide a default WACC).
   const [waccText, setWaccText] = useState<string | undefined>(undefined);
-  const [waccInputs, setWaccInputs] = useState<WaccInputs | null>(null);
+  const [waccInputs, setWaccInputs] = useState<WaccRequest | null>(null);
   const calculated = useWacc(waccInputs);
   const [lboConfigJson, setLboConfigJson] = useState<string | null>(null);
   const lbo = useEvaluateLbo(

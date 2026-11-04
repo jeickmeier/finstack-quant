@@ -1,22 +1,9 @@
-import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
+import { native, readRepoSource } from "../../../scripts/fixture-inputs.mjs";
 import { serializeHost } from "../../../src/codec.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
-const source = async (path) => {
-  const bytes = await readFile(new URL(path, repository));
-  return {
-    value: JSON.parse(bytes),
-    source: { path, sha256: createHash("sha256").update(bytes).digest("hex") },
-  };
-};
 // The interest_rate_swap and deposit pricing cases (no patches) over the
 // shared pricing market at their valuation date.
-const pricing = await source(
+const pricing = await readRepoSource(
   "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
 );
 const caseOf = (type) =>
@@ -28,9 +15,9 @@ for (const entry of [swapCase, depositCase])
     throw new Error(`${entry.type} pricing case gained patches`);
 if (swapCase.request.asOf !== depositCase.request.asOf)
   throw new Error("swap and deposit pricing cases moved apart");
-const swap = await source(swapCase.instrumentSource.path);
-const deposit = await source(depositCase.instrumentSource.path);
-const market = await source(
+const swap = await readRepoSource(swapCase.instrumentSource.path);
+const deposit = await readRepoSource(depositCase.instrumentSource.path);
+const market = await readRepoSource(
   "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
 );
 const asOf = swapCase.request.asOf;

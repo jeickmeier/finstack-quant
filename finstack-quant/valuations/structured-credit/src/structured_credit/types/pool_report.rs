@@ -8,9 +8,11 @@
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+use super::borrowing_base::{ConcentrationScope, concentration_key};
 use super::pool::{
     AssetPool, PoolAsset, PoolStats, calculate_pool_stats, weighted_avg_rating_factor,
 };
@@ -68,6 +70,69 @@ pub struct PoolReport {
     pub by_rating: Vec<PoolConcentrationEntry>,
 }
 
+impl PoolReport {
+    /// Export the three concentration tables stacked as one long [`TableEnvelope`].
+    ///
+    /// Rows are the obligor table, then industry, then rating, each in its
+    /// report order. Columns: `dimension` (`obligor`, `industry` or `rating`),
+    /// `key` (nullable string), `balance` (float, in `currency`), `currency`
+    /// (ISO code), `balance_pct` (float, percent points) and `asset_count`
+    /// (integer). The columns remain when every table is empty.
+    #[must_use]
+    pub fn to_table(&self) -> TableEnvelope {
+        let rows: Vec<(&str, &PoolConcentrationEntry)> = [
+            ("obligor", &self.by_obligor),
+            ("industry", &self.by_industry),
+            ("rating", &self.by_rating),
+        ]
+        .into_iter()
+        .flat_map(|(dimension, table)| table.iter().map(move |row| (dimension, row)))
+        .collect();
+        TableEnvelope {
+            row_count: rows.len(),
+            columns: vec![
+                TableColumn::new(
+                    "dimension",
+                    TableColumnData::String(rows.iter().map(|(d, _)| (*d).to_string()).collect()),
+                ),
+                TableColumn::new(
+                    "key",
+                    TableColumnData::NullableString(
+                        rows.iter().map(|(_, r)| r.key.clone()).collect(),
+                    ),
+                ),
+                TableColumn::new(
+                    "balance",
+                    TableColumnData::Float64(
+                        rows.iter().map(|(_, r)| r.balance.amount()).collect(),
+                    ),
+                ),
+                TableColumn::new(
+                    "currency",
+                    TableColumnData::String(
+                        rows.iter()
+                            .map(|(_, r)| r.balance.currency().to_string())
+                            .collect(),
+                    ),
+                ),
+                TableColumn::new(
+                    "balance_pct",
+                    TableColumnData::Float64(rows.iter().map(|(_, r)| r.balance_pct).collect()),
+                ),
+                TableColumn::new(
+                    "asset_count",
+                    TableColumnData::Int64(
+                        rows.iter()
+                            .map(|(_, r)| i64::try_from(r.asset_count).unwrap_or(i64::MAX))
+                            .collect(),
+                    ),
+                ),
+            ],
+            metadata: Default::default(),
+        }
+    }
+}
+
 /// Report a collateral pool's statistics, WARF and concentration at a date.
 ///
 /// Each concentration table covers every asset row, so its shares sum to 100%.
@@ -114,8 +179,8 @@ pub fn pool_report(pool: &AssetPool, as_of: Date) -> Result<PoolReport> {
                 .filter(|asset| !asset.defaulted)
                 .map(|asset| (asset.balance.amount(), asset.rating)),
         )?,
-        by_obligor: table(|asset| asset.obligor_id.clone())?,
-        by_industry: table(|asset| asset.industry.clone())?,
+        by_obligor: table(|asset| concentration_key(ConcentrationScope::Obligor, asset))?,
+        by_industry: table(|asset| concentration_key(ConcentrationScope::Industry, asset))?,
         by_rating: table(|asset| asset.rating.map(|rating| rating.to_string()))?,
     })
 }

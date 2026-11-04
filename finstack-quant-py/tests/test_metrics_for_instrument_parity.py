@@ -23,7 +23,7 @@ def test_ungrouped_ids_match_the_values_pinned_for_both_hosts() -> None:
 
 
 def test_metric_metadata_reports_the_same_group() -> None:
-    assert [entry["group"] for entry in metric_metadata(["all_in_rate", "no_such_metric"])] == [
+    assert [entry["group"] for entry in metric_metadata(["utilization_rate", "no_such_metric"])] == [
         PINNED["group"],
         None,
     ]

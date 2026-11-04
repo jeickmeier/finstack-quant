@@ -6,9 +6,10 @@ use super::comps::{
     PyPeerStats, PyRegressionResult, PyRelativeValueResult, extract_company_metrics,
     period_basis_label,
 };
-use super::{extract_serde_any, py_bool};
+use super::py_bool;
+use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
+use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::valuations::convert::enum_to_py_string;
 use crate::errors::core_to_py;
@@ -306,29 +307,7 @@ impl PyRelativeValueReport {
     #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValueReport.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let labels = self
-            .inner
-            .multiples
-            .iter()
-            .map(|column| enum_to_py_string(&column.multiple))
-            .collect::<PyResult<Vec<_>>>()?;
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .companies
-            .iter()
-            .map(|company| {
-                let mut row = serde_json::Map::new();
-                row.insert("id".to_string(), company.id.as_str().into());
-                row.insert("is_subject".to_string(), company.is_subject.into());
-                for (label, value) in labels.iter().zip(&company.values) {
-                    row.insert(label.clone(), (*value).into());
-                }
-                serde_json::Value::Object(row)
-            })
-            .collect();
-        let mut columns = vec![("id", "str"), ("is_subject", "bool")];
-        columns.extend(labels.iter().map(|label| (label.as_str(), "float64")));
-        serde_rows_to_dataframe_with_schema(py, &rows, &columns)
+        envelope_to_pandas(py, &self.inner.to_table().map_err(core_to_py)?)
     }
 
     /// Return ``repr(self)``.
@@ -395,14 +374,15 @@ fn relative_value_report<'py>(
 ) -> PyResult<PyRelativeValueReport> {
     let subject = extract_company_metrics(py, subject)?;
     let universe: Vec<CompanyMetrics> = if universe.is_instance_of::<PyString>() {
-        extract_serde_any(py, universe, "universe")?
+        crate::bindings::module_utils::spec_from_py(py, universe, "universe")?
     } else {
         universe
             .try_iter()?
             .map(|company| extract_company_metrics(py, &company?))
             .collect::<PyResult<_>>()?
     };
-    let config: RelativeValueReportConfig = extract_serde_any(py, config, "config")?;
+    let config: RelativeValueReportConfig =
+        crate::bindings::module_utils::spec_from_py(py, config, "config")?;
     let inner =
         analysis::relative_value_report(&subject, &universe, &config).map_err(core_to_py)?;
     Ok(PyRelativeValueReport { inner })

@@ -37,13 +37,6 @@ pub(super) fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue
     FinancialModelSpec::from_json(&json_text(model, "model")?).map_err(to_js_err)
 }
 
-/// Parse a `StatementResult` argument (object or JSON).
-pub(super) fn parse_results(
-    results: &JsValue,
-) -> Result<finstack_quant_statements::evaluator::StatementResult, JsValue> {
-    serde_json::from_str(&json_text(results, "results")?).map_err(to_js_err)
-}
-
 /// Run a sensitivity analysis on a financial model.
 ///
 /// Accepts JSON strings for the model spec and sensitivity configuration,
@@ -666,7 +659,8 @@ pub fn credit_assessment_report_text(
 
 /// Compute a structured credit assessment (leverage, coverage, FCF).
 ///
-/// Returns a structured JavaScript object.
+/// Returns a structured JavaScript object whose `series` covers every period
+/// of the results' `periods` up to `period`, in timeline order.
 /// Ratios are `null` when their inputs have mixed scalar/money representations,
 /// different currencies, or non-finite arithmetic.
 /// Trailing-year ratios require all annual, semiannual, quarterly or monthly
@@ -677,8 +671,8 @@ pub fn credit_assessment_report_text(
 /// # Errors
 ///
 /// Rejects malformed `results_json`, a `period` value that is not a valid
-/// statement period identifier, a `period` at which no node of the results has
-/// a value (kind `validation`), or failure to serialize the assessment to
+/// statement period identifier, a `period` that is not one of the results'
+/// `periods` (kind `validation`), or failure to serialize the assessment to
 /// JavaScript.
 /// @param results_json - Evaluated statement-result JSON.
 /// @param period - Statement period identifier, such as `2025Q4`, that is a period of the results in the model's own frequency: `2025` is the annual period, not the last quarter of a quarterly model.

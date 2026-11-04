@@ -6,7 +6,6 @@ const scripts = [
   "encoding-report.mjs",
   "catalogue-docs.mjs",
   "gen-registry.mjs",
-  "gen-gallery.mjs",
 ];
 const check = process.argv.includes("--check") ? ["--check"] : [];
 const root = fileURLToPath(new URL("..", import.meta.url));

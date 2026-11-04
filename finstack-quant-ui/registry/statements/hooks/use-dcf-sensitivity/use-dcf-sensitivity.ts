@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { DcfSensitivityRequest } from "@/workers/finstack-contract";
@@ -14,15 +13,13 @@ export function dcfSensitivityOptions(
   session: number,
   request: DcfSensitivityRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "dcfSensitivity", key] as const,
-    ready: snapshot !== null,
-    missing:
-      "The DCF sensitivity requires an explicit request and ready worker",
-    queryFn: (ready) => ready.call("dcfSensitivity", snapshot!),
-  });
+    session,
+    "dcfSensitivity",
+    request,
+    "The DCF sensitivity requires an explicit request and ready worker",
+  );
 }
 /** Native statements_analytics.dcfSensitivity enterprise-value tornado or structured failure. */
 export function useDcfSensitivity(request: DcfSensitivityRequest | null) {

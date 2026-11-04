@@ -82,7 +82,7 @@ impl MetricCalculator for YtwCalculator {
             &context.curves,
             context.as_of,
             &quote_ctx,
-            context.base_value.amount(),
+            || Ok(context.base_value.amount()),
         )?;
         let dirty_now = Money::new(dirty_amt, bond.notional.currency())?;
 

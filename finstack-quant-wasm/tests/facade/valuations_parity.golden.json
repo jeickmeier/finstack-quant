@@ -2611,6 +2611,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2024-04-01",
             "total_available": {
               "amount": "4603656.8929829690",
               "currency": "USD"
@@ -2740,12 +2741,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 1.661628723059354, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -2758,6 +2762,8 @@
               "amount": "0.000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "0",
               "currency": "USD"
@@ -2844,6 +2850,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2024-07-01",
             "total_available": {
               "amount": "4461389.0273762560",
               "currency": "USD"
@@ -2973,12 +2980,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 1.6863334880140861, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -2991,6 +3001,8 @@
               "amount": "0.000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "0",
               "currency": "USD"
@@ -3077,6 +3089,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2024-10-01",
             "total_available": {
               "amount": "4344335.0952036550",
               "currency": "USD"
@@ -3206,12 +3219,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 1.7124955757035034, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -3224,6 +3240,8 @@
               "amount": "0.000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "0",
               "currency": "USD"
@@ -3310,6 +3328,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2025-01-02",
             "total_available": {
               "amount": "4210081.1106339040",
               "currency": "USD"
@@ -3439,12 +3458,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 1.7402337724079056, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -3457,6 +3479,8 @@
               "amount": "0.00000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "0",
               "currency": "USD"
@@ -3543,6 +3567,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2025-04-01",
             "total_available": {
               "amount": "4242392.49575081140",
               "currency": "USD"
@@ -3672,12 +3697,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 1.7696799685392377, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -3690,6 +3718,8 @@
               "amount": "0.000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "201517.74429248540",
               "currency": "USD"
@@ -3776,6 +3806,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2025-07-01",
             "total_available": {
               "amount": "4130235.31733361030",
               "currency": "USD"
@@ -3905,12 +3936,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 1.8043691186486932, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -3923,6 +3957,8 @@
               "amount": "0.000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "195290.19518775730",
               "currency": "USD"
@@ -4009,6 +4045,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2025-10-01",
             "total_available": {
               "amount": "4020958.65143199430",
               "currency": "USD"
@@ -4138,12 +4175,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 1.8416195840417855, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -4156,6 +4196,8 @@
               "amount": "0.000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "189255.09746237530",
               "currency": "USD"
@@ -4242,6 +4284,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2026-01-02",
             "total_available": {
               "amount": "3896698.04332629150",
               "currency": "USD"
@@ -4371,12 +4414,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 1.881705406989686, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -4389,6 +4435,8 @@
               "amount": "0.000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "183406.50374719150",
               "currency": "USD"
@@ -4475,6 +4523,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2026-04-01",
             "total_available": {
               "amount": "3741790.18125221190",
               "currency": "USD"
@@ -4604,12 +4653,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 1.9249409730883948, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -4622,6 +4674,8 @@
               "amount": "0.000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "177738.65046597190",
               "currency": "USD"
@@ -4708,6 +4762,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2026-07-01",
             "total_available": {
               "amount": "3642867.54988824170",
               "currency": "USD"
@@ -4837,12 +4892,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 1.9716887242246188, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -4855,6 +4913,8 @@
               "amount": "0.000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "172245.95215560170",
               "currency": "USD"
@@ -4941,6 +5001,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2026-10-01",
             "total_available": {
               "amount": "3546485.53056301690",
               "currency": "USD"
@@ -5070,12 +5131,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 2.0223687115959104, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -5088,6 +5152,8 @@
               "amount": "0.000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "166922.99596181490",
               "currency": "USD"
@@ -5174,6 +5240,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2027-01-04",
             "total_available": {
               "amount": "3436887.67421378680",
               "currency": "USD"
@@ -5303,12 +5370,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 2.0774705221248717, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0.0000000004",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000004",
               "currency": "USD"
@@ -5321,6 +5391,8 @@
               "amount": "0.0000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "161764.53630502280",
               "currency": "USD"
@@ -5407,6 +5479,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2027-04-01",
             "total_available": {
               "amount": "3300258.93986444950",
               "currency": "USD"
@@ -5536,12 +5609,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 2.1375682959109628, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -5554,6 +5630,8 @@
               "amount": "0.0000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "156765.48971098710",
               "currency": "USD"
@@ -5640,6 +5718,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2027-07-01",
             "total_available": {
               "amount": "3213009.17900142660",
               "currency": "USD"
@@ -5769,12 +5848,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 2.2033398115520972, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -5787,6 +5869,8 @@
               "amount": "0.0000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "151920.92980124060",
               "currency": "USD"
@@ -5873,6 +5957,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2027-10-01",
             "total_available": {
               "amount": "3128000.23795657860",
               "currency": "USD"
@@ -6002,12 +6087,15 @@
                 "is_principal": false
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 2.2755909856474155, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "0.0000000000",
               "currency": "USD"
@@ -6020,6 +6108,8 @@
               "amount": "-0.0000000001",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "147226.08243832060",
               "currency": "USD"
@@ -6106,6 +6196,7 @@
             }
           ],
           "waterfall": {
+            "payment_date": "2028-01-03",
             "total_available": {
               "amount": "2888658.6076355270",
               "currency": "USD"
@@ -6208,12 +6299,15 @@
                 "is_principal": true
               }
             ],
-            "diverted_amounts": [],
+            "coverage_tests": [["OC_A", 2.3552876672960315, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
-            "had_diversions": false,
+            "remaining_cash": {
+              "amount": "396086.5971195770",
+              "currency": "USD"
+            },
             "remaining_interest": {
               "amount": "396086.5971195770",
               "currency": "USD"
@@ -6226,6 +6320,8 @@
               "amount": "0.000000000",
               "currency": "USD"
             },
+            "had_diversions": false,
+            "diverted_amounts": [],
             "recovery_proceeds": {
               "amount": "0",
               "currency": "USD"

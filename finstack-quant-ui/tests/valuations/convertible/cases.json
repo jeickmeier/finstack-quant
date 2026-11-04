@@ -35,13 +35,16 @@
       "gamma",
       "vega"
     ],
-    "Instrument Specific": [
+    "Pricing": [
+      "accrued",
       "bond_floor",
+      "clean_price",
       "conversion_premium",
       "conversion_value",
+      "implied_vol",
+      "oas",
       "parity"
     ],
-    "Pricing": ["accrued", "clean_price", "implied_vol", "oas"],
     "Sensitivity": [
       "bucketed_dv01",
       "conversion01",
@@ -57,7 +60,7 @@
       "components": [],
       "coordinates": [],
       "unit": "dimensionless",
-      "group": "Instrument Specific",
+      "group": "Pricing",
       "bucketed": false
     },
     {
@@ -66,7 +69,7 @@
       "components": [],
       "coordinates": [],
       "unit": "currency",
-      "group": "Instrument Specific",
+      "group": "Pricing",
       "bucketed": false
     },
     {
@@ -75,7 +78,7 @@
       "components": [],
       "coordinates": [],
       "unit": "decimal",
-      "group": "Instrument Specific",
+      "group": "Pricing",
       "bucketed": false
     },
     {
@@ -84,7 +87,7 @@
       "components": [],
       "coordinates": [],
       "unit": "currency",
-      "group": "Instrument Specific",
+      "group": "Pricing",
       "bucketed": false
     },
     {

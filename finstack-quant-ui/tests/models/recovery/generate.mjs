@@ -1,8 +1,5 @@
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { native } from "../../../scripts/fixture-inputs.mjs";
 // The worker's ModelsApi over the raw package (the facade's
 // models.credit.recoveryWaterfall and models.credit.lgd namespaces re-export
 // these unchanged). The BetaRecovery handle is read the way the worker reads it.

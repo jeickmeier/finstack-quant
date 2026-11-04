@@ -1,18 +1,15 @@
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import {
+  native,
+  readRepoJson,
+  sourceRecord,
+  withSpec,
+} from "../../../scripts/fixture-inputs.mjs";
 const paths = [
   "finstack-quant/valuations/tests/instruments/json_examples/bond.json",
   "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
 ];
-const read = async (path) =>
-  JSON.parse(await readFile(new URL(path, repository), "utf8"));
-const [bullet, baseMarket] = await Promise.all(paths.map(read));
+const [bullet, baseMarket] = await Promise.all(paths.map(readRepoJson));
 const asOf = "2024-07-15";
 // The shared market's discount curves are identical, so a government curve that
 // differs needs its own knots: g_spread and i_spread then tell apart.
@@ -31,13 +28,6 @@ const marketJson = JSON.stringify({
       ],
     },
   ],
-});
-const withSpec = (bond, spec) => ({
-  ...bond,
-  instrument: {
-    ...bond.instrument,
-    spec: { ...bond.instrument.spec, ...spec },
-  },
 });
 const window = (date, price_pct_of_par) => ({
   start: date,
@@ -173,14 +163,7 @@ const cases = {
   // A floating coupon has a discount margin and no fixed-rate quote.
   frn: card(frn, "discounting", horizon("ytm")),
 };
-const sources = await Promise.all(
-  paths.map(async (path) => ({
-    path,
-    sha256: createHash("sha256")
-      .update(await readFile(new URL(path, repository)))
-      .digest("hex"),
-  })),
-);
+const sources = await Promise.all(paths.map(sourceRecord));
 await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({

@@ -1,5 +1,4 @@
 "use client";
-import type { ReactNode } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type {
   MarginCall,
@@ -10,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { MoneyValue } from "@/components/finstack/core/primitives/money-value/money-value";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import { ReportSection } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** A returned VmResult with Rust's own call decision and net margin; the shape useVm returns. */
 export interface VmMarginReport {
@@ -96,14 +96,6 @@ const callColumns: ColumnDef<{}, CallRow, any>[] = [
     meta: { className: "text-right" },
   })),
 ];
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
-}
 /**
  * Presents native variation margin: one date's VmResult with Rust's call
  * decision and net margin, a margin-call schedule and the contractual call
@@ -144,7 +136,7 @@ export function MarginCallTable({
       className="space-y-6 font-sans text-sm text-foreground"
     >
       {vm ? (
-        <Section title="Variation margin">
+        <ReportSection title="Variation margin">
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant={vm.requiresCall ? "default" : "secondary"}>
               {vm.requiresCall ? "Margin call" : "No margin call"}
@@ -171,10 +163,10 @@ export function MarginCallTable({
             captionVisibility="sr-only"
             density={density}
           />
-        </Section>
+        </ReportSection>
       ) : null}
       {calls ? (
-        <Section title="Margin calls">
+        <ReportSection title="Margin calls">
           <FinstackTable
             data={calls.map((call, index) => ({ ...call, index }))}
             columns={callColumns}
@@ -184,10 +176,10 @@ export function MarginCallTable({
             density={density}
             emptyState="No margin calls"
           />
-        </Section>
+        </ReportSection>
       ) : null}
       {callDates ? (
-        <Section title="Call dates">
+        <ReportSection title="Call dates">
           {callDates.length ? (
             <ol className="flex flex-wrap gap-x-4 gap-y-1 finstack-numeric">
               {callDates.map((date) => (
@@ -199,7 +191,7 @@ export function MarginCallTable({
               No call dates
             </p>
           )}
-        </Section>
+        </ReportSection>
       ) : null}
     </section>
   );

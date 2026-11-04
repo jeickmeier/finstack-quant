@@ -8,9 +8,9 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
 
 use super::convert::enum_to_py_string;
 use super::typed_convertible::PyConvertibleBond;
+use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
-use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::errors::core_to_py;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._convertible_spot_ladder", "ConvertibleSpotRow")]
@@ -116,41 +116,7 @@ impl PyConvertibleSpotLadder {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._convertible_spot_ladder", "ConvertibleSpotLadder.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .rows
-            .iter()
-            .map(|row| {
-                serde_json::json!({
-                    "spot": row.spot,
-                    "is_market_spot": row.is_market_spot,
-                    "price": row.price,
-                    "delta": row.delta,
-                    "hedge_ratio": row.hedge_ratio,
-                    "regime": row.regime,
-                    "conversion_value": row.conversion_value,
-                    "parity": row.parity,
-                    "conversion_premium": row.conversion_premium,
-                    "bond_floor": row.bond_floor,
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &rows,
-            &[
-                ("spot", "float64"),
-                ("is_market_spot", "bool"),
-                ("price", "float64"),
-                ("delta", "float64"),
-                ("hedge_ratio", "float64"),
-                ("regime", "str"),
-                ("conversion_value", "float64"),
-                ("parity", "float64"),
-                ("conversion_premium", "float64"),
-                ("bond_floor", "float64"),
-            ],
-        )
+        envelope_to_pandas(py, &self.inner.to_table())
     }
 
     /// Return ``repr(self)``.

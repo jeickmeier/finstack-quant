@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { barY, defineChart } from "@tanstack/charts";
 import { scaleBand } from "@tanstack/charts/scales/band";
@@ -18,6 +18,7 @@ import { FinstackTable } from "@/components/finstack/shared/table/finstack-table
 import { MoneyValue } from "@/components/finstack/core/primitives/money-value/money-value";
 import { StampBadge } from "@/components/finstack/valuations/primitives/stamp-badge/stamp-badge";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
+import { ReportSection } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 export interface PnlAttributionReportProps {
   /** A native PnlAttribution, shown as returned. */
@@ -35,15 +36,6 @@ export interface PnlAttributionReportProps {
 }
 
 type Step = NonNullable<PnlAttribution["waterfall_steps"]>[number];
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
-}
 
 /** A returned AttributionMethod: a unit variant name, else its object as JSON text. */
 function methodText(method: unknown) {
@@ -351,15 +343,15 @@ function AttributionView({
         attribution={attribution}
         within={residualWithinTolerance}
       />
-      <Section title="Factors">
+      <ReportSection title="Factors">
         <PnlFactorBuckets
           buckets={buckets}
           currency={currency}
           density={density}
         />
-      </Section>
+      </ReportSection>
       {waterfall && (
-        <Section title="Waterfall">
+        <ReportSection title="Waterfall">
           <figure className="min-w-0">
             <FinstackChart
               definition={waterfall}
@@ -375,23 +367,23 @@ function AttributionView({
             getRowId={(step) => String(step.step_index)}
             density={density}
           />
-        </Section>
+        </ReportSection>
       )}
       {explain && (
-        <Section title="Explain">
+        <ReportSection title="Explain">
           <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">
             {explain}
           </pre>
-        </Section>
+        </ReportSection>
       )}
       {meta.notes.length > 0 && (
-        <Section title="Notes">
+        <ReportSection title="Notes">
           <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
             {meta.notes.map((note, index) => (
               <li key={index}>{note}</li>
             ))}
           </ul>
-        </Section>
+        </ReportSection>
       )}
       <StampBadge meta={meta as unknown as Record<string, unknown>} />
       <JsonViewer

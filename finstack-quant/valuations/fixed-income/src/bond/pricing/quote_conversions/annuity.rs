@@ -345,6 +345,19 @@ pub(crate) fn curve_par_rate(
     Ok(par_swap_rate)
 }
 
+/// Date an I-spread or G-spread par rate runs to from the quote date: the exit
+/// date of a workout path, or contractual maturity when the bond has none,
+/// even when its final payment rolls past maturity.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose contractual maturity is the horizon without a workout.
+/// * `workout_exit` - Last payment date of the workout path, `None` when the
+///   bond has no exercise rights to work out to.
+pub(crate) fn i_spread_horizon(bond: &Bond, workout_exit: Option<Date>) -> Date {
+    workout_exit.unwrap_or(bond.maturity)
+}
+
 /// Interpolate the curve's swap calibration quotes at `maturity`, restating
 /// each quote from its fixed-leg frequency to `yield_frequency` first.
 fn interpolated_swap_quote_rate(

@@ -969,7 +969,7 @@ class RelativeValueReport:
 
         Columns are ``id``, ``is_subject`` and then one float column per configured
         multiple, named by its serde name, in config order. A value Rust cannot compute
-        is missing.
+        is ``NaN``.
 
         Returns
         -------
@@ -979,9 +979,10 @@ class RelativeValueReport:
         Raises
         ------
         ValueError
-            If the report cannot be serialized.
+            If a multiple appears twice or a company row does not hold one value
+            per multiple (only possible for a report rebuilt from edited JSON).
         ImportError
-            If pandas is not installed.
+            If ``pyarrow`` is not installed.
         """
         ...
 

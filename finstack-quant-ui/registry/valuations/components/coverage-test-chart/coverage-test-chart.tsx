@@ -22,19 +22,23 @@ import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import {
+  utc,
+  yesNo,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
 type SimulationRun = ReturnType<StructuredCredit["runSimulation"]>;
 type Diagnostics = SimulationRun["diagnostics"];
 type Period = NonNullable<Diagnostics["periods"]>[number];
 type Breach = Diagnostics["first_breaches"][number];
 type TestRow = Period["coverage_tests"][number] & { payment_date: string };
-type DiversionRow = Period["waterfall"]["diverted_amounts"][number] & {
+type DiversionRow = NonNullable<
+  Period["waterfall"]["diverted_amounts"]
+>[number] & {
   payment_date: string;
 };
-const utc = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const axisLabel = (unit: MetricFieldUnit) =>
   `${labelFor(unit.field)} (${unit.label})`;
-const yesNo = (flag: boolean) => (flag ? "Yes" : "No");
 const numeric = { className: "text-right finstack-numeric" };
 /** What Rust's null ratio and cushion mean, per CoverageTestDiagnostic. */
 const noClaim = "No claim outstanding";
@@ -353,14 +357,18 @@ export function CoverageTestChart({
   );
   const diversions = useMemo(
     () =>
-      periods.flatMap(({ payment_date, waterfall }) =>
-        waterfall.diverted_amounts.map((diversion) => ({
-          payment_date,
-          ...diversion,
-        })),
+      periods.flatMap(
+        ({ payment_date, waterfall }) =>
+          waterfall.diverted_amounts?.map((diversion) => ({
+            payment_date,
+            ...diversion,
+          })) ?? [],
       ),
     [periods],
   );
+  const unrecorded = periods.filter(
+    ({ waterfall }) => !waterfall.diverted_amounts,
+  ).length;
   const cash = useMemo(
     () =>
       periods[1] && units ? diversionChart(periods, units.diverted_cash) : null,
@@ -446,6 +454,12 @@ export function CoverageTestChart({
             ariaLabel="Diverted cash by date"
             height={180}
           />
+        )}
+        {unrecorded > 0 && (
+          <p role="status" className="m-0 text-sm text-muted-foreground">
+            Diversion records were not returned on {unrecorded} of{" "}
+            {periods.length} dates.
+          </p>
         )}
         <FinstackTable
           caption="Diversions"

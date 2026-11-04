@@ -1,17 +1,14 @@
 "use client";
 import { useState } from "react";
 import type { ExampleProps } from "./props";
-import type { GoalSeekResult } from "finstack-quant-wasm";
-import {
-  GoalSeekForm,
-  type GoalSeekDefaults,
-} from "@/components/finstack/statements/components/goal-seek-form/goal-seek-form";
+import { GoalSeekForm } from "@/components/finstack/statements/components/goal-seek-form/goal-seek-form";
 import data from "../data.json";
+import { statementGoalSeekRun, statementGoalSeek } from "../fixtures";
 
 // Captured native goalSeek of the analyst model (solved without the updated
 // model); this item needs no worker and has nothing to apply.
-const run = data.statementGoalSeekRun as unknown as GoalSeekDefaults;
-const result = data.statementGoalSeek as unknown as GoalSeekResult;
+const run = statementGoalSeekRun;
+const result = statementGoalSeek;
 const nodeIds = Object.keys(data.statementModel.nodes);
 const periods = data.statementModel.periods.map((period) => period.id);
 

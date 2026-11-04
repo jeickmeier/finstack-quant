@@ -299,8 +299,8 @@ fn a_spec_entry_overrides_the_declared_method() {
 }
 
 #[test]
-fn default_for_lists_only_declared_lines_and_ignores_tags() {
-    let spec = RollupSpec::default_for(&declared_model(), PeriodKind::Annual);
+fn declared_methods_lists_only_declared_lines_and_ignores_tags() {
+    let spec = RollupSpec::declared_methods(&declared_model(), PeriodKind::Annual);
     assert_eq!(spec.frequency, PeriodKind::Annual);
     assert_eq!(
         spec.methods,
@@ -314,11 +314,14 @@ fn default_for_lists_only_declared_lines_and_ignores_tags() {
 }
 
 #[test]
-fn default_for_gives_the_same_rollup_as_an_empty_spec() {
+fn declared_methods_gives_the_same_rollup_as_an_empty_spec() {
     let model = declared_model();
     let quarterly = Evaluator::new().evaluate(&model).expect("evaluation");
     let listed = quarterly
-        .rollup(&model, &RollupSpec::default_for(&model, PeriodKind::Annual))
+        .rollup(
+            &model,
+            &RollupSpec::declared_methods(&model, PeriodKind::Annual),
+        )
         .expect("listed rollup");
     let empty = quarterly
         .rollup(&model, &empty_annual_spec())
@@ -327,8 +330,8 @@ fn default_for_gives_the_same_rollup_as_an_empty_spec() {
 }
 
 #[test]
-fn default_for_keeps_the_requested_frequency_and_lists_nothing_for_an_undeclared_model() {
-    let spec = RollupSpec::default_for(&quarterly_model(), PeriodKind::SemiAnnual);
+fn declared_methods_keeps_the_requested_frequency_and_lists_nothing_for_an_undeclared_model() {
+    let spec = RollupSpec::declared_methods(&quarterly_model(), PeriodKind::SemiAnnual);
     assert_eq!(spec.frequency, PeriodKind::SemiAnnual);
     assert!(spec.methods.is_empty());
 }

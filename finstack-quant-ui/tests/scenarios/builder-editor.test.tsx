@@ -1,18 +1,6 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -36,38 +24,19 @@ import { useBuildTemplateComponent } from "@/hooks/scenarios/use-build-template-
 import { useComposeScenarios } from "@/hooks/scenarios/use-compose-scenarios/use-compose-scenarios";
 import { useBuildMarketScenario } from "@/hooks/scenarios/use-market-scenario/use-market-scenario";
 import { unwrap } from "@/workers/finstack-contract";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import cases from "./templates/cases.json";
 import bond from "../../src/fixtures/results/bond.json";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-let call: ReturnType<typeof vi.fn>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  // Every call goes to the production worker service.
-  call = vi.fn(async (method: string, ...args: unknown[]) =>
-    unwrap(
-      await (
-        harness.proxy as unknown as Record<
-          string,
-          (...a: unknown[]) => Promise<never>
-        >
-      )[method]!(...args),
-    ),
-  );
-  mock.createClient.mockReturnValue({ call, close() {} });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
+// Every call goes to the production worker service.
+const harness = useWorkerHarness("any");
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -75,22 +44,9 @@ afterEach(() => {
 const canonical = (spec: unknown) =>
   JSON.stringify(native.parseScenarioSpec(JSON.stringify(spec)));
 const calls = (method: string) =>
-  call.mock.calls.filter(([name]) => name === method);
+  harness.call.mock.calls.filter(([name]) => name === method);
 // Applications are regenerated and compared by `mise run ui-fixtures --check`
 // (tests/scenarios/templates/generate.mjs).
-it("pins the JSON inputs the template fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../..",
-  );
-  for (const source of cases.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/scenarios/templates/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it("returns the native templates, components and composition through the real worker", async () => {
   expect(unwrap(await harness.proxy.listBuiltinTemplateMetadata())).toEqual(
     cases.metadata,

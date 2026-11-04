@@ -39,7 +39,7 @@ const solved = cases.filter((c) => c !== unsolved);
 let worker: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   worker = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => worker?.close());
 it("solves every calibration step kind through the worker", () => {
   const covered = new Set(solved.flatMap((c) => stepKinds(c.source)));

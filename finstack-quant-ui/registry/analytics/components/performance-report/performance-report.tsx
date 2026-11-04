@@ -5,9 +5,9 @@ import type {
 } from "@/components/finstack/analytics/lib/analytics-report-types";
 import {
   datedPoints,
-  ReportSection,
   type DatedPoint,
 } from "@/components/finstack/analytics/lib/analytics-report-presentation";
+import { ReportSection } from "@/components/finstack/shared/primitives/native-display/native-display";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { areaY, barY, colorLegend, defineChart, lineY } from "@tanstack/charts";
@@ -22,7 +22,10 @@ import {
   FinstackChart,
   heatmap,
 } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
-import type { HeatmapColors } from "@/components/finstack/shared/chart/finstack-chart/heatmap";
+import {
+  heatmapDomain,
+  type HeatmapColors,
+} from "@/components/finstack/shared/chart/finstack-chart/heatmap";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { TableEnvelope } from "@/components/finstack/shared/table/table-envelope/table-envelope";
@@ -91,17 +94,6 @@ function datedChart(
       }),
     },
   });
-}
-/** Presentation extent of the drawn values; null when they hold no range. */
-function derivedDomain(values: readonly number[]): HeatmapColors | null {
-  // finstack-arith: colour-scale extent of the drawn values
-  const min = Math.min(...values),
-    // finstack-arith: colour-scale extent of the drawn values
-    max = Math.max(...values);
-  if (!(min < max)) return null;
-  return min < 0 && max > 0
-    ? { palette: "diverging", domain: [min, 0, max] }
-    : { palette: "sequential", domain: [min, max] };
 }
 const numericEpisodeFields = new Set([
   "duration_days",
@@ -217,7 +209,7 @@ function ReportView({
     const data = (report.monthly[selected] ?? []).filter((point) =>
       Number.isFinite(point.value),
     );
-    const colors = monthlyDomain ?? derivedDomain(data.map((p) => p.value));
+    const colors = monthlyDomain ?? heatmapDomain(data.map((p) => p.value));
     if (!data.length || !colors)
       return { status: "No range of finite monthly returns to colour" };
     const [low, high] = [colors.domain[0], colors.domain.at(-1)!];

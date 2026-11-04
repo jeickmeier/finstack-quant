@@ -271,7 +271,7 @@ re-evaluates the formula on the rolled-up values, and `sum` for flows. A line
 resolves as its entry in `RollupSpec::methods`, then its declaration, then
 `sum`; tags never choose a method. Every target period must be complete, and
 the result's `periods` are the targets, each actual only when every source is.
-`RollupSpec::default_for(&model, frequency)` lists the declared methods so a
+`RollupSpec::declared_methods(&model, frequency)` lists the declared methods so a
 host can seed its method choices.
 
 Tabular export returns `finstack_quant_core::table::TableEnvelope`:

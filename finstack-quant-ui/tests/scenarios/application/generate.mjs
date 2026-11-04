@@ -1,15 +1,9 @@
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { native, readRepoSource } from "../../../scripts/fixture-inputs.mjs";
 // The priced bond of the results fixture (its request, metrics included) is the base.
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
-const bondBytes = await readFile(new URL(bondPath, repository));
-const base = JSON.parse(bondBytes).request;
+const bondInput = await readRepoSource(bondPath);
+const base = bondInput.value.request;
 // Builder drafts; blank options are omitted so Rust applies its defaults.
 const drafts = [
   {
@@ -121,13 +115,8 @@ await emit(
   JSON.stringify({
     description:
       "Native market scenarios on the results-fixture bond: the Rust-built spec, the applyScenario report and the bond repriced with the same model and metrics on the shocked market at the returned valuation date. The shocked market itself is not stored.",
-    sources: [
-      {
-        path: bondPath,
-        sha256: createHash("sha256").update(bondBytes).digest("hex"),
-      },
-    ],
-    base: { asOf: base.asOf, value: JSON.parse(bondBytes).result.value },
+    sources: [bondInput.source],
+    base: { asOf: base.asOf, value: bondInput.value.result.value },
     cases,
   }),
 );

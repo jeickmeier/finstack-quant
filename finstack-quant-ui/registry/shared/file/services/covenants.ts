@@ -49,6 +49,12 @@ export function createCovenantsService(
               request.minLiquidity,
               request.maxNetLeverage,
             );
+          default: {
+            const unhandled: never = request;
+            throw new RangeError("Unsupported covenant template", {
+              cause: unhandled,
+            });
+          }
         }
       });
     },
@@ -66,7 +72,6 @@ export function createCovenantsService(
           return native.statements_analytics.evaluateCovenants(
             request.resultsJson,
             engine,
-            request.modelJson,
           );
         } finally {
           engine.free();
@@ -79,25 +84,12 @@ export function createCovenantsService(
           request.engineJson,
         );
         try {
-          const api = native.statements_analytics;
-          // Without a config Rust applies its deterministic default. The config
-          // crosses as JSON text, which the binding parses like the object
-          // form (from_js_json) and which keeps a uint64 random_seed exact;
-          // the declaration names only the object form.
-          return request.configJson === undefined
-            ? api.forecastBreaches(
-                request.resultsJson,
-                engine,
-                request.modelJson,
-              )
-            : api.forecastBreaches(
-                request.resultsJson,
-                engine,
-                request.modelJson,
-                request.configJson as unknown as Parameters<
-                  typeof api.forecastBreaches
-                >[3],
-              );
+          // The config crosses as JSON text, which keeps a uint64 random_seed exact.
+          return native.statements_analytics.forecastBreaches(
+            request.resultsJson,
+            engine,
+            request.configJson,
+          );
         } finally {
           engine.free();
         }

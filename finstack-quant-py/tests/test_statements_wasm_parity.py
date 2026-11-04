@@ -87,7 +87,7 @@ def statements_cases() -> dict[str, Any]:
     first = registry.metric_ids()[0]
 
     rollup_model = json.dumps(INPUTS["rollup_model"])
-    rollup_spec = st.RollupSpec.default_for(rollup_model, "annual")
+    rollup_spec = st.RollupSpec.declared_methods(rollup_model, "annual")
 
     rollup_results = st.Evaluator().evaluate(rollup_model)
     rolled_up = doc(rollup_results.rollup(rollup_model, rollup_spec))
@@ -95,7 +95,7 @@ def statements_cases() -> dict[str, Any]:
     override_spec = st.RollupSpec("annual", {"cash": "sum"})
 
     return {
-        "rollup.default_for": doc(rollup_spec),
+        "rollup.declared_methods": doc(rollup_spec),
         "rollup.annual": rolled_up["nodes"],
         "rollup.empty_spec": doc(rollup_results.rollup(rollup_model, empty_spec))["nodes"],
         "rollup.spec_overrides": doc(rollup_results.rollup(rollup_model, override_spec))["nodes"]["cash"],
@@ -331,7 +331,7 @@ def analytics_cases() -> dict[str, Any]:
         "company_get": [subject.get("ebitda"), subject.get("rule_of_40"), subject.get("nope")],
         "peer_accepts": [peer_filter.accepts(row) for row in universe],
         "peer_set": [
-            row["id"] for row in doc(sa.PeerSet.from_universe(subject, universe, peer_filter, "ltm"))["peers"]
+            row["id"] for row in doc(sa.PeerSet.from_universe(subject, universe, peer_filter, "ltm")[0])["peers"]
         ],
         "sensitivity": {
             "config": doc(extended),

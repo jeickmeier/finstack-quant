@@ -151,7 +151,7 @@ pub(super) fn debt_interest_due(
         .and_then(|rules| rules.excess_spread.as_ref())
         .is_some()
         || state.reserve_balance.amount() > 0.0;
-    // N1: senior fees are part of what the waterfall owes AHEAD of the notes.
+    // Senior fees are part of what the waterfall owes AHEAD of the notes.
     //
     // `debt_interest_due` below was written for the reserve/excess-spread work
     // BEFORE the fee tier existed, and was never revisited
@@ -435,7 +435,7 @@ pub(super) fn apply_funding_account(
         } else if (early_amortization || pay_date >= spec.bullet_date)
             && state.principal_funding_account.amount() > 0.0
         {
-            // N3: early amortization RELEASES the account, it does not strand
+            // Early amortization RELEASES the account, it does not strand
             // it. Gating the release on `!early_amortization` would make a
             // deal that breached into early am with a funded account only see
             // that cash at the terminal sweep — dated at the final simulated

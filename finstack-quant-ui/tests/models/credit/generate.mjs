@@ -1,8 +1,5 @@
-import { createRequire } from "node:module";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { native } from "../../../scripts/fixture-inputs.mjs";
 // An illustrative one-year rating migration matrix, AAA to CCC plus an
 // absorbing default (rows in the shape of published agency averages; not a
 // sourced data set). Each row sums to one.

@@ -2,20 +2,15 @@
 import { useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { FutureBreachWire } from "@/lib/finstack/generated/types/future_breach";
-import { groupDecimal } from "@/lib/finstack/format/format";
+import { formatExact } from "@/lib/finstack/format/format";
 import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { covenantForecastConfigModule } from "./covenant-forecast-config";
+import { passThrough } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** Numeric FutureBreach fields, in the metric's own units (the probability as a fraction) as Rust returns them. */
 export type FutureBreachNumber =
   "projected_value" | "threshold" | "headroom" | "breach_probability";
-/** Every supplied digit, grouped; a non-finite native value shows as itself. */
-function exactValue(_field: FutureBreachNumber, value: number): string {
-  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
-}
-// Rust validates the configuration when it forecasts; the form checks structure only.
-const passThrough = async (json: string) => json;
 export interface CovenantBreachForecastProps {
   /** Initial CovenantForecastConfig text; omitted starts empty, which takes Rust's deterministic maintenance-scope defaults. Remount to load another document. */
   defaultConfigJson?: string;
@@ -44,7 +39,7 @@ export function CovenantBreachForecast({
   breaches,
   loading,
   error,
-  formatValue = exactValue,
+  formatValue = (_field, value) => formatExact(value),
   density = "compact",
 }: CovenantBreachForecastProps) {
   const [initial] = useState<Record<string, unknown> | undefined>(() =>

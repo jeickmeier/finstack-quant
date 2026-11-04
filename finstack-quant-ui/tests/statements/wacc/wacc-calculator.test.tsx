@@ -1,14 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from "react";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -23,40 +15,20 @@ import {
   waccOptions,
   type WaccRequest,
 } from "@/hooks/statements/use-wacc/use-wacc";
-import {
-  WaccCalculator,
-  type WaccInputs,
-} from "@/components/finstack/statements/components/wacc-calculator/wacc-calculator";
+import { WaccCalculator } from "@/components/finstack/statements/components/wacc-calculator/wacc-calculator";
 import { DcfAssumptionsForm } from "@/components/finstack/statements/components/dcf-assumptions-form/dcf-assumptions-form";
 import { unwrap } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
 
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "wacc")
-        return unwrap(await harness.proxy.wacc(request as WaccRequest));
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
+const harness = useWorkerHarness(["wacc"]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -68,8 +40,8 @@ const enter = (wire: string, value: string) =>
   fireEvent.change(field(wire), { target: { value } });
 const calculate = () =>
   fireEvent.click(screen.getByRole("button", { name: "Calculate" }));
-function Live({ start }: { start: WaccInputs }) {
-  const [inputs, setInputs] = useState<WaccInputs | null>(null);
+function Live({ start }: { start: WaccRequest }) {
+  const [inputs, setInputs] = useState<WaccRequest | null>(null);
   const rate = useWacc(inputs);
   return (
     <WaccCalculator
@@ -81,7 +53,7 @@ function Live({ start }: { start: WaccInputs }) {
     />
   );
 }
-const renderLive = (start: WaccInputs) =>
+const renderLive = (start: WaccRequest) =>
   render(
     <FinstackQueryProvider>
       <Live start={start} />

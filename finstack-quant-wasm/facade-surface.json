@@ -3961,7 +3961,7 @@
       "normalize",
       "parseAndCompile",
       "parseFormula",
-      "rollupSpecDefaultFor",
+      "rollupSpecDeclaredMethods",
       "schema",
       "statementResultAllPeriods",
       "statementResultGet",
@@ -4107,7 +4107,7 @@
   "statements.statementResultRollup": {
     "kind": "function"
   },
-  "statements.rollupSpecDefaultFor": {
+  "statements.rollupSpecDeclaredMethods": {
     "kind": "function"
   },
   "statements.statementResultGetNode": {
@@ -4180,6 +4180,7 @@
       "addVintageBuildup",
       "backtestForecast",
       "capitalStructureSummary",
+      "capitalStructureSummaryTable",
       "classifyStage",
       "companyMetricsGet",
       "computeEcl",
@@ -4209,6 +4210,7 @@
       "plSummaryReportText",
       "regressionFairValue",
       "relativeValueReport",
+      "relativeValueReportTable",
       "renderCheckReportHtml",
       "renderCheckReportText",
       "runChecks",
@@ -4315,6 +4317,9 @@
   "statements_analytics.capitalStructureSummary": {
     "kind": "function"
   },
+  "statements_analytics.capitalStructureSummaryTable": {
+    "kind": "function"
+  },
   "statements_analytics.evaluateCovenants": {
     "kind": "function"
   },
@@ -4355,6 +4360,9 @@
     "kind": "function"
   },
   "statements_analytics.relativeValueReport": {
+    "kind": "function"
+  },
+  "statements_analytics.relativeValueReportTable": {
     "kind": "function"
   },
   "statements_analytics.validateScorecardConfig": {
@@ -4577,7 +4585,9 @@
       "assetPoolWithReserve",
       "bondFromCashflowsJson",
       "bondQuoteSetFieldUnits",
+      "bondQuoteSetTable",
       "bondWorkoutLadder",
+      "bondWorkoutLadderTable",
       "calculatePoolStats",
       "calculateVar",
       "calendarYearLadderByCurrency",
@@ -4588,6 +4598,7 @@
       "cdsTrancheParamsMezzanineTranche",
       "computeQuotes",
       "convertibleSpotLadder",
+      "convertibleSpotLadderTable",
       "coverageRulesCloStandard",
       "coverageRulesValidate",
       "equityMetricsFieldUnits",
@@ -4605,6 +4616,7 @@
       "poolAssetFloatingRateLoan",
       "poolReport",
       "poolReportFieldUnits",
+      "poolReportTable",
       "prepaymentPenaltyFixed",
       "prepaymentPenaltyLockout",
       "prepaymentPenaltyStepDown",
@@ -6057,13 +6069,25 @@
   "valuations.instruments.poolReport": {
     "kind": "function"
   },
+  "valuations.instruments.poolReportTable": {
+    "kind": "function"
+  },
   "valuations.instruments.bondWorkoutLadder": {
+    "kind": "function"
+  },
+  "valuations.instruments.bondWorkoutLadderTable": {
     "kind": "function"
   },
   "valuations.instruments.convertibleSpotLadder": {
     "kind": "function"
   },
+  "valuations.instruments.convertibleSpotLadderTable": {
+    "kind": "function"
+  },
   "valuations.instruments.computeQuotes": {
+    "kind": "function"
+  },
+  "valuations.instruments.bondQuoteSetTable": {
     "kind": "function"
   },
   "valuations.instruments.trancheCashflowsTable": {

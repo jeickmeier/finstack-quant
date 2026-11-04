@@ -650,6 +650,19 @@ pub fn convertible_spot_ladder(
     )
 }
 
+/// One row per share price of a convertible spot ladder (mirrors Rust `ConvertibleSpotLadder::to_table`).
+///
+/// Python reaches the same table through `ConvertibleSpotLadder.to_dataframe`.
+/// @param ladder - `ConvertibleSpotLadder` plain object or JSON string, as `convertibleSpotLadder` returns it.
+/// @returns `TableEnvelope` in ascending share price with columns `spot` (float), `is_market_spot` (boolean), `price` (float), `delta` and `hedge_ratio` (nullable float), `regime` (nullable string: `busted`, `balanced` or `equity_sensitive`), `conversion_value` and `parity` (float), `conversion_premium` (nullable float) and `bond_floor` (float); money columns are in the ladder's `currency`, which the table does not state. The columns remain when there are no rows.
+/// @throws Error - Throws with kind `validation` if `ladder` does not match the `ConvertibleSpotLadder` schema.
+#[wasm_bindgen(js_name = convertibleSpotLadderTable)]
+pub fn convertible_spot_ladder_table(ladder: JsValue) -> Result<JsValue, JsValue> {
+    let ladder: finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleSpotLadder =
+        from_js_json(&ladder, "ladder")?;
+    to_js_value(&ladder.to_table())
+}
+
 factories!(JsConvertibleBond, "ConvertibleBond", finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond, {
         /// Canonical 5-year USD 1,000,000 2% semi-annual convertible (mirrors Rust `ConvertibleBond::example`): ratio 25 shares per bond, voluntary conversion, underlying `"TECH"`, curves `USD-IG` / `USD-CREDIT-BBB`, issue 2024-01-15, maturity 2029-01-15.
         /// @returns The example bond.

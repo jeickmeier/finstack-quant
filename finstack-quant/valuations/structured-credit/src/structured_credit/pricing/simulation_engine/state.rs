@@ -1,7 +1,5 @@
 use super::*;
 use crate::structured_credit::types::pool::weighted_avg_rating_factor;
-use crate::structured_credit::types::{DiversionRecord, PaymentRecord};
-
 /// De minimis threshold for write-down recording (avoids noise from fp rounding).
 pub(super) const WRITEDOWN_DE_MINIMIS: f64 = 0.01;
 
@@ -189,74 +187,6 @@ pub struct TrancheCreditEnhancement {
     pub credit_enhancement: f64,
 }
 
-/// How one period's waterfall ran: who was paid, how much, and what was left.
-///
-/// The serializable projection of [`WaterfallDistribution`]: its two
-/// recipient-keyed maps cannot be JSON (a `RecipientType::Tranche` is not a
-/// string key) and hold nothing `payment_records` does not, and its payment
-/// date and coverage tests are already on [`PeriodDiagnostics`].
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct PeriodWaterfall {
-    /// Cash entering the waterfall (interest plus principal proceeds).
-    pub total_available: Money,
-    /// Cash each tier allocated, as `(tier id, amount)` in execution order.
-    pub tier_allocations: Vec<(String, Money)>,
-    /// Every recipient payment, in execution order.
-    pub payment_records: Vec<PaymentRecord>,
-    /// Coverage-test diversions that moved cash, in execution order.
-    pub diverted_amounts: Vec<DiversionRecord>,
-    /// Total cash failing coverage tests diverted this period.
-    pub diverted_cash: Money,
-    /// Whether any coverage-test tier failed this period, even with no cash
-    /// left to divert.
-    pub had_diversions: bool,
-    /// Interest proceeds left undistributed, carried to the next period.
-    pub remaining_interest: Money,
-    /// Principal proceeds left undistributed, carried to the next period.
-    pub remaining_principal: Money,
-    /// Principal proceeds spent on fee or interest tiers.
-    pub principal_used_for_interest: Money,
-    /// Recovery cash included in `total_available`.
-    pub recovery_proceeds: Money,
-}
-
-impl PeriodWaterfall {
-    /// A waterfall that moved nothing, for a settlement with no waterfall run.
-    fn empty(currency: Currency) -> Self {
-        let zero = Money::from((0_i64, currency));
-        Self {
-            total_available: zero,
-            tier_allocations: Vec::new(),
-            payment_records: Vec::new(),
-            diverted_amounts: Vec::new(),
-            diverted_cash: zero,
-            had_diversions: false,
-            remaining_interest: zero,
-            remaining_principal: zero,
-            principal_used_for_interest: zero,
-            recovery_proceeds: zero,
-        }
-    }
-}
-
-impl From<WaterfallDistribution> for PeriodWaterfall {
-    fn from(distribution: WaterfallDistribution) -> Self {
-        Self {
-            total_available: distribution.total_available,
-            tier_allocations: distribution.tier_allocations,
-            payment_records: distribution.payment_records,
-            diverted_amounts: distribution.diverted_amounts,
-            diverted_cash: distribution.diverted_cash,
-            had_diversions: distribution.had_diversions,
-            remaining_interest: distribution.remaining_interest,
-            remaining_principal: distribution.remaining_principal,
-            principal_used_for_interest: distribution.principal_used_for_interest,
-            recovery_proceeds: distribution.recovery_proceeds,
-        }
-    }
-}
-
 /// Where cash paid to a tranche outside the waterfall came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -303,6 +233,26 @@ pub struct NonWaterfallPayment {
     /// equity class; zero otherwise. Already counted in the period's
     /// `fees_paid`, and not part of what the tranche received.
     pub incentive_fee: Money,
+}
+
+impl NonWaterfallPayment {
+    /// A payment of `interest` and `principal` with no incentive fee withheld.
+    pub(super) fn new(
+        payment_date: Date,
+        tranche_id: &str,
+        source: NonWaterfallSource,
+        interest: Money,
+        principal: Money,
+    ) -> Self {
+        Self {
+            payment_date,
+            tranche_id: tranche_id.to_string(),
+            source,
+            interest,
+            principal,
+            incentive_fee: Money::from((0_i64, interest.currency())),
+        }
+    }
 }
 
 /// Deal accounting for one payment period, recorded after the waterfall.
@@ -369,8 +319,10 @@ pub struct PeriodDiagnostics {
     pub excess_spread: f64,
     /// Every coverage test the executor evaluated this period.
     pub coverage_tests: Vec<CoverageTestDiagnostic>,
-    /// How this period's waterfall ran.
-    pub waterfall: PeriodWaterfall,
+    /// How this period's waterfall ran: who was paid, how much, and what was
+    /// left. Its recipient-keyed totals are not serialized; `payment_records`
+    /// carries the same cash.
+    pub waterfall: WaterfallDistribution,
     /// Cash paid to tranches outside the waterfall: reserve interest routed to
     /// a tranche, and, on the deal's last period, its redemption and terminal
     /// releases. Together with `waterfall.payment_records` this is every
@@ -425,7 +377,7 @@ impl PeriodDiagnostics {
             )?,
             excess_spread: 0.0,
             coverage_tests: Vec::new(),
-            waterfall: PeriodWaterfall::empty(state.currency),
+            waterfall: WaterfallDistribution::empty(payment_date, state.currency),
             non_waterfall_payments: Vec::new(),
             credit_enhancement: state
                 .tranches
@@ -590,7 +542,7 @@ impl SimulationDiagnostics {
 pub(super) fn step_down_metrics(
     state: &SimulationState,
 ) -> crate::structured_credit::pricing::resolve::StepDownMetrics {
-    // N2: include the controlled-accumulation funding account. That principal
+    // Include the controlled-accumulation funding account. That principal
     // has left the asset balances but is still collateral for the notes, so
     // omitting it depresses both the OC ratio and credit enhancement during
     // accumulation and can trip a step-down trigger that has not truly fired.
@@ -654,7 +606,7 @@ pub(super) fn step_down_metrics(
 ///
 /// The decimal share of collateral beneath the tranche.
 pub(super) fn tranche_credit_enhancement(state: &SimulationState, tranche: &Tranche) -> f64 {
-    // N2: the funding account's principal has left the asset balances but is
+    // The funding account's principal has left the asset balances but is
     // still collateral for the notes (see `step_down_metrics`).
     let collateral = state.pool_outstanding.amount() + state.principal_funding_account.amount();
     if collateral <= 0.0 {

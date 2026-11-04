@@ -1,31 +1,18 @@
-import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
+import { native, readRepoSource } from "../../../scripts/fixture-inputs.mjs";
 import { serializeHost } from "../../../src/codec.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
-const source = async (path) => {
-  const bytes = await readFile(new URL(path, repository));
-  return {
-    value: JSON.parse(bytes),
-    source: { path, sha256: createHash("sha256").update(bytes).digest("hex") },
-  };
-};
 // The workbench's margined rates book over the pricing market on the margin
 // fixture's date (T0). The host's closing markets (T1) are those two
 // market-scenario cases return from T0: a 50bp USD-OIS shock on the same date,
 // and a one-month roll with a 25bp shock, which takes the swaps past a SOFR
 // fixing the pricing market has no FIXING: series for.
-const workbench = await source(
+const workbench = await readRepoSource(
   "finstack-quant-ui/tests/portfolio/workbench/cases.json",
 );
-const market = await source(
+const market = await readRepoSource(
   "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
 );
-const scenarios = await source(
+const scenarios = await readRepoSource(
   "finstack-quant-ui/tests/scenarios/application/cases.json",
 );
 const { specJson } = workbench.value;

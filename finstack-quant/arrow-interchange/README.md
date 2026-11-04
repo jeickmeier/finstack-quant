@@ -60,9 +60,10 @@ column-scoped or table-scoped message.
 | `NullableUInt32` | `UInt32` | yes |
 | `Int64` | `Int64` | no |
 | `NullableInt64` | `Int64` | yes |
+| `Boolean` | `Boolean` | no |
 
 `to_record_batch` always emits the plain types above (`Utf8`, `Float64`,
-`UInt32`, `Int64`). Nullability is schema-driven: a nullable envelope column
+`UInt32`, `Int64`, `Boolean`). Nullability is schema-driven: a nullable envelope column
 becomes a nullable Arrow field even when the column contains no nulls, and
 `None` entries become validity-bitmap nulls. Non-finite floats (`NaN`, `±∞`)
 are preserved. Column order and names are preserved exactly.

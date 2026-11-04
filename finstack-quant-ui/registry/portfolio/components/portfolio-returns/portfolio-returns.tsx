@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { DateInput } from "@/components/finstack/core/primitives/date-input/date-input";
+import {
+  Outcome,
+  typedNumber,
+  yesNo,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** portfolio.twrrLinked as returned: cumulative, annualised, is_annualised and num_periods. */
 export type LinkedReturn = portfolio.LinkedReturn;
@@ -55,44 +60,10 @@ export interface PortfolioReturnsProps {
   formatValue?: (value: number) => string;
   density?: "compact" | "comfortable";
 }
-/** An empty field is NaN, which Rust rejects, not the zero `Number("")` would send. */
-const typed = (value: string) =>
-  value.trim() === "" ? Number.NaN : Number(value);
 const text = (value: number) => (Number.isNaN(value) ? "" : String(value));
 /** One-based row number shown beside an entry. */
 // finstack-arith: display ordinal of a row, never sent to Rust
 const ordinal = (index: number) => index + 1;
-function Outcome({
-  view,
-  pending,
-  none,
-  children,
-}: {
-  view: ReturnView<unknown>;
-  pending: string;
-  none: string;
-  children: ReactNode;
-}) {
-  if (view.error)
-    return (
-      <p role="alert" className="text-error">
-        {view.error}
-      </p>
-    );
-  if (view.loading)
-    return (
-      <p role="status" className="text-muted-foreground">
-        {pending}
-      </p>
-    );
-  if (view.value === null)
-    return (
-      <p role="status" className="text-muted-foreground">
-        {none}
-      </p>
-    );
-  return <>{children}</>;
-}
 function Value({
   value,
   formatValue,
@@ -194,7 +165,6 @@ export function PortfolioReturns({
       amount: text(flow.amount),
     })),
   );
-  const linkedValue = linked.value;
   return (
     <section
       aria-label="Portfolio returns"
@@ -211,8 +181,8 @@ export function PortfolioReturns({
           onSubmit={(event) => {
             event.preventDefault();
             onSubmitLinked({
-              returns: returns.map(typed),
-              horizonYears: typed(horizon),
+              returns: returns.map(typedNumber),
+              horizonYears: typedNumber(horizon),
             });
           }}
         >
@@ -254,43 +224,44 @@ export function PortfolioReturns({
           <Button type="submit">Link returns</Button>
         </form>
         <Outcome
-          view={linked}
-          pending="Linking returns…"
-          none="No linked return"
+          state={{
+            result: linked.value,
+            loading: linked.loading,
+            error: linked.error,
+          }}
+          working="Linking returns…"
+          empty="No linked return"
         >
-          {linkedValue && (
-            <dl
-              aria-label="Linked return"
-              className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1"
-            >
-              <dt>{labelFor("cumulative")} (decimal)</dt>
-              <dd>
-                <Value
-                  value={linkedValue.cumulative}
-                  formatValue={formatValue}
-                />
-              </dd>
-              <dt>
-                {labelFor("annualised")} (
-                {linkedValue.is_annualised ? "decimal per year" : "decimal"})
-              </dt>
-              <dd>
-                <Value
-                  value={linkedValue.annualised}
-                  formatValue={formatValue}
-                />
-              </dd>
-              <dt>{labelFor("is_annualised")}</dt>
-              <dd>{linkedValue.is_annualised ? "Yes" : "No"}</dd>
-              <dt>{labelFor("num_periods")}</dt>
-              <dd className="finstack-numeric">{linkedValue.num_periods}</dd>
-            </dl>
-          )}
-          {linkedValue && !linkedValue.is_annualised && (
-            <p role="note" className="text-xs text-muted-foreground">
-              Not annualised: Rust reports a horizon under one year
-              cumulatively, so the annualised figure equals the cumulative one.
-            </p>
+          {(value) => (
+            <>
+              <dl
+                aria-label="Linked return"
+                className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1"
+              >
+                <dt>{labelFor("cumulative")} (decimal)</dt>
+                <dd>
+                  <Value value={value.cumulative} formatValue={formatValue} />
+                </dd>
+                <dt>
+                  {labelFor("annualised")} (
+                  {value.is_annualised ? "decimal per year" : "decimal"})
+                </dt>
+                <dd>
+                  <Value value={value.annualised} formatValue={formatValue} />
+                </dd>
+                <dt>{labelFor("is_annualised")}</dt>
+                <dd>{yesNo(value.is_annualised)}</dd>
+                <dt>{labelFor("num_periods")}</dt>
+                <dd className="finstack-numeric">{value.num_periods}</dd>
+              </dl>
+              {!value.is_annualised && (
+                <p role="note" className="text-xs text-muted-foreground">
+                  Not annualised: Rust reports a horizon under one year
+                  cumulatively, so the annualised figure equals the cumulative
+                  one.
+                </p>
+              )}
+            </>
           )}
         </Outcome>
       </Card>
@@ -304,11 +275,11 @@ export function PortfolioReturns({
           onSubmit={(event) => {
             event.preventDefault();
             onSubmitDietz({
-              beginning_market_value: typed(bmv),
-              ending_market_value: typed(emv),
+              beginning_market_value: typedNumber(bmv),
+              ending_market_value: typedNumber(emv),
               cashflows: flows.map((flow) => ({
-                amount: typed(flow.amount),
-                fraction_of_period_remaining: typed(flow.fraction),
+                amount: typedNumber(flow.amount),
+                fraction_of_period_remaining: typedNumber(flow.fraction),
               })),
             });
           }}
@@ -367,14 +338,18 @@ export function PortfolioReturns({
           </div>
         </form>
         <Outcome
-          view={dietz}
-          pending="Computing period return…"
-          none="No period return"
+          state={{
+            result: dietz.value,
+            loading: dietz.loading,
+            error: dietz.error,
+          }}
+          working="Computing period return…"
+          empty="No period return"
         >
-          {dietz.value !== null && (
+          {(value) => (
             <p aria-label="Modified-Dietz return">
               Period return (decimal, not annualised):{" "}
-              <Value value={dietz.value} formatValue={formatValue} />
+              <Value value={value} formatValue={formatValue} />
             </p>
           )}
         </Outcome>
@@ -391,7 +366,7 @@ export function PortfolioReturns({
             onSubmitXirr(
               dated.map((flow) => ({
                 date: flow.date,
-                amount: typed(flow.amount),
+                amount: typedNumber(flow.amount),
               })),
             );
           }}
@@ -437,14 +412,18 @@ export function PortfolioReturns({
           </div>
         </form>
         <Outcome
-          view={xirr}
-          pending="Solving XIRR…"
-          none="No money-weighted return"
+          state={{
+            result: xirr.value,
+            loading: xirr.loading,
+            error: xirr.error,
+          }}
+          working="Solving XIRR…"
+          empty="No money-weighted return"
         >
-          {xirr.value !== null && (
+          {(value) => (
             <p aria-label="Money-weighted return">
               Money-weighted return (decimal per year, Act/365F):{" "}
-              <Value value={xirr.value} formatValue={formatValue} />
+              <Value value={value} formatValue={formatValue} />
             </p>
           )}
         </Outcome>

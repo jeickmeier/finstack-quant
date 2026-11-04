@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -19,18 +11,18 @@ import userEvent from "@testing-library/user-event";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
 import { PricingWorkbench } from "@/components/finstack/valuations/blocks/pricing-workbench/pricing-workbench";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
-import { unwrap, type PriceRequest } from "@/workers/finstack-contract";
-import { startWorker } from "../shared/worker/harness.mjs";
+import type { PriceRequest } from "@/workers/finstack-contract";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import bondCredit from "./bond-credit/cases.json";
 import convertible from "./convertible/cases.json";
 import loanYield from "./loan-yield/cases.json";
 import scenarioCases from "./scenario-table/cases.json";
 import pricingMarket from "./instruments/pricing-market.json";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
   async (importOriginal) => ({
@@ -42,26 +34,7 @@ vi.mock(
     ),
   }),
 );
-let harness: Awaited<ReturnType<typeof startWorker>>;
-const called = vi.fn();
-let rejecting: string | null = null;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  called.mockClear();
-  rejecting = null;
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: async (method: string, ...args: unknown[]) => {
-      called(method, ...args);
-      if (method === rejecting) throw new Error("native ladder error");
-      return unwrap(await (harness.proxy as any)[method](...args));
-    },
-    close: vi.fn(),
-  });
-});
+const harness = useWorkerHarness("any");
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -81,7 +54,7 @@ const openAnalytics = async (request: PriceRequest) => {
   );
   await userEvent.click(screen.getByRole("tab", { name: "Analytics" }));
 };
-const methods = () => called.mock.calls.map(([method]) => method);
+const methods = harness.methods;
 it(
   "mounts the convertible card on the completed request, prices it as the tab opens",
   async () => {
@@ -157,7 +130,12 @@ it(
   "a ladder that fails shows its error and leaves the credit card's values",
   async () => {
     const { request, rows } = bondCredit.cases.bullet;
-    rejecting = "bondWorkoutLadder";
+    const route = harness.call.getMockImplementation()!;
+    harness.call.mockImplementation(async (method, ...args) => {
+      if (method === "bondWorkoutLadder")
+        throw new Error("native ladder error");
+      return route(method, ...args);
+    });
     await openAnalytics({ ...request, metrics: [] });
     await userEvent.click(screen.getByText("Yield workout ladder"));
     const ladder = await screen.findByRole("region", {

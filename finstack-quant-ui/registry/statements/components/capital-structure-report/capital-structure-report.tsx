@@ -18,6 +18,10 @@ import { IdCombobox } from "@/components/finstack/shared/primitives/id-combobox/
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { capitalStructureConfigModule } from "./capital-structure-config";
+import {
+  passThrough,
+  UndefinedValue,
+} from "@/components/finstack/shared/primitives/native-display/native-display";
 
 type Tranche = CapitalStructureSummary["tranches"][number];
 type Money = CapitalStructureSummary["total_debt"];
@@ -34,24 +38,12 @@ const defaultShare = new Intl.NumberFormat("en-US", {
   style: "percent",
   maximumFractionDigits: 2,
 }).format;
-/**
- * No standalone native CapitalStructureSummaryConfig parse exists; Rust
- * validates the config (unknown keys included) when it summarizes the debt
- * stack and the caller shows its error. Kept stable so the form does not
- * revalidate on every render.
- */
-const passThrough = async (json: string) => json;
 /** Rust's own description of a returned field, from the generated contract. */
 function described(definition: string, field: string): string | undefined {
   const suffix = `${definition}/properties/${field}`;
   return resultMetadata.find((entry) => entry.source.endsWith(suffix))
     ?.description;
 }
-const undefinedValue = (reason: string | undefined) => (
-  <span className="finstack-na" title={reason}>
-    Undefined
-  </span>
-);
 /**
  * A value Rust returned, or Undefined: Rust returns null for a ratio it does
  * not define (a short LTM window, non-positive EBITDA or debt), and a live
@@ -62,9 +54,11 @@ function shown<T>(
   format: (value: T) => string,
   reason?: string,
 ): ReactNode {
-  return value == null || (typeof value === "number" && Number.isNaN(value))
-    ? undefinedValue(reason)
-    : format(value);
+  return value == null || (typeof value === "number" && Number.isNaN(value)) ? (
+    <UndefinedValue reason={reason} />
+  ) : (
+    format(value)
+  );
 }
 /** A returned number through the display format, with every digit in its title. */
 function shownNumber(
@@ -73,7 +67,7 @@ function shownNumber(
   reason?: string,
 ): ReactNode {
   return value == null || Number.isNaN(value) ? (
-    undefinedValue(reason)
+    <UndefinedValue reason={reason} />
   ) : (
     <span title={String(value)}>{format(value)}</span>
   );

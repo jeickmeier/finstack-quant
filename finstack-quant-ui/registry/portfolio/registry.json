@@ -89,7 +89,8 @@
         "@finstack/finstack-format",
         "@finstack/finstack-chart",
         "@finstack/finstack-table",
-        "@finstack/enum-field"
+        "@finstack/enum-field",
+        "@finstack/native-display"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",
@@ -292,6 +293,7 @@
         "@finstack/finstack-table",
         "@finstack/money-value",
         "@finstack/simm-sensitivity-table",
+        "@finstack/native-display",
         "badge"
       ],
       "dependencies": [
@@ -331,6 +333,7 @@
         "@finstack/money-value",
         "@finstack/json-viewer",
         "@finstack/pnl-attribution-report",
+        "@finstack/native-display",
         "badge"
       ],
       "dependencies": [
@@ -366,6 +369,7 @@
         "@finstack/finstack-format",
         "@finstack/decimal-input",
         "@finstack/date-input",
+        "@finstack/native-display",
         "button"
       ],
       "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],

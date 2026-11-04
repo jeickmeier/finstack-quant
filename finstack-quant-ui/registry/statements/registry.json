@@ -360,7 +360,8 @@
         "@finstack/finstack-table",
         "@finstack/money-value",
         "@finstack/tornado-chart",
-        "@finstack/contract-dcf-sensitivity-result"
+        "@finstack/contract-dcf-sensitivity-result",
+        "@finstack/native-display"
       ],
       "dependencies": [
         "@tanstack/react-table@9.2.4",
@@ -405,6 +406,7 @@
         "@finstack/id-combobox",
         "@finstack/contract-dcf-options",
         "@finstack/finstack-codec",
+        "@finstack/native-display",
         "button"
       ],
       "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
@@ -446,7 +448,8 @@
         "@finstack/statement-check-report",
         "@finstack/contract-lbo-config",
         "@finstack/contract-lbo-result",
-        "@finstack/finstack-codec"
+        "@finstack/finstack-codec",
+        "@finstack/native-display"
       ],
       "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
       "categories": ["Individual Components"],
@@ -532,6 +535,7 @@
         "@finstack/decimal-input",
         "@finstack/enum-field",
         "@finstack/id-combobox",
+        "@finstack/native-display",
         "button"
       ],
       "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
@@ -645,6 +649,7 @@
         "@finstack/contract-monte-carlo-config",
         "@finstack/contract-monte-carlo-results",
         "@finstack/finstack-codec",
+        "@finstack/native-display",
         "button"
       ],
       "dependencies": [
@@ -994,6 +999,8 @@
         "@finstack/finstack-theme",
         "@finstack/finstack-format",
         "@finstack/decimal-input",
+        "@finstack/native-display",
+        "@finstack/finstack-worker",
         "button"
       ],
       "dependencies": ["react@19.2.8"],
@@ -1002,7 +1009,9 @@
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -1086,7 +1095,8 @@
         "@finstack/finstack-chart",
         "@finstack/finstack-table",
         "@finstack/contract-capital-structure-summary-config",
-        "@finstack/contract-capital-structure-summary"
+        "@finstack/contract-capital-structure-summary",
+        "@finstack/native-display"
       ],
       "dependencies": [
         "@tanstack/charts@0.18.0",
@@ -1135,6 +1145,7 @@
         "@finstack/finstack-table",
         "@finstack/contract-relative-value-report-config",
         "@finstack/contract-relative-value-report",
+        "@finstack/native-display",
         "badge"
       ],
       "dependencies": [
@@ -1175,6 +1186,7 @@
         "@finstack/enum-field",
         "@finstack/table-envelope",
         "@finstack/contract-table-envelope",
+        "@finstack/native-display",
         "button"
       ],
       "dependencies": ["react@19.2.8"],
@@ -1706,6 +1718,26 @@
           "path": "blocks/statements-workbench/capital-structure-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/statements/blocks/statements-workbench/capital-structure-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/statements-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/statements-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/forecast-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/forecast-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/ratios-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/ratios-panel.tsx"
+        },
+        {
+          "path": "blocks/statements-workbench/advanced-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/statements/blocks/statements-workbench/advanced-panel.tsx"
         }
       ],
       "registryDependencies": [

@@ -34,7 +34,7 @@ use finstack_quant_models::monte_carlo::pricer::polynomial::{
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::seed::derive_seed;
 use finstack_quant_models::trees::two_factor_rates_credit::{
-    RatesCreditPathCheckpoint, RatesCreditPathState, RatesCreditTree,
+    BandTable, RatesCreditPathCheckpoint, RatesCreditPathState, RatesCreditTree,
 };
 use finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths;
 use finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight;

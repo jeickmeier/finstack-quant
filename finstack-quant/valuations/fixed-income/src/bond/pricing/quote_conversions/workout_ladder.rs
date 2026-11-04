@@ -10,11 +10,12 @@ use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
 use finstack_quant_valuations_core::instruments::Instrument;
 use serde::{Deserialize, Serialize};
 
-use super::curve_par_rate;
 use super::yield_price::solve_workout_exits;
+use super::{curve_par_rate, i_spread_horizon};
 use crate::bond::Bond;
 use crate::bond::pricing::settlement::{QuoteDateContext, model_dirty_at_quote_date};
 
@@ -29,6 +30,18 @@ pub enum WorkoutExitKind {
     Put,
     /// The bond runs to its final contractual payment.
     Maturity,
+}
+
+impl WorkoutExitKind {
+    /// Wire name of the exit kind (`call`, `put` or `maturity`), the serde spelling.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Call => "call",
+            Self::Put => "put",
+            Self::Maturity => "maturity",
+        }
+    }
 }
 
 /// One admissible exit of a bond: a row of a [`BondWorkoutLadder`].
@@ -104,6 +117,70 @@ pub struct BondWorkoutLadder {
     pub rows: Vec<BondWorkoutRow>,
 }
 
+impl BondWorkoutLadder {
+    /// Export one row per exit, in ladder order, as a [`TableEnvelope`].
+    ///
+    /// Columns: `date` (ISO string), `kind` (`call`, `put` or `maturity`),
+    /// `redemption_price_pct` (float), `redemption_amount` (float, in
+    /// `currency`), `currency` (ISO code), `make_whole` (bool), `yield_rate`
+    /// and `i_spread` (nullable float, decimal) and `is_worst` (bool). The
+    /// columns remain when there are no rows.
+    #[must_use]
+    pub fn to_table(&self) -> TableEnvelope {
+        let rows = &self.rows;
+        TableEnvelope {
+            row_count: rows.len(),
+            columns: vec![
+                TableColumn::new(
+                    "date",
+                    TableColumnData::String(rows.iter().map(|r| r.date.to_string()).collect()),
+                ),
+                TableColumn::new(
+                    "kind",
+                    TableColumnData::String(
+                        rows.iter().map(|r| r.kind.as_str().to_string()).collect(),
+                    ),
+                ),
+                TableColumn::new(
+                    "redemption_price_pct",
+                    TableColumnData::Float64(rows.iter().map(|r| r.redemption_price_pct).collect()),
+                ),
+                TableColumn::new(
+                    "redemption_amount",
+                    TableColumnData::Float64(
+                        rows.iter().map(|r| r.redemption_amount.amount()).collect(),
+                    ),
+                ),
+                TableColumn::new(
+                    "currency",
+                    TableColumnData::String(
+                        rows.iter()
+                            .map(|r| r.redemption_amount.currency().to_string())
+                            .collect(),
+                    ),
+                ),
+                TableColumn::new(
+                    "make_whole",
+                    TableColumnData::Boolean(rows.iter().map(|r| r.make_whole).collect()),
+                ),
+                TableColumn::new(
+                    "yield_rate",
+                    TableColumnData::NullableFloat64(rows.iter().map(|r| r.yield_rate).collect()),
+                ),
+                TableColumn::new(
+                    "i_spread",
+                    TableColumnData::NullableFloat64(rows.iter().map(|r| r.i_spread).collect()),
+                ),
+                TableColumn::new(
+                    "is_worst",
+                    TableColumnData::Boolean(rows.iter().map(|r| r.is_worst).collect()),
+                ),
+            ],
+            metadata: Default::default(),
+        }
+    }
+}
+
 /// Dirty price yield-to-worst is solved to, in the bond's currency.
 ///
 /// The quoted clean price plus accrued at the quote date. A bond with exercise
@@ -114,15 +191,16 @@ pub struct BondWorkoutLadder {
 ///
 /// * `bond` - Bond whose quote, notional and exercise rights decide the target.
 /// * `curves` - Market context used to carry a model value to the quote date.
-/// * `as_of` - Valuation date `pv_as_of` is anchored at.
+/// * `as_of` - Valuation date the model value is anchored at.
 /// * `quote_ctx` - Quote date and the accrued interest there.
-/// * `pv_as_of` - Model present value at `as_of`, read only when there is no quote.
+/// * `model_pv` - Model present value at `as_of` in currency, evaluated only
+///   for a bond with no quote and no exercise rights.
 pub(crate) fn workout_dirty_target(
     bond: &Bond,
     curves: &MarketContext,
     as_of: Date,
     quote_ctx: &QuoteDateContext,
-    pv_as_of: f64,
+    model_pv: impl FnOnce() -> Result<f64>,
 ) -> Result<f64> {
     match bond
         .instrument_pricing_overrides
@@ -131,7 +209,7 @@ pub(crate) fn workout_dirty_target(
     {
         Some(clean_px) => Ok(quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount())),
         None if !bond.has_exercise_rights() => {
-            model_dirty_at_quote_date(bond, curves, as_of, quote_ctx.quote_date, pv_as_of)
+            model_dirty_at_quote_date(bond, curves, as_of, quote_ctx.quote_date, model_pv()?)
         }
         None => Err(finstack_quant_core::Error::from(
             finstack_quant_core::InputError::NotFound {
@@ -207,12 +285,9 @@ pub fn bond_workout_ladder(
         .instrument_pricing_overrides
         .market_quotes
         .quoted_clean_price_pct;
-    let model_pv = if quoted_clean.is_some() || bond.has_exercise_rights() {
-        0.0
-    } else {
-        Instrument::value(bond, market, as_of)?.amount()
-    };
-    let dirty = workout_dirty_target(bond, market, as_of, &quote_ctx, model_pv)?;
+    let dirty = workout_dirty_target(bond, market, as_of, &quote_ctx, || {
+        Ok(Instrument::value(bond, market, as_of)?.amount())
+    })?;
 
     let effective_bond = bond.effective_for_pricing(market, as_of)?;
     let schedule = effective_bond.full_cashflow_schedule(market)?;
@@ -227,9 +302,6 @@ pub fn bond_workout_ladder(
     )?;
 
     let disc = market.get_discount(&bond.discount_curve_id)?;
-    // The `i_spread` metric times its par rate to the workout path's last date when
-    // a path exists, and to contractual maturity when none does. A rolled final
-    // payment separates the two, so a row with no path follows the metric, not `date`.
     let has_workout_path = effective_bond
         .call_put
         .as_ref()
@@ -240,11 +312,7 @@ pub fn bond_workout_ladder(
         let yield_rate = exit.yield_rate.is_finite().then_some(exit.yield_rate);
         let i_spread = match yield_rate {
             Some(rate) if date > quote_date => {
-                let horizon = if has_workout_path {
-                    date
-                } else {
-                    bond.maturity
-                };
+                let horizon = i_spread_horizon(bond, has_workout_path.then_some(date));
                 Some(rate - curve_par_rate(bond, disc.as_ref(), quote_date, horizon)?)
             }
             _ => None,

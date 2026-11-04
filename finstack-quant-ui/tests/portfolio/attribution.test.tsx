@@ -1,17 +1,5 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
@@ -24,20 +12,17 @@ import {
   type PortfolioWorkbenchProps,
 } from "@/components/finstack/portfolio/blocks/portfolio-workbench/portfolio-workbench";
 import { attributePortfolioPnlOptions } from "@/hooks/portfolio/use-attribute-portfolio-pnl/use-attribute-portfolio-pnl";
-import { unwrap, type WorkerApi } from "@/workers/finstack-contract";
+import { type WorkerApi } from "@/workers/finstack-contract";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { serializeHost } from "../../src/codec.mjs";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import fixture from "./attribution/cases.json";
 import pricingMarket from "../valuations/instruments/pricing-market.json";
-const mock = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  calls: [] as string[],
-}));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 // Figures are drawn by the shared chart in the browser gates; here each one
 // is a labelled placeholder.
 vi.mock(
@@ -49,23 +34,8 @@ vi.mock(
     ),
   }),
 );
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness("any");
 const proxy = () => harness.proxy as unknown as WorkerApi;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.calls.length = 0;
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      mock.calls.push(method);
-      return unwrap(await (proxy() as any)[method](request));
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -91,19 +61,6 @@ const rowsOf = (table: HTMLElement) =>
   (within(table).getAllByRole("row") as HTMLTableRowElement[]).slice(1);
 // The fixture is regenerated and compared by `mise run ui-fixtures --check`
 // (tests/portfolio/attribution/generate.mjs).
-it("pins the JSON inputs the attribution fixture was built from", () => {
-  const repository = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../..",
-  );
-  for (const source of fixture.sources)
-    expect(
-      createHash("sha256")
-        .update(readFileSync(resolve(repository, source.path)))
-        .digest("hex"),
-      `${source.path} changed since tests/portfolio/attribution/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(source.sha256);
-});
 it("records every Rust method on both closing markets", () => {
   expect(
     fixture.cases.map(({ scenario, name, ok }) => [scenario, name, ok]),
@@ -314,7 +271,7 @@ it(
     expect(
       screen.getByText("Choose a method; Rust requires one."),
     ).toBeTruthy();
-    expect(mock.calls).not.toContain("attributePortfolioPnl");
+    expect(harness.methods()).not.toContain("attributePortfolioPnl");
     for (const name of ["parallel", "waterfall", "metrics_based", "taylor"]) {
       await user.click(await screen.findByRole("radio", { name }));
       const view = await screen.findByRole(
@@ -327,7 +284,7 @@ it(
       ).toContain(report(name).explain);
     }
     expect(
-      mock.calls.filter((call) => call === "attributePortfolioPnl"),
+      harness.methods().filter((call) => call === "attributePortfolioPnl"),
     ).toHaveLength(4);
     expect(screen.queryAllByRole("alert")).toEqual([]);
   },

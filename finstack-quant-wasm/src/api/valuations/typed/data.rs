@@ -381,12 +381,12 @@ pub fn asset_pool_weighted_avg_maturity(
 
 /// Moody's diversity score of the pool (mirrors Rust `AssetPool::diversity_score`).
 /// @param pool - `AssetPool` plain object or JSON string.
-/// @returns Diversity score over the assets that name an obligor; `undefined` when none does or the pool balance cannot be summed.
-/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
+/// @returns Diversity score over the assets that name an obligor; `undefined` when the pool balance is zero or no asset names an obligor.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or the pool balances are inconsistent.
 #[wasm_bindgen(js_name = assetPoolDiversityScore)]
 pub fn asset_pool_diversity_score(pool: JsValue) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
-    Ok(pool.diversity_score())
+    pool.diversity_score().map_err(to_js_err)
 }
 
 /// Loan-level assets of one obligor (mirrors Rust `AssetPool::assets_by_obligor`).
@@ -443,6 +443,19 @@ pub fn pool_report(pool: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
         )
         .map_err(to_js_err)?,
     )
+}
+
+/// The three concentration tables of a pool report stacked as one long table (mirrors Rust `PoolReport::to_table`).
+///
+/// Python reaches the same table through `PoolReport.to_dataframe`.
+/// @param report - `PoolReport` plain object or JSON string, as `poolReport` returns it.
+/// @returns `TableEnvelope` with the obligor rows, then industry, then rating, each in report order, and columns `dimension` (`obligor`, `industry` or `rating`), `key` (nullable string, null for the assets with no value on the dimension), `balance` (float), `currency` (ISO code of the balance), `balance_pct` (percent points) and `asset_count` (integer). The columns remain when every table is empty.
+/// @throws Error - Throws with kind `validation` if `report` does not match the `PoolReport` schema.
+#[wasm_bindgen(js_name = poolReportTable)]
+pub fn pool_report_table(report: JsValue) -> Result<JsValue, JsValue> {
+    let report: finstack_quant_valuations::instruments::fixed_income::structured_credit::PoolReport =
+        from_js_json(&report, "report")?;
+    to_js_value(&report.to_table())
 }
 
 /// Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).

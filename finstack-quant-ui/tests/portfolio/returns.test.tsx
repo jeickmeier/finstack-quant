@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -37,19 +29,16 @@ import {
   type WorkerApi,
 } from "@/workers/finstack-contract";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
-import { startWorker } from "../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
 import fixture from "./returns/cases.json";
 import workbench from "./workbench/cases.json";
 import pricingMarket from "../valuations/instruments/pricing-market.json";
 
-const mock = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  calls: [] as string[],
-}));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 // Figures are drawn by the shared chart in the browser gates.
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
@@ -60,23 +49,8 @@ vi.mock(
     ),
   }),
 );
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness("any");
 const proxy = () => harness.proxy as unknown as WorkerApi;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.calls.length = 0;
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      mock.calls.push(method);
-      return unwrap(await (proxy() as any)[method](request));
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -352,7 +326,7 @@ it("offers the Returns tab only when the host supplies its data", () => {
     "Margin",
     "Book",
   ]);
-  expect(mock.calls).not.toContain("twrrLinked");
+  expect(harness.methods()).not.toContain("twrrLinked");
 });
 it(
   "computes the host's three returns natively when the tab opens, and a resubmitted form's native error",
@@ -387,7 +361,7 @@ it(
         .textContent,
     ).toBe(errors.dietz.fraction.error.message);
     expect(
-      mock.calls.filter((name) => name === "twrrModifiedDietz"),
+      harness.methods().filter((name) => name === "twrrModifiedDietz"),
     ).toHaveLength(2);
   },
   budget(30000),
@@ -423,7 +397,9 @@ it(
         )
       ).getAttribute("role"),
     ).toBe("alert");
-    expect(mock.calls.filter((name) => name === "twrrLinked")).toHaveLength(3);
+    expect(
+      harness.methods().filter((name) => name === "twrrLinked"),
+    ).toHaveLength(3);
   },
   budget(30000),
 );

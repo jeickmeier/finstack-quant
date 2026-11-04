@@ -10,6 +10,7 @@ import pytest
 
 from finstack_quant.statements_analytics import (
     CompanyMetrics,
+    PeerFilter,
     PeerSet,
     RelativeValueCompany,
     RelativeValueDimension,
@@ -88,6 +89,11 @@ def test_table_has_the_subject_first_and_one_value_per_multiple() -> None:
     assert ev_ebitda.percentile == 0.5
     assert ev_ebitda.z_score == pytest.approx(0.0)
     assert (pe.subject_value, pe.peer_stats, pe.percentile, pe.z_score) == (None, None, None, None)
+
+
+def test_peer_set_from_universe_counts_what_the_filter_drops() -> None:
+    peer_set, excluded_count = PeerSet.from_universe(SUBJECT, UNIVERSE, PeerFilter.from_json(json.dumps(ENERGY)), "ltm")
+    assert ([peer.id for peer in peer_set.peers], excluded_count) == (["P1", "P2", "P3", "P4", "P5"], 1)
 
 
 def test_regression_dimension_matches_the_hand_calculation() -> None:

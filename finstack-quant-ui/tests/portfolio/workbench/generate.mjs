@@ -1,29 +1,16 @@
-import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
+import { native, readRepoSource } from "../../../scripts/fixture-inputs.mjs";
 import { serializeHost } from "../../../src/codec.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
-const source = async (path) => {
-  const bytes = await readFile(new URL(path, repository));
-  return {
-    value: JSON.parse(bytes),
-    source: { path, sha256: createHash("sha256").update(bytes).digest("hex") },
-  };
-};
 // The margined rates book the margin fixture writes (two bilateral swaps and
 // an unmargined deposit), over the pricing market on that fixture's date,
 // under the two host-parity USD-OIS scenarios.
-const margin = await source(
+const margin = await readRepoSource(
   "finstack-quant-ui/tests/portfolio/margin/cases.json",
 );
-const market = await source(
+const market = await readRepoSource(
   "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
 );
-const parity = await source(
+const parity = await readRepoSource(
   "finstack-quant/portfolio/tests/fixtures/host_parity.json",
 );
 const { specJson, asOf } = margin.value;

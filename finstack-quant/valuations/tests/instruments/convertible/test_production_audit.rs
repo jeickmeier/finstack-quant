@@ -379,7 +379,7 @@ fn production_convertible_bond_floor_uses_fractional_recovery_of_principal() {
         .price_with_metrics(
             &ctx,
             as_of,
-            &[MetricId::custom("bond_floor"), MetricId::Dv01],
+            &[MetricId::BondFloor, MetricId::Dv01],
             PricingOptions::default(),
         )
         .expect("floor metric");

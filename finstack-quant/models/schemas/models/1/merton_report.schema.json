@@ -265,7 +265,7 @@
       "additionalProperties": {
         "type": "string"
       },
-      "description": "Message of each rejected measure, by field name; empty when all computed.",
+      "description": "Message of each rejected measure, keyed by the measure's field name\n(`implied_spread`, `debt_spread`, `cds_par_spread`, `implied_equity`);\nempty when all computed.",
       "type": "object"
     },
     "grades": {

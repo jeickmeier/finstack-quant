@@ -1,9 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { checking, emit } from "../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { native, readRepoJson } from "../../scripts/fixture-inputs.mjs";
 // The reporting_performance_tearsheet.ipynb panel: 756 business days from
 // 2023-01-02, fund 0.0008 + 0.012·sin(i/30), plus a slower benchmark wave.
 const dates = [];
@@ -239,14 +235,8 @@ const benchmarkRequest = {
 // Benchmark case 2: the shared analytics invariants panel
 // (finstack-quant/analytics/tests/data/api_invariants_data.json), whose
 // expected rolling greeks were produced with a five-observation window.
-const invariants = JSON.parse(
-  await readFile(
-    new URL(
-      "../../../finstack-quant/analytics/tests/data/api_invariants_data.json",
-      import.meta.url,
-    ),
-    "utf8",
-  ),
+const invariants = await readRepoJson(
+  "finstack-quant/analytics/tests/data/api_invariants_data.json",
 );
 const invariantsRequest = {
   dates: invariants.dates,

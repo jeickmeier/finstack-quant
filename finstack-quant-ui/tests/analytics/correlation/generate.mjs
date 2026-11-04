@@ -1,9 +1,6 @@
-import { createRequire } from "node:module";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
+import { native } from "../../../scripts/fixture-inputs.mjs";
 import { panel, failures } from "./panels.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
 // The worker's AnalyticsApi.correlationMatrix over the raw package:
 // Performance.fromReturns of the host panel, getTickerNames and
 // correlationMatrix, then free.

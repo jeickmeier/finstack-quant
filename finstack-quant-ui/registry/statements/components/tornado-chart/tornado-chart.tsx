@@ -6,7 +6,7 @@ import { scaleBand } from "@tanstack/charts/scales/band";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import type { TornadoEntry } from "finstack-quant-wasm";
-import { groupDecimal } from "@/lib/finstack/format/format";
+import { formatExact } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
@@ -15,10 +15,6 @@ interface Bar {
   parameter: string;
   side: "Downside" | "Upside";
   value: number;
-}
-/** Every supplied digit, grouped; a non-finite native value shows as itself. */
-function exactValue(value: number): string {
-  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
 }
 export interface TornadoChartProps {
   /** Native tornado entries; shown in the order Rust returned them. */
@@ -43,7 +39,7 @@ export function TornadoChart({
   valueLabel,
   caption,
   parameterLabel = labelFor,
-  formatValue = exactValue,
+  formatValue = formatExact,
   density = "compact",
 }: TornadoChartProps) {
   const chart = useMemo(() => {

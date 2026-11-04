@@ -13,9 +13,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    AssetPool, CoverageTestSpec, DealType, PeriodDiagnostics, PeriodWaterfall, PoolAsset,
+    AssetPool, CoverageTestSpec, DealType, PeriodDiagnostics, PoolAsset,
     ReserveInterestDestination, SimulationDiagnostics, StructuredCredit, Tranche, TrancheStructure,
-    calculate_equity_metrics, pool_report,
+    WaterfallDistribution, calculate_equity_metrics, pool_report,
 };
 use time::Month;
 
@@ -345,16 +345,19 @@ fn table_period(payment_date: Date, balance: f64) -> PeriodDiagnostics {
         servicer_advances_outstanding: usd(12.0),
         excess_spread: 0.02,
         coverage_tests: Vec::new(),
-        waterfall: PeriodWaterfall {
+        waterfall: WaterfallDistribution {
+            payment_date,
             total_available: usd(0.0),
             tier_allocations: Vec::new(),
             payment_records: Vec::new(),
-            diverted_amounts: Vec::new(),
+            coverage_tests: Vec::new(),
             diverted_cash: usd(0.0),
-            had_diversions: false,
+            remaining_cash: usd(0.0),
             remaining_interest: usd(0.0),
             remaining_principal: usd(0.0),
             principal_used_for_interest: usd(0.0),
+            had_diversions: false,
+            diverted_amounts: Vec::new(),
             recovery_proceeds: usd(0.0),
         },
         non_waterfall_payments: Vec::new(),

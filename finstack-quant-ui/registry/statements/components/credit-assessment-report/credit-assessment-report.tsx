@@ -7,7 +7,7 @@ import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import type { CreditAssessmentWire } from "@/lib/finstack/generated/types/credit_assessment";
 import type { TableEnvelopeWire } from "@/lib/finstack/generated/types/table_envelope";
-import { groupDecimal } from "@/lib/finstack/format/format";
+import { formatExact } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
@@ -27,10 +27,6 @@ interface RatioPoint {
   measure: string;
   period: string;
   value: number;
-}
-/** Every supplied digit, grouped; a non-finite native value shows as itself. */
-function exactValue(value: number): string {
-  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
 }
 export interface CreditAssessmentReportProps {
   /** Native statements_analytics CreditAssessment; null while none is available. */
@@ -59,7 +55,7 @@ export function CreditAssessmentReport({
   assessment,
   plSummary,
   currency,
-  formatValue = (_measure, value) => exactValue(value),
+  formatValue = (_measure, value) => formatExact(value),
   loading,
   error,
   plSummaryLoading,
@@ -116,7 +112,7 @@ export function CreditAssessmentReport({
         content: (marks) => ({
           rows: marks.map((m) => ({
             label: `${m.datum.measure} · ${m.datum.period}`,
-            value: exactValue(m.datum.value),
+            value: formatExact(m.datum.value),
           })),
         }),
       },

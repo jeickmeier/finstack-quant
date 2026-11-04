@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { ExampleProps } from "./props";
+import { sixPlaces, type ExampleProps } from "./props";
 import {
   CreditScorecard,
   type CreditScorecardModel,
@@ -23,8 +23,6 @@ const { description: _description, ...cases } = data.scorecard;
 const defaultInputs = Object.fromEntries(
   Object.entries(cases).map(([model, entry]) => [model, entry.request.input]),
 ) as Partial<Record<CreditScorecardModel, Record<string, number>>>;
-// Host display choice: six decimal places of the returned decimals.
-const sixPlaces = (value: number) => value.toFixed(6);
 function Scorecard({ density }: ExampleProps) {
   // Starts from the Zmijewski case, whose implied PD Rust grades.
   const [request, setRequest] = useState(

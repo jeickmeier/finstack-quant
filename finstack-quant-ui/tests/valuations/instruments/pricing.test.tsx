@@ -35,7 +35,7 @@ beforeAll(async () => {
     ),
   });
   worker = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => worker?.close());
 afterEach(cleanup);
 

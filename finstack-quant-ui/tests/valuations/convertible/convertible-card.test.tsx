@@ -1,17 +1,8 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -35,14 +26,14 @@ import {
 import type { MetricValueRow } from "@/components/finstack/valuations/components/metric-values-table/metric-values-table";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { unwrap } from "@/workers/finstack-contract";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
 
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
   async (importOriginal) => ({
@@ -54,28 +45,7 @@ vi.mock(
     ),
   }),
 );
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "convertibleSpotLadder")
-        return unwrap(
-          await harness.proxy.convertibleSpotLadder(
-            request as ConvertibleSpotLadderRequest,
-          ),
-        );
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+const harness = useWorkerHarness(["convertibleSpotLadder"]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -226,9 +196,4 @@ it("holds the card's ids in the fixture generator, each listed by Rust", () => {
   expect(fixture.metadata.map(({ key }) => key)).toEqual([
     ...convertibleMetrics,
   ]);
-  // The fixture's sources have not moved since it was generated.
-  for (const { path, sha256 } of fixture.sources) {
-    const content = readFileSync(resolve(here, "../../../..", path));
-    expect(createHash("sha256").update(content).digest("hex")).toBe(sha256);
-  }
 });

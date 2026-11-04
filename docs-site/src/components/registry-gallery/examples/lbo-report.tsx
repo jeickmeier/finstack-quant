@@ -2,13 +2,13 @@
 import { useState } from "react";
 import type { ExampleProps } from "./props";
 import { LboReport } from "@/components/finstack/statements/components/lbo-report/lbo-report";
-import type { LboResultWire } from "@/lib/finstack/generated/types/lbo_result";
 import data from "../data.json";
+import { statementLbo } from "../fixtures";
 
 // Captured native statements_analytics.evaluateLbo of the analyst model under
 // an illustrative transaction; this item needs no worker. The model has no
 // net-debt line, so the config reads exit net debt from total_debt.
-const result = data.statementLbo as unknown as LboResultWire;
+const result = statementLbo;
 const nodeIds = Object.keys(data.statementModel.nodes);
 
 export function Example({ density = "compact" }: ExampleProps) {

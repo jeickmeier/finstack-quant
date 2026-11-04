@@ -1,11 +1,8 @@
 // Native statements_analytics.wacc rates and rejections for wacc-calculator.
 // Rerun with `mise run ui-fixtures` after rebuilding the WASM package.
-import { createRequire } from "node:module";
 import { emit } from "../../../scripts/fixture-output.mjs";
+import { native } from "../../../scripts/fixture-inputs.mjs";
 
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
 const rate = (inputs) =>
   native.wacc(
     inputs.equityWeight,

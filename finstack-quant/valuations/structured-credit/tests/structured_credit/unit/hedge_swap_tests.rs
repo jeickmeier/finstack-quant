@@ -322,7 +322,7 @@ fn swap_payments_rank_as_fees_and_tighten_the_ic_test() {
             .coverage_tests
             .iter()
             .find(|(id, _, _)| id == "IC_A")
-            .map(|(_, ratio, _)| *ratio)
+            .and_then(|(_, ratio, _)| *ratio)
             .expect("IC_A")
     };
     let a_due = 80_000_000.0 * 0.055 * 91.0 / 360.0;

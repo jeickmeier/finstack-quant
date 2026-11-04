@@ -9,7 +9,6 @@
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::macros::wire_methods;
 use crate::bindings::statements::checks::{PyCheckReport, PyCheckSuiteSpec};
-use crate::bindings::statements_analytics::extract_serde_any;
 use crate::errors::statements_to_py;
 use finstack_quant_statements::checks::{CheckReport, CheckSuite, CheckSuiteSpec};
 use finstack_quant_statements::types::NodeId;
@@ -507,7 +506,7 @@ pub(crate) fn extract_three_statement_mapping(
     if let Ok(typed) = obj.extract::<PyRef<'_, PyThreeStatementMapping>>() {
         return Ok(typed.inner.clone());
     }
-    extract_serde_any(py, obj, "ThreeStatementMapping")
+    crate::bindings::module_utils::spec_from_py(py, obj, "ThreeStatementMapping")
 }
 
 /// Extract a `CreditMapping` from the typed object, a dict, or JSON.
@@ -518,7 +517,7 @@ pub(crate) fn extract_credit_mapping(
     if let Ok(typed) = obj.extract::<PyRef<'_, PyCreditMapping>>() {
         return Ok(typed.inner.clone());
     }
-    extract_serde_any(py, obj, "CreditMapping")
+    crate::bindings::module_utils::spec_from_py(py, obj, "CreditMapping")
 }
 
 /// Extract a `CheckSuiteSpec` from the typed `finstack_quant.statements.CheckSuiteSpec`,
@@ -530,7 +529,7 @@ pub(crate) fn extract_check_suite_spec(
     if let Ok(typed) = obj.extract::<PyRef<'_, PyCheckSuiteSpec>>() {
         return Ok(typed.inner.clone());
     }
-    extract_serde_any(py, obj, "CheckSuiteSpec")
+    crate::bindings::module_utils::spec_from_py(py, obj, "CheckSuiteSpec")
 }
 
 /// Extract a `CheckReport` from the typed wrapper, a dict, or JSON.
@@ -541,7 +540,7 @@ pub(crate) fn extract_check_report(
     if let Ok(typed) = obj.extract::<PyRef<'_, PyCheckReport>>() {
         return Ok(typed.inner.clone());
     }
-    extract_serde_any(py, obj, "CheckReport")
+    crate::bindings::module_utils::spec_from_py(py, obj, "CheckReport")
 }
 
 fn run_check_suite(

@@ -1,13 +1,13 @@
 "use client";
 import { SurfaceArbitrageBadge } from "@/components/finstack/models/components/surface-arbitrage-badge/surface-arbitrage-badge";
 import type { ExampleProps } from "./props";
-import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
-import data from "../data.json";
+import { calibration } from "../fixtures";
 /** AAPL-EQUITY-VOL, calibrated from market_bootstrap/08_equity_vol_surface.json. */
-const surface = (
-  data.calibration.find((entry) => entry.source.includes("08_equity"))!.result
-    .result.final_market as unknown as MarketContextStateWire
-).surfaces.find((entry) => entry.id === "AAPL-EQUITY-VOL")!;
+const surface = calibration
+  .find((entry) => entry.source.includes("08_equity"))!
+  .result.result.final_market.surfaces.find(
+    (entry) => entry.id === "AAPL-EQUITY-VOL",
+  )!;
 /** The 0.5y at-the-money node raised to 0.40, which breaks convexity and calendar monotonicity. */
 const bumped = {
   ...surface,

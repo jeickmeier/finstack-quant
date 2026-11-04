@@ -125,15 +125,7 @@ impl PyStatementResult {
         Ok(self.inner.get_or(node_id, &pid, default))
     }
 
-    /// The periods this result is keyed by, in timeline order.
-    ///
-    /// The model's periods for an evaluated result; the target periods for a
-    /// rolled-up one. Empty only for a result deserialized with no periods.
-    ///
-    /// Returns
-    /// -------
-    /// list[Period]
-    ///     Each period's id, inclusive start, exclusive end and actual flag.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.periods")]
     #[getter]
     fn periods(&self) -> Vec<PyPeriod> {
         self.inner

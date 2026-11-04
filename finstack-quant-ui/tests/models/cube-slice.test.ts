@@ -41,7 +41,7 @@ const delta = (before: Resources, after: Resources) =>
   );
 beforeAll(async () => {
   worker = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => worker?.close());
 const cubes = fixture.market.vol_cubes as CubeSliceRequest["cube"][];
 const normal = cubes.find((c) => c.id === "USD-SWAPTION-NORMAL-VOL")!;

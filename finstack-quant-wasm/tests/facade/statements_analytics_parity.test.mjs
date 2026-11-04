@@ -180,7 +180,7 @@ test('statements_analytics matches the cross-host golden', () => {
     ],
     peer_accepts: INPUTS.universe.map((row) => sa.peerFilterAccepts(INPUTS.peer_filter, row)),
     peer_set: sa
-      .peerSetFromUniverse(INPUTS.subject, INPUTS.universe, INPUTS.peer_filter, 'ltm')
+      .peerSetFromUniverse(INPUTS.subject, INPUTS.universe, INPUTS.peer_filter, 'ltm')[0]
       .peers.map((row) => row.id),
     sensitivity: {
       config: {
@@ -286,6 +286,32 @@ test('capitalStructureSummary reads the LTM window and rejects a bad request', (
   );
   // 920,000 of debt over 100,000 + 110,000 + 120,000 + 130,000 of EBITDA.
   assert.equal(summary.total_leverage, 2);
+  const table = sa.capitalStructureSummaryTable(summary);
+  assert.deepEqual(
+    table.columns.map((column) => column.name),
+    [
+      'id',
+      'kind',
+      'rank',
+      'payment_class',
+      'balance',
+      'share_of_debt',
+      'maturity',
+      'cumulative_debt',
+      'leverage',
+      'interest_coverage',
+      'ltm_interest',
+    ]
+  );
+  const tableCells = Object.fromEntries(
+    table.columns.map((column) => [column.name, column.data.values])
+  );
+  assert.deepEqual(tableCells.id, ['SR-A', 'SR-B', 'SUB']);
+  assert.deepEqual(tableCells.payment_class, ['1L', '1L', '2L']);
+  assert.deepEqual(
+    tableCells.leverage,
+    summary.tranches.map((tranche) => tranche.leverage)
+  );
   assert.deepEqual(
     summary.maturity_wall.map((bucket) => [bucket.year, bucket.amount.amount]),
     [
@@ -331,6 +357,25 @@ test('relativeValueReport hands over the table, the scatter and the score', () =
   assert.deepEqual([report.peer_count, report.excluded_count], [5, 1]);
   // 300 / 2.5; 1000 / 100; no P/E inputs.
   assert.deepEqual(report.companies[0].values, [120, 10, null]);
+  const table = sa.relativeValueReportTable(report);
+  const multiples = report.multiples.map((column) => column.multiple);
+  assert.deepEqual(
+    table.columns.map((column) => column.name),
+    ['id', 'is_subject', ...multiples]
+  );
+  assert.deepEqual(table.columns[1].data.values, [true, false, false, false, false, false]);
+  assert.deepEqual(
+    table.columns[2].data.values,
+    report.companies.map((row) => row.values[0])
+  );
+  assert.throws(
+    () =>
+      sa.relativeValueReportTable({
+        ...report,
+        multiples: [...report.multiples, report.multiples[0]],
+      }),
+    (error) => error.kind === 'validation'
+  );
   const [regression, , disabled, unavailable] = report.dimensions;
   // y = 10 + 95x over the four pairs, so 105 at x = 1; P5 has no leverage and no point.
   assert.deepEqual(
@@ -446,10 +491,14 @@ test('classifyStage honours a StagingConfig and rejects bad PDs', () => {
 });
 
 test('peerSetFromUniverse takes the serde period basis', () => {
-  const custom = sa.peerSetFromUniverse(INPUTS.subject, INPUTS.universe, INPUTS.peer_filter, {
-    custom: 'FY2025E',
-  });
+  const [custom, excluded] = sa.peerSetFromUniverse(
+    INPUTS.subject,
+    INPUTS.universe,
+    INPUTS.peer_filter,
+    { custom: 'FY2025E' }
+  );
   assert.deepEqual(custom.period_basis, { custom: 'FY2025E' });
+  assert.equal(custom.peers.length + excluded, INPUTS.universe.length);
   assert.throws(
     () => sa.peerSetFromUniverse(INPUTS.subject, INPUTS.universe, INPUTS.peer_filter, 'yearly'),
     (e) => e.kind === 'validation'

@@ -2386,12 +2386,13 @@ mod cases {
             .find(|(id, _, _)| id == "OC_CLASS_A")
             .expect("OC test must appear in the waterfall result");
         let (_, ratio, passing) = oc;
+        let ratio = ratio.expect("the OC test has a claim");
         assert!(
             !passing,
             "OC ratio {ratio:.4} against a 1.50 requirement must breach"
         );
         assert!(
-            (*ratio - 1.2875).abs() < 0.05,
+            (ratio - 1.2875).abs() < 0.05,
             "OC ratio must be ~(10M pool + 0.3M cash)/8M senior = 1.2875, got {ratio:.4}"
         );
     }
@@ -2544,7 +2545,8 @@ mod cases {
 
         let service_provider_cash = |result: &WaterfallDistribution| -> f64 {
             result
-                .distributions
+                .distributions()
+                .expect("distributions")
                 .iter()
                 .filter(|(recipient, _)| matches!(recipient, RecipientType::ServiceProvider(_)))
                 .map(|(_, amount)| amount.amount())
@@ -2567,13 +2569,15 @@ mod cases {
 
         // And that cash is taken ahead of the notes in the same period.
         let to_notes_with = run(&with_fees)
-            .distributions
+            .distributions()
+            .expect("distributions")
             .iter()
             .filter(|(r, _)| !matches!(r, RecipientType::ServiceProvider(_)))
             .map(|(_, m)| m.amount())
             .sum::<f64>();
         let to_notes_without = run(&without)
-            .distributions
+            .distributions()
+            .expect("distributions")
             .iter()
             .filter(|(r, _)| !matches!(r, RecipientType::ServiceProvider(_)))
             .map(|(_, m)| m.amount())

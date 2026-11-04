@@ -593,6 +593,7 @@
                 }
               ],
               "waterfall": {
+                "payment_date": "2024-04-01",
                 "total_available": {
                   "amount": "7163491.292056633",
                   "currency": "USD"
@@ -695,22 +696,15 @@
                     "is_principal": true
                   }
                 ],
-                "diverted_amounts": [
-                  {
-                    "source_tier": "CLONOTES-A_coverage",
-                    "target_tranche": "CLONOTES-A_principal",
-                    "amount": {
-                      "amount": "248320.597114086",
-                      "currency": "USD"
-                    },
-                    "reason": "coverage test failed: OC_CLONOTES-A"
-                  }
-                ],
+                "coverage_tests": [["OC_CLONOTES-A", 0.997984822557075, false]],
                 "diverted_cash": {
                   "amount": "248320.597114086",
                   "currency": "USD"
                 },
-                "had_diversions": true,
+                "remaining_cash": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
                 "remaining_interest": {
                   "amount": "0",
                   "currency": "USD"
@@ -723,6 +717,18 @@
                   "amount": "0.000000000",
                   "currency": "USD"
                 },
+                "had_diversions": true,
+                "diverted_amounts": [
+                  {
+                    "source_tier": "CLONOTES-A_coverage",
+                    "target_tranche": "CLONOTES-A_principal",
+                    "amount": {
+                      "amount": "248320.597114086",
+                      "currency": "USD"
+                    },
+                    "reason": "coverage test failed: OC_CLONOTES-A"
+                  }
+                ],
                 "recovery_proceeds": {
                   "amount": "0",
                   "currency": "USD"
@@ -801,6 +807,7 @@
                 }
               ],
               "waterfall": {
+                "payment_date": "2024-07-01",
                 "total_available": {
                   "amount": "6740680.660928912",
                   "currency": "USD"
@@ -903,22 +910,17 @@
                     "is_principal": true
                   }
                 ],
-                "diverted_amounts": [
-                  {
-                    "source_tier": "CLONOTES-A_coverage",
-                    "target_tranche": "CLONOTES-A_principal",
-                    "amount": {
-                      "amount": "229789.28909619",
-                      "currency": "USD"
-                    },
-                    "reason": "coverage test failed: OC_CLONOTES-A"
-                  }
+                "coverage_tests": [
+                  ["OC_CLONOTES-A", 0.9984863178973162, false]
                 ],
                 "diverted_cash": {
                   "amount": "229789.28909619",
                   "currency": "USD"
                 },
-                "had_diversions": true,
+                "remaining_cash": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
                 "remaining_interest": {
                   "amount": "0",
                   "currency": "USD"
@@ -931,6 +933,18 @@
                   "amount": "0.000000000",
                   "currency": "USD"
                 },
+                "had_diversions": true,
+                "diverted_amounts": [
+                  {
+                    "source_tier": "CLONOTES-A_coverage",
+                    "target_tranche": "CLONOTES-A_principal",
+                    "amount": {
+                      "amount": "229789.28909619",
+                      "currency": "USD"
+                    },
+                    "reason": "coverage test failed: OC_CLONOTES-A"
+                  }
+                ],
                 "recovery_proceeds": {
                   "amount": "0",
                   "currency": "USD"
@@ -1009,6 +1023,7 @@
                 }
               ],
               "waterfall": {
+                "payment_date": "2024-10-01",
                 "total_available": {
                   "amount": "6359999.051162289",
                   "currency": "USD"
@@ -1111,22 +1126,17 @@
                     "is_principal": true
                   }
                 ],
-                "diverted_amounts": [
-                  {
-                    "source_tier": "CLONOTES-A_coverage",
-                    "target_tranche": "CLONOTES-A_principal",
-                    "amount": {
-                      "amount": "214625.878090009",
-                      "currency": "USD"
-                    },
-                    "reason": "coverage test failed: OC_CLONOTES-A"
-                  }
+                "coverage_tests": [
+                  ["OC_CLONOTES-A", 0.9989728298809725, false]
                 ],
                 "diverted_cash": {
                   "amount": "214625.878090009",
                   "currency": "USD"
                 },
-                "had_diversions": true,
+                "remaining_cash": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
                 "remaining_interest": {
                   "amount": "0",
                   "currency": "USD"
@@ -1139,6 +1149,18 @@
                   "amount": "0.00000000",
                   "currency": "USD"
                 },
+                "had_diversions": true,
+                "diverted_amounts": [
+                  {
+                    "source_tier": "CLONOTES-A_coverage",
+                    "target_tranche": "CLONOTES-A_principal",
+                    "amount": {
+                      "amount": "214625.878090009",
+                      "currency": "USD"
+                    },
+                    "reason": "coverage test failed: OC_CLONOTES-A"
+                  }
+                ],
                 "recovery_proceeds": {
                   "amount": "0",
                   "currency": "USD"
@@ -1217,6 +1239,7 @@
                 }
               ],
               "waterfall": {
+                "payment_date": "2025-01-02",
                 "total_available": {
                   "amount": "5984612.929624669",
                   "currency": "USD"
@@ -1319,22 +1342,17 @@
                     "is_principal": true
                   }
                 ],
-                "diverted_amounts": [
-                  {
-                    "source_tier": "CLONOTES-A_coverage",
-                    "target_tranche": "CLONOTES-A_principal",
-                    "amount": {
-                      "amount": "197956.800183654",
-                      "currency": "USD"
-                    },
-                    "reason": "coverage test failed: OC_CLONOTES-A"
-                  }
+                "coverage_tests": [
+                  ["OC_CLONOTES-A", 0.9994677283069215, false]
                 ],
                 "diverted_cash": {
                   "amount": "197956.800183654",
                   "currency": "USD"
                 },
-                "had_diversions": true,
+                "remaining_cash": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
                 "remaining_interest": {
                   "amount": "0",
                   "currency": "USD"
@@ -1347,6 +1365,18 @@
                   "amount": "0.000000000",
                   "currency": "USD"
                 },
+                "had_diversions": true,
+                "diverted_amounts": [
+                  {
+                    "source_tier": "CLONOTES-A_coverage",
+                    "target_tranche": "CLONOTES-A_principal",
+                    "amount": {
+                      "amount": "197956.800183654",
+                      "currency": "USD"
+                    },
+                    "reason": "coverage test failed: OC_CLONOTES-A"
+                  }
+                ],
                 "recovery_proceeds": {
                   "amount": "0",
                   "currency": "USD"
@@ -1749,18 +1779,22 @@
               "excess_spread": 0,
               "coverage_tests": [],
               "waterfall": {
+                "payment_date": "2024-01-01",
                 "total_available": {
                   "amount": "0",
                   "currency": "USD"
                 },
                 "tier_allocations": [],
                 "payment_records": [],
-                "diverted_amounts": [],
+                "coverage_tests": [],
                 "diverted_cash": {
                   "amount": "0",
                   "currency": "USD"
                 },
-                "had_diversions": false,
+                "remaining_cash": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
                 "remaining_interest": {
                   "amount": "0",
                   "currency": "USD"
@@ -1773,6 +1807,8 @@
                   "amount": "0",
                   "currency": "USD"
                 },
+                "had_diversions": false,
+                "diverted_amounts": [],
                 "recovery_proceeds": {
                   "amount": "0",
                   "currency": "USD"

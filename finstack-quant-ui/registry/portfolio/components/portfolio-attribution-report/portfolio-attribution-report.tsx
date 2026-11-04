@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type {
   MoneyValue as Money,
@@ -17,6 +17,7 @@ import {
   PnlAttributionReport,
   PnlFactorBuckets,
 } from "@/components/finstack/attribution/components/pnl-attribution-report/pnl-attribution-report";
+import { ReportSection } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 /** One position's native attribution with the Rust helpers its report shows (usePortfolioAttribution's positions). */
 export interface PortfolioAttributionPosition {
@@ -53,15 +54,6 @@ export interface PortfolioAttributionReportProps {
   /** Native error, shown as returned. */
   error?: string;
   density?: "compact" | "comfortable";
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 space-y-2">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  );
 }
 
 /** A returned position bucket as exact money, else a "not returned" mark. */
@@ -216,15 +208,15 @@ function ReportView({
           reconciliation={report.reconciliation}
         />
       </div>
-      <Section title="Book factors">
+      <ReportSection title="Book factors">
         <PnlFactorBuckets
           buckets={buckets}
           currency={currency}
           caption="Book P&L by factor"
           density={density}
         />
-      </Section>
-      <Section title="Positions">
+      </ReportSection>
+      <ReportSection title="Positions">
         <FinstackTable
           data={positions as PortfolioAttributionPosition[]}
           columns={columns}
@@ -235,7 +227,7 @@ function ReportView({
           emptyState="No positions returned"
           onRowActivate={(row) => setSelected(row.positionId)}
         />
-      </Section>
+      </ReportSection>
       {position && (
         <section
           aria-label={`Position ${position.positionId}`}
@@ -253,11 +245,11 @@ function ReportView({
           />
         </section>
       )}
-      <Section title="Book explain">
+      <ReportSection title="Book explain">
         <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">
           {report.explain}
         </pre>
-      </Section>
+      </ReportSection>
       <JsonViewer
         label="Portfolio attribution JSON"
         text={JSON.stringify(attribution, null, 2)}

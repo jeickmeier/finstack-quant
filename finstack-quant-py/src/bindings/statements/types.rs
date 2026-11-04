@@ -239,9 +239,9 @@ impl PyForecastSpec {
     /// Build a forecast spec from a method plus its method-specific parameters.
     ///
     /// The parameter map is validated on construction: keys the method does
-    /// not understand and values of the wrong type (a string ``rate``, a
-    /// non-list ``curve``) raise ``ValueError`` here rather than at
-    /// evaluation.
+    /// not understand, missing or ``None`` parameters and values of the wrong
+    /// type (a string ``rate``, a non-list ``curve``) raise ``ValueError`` here
+    /// rather than at evaluation.
     ///
     /// Parameters
     /// ----------
@@ -262,7 +262,8 @@ impl PyForecastSpec {
     /// ------
     /// ValueError
     ///     If ``params`` is not a JSON object / dict, names a parameter the
-    ///     method does not accept, or carries a value of the wrong type.
+    ///     method does not accept, omits a required one, sets one to ``None``,
+    ///     or carries a value of the wrong type.
     #[new]
     #[pyo3(signature = (method, params=None), text_signature = "(method, params=None)")]
     fn new(
@@ -890,7 +891,7 @@ impl PyNodeSpec {
         self.inner.tags.clone()
     }
 
-    /// Declared rollup method label, or ``None`` when the line declares none.
+    #[doc = pydoc!("finstack_quant.statements._types", "NodeSpec.rollup")]
     #[getter]
     fn rollup(&self) -> PyResult<Option<String>> {
         self.inner

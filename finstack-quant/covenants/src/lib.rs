@@ -99,7 +99,7 @@ pub use metric::{CovenantMetricId, CovenantMetricSource, HashMapMetricSource};
 pub use report::CovenantReport;
 pub use schedule::ThresholdSchedule;
 pub use series::{
-    DatedCovenantReports, DatedMetricSeries, DatedMetrics, evaluate_series_generic,
+    DatedCovenantReports, DatedMetricSeries, DatedMetrics, evaluate_series_from_model,
     forecast_breaches, forecast_covenant,
 };
 

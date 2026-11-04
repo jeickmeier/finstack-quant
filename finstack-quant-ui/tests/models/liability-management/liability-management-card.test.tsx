@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -27,41 +19,27 @@ import {
   useLme,
   useTenderRecommendationHurdle,
 } from "@/hooks/models/use-liability-management/use-liability-management";
+import { ExchangeOfferCard } from "@/components/finstack/models/components/liability-management-card/exchange-offer-card";
+import { LiabilityManagementCard } from "@/components/finstack/models/components/liability-management-card/liability-management-card";
+import type { OutcomeState } from "@/components/finstack/shared/primitives/native-display/native-display";
 import {
-  LiabilityManagementCard,
-  type ExchangeOfferTerms,
-  type LmeTerms,
-} from "@/components/finstack/models/components/liability-management-card/liability-management-card";
-import { unwrap, type Envelope } from "@/workers/finstack-contract";
-import { startWorker } from "../../shared/worker/harness.mjs";
+  unwrap,
+  type Envelope,
+  type ExchangeOfferRequest,
+  type LmeRequest,
+} from "@/workers/finstack-contract";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
-let harness: Awaited<ReturnType<typeof startWorker>>;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: never) => {
-      if (method === "initialize")
-        return unwrap(await harness.proxy.initialize());
-      if (method === "analyzeExchangeOffer")
-        return unwrap(await harness.proxy.analyzeExchangeOffer(request));
-      if (method === "analyzeLme")
-        return unwrap(await harness.proxy.analyzeLme(request));
-      if (method === "tenderRecommendationHurdle")
-        return unwrap(await harness.proxy.tenderRecommendationHurdle());
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close: vi.fn(),
-  });
-});
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
+const harness = useWorkerHarness([
+  "analyzeExchangeOffer",
+  "analyzeLme",
+  "tenderRecommendationHurdle",
+]);
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -77,26 +55,47 @@ const expectOutcome = (actual: Envelope<unknown>, result: unknown) => {
   }
 };
 const exchangeTerms = fixture.exchange.recommended
-  .request as ExchangeOfferTerms;
-const lmeTerms = fixture.lme.tender.request as LmeTerms;
+  .request as ExchangeOfferRequest;
+const lmeTerms = fixture.lme.tender.request as LmeRequest;
 const value = <T,>(entry: { result: unknown }) =>
   (entry.result as { ok: true; value: T }).value;
 const offer = (entry: { result: unknown }) =>
   value<modelsWire.ExchangeOfferAnalysis>(entry);
 const exercise = (entry: { result: unknown }) =>
   value<modelsWire.LmeAnalysis>(entry);
-function card(props: Partial<Parameters<typeof LiabilityManagementCard>[0]>) {
-  return render(
-    <LiabilityManagementCard
-      defaultExchange={exchangeTerms}
-      defaultLme={lmeTerms}
-      onExchangeSubmit={() => {}}
-      onLmeSubmit={() => {}}
-      exchange={{ result: null }}
-      lme={{ result: null }}
-      {...props}
-    />,
+interface CardsProps {
+  onExchangeSubmit?: (terms: ExchangeOfferRequest) => void;
+  onLmeSubmit?: (terms: LmeRequest) => void;
+  exchange?: OutcomeState<modelsWire.ExchangeOfferAnalysis>;
+  lme?: OutcomeState<modelsWire.LmeAnalysis>;
+  hurdle?: number | null;
+}
+/** The item's two cards, each fed its own analysis. */
+function Cards({
+  onExchangeSubmit = () => {},
+  onLmeSubmit = () => {},
+  exchange = { result: null },
+  lme = { result: null },
+  hurdle,
+}: CardsProps) {
+  return (
+    <>
+      <ExchangeOfferCard
+        defaultTerms={exchangeTerms}
+        onSubmit={onExchangeSubmit}
+        state={exchange}
+        hurdle={hurdle}
+      />
+      <LiabilityManagementCard
+        defaultTerms={lmeTerms}
+        onSubmit={onLmeSubmit}
+        state={lme}
+      />
+    </>
   );
+}
+function card(props: CardsProps) {
+  return render(<Cards {...props} />);
 }
 it("calls each native function with its arguments in the binding's positions", async () => {
   // Four distinct amounts: each comes back under its own field.
@@ -135,7 +134,7 @@ it.each(Object.entries(fixture.exchange))(
   async (_name, entry) => {
     expectOutcome(
       await harness.proxy.analyzeExchangeOffer(
-        entry.request as ExchangeOfferTerms,
+        entry.request as ExchangeOfferRequest,
       ),
       entry.result,
     );
@@ -145,7 +144,7 @@ it.each(Object.entries(fixture.lme))(
   "the worker returns the native LME analysis of %s",
   async (_name, entry) => {
     expectOutcome(
-      await harness.proxy.analyzeLme(entry.request as LmeTerms),
+      await harness.proxy.analyzeLme(entry.request as LmeRequest),
       entry.result,
     );
   },
@@ -166,17 +165,7 @@ it("takes the recommendation from Rust's field, whatever the hurdle prop says", 
   // The tender beats holding out here, yet Rust does not recommend it.
   const inside = offer(fixture.exchange.insideHurdle);
   expect(inside.delta_npv).toBeGreaterThan(0);
-  rerender(
-    <LiabilityManagementCard
-      defaultExchange={exchangeTerms}
-      defaultLme={lmeTerms}
-      onExchangeSubmit={() => {}}
-      onLmeSubmit={() => {}}
-      exchange={{ result: inside }}
-      lme={{ result: null }}
-      hurdle={0}
-    />,
-  );
+  rerender(<Cards exchange={{ result: inside }} hurdle={0} />);
   expect(screen.getByText("Tender not recommended")).toBeTruthy();
 });
 it("tables every other returned field of an offer as Rust returned it", () => {
@@ -206,16 +195,7 @@ it("adds the leverage block only when Rust returned one", () => {
   expect(leverage.children[1].textContent).toBe(
     String(exercise(fixture.lme.tender).leverage_impact!.post_leverage),
   );
-  rerender(
-    <LiabilityManagementCard
-      defaultExchange={exchangeTerms}
-      defaultLme={lmeTerms}
-      onExchangeSubmit={() => {}}
-      onLmeSubmit={() => {}}
-      exchange={{ result: null }}
-      lme={{ result: exercise(fixture.lme.amendAndExtend) }}
-    />,
-  );
+  rerender(<Cards lme={{ result: exercise(fixture.lme.amendAndExtend) }} />);
   expect(screen.queryByRole("rowheader", { name: "Post leverage" })).toBeNull();
   expect(screen.getByRole("rowheader", { name: "Cost" })).toBeTruthy();
 });
@@ -286,18 +266,16 @@ function Connected() {
   const lmeQuery = useLme(lme);
   const hurdle = useTenderRecommendationHurdle();
   return (
-    <LiabilityManagementCard
-      defaultExchange={exchangeTerms}
-      defaultLme={lmeTerms}
+    <Cards
       onExchangeSubmit={setOfferTerms}
       onLmeSubmit={setLme}
       exchange={{
-        result: exchangeQuery.data ?? null,
+        result: exchangeQuery.data,
         loading: exchangeQuery.isFetching,
         error: exchangeQuery.error?.message,
       }}
       lme={{
-        result: lmeQuery.data ?? null,
+        result: lmeQuery.data,
         loading: lmeQuery.isFetching,
         error: lmeQuery.error?.message,
       }}

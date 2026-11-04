@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { RelativeValueReportRequest } from "@/workers/finstack-contract";
@@ -16,15 +15,13 @@ export function relativeValueReportOptions(
   session: number,
   request: RelativeValueReportRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "relativeValueReport", key] as const,
-    ready: snapshot !== null,
-    missing:
-      "The relative value report requires an explicit request and ready worker",
-    queryFn: (ready) => ready.call("relativeValueReport", snapshot!),
-  });
+    session,
+    "relativeValueReport",
+    request,
+    "The relative value report requires an explicit request and ready worker",
+  );
 }
 /** Native statements_analytics.relativeValueReport: one subject against its filtered peers, or the native error. */
 export function useRelativeValueReport(

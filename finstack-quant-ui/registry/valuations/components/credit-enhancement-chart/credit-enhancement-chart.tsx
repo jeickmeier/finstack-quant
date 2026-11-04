@@ -14,13 +14,13 @@ import { formatRaw } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import { utc } from "@/components/finstack/shared/primitives/native-display/native-display";
 
 type SimulationRun = ReturnType<StructuredCredit["runSimulation"]>;
 type Period = NonNullable<SimulationRun["diagnostics"]["periods"]>[number];
 type EnhancementRow = Period["credit_enhancement"][number] & {
   payment_date: string;
 };
-const utc = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const dateScale = { scale: scaleUtc, axis: { label: "Payment date" } };
 /** One line per tranche Rust returned; the chart's z channel draws them, and nothing is grouped here. */
 function enhancementChart(

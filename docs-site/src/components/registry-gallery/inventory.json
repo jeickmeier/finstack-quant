@@ -31,6 +31,12 @@
       "worker": "none"
     },
     {
+      "name": "native-display",
+      "type": "registry:ui",
+      "docs": "Presentation helpers shared by registry components: ReportSection, Pairs, Outcome (native error, working and empty states), TextField, UndefinedValue, and the typedNumber, shownValue, passThrough, utc and yesNo helpers. Values are shown as Rust returned them; empty typed numbers become NaN so Rust rejects them. Import the installed finstack theme; no worker or workbench is required.",
+      "worker": "none"
+    },
+    {
       "name": "json-viewer",
       "type": "registry:ui",
       "docs": "Read-only JSON with lossless formatted presentation and an Original toggle. Numeric tokens remain exact. Invalid JSON, including duplicate keys, stays in Original view with a formatting notice. Copy and download always preserve the supplied bytes. Import the installed finstack theme; no worker or workbench is required.",
@@ -285,7 +291,7 @@
     {
       "name": "waterfall-report",
       "type": "registry:component",
-      "docs": "Present a native StructuredCredit.runSimulation result: one row per SimulationDiagnostics.periods entry in Rust's order with PeriodWaterfall's total available, recovery proceeds, diverted cash, carried interest and principal, whether a coverage test failed, and how many payments went outside the waterfall. Expanding a period shows the principal used for interest, its tier allocations and payment records in execution order, its diversions and its non-waterfall payments with their own dates. A settlement-only deal has one row, whose release is in that row's non-waterfall payments, and a note says so. The non-waterfall column is a count; the caption names the deal currency Rust states on each amount, and each amount shows every digit. Nothing is summed, joined by date, sorted or classified. No worker is required.",
+      "docs": "Present a native StructuredCredit.runSimulation result: one row per SimulationDiagnostics.periods entry in Rust's order with WaterfallDistribution's total available, recovery proceeds, diverted cash, carried interest and principal, whether a coverage test failed, and how many payments went outside the waterfall. Expanding a period shows the principal used for interest, its tier allocations and payment records in execution order, its diversions and its non-waterfall payments with their own dates. A settlement-only deal has one row, whose release is in that row's non-waterfall payments, and a note says so. The non-waterfall column is a count; the caption names the deal currency Rust states on each amount, and each amount shows every digit. Nothing is summed, joined by date, sorted or classified. No worker is required.",
       "worker": "none"
     },
     {
@@ -501,13 +507,13 @@
     {
       "name": "liability-management-card",
       "type": "registry:component",
-      "docs": "Two forms. Exchange offer, the holder's view: hold-out PV, new instrument PV, consent fee, equity sweetener and offer structure, with the returned tender total, NPV pickup, breakeven recovery and tender_recommended, which is Rust's field and never compared here; the hurdle Rust applies shows beside it as supplied. Liability management exercise, the issuer's view: structure, notional, participation, EBITDA and a price input that Rust reads as a price, an extension fee or a transferred-asset fraction by structure, with the returned cost, par retired, discount capture, holder impact and, for a positive EBITDA, the leverage block. Amounts use one unit you choose, with no currency conversion; percentages are fractions. An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset. Each analysis shows its own native error. Accepts defaultExchange, defaultLme, onExchangeSubmit, onLmeSubmit, exchange, lme, hurdle, formatValue and density props; no worker or query provider required.",
+      "docs": "Two components, one form each. ExchangeOfferCard, the holder's view: hold-out PV, new instrument PV, consent fee, equity sweetener and offer structure, with the returned tender total, NPV pickup, breakeven recovery and tender_recommended, which is Rust's field and never compared here; the hurdle Rust applies shows beside it as supplied. LiabilityManagementCard, the issuer's view: structure, notional, participation, EBITDA and a price input that Rust reads as a price, an extension fee or a transferred-asset fraction by structure, with the returned cost, par retired, discount capture, holder impact and, for a positive EBITDA, the leverage block. Amounts use one unit you choose, with no currency conversion; percentages are fractions. An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset. Each analysis shows its own native error. Each accepts defaultTerms, onSubmit, state, formatValue and density props (ExchangeOfferCard also hurdle), typed by the worker's ExchangeOfferRequest and LmeRequest contracts; no worker or query provider required.",
       "worker": "none"
     },
     {
       "name": "recovery-waterfall",
       "type": "registry:component",
-      "docs": "Three forms. Recovery waterfall: an estate value and claims (id, a free-text seniority label, integer priority, principal, accrued, penalties, an optional collateral value and its haircut), with Rust's allocations in its priority-then-entry order (total claim, collateral and general recovery, total recovery, recovery rate and deficiency per claim) and the estate's total distributed, undistributed estate and apr_satisfied. Workout LGD: EAD, direct and indirect cost fractions, years to resolution, a discount rate and collateral pieces whose types come from the generated WorkoutCollateralType contract, with the returned net recovery, LGD and recovery rate. Recovery by seniority: a class from the generated SeniorityClass contract and a calibration from the supplied calibrationIds (Rust's seniorityCalibrationIds, default first), with the Beta distribution's mean, standard deviation, variance, shape parameters, mode and mean LGD. Nothing is summed, divided or ranked here; amounts use one unit you choose and rates are fractions. An empty amount is sent as NaN for Rust to reject, an empty collateral value is an unsecured claim, and each analysis shows its own native error, including a class a calibration lacks. Accepts defaultWaterfall, defaultWorkout, defaultSeniority, onWaterfallSubmit, onWorkoutSubmit, onStatsSubmit, waterfall, workout, stats, calibrationIds, formatValue and density props; no worker or query provider required.",
+      "docs": "Three components, one form each. RecoveryWaterfall: an estate value and claims (id, a free-text seniority label, integer priority, principal, accrued, penalties, an optional collateral value and its haircut), with Rust's allocations in its priority-then-entry order (total claim, collateral and general recovery, total recovery, recovery rate and deficiency per claim) and the estate's total distributed, undistributed estate and apr_satisfied. WorkoutLgdCard: EAD, direct and indirect cost fractions, years to resolution, a discount rate and collateral pieces whose types come from the generated WorkoutCollateralType contract, with the returned net recovery, LGD and recovery rate. SeniorityRecoveryCard: a class from the generated SeniorityClass contract and a calibration from the supplied calibrationIds (Rust's seniorityCalibrationIds, default first), with the Beta distribution's mean, standard deviation, variance, shape parameters, mode and mean LGD. Nothing is summed, divided or ranked here; amounts use one unit you choose and rates are fractions. An empty amount is sent as NaN for Rust to reject, an empty collateral value is an unsecured claim, and each analysis shows its own native error, including a class a calibration lacks. Each accepts defaultTerms (SeniorityRecoveryCard: defaultSeniority and calibrationIds), onSubmit, state, formatValue and density props, typed by the worker's RecoveryWaterfallRequest, WorkoutLgdRequest and SeniorityRecoveryRequest contracts; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -1718,11 +1724,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/waterfall-report.json",
-      "sha256": "89bc60c0979ee4a6e2d3caad0767e3e8ca93a8828df8dc8df8b88cf3dd35530a"
+      "sha256": "ba193a6d3cd1fcaed764404b5c17d03d21804a8b1c9bfeed49395a42bf50724f"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/deal-charts.json",
-      "sha256": "a7afa2bde83f84a7e36d233af08c3b665fa2b2876f280a8c41a6a4dbfa171633"
+      "sha256": "4b36a8f8d4b7ac574160a546cbf2d7deb00d84f171f9f9b77245724126153b96"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/equity-tranche.json",
@@ -1734,7 +1740,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
-      "sha256": "666043322ac73c37764c866b1b138708bfddcffaa8a17312925ed6c56f92c9b8"
+      "sha256": "fbeb0d1a7ffc1a05810b850c135ffc2ca098e7c6705347ddf2928157e02ebde6"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/bond-credit/cases.json",
@@ -1742,7 +1748,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/convertible/cases.json",
-      "sha256": "b9dbee02f7dfb319aaaca401c183f2d0b88c5e877fc51a668b7406c5fdeffa0b"
+      "sha256": "0581ebe9d47cfba12f7ff2dd4997ff65b3d643550dac1a9da846a379b9a2633b"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/workout-ladder/cases.json",
@@ -1758,7 +1764,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/horizon/cases.json",
-      "sha256": "8782915d628b0e56c45d6da992812da68fb6fc1bd68d2bbfb4ba33689ff9b609"
+      "sha256": "1c4eecde03629a38df14762995edfa501df5f5affc5cc47c162696b461b2e67a"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/templates/cases.json",
@@ -1766,7 +1772,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/attribution/cases.json",
-      "sha256": "17f439c57939b36c1af3ee8bd508423268553eaa76a5ba624f03c0a3707405a9"
+      "sha256": "01956388a89957668bd02f4819f397b210762e5c01bbd65c985b8c39d8b13950"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",

@@ -90,7 +90,12 @@ fn variance_and_bridge_reject_currency_mismatch() {
 
 #[test]
 fn trailing_year_requires_consecutive_calendar_periods() {
-    let mut results = StatementResult::default();
+    let mut results = StatementResult {
+        periods: finstack_quant_core::dates::build_periods("2024Q1..2025Q4", None)
+            .unwrap()
+            .periods,
+        ..StatementResult::default()
+    };
     for p in ["2024Q1", "2024Q2", "2024Q3", "2025Q4"] {
         results
             .nodes

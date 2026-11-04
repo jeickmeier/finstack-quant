@@ -73,9 +73,7 @@ impl PyScorecardMetric {
         description: Option<&str>,
     ) -> PyResult<Self> {
         let thresholds: indexmap::IndexMap<String, (f64, f64)> = match thresholds {
-            Some(value) => {
-                crate::bindings::statements_analytics::extract_serde_any(py, value, "thresholds")?
-            }
+            Some(value) => crate::bindings::module_utils::spec_from_py(py, value, "thresholds")?,
             None => indexmap::IndexMap::new(),
         };
         Ok(Self {

@@ -1,13 +1,5 @@
 // @vitest-environment jsdom
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   cleanup,
   render,
@@ -26,16 +18,13 @@ import {
   type FactorRiskData,
 } from "@/components/finstack/models/components/portfolio-risk-report/portfolio-risk-report";
 import { unwrap, type WorkerApi } from "@/workers/finstack-contract";
-import { startWorker } from "../../shared/worker/harness.mjs";
+import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
-const mock = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  calls: [] as string[],
-}));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../../shared/worker/client"),
+);
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
   async (importOriginal) => ({
@@ -45,30 +34,11 @@ vi.mock(
     ),
   }),
 );
-let harness: Awaited<ReturnType<typeof startWorker>>;
+const harness = useWorkerHarness([
+  "computeFactorSensitivities",
+  "decomposeFactors",
+]);
 const proxy = () => harness.proxy as unknown as WorkerApi;
-beforeAll(async () => {
-  harness = await startWorker();
-}, budget(30000));
-afterAll(async () => harness?.close());
-beforeEach(() => {
-  vi.stubGlobal("Worker", class {});
-  mock.calls.length = 0;
-  mock.createClient.mockReturnValue({
-    call: vi.fn(async (method: string, request: unknown) => {
-      mock.calls.push(method);
-      if (method === "initialize") return unwrap(await proxy().initialize());
-      if (method === "computeFactorSensitivities")
-        return unwrap(
-          await proxy().computeFactorSensitivities(request as never),
-        );
-      if (method === "decomposeFactors")
-        return unwrap(await proxy().decomposeFactors(request as never));
-      throw new Error(`Unexpected worker call ${method}`);
-    }),
-    close() {},
-  });
-});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -184,7 +154,7 @@ it("chains the sensitivities into the decomposition through the hook, then shows
       ).toBeTruthy(),
     { timeout: budget(5000) },
   );
-  expect(mock.calls.filter((call) => call !== "initialize")).toEqual([
+  expect(harness.methods().filter((call) => call !== "initialize")).toEqual([
     "computeFactorSensitivities",
     "decomposeFactors",
   ]);

@@ -508,9 +508,7 @@ export interface ForecastBreachesRequest extends EvaluateCovenantsRequest {
 export interface EvaluateCovenantsRequest {
   /** CovenantEngine JSON; covenant metric ids are statement node ids. */
   readonly engineJson: string;
-  /** FinancialModelSpec JSON whose period calendar gives each test date. */
-  readonly modelJson: string;
-  /** Host-serialized StatementResult of that model. */
+  /** Host-serialized StatementResult; its periods give each test date. */
   readonly resultsJson: string;
 }
 /** Roll an evaluated result of `modelJson` up to the native RollupSpec's frequency. */
@@ -522,7 +520,9 @@ export interface StatementRollupRequest {
 /** The rollup methods `modelJson` declares, as a native RollupSpec at `frequency`. */
 export interface StatementDefaultRollupRequest {
   readonly modelJson: string;
-  readonly frequency: Parameters<typeof statements.rollupSpecDefaultFor>[1];
+  readonly frequency: Parameters<
+    typeof statements.rollupSpecDeclaredMethods
+  >[1];
 }
 /** Native cashflow envelope object returned by the facade's instrument cashflow export. */
 export type { CurrencyLadder };
@@ -1719,10 +1719,10 @@ export interface StatementsApi {
   rollupStatement(
     request: StatementRollupRequest,
   ): Promise<Envelope<StatementResult>>;
-  /** statements.rollupSpecDefaultFor: the rollup methods the model's lines declare. */
+  /** statements.rollupSpecDeclaredMethods: the rollup methods the model's lines declare. */
   defaultRollupSpec(
     request: StatementDefaultRollupRequest,
-  ): Promise<Envelope<ReturnType<typeof statements.rollupSpecDefaultFor>>>;
+  ): Promise<Envelope<ReturnType<typeof statements.rollupSpecDeclaredMethods>>>;
   /** statements_analytics.creditAssessment: leverage, interest coverage and free cash flow at a period, with the per-period series. */
   creditAssessment(
     request: CreditAssessmentRequest,
