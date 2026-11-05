@@ -10,6 +10,7 @@ physically lives here and who owns it.
 | Path | What it is |
 | --- | --- |
 | [`index.md`](index.md) | Public documentation map: getting started, concepts, notebook curriculum, package surfaces. |
+| [`decisions/`](decisions/README.md) | Accepted ADRs grouped into project policy, code standards, specific code decisions, and financial conventions; includes enforcement requirements and known implementation gaps. |
 | [`REFERENCES.md`](REFERENCES.md) | Canonical citation anchors for formulas, market conventions, and standards. Rustdoc `# References` sections link into it by anchor. |
 | [`CONTRACTS.md`](CONTRACTS.md) | The persisted-contract matrix: which Rust serde types are wire contracts, their generated schemas, strict loaders, and Rust/Python/WASM API map. |
 | [`SERDE_STABILITY.md`](SERDE_STABILITY.md) | The serde contract policy: source-of-truth rules, v1-only scope, deterministic generation requirements. |

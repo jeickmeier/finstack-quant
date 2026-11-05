@@ -64,6 +64,9 @@ mise run python-examples
 
 ## Development Notes
 
+- [`decisions/`](decisions/README.md): accepted project policies, code standards,
+  specific code decisions, and financial conventions, with examples,
+  enforcement requirements, and known implementation gaps.
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md): contribution workflow, project
   principles, and binding-change checklist.
 - [`../INVARIANTS.md`](../INVARIANTS.md): cross-crate numerical and API
