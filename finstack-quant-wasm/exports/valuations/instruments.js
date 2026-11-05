@@ -1,5 +1,15 @@
 import * as wasm from '../../pkg/finstack_quant_wasm.js';
 
+/**
+ * Namespaced TypeScript entry points for valuation instruments calculations and types.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const models = valuations.instruments.listModels();
+ * console.log(models.includes("discounting"));
+ * ```
+ */
 export const instruments = {
   Bond: wasm.Bond,
   TermLoan: wasm.TermLoan,

@@ -58,7 +58,10 @@ ROOT = Path(__file__).parents[3]
 CONTRACT = tomllib.loads((Path(__file__).parents[2] / "parity_contract.toml").read_text())
 LEDGER: dict[str, Any] = CONTRACT["parity"]
 SURFACE: dict[str, dict[str, Any]] = json.loads((ROOT / "finstack-quant-wasm/facade-surface.json").read_text())
-DTS = (ROOT / "finstack-quant-wasm/index.d.ts").read_text()
+# The package's hand-written host types; every other TypeScript type is
+# generated from the Rust JSON Schemas. Both are committed, so this test needs
+# no WASM build.
+DTS = (ROOT / "finstack-quant-wasm/src/prelude.d.ts").read_text()
 GENERATED = ROOT / "finstack-quant-wasm/types/generated"
 TS_TYPES = set(re.findall(r"^(?:export )?(?:declare )?(?:interface|type|class) (\w+)", DTS, re.M)) | {
     name
@@ -71,7 +74,7 @@ TS_DECLARATION = re.compile(r"^(?:export )?(?:declare )?(interface|type|class) (
 def ts_declarations() -> dict[str, tuple[str, str, str]]:
     """TypeScript declarations by name: (keyword, header line, text up to the next declaration).
 
-    The schema-generated types win over a same-named facade declaration: a
+    The schema-generated types win over a same-named prelude declaration: a
     ``types`` entry names the wire type.
     """
     found: dict[str, tuple[str, str, str]] = {}
@@ -433,30 +436,6 @@ def test_data_class_methods_are_accounted_for(qualified: str) -> None:
     assert problems == []
 
 
-def _has_declared_constructor(dts: str, class_name: str) -> bool:
-    """Accept a constructor rename only for the named, declared class."""
-    declaration = re.search(
-        rf"^(?:export )?(?:declare )?class {re.escape(class_name)}\b[^{{]*{{(.*?)^}}",
-        dts,
-        re.M | re.S,
-    )
-    return bool(declaration and re.search(r"^\s+constructor\s*\(", declaration.group(1), re.M))
-
-
-@pytest.mark.parametrize(
-    ("declaration", "expected"),
-    [
-        ("declare class Performance {\n  constructor(dates: string[]);\n}\n", True),
-        ("export declare class Performance {\n  constructor();\n}\n", True),
-        ("declare class Other {\n  constructor();\n}\n", False),
-        ("declare class Performance {\n  static fromReturns(): Performance;\n}\n", False),
-        ("declare class Performance {\n  /** constructor() example */\n}\n", False),
-    ],
-)
-def test_constructor_renames_require_the_target_class(declaration: str, expected: bool) -> None:
-    assert _has_declared_constructor(declaration, "Performance") is expected
-
-
 @pytest.mark.parametrize("qualified", sorted(SHARED))
 def test_shared_class_members_are_partitioned(qualified: str) -> None:
     cls, target = SHARED[qualified]
@@ -484,8 +463,8 @@ def test_shared_class_members_are_partitioned(qualified: str) -> None:
             problems.append(f"{target}.{name}: wasm_only needs a reason")
     for rename in entry.get("renames", {}).values():
         if rename["js"] == "constructor":
-            if not _has_declared_constructor(DTS, target.rsplit(".", 1)[-1]):
-                problems.append(f"{target}: constructor rename target is not declared")
+            if not SURFACE.get(target, {}).get("constructor"):
+                problems.append(f"{target}: constructor rename target has no public constructor")
         elif rename["js"] not in js_members:
             problems.append(f"{target}: member rename target {rename['js']!r} does not exist")
     assert problems == []

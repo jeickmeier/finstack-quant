@@ -1,5 +1,16 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
 
+/**
+ * Namespaced TypeScript entry points for statements analytics calculations and types.
+ * @example
+ * ```typescript
+ * import init, { statements_analytics } from "finstack-quant-wasm";
+ * await init();
+ * console.log(
+ *   statements_analytics.wacc({ equity_weight: 0.6, cost_of_equity: 0.1, debt_weight: 0.4, cost_of_debt: 0.05, tax_rate: 0.25 })
+ * );
+ * ```
+ */
 export const statements_analytics = {
   DependencyTracer: wasm.DependencyTracer,
   CorkscrewExtension: wasm.CorkscrewExtension,

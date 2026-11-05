@@ -98,7 +98,9 @@ impl JsModelBuilder {
     /// @returns A builder waiting for `periods`.
     /// @throws TypeError with kind `invalid_type` if `id` is not a string.
     #[wasm_bindgen(constructor)]
-    pub fn new(id: JsValue) -> Result<JsModelBuilder, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsModelBuilder, JsValue> {
         Ok(JsModelBuilder {
             inner: Some(ModelBuilder::new(js_string(&id, "id")?)),
         })
@@ -112,7 +114,9 @@ impl JsModelBuilder {
     /// @returns A ready builder holding the model's periods and nodes.
     /// @throws Error with kind `validation` if the model is malformed or fails semantic validation.
     #[wasm_bindgen(js_name = fromSpec)]
-    pub fn from_spec(spec: JsValue) -> Result<JsModelBuilder, JsValue> {
+    pub fn from_spec(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] spec: JsValue,
+    ) -> Result<JsModelBuilder, JsValue> {
         let spec = FinancialModelSpec::from_json(&json_text(&spec, "spec")?).map_err(to_js_err)?;
         let builder = ModelBuilder::from_spec(spec).map_err(to_js_err)?;
         Ok(JsModelBuilder {
@@ -126,11 +130,15 @@ impl JsModelBuilder {
     /// A failed call leaves the builder usable.
     ///
     /// @param range - Period range `<start>..<end>` in one period kind, e.g. `"2025Q1..Q4"`, `"2024M10..2025M03"` or `"2025..2030"`.
-    /// @param actuals_until - Last actual period (inclusive), e.g. `"2025Q2"`; later periods are forecast. Omit to treat every period as forecast.
+    /// @param actualsUntil - Last actual period (inclusive), e.g. `"2025Q2"`; later periods are forecast. Omit to treat every period as forecast.
     /// @throws Error with kind `validation` if the range or cutoff cannot be parsed, the range is reversed or empty, periods were already set, or the builder was consumed.
     pub fn periods(
         &mut self,
-        range: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] range: JsValue,
+        #[wasm_bindgen(
+            js_name = "actualsUntil",
+            unchecked_optional_param_type = "string | null"
+        )]
         actuals_until: Option<JsValue>,
     ) -> Result<(), JsValue> {
         let range = js_string(&range, "range")?;
@@ -149,7 +157,11 @@ impl JsModelBuilder {
     /// @param periods - Array of `Period` objects (`id`, ISO `start`, exclusive ISO `end`, `is_actual`) in timeline order (array or JSON).
     /// @throws Error with kind `validation` if `periods` is malformed or empty, periods were already set, or the builder was consumed.
     #[wasm_bindgen(js_name = periodsExplicit)]
-    pub fn periods_explicit(&mut self, periods: JsValue) -> Result<(), JsValue> {
+    pub fn periods_explicit(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.Period[] | string")]
+        periods: JsValue,
+    ) -> Result<(), JsValue> {
         let periods: Vec<Period> = from_js_json(&periods, "periods")?;
         self.builder_mut()?
             .periods_explicit(periods)
@@ -162,10 +174,17 @@ impl JsModelBuilder {
     /// Twin of Python `ModelBuilder.value` (Rust `ModelBuilder::value`).
     /// Reusing a node identifier replaces its former definition.
     ///
-    /// @param node_id - Node identifier, unique within the model.
+    /// @param nodeId - Node identifier, unique within the model.
     /// @param values - Object mapping period id (e.g. `"2025Q1"`) to a number or a `Money` wire object (`{amount, currency}`).
     /// @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
-    pub fn value(&mut self, node_id: JsValue, values: JsValue) -> Result<(), JsValue> {
+    pub fn value(
+        &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+        #[wasm_bindgen(
+            unchecked_param_type = "Record<string, generated.statements.AmountOrScalar> | string"
+        )]
+        values: JsValue,
+    ) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let values: IndexMap<PeriodId, AmountOrScalar> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, AmountOrScalar)> = values.into_iter().collect();
@@ -178,11 +197,15 @@ impl JsModelBuilder {
     /// Twin of Python `ModelBuilder.value_scalar` (Rust
     /// `ModelBuilder::value_scalar`).
     ///
-    /// @param node_id - Node identifier, unique within the model.
+    /// @param nodeId - Node identifier, unique within the model.
     /// @param values - Object mapping period id (e.g. `"2025Q1"`) to a number.
     /// @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
     #[wasm_bindgen(js_name = valueScalar)]
-    pub fn value_scalar(&mut self, node_id: JsValue, values: JsValue) -> Result<(), JsValue> {
+    pub fn value_scalar(
+        &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "Record<string, number> | string")] values: JsValue,
+    ) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let values: IndexMap<PeriodId, f64> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, f64)> = values.into_iter().collect();
@@ -195,11 +218,18 @@ impl JsModelBuilder {
     /// Twin of Python `ModelBuilder.value_money` (Rust
     /// `ModelBuilder::value_money`).
     ///
-    /// @param node_id - Node identifier, unique within the model.
+    /// @param nodeId - Node identifier, unique within the model.
     /// @param values - Object mapping period id (e.g. `"2025Q1"`) to a `Money` wire object (`{amount, currency}`); all amounts share one currency.
     /// @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
     #[wasm_bindgen(js_name = valueMoney)]
-    pub fn value_money(&mut self, node_id: JsValue, values: JsValue) -> Result<(), JsValue> {
+    pub fn value_money(
+        &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+        #[wasm_bindgen(
+            unchecked_param_type = "Record<string, generated.statements.Money> | string"
+        )]
+        values: JsValue,
+    ) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let values: IndexMap<PeriodId, Money> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, Money)> = values.into_iter().collect();
@@ -213,13 +243,17 @@ impl JsModelBuilder {
     /// `ModelBuilder::availability_dates`). A failed call leaves the
     /// builder usable.
     ///
-    /// @param node_id - Existing node whose values the dates describe.
-    /// @param availability_dates - Object mapping period id (e.g. `"2025Q1"`) to the ISO 8601 date its value was published.
+    /// @param nodeId - Existing node whose values the dates describe.
+    /// @param availabilityDates - Object mapping period id (e.g. `"2025Q1"`) to the ISO 8601 date its value was published.
     /// @throws Error with kind `validation` if `availabilityDates` is malformed, the node does not exist or the builder was consumed.
     #[wasm_bindgen(js_name = availabilityDates)]
     pub fn availability_dates(
         &mut self,
-        node_id: JsValue,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+        #[wasm_bindgen(
+            js_name = "availabilityDates",
+            unchecked_param_type = "Record<string, string> | string"
+        )]
         availability_dates: JsValue,
     ) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
@@ -241,10 +275,14 @@ impl JsModelBuilder {
     /// it after the method that creates the line; redefining the node discards
     /// the declaration. A failed call leaves the builder usable.
     ///
-    /// @param node_id - Existing node to declare the method on.
+    /// @param nodeId - Existing node to declare the method on.
     /// @param rollup - `"sum"` for flows, `"period_end"` for balances and trailing metrics, `"formula"` for ratios. A rollup rejects `"formula"` on a node without a formula, and a `RollupSpec` entry for the node overrides this declaration.
     /// @throws Error with kind `validation` if `rollup` is not a recognized method, the node does not exist or the builder was consumed.
-    pub fn rollup(&mut self, node_id: JsValue, rollup: JsValue) -> Result<(), JsValue> {
+    pub fn rollup(
+        &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.RollupMethod")] rollup: JsValue,
+    ) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let method: RollupMethod = js_wire(&rollup, "rollup")?;
         self.builder_mut()?
@@ -258,10 +296,14 @@ impl JsModelBuilder {
     /// Twin of Python `ModelBuilder.compute` (Rust `ModelBuilder::compute`).
     /// A failed call leaves the builder usable.
     ///
-    /// @param node_id - Node identifier, unique within the model.
+    /// @param nodeId - Node identifier, unique within the model.
     /// @param formula - Statements DSL expression, e.g. `"revenue - cogs"`.
     /// @throws Error with kind `validation` if the identifier is reserved, the formula is blank or does not parse and compile or the builder was consumed.
-    pub fn compute(&mut self, node_id: JsValue, formula: JsValue) -> Result<(), JsValue> {
+    pub fn compute(
+        &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] formula: JsValue,
+    ) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let formula = js_string(&formula, "formula")?;
         self.builder_mut()?
@@ -278,7 +320,11 @@ impl JsModelBuilder {
     /// @param node - `NodeSpec` to insert under its own `node_id` (object or JSON).
     /// @throws Error with kind `validation` if `node` is malformed or the builder was consumed.
     #[wasm_bindgen(js_name = insertNode)]
-    pub fn insert_node(&mut self, node: JsValue) -> Result<(), JsValue> {
+    pub fn insert_node(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.NodeSpec | string")]
+        node: JsValue,
+    ) -> Result<(), JsValue> {
         let spec: NodeSpec = from_js_json(&node, "node")?;
         self.builder_mut()?.insert_node(spec);
         Ok(())
@@ -290,10 +336,13 @@ impl JsModelBuilder {
     /// builder is consumed; `MixedNodeBuilder.build` returns the builder to
     /// continue with.
     ///
-    /// @param node_id - Node identifier, unique within the model.
+    /// @param nodeId - Node identifier, unique within the model.
     /// @returns A `MixedNodeBuilder` for the node.
     /// @throws Error with kind `validation` if the builder was consumed.
-    pub fn mixed(&mut self, node_id: JsValue) -> Result<JsMixedNodeBuilder, JsValue> {
+    pub fn mixed(
+        &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    ) -> Result<JsMixedNodeBuilder, JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let builder = self.take()?;
         Ok(JsMixedNodeBuilder {
@@ -305,10 +354,18 @@ impl JsModelBuilder {
     ///
     /// Twin of Python `ModelBuilder.forecast` (Rust `ModelBuilder::forecast`).
     ///
-    /// @param node_id - Node whose forecast periods the spec fills.
-    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
+    /// @param nodeId - Node whose forecast periods the spec fills.
+    /// @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
     /// @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
-    pub fn forecast(&mut self, node_id: JsValue, forecast_spec: JsValue) -> Result<(), JsValue> {
+    pub fn forecast(
+        &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+        #[wasm_bindgen(
+            js_name = "forecastSpec",
+            unchecked_param_type = "generated.statements.ForecastSpec | string"
+        )]
+        forecast_spec: JsValue,
+    ) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let spec: ForecastSpec = from_js_json(&forecast_spec, "forecastSpec")?;
         self.builder_mut()?.forecast(node_id, spec);
@@ -320,10 +377,14 @@ impl JsModelBuilder {
     /// Twin of Python `ModelBuilder.where_clause` (Rust
     /// `ModelBuilder::where_clause`).
     ///
-    /// @param where_clause - Boolean DSL expression; the node evaluates only in periods where it is true.
+    /// @param whereClause - Boolean DSL expression; the node evaluates only in periods where it is true.
     /// @throws Error with kind `validation` if the builder was consumed.
     #[wasm_bindgen(js_name = whereClause)]
-    pub fn where_clause(&mut self, where_clause: JsValue) -> Result<(), JsValue> {
+    pub fn where_clause(
+        &mut self,
+        #[wasm_bindgen(js_name = "whereClause", unchecked_param_type = "string")]
+        where_clause: JsValue,
+    ) -> Result<(), JsValue> {
         let where_clause = js_string(&where_clause, "whereClause")?;
         self.builder_mut()?.where_clause(where_clause);
         Ok(())
@@ -337,7 +398,11 @@ impl JsModelBuilder {
     /// @param value - Any JSON value (string, number, boolean, array, plain object or `null`), stored as given: a string is not parsed as JSON. For `key = "currency"` pass a three-letter code such as `"USD"`.
     /// @throws Error with kind `invalid_type` if `value` is not JSON-representable, and kind `validation` if a number is not finite or the builder was consumed.
     #[wasm_bindgen(js_name = withMeta)]
-    pub fn with_meta(&mut self, key: JsValue, value: JsValue) -> Result<(), JsValue> {
+    pub fn with_meta(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "unknown")] value: JsValue,
+    ) -> Result<(), JsValue> {
         let key = js_string(&key, "key")?;
         let value = meta_value(&value)?;
         self.builder_mut()?.with_meta(key, value);
@@ -365,12 +430,13 @@ impl JsModelBuilder {
     /// `ModelBuilder::add_metric_from_registry`). A failed call leaves the
     /// builder usable.
     ///
-    /// @param qualified_id - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
+    /// @param qualifiedId - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
     /// @param registry - `Registry` holding the metric and its dependencies.
     /// @throws Error with kind `not_found` if the metric or a dependency is not in `registry`, and kind `validation` if the identifier is not `namespace.metric` shaped or the builder was consumed.
     #[wasm_bindgen(js_name = addMetricFromRegistry)]
     pub fn add_metric_from_registry(
         &mut self,
+        #[wasm_bindgen(js_name = "qualifiedId", unchecked_param_type = "string")]
         qualified_id: JsValue,
         registry: &JsRegistry,
     ) -> Result<(), JsValue> {
@@ -388,19 +454,23 @@ impl JsModelBuilder {
     ///
     /// @param id - Unique instrument identifier.
     /// @param notional - Principal as a `Money` wire object (`{amount, currency}`).
-    /// @param coupon_rate - Annual coupon rate as a decimal (`0.05` = 5%).
-    /// @param issue_date - ISO 8601 issue date.
-    /// @param maturity_date - ISO 8601 maturity date.
-    /// @param discount_curve_id - Identifier of the discount curve used for pricing.
+    /// @param couponRate - Annual coupon rate as a decimal (`0.05` = 5%).
+    /// @param issueDate - ISO 8601 issue date.
+    /// @param maturityDate - ISO 8601 maturity date.
+    /// @param discountCurveId - Identifier of the discount curve used for pricing.
     /// @throws Error with kind `validation` if an argument is malformed, the bond cannot be constructed, or the builder was consumed.
     #[wasm_bindgen(js_name = addBond)]
     pub fn add_bond(
         &mut self,
-        id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.Money | string")]
         notional: JsValue,
+        #[wasm_bindgen(js_name = "couponRate", unchecked_param_type = "number")]
         coupon_rate: JsValue,
-        issue_date: JsValue,
+        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
+        #[wasm_bindgen(js_name = "maturityDate", unchecked_param_type = "string")]
         maturity_date: JsValue,
+        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
         discount_curve_id: JsValue,
     ) -> Result<(), JsValue> {
         let id = js_string(&id, "id")?;
@@ -423,22 +493,26 @@ impl JsModelBuilder {
     ///
     /// @param id - Unique instrument identifier.
     /// @param notional - Principal as a `Money` wire object (`{amount, currency}`).
-    /// @param coupon_rate - Annual coupon rate as a decimal (`0.03` = 3%).
-    /// @param issue_date - ISO 8601 issue date.
-    /// @param maturity_date - ISO 8601 maturity date.
+    /// @param couponRate - Annual coupon rate as a decimal (`0.03` = 3%).
+    /// @param issueDate - ISO 8601 issue date.
+    /// @param maturityDate - ISO 8601 maturity date.
     /// @param convention - Regional preset: `"us_treasury"`, `"us_agency"`, `"german_bund"`, `"uk_gilt"`, `"french_oat"`, `"jgb"`, `"us_corporate"` or `"eur_corporate"`; sets day count, coupon frequency and calendar.
-    /// @param discount_curve_id - Identifier of the discount curve used for pricing.
+    /// @param discountCurveId - Identifier of the discount curve used for pricing.
     /// @throws Error with kind `validation` if an argument is malformed, `convention` is unknown, the bond cannot be constructed, or the builder was consumed.
     #[wasm_bindgen(js_name = addBondWithConvention)]
     #[allow(clippy::too_many_arguments)]
     pub fn add_bond_with_convention(
         &mut self,
-        id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.Money | string")]
         notional: JsValue,
+        #[wasm_bindgen(js_name = "couponRate", unchecked_param_type = "number")]
         coupon_rate: JsValue,
-        issue_date: JsValue,
+        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
+        #[wasm_bindgen(js_name = "maturityDate", unchecked_param_type = "string")]
         maturity_date: JsValue,
-        convention: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] convention: JsValue,
+        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
         discount_curve_id: JsValue,
     ) -> Result<(), JsValue> {
         let id = js_string(&id, "id")?;
@@ -472,22 +546,26 @@ impl JsModelBuilder {
     ///
     /// @param id - Unique instrument identifier.
     /// @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
-    /// @param fixed_rate - Fixed leg rate as a decimal (`0.04` = 4%).
-    /// @param start_date - ISO 8601 effective date.
-    /// @param maturity_date - ISO 8601 maturity date.
-    /// @param discount_curve_id - Identifier of the discount curve.
-    /// @param forward_curve_id - Identifier of the floating-leg forward curve.
+    /// @param fixedRate - Fixed leg rate as a decimal (`0.04` = 4%).
+    /// @param startDate - ISO 8601 effective date.
+    /// @param maturityDate - ISO 8601 maturity date.
+    /// @param discountCurveId - Identifier of the discount curve.
+    /// @param forwardCurveId - Identifier of the floating-leg forward curve.
     /// @throws Error with kind `validation` if an argument is malformed, the swap cannot be constructed, or the builder was consumed.
     #[wasm_bindgen(js_name = addSwap)]
     #[allow(clippy::too_many_arguments)]
     pub fn add_swap(
         &mut self,
-        id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.Money | string")]
         notional: JsValue,
-        fixed_rate: JsValue,
-        start_date: JsValue,
+        #[wasm_bindgen(js_name = "fixedRate", unchecked_param_type = "number")] fixed_rate: JsValue,
+        #[wasm_bindgen(js_name = "startDate", unchecked_param_type = "string")] start_date: JsValue,
+        #[wasm_bindgen(js_name = "maturityDate", unchecked_param_type = "string")]
         maturity_date: JsValue,
+        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
         discount_curve_id: JsValue,
+        #[wasm_bindgen(js_name = "forwardCurveId", unchecked_param_type = "string")]
         forward_curve_id: JsValue,
     ) -> Result<(), JsValue> {
         let params = SwapParams {
@@ -511,32 +589,42 @@ impl JsModelBuilder {
     ///
     /// @param id - Unique instrument identifier.
     /// @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
-    /// @param fixed_rate - Fixed leg rate as a decimal (`0.04` = 4%).
-    /// @param start_date - ISO 8601 effective date.
-    /// @param maturity_date - ISO 8601 maturity date.
-    /// @param discount_curve_id - Identifier of the discount curve.
-    /// @param forward_curve_id - Identifier of the floating-leg forward curve.
-    /// @param fixed_frequency - Fixed leg payment frequency as a tenor, e.g. `"1Y"`.
-    /// @param fixed_day_count - Fixed leg day-count convention, e.g. `"act_360"` or `"30_360"`.
-    /// @param float_frequency - Floating leg payment and fixing frequency as a tenor, e.g. `"3M"`.
-    /// @param float_day_count - Floating leg day-count convention, e.g. `"act_360"`.
-    /// @param business_day_convention - Schedule roll convention, e.g. `"modified_following"`; omitted uses the Rust default, Modified Following.
+    /// @param fixedRate - Fixed leg rate as a decimal (`0.04` = 4%).
+    /// @param startDate - ISO 8601 effective date.
+    /// @param maturityDate - ISO 8601 maturity date.
+    /// @param discountCurveId - Identifier of the discount curve.
+    /// @param forwardCurveId - Identifier of the floating-leg forward curve.
+    /// @param fixedFrequency - Fixed leg payment frequency as a tenor, e.g. `"1Y"`.
+    /// @param fixedDayCount - Fixed leg day-count convention, e.g. `"act_360"` or `"30_360"`.
+    /// @param floatFrequency - Floating leg payment and fixing frequency as a tenor, e.g. `"3M"`.
+    /// @param floatDayCount - Floating leg day-count convention, e.g. `"act_360"`.
+    /// @param businessDayConvention - Schedule roll convention, e.g. `"modified_following"`; omitted uses the Rust default, Modified Following.
     /// @throws Error with kind `validation` if an argument is malformed, a tenor, day count or roll convention is unknown, the swap cannot be constructed, or the builder was consumed.
     #[wasm_bindgen(js_name = addSwapWithConventions)]
     #[allow(clippy::too_many_arguments)]
     pub fn add_swap_with_conventions(
         &mut self,
-        id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.Money | string")]
         notional: JsValue,
-        fixed_rate: JsValue,
-        start_date: JsValue,
+        #[wasm_bindgen(js_name = "fixedRate", unchecked_param_type = "number")] fixed_rate: JsValue,
+        #[wasm_bindgen(js_name = "startDate", unchecked_param_type = "string")] start_date: JsValue,
+        #[wasm_bindgen(js_name = "maturityDate", unchecked_param_type = "string")]
         maturity_date: JsValue,
+        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
         discount_curve_id: JsValue,
+        #[wasm_bindgen(js_name = "forwardCurveId", unchecked_param_type = "string")]
         forward_curve_id: JsValue,
+        #[wasm_bindgen(js_name = "fixedFrequency", unchecked_param_type = "string")]
         fixed_frequency: JsValue,
-        fixed_day_count: JsValue,
+        #[wasm_bindgen(js_name = "fixedDayCount", unchecked_param_type = "string")] fixed_day_count: JsValue,
+        #[wasm_bindgen(js_name = "floatFrequency", unchecked_param_type = "string")]
         float_frequency: JsValue,
-        float_day_count: JsValue,
+        #[wasm_bindgen(js_name = "floatDayCount", unchecked_param_type = "string")] float_day_count: JsValue,
+        #[wasm_bindgen(
+            js_name = "businessDayConvention",
+            unchecked_optional_param_type = "string | null"
+        )]
         business_day_convention: Option<JsValue>,
     ) -> Result<(), JsValue> {
         use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
@@ -590,7 +678,11 @@ impl JsModelBuilder {
     /// @param instrument - The instrument's `finstack_quant.instrument/1` envelope (object or JSON); bare payloads without the envelope are rejected.
     /// @throws Error with kind `validation` if the envelope is invalid, the instrument type is not supported in a statement capital structure, or the builder was consumed.
     #[wasm_bindgen(js_name = addDebt)]
-    pub fn add_debt(&mut self, id: JsValue, instrument: JsValue) -> Result<(), JsValue> {
+    pub fn add_debt(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] instrument: JsValue,
+    ) -> Result<(), JsValue> {
         let id = js_string(&id, "id")?;
         let spec = finstack_quant_valuations::pricer::parse_instrument_from_json(&json_text(
             &instrument,
@@ -610,7 +702,10 @@ impl JsModelBuilder {
     /// @param currency - ISO 4217 currency code, e.g. `"USD"`.
     /// @throws Error with kind `validation` if `currency` is not a known currency code or the builder was consumed.
     #[wasm_bindgen(js_name = reportingCurrency)]
-    pub fn reporting_currency(&mut self, currency: JsValue) -> Result<(), JsValue> {
+    pub fn reporting_currency(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    ) -> Result<(), JsValue> {
         let currency: finstack_quant_core::currency::Currency = js_string(&currency, "currency")?
             .parse()
             .map_err(to_js_err)?;
@@ -625,7 +720,11 @@ impl JsModelBuilder {
     /// @param policy - `"cashflow_date"`, `"period_end"` or `"period_average"`.
     /// @throws Error with kind `validation` if `policy` is not a known policy or the builder was consumed.
     #[wasm_bindgen(js_name = fxPolicy)]
-    pub fn fx_policy(&mut self, policy: JsValue) -> Result<(), JsValue> {
+    pub fn fx_policy(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "'cashflow_date' | 'period_end' | 'period_average'")]
+        policy: JsValue,
+    ) -> Result<(), JsValue> {
         let policy: finstack_quant_core::money::fx::FxConversionPolicy =
             js_wire(&policy, "policy")?;
         self.builder_mut()?.fx_policy(policy);
@@ -637,9 +736,16 @@ impl JsModelBuilder {
     /// Twin of Python `ModelBuilder.waterfall` (Rust `ModelBuilder::waterfall`).
     /// The waterfall is validated against the instruments at `build`.
     ///
-    /// @param waterfall_spec - `WaterfallSpec` attached to the capital structure (object or JSON).
+    /// @param waterfallSpec - `WaterfallSpec` attached to the capital structure (object or JSON).
     /// @throws Error with kind `validation` if `waterfallSpec` is malformed or the builder was consumed.
-    pub fn waterfall(&mut self, waterfall_spec: JsValue) -> Result<(), JsValue> {
+    pub fn waterfall(
+        &mut self,
+        #[wasm_bindgen(
+            js_name = "waterfallSpec",
+            unchecked_param_type = "generated.statements.WaterfallSpec | string"
+        )]
+        waterfall_spec: JsValue,
+    ) -> Result<(), JsValue> {
         let spec: WaterfallSpec = from_js_json(&waterfall_spec, "waterfallSpec")?;
         self.builder_mut()?.waterfall(spec);
         Ok(())
@@ -652,6 +758,7 @@ impl JsModelBuilder {
     ///
     /// @returns The completed `FinancialModelSpec` plain object, accepted by every model-taking function.
     /// @throws Error with kind `validation` if the model fails semantic validation or the builder was consumed.
+    #[wasm_bindgen(unchecked_return_type = "generated.statements.FinancialModelSpec")]
     pub fn build(&mut self) -> Result<JsValue, JsValue> {
         let builder = self.take()?;
         to_js_value(&builder.build().map_err(to_js_err)?)
@@ -703,7 +810,13 @@ impl JsMixedNodeBuilder {
     ///
     /// @param values - Object mapping period id (e.g. `"2025Q1"`) to a number or a `Money` wire object (`{amount, currency}`).
     /// @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
-    pub fn values(&mut self, values: JsValue) -> Result<(), JsValue> {
+    pub fn values(
+        &mut self,
+        #[wasm_bindgen(
+            unchecked_param_type = "Record<string, generated.statements.AmountOrScalar> | string"
+        )]
+        values: JsValue,
+    ) -> Result<(), JsValue> {
         let values: IndexMap<PeriodId, AmountOrScalar> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, AmountOrScalar)> = values.into_iter().collect();
         self.builder_mut()?.values(&values);
@@ -718,7 +831,13 @@ impl JsMixedNodeBuilder {
     /// @param values - Object mapping period id (e.g. `"2025Q1"`) to a `Money` wire object (`{amount, currency}`).
     /// @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
     #[wasm_bindgen(js_name = valuesMoney)]
-    pub fn values_money(&mut self, values: JsValue) -> Result<(), JsValue> {
+    pub fn values_money(
+        &mut self,
+        #[wasm_bindgen(
+            unchecked_param_type = "Record<string, generated.statements.Money> | string"
+        )]
+        values: JsValue,
+    ) -> Result<(), JsValue> {
         let values: IndexMap<PeriodId, Money> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, AmountOrScalar)> = values
             .into_iter()
@@ -733,9 +852,16 @@ impl JsMixedNodeBuilder {
     /// Twin of Python `MixedNodeBuilder.forecast` (Rust
     /// `MixedNodeBuilder::forecast`).
     ///
-    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
+    /// @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
     /// @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
-    pub fn forecast(&mut self, forecast_spec: JsValue) -> Result<(), JsValue> {
+    pub fn forecast(
+        &mut self,
+        #[wasm_bindgen(
+            js_name = "forecastSpec",
+            unchecked_param_type = "generated.statements.ForecastSpec | string"
+        )]
+        forecast_spec: JsValue,
+    ) -> Result<(), JsValue> {
         let spec: ForecastSpec = from_js_json(&forecast_spec, "forecastSpec")?;
         self.builder_mut()?.forecast(spec);
         Ok(())
@@ -749,7 +875,10 @@ impl JsMixedNodeBuilder {
     ///
     /// @param formula - Statements DSL expression, e.g. `"lag(revenue, 1) * 1.05"`.
     /// @throws Error with kind `validation` if the formula is blank or does not parse and compile, or the builder was consumed.
-    pub fn formula(&mut self, formula: JsValue) -> Result<(), JsValue> {
+    pub fn formula(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] formula: JsValue,
+    ) -> Result<(), JsValue> {
         let formula = js_string(&formula, "formula")?;
         self.builder_mut()?.formula(formula).map_err(to_js_err)?;
         Ok(())
@@ -761,7 +890,10 @@ impl JsMixedNodeBuilder {
     ///
     /// @param name - Display name shown in reports.
     /// @throws Error with kind `validation` if the builder was consumed.
-    pub fn name(&mut self, name: JsValue) -> Result<(), JsValue> {
+    pub fn name(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    ) -> Result<(), JsValue> {
         let name = js_string(&name, "name")?;
         self.builder_mut()?.name(name);
         Ok(())
@@ -773,7 +905,10 @@ impl JsMixedNodeBuilder {
     ///
     /// @param rollup - `"sum"` for flows, `"period_end"` for balances and trailing metrics, `"formula"` for ratios. A rollup rejects `"formula"` on a node without a formula, and a `RollupSpec` entry for the node overrides this declaration.
     /// @throws Error with kind `validation` if `rollup` is not a recognized method or the builder was consumed.
-    pub fn rollup(&mut self, rollup: JsValue) -> Result<(), JsValue> {
+    pub fn rollup(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.RollupMethod")] rollup: JsValue,
+    ) -> Result<(), JsValue> {
         let method: RollupMethod = js_wire(&rollup, "rollup")?;
         self.builder_mut()?.rollup(method);
         Ok(())

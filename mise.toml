@@ -412,13 +412,14 @@ run = [
   ''',
   "node finstack-quant-wasm/scripts/generate-contract-types.mjs",
   "uv run --no-sync python scripts/sync_generated_ts_index.py",
-  # The facade surface and the UI read the built WASM packages.
+  # The facade declarations, the facade surface and the UI read the built WASM
+  # packages; `index.d.ts` is generated over wasm-bindgen's declarations.
   { task = "wasm-build" },
   { task = "wasm-build-node" },
+  "node finstack-quant-wasm/scripts/gen-facade-dts.mjs",
   # The test writes plain JSON.stringify output; Prettier gives the committed form.
   "UPDATE_FACADE_SURFACE=1 node --test finstack-quant-wasm/tests/facade/surface.test.mjs",
   "finstack-quant-wasm/node_modules/.bin/prettier --log-level warn --write finstack-quant-wasm/facade-surface.json",
-  "npm --prefix finstack-quant-wasm run docs:sync",
   "npm --prefix finstack-quant-ui run generate",
   { task = "ui-fixtures" },
   # Last, so every file written above is listed.
@@ -576,7 +577,7 @@ run = [
 [tasks.wasm-test]
 # The wasm-bindgen tests (`wasm-pack test`) and both facade builds use the `dev`
 # profile, so they share one set of wasm32 artifacts.
-description = "Run the wasm-bindgen and Node facade tests and the JSDoc sync check"
+description = "Run the wasm-bindgen and Node facade tests and type-check the published declarations"
 usage = 'flag "--doctest" help="Run only the documented code samples, against the web build"'
 run = '''
 set -e
@@ -588,14 +589,16 @@ npm --prefix finstack-quant-wasm run test
 mise run wasm-build
 mise run wasm-build-node
 npm --prefix finstack-quant-wasm run test:facade
-npm --prefix finstack-quant-wasm run docs:check-sync
+node finstack-quant-wasm/scripts/gen-facade-dts.mjs --check
+npm --prefix finstack-quant-wasm run test:dts
 '''
 
 [tasks.wasm-test-built]
-description = "Rerun the Node facade tests and JSDoc sync check against the built packages"
+description = "Rerun the Node facade tests and declaration checks against the built packages"
 run = [
   "npm --prefix finstack-quant-wasm run test:facade",
-  "npm --prefix finstack-quant-wasm run docs:check-sync",
+  "node finstack-quant-wasm/scripts/gen-facade-dts.mjs --check",
+  "npm --prefix finstack-quant-wasm run test:dts",
 ]
 
 [tasks.wasm-fmt]
@@ -615,10 +618,7 @@ run = [
 
 [tasks.wasm-doc]
 description = "Enforce complete WASM and TypeScript IntelliSense documentation"
-run = [
-  "uv run --no-sync python scripts/check_wasm_api_input_docs.py",
-  "npm --prefix finstack-quant-wasm run docs:check",
-]
+run = "npm --prefix finstack-quant-wasm run docs:check"
 
 # ─────────────────────────────────────────────────────────────────
 # Component registry (finstack-quant-ui)

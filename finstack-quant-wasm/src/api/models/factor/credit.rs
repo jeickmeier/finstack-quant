@@ -27,6 +27,17 @@ use wasm_bindgen::prelude::*;
 ///
 /// Produced by `CreditCalibrator` or loaded from JSON via
 /// `CreditFactorModel.fromJson`. Immutable once constructed.
+///
+/// @example
+/// ```typescript
+/// import init, { models, type JsonInput } from "finstack-quant-wasm";
+/// await init();
+/// const schema = models.factor.schema.get("https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json");
+/// const [example] = schema.examples as JsonInput[];
+/// const model = models.factor.credit.CreditFactorModel.fromJson(example);
+/// console.log(model.nFactors, model.issuerIds()); // 1 ["ACME", "BOREAS", "CYGNUS"]
+/// model.free();
+/// ```
 #[wasm_bindgen(js_name = CreditFactorModel)]
 pub struct JsCreditFactorModel {
     /// Underlying Rust value (not exposed to JS).
@@ -49,6 +60,18 @@ impl JsCreditFactorModel {
 /// Deterministic calibrator that produces a `CreditFactorModel`.
 ///
 /// Configuration and inputs are passed as JSON strings or plain objects.
+///
+/// @example
+/// ```typescript
+/// import init, { models, type JsonInput } from "finstack-quant-wasm";
+/// await init();
+/// const [inputs] = models.factor.schema.get("https://finstack_quant.dev/schemas/factor_model/1/credit_calibration_inputs.schema.json").examples as JsonInput[];
+/// const calibrator = new models.factor.credit.CreditCalibrator();
+/// const model = calibrator.calibrate(inputs);
+/// console.log(model.nIssuers, model.factorIds());
+/// model.free();
+/// calibrator.free();
+/// ```
 #[wasm_bindgen(js_name = CreditCalibrator)]
 pub struct JsCreditCalibrator {
     inner: finstack_quant_factor::credit::calibration::CreditCalibrator,
@@ -60,9 +83,15 @@ impl JsCreditCalibrator {
     ///
     /// # Errors
     /// Throws if `config_json` is not a valid `CreditCalibrationConfig`.
-    /// @param config_json - Optional credit-factor calibration configuration JSON; omitted or `null` uses the Rust `CreditCalibrationConfig::default()`.
+    /// @param configJson - Optional credit-factor calibration configuration JSON; omitted or `null` uses the Rust `CreditCalibrationConfig::default()`.
     #[wasm_bindgen(constructor)]
-    pub fn new(config_json: Option<JsValue>) -> Result<JsCreditCalibrator, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(
+            js_name = "configJson",
+            unchecked_optional_param_type = "JsonInput | null"
+        )]
+        config_json: Option<JsValue>,
+    ) -> Result<JsCreditCalibrator, JsValue> {
         let config: finstack_quant_factor::credit::calibration::CreditCalibrationConfig =
             opt_from_js_json(config_json.as_ref(), "configJson")?.unwrap_or_default();
         Ok(Self {
@@ -76,8 +105,13 @@ impl JsCreditCalibrator {
     ///
     /// # Errors
     /// Throws if inputs are structurally invalid or calibration fails.
-    /// @param inputs_json - Credit-factor calibration input JSON containing issuers, spreads, and observations.
-    pub fn calibrate(&self, inputs_json: JsValue) -> Result<JsCreditFactorModel, JsValue> {
+    /// @param inputsJson - Credit-factor calibration input JSON containing issuers, spreads, and observations.
+    /// @returns A calibrated `CreditFactorModel` handle.
+    pub fn calibrate(
+        &self,
+        #[wasm_bindgen(js_name = "inputsJson", unchecked_param_type = "JsonInput")]
+        inputs_json: JsValue,
+    ) -> Result<JsCreditFactorModel, JsValue> {
         let inputs: finstack_quant_factor::credit::calibration::CreditCalibrationInputs =
             from_js_json(&inputs_json, "inputsJson")?;
         let model = self.inner.calibrate(inputs).map_err(to_js_err)?;
@@ -89,8 +123,22 @@ impl JsCreditCalibrator {
 
 /// Snapshot of all hierarchy-level factor values at a single date.
 ///
-/// Produced by [`decompose_levels`]. Pass to [`decompose_period`] to compute
+/// Produced by `decomposeLevels`. Pass to `decomposePeriod` to compute
 /// period-over-period changes.  The full data is available via `toJson`.
+///
+/// @example
+/// ```typescript
+/// import init, { models, type JsonInput } from "finstack-quant-wasm";
+/// await init();
+/// const schema = models.factor.schema.get("https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json");
+/// const [example] = schema.examples as JsonInput[];
+/// const model = models.factor.credit.CreditFactorModel.fromJson(example);
+/// const spreads = { ACME: 0.012, BOREAS: 0.013, CYGNUS: 0.014 };
+/// const levels = models.factor.credit.decomposeLevels(model, spreads, 0.01, "2024-06-03");
+/// console.log(JSON.parse(levels.toJson()).generic);
+/// levels.free();
+/// model.free();
+/// ```
 #[wasm_bindgen(js_name = LevelsAtDate)]
 pub struct JsLevelsAtDate {
     /// Underlying Rust value (not exposed to JS).
@@ -132,8 +180,13 @@ impl JsLevelsAtDate {
     /// wasm32 integer range, is outside the available levels, or the map
     /// cannot be converted to a JavaScript object.
     /// @returns A bucket-name to factor-level mapping in basis points.
-    #[wasm_bindgen(js_name = levelValues)]
-    pub fn level_values(&self, level_index: JsValue) -> Result<JsValue, JsValue> {
+    /// @param levelIndex - Zero-based hierarchy level index, which must be less than `nLevels`.
+    #[wasm_bindgen(js_name = levelValues, unchecked_return_type = "Record<string, number>")]
+    pub fn level_values(
+        &self,
+        #[wasm_bindgen(js_name = "levelIndex", unchecked_param_type = "number")]
+        level_index: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let level_index: usize = js_uint(&level_index, "levelIndex")?;
         let level = self.inner.level(level_index).map_err(to_js_err)?;
         to_js_value(&level.values)
@@ -145,7 +198,7 @@ impl JsLevelsAtDate {
     ///
     /// Throws when the mapping cannot be converted to a JavaScript object.
     /// @returns An issuer-ID to residual-adder mapping.
-    #[wasm_bindgen(js_name = adder)]
+    #[wasm_bindgen(js_name = adder, unchecked_return_type = "Record<string, number>")]
     pub fn adder(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.adder)
     }
@@ -153,7 +206,26 @@ impl JsLevelsAtDate {
 
 /// Component-wise difference between two `LevelsAtDate` snapshots.
 ///
-/// Produced by [`decompose_period`].
+/// Produced by `decomposePeriod`.
+///
+/// @example
+/// ```typescript
+/// import init, { models, type JsonInput } from "finstack-quant-wasm";
+/// await init();
+/// const schema = models.factor.schema.get("https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json");
+/// const [example] = schema.examples as JsonInput[];
+/// const model = models.factor.credit.CreditFactorModel.fromJson(example);
+/// const spreads = { ACME: 0.012, BOREAS: 0.013, CYGNUS: 0.014 };
+/// const levels = models.factor.credit.decomposeLevels(model, spreads, 0.01, "2024-06-03");
+/// const wider = { ACME: 0.013, BOREAS: 0.014, CYGNUS: 0.015 };
+/// const later = models.factor.credit.decomposeLevels(model, wider, 0.011, "2024-07-01");
+/// const period = models.factor.credit.decomposePeriod(levels, later);
+/// console.log(JSON.parse(period.toJson()).d_generic);
+/// period.free();
+/// later.free();
+/// levels.free();
+/// model.free();
+/// ```
 #[wasm_bindgen(js_name = PeriodDecomposition)]
 pub struct JsPeriodDecomposition {
     /// Underlying Rust value (not exposed to JS).
@@ -201,8 +273,13 @@ impl JsPeriodDecomposition {
     /// wasm32 integer range, is outside the available levels, or the map
     /// cannot be converted to a JavaScript object.
     /// @returns A bucket-name to factor-change mapping in basis points.
-    #[wasm_bindgen(js_name = levelDeltas)]
-    pub fn level_deltas(&self, level_index: JsValue) -> Result<JsValue, JsValue> {
+    /// @param levelIndex - Zero-based hierarchy level index, which must be less than `nLevels`.
+    #[wasm_bindgen(js_name = levelDeltas, unchecked_return_type = "Record<string, number>")]
+    pub fn level_deltas(
+        &self,
+        #[wasm_bindgen(js_name = "levelIndex", unchecked_param_type = "number")]
+        level_index: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let level_index: usize = js_uint(&level_index, "levelIndex")?;
         let level = self.inner.level(level_index).map_err(to_js_err)?;
         to_js_value(&level.deltas)
@@ -214,7 +291,7 @@ impl JsPeriodDecomposition {
     ///
     /// Throws when the mapping cannot be converted to a JavaScript object.
     /// @returns An issuer-ID to residual-adder-change mapping.
-    #[wasm_bindgen(js_name = dAdder)]
+    #[wasm_bindgen(js_name = dAdder, unchecked_return_type = "Record<string, number>")]
     pub fn d_adder(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.d_adder)
     }
@@ -244,12 +321,23 @@ impl JsPeriodDecomposition {
 /// Throws a `not_found` error if an issuer has no model row and no
 /// `runtime_tags` entry, and a `validation` error if `as_of` cannot be parsed
 /// or a spread is outside the decimal band.
+/// @param model - Calibrated credit factor hierarchy used for the peel.
+/// @param observedSpreadsJson - JSON `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Values that look like bp (e.g. `100.0`) are rejected.
+/// @param observedGeneric - Generic (PC) factor value at `as_of`, same decimal convention as the spreads.
+/// @param asOf - ISO-8601 valuation date for the snapshot.
+/// @param runtimeTagsJson - Optional JSON `{issuer_id: {dim_key: tag}}` for issuers not present in the model artifact.
+/// @returns Per-level factor values and residual adders at the requested date, in bp.
 #[wasm_bindgen(js_name = decomposeLevels)]
 pub fn decompose_levels(
     model: &JsCreditFactorModel,
+    #[wasm_bindgen(js_name = "observedSpreadsJson", unchecked_param_type = "JsonInput")]
     observed_spreads_json: JsValue,
-    observed_generic: JsValue,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "observedGeneric", unchecked_param_type = "number")] observed_generic: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(
+        js_name = "runtimeTagsJson",
+        unchecked_optional_param_type = "JsonInput"
+    )]
     runtime_tags_json: Option<JsValue>,
 ) -> Result<JsLevelsAtDate, JsValue> {
     let observed_generic = js_f64(&observed_generic, "observedGeneric")?;
@@ -288,12 +376,13 @@ pub fn decompose_levels(
 /// # Errors
 /// Throws if `from_levels.date > to_levels.date` or the snapshots disagree
 /// on hierarchy depth.
-/// @param from_levels - Credit-factor levels at the start of the attribution period.
-/// @param to_levels - Credit-factor levels at the end of the attribution period.
+/// @param fromLevels - Credit-factor levels at the start of the attribution period.
+/// @param toLevels - Credit-factor levels at the end of the attribution period.
+/// @returns Component-wise change between two hierarchy-level snapshots.
 #[wasm_bindgen(js_name = decomposePeriod)]
 pub fn decompose_period(
-    from_levels: &JsLevelsAtDate,
-    to_levels: &JsLevelsAtDate,
+    #[wasm_bindgen(js_name = "fromLevels")] from_levels: &JsLevelsAtDate,
+    #[wasm_bindgen(js_name = "toLevels")] to_levels: &JsLevelsAtDate,
 ) -> Result<JsPeriodDecomposition, JsValue> {
     let inner = finstack_quant_factor::credit::decomposition::decompose_period(
         &from_levels.inner,
@@ -306,6 +395,20 @@ pub fn decompose_period(
 /// Vol-forecast view over a calibrated `CreditFactorModel`.
 ///
 /// `VolHorizon::Custom` is intentionally **not** exposed.
+///
+/// @example
+/// ```typescript
+/// import init, { models, type JsonInput } from "finstack-quant-wasm";
+/// await init();
+/// const schema = models.factor.schema.get("https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json");
+/// const [example] = schema.examples as JsonInput[];
+/// const model = models.factor.credit.CreditFactorModel.fromJson(example);
+/// const forecast = new models.factor.credit.FactorCovarianceForecast(model);
+/// const oneStep = models.factor.credit.VolHorizon.oneStep().toString();
+/// console.log(forecast.covarianceAt(oneStep).factor_ids);
+/// forecast.free();
+/// model.free();
+/// ```
 #[wasm_bindgen(js_name = FactorCovarianceForecast)]
 pub struct JsFactorCovarianceForecast {
     /// Store the model by value so `FactorCovarianceForecast<'a>` lifetime
@@ -351,9 +454,13 @@ impl JsFactorCovarianceForecast {
     /// Throws if the horizon string is invalid or the model data is
     /// inconsistent.
     /// @returns Structured covariance matrix with ordered factor axes and row-major data.
-    /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
-    #[wasm_bindgen(js_name = covarianceAt)]
-    pub fn covariance_at(&self, horizon_json: JsValue) -> Result<JsValue, JsValue> {
+    /// @param horizonJson - JSON-serialized forecast horizon defining the future covariance date or period.
+    #[wasm_bindgen(js_name = covarianceAt, unchecked_return_type = "FactorCovarianceMatrix")]
+    pub fn covariance_at(
+        &self,
+        #[wasm_bindgen(js_name = "horizonJson", unchecked_param_type = "JsonInput")]
+        horizon_json: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let h = parse_vol_horizon(&horizon_json, "horizonJson")?;
         let forecast = finstack_quant_factor::credit::FactorCovarianceForecast::new(&self.model);
         let cov = forecast.covariance_at(h).map_err(to_js_err)?;
@@ -367,12 +474,13 @@ impl JsFactorCovarianceForecast {
     /// Throws if the issuer is not present in the model's vol state or the
     /// calibrated variance is negative.
     /// @returns Issuer idiosyncratic volatility (standard deviation) in basis points of spread, scaled to the horizon.
-    /// @param issuer_id - Stable issuer identifier used to select the required domain object.
-    /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
+    /// @param issuerId - Stable issuer identifier used to select the required domain object.
+    /// @param horizonJson - JSON-serialized forecast horizon defining the future covariance date or period.
     #[wasm_bindgen(js_name = idiosyncraticVol)]
     pub fn idiosyncratic_vol(
         &self,
-        issuer_id: JsValue,
+        #[wasm_bindgen(js_name = "issuerId", unchecked_param_type = "string")] issuer_id: JsValue,
+        #[wasm_bindgen(js_name = "horizonJson", unchecked_param_type = "JsonInput")]
         horizon_json: JsValue,
     ) -> Result<f64, JsValue> {
         let issuer_id: &str = &js_string(&issuer_id, "issuerId")?;
@@ -389,12 +497,17 @@ impl JsFactorCovarianceForecast {
     /// Throws if the horizon or risk measure is invalid, or the model builder
     /// rejects the assembled configuration.
     /// @returns Structured factor-model configuration ready for portfolio risk workflows.
-    /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
-    /// @param risk_measure_json - Optional `RiskMeasure` wire value for the horizon factor model: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omitted or `null` uses the Rust `RiskMeasure::default()` (`"variance"`).
-    #[wasm_bindgen(js_name = factorModelAt)]
+    /// @param horizonJson - JSON-serialized forecast horizon defining the future covariance date or period.
+    /// @param riskMeasureJson - Optional `RiskMeasure` wire value for the horizon factor model: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omitted or `null` uses the Rust `RiskMeasure::default()` (`"variance"`).
+    #[wasm_bindgen(js_name = factorModelAt, unchecked_return_type = "FactorModelConfig")]
     pub fn factor_model_at(
         &self,
+        #[wasm_bindgen(js_name = "horizonJson", unchecked_param_type = "JsonInput")]
         horizon_json: JsValue,
+        #[wasm_bindgen(
+            js_name = "riskMeasureJson",
+            unchecked_optional_param_type = "JsonInput | null"
+        )]
         risk_measure_json: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let h = parse_vol_horizon(&horizon_json, "horizonJson")?;
@@ -447,25 +560,25 @@ impl JsCreditFactorModel {
     }
 
     /// Factor-model configuration (factors, covariance, matching, risk measure) as a `FactorModelConfig` object.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "FactorModelConfig")]
     pub fn config(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.config)
     }
 
     /// Calibrated factor covariance as a `FactorCovarianceMatrix` object (`factor_ids`, row-major `data`).
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "FactorCovarianceMatrix")]
     pub fn covariance(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.config.covariance)
     }
 
     /// Calibration diagnostics (fit quality, fold-ups, dropped factors) as a plain object.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "Record<string, unknown>")]
     pub fn diagnostics(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.diagnostics)
     }
 
     /// Static factor correlation matrix the covariance forecasts are built on, as a plain object.
-    #[wasm_bindgen(getter, js_name = staticCorrelation)]
+    #[wasm_bindgen(getter, js_name = staticCorrelation, unchecked_return_type = "generated.models.FactorCorrelationMatrix")]
     pub fn static_correlation(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.static_correlation)
     }
@@ -513,7 +626,10 @@ impl JsCreditFactorModel {
 #[wasm_bindgen(js_class = CreditCalibrator)]
 impl JsCreditCalibrator {
     /// Calibration configuration in canonical JSON form, as a `CreditCalibrationConfig` object.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(
+        getter,
+        unchecked_return_type = "generated.models.CreditCalibrationConfig"
+    )]
     pub fn config(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.config())
     }
@@ -522,6 +638,15 @@ impl JsCreditCalibrator {
 /// Forecast horizon for the covariance and idiosyncratic-vol forecasts.
 ///
 /// The forecast methods take the horizon descriptor; pass `horizon.toString()`.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const horizon = models.factor.credit.VolHorizon.years(10 / 252);
+/// console.log(horizon.kind, horizon.yearsValue, horizon.toString());
+/// horizon.free();
+/// ```
 #[wasm_bindgen(js_name = VolHorizon)]
 pub struct JsVolHorizon {
     pub(crate) inner: VolHorizon,
@@ -554,7 +679,9 @@ impl JsVolHorizon {
     ///
     /// Throws a `TypeError` if `n` is not a safe non-negative integer.
     #[wasm_bindgen(js_name = nSteps)]
-    pub fn n_steps(n: JsValue) -> Result<JsVolHorizon, JsValue> {
+    pub fn n_steps(
+        #[wasm_bindgen(unchecked_param_type = "number")] n: JsValue,
+    ) -> Result<JsVolHorizon, JsValue> {
         Ok(Self {
             inner: VolHorizon::NSteps(js_uint(&n, "n")?),
         })
@@ -567,7 +694,9 @@ impl JsVolHorizon {
     /// # Errors
     ///
     /// Throws a `validation` error if `years` is non-finite or negative.
-    pub fn years(years: JsValue) -> Result<JsVolHorizon, JsValue> {
+    pub fn years(
+        #[wasm_bindgen(unchecked_param_type = "number")] years: JsValue,
+    ) -> Result<JsVolHorizon, JsValue> {
         VolHorizon::years(js_f64(&years, "years")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -580,7 +709,9 @@ impl JsVolHorizon {
     /// # Errors
     ///
     /// Throws a `validation` error if the descriptor is not recognized.
-    pub fn parse(s: JsValue) -> Result<JsVolHorizon, JsValue> {
+    pub fn parse(
+        #[wasm_bindgen(unchecked_param_type = "string")] s: JsValue,
+    ) -> Result<JsVolHorizon, JsValue> {
         VolHorizon::parse(&js_string(&s, "s")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -624,7 +755,7 @@ impl JsVolHorizon {
 
 /// Variance of one factor in a factor covariance matrix.
 /// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
-/// @param factor_id - Factor whose diagonal variance is requested; an unknown identifier returns 0.
+/// @param factorId - Factor whose diagonal variance is requested; an unknown identifier returns 0.
 /// @returns The factor's variance.
 ///
 /// # Errors
@@ -632,7 +763,10 @@ impl JsVolHorizon {
 /// Throws a `validation` error if `matrix` is malformed or not a valid
 /// covariance matrix.
 #[wasm_bindgen(js_name = factorVariance)]
-pub fn factor_variance(matrix: JsValue, factor_id: JsValue) -> Result<f64, JsValue> {
+pub fn factor_variance(
+    #[wasm_bindgen(unchecked_param_type = "FactorCovarianceMatrix | string")] matrix: JsValue,
+    #[wasm_bindgen(js_name = "factorId", unchecked_param_type = "string")] factor_id: JsValue,
+) -> Result<f64, JsValue> {
     let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
     Ok(matrix.variance(&FactorId::new(js_string(&factor_id, "factorId")?)))
 }
@@ -648,7 +782,11 @@ pub fn factor_variance(matrix: JsValue, factor_id: JsValue) -> Result<f64, JsVal
 /// Throws a `validation` error if `matrix` is malformed or not a valid
 /// covariance matrix.
 #[wasm_bindgen(js_name = factorCovariance)]
-pub fn factor_covariance(matrix: JsValue, lhs: JsValue, rhs: JsValue) -> Result<f64, JsValue> {
+pub fn factor_covariance(
+    #[wasm_bindgen(unchecked_param_type = "FactorCovarianceMatrix | string")] matrix: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] lhs: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] rhs: JsValue,
+) -> Result<f64, JsValue> {
     let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
     Ok(matrix.covariance(
         &FactorId::new(js_string(&lhs, "lhs")?),
@@ -667,7 +805,11 @@ pub fn factor_covariance(matrix: JsValue, lhs: JsValue, rhs: JsValue) -> Result<
 /// Throws a `validation` error if `matrix` is malformed or not a valid
 /// covariance matrix.
 #[wasm_bindgen(js_name = factorCorrelation)]
-pub fn factor_correlation(matrix: JsValue, lhs: JsValue, rhs: JsValue) -> Result<f64, JsValue> {
+pub fn factor_correlation(
+    #[wasm_bindgen(unchecked_param_type = "FactorCovarianceMatrix | string")] matrix: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] lhs: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] rhs: JsValue,
+) -> Result<f64, JsValue> {
     let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
     Ok(matrix.correlation(
         &FactorId::new(js_string(&lhs, "lhs")?),
@@ -683,8 +825,10 @@ pub fn factor_correlation(matrix: JsValue, lhs: JsValue, rhs: JsValue) -> Result
 ///
 /// Throws a `validation` error if `matrix` is malformed or not a valid
 /// covariance matrix.
-#[wasm_bindgen(js_name = factorCovarianceRows)]
-pub fn factor_covariance_rows(matrix: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = factorCovarianceRows, unchecked_return_type = "number[][]")]
+pub fn factor_covariance_rows(
+    #[wasm_bindgen(unchecked_param_type = "FactorCovarianceMatrix | string")] matrix: JsValue,
+) -> Result<JsValue, JsValue> {
     let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
     to_js_value(&matrix.to_rows())
 }
@@ -696,7 +840,9 @@ pub fn factor_covariance_rows(matrix: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Throws a `validation` error naming the first inconsistency.
 #[wasm_bindgen(js_name = validateFactorModelConfig)]
-pub fn validate_factor_model_config(config: JsValue) -> Result<(), JsValue> {
+pub fn validate_factor_model_config(
+    #[wasm_bindgen(unchecked_param_type = "FactorModelConfig | string")] config: JsValue,
+) -> Result<(), JsValue> {
     let config: FactorModelConfig = from_js_json(&config, "config")?;
     config.validate().map_err(to_js_err)
 }

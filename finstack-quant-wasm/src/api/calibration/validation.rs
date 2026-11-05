@@ -26,11 +26,15 @@ use wasm_bindgen::prelude::*;
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not have one finite positive entry per expiry, or any check fails.
+/// @param surface - Implied-volatility surface (expiries in years, absolute strikes).
+/// @param config - `ValidationConfig` object; `check_arbitrage: false` skips the arbitrage checks; forward-input validation remains active.
+/// @param forwards - Positive finite forward price for each surface expiry, in expiry order and strike units, even when arbitrage checks are disabled.
 #[wasm_bindgen(js_name = validateSurface)]
 pub fn validate_surface(
     surface: &JsVolSurface,
+    #[wasm_bindgen(unchecked_param_type = "generated.calibration.ValidationConfig")]
     config: JsValue,
-    forwards: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number[] | Float64Array")] forwards: JsValue,
 ) -> Result<(), JsValue> {
     let config: ValidationConfig = from_js_json(&config, "config")?;
     rust_validation::validate_surface(&surface.inner, &config, &js_f64_seq(&forwards, "forwards")?)
@@ -51,11 +55,15 @@ pub fn validate_surface(
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not match the expiries, or total variance decreases at fixed forward moneyness.
+/// @param surface - Implied-volatility surface (expiries in years, absolute strikes).
+/// @param config - `ValidationConfig` object; `check_arbitrage: false` skips the check; forward-input validation remains active.
+/// @param forwards - Positive finite forward price for each surface expiry, in expiry order and strike units, even when arbitrage checks are disabled.
 #[wasm_bindgen(js_name = validateCalendarSpread)]
 pub fn validate_calendar_spread(
     surface: &JsVolSurface,
+    #[wasm_bindgen(unchecked_param_type = "generated.calibration.ValidationConfig")]
     config: JsValue,
-    forwards: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number[] | Float64Array")] forwards: JsValue,
 ) -> Result<(), JsValue> {
     let config: ValidationConfig = from_js_json(&config, "config")?;
     rust_validation::validate_calendar_spread(
@@ -83,11 +91,15 @@ pub fn validate_calendar_spread(
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not match the expiries, or call prices are not convex in strike.
+/// @param surface - Implied-volatility surface (expiries in years, absolute strikes).
+/// @param config - `ValidationConfig` object; `check_arbitrage: false` skips the check; forward-input validation remains active.
+/// @param forwards - Positive finite forward price for each surface expiry, in expiry order and strike units, even when arbitrage checks are disabled.
 #[wasm_bindgen(js_name = validateButterflySpread)]
 pub fn validate_butterfly_spread(
     surface: &JsVolSurface,
+    #[wasm_bindgen(unchecked_param_type = "generated.calibration.ValidationConfig")]
     config: JsValue,
-    forwards: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number[] | Float64Array")] forwards: JsValue,
 ) -> Result<(), JsValue> {
     let config: ValidationConfig = from_js_json(&config, "config")?;
     rust_validation::validate_butterfly_spread(
@@ -111,8 +123,14 @@ pub fn validate_butterfly_spread(
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if `config` is malformed or a volatility is not positive or exceeds `max_volatility`.
+/// @param surface - Implied-volatility surface (expiries in years, absolute strikes).
+/// @param config - `ValidationConfig` object; `max_volatility` is the upper bound (annualized decimal).
 #[wasm_bindgen(js_name = validateVolBounds)]
-pub fn validate_vol_bounds(surface: &JsVolSurface, config: JsValue) -> Result<(), JsValue> {
+pub fn validate_vol_bounds(
+    surface: &JsVolSurface,
+    #[wasm_bindgen(unchecked_param_type = "generated.calibration.ValidationConfig")]
+    config: JsValue,
+) -> Result<(), JsValue> {
     let config: ValidationConfig = from_js_json(&config, "config")?;
     rust_validation::validate_vol_bounds(&surface.inner, &config).map_err(to_js_err)
 }

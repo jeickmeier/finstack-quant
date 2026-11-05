@@ -21,8 +21,11 @@ use wasm_bindgen::prelude::*;
 ///
 /// Throws a `validation` error if the input is malformed, has an unknown
 /// field, or a ratio is non-finite.
-#[wasm_bindgen(js_name = altmanZScore)]
-pub fn altman_z_score(input: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = altmanZScore, unchecked_return_type = "generated.models.ScoringResult")]
+pub fn altman_z_score(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.AltmanZScoreInput | string")]
+    input: JsValue,
+) -> Result<JsValue, JsValue> {
     let input: AltmanZScoreInput = from_js_json(&input, "input")?;
     to_js_value(&scoring::altman_z_score(&input).map_err(to_js_err)?)
 }
@@ -35,8 +38,11 @@ pub fn altman_z_score(input: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Throws a `validation` error if the input is malformed, has an unknown
 /// field, or a ratio is non-finite.
-#[wasm_bindgen(js_name = altmanZPrime)]
-pub fn altman_z_prime(input: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = altmanZPrime, unchecked_return_type = "generated.models.ScoringResult")]
+pub fn altman_z_prime(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.AltmanZPrimeInput | string")]
+    input: JsValue,
+) -> Result<JsValue, JsValue> {
     let input: AltmanZPrimeInput = from_js_json(&input, "input")?;
     to_js_value(&scoring::altman_z_prime(&input).map_err(to_js_err)?)
 }
@@ -49,8 +55,11 @@ pub fn altman_z_prime(input: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Throws a `validation` error if the input is malformed, has an unknown
 /// field, or a ratio is non-finite.
-#[wasm_bindgen(js_name = altmanZDoublePrime)]
-pub fn altman_z_double_prime(input: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = altmanZDoublePrime, unchecked_return_type = "generated.models.ScoringResult")]
+pub fn altman_z_double_prime(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.AltmanZDoublePrimeInput | string")]
+    input: JsValue,
+) -> Result<JsValue, JsValue> {
     let input: AltmanZDoublePrimeInput = from_js_json(&input, "input")?;
     to_js_value(&scoring::altman_z_double_prime(&input).map_err(to_js_err)?)
 }
@@ -63,8 +72,11 @@ pub fn altman_z_double_prime(input: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Throws a `validation` error if the input is malformed, has an unknown
 /// field, or a ratio is non-finite.
-#[wasm_bindgen(js_name = altmanEmScore)]
-pub fn altman_em_score(input: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = altmanEmScore, unchecked_return_type = "generated.models.ScoringResult")]
+pub fn altman_em_score(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.AltmanZDoublePrimeInput | string")]
+    input: JsValue,
+) -> Result<JsValue, JsValue> {
     let input: AltmanZDoublePrimeInput = from_js_json(&input, "input")?;
     to_js_value(&scoring::altman_em_score(&input).map_err(to_js_err)?)
 }
@@ -77,8 +89,11 @@ pub fn altman_em_score(input: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Throws a `validation` error if the input is malformed, has an unknown
 /// field, a ratio is non-finite, or an indicator is not exactly 0 or 1.
-#[wasm_bindgen(js_name = ohlsonOScore)]
-pub fn ohlson_o_score(input: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = ohlsonOScore, unchecked_return_type = "generated.models.ScoringResult")]
+pub fn ohlson_o_score(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OhlsonOScoreInput | string")]
+    input: JsValue,
+) -> Result<JsValue, JsValue> {
     let input: OhlsonOScoreInput = from_js_json(&input, "input")?;
     to_js_value(&scoring::ohlson_o_score(&input).map_err(to_js_err)?)
 }
@@ -91,8 +106,11 @@ pub fn ohlson_o_score(input: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Throws a `validation` error if the input is malformed, has an unknown
 /// field, or a ratio is non-finite.
-#[wasm_bindgen(js_name = zmijewskiScore)]
-pub fn zmijewski_score(input: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = zmijewskiScore, unchecked_return_type = "generated.models.ScoringResult")]
+pub fn zmijewski_score(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.ZmijewskiInput | string")]
+    input: JsValue,
+) -> Result<JsValue, JsValue> {
     let input: ZmijewskiInput = from_js_json(&input, "input")?;
     to_js_value(&scoring::zmijewski_score(&input).map_err(to_js_err)?)
 }
@@ -110,8 +128,10 @@ pub fn zmijewski_score(input: JsValue) -> Result<JsValue, JsValue> {
 /// Throws a `validation` error if the request is malformed or has an unknown
 /// model or field, a ratio is non-finite, or an Ohlson indicator is not
 /// exactly 0 or 1.
-#[wasm_bindgen(js_name = creditScoreReport)]
-pub fn credit_score_report(request: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = creditScoreReport, unchecked_return_type = "generated.models.CreditScoreReport")]
+pub fn credit_score_report(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.CreditScoreRequest | string")] request: JsValue,
+) -> Result<JsValue, JsValue> {
     let request: CreditScoreRequest = from_js_json(&request, "request")?;
     to_js_value(&scoring::credit_score_report(&request).map_err(to_js_err)?)
 }

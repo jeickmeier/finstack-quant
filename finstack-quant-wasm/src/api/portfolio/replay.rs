@@ -10,8 +10,8 @@ use wasm_bindgen::prelude::*;
 /// Accepts a built portfolio, an array of dated market snapshots, and a
 /// replay configuration. Returns a structured `ReplayResult` object.
 /// @param portfolio - Built `Portfolio` handle (from `Portfolio.fromSpec` or `Portfolio.builder`) to revalue at every snapshot.
-/// @param snapshots_json - Market-snapshot JSON array.
-/// @param config_json - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected.
+/// @param snapshotsJson - Market-snapshot JSON array.
+/// @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected.
 ///
 /// Each position's `valuation_result` matches what `priceInstrument` returns:
 /// the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain
@@ -27,10 +27,13 @@ use wasm_bindgen::prelude::*;
 /// configuration or snapshot dates and ordering are invalid; valuation,
 /// attribution, or currency conversion fails; best-effort replay retains no
 /// step; or the result cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = replayPortfolio)]
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = replayPortfolio, unchecked_return_type = "ReplayResult")]
 pub fn replay_portfolio(
     portfolio: &JsPortfolio,
+    #[wasm_bindgen(js_name = "snapshotsJson", unchecked_param_type = "JsonInput")]
     snapshots_json: JsValue,
+    #[wasm_bindgen(js_name = "configJson", unchecked_param_type = "JsonInput")]
     config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let snapshots_json: &str = &json_text(&snapshots_json, "snapshotsJson")?;

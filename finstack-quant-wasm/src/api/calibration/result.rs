@@ -15,8 +15,8 @@ use wasm_bindgen::prelude::*;
 ///
 /// Free-function twin of Python `CalibrationResultEnvelope.step_report` (Rust
 /// `CalibrationResult::step_report`).
-/// @param result_json - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
-/// @param step_id - Identifier of the calibration step, as given in the plan.
+/// @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
+/// @param stepId - Identifier of the calibration step, as given in the plan.
 /// @returns The step's `CalibrationReport`, with raw residuals keyed by quote id.
 ///
 /// # Errors
@@ -24,10 +24,14 @@ use wasm_bindgen::prelude::*;
 /// Throws a `CalibrationEnvelopeError` if the result is malformed or exceeds
 /// the default load limits, and a `FinstackError` with `kind: "not_found"`
 /// naming the available step ids if no step has the given `stepId`.
-#[wasm_bindgen(js_name = calibrationResultStepReport)]
+#[wasm_bindgen(js_name = calibrationResultStepReport, unchecked_return_type = "generated.calibration.CalibrationReport")]
 pub fn calibration_result_step_report(
+    #[wasm_bindgen(
+        js_name = "resultJson",
+        unchecked_param_type = "CalibrationResultEnvelope | string"
+    )]
     result_json: JsValue,
-    step_id: JsValue,
+    #[wasm_bindgen(js_name = "stepId", unchecked_param_type = "string")] step_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result_json: &str = &json_text(&result_json, "resultJson")?;
     let step_id: &str = &js_string(&step_id, "stepId")?;
@@ -43,8 +47,8 @@ pub fn calibration_result_step_report(
 /// `DataFrame`. Rows use the report's declared residual units. Without recorded
 /// diagnostics, `quote_value` is absent and `sensitivity` is `NaN`. Python's
 /// DataFrame represents an absent quote value as `NaN`.
-/// @param result_json - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
-/// @param step_id - Identifier of the calibration step, as given in the plan.
+/// @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
+/// @param stepId - Identifier of the calibration step, as given in the plan.
 /// @returns One `QuoteQuality` row per quote: `quote_label`, `quote_value` (the market quote in its native units, when recorded), `residual` (signed error in the report's declared units; the target is zero) and `sensitivity`.
 ///
 /// # Errors
@@ -52,10 +56,14 @@ pub fn calibration_result_step_report(
 /// Throws a `CalibrationEnvelopeError` if the result is malformed or exceeds
 /// the default load limits, and a `FinstackError` with `kind: "not_found"`
 /// naming the available step ids if no step has the given `stepId`.
-#[wasm_bindgen(js_name = calibrationResultResiduals)]
+#[wasm_bindgen(js_name = calibrationResultResiduals, unchecked_return_type = "generated.calibration.QuoteQuality[]")]
 pub fn calibration_result_residuals(
+    #[wasm_bindgen(
+        js_name = "resultJson",
+        unchecked_param_type = "CalibrationResultEnvelope | string"
+    )]
     result_json: JsValue,
-    step_id: JsValue,
+    #[wasm_bindgen(js_name = "stepId", unchecked_param_type = "string")] step_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result_json: &str = &json_text(&result_json, "resultJson")?;
     let step_id: &str = &js_string(&step_id, "stepId")?;

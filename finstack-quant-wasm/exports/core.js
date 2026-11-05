@@ -6,6 +6,7 @@ import { schema } from './core/schema.js';
 // published methods make it optional, which wasm-bindgen cannot express for a
 // borrowed handle. An omitted context is the Rust default
 // (`new DayCountContext()`), created once after `init()` and only borrowed.
+// The Rust parameter is declared optional (`unchecked_optional_param_type`).
 let defaultDayCountContext;
 // wasm-bindgen cannot borrow an optional context: resolves an omitted one to the Rust default.
 const dayCountContext = (ctx) =>
@@ -27,7 +28,7 @@ wasm.DayCount.prototype.signedYearFraction = function signedYearFraction(
 
 // `FxMatrix.rate(base, quote, date, policy?)`: an omitted policy is the Rust
 // default (`new FxConversionPolicy()`, cashflow date), created once after
-// `init()` and only borrowed.
+// `init()` and only borrowed. The Rust parameter is declared optional.
 let defaultFxConversionPolicy;
 const rawFxRate = wasm.FxMatrix.prototype.rate;
 // wasm-bindgen cannot borrow an optional policy: an omitted one is the shared Rust default.
@@ -42,7 +43,22 @@ wasm.FxMatrix.prototype.rate = function rate(base, quote, date, policy = undefin
 // `MarketContext.insert(curve)` takes any of nine curve and surface classes.
 // wasm-bindgen cannot express a borrowed union of handles, so the typed raw
 // methods are bound in Rust and the dispatch on the handle's class is done
-// here; the raw methods are removed from the published prototype.
+// here; the raw methods are removed from the published prototype (Rust marks
+// them `skip_typescript`, so they are not declared either).
+/**
+ * Store a curve or surface under its own id, replacing any item with the same id.
+ *
+ * The class of the handle selects the store: discount, forward, hazard,
+ * inflation, price and base-correlation curves; volatility surfaces; FX
+ * delta-quoted surfaces; and SABR cubes. The context is changed in place.
+ *
+ * @param curve - A `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `PriceCurve`, `BaseCorrelationCurve`, `VolSurface`, `FxDeltaVolSurface` or `VolCube` handle; its data is shared with the context, not copied.
+ * @returns This context, updated in place, so calls can be chained.
+ * @throws `TypeError` (kind `invalid_type`) if `curve` is not one of those handles.
+ *
+ * @facadeClass MarketContext
+ * @member insert(curve: MarketContextCurve): this
+ */
 const marketContextInserts = [
   [wasm.DiscountCurve, 'insertDiscountCurve'],
   [wasm.ForwardCurve, 'insertForwardCurve'],
@@ -96,12 +112,36 @@ chain(wasm.ScheduleBuilder, [
 // take an optional borrowed handle, so an omitted class runs the raw
 // `sifmaSettlementDateDefaultClass`, which applies the Rust default
 // (`SifmaSettlementClass::default()`, Class A).
+/**
+ * Published SIFMA settlement date of a month for one class (Rust
+ * `sifma_settlement_date`).
+ *
+ * The published facade makes `settlementClass` optional: an omitted class is
+ * the Rust default `SifmaSettlementClass::default()` (Class A).
+ *
+ * @param month - Settlement month number, `1` through `12`.
+ * @param year - Settlement year.
+ * @param settlementClass - Agency-MBS settlement class whose date is requested.
+ * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar (dates are never approximated).
+ * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
+ *
+ * @facadeType (month: number, year: number, settlementClass?: SifmaSettlementClass | null) => number | undefined
+ */
 function sifmaSettlementDate(month, year, settlementClass = undefined) {
   return settlementClass === undefined || settlementClass === null
     ? wasm.sifmaSettlementDateDefaultClass(month, year)
     : wasm.sifmaSettlementDate(month, year, settlementClass);
 }
 
+/**
+ * Namespaced TypeScript entry points for core calculations and types.
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * console.log(core.mean([1, 2, 3]));
+ * ```
+ */
 export const core = {
   toleranceConfigNew: wasm.toleranceConfigNew,
   ratingLevelTryNew: wasm.ratingLevelTryNew,

@@ -231,7 +231,8 @@ The published entry point is
 the fourteen domain namespaces plus `schema` assembled in
 `finstack-quant-wasm/exports/`. TypeScript
 declarations live in
-[`finstack-quant-wasm/index.d.ts`](finstack-quant-wasm/index.d.ts). The
+[`finstack-quant-wasm/index.d.ts`](finstack-quant-wasm/index.d.ts), generated
+over the declarations wasm-bindgen writes from the Rust bindings. The
 `wasm-pack` output under `pkg/` and `pkg-node/` is generated build output, not
 the public API. See
 [`finstack-quant-wasm/README.md`](finstack-quant-wasm/README.md).

@@ -52,8 +52,11 @@ impl JsHolidayCalendar {
     /// @throws `TypeError` (kind `invalid_type`) if `code` is not a string;
     /// `FinstackError` (kind `not_found`) naming close matches if `code` or a
     /// `+` member is not a registered calendar.
+    /// @param code - Built-in calendar id in any case (for example `"target2"` or `"nyse"`; see `availableCalendars()`), or `+`-joined ids for a union calendar (`"nyse+gblo"`).
     #[wasm_bindgen(constructor)]
-    pub fn new(code: JsValue) -> Result<JsHolidayCalendar, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "string")] code: JsValue,
+    ) -> Result<JsHolidayCalendar, JsValue> {
         let code = js_string(&code, "code")?;
         let calendar = calendar_by_id_strict(&code).map_err(to_js_err)?;
         let code = canonical_calendar_id(&code).map_err(to_js_err)?;
@@ -69,8 +72,12 @@ impl JsHolidayCalendar {
     /// @returns `true` for a holiday; weekends follow the calendar's weekend rule.
     /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
     /// `validation`) if it is outside the supported date range.
+    /// @param date - Date as days since 1970-01-01.
     #[wasm_bindgen(js_name = isHoliday)]
-    pub fn is_holiday(&self, date: JsValue) -> Result<bool, JsValue> {
+    pub fn is_holiday(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+    ) -> Result<bool, JsValue> {
         Ok(self.calendar.is_holiday(js_epoch_days(&date, "date")?))
     }
 
@@ -83,8 +90,12 @@ impl JsHolidayCalendar {
     /// @returns `true` when the market is open on `date`.
     /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
     /// `validation`) if it is outside the supported date range.
+    /// @param date - Date as days since 1970-01-01.
     #[wasm_bindgen(js_name = isBusinessDay)]
-    pub fn is_business_day(&self, date: JsValue) -> Result<bool, JsValue> {
+    pub fn is_business_day(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+    ) -> Result<bool, JsValue> {
         Ok(self.calendar.is_business_day(js_epoch_days(&date, "date")?))
     }
 
@@ -98,8 +109,14 @@ impl JsHolidayCalendar {
     /// @returns Number of business days; `0` when `start` is on or after `end`.
     /// @throws `TypeError` if a date is not an integer; `FinstackError` (kind
     /// `validation`) if a date is outside the supported range.
+    /// @param start - First date counted, as days since 1970-01-01.
+    /// @param end - Exclusive end date, as days since 1970-01-01.
     #[wasm_bindgen(js_name = countBusinessDays)]
-    pub fn count_business_days(&self, start: JsValue, end: JsValue) -> Result<i32, JsValue> {
+    pub fn count_business_days(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] start: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] end: JsValue,
+    ) -> Result<i32, JsValue> {
         Ok(self
             .calendar
             .count_business_days(js_epoch_days(&start, "start")?, js_epoch_days(&end, "end")?))
@@ -109,7 +126,7 @@ impl JsHolidayCalendar {
     ///
     /// A plain `CalendarMetadata` object with `id`, `name` and
     /// `ignore_weekends`.
-    #[wasm_bindgen(getter, js_name = metadata)]
+    #[wasm_bindgen(getter, js_name = metadata, unchecked_return_type = "CalendarMetadata | undefined")]
     pub fn metadata(&self) -> Result<JsValue, JsValue> {
         match self.calendar.metadata() {
             Some(metadata) => to_js_value(&metadata),
@@ -148,8 +165,11 @@ pub(crate) fn calendar_arg(
 /// @returns Days since 1970-01-01 (negative before the epoch).
 /// @throws `TypeError` (kind `invalid_type`) if `date` is not a string;
 /// `FinstackError` (kind `validation`) if it is not a valid ISO date.
+/// @param date - Calendar date as strict ISO-8601 text (`"YYYY-MM-DD"`).
 #[wasm_bindgen(js_name = daysSinceEpoch)]
-pub fn days_since_epoch(date: JsValue) -> Result<i32, JsValue> {
+pub fn days_since_epoch(
+    #[wasm_bindgen(unchecked_param_type = "string")] date: JsValue,
+) -> Result<i32, JsValue> {
     Ok(rust_days_since_epoch(js_date(&date, "date")?))
 }
 
@@ -167,8 +187,15 @@ pub fn days_since_epoch(date: JsValue) -> Result<i32, JsValue> {
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `not_found`) for an unknown calendar, or kind `validation` if no business
 /// day is found within the bounded search window.
+/// @param date - Start date as days since 1970-01-01.
+/// @param n - Signed number of business days to move; negative moves backward and `0` returns `date` unchanged, even on a holiday.
+/// @param calendar - Registered holiday-calendar id (for example `"nyse"`, or a `+`-joined union).
 #[wasm_bindgen(js_name = addBusinessDays)]
-pub fn add_business_days(date: JsValue, n: JsValue, calendar: JsValue) -> Result<i32, JsValue> {
+pub fn add_business_days(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] n: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] calendar: JsValue,
+) -> Result<i32, JsValue> {
     let start = js_epoch_days(&date, "date")?;
     let n: i32 = js_int(&n, "n")?;
     let calendar = calendar_arg(&calendar, "calendar")?;
@@ -188,8 +215,13 @@ pub fn add_business_days(date: JsValue, n: JsValue, calendar: JsValue) -> Result
 /// @returns The shifted date as epoch days.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `date` is outside the supported range.
+/// @param date - Start date as days since 1970-01-01.
+/// @param n - Signed number of weekdays to move; holidays are not considered.
 #[wasm_bindgen(js_name = addWeekdays)]
-pub fn add_weekdays(date: JsValue, n: JsValue) -> Result<i32, JsValue> {
+pub fn add_weekdays(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] n: JsValue,
+) -> Result<i32, JsValue> {
     let start = js_epoch_days(&date, "date")?;
     let n: i32 = js_int(&n, "n")?;
     start
@@ -210,8 +242,13 @@ pub fn add_weekdays(date: JsValue, n: JsValue) -> Result<i32, JsValue> {
 /// @returns The shifted date as epoch days.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `date` is outside the supported range.
+/// @param date - Start date as days since 1970-01-01.
+/// @param months - Signed number of months to move (`Jan 31 + 1` gives the last day of February).
 #[wasm_bindgen(js_name = addMonths)]
-pub fn add_months(date: JsValue, months: JsValue) -> Result<i32, JsValue> {
+pub fn add_months(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] months: JsValue,
+) -> Result<i32, JsValue> {
     let start = js_epoch_days(&date, "date")?;
     let months: i32 = js_int(&months, "months")?;
     start
@@ -229,8 +266,11 @@ pub fn add_months(date: JsValue, months: JsValue) -> Result<i32, JsValue> {
 /// @returns The month-end date as epoch days.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported range.
+/// @param date - Any date in the month, as days since 1970-01-01.
 #[wasm_bindgen(js_name = endOfMonth)]
-pub fn end_of_month(date: JsValue) -> Result<i32, JsValue> {
+pub fn end_of_month(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<i32, JsValue> {
     Ok(rust_days_since_epoch(
         js_epoch_days(&date, "date")?.end_of_month(),
     ))
@@ -245,8 +285,11 @@ pub fn end_of_month(date: JsValue) -> Result<i32, JsValue> {
 /// @returns `true` on Saturday or Sunday.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported range.
+/// @param date - Date as days since 1970-01-01.
 #[wasm_bindgen(js_name = isWeekend)]
-pub fn is_weekend(date: JsValue) -> Result<bool, JsValue> {
+pub fn is_weekend(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<bool, JsValue> {
     Ok(js_epoch_days(&date, "date")?.is_weekend())
 }
 
@@ -259,8 +302,11 @@ pub fn is_weekend(date: JsValue) -> Result<bool, JsValue> {
 /// @returns The quarter number, `1` through `4`.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported range.
+/// @param date - Date as days since 1970-01-01.
 #[wasm_bindgen(js_name = quarter)]
-pub fn quarter(date: JsValue) -> Result<u8, JsValue> {
+pub fn quarter(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<u8, JsValue> {
     Ok(js_epoch_days(&date, "date")?.quarter())
 }
 
@@ -275,8 +321,13 @@ pub fn quarter(date: JsValue) -> Result<u8, JsValue> {
 /// @returns The fiscal year the date falls in.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported range.
+/// @param date - Date as days since 1970-01-01.
+/// @param config - Fiscal-year start month and day that decide which fiscal year the date belongs to (for example `FiscalConfig.usFederal()`).
 #[wasm_bindgen(js_name = fiscalYear)]
-pub fn fiscal_year(date: JsValue, config: &JsFiscalConfig) -> Result<i32, JsValue> {
+pub fn fiscal_year(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+    config: &JsFiscalConfig,
+) -> Result<i32, JsValue> {
     Ok(js_epoch_days(&date, "date")?.fiscal_year(config.inner))
 }
 
@@ -292,7 +343,12 @@ pub fn fiscal_year(date: JsValue, config: &JsFiscalConfig) -> Result<i32, JsValu
 /// month-ends; `0` when `other` is before `date`.
 /// @throws `TypeError` if a date is not an integer; `FinstackError` (kind
 /// `validation`) if a date is outside the supported range.
+/// @param date - Start date as days since 1970-01-01.
+/// @param other - End date as days since 1970-01-01.
 #[wasm_bindgen(js_name = monthsUntil)]
-pub fn months_until(date: JsValue, other: JsValue) -> Result<u32, JsValue> {
+pub fn months_until(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] other: JsValue,
+) -> Result<u32, JsValue> {
     Ok(js_epoch_days(&date, "date")?.months_until(js_epoch_days(&other, "other")?))
 }

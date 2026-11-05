@@ -45,8 +45,12 @@ fn run_attribute_pnl(
 /// Throws a classified `FinstackError` for malformed or unknown spec fields,
 /// invalid dates, unavailable market data, pricing, currency, configuration or
 /// method failures, or a contained Rust panic. Invalid host types throw `TypeError`.
-#[wasm_bindgen(js_name = attributePnl)]
-pub fn attribute_pnl(spec: JsValue) -> Result<JsValue, JsValue> {
+/// @param spec - Canonical `AttributionSpec` object or JSON text with the instrument payload, market states, ISO calendar dates, method and optional config.
+/// @returns The native-currency or configured reporting-currency `PnlAttribution` object.
+#[wasm_bindgen(js_name = attributePnl, unchecked_return_type = "PnlAttribution")]
+pub fn attribute_pnl(
+    #[wasm_bindgen(unchecked_param_type = "AttributionSpec | string")] spec: JsValue,
+) -> Result<JsValue, JsValue> {
     let result = run_attribute_pnl(&spec)?;
     crate::utils::to_js_value(&result.attribution)
 }
@@ -65,15 +69,19 @@ pub fn attribute_pnl(spec: JsValue) -> Result<JsValue, JsValue> {
 /// # Errors
 ///
 /// Throws the same classified errors as `attributePnl`, or a serialization error.
+/// @param spec - Canonical `AttributionSpec` object or JSON text with the instrument payload, market states, ISO calendar dates, method and optional config.
+/// @returns Compact canonical `PnlAttribution` JSON, preserving decimal amounts and map order.
 #[wasm_bindgen(js_name = attributePnlJson)]
-pub fn attribute_pnl_json(spec: JsValue) -> Result<String, JsValue> {
+pub fn attribute_pnl_json(
+    #[wasm_bindgen(unchecked_param_type = "AttributionSpec | string")] spec: JsValue,
+) -> Result<String, JsValue> {
     let result = run_attribute_pnl(&spec)?;
     serde_json::to_string(&result.attribution).map_err(to_js_err)
 }
 
 /// Parse and execute one `AttributionEnvelope`.
 ///
-/// Shared by [`attribute_pnl_envelope`] and [`attribute_pnl_envelope_json`].
+/// Shared by `attributePnlEnvelope` and `attributePnlEnvelopeJson`.
 fn run_attribute_pnl_envelope(
     spec_json: &JsValue,
 ) -> Result<finstack_quant_attribution::AttributionResultEnvelope, JsValue> {
@@ -87,7 +95,7 @@ fn run_attribute_pnl_envelope(
 ///
 /// Returns the Rust `AttributionResultEnvelope` as a plain object:
 /// `{ schema: "finstack_quant.attribution/1", result: { attribution, results_meta } }`.
-/// Use [`attribute_pnl_envelope_json`] for the JSON wire string.
+/// Use `attributePnlEnvelopeJson` for the JSON wire string.
 ///
 /// # Errors
 ///
@@ -95,25 +103,31 @@ fn run_attribute_pnl_envelope(
 /// instrument or market reconstruction, pricing, FX, rounding, metric, or
 /// method-specific attribution failures; a caught execution panic; or
 /// failure to convert the result envelope to a JavaScript value.
-/// @param spec_json - JSON-serialized AttributionEnvelope (schema `finstack_quant.attribution/1`) to validate and execute.
-#[wasm_bindgen(js_name = attributePnlEnvelope)]
-pub fn attribute_pnl_envelope(spec_json: JsValue) -> Result<JsValue, JsValue> {
+/// @param specJson - JSON-serialized AttributionEnvelope (schema `finstack_quant.attribution/1`) to validate and execute.
+/// @returns The `AttributionResultEnvelope` as a plain object.
+#[wasm_bindgen(js_name = attributePnlEnvelope, unchecked_return_type = "AttributionResultEnvelope")]
+pub fn attribute_pnl_envelope(
+    #[wasm_bindgen(js_name = "specJson", unchecked_param_type = "JsonInput")] spec_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let result_envelope = run_attribute_pnl_envelope(&spec_json)?;
     crate::utils::to_js_value(&result_envelope)
 }
 
 /// Run attribution from a full JSON `AttributionEnvelope` and return JSON.
 ///
-/// Wire twin of [`attribute_pnl_envelope`] for full envelope round-trip
+/// Wire twin of `attributePnlEnvelope` for full envelope round-trip
 /// workflows.
 ///
 /// # Errors
 ///
 /// Rejects the same conditions as `attributePnlEnvelope`, plus failure to
 /// serialize the result envelope.
-/// @param spec_json - JSON-serialized AttributionEnvelope (schema `finstack_quant.attribution/1`) to validate and execute.
+/// @param specJson - JSON-serialized AttributionEnvelope (schema `finstack_quant.attribution/1`) to validate and execute.
+/// @returns JSON attribution result envelope for the supplied spec.
 #[wasm_bindgen(js_name = attributePnlEnvelopeJson)]
-pub fn attribute_pnl_envelope_json(spec_json: JsValue) -> Result<String, JsValue> {
+pub fn attribute_pnl_envelope_json(
+    #[wasm_bindgen(js_name = "specJson", unchecked_param_type = "JsonInput")] spec_json: JsValue,
+) -> Result<String, JsValue> {
     let result_envelope = run_attribute_pnl_envelope(&spec_json)?;
     serde_json::to_string(&result_envelope).map_err(to_js_err)
 }
@@ -130,8 +144,11 @@ pub fn attribute_pnl_envelope_json(spec_json: JsValue) -> Result<String, JsValue
 /// Rejects malformed, schema-incompatible, or unsupported-version `json`, or
 /// failure to serialize the canonical attribution envelope.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+/// @returns Canonical attribution-envelope JSON after schema validation.
 #[wasm_bindgen(js_name = validateAttributionJson)]
-pub fn validate_attribution_json(json: JsValue) -> Result<String, JsValue> {
+pub fn validate_attribution_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     let json: &str = &json_text(&json, "json")?;
     finstack_quant_attribution::validate_attribution_json(json).map_err(to_js_err)
 }
@@ -142,7 +159,8 @@ pub fn validate_attribution_json(json: JsValue) -> Result<String, JsValue> {
 ///
 /// Rejects if the default factor identifiers cannot be serialized to
 /// JavaScript.
-#[wasm_bindgen(js_name = defaultWaterfallOrder)]
+/// @returns Default waterfall factor names in execution order.
+#[wasm_bindgen(js_name = defaultWaterfallOrder, unchecked_return_type = "string[]")]
 pub fn default_waterfall_order() -> Result<JsValue, JsValue> {
     let factors: Vec<String> = finstack_quant_attribution::default_waterfall_order()
         .into_iter()
@@ -157,7 +175,8 @@ pub fn default_waterfall_order() -> Result<JsValue, JsValue> {
 ///
 /// Rejects if the default metric identifiers cannot be serialized to
 /// JavaScript.
-#[wasm_bindgen(js_name = defaultAttributionMetrics)]
+/// @returns Default metric identifiers used by metrics-based attribution.
+#[wasm_bindgen(js_name = defaultAttributionMetrics, unchecked_return_type = "string[]")]
 pub fn default_attribution_metrics() -> Result<JsValue, JsValue> {
     let metrics: Vec<String> = finstack_quant_attribution::default_attribution_metrics()
         .into_iter()
@@ -172,12 +191,12 @@ pub fn default_attribution_metrics() -> Result<JsValue, JsValue> {
 /// factor loop. The T₀ value converts into `targetCurrency` with the T₀
 /// market's FX and the T₁ value with the T₁ market's FX. Use `attributePnl`
 /// when the factor decomposition matters.
-/// @param instrument_json - Canonical `finstack_quant.instrument/1` envelope (object or JSON).
-/// @param market_t0_json - Canonical MarketContext at the opening date.
-/// @param market_t1_json - Canonical MarketContext at the closing date.
-/// @param as_of_t0 - Opening valuation date as an ISO-8601 string.
-/// @param as_of_t1 - Closing valuation date as an ISO-8601 string.
-/// @param target_currency - ISO-4217 currency of the returned P&L.
+/// @param instrumentJson - Canonical `finstack_quant.instrument/1` envelope (object or JSON).
+/// @param marketT0Json - Canonical MarketContext at the opening date.
+/// @param marketT1Json - Canonical MarketContext at the closing date.
+/// @param asOfT0 - Opening valuation date as an ISO-8601 string.
+/// @param asOfT1 - Closing valuation date as an ISO-8601 string.
+/// @param targetCurrency - ISO-4217 currency of the returned P&L.
 /// @returns The P&L as a `Money` handle in `targetCurrency`.
 ///
 /// # Errors
@@ -187,11 +206,14 @@ pub fn default_attribution_metrics() -> Result<JsValue, JsValue> {
 /// pricing fails.
 #[wasm_bindgen(js_name = pnlBridge)]
 pub fn pnl_bridge(
-    instrument_json: JsValue,
+    #[wasm_bindgen(js_name = "instrumentJson", unchecked_param_type = "JsonInput")] instrument_json: JsValue,
+    #[wasm_bindgen(js_name = "marketT0Json", unchecked_param_type = "JsonInput")]
     market_t0_json: JsValue,
+    #[wasm_bindgen(js_name = "marketT1Json", unchecked_param_type = "JsonInput")]
     market_t1_json: JsValue,
-    as_of_t0: JsValue,
-    as_of_t1: JsValue,
+    #[wasm_bindgen(js_name = "asOfT0", unchecked_param_type = "string")] as_of_t0: JsValue,
+    #[wasm_bindgen(js_name = "asOfT1", unchecked_param_type = "string")] as_of_t1: JsValue,
+    #[wasm_bindgen(js_name = "targetCurrency", unchecked_param_type = "string")]
     target_currency: JsValue,
 ) -> Result<crate::api::core::money::JsMoney, JsValue> {
     let instrument = finstack_quant_valuations::pricer::parse_instrument_from_json(&json_text(
@@ -238,8 +260,14 @@ pub fn pnl_bridge(
 ///
 /// Throws a classified `FinstackError` for malformed inputs or envelopes,
 /// or the first instrument's pricing, market-data, currency or validation error.
-#[wasm_bindgen(js_name = attributePnlMany)]
-pub fn attribute_pnl_many(inputs: JsValue, instruments: JsValue) -> Result<JsValue, JsValue> {
+/// @param inputs - `AttributionInputs` object or JSON containing markets, dates, method and execution options; no placeholder instrument is required.
+/// @param instruments - Ordered array of canonical instrument envelopes, each an object or JSON string. The array itself may also be serialized JSON.
+/// @returns One `PnlAttribution` object per instrument, in input order.
+#[wasm_bindgen(js_name = attributePnlMany, unchecked_return_type = "PnlAttribution[]")]
+pub fn attribute_pnl_many(
+    #[wasm_bindgen(unchecked_param_type = "AttributionInputs | string")] inputs: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput[] | string")] instruments: JsValue,
+) -> Result<JsValue, JsValue> {
     let inputs: finstack_quant_attribution::AttributionInputs =
         crate::utils::input::from_js_json(&inputs, "inputs")?;
     let instruments: Vec<serde_json::Value> =
@@ -273,8 +301,10 @@ pub fn attribute_pnl_many(inputs: JsValue, instruments: JsValue) -> Result<JsVal
 /// Throws with kind `validation` if the spec is malformed or violates the
 /// weighting/benchmark invariants (including a Brinson group with zero net
 /// weight but nonzero contribution).
-#[wasm_bindgen(js_name = attributeReturnContribution)]
-pub fn attribute_return_contribution(spec: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = attributeReturnContribution, unchecked_return_type = "ReturnContributionResult")]
+pub fn attribute_return_contribution(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] spec: JsValue,
+) -> Result<JsValue, JsValue> {
     let spec: finstack_quant_attribution::ReturnContributionSpec =
         crate::utils::input::from_js_json(&spec, "spec")?;
     let result =
@@ -286,7 +316,7 @@ pub fn attribute_return_contribution(spec: JsValue) -> Result<JsValue, JsValue> 
 ///
 /// Wire twin of `attributeReturnContribution` (Rust
 /// `attribute_return_contribution_json`).
-/// @param spec_json - `ReturnContributionSpec` (object or JSON).
+/// @param specJson - `ReturnContributionSpec` (object or JSON).
 /// @returns Canonical `ReturnContributionResult` JSON text.
 ///
 /// # Errors
@@ -294,7 +324,9 @@ pub fn attribute_return_contribution(spec: JsValue) -> Result<JsValue, JsValue> 
 /// Throws with kind `validation` if the spec is malformed or violates the
 /// weighting/benchmark invariants.
 #[wasm_bindgen(js_name = attributeReturnContributionJson)]
-pub fn attribute_return_contribution_json(spec_json: JsValue) -> Result<String, JsValue> {
+pub fn attribute_return_contribution_json(
+    #[wasm_bindgen(js_name = "specJson", unchecked_param_type = "JsonInput")] spec_json: JsValue,
+) -> Result<String, JsValue> {
     finstack_quant_attribution::attribute_return_contribution_json(&json_text(
         &spec_json, "specJson",
     )?)
@@ -305,7 +337,7 @@ pub fn attribute_return_contribution_json(spec_json: JsValue) -> Result<String, 
 ///
 /// Mirrors Python `validate_return_contribution_json`: the spec is parsed and
 /// executed, so a spec that validates here also computes.
-/// @param spec_json - `ReturnContributionSpec` (object or JSON).
+/// @param specJson - `ReturnContributionSpec` (object or JSON).
 /// @returns Canonical compact spec JSON.
 ///
 /// # Errors
@@ -313,7 +345,9 @@ pub fn attribute_return_contribution_json(spec_json: JsValue) -> Result<String, 
 /// Throws with kind `validation` if the spec is malformed or violates the
 /// weighting/benchmark invariants.
 #[wasm_bindgen(js_name = validateReturnContributionJson)]
-pub fn validate_return_contribution_json(spec_json: JsValue) -> Result<String, JsValue> {
+pub fn validate_return_contribution_json(
+    #[wasm_bindgen(js_name = "specJson", unchecked_param_type = "JsonInput")] spec_json: JsValue,
+) -> Result<String, JsValue> {
     finstack_quant_attribution::validate_return_contribution_json(&json_text(
         &spec_json, "specJson",
     )?)
@@ -339,7 +373,11 @@ fn parse_pnl(value: &JsValue) -> Result<finstack_quant_attribution::PnlAttributi
 /// kind `invalid_type` if `showZeros` is not a boolean.
 #[wasm_bindgen(js_name = pnlAttributionExplainText)]
 pub fn pnl_attribution_explain(
-    pnl: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PnlAttribution | string")] pnl: JsValue,
+    #[wasm_bindgen(
+        js_name = "showZeros",
+        unchecked_optional_param_type = "boolean | null"
+    )]
     show_zeros: Option<JsValue>,
 ) -> Result<String, JsValue> {
     let show_zeros =
@@ -361,7 +399,10 @@ pub fn pnl_attribution_explain(
 /// Throws with kind `validation` if `pnl` is not a `PnlAttribution`, and kind
 /// `invalid_type` if `amount` is not a number.
 #[wasm_bindgen(js_name = pnlAttributionPctOfTotal)]
-pub fn pnl_attribution_pct_of_total(pnl: JsValue, amount: JsValue) -> Result<Option<f64>, JsValue> {
+pub fn pnl_attribution_pct_of_total(
+    #[wasm_bindgen(unchecked_param_type = "PnlAttribution | string")] pnl: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+) -> Result<Option<f64>, JsValue> {
     let pnl = parse_pnl(&pnl)?;
     Ok(pnl.pct_of_total(crate::utils::input::js_f64(&amount, "amount")?))
 }
@@ -377,8 +418,10 @@ pub fn pnl_attribution_pct_of_total(pnl: JsValue, amount: JsValue) -> Result<Opt
 /// # Errors
 ///
 /// Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
-#[wasm_bindgen(js_name = pnlAttributionPctOfTotalByBucket)]
-pub fn pnl_attribution_pct_of_total_by_bucket(pnl: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = pnlAttributionPctOfTotalByBucket, unchecked_return_type = "PnlBucketShare[]")]
+pub fn pnl_attribution_pct_of_total_by_bucket(
+    #[wasm_bindgen(unchecked_param_type = "PnlAttribution | string")] pnl: JsValue,
+) -> Result<JsValue, JsValue> {
     crate::utils::to_js_value(&parse_pnl(&pnl)?.pct_of_total_by_bucket())
 }
 
@@ -389,8 +432,8 @@ pub fn pnl_attribution_pct_of_total_by_bucket(pnl: JsValue) -> Result<JsValue, J
 /// larger of `pctTolerance`% of |total P&L| and `absTolerance`; an
 /// attribution flagged `result_invalid` is never within tolerance.
 /// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
-/// @param pct_tolerance - Optional percentage tolerance (`0.1` = 0.1%); omitted uses the run's `meta.tolerance_pct`.
-/// @param abs_tolerance - Optional absolute tolerance in `total_pnl` currency units; omitted uses `meta.tolerance_abs`.
+/// @param pctTolerance - Optional percentage tolerance (`0.1` = 0.1%); omitted uses the run's `meta.tolerance_pct`.
+/// @param absTolerance - Optional absolute tolerance in `total_pnl` currency units; omitted uses `meta.tolerance_abs`.
 /// @returns `true` when the residual is within tolerance.
 ///
 /// # Errors
@@ -399,8 +442,16 @@ pub fn pnl_attribution_pct_of_total_by_bucket(pnl: JsValue) -> Result<JsValue, J
 /// `invalid_type` if a tolerance is not a number.
 #[wasm_bindgen(js_name = pnlAttributionResidualWithinTolerance)]
 pub fn pnl_attribution_residual_within_tolerance(
-    pnl: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PnlAttribution | string")] pnl: JsValue,
+    #[wasm_bindgen(
+        js_name = "pctTolerance",
+        unchecked_optional_param_type = "number | null"
+    )]
     pct_tolerance: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "absTolerance",
+        unchecked_optional_param_type = "number | null"
+    )]
     abs_tolerance: Option<JsValue>,
 ) -> Result<bool, JsValue> {
     let pnl = parse_pnl(&pnl)?;
@@ -421,7 +472,9 @@ pub fn pnl_attribution_residual_within_tolerance(
 /// Throws with kind `validation` if `pnl` is not a `PnlAttribution` or a
 /// factor is denominated in another currency.
 #[wasm_bindgen(js_name = pnlAttributionValidateCurrencies)]
-pub fn pnl_attribution_validate_currencies(pnl: JsValue) -> Result<(), JsValue> {
+pub fn pnl_attribution_validate_currencies(
+    #[wasm_bindgen(unchecked_param_type = "PnlAttribution | string")] pnl: JsValue,
+) -> Result<(), JsValue> {
     parse_pnl(&pnl)?.validate_currencies().map_err(to_js_err)
 }
 
@@ -437,7 +490,9 @@ pub fn pnl_attribution_validate_currencies(pnl: JsValue) -> Result<(), JsValue> 
 ///
 /// Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
 #[wasm_bindgen(js_name = pnlAttributionRequiredMetrics)]
-pub fn pnl_attribution_required_metrics(pnl: JsValue) -> Result<Vec<String>, JsValue> {
+pub fn pnl_attribution_required_metrics(
+    #[wasm_bindgen(unchecked_param_type = "PnlAttribution | string")] pnl: JsValue,
+) -> Result<Vec<String>, JsValue> {
     Ok(parse_pnl(&pnl)?
         .meta
         .method

@@ -34,6 +34,17 @@ struct ForwardCurveOptions {
 }
 
 /// Forward rate curve for a floating-rate index with a fixed tenor.
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const curve = new core.ForwardCurve({
+///   id: "USD-SOFR-3M", tenor: 0.25, baseDate: "2026-01-02",
+///   knots: [0, 0.03, 1, 0.035]
+/// });
+/// console.log(curve.rate(0.5));
+/// ```
 #[wasm_bindgen(js_name = ForwardCurve)]
 pub struct JsForwardCurve {
     pub(crate) inner: Arc<RustForwardCurve>,
@@ -86,8 +97,11 @@ impl JsForwardCurve {
     /// # Errors
     ///
     /// Throws Error when options contain unknown fields, cannot be decoded, or canonical curve validation rejects dates, conventions, knots, tenor, reset lag, or projection grid.
+    /// @param options - ForwardCurveOptions object: curve id, tenor in years, ISO baseDate, flat time/decimal-rate knots, and optional dayCount, interp, extrapolation, projectionGrid and resetLag. Omitted policies use the Rust builder defaults; arrays and typed arrays are accepted.
     #[wasm_bindgen(constructor)]
-    pub fn new(options: JsValue) -> Result<JsForwardCurve, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "ForwardCurveOptions")] options: JsValue,
+    ) -> Result<JsForwardCurve, JsValue> {
         let options = from_js_json(&options, "options")?;
         Self::build(options)
     }
@@ -109,8 +123,12 @@ impl JsForwardCurve {
     /// @throws `TypeError` if `t` is neither a number nor a string;
     /// `FinstackError` (kind `validation`) for a malformed date or a year
     /// fraction that cannot be computed.
+    /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count; a date on or before the base date reads the rate at curve time zero).
     #[wasm_bindgen(js_name = rate)]
-    pub fn rate(&self, t: JsValue) -> Result<f64, JsValue> {
+    pub fn rate(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
+    ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
             TimePoint::Years(t) => Ok(self.inner.rate(t)),
             TimePoint::Date(d) => self.inner.rate_on_date(d).map_err(to_js_err),
@@ -132,7 +150,11 @@ impl JsForwardCurve {
     /// later than `t1`, a projection discount factor cannot be computed, or the
     /// implied rate is non-finite.
     #[wasm_bindgen(js_name = rateBetween)]
-    pub fn rate_between(&self, t1: JsValue, t2: JsValue) -> Result<f64, JsValue> {
+    pub fn rate_between(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t1: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] t2: JsValue,
+    ) -> Result<f64, JsValue> {
         let t1 = js_f64(&t1, "t1")?;
         let t2 = js_f64(&t2, "t2")?;
         self.inner.rate_between(t1, t2).map_err(to_js_err)
@@ -151,7 +173,7 @@ impl JsForwardCurve {
     }
 
     /// Contractual projection boundaries, or `undefined` for legacy tenor stepping.
-    #[wasm_bindgen(getter, js_name = projectionGrid)]
+    #[wasm_bindgen(getter, js_name = projectionGrid, unchecked_return_type = "Float64Array | undefined")]
     pub fn projection_grid(&self) -> JsValue {
         self.inner
             .projection_grid()
@@ -175,12 +197,16 @@ impl JsForwardCurve {
     ///
     /// @returns A `ForwardCurve` with the Rust builder defaults.
     /// @throws If `baseDate` is not an ISO date, or `tenor` or `rate` is invalid.
+    /// @param id - Curve identifier stored on the curve.
+    /// @param tenor - Index tenor in years (e.g. `0.25` for a 3M index).
+    /// @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
+    /// @param rate - Constant forward rate as a decimal.
     #[wasm_bindgen(js_name = flat)]
     pub fn flat(
-        id: JsValue,
-        tenor: JsValue,
-        base_date: JsValue,
-        rate: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] tenor: JsValue,
+        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
     ) -> Result<JsForwardCurve, JsValue> {
         let id = js_string(&id, "id")?;
         let tenor = js_f64(&tenor, "tenor")?;
@@ -201,8 +227,11 @@ impl JsForwardCurve {
     ///
     /// @returns The validated `ForwardCurve`.
     /// @throws If `json` is malformed, has unknown fields, or fails curve validation.
+    /// @param json - Canonical ForwardCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsForwardCurve, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsForwardCurve, JsValue> {
         from_js_json::<RustForwardCurve>(&json, "json").map(Self::from_inner)
     }
 
@@ -224,8 +253,14 @@ impl JsForwardCurve {
     ///
     /// @returns The finite period-average rate as a decimal; equal or very short intervals return the start rate.
     /// @throws If endpoints are non-finite or reversed, or the interval or result is non-finite.
+    /// @param t1 - Start of the accrual period in years from `baseDate`.
+    /// @param t2 - End of the accrual period in years from `baseDate`.
     #[wasm_bindgen(js_name = ratePeriod)]
-    pub fn rate_period(&self, t1: JsValue, t2: JsValue) -> Result<f64, JsValue> {
+    pub fn rate_period(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t1: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] t2: JsValue,
+    ) -> Result<f64, JsValue> {
         let t1 = js_f64(&t1, "t1")?;
         let t2 = js_f64(&t2, "t2")?;
         self.inner.rate_period(t1, t2).map_err(to_js_err)
@@ -243,7 +278,11 @@ impl JsForwardCurve {
     /// @throws `TypeError` if `t` is neither a number nor a string;
     /// `FinstackError` (kind `validation`) for a malformed date, a year
     /// fraction that cannot be computed, or an invalid implied discount factor.
-    pub fn df(&self, t: JsValue) -> Result<f64, JsValue> {
+    /// @param t - Time from `baseDate` in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    pub fn df(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
+    ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
             TimePoint::Years(t) => self.inner.df(t).map_err(to_js_err),
             TimePoint::Date(d) => self.inner.df_on_date(d).map_err(to_js_err),
@@ -294,7 +333,7 @@ impl JsForwardCurve {
     ///
     /// @returns The `RateCalibrationRecipe` object, or `undefined` for a curve that was built directly rather than produced by a calibration step.
     /// @throws FinstackError - If the recipe cannot be converted to a JavaScript object.
-    #[wasm_bindgen(getter, js_name = rateCalibration)]
+    #[wasm_bindgen(getter, js_name = rateCalibration, unchecked_return_type = "RateCalibrationRecipe | undefined")]
     pub fn rate_calibration(&self) -> Result<JsValue, JsValue> {
         match self.inner.rate_calibration() {
             Some(recipe) => crate::utils::to_js_value(recipe),

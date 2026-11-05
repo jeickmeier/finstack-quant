@@ -41,38 +41,40 @@ use wasm_bindgen::prelude::*;
 /// @param spot - Current spot price or exchange rate in the same units as the strike.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
-/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
 /// @param kappa - Mean-reversion speed of variance in the Heston stochastic-volatility model.
 /// @param theta - Long-run variance level in the Heston stochastic-volatility model.
-/// @param vol_of_vol - Annualized volatility of variance in the Heston stochastic-volatility model.
+/// @param volOfVol - Annualized volatility of variance in the Heston stochastic-volatility model.
 /// @param rho - Instantaneous correlation between the asset and variance shocks.
 /// @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
 /// @param expiry - Time to option expiry in years on the model's annual time basis.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param num_paths - Integer number of independent path estimators in [2, 10000000]; each
+/// @param isCall - Whether to value a call (`true`) or put (`false`).
+/// @param numPaths - Integer number of independent path estimators in [2, 10000000]; each
 /// antithetic pair counts once. Omitted or `null` uses the Rust registry European-pricer
 /// default (100 000).
 /// @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses
 /// the Rust registry default seed, so results stay reproducible.
-/// @param num_steps - Optional positive integer number of time steps per simulated path; omitted uses the Rust registry default.
+/// @param numSteps - Optional positive integer number of time steps per simulated path; omitted uses the Rust registry default.
 /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
-#[wasm_bindgen(js_name = priceHeston)]
+#[wasm_bindgen(js_name = priceHeston, unchecked_return_type = "MoneyEstimate")]
 pub fn price_heston(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    kappa: JsValue,
-    theta: JsValue,
-    vol_of_vol: JsValue,
-    rho: JsValue,
-    v0: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] kappa: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] theta: JsValue,
+    #[wasm_bindgen(js_name = "volOfVol", unchecked_param_type = "number")] vol_of_vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rho: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] v0: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(js_name = "numPaths", unchecked_optional_param_type = "number | null")]
     num_paths: Option<JsValue>,
-    seed: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "bigint | number | null")] seed: Option<JsValue>,
+    #[wasm_bindgen(js_name = "numSteps", unchecked_optional_param_type = "number | null")]
     num_steps: Option<JsValue>,
-    currency: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] currency: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     use finstack_quant_models::monte_carlo::pricer::heston as canonical;
 
@@ -146,7 +148,7 @@ fn gbm_inputs(
 /// Whether Heston parameters satisfy the Feller condition `2 * kappa * theta >= volOfVol^2`.
 /// @param kappa - Mean-reversion speed of the variance, per year.
 /// @param theta - Long-run variance level (annualized, as a decimal).
-/// @param vol_of_vol - Volatility of variance (annualized, as a decimal).
+/// @param volOfVol - Volatility of variance (annualized, as a decimal).
 /// @returns `true` when the variance process stays strictly positive.
 ///
 /// # Errors
@@ -154,9 +156,9 @@ fn gbm_inputs(
 /// Throws a `TypeError` if an argument is not a number.
 #[wasm_bindgen(js_name = hestonSatisfiesFeller)]
 pub fn heston_satisfies_feller(
-    kappa: JsValue,
-    theta: JsValue,
-    vol_of_vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] kappa: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] theta: JsValue,
+    #[wasm_bindgen(js_name = "volOfVol", unchecked_param_type = "number")] vol_of_vol: JsValue,
 ) -> Result<bool, JsValue> {
     Ok(
         finstack_quant_models::monte_carlo::process::heston::heston_satisfies_feller(
@@ -200,8 +202,11 @@ pub fn heston_satisfies_feller(
 /// `initial_state` has the wrong length or lies outside the process's domain,
 /// the time grid is invalid, `num_paths` is outside [1, 100000], the output
 /// would exceed 64 million stored values, or a simulated state is non-finite.
-#[wasm_bindgen(js_name = simulatePaths)]
-pub fn simulate_paths(spec: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = simulatePaths, unchecked_return_type = "generated.models.PathSummary")]
+pub fn simulate_paths(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.PathSimulationSpec | string")]
+    spec: JsValue,
+) -> Result<JsValue, JsValue> {
     let spec: PathSimulationSpec = from_js_json(&spec, "spec")?;
     let summary =
         finstack_quant_models::monte_carlo::simulate::simulate_paths(&spec).map_err(to_js_err)?;
@@ -218,7 +223,9 @@ pub fn simulate_paths(spec: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Throws a `validation` error if `estimate` is malformed.
 #[wasm_bindgen(js_name = relativeStderr)]
-pub fn relative_stderr(estimate: JsValue) -> Result<f64, JsValue> {
+pub fn relative_stderr(
+    #[wasm_bindgen(unchecked_param_type = "MoneyEstimate | string")] estimate: JsValue,
+) -> Result<f64, JsValue> {
     let estimate: MoneyEstimate = from_js_json(&estimate, "estimate")?;
     Ok(estimate.relative_stderr())
 }
@@ -263,14 +270,14 @@ fn fd_spec(
 /// @param spot - Spot level at time 0.
 /// @param strike - Exercise price in the same units as `spot`.
 /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-/// @param div_yield - Continuous dividend yield (decimal, annualized).
+/// @param divYield - Continuous dividend yield (decimal, annualized).
 /// @param vol - Annualized GBM volatility (decimal); positive.
 /// @param expiry - Time to expiry in years.
-/// @param is_call - `true` for a call payoff, `false` for a put.
-/// @param num_paths - Optional paths per evaluation; omitted uses the registry default.
+/// @param isCall - `true` for a call payoff, `false` for a put.
+/// @param numPaths - Optional paths per evaluation; omitted uses the registry default.
 /// @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-/// @param num_steps - Optional time-grid steps; omitted uses the registry default.
-/// @param bump_size - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
+/// @param numSteps - Optional time-grid steps; omitted uses the registry default.
+/// @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
 /// @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
 /// @returns The `Estimate` object for delta (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
 ///
@@ -279,20 +286,23 @@ fn fd_spec(
 /// Throws a `validation` error if an input is non-finite or out of range or
 /// the currency code is unknown.
 #[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = finiteDiffDelta)]
+#[wasm_bindgen(js_name = finiteDiffDelta, unchecked_return_type = "generated.models.Estimate")]
 pub fn finite_diff_delta(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(js_name = "numPaths", unchecked_optional_param_type = "number")]
     num_paths: Option<JsValue>,
-    seed: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "number | bigint")] seed: Option<JsValue>,
+    #[wasm_bindgen(js_name = "numSteps", unchecked_optional_param_type = "number")]
     num_steps: Option<JsValue>,
+    #[wasm_bindgen(js_name = "bumpSize", unchecked_optional_param_type = "number")]
     bump_size: Option<JsValue>,
-    currency: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "string")] currency: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let spec = fd_spec(
         &spot,
@@ -319,14 +329,14 @@ pub fn finite_diff_delta(
 /// @param spot - Spot level at time 0.
 /// @param strike - Exercise price in the same units as `spot`.
 /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-/// @param div_yield - Continuous dividend yield (decimal, annualized).
+/// @param divYield - Continuous dividend yield (decimal, annualized).
 /// @param vol - Annualized GBM volatility (decimal); positive.
 /// @param expiry - Time to expiry in years.
-/// @param is_call - `true` for a call payoff, `false` for a put.
-/// @param num_paths - Optional paths per evaluation; omitted uses the registry default.
+/// @param isCall - `true` for a call payoff, `false` for a put.
+/// @param numPaths - Optional paths per evaluation; omitted uses the registry default.
 /// @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-/// @param num_steps - Optional time-grid steps; omitted uses the registry default.
-/// @param bump_size - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
+/// @param numSteps - Optional time-grid steps; omitted uses the registry default.
+/// @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
 /// @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
 /// @returns The `Estimate` object for gamma (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
 ///
@@ -335,20 +345,23 @@ pub fn finite_diff_delta(
 /// Throws a `validation` error if an input is non-finite or out of range or
 /// the currency code is unknown.
 #[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = finiteDiffGamma)]
+#[wasm_bindgen(js_name = finiteDiffGamma, unchecked_return_type = "generated.models.Estimate")]
 pub fn finite_diff_gamma(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(js_name = "numPaths", unchecked_optional_param_type = "number")]
     num_paths: Option<JsValue>,
-    seed: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "number | bigint")] seed: Option<JsValue>,
+    #[wasm_bindgen(js_name = "numSteps", unchecked_optional_param_type = "number")]
     num_steps: Option<JsValue>,
+    #[wasm_bindgen(js_name = "bumpSize", unchecked_optional_param_type = "number")]
     bump_size: Option<JsValue>,
-    currency: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "string")] currency: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let spec = fd_spec(
         &spot,
@@ -368,6 +381,16 @@ pub fn finite_diff_gamma(
 }
 
 /// Monte Carlo pricer for European options under geometric Brownian motion.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const pricer = new models.monteCarlo.EuropeanPricer(10000, 42);
+/// const call = pricer.priceGbm(100, 100, 0.05, 0.0, 0.2, 1.0, true);
+/// console.log(call.mean.amount, call.stderr);
+/// pricer.free();
+/// ```
 #[wasm_bindgen(js_name = EuropeanPricer)]
 pub struct JsEuropeanPricer {
     inner: EuropeanPricer,
@@ -376,17 +399,19 @@ pub struct JsEuropeanPricer {
 #[wasm_bindgen(js_class = EuropeanPricer)]
 impl JsEuropeanPricer {
     /// Pricer whose omitted settings come from the Rust Monte Carlo registry.
-    /// @param num_paths - Optional number of paths; a positive safe integer. Omitted uses the registry default.
+    /// @param numPaths - Optional number of paths; a positive safe integer. Omitted uses the registry default.
     /// @param seed - Optional seed of the path-indexed random streams, as a safe integer or `bigint`. Omitted uses the registry default.
-    /// @param use_parallel - Optional; run paths on the thread pool. WebAssembly always runs sequentially with identical results. Omitted uses the registry default.
+    /// @param useParallel - Optional; run paths on the thread pool. WebAssembly always runs sequentially with identical results. Omitted uses the registry default.
     ///
     /// # Errors
     ///
     /// Throws a `validation` error if `numPaths` is zero.
     #[wasm_bindgen(constructor)]
     pub fn new(
+        #[wasm_bindgen(js_name = "numPaths", unchecked_optional_param_type = "number")]
         num_paths: Option<JsValue>,
-        seed: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "number | bigint")] seed: Option<JsValue>,
+        #[wasm_bindgen(js_name = "useParallel", unchecked_optional_param_type = "boolean")]
         use_parallel: Option<JsValue>,
     ) -> Result<JsEuropeanPricer, JsValue> {
         convenience::european_pricer(
@@ -420,11 +445,11 @@ impl JsEuropeanPricer {
     /// @param spot - Spot level at time 0.
     /// @param strike - Exercise price in the same units as `spot`.
     /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-    /// @param div_yield - Continuous dividend yield (decimal, annualized).
+    /// @param divYield - Continuous dividend yield (decimal, annualized).
     /// @param vol - Annualized GBM volatility (decimal).
     /// @param expiry - Time to expiry in years.
-    /// @param is_call - Whether to value a call (`true`) or put (`false`).
-    /// @param num_steps - Optional time-grid steps; omitted uses the registry default.
+    /// @param isCall - Whether to value a call (`true`) or put (`false`).
+    /// @param numSteps - Optional time-grid steps; omitted uses the registry default.
     /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
     /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
     ///
@@ -433,18 +458,19 @@ impl JsEuropeanPricer {
     /// Throws a `validation` error if an input is non-finite or out of range or
     /// the currency code is unknown.
     #[allow(clippy::too_many_arguments)]
-    #[wasm_bindgen(js_name = priceGbm)]
+    #[wasm_bindgen(js_name = priceGbm, unchecked_return_type = "MoneyEstimate")]
     pub fn price_gbm(
         &self,
-        spot: JsValue,
-        strike: JsValue,
-        rate: JsValue,
-        div_yield: JsValue,
-        vol: JsValue,
-        expiry: JsValue,
-        is_call: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+        #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+        #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+        #[wasm_bindgen(js_name = "numSteps", unchecked_optional_param_type = "number")]
         num_steps: Option<JsValue>,
-        currency: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string")] currency: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
         let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
@@ -469,6 +495,16 @@ impl JsEuropeanPricer {
 }
 
 /// Monte Carlo pricer for arithmetic-average Asian options under GBM.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const pricer = new models.monteCarlo.PathDependentPricer(10000, 42);
+/// const call = pricer.priceAsian(100, 100, 0.05, 0.0, 0.2, 1.0, true, 12);
+/// console.log(call.mean.amount, pricer.antithetic);
+/// pricer.free();
+/// ```
 #[wasm_bindgen(js_name = PathDependentPricer)]
 pub struct JsPathDependentPricer {
     inner: PathDependentPricer,
@@ -477,12 +513,12 @@ pub struct JsPathDependentPricer {
 #[wasm_bindgen(js_class = PathDependentPricer)]
 impl JsPathDependentPricer {
     /// Pricer whose omitted settings come from the Rust Monte Carlo registry.
-    /// @param num_paths - Optional number of paths; a positive safe integer. Omitted uses the registry default.
+    /// @param numPaths - Optional number of paths; a positive safe integer. Omitted uses the registry default.
     /// @param seed - Optional seed of the random streams, as a safe integer or `bigint`. Omitted uses the registry default.
-    /// @param use_parallel - Optional; run paths on the thread pool. WebAssembly always runs sequentially with identical results. Omitted uses the registry default.
+    /// @param useParallel - Optional; run paths on the thread pool. WebAssembly always runs sequentially with identical results. Omitted uses the registry default.
     /// @param antithetic - Optional; use antithetic variates. Omitted keeps the Rust configuration default.
-    /// @param use_sobol - Optional; use Sobol quasi-random numbers. Omitted keeps the Rust configuration default.
-    /// @param use_brownian_bridge - Optional; build paths by Brownian bridge. Omitted keeps the Rust configuration default.
+    /// @param useSobol - Optional; use Sobol quasi-random numbers. Omitted keeps the Rust configuration default.
+    /// @param useBrownianBridge - Optional; build paths by Brownian bridge. Omitted keeps the Rust configuration default.
     ///
     /// # Errors
     ///
@@ -490,11 +526,17 @@ impl JsPathDependentPricer {
     /// a zero path count or Sobol combined with antithetic variates.
     #[wasm_bindgen(constructor)]
     pub fn new(
+        #[wasm_bindgen(js_name = "numPaths", unchecked_optional_param_type = "number")]
         num_paths: Option<JsValue>,
-        seed: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "number | bigint")] seed: Option<JsValue>,
+        #[wasm_bindgen(js_name = "useParallel", unchecked_optional_param_type = "boolean")]
         use_parallel: Option<JsValue>,
-        antithetic: Option<JsValue>,
-        use_sobol: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "boolean")] antithetic: Option<JsValue>,
+        #[wasm_bindgen(js_name = "useSobol", unchecked_optional_param_type = "boolean")] use_sobol: Option<JsValue>,
+        #[wasm_bindgen(
+            js_name = "useBrownianBridge",
+            unchecked_optional_param_type = "boolean"
+        )]
         use_brownian_bridge: Option<JsValue>,
     ) -> Result<JsPathDependentPricer, JsValue> {
         convenience::path_dependent_pricer(
@@ -566,19 +608,30 @@ impl JsPathDependentPricer {
     /// # Errors
     ///
     /// Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
+    /// @param spot - Spot level at time 0.
+    /// @param strike - Exercise price in the same units as `spot`.
+    /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
+    /// @param divYield - Continuous dividend yield (decimal, annualized).
+    /// @param vol - Annualized GBM volatility (decimal).
+    /// @param expiry - Time to expiry in years.
+    /// @param isCall - `true` for a call on the arithmetic average, `false` for a put.
+    /// @param numSteps - Optional number of averaging steps; omitted uses the registry default.
+    /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+    /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
     #[allow(clippy::too_many_arguments)]
-    #[wasm_bindgen(js_name = priceAsian)]
+    #[wasm_bindgen(js_name = priceAsian, unchecked_return_type = "MoneyEstimate")]
     pub fn price_asian(
         &self,
-        spot: JsValue,
-        strike: JsValue,
-        rate: JsValue,
-        div_yield: JsValue,
-        vol: JsValue,
-        expiry: JsValue,
-        is_call: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+        #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+        #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+        #[wasm_bindgen(js_name = "numSteps", unchecked_optional_param_type = "number")]
         num_steps: Option<JsValue>,
-        currency: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string")] currency: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
         let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
@@ -610,11 +663,11 @@ impl JsPathDependentPricer {
     /// @param spot - Finite, strictly positive spot level at time 0.
     /// @param strike - Exercise price in the same units as `spot`.
     /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-    /// @param div_yield - Continuous dividend yield (decimal, annualized).
+    /// @param divYield - Continuous dividend yield (decimal, annualized).
     /// @param vol - Annualized GBM volatility (decimal), strictly positive.
     /// @param expiry - Time to expiry in years.
-    /// @param is_call - `true` for a call on the arithmetic average, `false` for a put.
-    /// @param num_steps - Optional number of time-grid steps, each an averaging date; omitted uses the registry default `convenience.greeks.lrm_num_steps` (32).
+    /// @param isCall - `true` for a call on the arithmetic average, `false` for a put.
+    /// @param numSteps - Optional number of time-grid steps, each an averaging date; omitted uses the registry default `convenience.greeks.lrm_num_steps` (32).
     /// @param currency - Optional ISO-4217 code stamped on the price estimate; omitted uses the registry default.
     /// @returns The `LrmGreeks` object: `price` (a `MoneyEstimate`), `delta` per unit of spot and `vega` per volatility point (`0.01`), each an `Estimate` with `mean`, `stderr` and `ci_95`.
     ///
@@ -637,18 +690,19 @@ impl JsPathDependentPricer {
     /// the pricer uses Sobol or antithetic sampling, `numPaths` exceeds
     /// 100,000, or `numPaths x (numSteps + 1)` exceeds 4,000,000.
     #[allow(clippy::too_many_arguments)]
-    #[wasm_bindgen(js_name = priceWithLrmGreeks)]
+    #[wasm_bindgen(js_name = priceWithLrmGreeks, unchecked_return_type = "generated.models.LrmGreeks")]
     pub fn price_with_lrm_greeks(
         &self,
-        spot: JsValue,
-        strike: JsValue,
-        rate: JsValue,
-        div_yield: JsValue,
-        vol: JsValue,
-        expiry: JsValue,
-        is_call: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+        #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+        #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+        #[wasm_bindgen(js_name = "numSteps", unchecked_optional_param_type = "number")]
         num_steps: Option<JsValue>,
-        currency: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string")] currency: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
         let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
@@ -673,6 +727,16 @@ impl JsPathDependentPricer {
 }
 
 /// Longstaff-Schwartz Monte Carlo pricer for American options under GBM.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const pricer = new models.monteCarlo.LsmcPricer(10000, 42, false, 50);
+/// const put = pricer.priceAmerican(100, 100, 0.05, 0.0, 0.2, 1.0, false);
+/// console.log(put.mean.amount, pricer.basis, pricer.basisDegree);
+/// pricer.free();
+/// ```
 #[wasm_bindgen(js_name = LsmcPricer)]
 pub struct JsLsmcPricer {
     inner: LsmcPricer,
@@ -681,12 +745,12 @@ pub struct JsLsmcPricer {
 #[wasm_bindgen(js_class = LsmcPricer)]
 impl JsLsmcPricer {
     /// Pricer whose omitted settings come from the Rust Monte Carlo registry.
-    /// @param num_paths - Optional number of paths; a positive safe integer. Omitted uses the registry default.
+    /// @param numPaths - Optional number of paths; a positive safe integer. Omitted uses the registry default.
     /// @param seed - Optional seed of the random streams, as a safe integer or `bigint`. Omitted uses the registry default.
-    /// @param use_parallel - Optional; run paths on the thread pool. WebAssembly always runs sequentially with identical results. Omitted uses the registry default.
-    /// @param num_steps - Optional number of exercise dates between 0 and expiry. Omitted uses the registry default.
+    /// @param useParallel - Optional; run paths on the thread pool. WebAssembly always runs sequentially with identical results. Omitted uses the registry default.
+    /// @param numSteps - Optional number of exercise dates between 0 and expiry. Omitted uses the registry default.
     /// @param basis - Optional regression basis name, `"laguerre"` or `"polynomial"`. Omitted uses the registry default.
-    /// @param basis_degree - Optional highest polynomial degree of the regression basis. Omitted uses the registry default.
+    /// @param basisDegree - Optional highest polynomial degree of the regression basis. Omitted uses the registry default.
     /// @param antithetic - Optional; use antithetic variates. Omitted uses the registry default.
     ///
     /// # Errors
@@ -695,13 +759,17 @@ impl JsLsmcPricer {
     /// step count.
     #[wasm_bindgen(constructor)]
     pub fn new(
+        #[wasm_bindgen(js_name = "numPaths", unchecked_optional_param_type = "number")]
         num_paths: Option<JsValue>,
-        seed: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "number | bigint")] seed: Option<JsValue>,
+        #[wasm_bindgen(js_name = "useParallel", unchecked_optional_param_type = "boolean")]
         use_parallel: Option<JsValue>,
+        #[wasm_bindgen(js_name = "numSteps", unchecked_optional_param_type = "number")]
         num_steps: Option<JsValue>,
-        basis: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string")] basis: Option<JsValue>,
+        #[wasm_bindgen(js_name = "basisDegree", unchecked_optional_param_type = "number")]
         basis_degree: Option<JsValue>,
-        antithetic: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "boolean")] antithetic: Option<JsValue>,
     ) -> Result<JsLsmcPricer, JsValue> {
         let basis = js_opt_string(basis.as_ref(), "basis")?;
         LsmcPricer::new(
@@ -776,20 +844,34 @@ impl JsLsmcPricer {
     /// # Errors
     ///
     /// Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or the regression is ill-conditioned.
+    /// @param spot - Spot level at time 0.
+    /// @param strike - Exercise price in the same units as `spot`.
+    /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
+    /// @param divYield - Continuous dividend yield (decimal, annualized).
+    /// @param vol - Annualized GBM volatility (decimal).
+    /// @param expiry - Time to expiry in years.
+    /// @param isCall - `true` for a call payoff, `false` for a put.
+    /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+    /// @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
+    /// @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
+    /// @param basisDegree - Optional basis degree for this call; omitted keeps the pricer's degree.
+    /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
     #[allow(clippy::too_many_arguments)]
-    #[wasm_bindgen(js_name = priceAmerican)]
+    #[wasm_bindgen(js_name = priceAmerican, unchecked_return_type = "MoneyEstimate")]
     pub fn price_american(
         &self,
-        spot: JsValue,
-        strike: JsValue,
-        rate: JsValue,
-        div_yield: JsValue,
-        vol: JsValue,
-        expiry: JsValue,
-        is_call: JsValue,
-        currency: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+        #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+        #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "string")] currency: Option<JsValue>,
+        #[wasm_bindgen(js_name = "numSteps", unchecked_optional_param_type = "number")]
         num_steps: Option<JsValue>,
-        basis: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string")] basis: Option<JsValue>,
+        #[wasm_bindgen(js_name = "basisDegree", unchecked_optional_param_type = "number")]
         basis_degree: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
@@ -845,21 +927,37 @@ impl JsLsmcPricer {
     /// # Errors
     ///
     /// Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or `pricingSeed` equals the training seed.
+    /// @param spot - Spot level at time 0.
+    /// @param strike - Exercise price in the same units as `spot`.
+    /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
+    /// @param divYield - Continuous dividend yield (decimal, annualized).
+    /// @param vol - Annualized GBM volatility (decimal).
+    /// @param expiry - Time to expiry in years.
+    /// @param isCall - `true` for a call payoff, `false` for a put.
+    /// @param pricingSeed - Seed of the independent pricing paths, as a safe integer or `bigint`; must differ from the pricer's seed.
+    /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+    /// @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
+    /// @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
+    /// @param basisDegree - Optional basis degree for this call; omitted keeps the pricer's degree.
+    /// @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
     #[allow(clippy::too_many_arguments)]
-    #[wasm_bindgen(js_name = priceAmericanUnbiased)]
+    #[wasm_bindgen(js_name = priceAmericanUnbiased, unchecked_return_type = "MoneyEstimate")]
     pub fn price_american_unbiased(
         &self,
-        spot: JsValue,
-        strike: JsValue,
-        rate: JsValue,
-        div_yield: JsValue,
-        vol: JsValue,
-        expiry: JsValue,
-        is_call: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+        #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+        #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+        #[wasm_bindgen(js_name = "pricingSeed", unchecked_param_type = "number | bigint")]
         pricing_seed: JsValue,
-        currency: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string")] currency: Option<JsValue>,
+        #[wasm_bindgen(js_name = "numSteps", unchecked_optional_param_type = "number")]
         num_steps: Option<JsValue>,
-        basis: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string")] basis: Option<JsValue>,
+        #[wasm_bindgen(js_name = "basisDegree", unchecked_optional_param_type = "number")]
         basis_degree: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let option_type = OptionType::from(js_bool(&is_call, "isCall")?);

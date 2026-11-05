@@ -21,8 +21,10 @@ use wasm_bindgen::prelude::*;
 /// @throws Error - Rejects a `returns` value that is not a numeric array.
 #[wasm_bindgen(js_name = sharpe)]
 pub fn sharpe(
-    returns: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] returns: JsValue,
+    #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
     risk_free_rate: Option<JsValue>,
+    #[wasm_bindgen(js_name = "periodsPerYear", unchecked_optional_param_type = "number")]
     periods_per_year: Option<JsValue>,
 ) -> Result<f64, JsValue> {
     let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
@@ -44,8 +46,9 @@ pub fn sharpe(
 /// @throws Error - Rejects a `returns` value that is not a numeric array.
 #[wasm_bindgen(js_name = sortino)]
 pub fn sortino(
-    returns: JsValue,
-    mar: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] returns: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "number")] mar: Option<JsValue>,
+    #[wasm_bindgen(js_name = "periodsPerYear", unchecked_optional_param_type = "number")]
     periods_per_year: Option<JsValue>,
 ) -> Result<f64, JsValue> {
     let mar = js_opt_f64(mar.as_ref(), "mar")?;
@@ -65,7 +68,11 @@ pub fn sortino(
 /// @returns Annualized volatility as a decimal; `0` for an empty array, `NaN` for non-finite inputs or an invalid `periodsPerYear`.
 /// @throws Error - Rejects a `returns` value that is not a numeric array.
 #[wasm_bindgen(js_name = volatility)]
-pub fn volatility(returns: JsValue, periods_per_year: Option<JsValue>) -> Result<f64, JsValue> {
+pub fn volatility(
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] returns: JsValue,
+    #[wasm_bindgen(js_name = "periodsPerYear", unchecked_optional_param_type = "number")]
+    periods_per_year: Option<JsValue>,
+) -> Result<f64, JsValue> {
     let periods_per_year = js_opt_f64(periods_per_year.as_ref(), "periodsPerYear")?;
     let returns = js_f64_seq(&returns, "returns")?;
     Ok(finstack_quant_analytics::volatility(
@@ -80,7 +87,9 @@ pub fn volatility(returns: JsValue, periods_per_year: Option<JsValue>) -> Result
 /// @returns Non-positive fraction (`-0.25` is a 25% loss); `0` when the series never falls below its running peak or is empty. Non-finite returns or reconstructed drawdowns yield `NaN`.
 /// @throws Error - Rejects a `returns` value that is not a numeric array.
 #[wasm_bindgen(js_name = maxDrawdown)]
-pub fn max_drawdown(returns: JsValue) -> Result<f64, JsValue> {
+pub fn max_drawdown(
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] returns: JsValue,
+) -> Result<f64, JsValue> {
     let returns = js_f64_seq(&returns, "returns")?;
     Ok(finstack_quant_analytics::max_drawdown(&returns))
 }

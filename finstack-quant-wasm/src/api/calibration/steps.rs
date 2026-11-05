@@ -37,9 +37,9 @@ fn step(
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
 /// @param currency - ISO-4217 currency code of the curve (for example `"USD"`).
-/// @param base_date - ISO-8601 base (valuation) date.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
-/// @param curve_id - Identifier of the produced curve; defaults to `id`.
+/// @param baseDate - ISO-8601 base (valuation) date.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param curveId - Identifier of the produced curve; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `method` (`"bootstrap"` or `"global"`), `interpolation` (default `"log_linear"`), `extrapolation`, `pricing_discount_id`, `pricing_forward_id`, `conventions`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "discount"`.
 ///
@@ -48,13 +48,15 @@ fn step(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepDiscount)]
+#[wasm_bindgen(js_name = calibrationStepDiscount, unchecked_return_type = "generated.calibration.CalibrationStep")]
 pub fn calibration_step_discount(
-    id: JsValue,
-    currency: JsValue,
-    base_date: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
-    curve_id: Option<JsValue>,
+    #[wasm_bindgen(js_name = "curveId", unchecked_optional_param_type = "string | null")] curve_id: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -71,11 +73,11 @@ pub fn calibration_step_discount(
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
 /// @param currency - ISO-4217 currency code of the curve (for example `"USD"`).
-/// @param base_date - ISO-8601 base (valuation) date.
-/// @param tenor_years - Index accrual tenor in years (`0.25` for 3M).
-/// @param discount_curve_id - Identifier of the discount curve used to price the quotes.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
-/// @param curve_id - Identifier of the produced curve; defaults to `id`.
+/// @param baseDate - ISO-8601 base (valuation) date.
+/// @param tenorYears - Index accrual tenor in years (`0.25` for 3M).
+/// @param discountCurveId - Identifier of the discount curve used to price the quotes.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param curveId - Identifier of the produced curve; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `method`, `interpolation` (default `"cubic_hermite"`), `conventions`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "forward"`.
 ///
@@ -84,16 +86,18 @@ pub fn calibration_step_discount(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepForward)]
+#[wasm_bindgen(js_name = calibrationStepForward, unchecked_return_type = "generated.calibration.CalibrationStep")]
 #[allow(clippy::too_many_arguments)]
 pub fn calibration_step_forward(
-    id: JsValue,
-    currency: JsValue,
-    base_date: JsValue,
-    tenor_years: JsValue,
-    discount_curve_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(js_name = "tenorYears", unchecked_param_type = "number")] tenor_years: JsValue,
+    #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")] discount_curve_id: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
-    curve_id: Option<JsValue>,
+    #[wasm_bindgen(js_name = "curveId", unchecked_optional_param_type = "string | null")] curve_id: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -113,12 +117,12 @@ pub fn calibration_step_forward(
 /// @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
 /// @param entity - Reference entity name.
 /// @param currency - ISO-4217 currency code of the curve (for example `"USD"`).
-/// @param base_date - ISO-8601 base (valuation) date.
-/// @param discount_curve_id - Discount curve used for CDS present values.
-/// @param recovery_rate - Assumed recovery rate as a decimal.
+/// @param baseDate - ISO-8601 base (valuation) date.
+/// @param discountCurveId - Discount curve used for CDS present values.
+/// @param recoveryRate - Assumed recovery rate as a decimal.
 /// @param seniority - Debt seniority label (`"senior_secured"`, `"senior"`, `"subordinated"`, `"junior"`); defaults to `"senior"`.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
-/// @param curve_id - Identifier of the produced curve; defaults to `id`.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param curveId - Identifier of the produced curve; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `notional`, `method`, `interpolation`, `par_interp`, `doc_clause`, `cds_valuation_convention`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "hazard"`.
 ///
@@ -127,18 +131,21 @@ pub fn calibration_step_forward(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepHazard)]
+#[wasm_bindgen(js_name = calibrationStepHazard, unchecked_return_type = "generated.calibration.CalibrationStep")]
 #[allow(clippy::too_many_arguments)]
 pub fn calibration_step_hazard(
-    id: JsValue,
-    entity: JsValue,
-    currency: JsValue,
-    base_date: JsValue,
-    discount_curve_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] entity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")] discount_curve_id: JsValue,
+    #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
     recovery_rate: JsValue,
-    seniority: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] seniority: Option<JsValue>,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
-    curve_id: Option<JsValue>,
+    #[wasm_bindgen(js_name = "curveId", unchecked_optional_param_type = "string | null")] curve_id: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -159,13 +166,13 @@ pub fn calibration_step_hazard(
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
 /// @param currency - ISO-4217 currency code of the curve (for example `"USD"`).
-/// @param base_date - ISO-8601 base (valuation) date.
-/// @param discount_curve_id - Discount curve used for swap present values.
+/// @param baseDate - ISO-8601 base (valuation) date.
+/// @param discountCurveId - Discount curve used for swap present values.
 /// @param index - Inflation index identifier (for example `"USA-CPI-U"`).
-/// @param observation_lag - Observation lag tenor (for example `"3M"`).
-/// @param base_cpi - CPI index level at the base date.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
-/// @param curve_id - Identifier of the produced curve; defaults to `id`.
+/// @param observationLag - Observation lag tenor (for example `"3M"`).
+/// @param baseCpi - CPI index level at the base date.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param curveId - Identifier of the produced curve; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `notional`, `method`, `interpolation`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "inflation"`.
 ///
@@ -174,18 +181,21 @@ pub fn calibration_step_hazard(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepInflation)]
+#[wasm_bindgen(js_name = calibrationStepInflation, unchecked_return_type = "generated.calibration.CalibrationStep")]
 #[allow(clippy::too_many_arguments)]
 pub fn calibration_step_inflation(
-    id: JsValue,
-    currency: JsValue,
-    base_date: JsValue,
-    discount_curve_id: JsValue,
-    index: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")] discount_curve_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] index: JsValue,
+    #[wasm_bindgen(js_name = "observationLag", unchecked_param_type = "string")]
     observation_lag: JsValue,
-    base_cpi: JsValue,
+    #[wasm_bindgen(js_name = "baseCpi", unchecked_param_type = "number")] base_cpi: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
-    curve_id: Option<JsValue>,
+    #[wasm_bindgen(js_name = "curveId", unchecked_optional_param_type = "string | null")] curve_id: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -205,10 +215,10 @@ pub fn calibration_step_inflation(
 /// `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
-/// @param base_date - ISO-8601 surface base date.
-/// @param underlying_ticker - Underlying identifier the quotes reference.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
-/// @param vol_surface_id - Identifier of the produced surface; defaults to `id`.
+/// @param baseDate - ISO-8601 surface base date.
+/// @param underlyingTicker - Underlying identifier the quotes reference.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param volSurfaceId - Identifier of the produced surface; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `discount_curve_id`, `beta`, `target_expiries`, `target_strikes`, `spot_override`, `dividend_yield_override`, `expiry_extrapolation`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "vol_surface"`.
 ///
@@ -217,13 +227,20 @@ pub fn calibration_step_inflation(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepVolSurface)]
+#[wasm_bindgen(js_name = calibrationStepVolSurface, unchecked_return_type = "generated.calibration.CalibrationStep")]
 pub fn calibration_step_vol_surface(
-    id: JsValue,
-    base_date: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(js_name = "underlyingTicker", unchecked_param_type = "string")]
     underlying_ticker: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "volSurfaceId",
+        unchecked_optional_param_type = "string | null"
+    )]
     vol_surface_id: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -239,11 +256,11 @@ pub fn calibration_step_vol_surface(
 /// `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
-/// @param base_date - ISO-8601 surface base date.
-/// @param discount_curve_id - Discount curve for forward-swap-rate construction.
+/// @param baseDate - ISO-8601 surface base date.
+/// @param discountCurveId - Discount curve for forward-swap-rate construction.
 /// @param currency - ISO-4217 currency code of the surface.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
-/// @param vol_surface_id - Identifier of the produced surface; defaults to `id`.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param volSurfaceId - Identifier of the produced surface; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `forward_id`, `vol_convention`, `sabr_beta`, `target_expiries`, `target_tenors`, `calendar_id`, `fixed_day_count`, `swap_index`, `vol_tolerance`, `sabr_extrapolation`, `allow_sabr_missing_bucket_fallback`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "swaption_vol"`.
 ///
@@ -252,14 +269,20 @@ pub fn calibration_step_vol_surface(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepSwaptionVol)]
+#[wasm_bindgen(js_name = calibrationStepSwaptionVol, unchecked_return_type = "generated.calibration.CalibrationStep")]
 pub fn calibration_step_swaption_vol(
-    id: JsValue,
-    base_date: JsValue,
-    discount_curve_id: JsValue,
-    currency: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")] discount_curve_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "volSurfaceId",
+        unchecked_optional_param_type = "string | null"
+    )]
     vol_surface_id: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -276,13 +299,13 @@ pub fn calibration_step_swaption_vol(
 /// `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name.
-/// @param index_id - Credit index identifier (the curve is written as `"{index_id}_CORR"`).
+/// @param indexId - Credit index identifier (the curve is written as `"{index_id}_CORR"`).
 /// @param series - Index series number (non-negative integer).
-/// @param maturity_years - Tranche maturity in years.
-/// @param base_date - ISO-8601 valuation date.
-/// @param discount_curve_id - Discount curve for tranche present values.
+/// @param maturityYears - Tranche maturity in years.
+/// @param baseDate - ISO-8601 valuation date.
+/// @param discountCurveId - Discount curve for tranche present values.
 /// @param currency - ISO-4217 currency code of the index.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `notional`, `frequency`, `day_count`, `business_day_convention`, `calendar_id`, `detachment_points`, `roll_rule`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "base_correlation"`.
 ///
@@ -291,17 +314,20 @@ pub fn calibration_step_swaption_vol(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepBaseCorrelation)]
+#[wasm_bindgen(js_name = calibrationStepBaseCorrelation, unchecked_return_type = "generated.calibration.CalibrationStep")]
 #[allow(clippy::too_many_arguments)]
 pub fn calibration_step_base_correlation(
-    id: JsValue,
-    index_id: JsValue,
-    series: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(js_name = "indexId", unchecked_param_type = "string")] index_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] series: JsValue,
+    #[wasm_bindgen(js_name = "maturityYears", unchecked_param_type = "number")]
     maturity_years: JsValue,
-    base_date: JsValue,
-    discount_curve_id: JsValue,
-    currency: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")] discount_curve_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -320,9 +346,9 @@ pub fn calibration_step_base_correlation(
 /// `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name.
-/// @param tranche_instrument_id - Tranche instrument whose `"{id}_STUDENT_T_DF"` scalar is written.
-/// @param base_correlation_curve_id - Base-correlation curve the tranche is priced on.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param trancheInstrumentId - Tranche instrument whose `"{id}_STUDENT_T_DF"` scalar is written.
+/// @param baseCorrelationCurveId - Base-correlation curve the tranche is priced on.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `discount_curve_id`, `initial_df`, `df_bounds`, `correlation`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "student_t"`.
 ///
@@ -331,12 +357,16 @@ pub fn calibration_step_base_correlation(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepStudentT)]
+#[wasm_bindgen(js_name = calibrationStepStudentT, unchecked_return_type = "generated.calibration.CalibrationStep")]
 pub fn calibration_step_student_t(
-    id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(js_name = "trancheInstrumentId", unchecked_param_type = "string")]
     tranche_instrument_id: JsValue,
+    #[wasm_bindgen(js_name = "baseCorrelationCurveId", unchecked_param_type = "string")]
     base_correlation_curve_id: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -359,10 +389,10 @@ pub fn calibration_step_student_t(
 /// `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name.
-/// @param curve_id - Discount curve the model is calibrated on (scalars are written as `"{curve_id}_HW1F_KAPPA"` and `"{curve_id}_HW1F_SIGMA"`).
+/// @param curveId - Discount curve the model is calibrated on (scalars are written as `"{curve_id}_HW1F_KAPPA"` and `"{curve_id}_HW1F_SIGMA"`).
 /// @param currency - ISO-4217 currency code of the model.
-/// @param base_date - ISO-8601 valuation date.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param baseDate - ISO-8601 valuation date.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `initial_kappa`, `initial_sigma`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "hull_white"`.
 ///
@@ -371,13 +401,15 @@ pub fn calibration_step_student_t(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepHullWhite)]
+#[wasm_bindgen(js_name = calibrationStepHullWhite, unchecked_return_type = "generated.calibration.CalibrationStep")]
 pub fn calibration_step_hull_white(
-    id: JsValue,
-    curve_id: JsValue,
-    currency: JsValue,
-    base_date: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(js_name = "curveId", unchecked_param_type = "string")] curve_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -393,12 +425,12 @@ pub fn calibration_step_hull_white(
 /// `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name.
-/// @param discount_curve_id - Discounting curve and output-key prefix: scalar fits write `"{discount_curve_id}_CAPFLOOR_HW1F_KAPPA"` and `"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA"`; piecewise fits write the same kappa scalar and the series `"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA_SCHEDULE"`.
-/// @param forward_curve_id - Curve projecting the caplet forwards.
-/// @param index_id - Term-rate index identifier (for example `"EUR-EURIBOR-3M"`) whose conventions set caplet settlement, fixing and payment dates, calendars and accrual fractions; its currency must match `currency` and overnight indices are rejected at calibration.
+/// @param discountCurveId - Discounting curve and output-key prefix: scalar fits write `"{discount_curve_id}_CAPFLOOR_HW1F_KAPPA"` and `"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA"`; piecewise fits write the same kappa scalar and the series `"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA_SCHEDULE"`.
+/// @param forwardCurveId - Curve projecting the caplet forwards.
+/// @param indexId - Term-rate index identifier (for example `"EUR-EURIBOR-3M"`) whose conventions set caplet settlement, fixing and payment dates, calendars and accrual fractions; its currency must match `currency` and overnight indices are rejected at calibration.
 /// @param currency - ISO-4217 currency code of the model.
-/// @param base_date - ISO-8601 valuation date.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param baseDate - ISO-8601 valuation date.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: the required `fit_tolerance` (positive maximum implied-quote error in quoted volatility units), `fixed_kappa`, `initial_kappa`, `initial_sigma`, `volatility_mode`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "cap_floor_hull_white"`.
 ///
@@ -408,15 +440,18 @@ pub fn calibration_step_hull_white(
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
 #[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = calibrationStepCapFloorHullWhite)]
+#[wasm_bindgen(js_name = calibrationStepCapFloorHullWhite, unchecked_return_type = "generated.calibration.CalibrationStep")]
 pub fn calibration_step_cap_floor_hull_white(
-    id: JsValue,
-    discount_curve_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")] discount_curve_id: JsValue,
+    #[wasm_bindgen(js_name = "forwardCurveId", unchecked_param_type = "string")]
     forward_curve_id: JsValue,
-    index_id: JsValue,
-    currency: JsValue,
-    base_date: JsValue,
+    #[wasm_bindgen(js_name = "indexId", unchecked_param_type = "string")] index_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -434,10 +469,10 @@ pub fn calibration_step_cap_floor_hull_white(
 /// `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
-/// @param base_date - ISO-8601 surface base date.
-/// @param underlying_ticker - Underlying identifier the quotes reference.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
-/// @param vol_surface_id - Identifier of the produced surface; defaults to `id`.
+/// @param baseDate - ISO-8601 surface base date.
+/// @param underlyingTicker - Underlying identifier the quotes reference.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param volSurfaceId - Identifier of the produced surface; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `discount_curve_id`, `target_expiries`, `target_strikes`, `spot_override`, `dividend_yield_override`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "svi_surface"`.
 ///
@@ -446,13 +481,20 @@ pub fn calibration_step_cap_floor_hull_white(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepSviSurface)]
+#[wasm_bindgen(js_name = calibrationStepSviSurface, unchecked_return_type = "generated.calibration.CalibrationStep")]
 pub fn calibration_step_svi_surface(
-    id: JsValue,
-    base_date: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(js_name = "underlyingTicker", unchecked_param_type = "string")]
     underlying_ticker: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "volSurfaceId",
+        unchecked_optional_param_type = "string | null"
+    )]
     vol_surface_id: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -469,11 +511,11 @@ pub fn calibration_step_svi_surface(
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
 /// @param currency - ISO-4217 foreign (collateral) currency of the produced discount curve.
-/// @param base_date - ISO-8601 base (valuation) date.
-/// @param fx_spot - Spot FX rate used to translate the basis quotes.
-/// @param domestic_discount_id - Domestic discount curve the basis is measured against.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
-/// @param curve_id - Identifier of the produced curve; defaults to `id`.
+/// @param baseDate - ISO-8601 base (valuation) date.
+/// @param fxSpot - Spot FX rate used to translate the basis quotes.
+/// @param domesticDiscountId - Domestic discount curve the basis is measured against.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param curveId - Identifier of the produced curve; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `method`, `interpolation`, `extrapolation`, `conventions`, `basis_spread_curve_id`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "xccy_basis"`.
 ///
@@ -482,16 +524,19 @@ pub fn calibration_step_svi_surface(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepXccyBasis)]
+#[wasm_bindgen(js_name = calibrationStepXccyBasis, unchecked_return_type = "generated.calibration.CalibrationStep")]
 #[allow(clippy::too_many_arguments)]
 pub fn calibration_step_xccy_basis(
-    id: JsValue,
-    currency: JsValue,
-    base_date: JsValue,
-    fx_spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(js_name = "fxSpot", unchecked_param_type = "number")] fx_spot: JsValue,
+    #[wasm_bindgen(js_name = "domesticDiscountId", unchecked_param_type = "string")]
     domestic_discount_id: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
-    curve_id: Option<JsValue>,
+    #[wasm_bindgen(js_name = "curveId", unchecked_optional_param_type = "string | null")] curve_id: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?
@@ -513,10 +558,10 @@ pub fn calibration_step_xccy_basis(
 /// `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
-/// @param base_date - ISO-8601 base (valuation) date.
+/// @param baseDate - ISO-8601 base (valuation) date.
 /// @param model - Parametric family: `"ns"` (Nelson-Siegel) or `"nss"` (Svensson); defaults to `"ns"`.
-/// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
-/// @param curve_id - Identifier of the produced curve; defaults to `id`.
+/// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+/// @param curveId - Identifier of the produced curve; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `initial_params`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "parametric"`.
 ///
@@ -525,13 +570,15 @@ pub fn calibration_step_xccy_basis(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
-#[wasm_bindgen(js_name = calibrationStepParametric)]
+#[wasm_bindgen(js_name = calibrationStepParametric, unchecked_return_type = "generated.calibration.CalibrationStep")]
 pub fn calibration_step_parametric(
-    id: JsValue,
-    base_date: JsValue,
-    model: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] model: Option<JsValue>,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
     quote_set: Option<JsValue>,
-    curve_id: Option<JsValue>,
+    #[wasm_bindgen(js_name = "curveId", unchecked_optional_param_type = "string | null")] curve_id: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "Record<string, unknown> | string | null")]
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::from_overrides(params.as_ref())?

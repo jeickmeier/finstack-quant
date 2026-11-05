@@ -45,12 +45,12 @@ fn js_date(value: &JsValue, label: &str) -> Result<finstack_quant_core::dates::D
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if the pillar cannot be parsed or the rate is not finite.
-#[wasm_bindgen(js_name = rateQuoteDeposit)]
+#[wasm_bindgen(js_name = rateQuoteDeposit, unchecked_return_type = "generated.calibration.RateQuote")]
 pub fn rate_quote_deposit(
-    id: JsValue,
-    index: JsValue,
-    pillar: JsValue,
-    rate: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] index: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string | generated.calibration.Pillar")] pillar: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
 ) -> Result<JsValue, JsValue> {
     let quote = RateQuote::deposit(
         js_string(&id, "id")?,
@@ -76,13 +76,13 @@ pub fn rate_quote_deposit(
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a pillar cannot be parsed or the rate is not finite.
-#[wasm_bindgen(js_name = rateQuoteFra)]
+#[wasm_bindgen(js_name = rateQuoteFra, unchecked_return_type = "generated.calibration.RateQuote")]
 pub fn rate_quote_fra(
-    id: JsValue,
-    index: JsValue,
-    start: JsValue,
-    end: JsValue,
-    rate: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] index: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string | generated.calibration.Pillar")] start: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string | generated.calibration.Pillar")] end: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
 ) -> Result<JsValue, JsValue> {
     let quote = RateQuote::fra(
         js_string(&id, "id")?,
@@ -102,19 +102,23 @@ pub fn rate_quote_fra(
 /// @param contract - Futures contract identifier (for example `"CME:SR3"`).
 /// @param expiry - ISO-8601 last trading date of the contract.
 /// @param price - Futures price (for example `98.50`); the implied rate is `(100 - price) / 100`.
-/// @param convexity_adjustment - Convexity adjustment as a decimal rate subtracted from the futures-implied forward (Hull convention); defaults to `0.0`.
+/// @param convexityAdjustment - Convexity adjustment as a decimal rate subtracted from the futures-implied forward (Hull convention); defaults to `0.0`.
 /// @returns A validated `RateQuote` object with `type: "futures"`.
 ///
 /// # Errors
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if the expiry is not an ISO-8601 date or the price is not finite.
-#[wasm_bindgen(js_name = rateQuoteFutures)]
+#[wasm_bindgen(js_name = rateQuoteFutures, unchecked_return_type = "generated.calibration.RateQuote")]
 pub fn rate_quote_futures(
-    id: JsValue,
-    contract: JsValue,
-    expiry: JsValue,
-    price: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] contract: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] price: JsValue,
+    #[wasm_bindgen(
+        js_name = "convexityAdjustment",
+        unchecked_optional_param_type = "number | null"
+    )]
     convexity_adjustment: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let quote = RateQuote::futures(
@@ -135,19 +139,23 @@ pub fn rate_quote_futures(
 /// @param index - Floating-leg index identifier (for example `"USD-SOFR-OIS"`).
 /// @param pillar - Swap maturity pillar: tenor string (`"5Y"`), ISO-8601 date string, or pillar object.
 /// @param rate - Fixed par rate as a decimal.
-/// @param spread_decimal - Optional floating-leg spread as a decimal (`0.0010` is 10 bp); omitted means no spread.
+/// @param spreadDecimal - Optional floating-leg spread as a decimal (`0.0010` is 10 bp); omitted means no spread.
 /// @returns A validated `RateQuote` object with `type: "swap"`.
 ///
 /// # Errors
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if the pillar cannot be parsed or the rate is not finite.
-#[wasm_bindgen(js_name = rateQuoteSwap)]
+#[wasm_bindgen(js_name = rateQuoteSwap, unchecked_return_type = "generated.calibration.RateQuote")]
 pub fn rate_quote_swap(
-    id: JsValue,
-    index: JsValue,
-    pillar: JsValue,
-    rate: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] index: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string | generated.calibration.Pillar")] pillar: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(
+        js_name = "spreadDecimal",
+        unchecked_optional_param_type = "number | null"
+    )]
     spread_decimal: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let quote = RateQuote::swap(
@@ -167,24 +175,25 @@ pub fn rate_quote_swap(
 /// @param id - Unique quote identifier.
 /// @param entity - Reference entity name.
 /// @param currency - ISO-4217 contract currency of the CDS convention.
-/// @param doc_clause - ISDA documentation clause: `"isda_na"`, `"isda_eu"`, `"cr14"`, `"mr14"`, `"mm14"` or `"xr14"`.
+/// @param docClause - ISDA documentation clause: `"isda_na"`, `"isda_eu"`, `"cr14"`, `"mr14"`, `"mm14"` or `"xr14"`.
 /// @param pillar - Maturity pillar: tenor string (`"5Y"`), ISO-8601 date string, or pillar object.
-/// @param spread_bp - Par spread in basis points (`80.0` is 80 bp).
-/// @param recovery_rate - Assumed recovery rate as a decimal in `[0, 1)`.
+/// @param spreadBp - Par spread in basis points (`80.0` is 80 bp).
+/// @param recoveryRate - Assumed recovery rate as a decimal in `[0, 1)`.
 /// @returns A validated `CdsQuote` object with `type: "cds_par_spread"`.
 ///
 /// # Errors
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if the convention, pillar or a numeric input is invalid.
-#[wasm_bindgen(js_name = cdsQuoteParSpread)]
+#[wasm_bindgen(js_name = cdsQuoteParSpread, unchecked_return_type = "generated.calibration.CdsQuote")]
 pub fn cds_quote_par_spread(
-    id: JsValue,
-    entity: JsValue,
-    currency: JsValue,
-    doc_clause: JsValue,
-    pillar: JsValue,
-    spread_bp: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] entity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(js_name = "docClause", unchecked_param_type = "string")] doc_clause: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string | generated.calibration.Pillar")] pillar: JsValue,
+    #[wasm_bindgen(js_name = "spreadBp", unchecked_param_type = "number")] spread_bp: JsValue,
+    #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
     recovery_rate: JsValue,
 ) -> Result<JsValue, JsValue> {
     let quote = CdsQuote::par_spread(
@@ -206,27 +215,28 @@ pub fn cds_quote_par_spread(
 /// @param id - Unique quote identifier.
 /// @param entity - Reference entity name.
 /// @param currency - ISO-4217 contract currency of the CDS convention.
-/// @param doc_clause - ISDA documentation clause: `"isda_na"`, `"isda_eu"`, `"cr14"`, `"mr14"`, `"mm14"` or `"xr14"`.
+/// @param docClause - ISDA documentation clause: `"isda_na"`, `"isda_eu"`, `"cr14"`, `"mr14"`, `"mm14"` or `"xr14"`.
 /// @param pillar - Maturity pillar: tenor string (`"5Y"`), ISO-8601 date string, or pillar object.
-/// @param coupon_bp - Standard running coupon in basis points (for example `100.0`).
-/// @param upfront_pct - Upfront payment as a fraction of notional (`0.01` is 1%).
-/// @param recovery_rate - Assumed recovery rate as a decimal in `[0, 1)`.
+/// @param couponBp - Standard running coupon in basis points (for example `100.0`).
+/// @param upfrontPct - Upfront payment as a fraction of notional (`0.01` is 1%).
+/// @param recoveryRate - Assumed recovery rate as a decimal in `[0, 1)`.
 /// @returns A validated `CdsQuote` object with `type: "cds_upfront"`.
 ///
 /// # Errors
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if the convention, pillar or a numeric input is invalid.
-#[wasm_bindgen(js_name = cdsQuoteUpfront)]
+#[wasm_bindgen(js_name = cdsQuoteUpfront, unchecked_return_type = "generated.calibration.CdsQuote")]
 #[allow(clippy::too_many_arguments)]
 pub fn cds_quote_upfront(
-    id: JsValue,
-    entity: JsValue,
-    currency: JsValue,
-    doc_clause: JsValue,
-    pillar: JsValue,
-    coupon_bp: JsValue,
-    upfront_pct: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] entity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(js_name = "docClause", unchecked_param_type = "string")] doc_clause: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string | generated.calibration.Pillar")] pillar: JsValue,
+    #[wasm_bindgen(js_name = "couponBp", unchecked_param_type = "number")] coupon_bp: JsValue,
+    #[wasm_bindgen(js_name = "upfrontPct", unchecked_param_type = "number")] upfront_pct: JsValue,
+    #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
     recovery_rate: JsValue,
 ) -> Result<JsValue, JsValue> {
     let quote = CdsQuote::upfront(
@@ -251,20 +261,24 @@ pub fn cds_quote_upfront(
 /// @param expiry - ISO-8601 option expiry date.
 /// @param strike - Absolute strike in underlying price units.
 /// @param vol - Black implied volatility as an annualized decimal (`0.28` is 28%).
-/// @param option_type - `"call"` or `"put"`; defaults to `"call"`.
+/// @param optionType - `"call"` or `"put"`; defaults to `"call"`.
 /// @returns A validated `VolQuote` object tagged `option_vol`.
 ///
 /// # Errors
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if the expiry is not an ISO-8601 date, the option type is unknown or a numeric input is invalid.
-#[wasm_bindgen(js_name = volQuoteOptionVol)]
+#[wasm_bindgen(js_name = volQuoteOptionVol, unchecked_return_type = "generated.calibration.VolQuote")]
 pub fn vol_quote_option_vol(
-    id: JsValue,
-    underlying: JsValue,
-    expiry: JsValue,
-    strike: JsValue,
-    vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] underlying: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(
+        js_name = "optionType",
+        unchecked_optional_param_type = "string | null"
+    )]
     option_type: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let option_type = js_opt_string(option_type.as_ref(), "optionType")?;
@@ -288,7 +302,7 @@ pub fn vol_quote_option_vol(
 /// @param maturity - ISO-8601 maturity date of the underlying swap.
 /// @param strike - Fixed strike rate as a decimal.
 /// @param vol - Volatility: absolute rate volatility for normal quotes (for example `0.0072`), annualized decimal for lognormal quotes.
-/// @param quote_type - `"normal"` (`vol` is an absolute rate volatility) or `"black_lognormal"` (`vol` is a relative volatility); required, because it decides the unit of `vol`.
+/// @param quoteType - `"normal"` (`vol` is an absolute rate volatility) or `"black_lognormal"` (`vol` is a relative volatility); required, because it decides the unit of `vol`.
 /// @param convention - Swaption market convention identifier; omitted uses the Rust default `VolQuote::DEFAULT_SWAPTION_CONVENTION` (`"USD"`).
 /// @returns A validated `VolQuote` object tagged `swaption_vol`.
 ///
@@ -296,15 +310,15 @@ pub fn vol_quote_option_vol(
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601, the quote type is unknown or a numeric input is invalid.
-#[wasm_bindgen(js_name = volQuoteSwaptionVol)]
+#[wasm_bindgen(js_name = volQuoteSwaptionVol, unchecked_return_type = "generated.calibration.VolQuote")]
 pub fn vol_quote_swaption_vol(
-    id: JsValue,
-    expiry: JsValue,
-    maturity: JsValue,
-    strike: JsValue,
-    vol: JsValue,
-    quote_type: JsValue,
-    convention: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(js_name = "quoteType", unchecked_param_type = "string")] quote_type: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] convention: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let convention = js_opt_string(convention.as_ref(), "convention")?;
     let quote = VolQuote::swaption_vol(
@@ -327,21 +341,22 @@ pub fn vol_quote_swaption_vol(
 /// @param expiry - ISO-8601 cap/floor maturity date.
 /// @param strike - Strike rate as a decimal.
 /// @param vol - Volatility: absolute rate volatility for normal quotes, annualized decimal for lognormal quotes.
-/// @param quote_type - `"normal"` (`vol` is an absolute rate volatility) or `"black_lognormal"` (`vol` is a relative volatility); required, because it decides the unit of `vol`.
-/// @param is_cap - `true` for a cap, `false` for a floor; defaults to `true`.
+/// @param quoteType - `"normal"` (`vol` is an absolute rate volatility) or `"black_lognormal"` (`vol` is a relative volatility); required, because it decides the unit of `vol`.
+/// @param isCap - `true` for a cap, `false` for a floor; defaults to `true`.
 /// @returns A validated `VolQuote` object tagged `cap_floor_vol`.
 ///
 /// # Errors
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if the expiry is not an ISO-8601 date, the quote type is unknown or a numeric input is invalid.
-#[wasm_bindgen(js_name = volQuoteCapFloorVol)]
+#[wasm_bindgen(js_name = volQuoteCapFloorVol, unchecked_return_type = "generated.calibration.VolQuote")]
 pub fn vol_quote_cap_floor_vol(
-    id: JsValue,
-    expiry: JsValue,
-    strike: JsValue,
-    vol: JsValue,
-    quote_type: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(js_name = "quoteType", unchecked_param_type = "string")] quote_type: JsValue,
+    #[wasm_bindgen(js_name = "isCap", unchecked_optional_param_type = "boolean | null")]
     is_cap: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let quote = VolQuote::cap_floor_vol(
@@ -367,8 +382,10 @@ pub fn vol_quote_cap_floor_vol(
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) if `currency` is not a string
 /// and a `FinstackError` (`kind: "validation"`) if it is not a valid ISO-4217 code.
-#[wasm_bindgen(js_name = rateBoundsForCurrency)]
-pub fn rate_bounds_for_currency(currency: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = rateBoundsForCurrency, unchecked_return_type = "generated.calibration.RateBounds")]
+pub fn rate_bounds_for_currency(
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+) -> Result<JsValue, JsValue> {
     let currency: Currency = js_string(&currency, "currency")?
         .parse()
         .map_err(to_js_err)?;
@@ -385,7 +402,7 @@ pub fn rate_bounds_for_currency(currency: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Throws a `FinstackError` only if the bounds cannot be converted to a
 /// JavaScript value.
-#[wasm_bindgen(js_name = rateBoundsEmergingMarkets)]
+#[wasm_bindgen(js_name = rateBoundsEmergingMarkets, unchecked_return_type = "generated.calibration.RateBounds")]
 pub fn rate_bounds_emerging_markets() -> Result<JsValue, JsValue> {
     to_js_value(&RateBounds::emerging_markets())
 }
@@ -404,13 +421,13 @@ pub fn rate_bounds_emerging_markets() -> Result<JsValue, JsValue> {
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if the maturity is not an ISO-8601 date or the rate is not finite.
-#[wasm_bindgen(js_name = inflationQuoteInflationSwap)]
+#[wasm_bindgen(js_name = inflationQuoteInflationSwap, unchecked_return_type = "generated.calibration.InflationQuote")]
 pub fn inflation_quote_inflation_swap(
-    id: JsValue,
-    maturity: JsValue,
-    rate: JsValue,
-    index: JsValue,
-    convention: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] index: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] convention: JsValue,
 ) -> Result<JsValue, JsValue> {
     let quote = InflationQuote::inflation_swap(
         js_string(&id, "id")?,
@@ -438,14 +455,14 @@ pub fn inflation_quote_inflation_swap(
 ///
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if the maturity is not an ISO-8601 date, the frequency is not a tenor or the rate is not finite.
-#[wasm_bindgen(js_name = inflationQuoteYoyInflationSwap)]
+#[wasm_bindgen(js_name = inflationQuoteYoyInflationSwap, unchecked_return_type = "generated.calibration.InflationQuote")]
 pub fn inflation_quote_yoy_inflation_swap(
-    id: JsValue,
-    maturity: JsValue,
-    rate: JsValue,
-    index: JsValue,
-    frequency: JsValue,
-    convention: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] index: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] frequency: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] convention: JsValue,
 ) -> Result<JsValue, JsValue> {
     let quote = InflationQuote::yoy_inflation_swap(
         js_string(&id, "id")?,
@@ -472,8 +489,11 @@ pub fn inflation_quote_yoy_inflation_swap(
 /// Throws `TypeError` for non-JSON values including nonfinite numbers, or
 /// `FinstackError` with kind `validation` for malformed fields, an invalid pillar,
 /// or nonpositive spot FX. Convention identifiers are resolved during calibration.
-#[wasm_bindgen(js_name = xccyQuote)]
-pub fn xccy_quote(fields: JsValue) -> Result<JsValue, JsValue> {
+/// @param fields - Quote fields: identifier, convention identifier, maturity pillar, basis spread in basis points, and optional positive spot FX in quote currency per base currency. Omitted spot FX uses market FX during instrument construction.
+#[wasm_bindgen(js_name = xccyQuote, unchecked_return_type = "generated.calibration.XccyQuote")]
+pub fn xccy_quote(
+    #[wasm_bindgen(unchecked_param_type = "generated.calibration.XccyQuote")] fields: JsValue,
+) -> Result<JsValue, JsValue> {
     let fields: XccyQuote = from_js_json(&fields, "fields")?;
     let quote = XccyQuote::new(
         fields.id,
@@ -499,8 +519,11 @@ pub fn xccy_quote(fields: JsValue) -> Result<JsValue, JsValue> {
 /// Throws `TypeError` for non-JSON values including nonfinite numbers, or
 /// `FinstackError` with kind `validation` for malformed fields, invalid dates or
 /// conventions, or violated tranche, upfront, or coupon bounds.
-#[wasm_bindgen(js_name = cdsTrancheQuote)]
-pub fn cds_tranche_quote(fields: JsValue) -> Result<JsValue, JsValue> {
+/// @param fields - Quote fields including the index and series, ISO maturity date, decimal attachment and detachment in [0, 1] with attachment below detachment, decimal upfront in [-1, 1], positive running coupon in basis points, and currency/documentation convention.
+#[wasm_bindgen(js_name = cdsTrancheQuote, unchecked_return_type = "generated.calibration.CdsTrancheQuote")]
+pub fn cds_tranche_quote(
+    #[wasm_bindgen(unchecked_param_type = "generated.calibration.CdsTrancheQuote")] fields: JsValue,
+) -> Result<JsValue, JsValue> {
     let fields: CdsTrancheQuote = from_js_json(&fields, "fields")?;
     let quote = CdsTrancheQuote::new(
         fields.id,

@@ -27,6 +27,26 @@ use wasm_bindgen::prelude::*;
 
 instrument_class!(
     /// Typed wrapper for the canonical Rust Bond instrument.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { core, valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const usd = new core.Currency("USD");
+    /// const bond = valuations.instruments.Bond.fixed(
+    ///   "BOND-1",
+    ///   new core.Money(1_000_000, usd),
+    ///   new core.Rate(0.05),
+    ///   "2024-01-01",
+    ///   "2034-01-01",
+    ///   "none",
+    ///   "USD-OIS"
+    /// );
+    /// const market = new core.MarketContext();
+    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2024-06-30", 0.03));
+    /// const result = valuations.instruments.priceInstrument(bond.toJson(), market.toJson(), "2024-06-30", "default");
+    /// console.log(result.value.amount, result.value.currency);
+    /// ```
     JsBond, "Bond", finstack_quant_valuations::instruments::fixed_income::bond::Bond
 );
 
@@ -38,7 +58,7 @@ impl JsBond {
     /// @param id - Unique instrument identifier.
     /// @param notional - Principal amount of the bond.
     /// @param couponRate - Annual coupon rate.
-    /// @param issue_date - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+    /// @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param stub - Stub policy: `none`, `short_front`, `short_back`,
     /// `long_front`, or `long_back`.
@@ -46,12 +66,16 @@ impl JsBond {
     /// @returns The validated fixed-rate bond.
     /// @throws If validation fails (e.g. maturity not after issue_date).
     pub fn fixed(
-        id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
         notional: &JsMoney,
-        coupon_rate: &JsRate,
-        issue_date: JsValue,
-        maturity: JsValue,
+        #[wasm_bindgen(js_name = "couponRate")] coupon_rate: &JsRate,
+        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+        #[wasm_bindgen(
+            unchecked_param_type = "'none' | 'short_front' | 'short_back' | 'long_front' | 'long_back'"
+        )]
         stub: JsValue,
+        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
         discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
         let id: &str = &js_string(&id, "id")?;
@@ -80,7 +104,7 @@ impl JsBond {
     /// @param id - Unique instrument identifier.
     /// @param notional - Principal amount of the bond.
     /// @param couponRate - Annual coupon rate.
-    /// @param issue_date - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+    /// @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param convention - Bond convention preset: `us_treasury`, `us_agency`,
     /// `german_bund`, `uk_gilt`, `french_oat`, `jgb`, `us_corporate`, or
@@ -92,12 +116,16 @@ impl JsBond {
     /// maturity not after issue_date).
     #[wasm_bindgen(js_name = withConvention)]
     pub fn with_convention(
-        id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
         notional: &JsMoney,
-        coupon_rate: &JsRate,
-        issue_date: JsValue,
-        maturity: JsValue,
+        #[wasm_bindgen(js_name = "couponRate")] coupon_rate: &JsRate,
+        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+        #[wasm_bindgen(
+            unchecked_param_type = "| 'us_treasury' | 'us_agency' | 'german_bund' | 'uk_gilt' | 'french_oat' | 'jgb' | 'us_corporate' | 'eur_corporate'"
+        )]
         convention: JsValue,
+        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
         discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
         let id: &str = &js_string(&id, "id")?;
@@ -129,7 +157,13 @@ impl JsBond {
     /// @returns A new bond whose coupon schedule uses `stub`.
     /// @throws Error - Throws with kind `validation` if `stub` is not a known stub policy.
     #[wasm_bindgen(js_name = withStub)]
-    pub fn with_stub(&self, stub: JsValue) -> Result<JsBond, JsValue> {
+    pub fn with_stub(
+        &self,
+        #[wasm_bindgen(
+            unchecked_param_type = "'none' | 'short_front' | 'short_back' | 'long_front' | 'long_back'"
+        )]
+        stub: JsValue,
+    ) -> Result<JsBond, JsValue> {
         let stub: &str = &js_string(&stub, "stub")?;
         Ok(JsBond {
             inner: self
@@ -151,7 +185,7 @@ impl JsBond {
     /// @param spreadBp - Spread over the index in whole basis points
     /// (`Bps` rejects fractional values; use `Bond.fromJson` for sub-bp
     /// margins, which preserves the exact decimal spread).
-    /// @param issue_date - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+    /// @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param frequency - Payment frequency (e.g. `Tenor.quarterly()`).
     /// @param dayCount - Day count convention (e.g. `DayCount.act360()`).
@@ -161,14 +195,16 @@ impl JsBond {
     /// or validation fails.
     #[allow(clippy::too_many_arguments)]
     pub fn floating(
-        id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
         notional: &JsMoney,
+        #[wasm_bindgen(js_name = "forwardCurveId", unchecked_param_type = "string")]
         forward_curve_id: JsValue,
-        spread_bp: &JsBps,
-        issue_date: JsValue,
-        maturity: JsValue,
+        #[wasm_bindgen(js_name = "spreadBp")] spread_bp: &JsBps,
+        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
         frequency: &JsTenor,
-        day_count: &JsDayCount,
+        #[wasm_bindgen(js_name = "dayCount")] day_count: &JsDayCount,
+        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
         discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
         let id: &str = &js_string(&id, "id")?;
@@ -200,7 +236,7 @@ impl JsBond {
     /// @param notional - Principal amount of the bond.
     /// @param forwardCurveId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
     /// @param spreadBp - Spread over the index in whole basis points.
-    /// @param issue_date - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+    /// @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param frequency - Payment frequency (e.g. `Tenor.quarterly()`).
     /// @param dayCount - Day count convention (e.g. `DayCount.act360()`).
@@ -214,15 +250,20 @@ impl JsBond {
     #[allow(clippy::too_many_arguments)]
     #[wasm_bindgen(js_name = floatingWithConvention)]
     pub fn floating_with_convention(
-        id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
         notional: &JsMoney,
+        #[wasm_bindgen(js_name = "forwardCurveId", unchecked_param_type = "string")]
         forward_curve_id: JsValue,
-        spread_bp: &JsBps,
-        issue_date: JsValue,
-        maturity: JsValue,
+        #[wasm_bindgen(js_name = "spreadBp")] spread_bp: &JsBps,
+        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
         frequency: &JsTenor,
-        day_count: &JsDayCount,
+        #[wasm_bindgen(js_name = "dayCount")] day_count: &JsDayCount,
+        #[wasm_bindgen(
+            unchecked_param_type = "| 'us_treasury' | 'us_agency' | 'german_bund' | 'uk_gilt' | 'french_oat' | 'jgb' | 'us_corporate' | 'eur_corporate'"
+        )]
         convention: JsValue,
+        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
         discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
         let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating_with_convention(
@@ -248,7 +289,7 @@ impl JsBond {
     /// Mirrors Rust `Bond::zero_coupon`.
     /// @param id - Unique instrument identifier.
     /// @param notional - Principal repaid at maturity.
-    /// @param issue_date - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+    /// @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param discountCurveId - Discount curve identifier used for pricing.
     /// @returns The validated zero-coupon bond.
@@ -256,10 +297,11 @@ impl JsBond {
     /// bond validation fails (e.g. maturity not after issue_date).
     #[wasm_bindgen(js_name = zeroCoupon)]
     pub fn zero_coupon(
-        id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
         notional: &JsMoney,
-        issue_date: JsValue,
-        maturity: JsValue,
+        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
         discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
         let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::zero_coupon(
@@ -281,7 +323,10 @@ impl JsBond {
     /// @returns A new bond carrying the return floor.
     /// @throws Error - Throws with kind `invalid_type` if `multiple` is not a number.
     #[wasm_bindgen(js_name = minMoic)]
-    pub fn min_moic(&self, multiple: JsValue) -> Result<JsBond, JsValue> {
+    pub fn min_moic(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] multiple: JsValue,
+    ) -> Result<JsBond, JsValue> {
         Ok(JsBond {
             inner: self.inner.clone().min_moic(js_f64(&multiple, "multiple")?),
         })
@@ -325,6 +370,17 @@ factories!(JsBond, "Bond", finstack_quant_valuations::instruments::fixed_income:
 
 instrument_class!(
     /// Typed wrapper for the canonical Rust TermLoan instrument.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { core, valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const loan = valuations.instruments.TermLoan.example();
+    /// const market = new core.MarketContext();
+    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2024-06-30", 0.03));
+    /// const result = valuations.instruments.priceInstrument(loan.toJson(), market.toJson(), "2024-06-30", "default");
+    /// console.log(result.value.amount, result.value.currency);
+    /// ```
     JsTermLoan, "TermLoan", finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan
 );
 
@@ -349,6 +405,18 @@ factories!(JsTermLoan, "TermLoan", finstack_quant_valuations::instruments::fixed
 
 instrument_class!(
     /// Typed wrapper for the canonical Rust AssetBackedFacility instrument.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { core, valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const facility = valuations.instruments.AssetBackedFacility.example();
+    /// const base = facility.borrowingBase();
+    /// const market = new core.MarketContext();
+    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2024-01-15", 0.03));
+    /// const result = valuations.instruments.priceInstrument(facility.toJson(), market.toJson(), "2024-01-15", "default");
+    /// console.log(base.borrowing_base.amount, result.value.amount);
+    /// ```
     JsAssetBackedFacility, "AssetBackedFacility", finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility
 );
 
@@ -379,7 +447,13 @@ impl JsAssetBackedFacility {
     /// @param asOf - Valuation date as an ISO-8601 string; the projection starts here.
     /// @returns Plain `FacilityProjection` object: `facility` and `residual` tranche cashflows, `commitment_fees` and `draws` as `[date, Money]` pairs, and the per-period `diagnostics`.
     /// @throws Error - Throws with kind `validation` if the facility fails validation or an input is malformed, and kind `not_found` if market data is missing.
-    pub fn project(&self, market_json: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "FacilityProjection")]
+    pub fn project(
+        &self,
+        #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
+        market_json: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let market = parse_market(&market_json)?;
         let as_of = js_date(&as_of, "asOf")?;
         to_js_value(&self.inner.project(&market, as_of).map_err(to_js_err)?)
@@ -400,7 +474,7 @@ impl JsAssetBackedFacility {
     /// concentration excess and the advance-rate-weighted base.
     /// @returns Plain `BorrowingBaseReport` object with `eligible_collateral`, `concentration_excess` and `borrowing_base` Money values.
     /// @throws If the borrowing-base rules are malformed.
-    #[wasm_bindgen(js_name = borrowingBase)]
+    #[wasm_bindgen(js_name = borrowingBase, unchecked_return_type = "BorrowingBaseReport")]
     pub fn borrowing_base(&self) -> Result<JsValue, JsValue> {
         let report = self.inner.borrowing_base().map_err(to_js_err)?;
         to_js_value(&report)
@@ -427,6 +501,21 @@ market_metrics!(JsAssetBackedFacility, "AssetBackedFacility", {
 
 instrument_class!(
     /// Typed wrapper for the canonical Rust RevolvingCredit instrument.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { core, valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const facility = valuations.instruments.RevolvingCredit.example();
+    /// // The example facility commits on 2024-01-01 and draws on dated events after
+    /// // that, so it is valued before the commitment date: a later date needs the
+    /// // `FIXING:USD-SOFR-3M` history, and one past a draw event is rejected.
+    /// const market = new core.MarketContext();
+    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2023-12-15", 0.03));
+    /// market.insert(core.ForwardCurve.flat("USD-SOFR-3M", 0.25, "2023-12-15", 0.03));
+    /// const result = valuations.instruments.priceInstrument(facility.toJson(), market.toJson(), "2023-12-15", "default");
+    /// console.log(result.value.amount, result.value.currency);
+    /// ```
     JsRevolvingCredit, "RevolvingCredit", finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit
 );
 
@@ -447,11 +536,12 @@ impl JsRevolvingCredit {
     /// @param asOf - Valuation date as an ISO-8601 string; flows are projected from here.
     /// @returns Plain `CashFlowSchedule` object with dated interest, fee and principal flows from the lender's perspective (draws negative, repayments positive).
     /// @throws Error - Throws with kind `validation` if the facility fails validation or an input is malformed, and kind `not_found` if a required curve is missing.
-    #[wasm_bindgen(js_name = expectedCashflows)]
+    #[wasm_bindgen(js_name = expectedCashflows, unchecked_return_type = "generated.valuations.CashFlowSchedule")]
     pub fn expected_cashflows(
         &self,
+        #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
         market_json: JsValue,
-        as_of: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         use finstack_quant_cashflows::CashflowScheduleSource;
         let market = parse_market(&market_json)?;
@@ -476,11 +566,12 @@ impl JsRevolvingCredit {
     /// @param asOf - Valuation date as an ISO 8601 `YYYY-MM-DD` string.
     /// @returns Plain `EnhancedMonteCarloResult` object with `mc_result`, one `path_results` entry per simulated path and the `draw_option_cost` estimate; path counts are plain numbers and `mc_result.run` is `null`.
     /// @throws If the market JSON or date is malformed, a required curve or fixing is missing, or the facility has a deterministic draw schedule (only stochastic facilities simulate paths).
-    #[wasm_bindgen(js_name = priceWithPaths)]
+    #[wasm_bindgen(js_name = priceWithPaths, unchecked_return_type = "EnhancedMonteCarloResult")]
     pub fn price_with_paths(
         &self,
+        #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
         market_json: JsValue,
-        as_of: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let market = parse_market(&market_json)?;
         let as_of = js_date(&as_of, "asOf")?;
@@ -505,60 +596,60 @@ factories!(JsRevolvingCredit, "RevolvingCredit", finstack_quant_valuations::inst
         example as example,
 });
 
-instrument_surface!(JsBond, "Bond", JsBondBuilder);
+instrument_surface!(JsBond, "Bond", JsBondBuilder, "generated.valuations.Bond");
 
 getters!(JsBond, "Bond", |i| {
         /// Principal amount of the bond.
         /// @returns Currency-tagged principal.
-        notional as notional => money(i.notional),
+        notional as notional: "Money" => money(i.notional),
         /// Issue date of the bond.
         /// @returns The contractual issue date.
-        issue_date as issueDate => date(i.issue_date),
+        issue_date as issueDate: "string" => date(i.issue_date),
         /// Maturity (final redemption) date.
         /// @returns The contractual maturity date.
-        maturity as maturity => date(i.maturity),
+        maturity as maturity: "string" => date(i.maturity),
         /// Coupon/cashflow specification in serde form.
         /// @returns One-key plain object: `{"fixed": {...}}`, `{"floating": {...}}`, `{"step_up": {...}}` or `{"amortizing": {...}}`.
-        cashflow_spec as cashflowSpec => json(i.cashflow_spec),
+        cashflow_spec as cashflowSpec: "generated.valuations.Bond['cashflow_spec']" => json(i.cashflow_spec),
         /// Discount curve identifier.
         /// @returns Curve id used for discounting.
-        discount_curve_id as discountCurveId => text(i.discount_curve_id),
+        discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
         /// Hazard curve identifier for `hazard_rate` and `rates_credit` pricing.
         /// @returns Curve id, or `null` when no credit-consuming model is configured.
-        credit_curve_id as creditCurveId => opt_text(i.credit_curve_id),
+        credit_curve_id as creditCurveId: "string | null" => opt_text(i.credit_curve_id),
         /// Repo (financing) discount curve identifier.
         /// @returns Curve id, or `null`.
-        repo_curve_id as repoCurveId => opt_text(i.repo_curve_id),
+        repo_curve_id as repoCurveId: "string | null" => opt_text(i.repo_curve_id),
         /// Call/put schedule in serde form.
         /// @returns `{"calls": [...], "puts": [...]}` or `null` for a bullet bond.
-        call_put as callPut => json(i.call_put),
+        call_put as callPut: "NonNullable<generated.valuations.Bond['call_put']> | null" => json(i.call_put),
         /// Return-floor specification (minimum MOIC / XIRR) in serde form.
         /// @returns The spec plain object, or `null`.
-        return_floor as returnFloor => json(i.return_floor),
+        return_floor as returnFloor: "NonNullable<generated.valuations.Bond['return_floor']> | null" => json(i.return_floor),
         /// Explicit cashflow schedule overriding generated coupons, in serde form.
         /// @returns The schedule plain object, or `null`.
-        custom_cashflows as customCashflows => json(i.custom_cashflows),
+        custom_cashflows as customCashflows: "NonNullable<generated.valuations.Bond['custom_cashflows']> | null" => json(i.custom_cashflows),
         /// Accrual method (serde string).
         /// @returns `"linear"` unless overridden.
-        accrual_method as accrualMethod => json(i.accrual_method),
+        accrual_method as accrualMethod: "NonNullable<generated.valuations.Bond['accrual_method']>" => json(i.accrual_method),
         /// Settlement convention (settlement lag, ex-coupon period) in serde form.
         /// @returns `{"settlement_days": ..., "ex_coupon_days": ..., "ex_coupon_calendar_id": ...}` or `null`.
-        settlement_convention as settlementConvention => json(i.settlement_convention),
+        settlement_convention as settlementConvention: "Pick< generated.valuations.Bond, 'settlement_days' | 'ex_coupon_days' | 'ex_coupon_calendar_id' > | null" => json(i.settlement_convention),
         /// Settlement lag in business days.
         /// @returns The lag, or `null` when no settlement convention is set.
-        settlement_days as settlementDays => json(i.settlement_days()),
+        settlement_days as settlementDays: "number | null" => json(i.settlement_days()),
         /// Ex-coupon period in business days.
         /// @returns The period, or `null` when no settlement convention is set.
-        ex_coupon_days as exCouponDays => json(i.ex_coupon_days()),
+        ex_coupon_days as exCouponDays: "number | null" => json(i.ex_coupon_days()),
         /// Whether coupons depend on forward-curve projection (FRNs).
         /// @returns `true` for floating (or amortizing-floating) cashflow specs.
-        has_floating_coupons as hasFloatingCoupons => json(i.has_floating_coupons()),
+        has_floating_coupons as hasFloatingCoupons: "boolean" => json(i.has_floating_coupons()),
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"discounting"` or `"black76"`.
-        default_model as defaultModel => text(Instrument::default_model(i)),
+        default_model as defaultModel: "string" => text(Instrument::default_model(i)),
         /// Expiry date exposed by the Rust `Instrument` trait.
         /// @returns The expiry/maturity date, or `null` when the instrument type reports none.
-        expiry as expiry => opt_date(Instrument::expiry(i)),
+        expiry as expiry: "string | null" => opt_date(Instrument::expiry(i)),
 });
 
 common_getters!(JsBond, "Bond");
@@ -568,6 +659,15 @@ builder_class!(
     ///
     /// Every setter returns the builder, so calls chain; `build()` validates
     /// and consumes it.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const builder = valuations.instruments.Bond.builder();
+    /// console.log(typeof builder.build);
+    /// builder.free();
+    /// ```
     JsBondBuilder,
     "BondBuilder",
     finstack_quant_valuations::instruments::fixed_income::bond::BondBuilder,
@@ -580,62 +680,62 @@ setters!(JsBondBuilder, "BondBuilder", {
         /// @param value - Instrument identifier.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        id as id => id,
+        id as id: "string" => id,
         /// Set the required contractual issue date.
         /// @param value - Required contractual issue date as an ISO-8601 string. `build()` throws when it is not set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        issue_date as issueDate => js_date,
+        issue_date as issueDate: "string" => js_date,
         /// Set the maturity date.
         /// @param value - Maturity date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        maturity as maturity => js_date,
+        maturity as maturity: "string" => js_date,
         /// Set the coupon/cashflow specification.
         /// @param value - Rust `CashflowSpec` in serde form (plain object or JSON string), e.g. `{"fixed": {"coupon_type": "cash", "rate": "0.05", "schedule": {...}}}` (copy `Bond.example().cashflow_spec`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        cashflow_spec as cashflowSpec => from_js_json,
+        cashflow_spec as cashflowSpec: "generated.valuations.Bond['cashflow_spec']" => from_js_json,
         /// Set the discount curve identifier.
         /// @param value - Discount curve identifier.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        discount_curve_id as discountCurveId => id,
+        discount_curve_id as discountCurveId: "string" => id,
         /// Set the hazard curve identifier for `hazard_rate` and `rates_credit` pricing.
         /// @param value - Hazard curve identifier for scalar or joint rates-credit pricing.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        credit_curve_id as creditCurveId => id,
+        credit_curve_id as creditCurveId: "string" => id,
         /// Set the repo (financing) discount curve identifier.
         /// @param value - Repo (financing) discount curve identifier.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        repo_curve_id as repoCurveId => id,
+        repo_curve_id as repoCurveId: "string" => id,
         /// Set the call/put schedule.
         /// @param value - Rust `CallPutSchedule` in serde form (plain object or JSON string), e.g. `{"calls": [{"start": "2027-01-15", "end": "2029-01-15", "price_pct_of_par": 100.0}], "puts": []}`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        call_put as callPut => from_js_json,
+        call_put as callPut: "NonNullable<generated.valuations.Bond['call_put']>" => from_js_json,
         /// Set the return-floor specification (minimum MOIC / XIRR on early redemption).
         /// @param value - Rust `ReturnFloorSpec` in serde form (plain object or JSON string), e.g. `Bond.example().min_moic(1.25).return_floor`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        return_floor as returnFloor => from_js_json,
+        return_floor as returnFloor: "NonNullable<generated.valuations.Bond['return_floor']>" => from_js_json,
         /// Set the explicit cashflow schedule that overrides generated coupons.
         /// @param value - Rust `CashFlowSchedule` in serde form (plain object or JSON string), e.g. the `custom_cashflows` value of a bond built from cashflows.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        custom_cashflows as customCashflows => from_js_json,
+        custom_cashflows as customCashflows: "NonNullable<generated.valuations.Bond['custom_cashflows']>" => from_js_json,
         /// Set the accrual method.
         /// @param value - Accrual method (serde string). `"linear"` is the default.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        accrual_method as accrualMethod => js_wire,
+        accrual_method as accrualMethod: "NonNullable<generated.valuations.Bond['accrual_method']>" => js_wire,
         /// Set the settlement convention (settlement lag and ex-coupon period).
         /// @param value - Rust `BondSettlementConvention` in serde form (plain object or JSON string), e.g. `{"settlement_days": 2, "ex_coupon_days": 0, "ex_coupon_calendar_id": `null`}`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        settlement_convention as settlementConvention => from_js_json,
+        settlement_convention as settlementConvention: "Pick< generated.valuations.Bond, 'settlement_days' | 'ex_coupon_days' | 'ex_coupon_calendar_id' >" => from_js_json,
 });
 
 common_setters!(JsBondBuilder, "BondBuilder");
@@ -648,75 +748,80 @@ handle_setters!(JsBondBuilder, "BondBuilder", {
         notional as notional => JsMoney,
 });
 
-instrument_surface!(JsTermLoan, "TermLoan", JsTermLoanBuilder);
+instrument_surface!(
+    JsTermLoan,
+    "TermLoan",
+    JsTermLoanBuilder,
+    "generated.valuations.TermLoan"
+);
 
 getters!(JsTermLoan, "TermLoan", |i| {
         /// Currency the loan is denominated in.
         /// @returns ISO-4217 currency code such as `"USD"`.
-        currency as currency => text(i.currency),
+        currency as currency: "string" => text(i.currency),
         /// Committed notional (facility limit).
         /// @returns Currency-tagged commitment.
-        notional_limit as notionalLimit => money(i.notional_limit),
+        notional_limit as notionalLimit: "Money" => money(i.notional_limit),
         /// Issue / funding date.
         /// @returns The issue date.
-        issue_date as issueDate => date(i.issue_date),
+        issue_date as issueDate: "string" => date(i.issue_date),
         /// Maturity (final redemption) date.
         /// @returns The contractual maturity date.
-        maturity as maturity => date(i.maturity),
+        maturity as maturity: "string" => date(i.maturity),
         /// Rate specification in serde form.
         /// @returns `{"fixed": {"rate": 0.06}}` (decimal rate) or `{"floating": {...}}`.
-        rate as rate => json(i.rate),
+        rate as rate: "generated.valuations.TermLoan['rate']" => json(i.rate),
         /// Payment frequency.
         /// @returns The payment tenor.
-        frequency as frequency => tenor(i.frequency),
+        frequency as frequency: "Tenor" => tenor(i.frequency),
         /// Accrual day-count convention.
         /// @returns The day count.
-        day_count as dayCount => day_count(i.day_count),
+        day_count as dayCount: "DayCount" => day_count(i.day_count),
         /// Business day convention (serde string).
         /// @returns `"modified_following"` unless overridden.
-        business_day_convention as businessDayConvention => json(i.business_day_convention),
+        business_day_convention as businessDayConvention: "NonNullable< generated.valuations.TermLoan['business_day_convention'] >" => json(i.business_day_convention),
         /// Holiday calendar identifier.
         /// @returns Calendar id, or `null`.
-        calendar_id as calendarId => opt_text(i.calendar_id),
+        calendar_id as calendarId: "string | null" => opt_text(i.calendar_id),
         /// Stub-period handling rule for the schedule.
         /// @returns Stub rule serde name (`"none"`, `"short_front"`, ...).
-        stub as stub => json(i.stub),
+        stub as stub: "NonNullable<generated.valuations.TermLoan['stub']>" => json(i.stub),
         /// Discount curve identifier.
         /// @returns Curve id used for discounting.
-        discount_curve_id as discountCurveId => text(i.discount_curve_id),
+        discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
         /// Hazard curve identifier.
         /// @returns Curve id, or `null`.
-        credit_curve_id as creditCurveId => opt_text(i.credit_curve_id),
+        credit_curve_id as creditCurveId: "string | null" => opt_text(i.credit_curve_id),
         /// Amortization specification in serde form.
         /// @returns `"none"`, `{"percent_of_remaining_per_period": {"pct": 0.025}}`, `{"linear_between": {...}}`, ...
-        amortization as amortization => json(i.amortization),
+        amortization as amortization: "generated.valuations.TermLoan['amortization']" => json(i.amortization),
         /// Coupon type (serde string).
         /// @returns `"cash"`, `"pik"`, ...
-        coupon_type as couponType => json(i.coupon_type),
+        coupon_type as couponType: "NonNullable<generated.valuations.TermLoan['coupon_type']>" => json(i.coupon_type),
         /// Upfront (arrangement or OID) fee paid on the issue date.
         /// @returns `UpfrontFee` serde plain object (`{"amount": `Money` plain object}` or `{"fraction_of_commitment": 0.02}`), or `null` when the loan has no upfront fee.
-        upfront_fee as upfrontFee => json(i.upfront_fee),
+        upfront_fee as upfrontFee: "NonNullable<generated.valuations.TermLoan['upfront_fee']> | null" => json(i.upfront_fee),
         /// Delayed-draw term loan specification in serde form.
         /// @returns The spec plain object, or `null`.
-        ddtl as ddtl => json(i.ddtl),
+        ddtl as ddtl: "NonNullable<generated.valuations.TermLoan['ddtl']> | null" => json(i.ddtl),
         /// Covenant event schedule in serde form.
         /// @returns The events plain object, or `null`.
-        covenants as covenants => json(i.covenants),
+        covenants as covenants: "NonNullable<generated.valuations.TermLoan['covenants']> | null" => json(i.covenants),
         /// OID / effective-interest-rate specification in serde form.
         /// @returns The spec plain object, or `null`.
-        oid_eir as oidEir => json(i.oid_eir),
+        oid_eir as oidEir: "NonNullable<generated.valuations.TermLoan['oid_eir']> | null" => json(i.oid_eir),
         /// Prepayment (call) schedule in serde form.
         /// @returns The schedule plain object, or `null`.
-        call_schedule as callSchedule => json(i.call_schedule),
+        call_schedule as callSchedule: "NonNullable<generated.valuations.TermLoan['call_schedule']> | null" => json(i.call_schedule),
         /// Settlement lag in business days.
         /// @returns The lag (Rust default 2).
-        settlement_days as settlementDays => json(i.settlement_days),
+        settlement_days as settlementDays: "NonNullable<generated.valuations.TermLoan['settlement_days']>" => json(i.settlement_days),
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"discounting"` or `"black76"`.
-        default_model as defaultModel => text(Instrument::default_model(i)),
+        default_model as defaultModel: "string" => text(Instrument::default_model(i)),
         /// Expiry date exposed by the Rust `Instrument` trait.
         /// @returns The expiry/maturity date, or `null` when the instrument type reports none.
-        expiry as expiry => opt_date(Instrument::expiry(i)),
+        expiry as expiry: "string | null" => opt_date(Instrument::expiry(i)),
 });
 
 common_getters!(JsTermLoan, "TermLoan");
@@ -726,6 +831,15 @@ builder_class!(
     ///
     /// Every setter returns the builder, so calls chain; `build()` validates
     /// and consumes it.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const builder = valuations.instruments.TermLoan.builder();
+    /// console.log(typeof builder.build);
+    /// builder.free();
+    /// ```
     JsTermLoanBuilder,
     "TermLoanBuilder",
     finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanBuilder,
@@ -738,92 +852,92 @@ setters!(JsTermLoanBuilder, "TermLoanBuilder", {
         /// @param value - Instrument identifier.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        id as id => id,
+        id as id: "string" => id,
         /// Set the loan currency.
         /// @param value - ISO-4217 currency code of the loan, e.g. `"USD"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        currency as currency => js_wire,
+        currency as currency: "generated.valuations.TermLoan['currency']" => js_wire,
         /// Set the required contractual issue / funding date.
         /// @param value - Required contractual issue / funding date as an ISO-8601 string. `build()` throws when it is not set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        issue_date as issueDate => js_date,
+        issue_date as issueDate: "string" => js_date,
         /// Set the maturity date.
         /// @param value - Maturity date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        maturity as maturity => js_date,
+        maturity as maturity: "string" => js_date,
         /// Set the interest rate specification.
         /// @param value - `RateSpec` plain object or JSON string: `{"fixed": {"rate": 0.06}}` for a fixed all-in rate (`0.06` = 6%) or `{"floating": {...}}` with a `FloatingRateSpec`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        rate as rate => from_js_json,
+        rate as rate: "generated.valuations.TermLoan['rate']" => from_js_json,
         /// Set the business day convention.
         /// @param value - Business day convention (serde string). Default `"modified_following"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        business_day_convention as businessDayConvention => js_wire,
+        business_day_convention as businessDayConvention: "NonNullable<generated.valuations.TermLoan['business_day_convention']>" => js_wire,
         /// Set the holiday calendar identifier (e.g. `"usny"`).
         /// @param value - Holiday calendar identifier (e.g. `"usny"`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        calendar_id as calendarId => id,
+        calendar_id as calendarId: "string" => id,
         /// Set the stub rule.
         /// @param value - Stub rule (serde string). Default `"short_front"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        stub as stub => js_wire,
+        stub as stub: "NonNullable<generated.valuations.TermLoan['stub']>" => js_wire,
         /// Set the discount curve identifier.
         /// @param value - Discount curve identifier.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        discount_curve_id as discountCurveId => id,
+        discount_curve_id as discountCurveId: "string" => id,
         /// Set the hazard curve identifier for credit-risky pricing.
         /// @param value - Hazard curve identifier for credit-risky pricing.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        credit_curve_id as creditCurveId => id,
+        credit_curve_id as creditCurveId: "string" => id,
         /// Set the amortization schedule.
         /// @param value - Amortization as the serde name of a unit variant (`"none"`) or an `AmortizationSpec` plain object / JSON string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        amortization as amortization => js_wire,
+        amortization as amortization: "generated.valuations.TermLoan['amortization']" => js_wire,
         /// Set the coupon type.
         /// @param value - Coupon type (serde string). `"cash"` (default), `"pik"`, ...
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        coupon_type as couponType => js_wire,
+        coupon_type as couponType: "NonNullable<generated.valuations.TermLoan['coupon_type']>" => js_wire,
         /// Set the upfront (arrangement or OID) fee paid on the issue date.
         /// @param value - `UpfrontFee` plain object or JSON string: `{"amount": Money}` for a cash fee or `{"fraction_of_commitment": 0.02}`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        upfront_fee as upfrontFee => from_js_json,
+        upfront_fee as upfrontFee: "NonNullable<generated.valuations.TermLoan['upfront_fee']>" => from_js_json,
         /// Set the delayed-draw (DDTL) specification.
         /// @param value - Rust `DdtlSpec` in serde form (plain object or JSON string), e.g. `TermLoan.example_floating_with_ddtl().ddtl`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        ddtl as ddtl => from_js_json,
+        ddtl as ddtl: "NonNullable<generated.valuations.TermLoan['ddtl']>" => from_js_json,
         /// Set the covenant event schedule.
         /// @param value - Rust `TermLoanCovenantEvents` in serde form (plain object or JSON string), e.g. `{"events": [...]}`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        covenants as covenants => from_js_json,
+        covenants as covenants: "NonNullable<generated.valuations.TermLoan['covenants']>" => from_js_json,
         /// Set the OID / effective-interest-rate specification.
         /// @param value - Rust `OidEirSpec` in serde form (plain object or JSON string), e.g. `{"issue_price_pct": 99.0, ...}`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        oid_eir as oidEir => from_js_json,
+        oid_eir as oidEir: "NonNullable<generated.valuations.TermLoan['oid_eir']>" => from_js_json,
         /// Set the prepayment (call) schedule.
         /// @param value - Rust `LoanCallSchedule` in serde form (plain object or JSON string), e.g. `TermLoan.example_callable().call_schedule`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        call_schedule as callSchedule => from_js_json,
+        call_schedule as callSchedule: "NonNullable<generated.valuations.TermLoan['call_schedule']>" => from_js_json,
         /// Set the settlement lag in business days (default 2).
         /// @param value - Settlement lag.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        settlement_days as settlementDays => js_uint,
+        settlement_days as settlementDays: "number" => js_uint,
 });
 
 common_setters!(JsTermLoanBuilder, "TermLoanBuilder");
@@ -849,88 +963,89 @@ handle_setters!(JsTermLoanBuilder, "TermLoanBuilder", {
 instrument_surface!(
     JsRevolvingCredit,
     "RevolvingCredit",
-    JsRevolvingCreditBuilder
+    JsRevolvingCreditBuilder,
+    "generated.valuations.RevolvingCredit"
 );
 
 getters!(JsRevolvingCredit, "RevolvingCredit", |i| {
         /// Total committed amount.
         /// @returns Currency-tagged commitment.
-        commitment as commitment => money(i.commitment),
+        commitment as commitment: "Money" => money(i.commitment),
         /// Drawn balance at the simulation anchor (the later of the commitment and valuation dates), in both deterministic and stochastic mode.
         /// @returns Currency-tagged drawn balance.
-        drawn as drawn => money(i.drawn),
+        drawn as drawn: "Money" => money(i.drawn),
         /// Date the facility becomes available.
         /// @returns The commitment date.
-        issue_date as issueDate => date(i.issue_date),
+        issue_date as issueDate: "string" => date(i.issue_date),
         /// Expiry of the commitment.
         /// @returns The maturity date.
-        maturity as maturity => date(i.maturity),
+        maturity as maturity: "string" => date(i.maturity),
         /// Coupon specification as its `RateSpec` serde plain object.
         /// @returns `{"fixed": {"rate": r}}` with a decimal rate, or `{"floating": {...}}`.
-        rate as rate => json(i.rate),
+        rate as rate: "generated.valuations.RevolvingCredit['rate']" => json(i.rate),
         /// Interest accrual day count.
         /// @returns The accrual convention.
-        day_count as dayCount => day_count(i.day_count),
+        day_count as dayCount: "DayCount" => day_count(i.day_count),
         /// Payment frequency for interest and fees.
         /// @returns The payment tenor.
-        frequency as frequency => tenor(i.frequency),
+        frequency as frequency: "Tenor" => tenor(i.frequency),
         /// Fee structure as its serde plain object (including dated `steps`).
         /// @returns `upfront_fee`, `commitment_fee_tiers`, `usage_fee_tiers`, `facility_fee_bp` and `steps`.
-        fees as fees => json(i.fees),
+        fees as fees: "generated.valuations.RevolvingCredit['fees']" => json(i.fees),
         /// Scheduled commitment changes as serde plain object rows (`date`, `amount`, `reduction_fee_bp`); empty when the commitment is flat.
         /// @returns One row per commitment step, in date order.
-        commitment_steps as commitmentSteps => json(i.commitment_steps),
+        commitment_steps as commitmentSteps: "NonNullable<generated.valuations.RevolvingCredit['commitment_steps']>" => json(i.commitment_steps),
         /// Dated margin steps as serde plain object rows (`date`, `delta_bp`); empty when the margin is flat.
         /// @returns One row per margin step, in date order.
-        margin_steps as marginSteps => json(i.margin_steps),
+        margin_steps as marginSteps: "NonNullable<generated.valuations.RevolvingCredit['margin_steps']>" => json(i.margin_steps),
         /// Dated fixed fees as serde plain object rows (`date`, `amount`); empty when none are scheduled.
         /// @returns One row per scheduled fee, in date order.
-        scheduled_fees as scheduledFees => json(i.scheduled_fees),
+        scheduled_fees as scheduledFees: "NonNullable<generated.valuations.RevolvingCredit['scheduled_fees']>" => json(i.scheduled_fees),
         /// Effective-interest-rate reporting switch (`{"include_fees": boolean}`), or `null` for the default (fees included).
         /// @returns The switch, or `null`.
-        oid_eir as oidEir => json(i.oid_eir),
+        oid_eir as oidEir: "NonNullable<generated.valuations.RevolvingCredit['oid_eir']> | null" => json(i.oid_eir),
         /// Letter-of-credit sub-facility as its serde plain object (`sublimit`, `outstanding`, `events`, `fee_bp`, `fronting_fee_bp`, `leq`), or `null` without an LC sublimit.
         /// @returns The LC sub-facility, or `null`.
-        lc as lc => json(i.lc),
+        lc as lc: "NonNullable<generated.valuations.RevolvingCredit['lc']> | null" => json(i.lc),
         /// Draw/repay specification as its serde plain object.
         /// @returns `{"deterministic": [...]}` or `{"stochastic": {...}}`.
-        draw_repay_spec as drawRepaySpec => json(i.draw_repay_spec),
+        draw_repay_spec as drawRepaySpec: "generated.valuations.RevolvingCredit['draw_repay_spec']" => json(i.draw_repay_spec),
         /// Discount curve identifier.
         /// @returns The curve id.
-        discount_curve_id as discountCurveId => text(i.discount_curve_id),
+        discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
         /// Credit (hazard) curve identifier, or `null`.
         /// @returns The curve id when the facility carries credit risk.
-        credit_curve_id as creditCurveId => opt_text(i.credit_curve_id),
+        credit_curve_id as creditCurveId: "string | null" => opt_text(i.credit_curve_id),
         /// Recovery rate on default, as a decimal in `[0, 1]`.
         /// @returns The recovery fraction.
-        recovery_rate as recoveryRate => json(i.recovery_rate),
+        recovery_rate as recoveryRate: "generated.valuations.RevolvingCredit['recovery_rate']" => json(i.recovery_rate),
         /// Loan-equivalent exposure: fraction of the undrawn commitment drawn at default, as a decimal in `[0, 1]`.
         /// @returns The loan-equivalent exposure.
-        leq as leq => json(i.leq),
+        leq as leq: "NonNullable<generated.valuations.RevolvingCredit['leq']>" => json(i.leq),
         /// Stub rule for schedule generation.
         /// @returns The stub kind.
-        stub as stub => json(i.stub),
+        stub as stub: "NonNullable<generated.valuations.RevolvingCredit['stub']>" => json(i.stub),
         /// Business-day convention applied to payment dates (serde string, e.g. `"modified_following"`).
         /// @returns `"modified_following"` unless overridden.
-        business_day_convention as businessDayConvention => json(i.business_day_convention),
+        business_day_convention as businessDayConvention: "NonNullable< generated.valuations.RevolvingCredit['business_day_convention'] >" => json(i.business_day_convention),
         /// Holiday calendar identifier used for payment, fixing and settlement rolls, or `null` for weekends only.
         /// @returns The calendar identifier, or `null`.
-        calendar_id as calendarId => opt_text(i.calendar_id),
+        calendar_id as calendarId: "string | null" => opt_text(i.calendar_id),
         /// Business days between an accrual end and its payment date.
         /// @returns The payment lag; `0` pays on the adjusted accrual end.
-        payment_lag_days as paymentLagDays => json(i.payment_lag_days),
+        payment_lag_days as paymentLagDays: "NonNullable<generated.valuations.RevolvingCredit['payment_lag_days']>" => json(i.payment_lag_days),
         /// Business days from the valuation date to the settlement date used by quote metrics.
         /// @returns The settlement lag; `0` settles on the valuation date.
-        settlement_days as settlementDays => json(i.settlement_days),
+        settlement_days as settlementDays: "NonNullable<generated.valuations.RevolvingCredit['settlement_days']>" => json(i.settlement_days),
         /// Scenario-selection attributes.
         /// @returns The attribute map.
-        attributes as attributes => json(i.attributes),
+        attributes as attributes: "generated.valuations.RevolvingCredit['attributes']" => json(i.attributes),
         /// Default pricing model key from the `Instrument` trait.
         /// @returns The model key.
-        default_model as defaultModel => text(Instrument::default_model(i)),
+        default_model as defaultModel: "string" => text(Instrument::default_model(i)),
         /// Expiry date exposed by the `Instrument` trait, or `null`.
         /// @returns The expiry date.
-        expiry as expiry => opt_date(Instrument::expiry(i)),
+        expiry as expiry: "string | null" => opt_date(Instrument::expiry(i)),
 });
 
 common_getters!(JsRevolvingCredit, "RevolvingCredit", overrides);
@@ -940,6 +1055,15 @@ builder_class!(
     ///
     /// Every setter returns the builder, so calls chain; `build()` validates
     /// and consumes it.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const builder = valuations.instruments.RevolvingCredit.builder();
+    /// console.log(typeof builder.build);
+    /// builder.free();
+    /// ```
     JsRevolvingCreditBuilder,
     "RevolvingCreditBuilder",
     finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditBuilder,
@@ -952,107 +1076,107 @@ setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
         /// @param value - Unique identifier for the facility.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        id as id => id,
+        id as id: "string" => id,
         /// Set the date the facility becomes available.
         /// @param value - Commitment date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        issue_date as issueDate => js_date,
+        issue_date as issueDate: "string" => js_date,
         /// Set the expiry of the commitment.
         /// @param value - Maturity date as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        maturity as maturity => js_date,
+        maturity as maturity: "string" => js_date,
         /// Set the facility coupon.
         /// @param value - `RateSpec` plain object or JSON string: `{"fixed": {"rate": 0.06}}` for a fixed all-in rate (`0.06` = 6%) or `{"floating": {...}}` with a `FloatingRateSpec`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        rate as rate => from_js_json,
+        rate as rate: "generated.valuations.RevolvingCredit['rate']" => from_js_json,
         /// Set the fee structure from its serde shape.
         /// @param value - `RevolvingCreditFees` as a plain object or JSON string (`upfront_fee` as `null`, `{"amount": `Money` plain object}` or `{"fraction_of_commitment": 0.02}`; `commitment_fee_tiers`, `usage_fee_tiers`, `facility_fee_bp` and the dated `steps` list of `{"date", "commitment_delta_bp", "usage_delta_bp", "facility_delta_bp"}` rows).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        fees as fees => from_js_json,
+        fees as fees: "generated.valuations.RevolvingCredit['fees']" => from_js_json,
         /// Set the scheduled commitment changes.
         /// @param value - Rows of `{"date": "YYYY-MM-DD", "amount": `Money` plain object, "reduction_fee_bp": string}` (an array of plain objects or a JSON string), each the commitment in force from its date; `reduction_fee_bp` is the one-off reduction fee on a step down, a decimal string in basis points of the reduced amount (default `"0"`). Dates must be strictly increasing, after the commitment date and on or before maturity.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        commitment_steps as commitmentSteps => from_js_json,
+        commitment_steps as commitmentSteps: "NonNullable<generated.valuations.RevolvingCredit['commitment_steps']>" => from_js_json,
         /// Set the dated fixed fees (amendment, waiver, extension, consent).
         /// @param value - Rows of `{"date": "YYYY-MM-DD", "amount": `Money` plain object}` (a array of plain objects or a JSON string), each paid on its date. Dates must lie after the commitment date and on or before maturity.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scheduled_fees as scheduledFees => from_js_json,
+        scheduled_fees as scheduledFees: "NonNullable<generated.valuations.RevolvingCredit['scheduled_fees']>" => from_js_json,
         /// Set the effective-interest-rate reporting switch.
         /// @param value - `{"include_fees": boolean}` as a plain object or JSON string; `null` (the default) includes fees in the effective yield.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        oid_eir as oidEir => from_js_json,
+        oid_eir as oidEir: "NonNullable<generated.valuations.RevolvingCredit['oid_eir']>" => from_js_json,
         /// Set the letter-of-credit sub-facility.
         /// @param value - `LetterOfCreditSpec` as a plain object or JSON string with `sublimit` and `outstanding` (`Money` plain objects), `events` (rows of `{"date", "amount", "is_issue"}`), `fee_bp` (`null` accrues the floating margin), `fronting_fee_bp` and `leq` (the fraction of the LC face drawn at default). `null` removes the sublimit.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        lc as lc => from_js_json,
+        lc as lc: "NonNullable<generated.valuations.RevolvingCredit['lc']>" => from_js_json,
         /// Set the dated margin steps.
         /// @param value - Rows of `{"date": "YYYY-MM-DD", "delta_bp": string}` (a decimal string in basis points; a array of plain objects or a JSON string); each delta shifts the floating spread or the fixed rate from its date, cumulatively. Dates must be strictly increasing and strictly inside the facility life.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        margin_steps as marginSteps => from_js_json,
+        margin_steps as marginSteps: "NonNullable<generated.valuations.RevolvingCredit['margin_steps']>" => from_js_json,
         /// Set the draw/repay specification from its serde shape.
         /// @param value - `DrawRepaySpec` as a plain object or JSON string: `{"deterministic": [{"date": ..., "amount": Money, "is_draw": boolean}, ...]}` or `{"stochastic": {"utilization_process": {...}, "mc_config": ...}}`. The estimator count, antithetic flag and seed label come from `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`, `mc_seed_scenario`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        draw_repay_spec as drawRepaySpec => from_js_json,
+        draw_repay_spec as drawRepaySpec: "generated.valuations.RevolvingCredit['draw_repay_spec']" => from_js_json,
         /// Set the discount curve identifier.
         /// @param value - Discount curve id in the market context.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        discount_curve_id as discountCurveId => id,
+        discount_curve_id as discountCurveId: "string" => id,
         /// Set (or clear) the credit curve identifier.
         /// @param value - Hazard curve id used for survival weighting; `null` prices without credit risk. A stochastic facility with a credit curve must use a market-anchored spread process on the same curve.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        credit_curve_id as creditCurveId => id,
+        credit_curve_id as creditCurveId: "string" => id,
         /// Set the recovery rate on default.
         /// @param value - Recovery fraction as a decimal in `[0, 1]`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        recovery_rate as recoveryRate => js_f64,
+        recovery_rate as recoveryRate: "number" => js_f64,
         /// Set the loan-equivalent exposure drawn at default.
         /// @param value - Fraction of the undrawn commitment assumed drawn at default, as a decimal in `[0, 1]` (default `0.0`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        leq as leq => js_f64,
+        leq as leq: "number" => js_f64,
         /// Set the stub rule for schedule generation.
         /// @param value - Stub kind object or serde name (`"short_front"`, `"short_back"`, `"long_front"`, `"long_back"`, `"none"`); default `"short_front"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        stub as stub => js_wire,
+        stub as stub: "NonNullable<generated.valuations.RevolvingCredit['stub']>" => js_wire,
         /// Set the business-day convention for payment dates.
         /// @param value - Convention object or serde name (`"modified_following"`, `"following"`, `"preceding"`, ...); default `"modified_following"`. Accrual boundaries stay unadjusted.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        business_day_convention as businessDayConvention => js_wire,
+        business_day_convention as businessDayConvention: "NonNullable<generated.valuations.RevolvingCredit['business_day_convention']>" => js_wire,
         /// Set the holiday calendar used for payment, fixing and settlement rolls.
         /// @param value - Calendar identifier such as `"usny"`; `null` (the default) adjusts for weekends only. An unknown identifier fails at `build()`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        calendar_id as calendarId => id,
+        calendar_id as calendarId: "string" => id,
         /// Set the payment lag in business days after each accrual end.
         /// @param value - Business days on the facility calendar; `0` (the default) pays on the adjusted accrual end.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        payment_lag_days as paymentLagDays => js_uint,
+        payment_lag_days as paymentLagDays: "number" => js_uint,
         /// Set the settlement lag used by quote metrics.
         /// @param value - Business days from the valuation date to settlement; `0` (the default) settles on the valuation date. The base present value is always anchored at the valuation date.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        settlement_days as settlementDays => js_uint,
+        settlement_days as settlementDays: "number" => js_uint,
         /// Set scenario-selection attributes.
         /// @param value - Attribute map; `null` clears it.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => from_js_json,
+        attributes as attributes: "generated.valuations.RevolvingCredit['attributes']" => from_js_json,
 });
 
 common_setters!(
@@ -1087,90 +1211,91 @@ handle_setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
 instrument_surface!(
     JsAssetBackedFacility,
     "AssetBackedFacility",
-    JsAssetBackedFacilityBuilder
+    JsAssetBackedFacilityBuilder,
+    "generated.valuations.AssetBackedFacility"
 );
 
 getters!(JsAssetBackedFacility, "AssetBackedFacility", |i| {
         /// Collateral pool the facility lends against.
         /// @returns The pool (asset rows, rep lines or instrument collateral).
-        collateral as collateral => json(i.collateral),
+        collateral as collateral: "generated.valuations.AssetBackedFacility['collateral']" => json(i.collateral),
         /// Advance rates and concentration limits as their serde plain object.
         /// @returns `BorrowingBaseRules` with `advance_rates` and `concentration_limits`.
-        borrowing_base_rules as borrowingBaseRules => json(i.borrowing_base_rules),
+        borrowing_base_rules as borrowingBaseRules: "generated.valuations.AssetBackedFacility['borrowing_base_rules']" => json(i.borrowing_base_rules),
         /// Total commitment.
         /// @returns Currency-tagged commitment.
-        commitment as commitment => money(i.commitment),
+        commitment as commitment: "Money" => money(i.commitment),
         /// Amount drawn at closing.
         /// @returns Currency-tagged drawn balance.
-        drawn as drawn => money(i.drawn),
+        drawn as drawn: "Money" => money(i.drawn),
         /// Facility coupon as its `RateSpec` serde plain object.
         /// @returns `{"fixed": {"rate": r}}` with a decimal all-in rate, or `{"floating": {...}}` with a `FloatingRateSpec`.
-        rate as rate => json(i.rate),
+        rate as rate: "generated.valuations.AssetBackedFacility['rate']" => json(i.rate),
         /// Commitment fee on the undrawn commitment in basis points per annum.
         /// @returns Basis points per annum.
-        commitment_fee_bp as commitmentFeeBp => dec(i.commitment_fee_bp),
+        commitment_fee_bp as commitmentFeeBp: "number" => dec(i.commitment_fee_bp),
         /// Closing date; the first payment date is one frequency later.
         /// @returns The closing date.
-        closing_date as closingDate => date(i.closing_date),
+        closing_date as closingDate: "string" => date(i.closing_date),
         /// Scheduled end of the revolving period.
         /// @returns The scheduled revolving end.
-        revolving_end as revolvingEnd => date(i.revolving_end),
+        revolving_end as revolvingEnd: "string" => date(i.revolving_end),
         /// Final repayment date: the revolving end plus the term-out window, capped at maturity.
         /// @returns The repayment date.
         /// @throws `FinstackError` (kind `validation`) if the term-out window
         /// exceeds the supported date range.
-        repayment_date as repaymentDate => date(i.repayment_date().map_err(to_js_err)?),
+        repayment_date as repaymentDate: "string" => date(i.repayment_date().map_err(to_js_err)?),
         /// Legal final maturity.
         /// @returns The maturity date.
-        maturity as maturity => date(i.maturity),
+        maturity as maturity: "string" => date(i.maturity),
         /// Payment frequency of interest, fees and the borrowing-base test.
         /// @returns The payment frequency.
-        frequency as frequency => tenor(i.frequency),
+        frequency as frequency: "Tenor" => tenor(i.frequency),
         /// Accrual day count of the facility interest and the commitment fee.
         /// @returns The accrual convention.
-        day_count as dayCount => day_count(i.day_count),
+        day_count as dayCount: "DayCount" => day_count(i.day_count),
         /// Payment calendar identifier, or `null`.
         /// @returns Holiday calendar id (e.g. `"nyse"`).
-        calendar_id as calendarId => opt_text(i.calendar_id),
+        calendar_id as calendarId: "string | null" => opt_text(i.calendar_id),
         /// Events that end revolving early, as `AmortizationEvent` serde plain objects.
         /// @returns Each `{"kind": "date", "date": ...}`, `{"kind": "cumulative_loss", "max_cumulative_loss": ...}` or `{"kind": "excess_spread", "min_excess_spread_3m": ...}`.
-        amortization_events as amortizationEvents => json(i.amortization_events),
+        amortization_events as amortizationEvents: "NonNullable< generated.valuations.AssetBackedFacility['amortization_events'] >" => json(i.amortization_events),
         /// Term-out window as its serde plain object (`{"months": ...}`), or `null`.
         /// @returns Months after the revolving end at which the collateral is liquidated.
-        term_out as termOut => json(i.term_out),
+        term_out as termOut: "NonNullable<generated.valuations.AssetBackedFacility['term_out']> | null" => json(i.term_out),
         /// Collateral liquidation price at the term-out end in percent of par, or `null` for par.
         /// @returns Percent of par.
-        liquidation_price_pct as liquidationPricePct => json(i.liquidation_price_pct),
+        liquidation_price_pct as liquidationPricePct: "NonNullable< generated.valuations.AssetBackedFacility['liquidation_price_pct'] > | null" => json(i.liquidation_price_pct),
         /// Transaction fees paid ahead of the facility's interest as the `DealFees` serde plain object.
         /// @returns `null` when the facility carries no fees.
-        fees as fees => json(i.fees),
+        fees as fees: "NonNullable<generated.valuations.AssetBackedFacility['fees']> | null" => json(i.fees),
         /// Scheduled draws after closing as `DrawEvent` serde plain objects (`date`, `amount`).
         /// @returns Empty when the line is fully funded at closing.
-        draws as draws => json(i.draws),
+        draws as draws: "NonNullable<generated.valuations.AssetBackedFacility['draws']>" => json(i.draws),
         /// Whether the line is re-advanced up to the borrowing base each revolving period.
         /// @returns `true` when re-advances apply.
-        readvance_to_borrowing_base as readvanceToBorrowingBase => json(i.readvance_to_borrowing_base),
+        readvance_to_borrowing_base as readvanceToBorrowingBase: "NonNullable< generated.valuations.AssetBackedFacility['readvance_to_borrowing_base'] >" => json(i.readvance_to_borrowing_base),
         /// Discount curve identifier.
         /// @returns The curve id.
-        discount_curve_id as discountCurveId => text(i.discount_curve_id),
+        discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
         /// Collateral behavior as its `CreditModelConfig` serde plain object.
         /// @returns Prepayment, default, recovery and delinquency assumptions.
-        credit_model as creditModel => json(i.credit_model),
+        credit_model as creditModel: "CreditModelConfig" => json(i.credit_model),
         /// Deterministic prepayment model of the collateral.
         /// @returns The typed spec.
-        prepayment_spec as prepaymentSpec => json(i.credit_model.prepayment_spec),
+        prepayment_spec as prepaymentSpec: "NonNullable<generated.valuations.AssetBackedFacility['prepayment_spec']>" => json(i.credit_model.prepayment_spec),
         /// Deterministic default model of the collateral.
         /// @returns The typed spec.
-        default_spec as defaultSpec => json(i.credit_model.default_spec),
+        default_spec as defaultSpec: "NonNullable<generated.valuations.AssetBackedFacility['default_spec']>" => json(i.credit_model.default_spec),
         /// Recovery model of the collateral.
         /// @returns The typed spec.
-        recovery_spec as recoverySpec => json(i.credit_model.recovery_spec),
+        recovery_spec as recoverySpec: "NonNullable<generated.valuations.AssetBackedFacility['recovery_spec']>" => json(i.credit_model.recovery_spec),
         /// Scenario-selection attributes.
         /// @returns The attribute map.
-        attributes as attributes => json(i.attributes),
+        attributes as attributes: "NonNullable<generated.valuations.AssetBackedFacility['attributes']>" => json(i.attributes),
         /// Default pricing model key from the `Instrument` trait (`"discounting"`).
         /// @returns The model key.
-        default_model as defaultModel => text(Instrument::default_model(i)),
+        default_model as defaultModel: "string" => text(Instrument::default_model(i)),
 });
 
 common_getters!(JsAssetBackedFacility, "AssetBackedFacility", overrides);
@@ -1180,6 +1305,15 @@ builder_class!(
     ///
     /// Every setter returns the builder, so calls chain; `build()` validates
     /// and consumes it.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const builder = valuations.instruments.AssetBackedFacility.builder();
+    /// console.log(typeof builder.build);
+    /// builder.free();
+    /// ```
     JsAssetBackedFacilityBuilder,
     "AssetBackedFacilityBuilder",
     finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacilityBuilder,
@@ -1192,107 +1326,107 @@ setters!(JsAssetBackedFacilityBuilder, "AssetBackedFacilityBuilder", {
         /// @param value - Stable facility identifier.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        id as id => id,
+        id as id: "string" => id,
         /// Set the collateral pool.
         /// @param value - Collateral pool (asset rows, rep lines or instrument collateral).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        collateral as collateral => from_js_json,
+        collateral as collateral: "generated.valuations.AssetBackedFacility['collateral']" => from_js_json,
         /// Set the advance rates, eligibility and concentration limits.
         /// @param value - `BorrowingBaseRules` serde object: `advance_rates` (each with an `asset_class` wire name or `"*"`, a decimal `rate` and an optional `eligibility`) and `concentration_limits` (each with `scope` `"obligor"` / `"industry"` / `"asset_class"` and a percent `max_pct`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        borrowing_base_rules as borrowingBaseRules => from_js_json,
+        borrowing_base_rules as borrowingBaseRules: "generated.valuations.AssetBackedFacility['borrowing_base_rules']" => from_js_json,
         /// Set the facility coupon.
         /// @param value - `RateSpec` plain object or JSON string: `{"fixed": {"rate": 0.06}}` for a fixed all-in rate (`0.06` = 6%) or `{"floating": {...}}` with a `FloatingRateSpec`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        rate as rate => from_js_json,
+        rate as rate: "generated.valuations.AssetBackedFacility['rate']" => from_js_json,
         /// Set the commitment fee on the undrawn commitment.
         /// @param value - Basis points per annum (`50.0` = 0.50%).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        commitment_fee_bp as commitmentFeeBp => dec,
+        commitment_fee_bp as commitmentFeeBp: "number" => dec,
         /// Set the closing date.
         /// @param value - Closing date; the first payment date is one frequency later.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        closing_date as closingDate => js_date,
+        closing_date as closingDate: "string" => js_date,
         /// Set the scheduled end of the revolving period.
         /// @param value - Revolving end; after it, collateral principal repays the facility.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        revolving_end as revolvingEnd => js_date,
+        revolving_end as revolvingEnd: "string" => js_date,
         /// Set the legal final maturity.
         /// @param value - Legal final maturity.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        maturity as maturity => js_date,
+        maturity as maturity: "string" => js_date,
         /// Set the payment calendar.
         /// @param value - Holiday calendar identifier (e.g. `"nyse"`); required for pricing.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        calendar_id as calendarId => id,
+        calendar_id as calendarId: "string" => id,
         /// Set the events that end revolving early.
         /// @param value - `AmortizationEvent` objects: `{"kind": "date", "date": ...}`, `{"kind": "cumulative_loss", "max_cumulative_loss": ...}` or `{"kind": "excess_spread", "min_excess_spread_3m": ...}`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        amortization_events as amortizationEvents => from_js_json,
+        amortization_events as amortizationEvents: "NonNullable<generated.valuations.AssetBackedFacility['amortization_events']>" => from_js_json,
         /// Set the term-out window after revolving.
         /// @param value - Month count (e.g. `24`) or `TermOutSpec` plain object (`{"months": 24}`): the amortization term after the revolving period ends.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        term_out as termOut => term_out,
+        term_out as termOut: "number | NonNullable<generated.valuations.AssetBackedFacility['term_out']>" => term_out,
         /// Set the transaction fees paid through the waterfall ahead of the facility's interest.
         /// @param value - `DealFees` serde object (`trustee_fee` Money per annum, `senior_mgmt_fee_bp`, `subordinated_mgmt_fee_bp`, `servicing_fee_bp`, optional `master_servicer_fee_bp` / `workout_fee_pct` / `liquidation_fee_pct` / `special_servicer_fee_bp` / `incentive_fee`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        fees as fees => from_js_json,
+        fees as fees: "NonNullable<generated.valuations.AssetBackedFacility['fees']>" => from_js_json,
         /// Set the scheduled draws after closing.
         /// @param value - `DrawEvent` serde objects `{"date": "2025-01-01", "amount": {"amount": "10000000", "currency": "USD"}}`, ascending by date; each is applied on the first payment date at or after its date.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        draws as draws => from_js_json,
+        draws as draws: "NonNullable<generated.valuations.AssetBackedFacility['draws']>" => from_js_json,
         /// Set whether the line is re-advanced up to the borrowing base each revolving period.
         /// @param value - `true` draws `min(commitment, borrowing base) − balance` every revolving period.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        readvance_to_borrowing_base as readvanceToBorrowingBase => js_bool,
+        readvance_to_borrowing_base as readvanceToBorrowingBase: "boolean" => js_bool,
         /// Set the collateral liquidation price at the term-out end.
         /// @param value - Percent of par (`100.0` = par).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        liquidation_price_pct as liquidationPricePct => js_f64,
+        liquidation_price_pct as liquidationPricePct: "number" => js_f64,
         /// Set the discount curve.
         /// @param value - Discount curve identifier.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        discount_curve_id as discountCurveId => id,
+        discount_curve_id as discountCurveId: "string" => id,
         /// Replace the whole collateral behavior model.
         /// @param value - `CreditModelConfig` serde object; the per-field setters (`prepayment_spec` ...) then modify it.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        credit_model as creditModel => from_js_json,
+        credit_model as creditModel: "CreditModelConfig" => from_js_json,
         /// Set the deterministic prepayment model of the collateral.
         /// @param value - Typed spec or its serde form.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        prepayment_spec as prepaymentSpec => from_js_json,
+        prepayment_spec as prepaymentSpec: "NonNullable<generated.valuations.AssetBackedFacility['prepayment_spec']>" => from_js_json,
         /// Set the deterministic default model of the collateral.
         /// @param value - Typed spec or its serde form.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        default_spec as defaultSpec => from_js_json,
+        default_spec as defaultSpec: "NonNullable<generated.valuations.AssetBackedFacility['default_spec']>" => from_js_json,
         /// Set the recovery model of the collateral.
         /// @param value - Typed spec or its serde form.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        recovery_spec as recoverySpec => from_js_json,
+        recovery_spec as recoverySpec: "NonNullable<generated.valuations.AssetBackedFacility['recovery_spec']>" => from_js_json,
         /// Set scenario-selection attributes.
         /// @param value - Attribute map; `null` clears it.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => from_js_json,
+        attributes as attributes: "NonNullable<generated.valuations.AssetBackedFacility['attributes']>" => from_js_json,
 });
 
 common_setters!(
@@ -1328,15 +1462,15 @@ handle_setters!(JsAssetBackedFacilityBuilder, "AssetBackedFacilityBuilder", {
 ///
 /// The exits are the ones the `ytw` metric walks, a return floor lowered into calls first, and the row marked worst holds that metric's yield and the `i_spread` metric's spread.
 /// @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights must carry `quoted_clean_price_pct`; one with none falls back to its model price.
-/// @param market_json - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index and make-whole reference curves.
-/// @param as_of - ISO-8601 valuation date; the quote date and coupon entitlement follow the bond's settlement convention.
+/// @param marketJson - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index and make-whole reference curves.
+/// @param asOf - ISO-8601 valuation date; the quote date and coupon entitlement follow the bond's settlement convention.
 /// @returns `BondWorkoutLadder` plain object: `clean_price_pct` and `dirty_price`, the one price every exit is solved at, and `rows` in date order, each with `date`, `kind` (`call`, `put` or `maturity`), `redemption_price_pct` in percent of the principal redeemed, `redemption_amount`, `make_whole`, `yield_rate` and `i_spread` as decimals (the par rate runs to `date` when the bond has an exit other than maturity, and to contractual maturity when it has none) or `null` when the path has no finite yield (an exit on the quote date, or same-day cash at or above the price; a worst row can be `null`, where the `ytw` metric is negative infinity), and `is_worst`.
 /// @throws Error - Throws with kind `not_found` if a bond with exercise rights has no quoted clean price or a curve is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if a yield cannot be solved.
-#[wasm_bindgen(js_name = bondWorkoutLadder)]
+#[wasm_bindgen(js_name = bondWorkoutLadder, unchecked_return_type = "generated.valuations.BondWorkoutLadder")]
 pub fn bond_workout_ladder(
     bond: &JsBond,
-    market_json: JsValue,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "string")] market_json: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
 ) -> Result<JsValue, JsValue> {
     let market = parse_market(&market_json)?;
     let as_of = js_date(&as_of, "asOf")?;
@@ -1356,8 +1490,11 @@ pub fn bond_workout_ladder(
 /// @param ladder - `BondWorkoutLadder` plain object or JSON string, as `bondWorkoutLadder` returns it.
 /// @returns `TableEnvelope` in date order with columns `date` (ISO string), `kind` (`call`, `put` or `maturity`), `redemption_price_pct` (percent of the principal redeemed), `redemption_amount` (float), `currency` (ISO code of the amount), `make_whole` (boolean), `yield_rate` and `i_spread` (nullable decimals) and `is_worst` (boolean). The columns remain when there are no rows.
 /// @throws Error - Throws with kind `validation` if `ladder` does not match the `BondWorkoutLadder` schema.
-#[wasm_bindgen(js_name = bondWorkoutLadderTable)]
-pub fn bond_workout_ladder_table(ladder: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = bondWorkoutLadderTable, unchecked_return_type = "TableEnvelope")]
+pub fn bond_workout_ladder_table(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.BondWorkoutLadder | string")]
+    ladder: JsValue,
+) -> Result<JsValue, JsValue> {
     let ladder: finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondWorkoutLadder =
         crate::utils::input::from_js_json(&ladder, "ladder")?;
     to_js_value(&ladder.to_table())
@@ -1369,8 +1506,11 @@ pub fn bond_workout_ladder_table(ladder: JsValue) -> Result<JsValue, JsValue> {
 /// @param quotes - `BondQuoteSet` plain object or JSON string, as `computeQuotes` returns it.
 /// @returns `TableEnvelope` with one row and one column per field in declaration order: float `clean_price_currency`, `clean_price_pct` and `dirty_price_currency`, then nullable float `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_par`, `asw_market`, `i_spread`, `japanese_simple_yield` and `moosmuller_ytm`, null where the quote does not apply.
 /// @throws Error - Throws with kind `validation` if `quotes` does not match the `BondQuoteSet` schema.
-#[wasm_bindgen(js_name = bondQuoteSetTable)]
-pub fn bond_quote_set_table(quotes: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = bondQuoteSetTable, unchecked_return_type = "TableEnvelope")]
+pub fn bond_quote_set_table(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.BondQuoteSet | string")]
+    quotes: JsValue,
+) -> Result<JsValue, JsValue> {
     let quotes: finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteSet =
         crate::utils::input::from_js_json(&quotes, "quotes")?;
     to_js_value(&quotes.to_table())
@@ -1380,16 +1520,20 @@ pub fn bond_quote_set_table(quotes: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// The quote is normalized to a clean price and every other field is the metric of the same name at that price, in one call. The bond's default pricing model runs (tree when it has exercise rights) on the bond family's registries; any quote the bond carries is replaced.
 /// @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights needs HW1F parameters on the bond or in the market, because its `oas` is part of the set.
-/// @param market_json - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index curve.
-/// @param as_of - ISO-8601 valuation date; the quote date and accrued interest follow the bond's settlement convention.
-/// @param quote_input - One `BondQuoteInput`, a plain object or JSON string with exactly one key: `clean_price_pct` (percent of par), `dirty_price_currency` (currency, the whole notional), `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_market`, `i_spread` or `japanese_simple_yield` (decimals, `0.01` = 100bp).
+/// @param marketJson - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index curve.
+/// @param asOf - ISO-8601 valuation date; the quote date and accrued interest follow the bond's settlement convention.
+/// @param quoteInput - One `BondQuoteInput`, a plain object or JSON string with exactly one key: `clean_price_pct` (percent of par), `dirty_price_currency` (currency, the whole notional), `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_market`, `i_spread` or `japanese_simple_yield` (decimals, `0.01` = 100bp).
 /// @returns `BondQuoteSet` plain object: `clean_price_currency`, `clean_price_pct`, `dirty_price_currency`, and `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_par`, `asw_market`, `i_spread`, `japanese_simple_yield` and `moosmuller_ytm` as decimals, each `null` when it does not apply to the bond or has no finite value.
 /// @throws Error - Throws with kind `validation` if `quoteInput` has an unknown or second key or a non-finite value, a dirty price is not positive, the market JSON or `asOf` is malformed, the quote kind does not apply to the bond (`discount_margin` with no floating coupons, `asw_market` or `japanese_simple_yield` on a floating coupon, `z_spread` or `asw_market` with exercise rights, whose workout path depends on the price), or a metric of the set cannot be solved, which fails the whole set (`z_spread` with a call or put on the quote date below the price, `oas` with exercise rights and no HW1F parameters); and with kind `not_found` if a curve the bond needs to normalize the quote is missing.
-#[wasm_bindgen(js_name = computeQuotes)]
+#[wasm_bindgen(js_name = computeQuotes, unchecked_return_type = "generated.valuations.BondQuoteSet")]
 pub fn compute_quotes(
     bond: &JsBond,
-    market_json: JsValue,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "string")] market_json: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(
+        js_name = "quoteInput",
+        unchecked_param_type = "generated.valuations.BondQuoteInput | string"
+    )]
     quote_input: JsValue,
 ) -> Result<JsValue, JsValue> {
     let market = parse_market(&market_json)?;
@@ -1418,16 +1562,17 @@ impl JsBond {
     /// (`mc_paths`, `mc_antithetic`, `mc_seed_scenario`), defaulting to 5,000
     /// antithetic estimators seeded from the bond id.
     /// @param config - Merton Monte Carlo configuration built with `MertonMcConfig`.
-    /// @param discount_rate - Flat continuously compounded risk-free rate as a decimal (`0.04` = 4%).
-    /// @param as_of - ISO-8601 valuation date.
+    /// @param discountRate - Flat continuously compounded risk-free rate as a decimal (`0.04` = 4%).
+    /// @param asOf - ISO-8601 valuation date.
     /// @returns `MertonMcResult` with clean and dirty price in percent of par, loss statistics and path statistics.
     /// @throws Error - Throws with kind `validation` if `asOf` is malformed or the bond or configuration is invalid, kind `invalid_type` if `discountRate` is not a number, and kind `computation` if the simulation fails.
-    #[wasm_bindgen(js_name = priceMertonMc)]
+    #[wasm_bindgen(js_name = priceMertonMc, unchecked_return_type = "generated.valuations.MertonMcResult")]
     pub fn price_merton_mc(
         &self,
         config: &JsMertonMcConfig,
+        #[wasm_bindgen(js_name = "discountRate", unchecked_param_type = "number")]
         discount_rate: JsValue,
-        as_of: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let discount_rate = js_f64(&discount_rate, "discountRate")?;
         let as_of = js_date(&as_of, "asOf")?;

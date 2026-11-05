@@ -1,6 +1,15 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
 import { schema } from './attribution/schema.js';
 
+/**
+ * Namespaced TypeScript entry points for attribution calculations and types.
+ * @example
+ * ```typescript
+ * import init, { attribution } from "finstack-quant-wasm";
+ * await init();
+ * console.log(attribution.defaultWaterfallOrder());
+ * ```
+ */
 export const attribution = {
   attributePnl: wasm.attributePnl,
   attributePnlJson: wasm.attributePnlJson,

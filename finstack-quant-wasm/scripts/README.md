@@ -1,178 +1,84 @@
 # scripts
 
-The JSDoc / TypeScript documentation tooling for this package. Three of these are
-checkers; two are generators that write documentation into
-[`../index.d.ts`](../index.d.ts); one is the shared JSDoc block parser they build
-on. Three can fail `mise run wasm-doc` — both checkers, plus
-`complete-facade-jsdoc.mjs` in its `--check` mode. The fourth,
-`sync-facade-jsdoc.mjs --check`, fails `mise run wasm-test` (and
-`wasm-test-built`), where the `pkg/` build it reads exists.
-
-These exist because `index.d.ts` is hand-maintained. `wasm-bindgen` emits
-declarations under `pkg/`, but they describe a flat module rather than the
-namespaced facade the package publishes, so the IntelliSense surface every
-TypeScript consumer sees is a file no compiler regenerates. That file is large
-enough that hand-review does not scale — hence a generator that produces the
-mechanical parts and a checker that refuses the boilerplate the generator used to
-emit.
-
-The repository-root [`../../scripts/README.md`](../../scripts/README.md) covers
-the Python-language gates, including `check_wasm_api_input_docs.py`, which
-polices the _Rust_ doc comments under `../src/api/` — the text wasm-bindgen copies
-into `pkg/`. That checker and these scripts are the two halves of `mise run wasm-doc`.
-
-Nothing here is published: `scripts` is absent from the `files` list in
+Build-time tooling for the package's TypeScript surface: one generator and two
+documentation checkers, plus the contract-type generator and the web build
+helpers. Nothing here is published: `scripts` is absent from the `files` list in
 `package.json`.
 
-## Running them
+## Where the TypeScript comes from
 
-All of them are plain Node ESM, run from the package root and dependent only on
-`typescript` (a devDependency) and `node:*`:
+The Rust bindings are the one source of the published TypeScript:
 
-```bash
-npm --prefix finstack-quant-wasm run docs:check   # the gate: all checkers + tooling tests + tsc
-npm --prefix finstack-quant-wasm run docs:sync    # the generators, in --write mode
-npm --prefix finstack-quant-wasm run docs:check-sync  # sync --check; needs a pkg/ build
-mise run wasm-doc                                 # docs:check plus the Rust-side @param checker
-```
+- **Types and names.** `#[wasm_bindgen]` attributes in `../src/api/**` give each
+  `JsValue` parameter and return its TypeScript type
+  (`unchecked_param_type`, `unchecked_optional_param_type`,
+  `unchecked_return_type`) and each snake_case parameter its camelCase
+  `js_name`. wasm-bindgen writes them into `../pkg/finstack_quant_wasm.d.ts`.
+- **Documentation.** The Rustdoc above each `#[wasm_bindgen]` item becomes its
+  JSDoc in the same file. Doc comments a `macro_rules!` invocation forwards go
+  through `#[finstack_quant_wasm_macros::plain_docs]` (`../macros/`), which
+  turns rustc's raw-string doc literals into plain ones wasm-bindgen copies
+  verbatim.
+- **Host-only types.** `../src/prelude.d.ts` (the schema-generated type imports
+  and shapes such as `JsonInput` and `FinstackError`) is appended to the same
+  file by the `typescript_custom_section` in `../src/lib.rs`.
+- **The facade.** `gen-facade-dts.mjs` writes `../index.d.ts` from `../index.js`
+  and `../exports/**`: one `*Namespace` interface per namespace, each member
+  `typeof wasm.X`, plus the declarations of the JavaScript the facade adds.
 
-Prefer the npm script or the `mise` task over invoking a file directly — they pass
-the argument set CI uses. `mise run wasm-doc` runs in the nightly tier
-(`mise run all --full`, through `all-doc`).
+## Generator
 
-Exit codes are uniform: `0` clean, `1` contract violation, `2` usage error
-(passing `--write` and `--check` together).
+| Script               | Does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Run by                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `gen-facade-dts.mjs` | Writes `../index.d.ts` over the built `../pkg/finstack_quant_wasm.d.ts`. A facade wrapper is declared from its JSDoc ending in `@facadeType <function type>`; a method the facade adds to (or widens on) a class prototype from one JSDoc block ending in `@facadeClass Name` and `@member name(params): Return`, emitted as an augmentation of the package module; `chain(Class, [...])` methods get `this`-returning overloads with the package's parameters and docs. It fails on a wrapper or added member without documentation, and on `@omit`/`@static` (mark a replaced raw method `skip_typescript` in Rust instead). `--check` fails when the committed file differs. | `mise run gen-write` (write); `mise run wasm-test` and `wasm-test-built` (`--check`) |
 
 ## Checkers
 
-Run by `docs:check`, in this order.
+Both run in `mise run wasm-doc` (nightly, `mise run all --full`) through
+`npm run docs:check`, which also runs the tooling tests and `npm run test:dts`.
 
-| Script                          | Enforces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Options                                                                                                                                           |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check-dts-docs.mjs`            | The WASM-ownership contract as _text_. `index.d.ts` must declare `export interface WasmOwned`, expose `free(): void;`, carry the package-level ownership note and the conditional-`Symbol.dispose` sentence, and must **not** declare `[Symbol.dispose](): void;` (that would force ES2020 consumers onto `esnext.disposable`). Eight named classes must each merge the contract as `export interface <Name> extends WasmOwned {}`. `../README.md` must carry the matching `## WASM Object Disposal` section.                                                                                                                                                                                                                    | none — paths are fixed                                                                                                                            |
-| `check-typescript-docs.mjs`     | Per-declaration JSDoc completeness, parsed with the TypeScript compiler API. Every exported interface, class, type alias, function, and variable needs a summary of at least 16 characters. Callables need one `@param` per parameter and a `@returns` unless the return type is `void` or the node is a constructor. Exported functions and namespace or constructor interfaces also need an `@example`. The checker rejects fabricated prose: the legacy catch-all throws tag, non-executable placeholder examples, generic phrases, template units, internal Rust wrapper names, and a parameter documented twice. Top-level `declare class` handles are checked like exported classes. Members marked `private` are skipped. | `--declaration=<path>` (default `../index.d.ts`), `--max-errors=<n>` (default 200), `--summary` for a count-per-category tally before the listing |
-| `check-typescript-examples.mjs` | Every documented code sample type-checks. The samples are each fenced `ts`/`js` block in an `index.d.ts` doc comment (the `@example` blocks), in `../README.md` and in `.agents/rules/wasm/javascript-usage-standards.md`. They are compiled as one TypeScript program under `strict` (`js` blocks with `checkJs`), each as a module inside this package so `finstack-quant-wasm` resolves to `index.d.ts` as it does for a consumer, with the DOM lib included so a sample that leans on a platform global the package also names (`Performance`) fails. Needs no build. `../tests/docs/doc_examples.test.mjs` executes the same samples against the built package under `mise run wasm-test --doctest`.                        | none                                                                                                                                              |
+| Script                          | Enforces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Options                                                                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `check-typescript-docs.mjs`     | JSDoc completeness of the published declarations (`../pkg/finstack_quant_wasm.d.ts` and `../index.d.ts`), parsed with the TypeScript compiler API. Every declaration needs a summary of at least 16 characters; callables need one `@param` per parameter and a `@returns` unless they return `void`; classes (on the class or its constructor) and namespace interfaces need an `@example`. It rejects fabricated prose: the legacy catch-all throws tag, placeholder examples, generic phrases, template units, Rust intra-doc links and internal wrapper names, and a parameter documented twice. wasm-bindgen's glue (`InitOutput`, `initSync`, `free`, `[Symbol.dispose]`) is skipped. | `--declaration=<path>` (one file instead of the two), `--max-errors=<n>` (default 200), `--summary` for a per-category tally |
+| `check-typescript-examples.mjs` | Every documented code sample type-checks: each fenced `ts`/`js` block in a declaration doc comment and in `../README.md`, `../../README.md` and `.agents/rules/wasm/javascript-usage-standards.md`. They compile as one `strict` TypeScript program inside this package, so `finstack-quant-wasm` resolves to `../index.d.ts` as it does for a consumer. A sample the facade copies from the package declarations is checked once. `../tests/docs/doc_examples.test.mjs` executes the same samples under `mise run wasm-test --doctest`.                                                                                                                                                    | none                                                                                                                         |
 
 A sample must be a complete program. A block with no `import` statement
 continues from the standard setup (every namespace imported and `await init()`
 done), which both gates put in front of it. A fence tagged `no-run`
-(` ```javascript no-run `) is skipped by both; use it only to show what not
-to write.
+(` ```javascript no-run `) is skipped by both; use it only to show what not to
+write. `doc-examples.mjs` collects the samples for both gates.
 
-The seven classes hard-coded in `check-dts-docs.mjs` are `Performance`,
-`CreditFactorModel`, `CreditCalibrator`, `LevelsAtDate`, `PeriodDecomposition`,
-`FactorCovarianceForecast`, and `Portfolio`. A new wasm-bindgen class
-that owns heap memory is not covered until it is added to that list.
-
-The banned-phrase list in `check-typescript-docs.mjs` mirrors text
-`complete-facade-jsdoc.mjs` once emitted. The two files are coupled: changing a
-default string in the generator without updating the blocklist (or vice versa)
-leaves a phrase either unenforced or unproducible.
+Both need a build (`mise run wasm-build`), since they read the generated
+declarations. Exit codes: `0` clean, `1` contract violation.
 
 `check-exports-boundary.mjs` is not a docs check: `npm run lint` runs it. It fails
 on arithmetic in `exports/**` and on a function with no comment saying what
 wasm-bindgen cannot express.
 
-## Generators
+## Other scripts
 
-Run by `docs:sync` with `--write`. Both accept `--check`, which exits 1 instead of
-writing when the file would change; `--write` and `--check` together exit 2.
-
-| Script                      | Does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Options                                                                                                                       |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `sync-facade-jsdoc.mjs`     | Pulls contract tags from the wasm-bindgen output into the facade. Reads `pkg/finstack_quant_wasm.d.ts` as authoritative for `@param` / `@returns` / `@throws`, converting rustdoc `# Arguments` / `# Returns` / `# Errors` sections into JSDoc tags and mapping snake_case Rust argument names onto the facade's camelCase parameter names. Facade prose and `@example` blocks are preserved; only contract tags are replaced. The legacy catch-all `@throws` is dropped.                                                                                                                                                                                           | `--facade=<path>` (default `../index.d.ts`), `--raw=<path>` (default `../pkg/finstack_quant_wasm.d.ts`), `--write`, `--check` |
-| `complete-facade-jsdoc.mjs` | Fills what the synchronizer cannot: strips legacy boilerplate, inserts a default summary wherever the existing one is missing or under 16 characters, and appends any missing `@param` / `@returns`. It never derives a unit, convention or parameter meaning from a name: a number- or string-returning member with no `@returns` repeats its own summary, and an undocumented parameter is left without an `@param` so the checker reports it. Units and parameter semantics are written in the Rustdoc and arrive through the synchronizer. Type-derived text remains for handles, arrays and structured results, plus per-kind interface/type/member summaries. | `--declaration=<path>` (default `../index.d.ts`), `--write`, `--check`                                                        |
-
-`--check` on `complete-facade-jsdoc.mjs` is part of `docs:check`, which makes the
-committed `index.d.ts` a **fixed point** of the generator: if running the
-completer would change a single block, the gate fails. Hand-written documentation
-survives that check only when its summary is at least 16 characters and its tags
-are complete — the generator overwrites nothing it considers adequate.
-
-Name resolution in `sync-facade-jsdoc.mjs` maps facade shapes onto raw classes:
-interface `FooConstructor` takes its members from the statics of raw class `Foo`
-plus that class's instance constructor; interface `FooNamespace` takes them from
-raw free functions; a plain interface `Foo` takes them from `Foo`'s instance
-members. Class and top-level function declarations map directly. wasm-bindgen
-writes a doc line forwarded through a `macro_rules!` macro as its raw-string
-literal (`r" text`, `r#" text"#`); the synchronizer reads those lines as
-plain text.
-
-Parameters are matched by name after snake_case to camelCase conversion, then by
-the name without its `Json` suffix (Rust `instrument_json` documents the facade's
-`instrument`). A facade parameter the Rustdoc does not name keeps its
-hand-written `@param`; every parameter the Rustdoc does name is replaced.
-
-`sync-facade-jsdoc.mjs` needs `pkg/finstack_quant_wasm.d.ts` on disk, so it
-requires a `wasm-pack --target web` build. That is why it is not in `docs:check`
-— `mise run wasm-doc` must run without a build. Its `--check` mode is the
-`docs:check-sync` npm script, which `mise run wasm-test` and
-`mise run wasm-test-built` run after the facade tests: a Rustdoc edit above a
-`#[wasm_bindgen]` item that is not followed by `npm run docs:sync` fails there.
-
-## Shared modules
-
-`doc-examples.mjs` extracts the code samples (`collectExamples`, `fencedBlocks`,
-`PRELUDE`) for `check-typescript-examples.mjs` and
-`../tests/docs/doc_examples.test.mjs`.
-
-`typescript-docs-shared.mjs` is the JSDoc block parser. It is `pub(crate)` in spirit — imported by
-`check-typescript-docs.mjs`, `sync-facade-jsdoc.mjs`, and
-`complete-facade-jsdoc.mjs`, and by nothing outside this directory.
-
-| Export                              | Purpose                                                                                                                                                                    |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LEGACY_CATCH_ALL_THROW`            | The exact banned `@throws` sentence. Single source of truth for the checker and both generators.                                                                           |
-| `documentationBlocks(text)`         | Splits a JSDoc comment into tag-anchored blocks (`prose`, `param`, `returns`, `throws`, `example`). This block model is why tags can be replaced without disturbing prose. |
-| `documentationFromBlocks(blocks)`   | The inverse: reassembles a comment, or `null` when empty.                                                                                                                  |
-| `isLegacyPlaceholderExample(block)` | Recognizes the three exact shapes of non-executable `@example` the old generator produced.                                                                                 |
-| `stripLegacyBoilerplate(text)`      | Removes the catch-all `@throws` and every placeholder example from a comment.                                                                                              |
-
-Whatever pattern this module defines, the checker enforces and the generators
-produce — keep the three in step when changing any of them.
+- `generate-contract-types.mjs` writes `../types/generated/` from the Rust JSON
+  Schemas (`mise run gen-write`).
+- `prepare-schema.mjs` lowers draft-2020-12 tuples for that generator.
+- `build-web.mjs` and `measure-web.mjs` build the web package and report its
+  artifact sizes; `order.mjs` is the shared locale-independent sort.
 
 ## Tests
 
-The tooling is tested like production code, because it edits the published
-contract. [`../tests/scripts/typescript_docs.test.mjs`](../tests/scripts/typescript_docs.test.mjs)
-covers the synchronizer in `--write` and `--check` (including the `Json`-suffix
-parameter mapping, facade-only parameters and macro-forwarded raw-string doc
-lines), the
-completer's legacy-removal and no-invented-unit behaviour, the checker's
-accept/reject pairs, and the `--write`/`--check` exit-2 contract.
-
-Fixtures live in `../tests/scripts/fixtures/typescript-docs/`: `raw.d.ts` (a stand-in
-for wasm-bindgen output), `facade.stale.d.ts` and `facade.expected.d.ts` (the
-synchronizer's before/after), `checker.valid.d.ts` and `checker.legacy.d.ts`.
-Every mutating case copies its fixture to a temp directory first, so the tests
-never touch the repository.
+[`../tests/scripts/typescript_docs.test.mjs`](../tests/scripts/typescript_docs.test.mjs)
+covers the doc checker's accept/reject pairs (fixtures in
+`../tests/scripts/fixtures/typescript-docs/`), its class-example rule and its
+glue exemptions; `exports_boundary.test.mjs` covers the boundary lint.
 
 ```bash
-npm --prefix finstack-quant-wasm run test:docs-tools   # this file only
-npm --prefix finstack-quant-wasm run docs:check        # includes it
+npm --prefix finstack-quant-wasm run test:docs-tools
 ```
-
-## Adding a checker
-
-- Add it to the `docs:check` chain in `package.json`; it then reaches
-  `mise run wasm-doc` and the nightly tier with no further wiring.
-- Honour the exit-code contract: 0 / 1 / 2 as above. Print failures to stderr,
-  one per line, prefixed with `path:line:` where a position exists.
-- Support `--declaration=<path>` (or the equivalent) so the tooling tests can
-  point it at a fixture instead of the real `index.d.ts`.
-- Add a case and a fixture to `../tests/scripts/typescript_docs.test.mjs`, and copy
-  the fixture to a temp directory if the script mutates it.
-- eslint waives `no-console` for `scripts/**`; prettier covers `.mjs` under
-  `mise run wasm-lint`. Fixture `.d.ts` files are excluded from prettier by
-  `../.prettierignore`.
 
 ## Related
 
 - [`../README.md`](../README.md) — the WASM package overview
-- [`../index.d.ts`](../index.d.ts) — the published contract these scripts write
-  and police
-- [`../tests/README.md`](../tests/README.md) — the four test layers, layer 4 being
-  this tooling plus the `tsc` declaration checks
-- [`../../scripts/README.md`](../../scripts/README.md) — the Python-language
-  gates, including the Rust-side `check_wasm_api_input_docs.py`
+- [`../tests/README.md`](../tests/README.md) — the test layers, including the
+  declaration tests
+- [`../../scripts/README.md`](../../scripts/README.md) — the gate map: every
+  checker and the stage that runs it
 - [`../../.agents/rules/wasm/code-standards.md`](../../.agents/rules/wasm/code-standards.md)

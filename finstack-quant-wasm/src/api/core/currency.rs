@@ -43,7 +43,9 @@ impl JsCurrency {
     /// eur.toString(); // "EUR"
     /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(code: JsValue) -> Result<JsCurrency, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "string")] code: JsValue,
+    ) -> Result<JsCurrency, JsValue> {
         let code = crate::utils::input::js_string(&code, "code")?;
         RustCurrency::from_str(&code)
             .map(|inner| JsCurrency { inner })
@@ -60,8 +62,11 @@ impl JsCurrency {
     /// @throws `TypeError` (kind `invalid_type`) if `code` is not an integer in
     /// `0..=65535`; `FinstackError` (kind `validation`) if no supported
     /// currency has that numeric code.
+    /// @param code - ISO-4217 numeric code, such as `840` for USD or `978` for EUR.
     #[wasm_bindgen(js_name = fromNumeric)]
-    pub fn from_numeric(code: JsValue) -> Result<JsCurrency, JsValue> {
+    pub fn from_numeric(
+        #[wasm_bindgen(unchecked_param_type = "number")] code: JsValue,
+    ) -> Result<JsCurrency, JsValue> {
         let code: u16 = crate::utils::input::js_uint(&code, "code")?;
         RustCurrency::try_from(code)
             .map(|inner| JsCurrency { inner })
@@ -108,7 +113,9 @@ impl JsCurrency {
     /// @returns The parsed `Currency`.
     /// @throws If `json` is malformed or contains an unknown code.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsCurrency, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsCurrency, JsValue> {
         from_js_json(&json, "json").map(|inner| JsCurrency { inner })
     }
 }

@@ -33,7 +33,7 @@ use wasm_bindgen::prelude::*;
 /// or a projection day-count error). Supplied historical gaps before a
 /// resolved curve's base date always fail.
 ///
-/// @param spec_json - JSON-encoded `CashflowScheduleBuildSpec`. Optional
+/// @param specJson - JSON-encoded `CashflowScheduleBuildSpec`. Optional
 ///   `principal_exchange` is `"none"` or `"initial_and_final"` (default).
 ///   `principal_events` entries require both economic `date` and cash `payment_date`.
 ///   `linear_between` amortization uses coupon accrual boundaries in `(start, end]`;
@@ -47,12 +47,16 @@ use wasm_bindgen::prelude::*;
 ///   observations; `overnight_index_constraints` selects daily or final-period
 ///   index bounds. Final-period index and all-in rate adjustments are allocated
 ///   uniformly over contractual accrual time when principal changes.
-/// @param market_json - Optional JSON-encoded market context for floating-rate lookups.
+/// @param marketJson - Optional JSON-encoded market context for floating-rate lookups.
 /// @returns JSON-encoded `CashFlowSchedule`.
 /// @throws If the spec or market JSON is malformed, or schedule construction fails.
 #[wasm_bindgen(js_name = buildCashflowScheduleJson)]
 pub fn build_cashflow_schedule_json(
-    spec_json: JsValue,
+    #[wasm_bindgen(js_name = "specJson", unchecked_param_type = "JsonInput")] spec_json: JsValue,
+    #[wasm_bindgen(
+        js_name = "marketJson",
+        unchecked_optional_param_type = "JsonInput | null"
+    )]
     market_json: Option<JsValue>,
 ) -> Result<String, JsValue> {
     let spec_json: &str = &json_text(&spec_json, "specJson")?;
@@ -63,18 +67,21 @@ pub fn build_cashflow_schedule_json(
 
 /// Validate a cashflow schedule JSON string and return it canonicalized.
 ///
-/// @param schedule_json - JSON-encoded `CashFlowSchedule`.
+/// @param scheduleJson - JSON-encoded `CashFlowSchedule`.
 /// @returns Canonicalized JSON-encoded `CashFlowSchedule`.
 /// @throws If the schedule JSON is malformed or fails validation.
 #[wasm_bindgen(js_name = validateCashflowScheduleJson)]
-pub fn validate_cashflow_schedule_json(schedule_json: JsValue) -> Result<String, JsValue> {
+pub fn validate_cashflow_schedule_json(
+    #[wasm_bindgen(js_name = "scheduleJson", unchecked_param_type = "JsonInput")]
+    schedule_json: JsValue,
+) -> Result<String, JsValue> {
     let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
     finstack_quant_cashflows::validate_cashflow_schedule_json(schedule_json).map_err(to_js_err)
 }
 
 /// Extract dated flows from a cashflow schedule JSON string.
 ///
-/// @param schedule_json - JSON-encoded `CashFlowSchedule`.
+/// @param scheduleJson - JSON-encoded `CashFlowSchedule`.
 /// @returns JSON array of settlement cash entries. PIK and
 ///   `DefaultedNotional` state rows and zero-cash principal markers are omitted.
 ///   Native currencies are retained without conversion or netting; parse the
@@ -85,7 +92,10 @@ pub fn validate_cashflow_schedule_json(schedule_json: JsValue) -> Result<String,
 ///   multiple currencies receive structural validation without scalar balance
 ///   reconciliation.
 #[wasm_bindgen(js_name = datedFlowsJson)]
-pub fn dated_flows_json(schedule_json: JsValue) -> Result<String, JsValue> {
+pub fn dated_flows_json(
+    #[wasm_bindgen(js_name = "scheduleJson", unchecked_param_type = "JsonInput")]
+    schedule_json: JsValue,
+) -> Result<String, JsValue> {
     let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
     finstack_quant_cashflows::dated_flows_json(schedule_json).map_err(to_js_err)
 }
@@ -98,7 +108,9 @@ pub fn dated_flows_json(schedule_json: JsValue) -> Result<String, JsValue> {
 /// @returns Monthly mortality as a decimal; zero and one map to themselves.
 /// @throws If `annual` is not a number (kind `invalid_type`), is non-finite, or lies outside `[0, 1]` (kind `validation`).
 #[wasm_bindgen(js_name = annualToMonthly)]
-pub fn annual_to_monthly(annual: JsValue) -> Result<f64, JsValue> {
+pub fn annual_to_monthly(
+    #[wasm_bindgen(unchecked_param_type = "number")] annual: JsValue,
+) -> Result<f64, JsValue> {
     let annual = js_f64(&annual, "annual")?;
     finstack_quant_cashflows::builder::annual_to_monthly(annual).map_err(to_js_err)
 }
@@ -111,7 +123,9 @@ pub fn annual_to_monthly(annual: JsValue) -> Result<f64, JsValue> {
 /// @returns Annual mortality as a decimal; zero and one map to themselves.
 /// @throws If `monthly` is not a number (kind `invalid_type`), is non-finite, or lies outside `[0, 1]` (kind `validation`).
 #[wasm_bindgen(js_name = monthlyToAnnual)]
-pub fn monthly_to_annual(monthly: JsValue) -> Result<f64, JsValue> {
+pub fn monthly_to_annual(
+    #[wasm_bindgen(unchecked_param_type = "number")] monthly: JsValue,
+) -> Result<f64, JsValue> {
     let monthly = js_f64(&monthly, "monthly")?;
     finstack_quant_cashflows::builder::monthly_to_annual(monthly).map_err(to_js_err)
 }
@@ -128,7 +142,10 @@ pub fn monthly_to_annual(monthly: JsValue) -> Result<f64, JsValue> {
 /// @returns Single-month mortality as a decimal in `[0, 1]`.
 /// @throws If `speed` is non-finite or outside `[0, 1]` (kind `validation`), or `month` is not a non-negative integer (kind `invalid_type`).
 #[wasm_bindgen(js_name = absToSmm)]
-pub fn abs_to_smm(speed: JsValue, month: JsValue) -> Result<f64, JsValue> {
+pub fn abs_to_smm(
+    #[wasm_bindgen(unchecked_param_type = "number")] speed: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
+) -> Result<f64, JsValue> {
     let speed = js_f64(&speed, "speed")?;
     let month: u32 = js_uint(&month, "month")?;
     finstack_quant_cashflows::builder::abs_to_smm(speed, month).map_err(to_js_err)

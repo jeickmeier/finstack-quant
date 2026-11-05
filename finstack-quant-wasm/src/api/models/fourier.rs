@@ -25,11 +25,11 @@ use wasm_bindgen::prelude::*;
 /// @param spot - Current spot price or exchange rate in the same units as the strike.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
-/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
 /// @param expiry - Time to option expiry in years.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+/// @param isCall - Whether to value a call (`true`) or put (`false`).
+/// @param nTerms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
@@ -39,17 +39,20 @@ use wasm_bindgen::prelude::*;
 /// the model produces a degenerate or invalid COS truncation range, a
 /// non-finite characteristic-function value or forward moment, or a
 /// non-finite option price.
+/// @returns Discounted European option price in the same units as `spot`.
 #[wasm_bindgen(js_name = bsCosPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn bs_cos_price(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
-    n_terms: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(js_name = "nTerms", unchecked_optional_param_type = "number")] n_terms: Option<
+        JsValue,
+    >,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
@@ -81,13 +84,13 @@ pub fn bs_cos_price(
 /// @param spot - Current spot price or exchange rate in the same units as the strike.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
-/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
 /// @param sigma - Positive finite volatility of the subordinated Brownian motion, as a decimal.
 /// @param theta - Finite annual log-return drift of the subordinated Brownian motion; its sign controls skew.
 /// @param nu - Positive finite variance rate of the Gamma time change, in years; larger values increase tail thickness.
 /// @param expiry - Time to option expiry in years.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+/// @param isCall - Whether to value a call (`true`) or put (`false`).
+/// @param nTerms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
@@ -97,19 +100,22 @@ pub fn bs_cos_price(
 /// `computation` error if the model produces a degenerate or invalid COS
 /// truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
+/// @returns Discounted European option price in the same units as `spot`.
 #[wasm_bindgen(js_name = vgCosPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn vg_cos_price(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    sigma: JsValue,
-    theta: JsValue,
-    nu: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
-    n_terms: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] sigma: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] theta: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] nu: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(js_name = "nTerms", unchecked_optional_param_type = "number")] n_terms: Option<
+        JsValue,
+    >,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
@@ -145,14 +151,14 @@ pub fn vg_cos_price(
 /// @param spot - Current spot price or exchange rate in the same units as the strike.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
-/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
 /// @param sigma - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-/// @param mu_jump - Mean log jump size in the Merton jump-diffusion model.
-/// @param sigma_jump - Standard deviation of log jump sizes in the Merton jump-diffusion model.
+/// @param muJump - Mean log jump size in the Merton jump-diffusion model.
+/// @param sigmaJump - Standard deviation of log jump sizes in the Merton jump-diffusion model.
 /// @param lambda - Annual jump-arrival intensity in the Merton jump-diffusion model.
 /// @param expiry - Time to option expiry in years.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+/// @param isCall - Whether to value a call (`true`) or put (`false`).
+/// @param nTerms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
@@ -163,20 +169,23 @@ pub fn vg_cos_price(
 /// produces a degenerate or invalid COS
 /// truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
+/// @returns Discounted European option price in the same units as `spot`.
 #[wasm_bindgen(js_name = mertonJumpCosPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn merton_jump_cos_price(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    sigma: JsValue,
-    mu_jump: JsValue,
-    sigma_jump: JsValue,
-    lambda: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
-    n_terms: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] sigma: JsValue,
+    #[wasm_bindgen(js_name = "muJump", unchecked_param_type = "number")] mu_jump: JsValue,
+    #[wasm_bindgen(js_name = "sigmaJump", unchecked_param_type = "number")] sigma_jump: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] lambda: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(js_name = "nTerms", unchecked_optional_param_type = "number")] n_terms: Option<
+        JsValue,
+    >,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;

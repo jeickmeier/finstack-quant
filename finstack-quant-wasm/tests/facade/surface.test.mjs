@@ -164,7 +164,13 @@ function declaredSurface() {
     }
   };
 
+  // Type-only: an `export type { ... }` specifier, or a name that reaches the
+  // facade only through `export type * from './pkg/...'` (declared in the
+  // package, or only augmented by the facade).
   const typeOnly = (symbol) =>
+    !(symbol.declarations ?? []).some(
+      (decl) => decl.getSourceFile() === source && !ts.isModuleBlock(decl.parent)
+    ) ||
     (symbol.declarations ?? []).some(
       (decl) => ts.isExportSpecifier(decl) && (decl.isTypeOnly || decl.parent.parent.isTypeOnly)
     );

@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::*;
 /// Apply a scenario to an already-built `Portfolio` handle and revalue.
 /// Returns a JS object with structured `valuation` and `report` values.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
-/// @param scenario_json - Scenario specification JSON.
+/// @param scenarioJson - Scenario specification JSON.
 /// @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
 ///
 /// Each position's `valuation_result` matches what `priceInstrument` returns:
@@ -27,9 +27,11 @@ use wasm_bindgen::prelude::*;
 /// Throws a JavaScript exception if the scenario JSON is malformed or invalid,
 /// scenario application or portfolio revaluation fails, or the structured
 /// result cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = applyScenarioAndRevalue)]
+/// @returns Revalued result object and scenario application report.
+#[wasm_bindgen(js_name = applyScenarioAndRevalue, unchecked_return_type = "ScenarioRevalueView")]
 pub fn apply_scenario_and_revalue(
     portfolio: &JsPortfolio,
+    #[wasm_bindgen(js_name = "scenarioJson", unchecked_param_type = "JsonInput")]
     scenario_json: JsValue,
     market: &JsMarketContext,
 ) -> Result<JsValue, JsValue> {
@@ -56,7 +58,7 @@ pub fn apply_scenario_and_revalue(
 /// scenario. Positions added or removed by the scenario are zero-filled
 /// against the missing side, so the drill-down always sums to the total.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
-/// @param scenario_json - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
+/// @param scenarioJson - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
 /// @param market - Constructed `core.MarketContext` handle supplying the unshocked curves, quotes, and FX data used for the base leg.
 /// @returns The scenario's `ScenarioPnlBatchItem`.
 ///
@@ -65,9 +67,10 @@ pub fn apply_scenario_and_revalue(
 /// Throws a JavaScript exception if the scenario JSON is malformed or invalid,
 /// scenario application or either valuation fails, valuation currencies are
 /// inconsistent, or the structured result cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = scenarioPnl)]
+#[wasm_bindgen(js_name = scenarioPnl, unchecked_return_type = "ScenarioPnlBatchItem")]
 pub fn scenario_pnl(
     portfolio: &JsPortfolio,
+    #[wasm_bindgen(js_name = "scenarioJson", unchecked_param_type = "JsonInput")]
     scenario_json: JsValue,
     market: &JsMarketContext,
 ) -> Result<JsValue, JsValue> {
@@ -102,10 +105,10 @@ pub fn scenario_pnl(
 /// inconsistent (kind `validation`), or scenario application, valuation or
 /// base-currency differencing fails; the error is the earliest failing
 /// scenario's.
-#[wasm_bindgen(js_name = scenarioPnlBatch)]
+#[wasm_bindgen(js_name = scenarioPnlBatch, unchecked_return_type = "ScenarioPnlBatchItem[]")]
 pub fn scenario_pnl_batch(
     portfolio: &JsPortfolio,
-    scenarios: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "ScenarioSpec[] | string")] scenarios: JsValue,
     market: &JsMarketContext,
 ) -> Result<JsValue, JsValue> {
     let scenarios: Vec<finstack_quant_scenarios::ScenarioSpec> =

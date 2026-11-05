@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### WASM: TypeScript declarations come from the Rust bindings
+
+The hand-written `index.d.ts` is gone. Every `#[wasm_bindgen]` export now types
+its `JsValue` parameters and returns (`unchecked_param_type`,
+`unchecked_optional_param_type`, `unchecked_return_type`), so wasm-bindgen's
+`pkg/finstack_quant_wasm.d.ts` publishes no `any`, and the Rustdoc above each
+export is its JSDoc. `index.d.ts` is generated over it by
+`scripts/gen-facade-dts.mjs`. TypeScript-visible changes:
+
+- Namespace interfaces are named by their facade path
+  (`ValuationsInstrumentsNamespace`, `ModelsVolatilityNamespace`, ...); the
+  `*Constructor` interfaces are gone (use `typeof valuations.instruments.Bond`).
+- Parameters are declared under the camelCase names the runtime errors use
+  (`instrumentJson`, `marketJson`, `envelopeJson`, `varValue`, ...).
+- Classes declare `[Symbol.dispose]()`; the package declares `Symbol.dispose`
+  itself, so ES2020 consumers still compile without `esnext.disposable`.
+- Members the facade adds (`MarketContext.insert`, `CashFlowBuilder.build(market?)`,
+  `Performance.lookbackReturns`/`periodStats` with a `FiscalConfig`, the chained
+  builder methods) are declared by augmenting the package's classes.
+
 ### Statements: forecasts run on typed parameters; covenant bridge reads the result calendar
 
 `ForecastSpec::parameters` reads a forecast's parameter map once into `ForecastParameters`, and every method runs on that typed form; `ForecastSpec::validate` is that read. A missing required parameter (`rate`, `season_length`, `mode`, ...) now fails when the model is built rather than when it is evaluated, and errors name the offending key (`Invalid GrowthPct forecast parameter 'rate': ...`, or the unknown key with the accepted ones); `null` is rejected rather than read as absent. Values do not move.

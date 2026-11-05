@@ -26,10 +26,10 @@ use crate::utils::to_js_err;
 /// @throws Error - A `TypeError` (kind `invalid_type`) if `nFactors` is not a finite, non-negative whole number within the WebAssembly `usize` range. A validation error from Rust if `nFactors` is zero or `returns` is empty; if vector dimensions are inconsistent (including an overflowing `n_assets * n_factors`); if any vector value is non-finite; if the design matrix is rank-deficient; if coefficient rescaling or the constraint correction produces a non-finite value; or if the correction direction is degenerate and OLS does not already satisfy the constraint.
 #[wasm_bindgen(js_name = constrainedLeastSquares)]
 pub fn constrained_least_squares(
-    exposures: JsValue,
-    n_factors: JsValue,
-    returns: JsValue,
-    weights: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] exposures: JsValue,
+    #[wasm_bindgen(js_name = "nFactors", unchecked_param_type = "number")] n_factors: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] returns: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] weights: JsValue,
 ) -> Result<Float64Array, JsValue> {
     let n_factors: usize = js_uint(&n_factors, "nFactors")?;
     let exposures = js_f64_seq(&exposures, "exposures")?;

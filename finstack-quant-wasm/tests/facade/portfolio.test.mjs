@@ -175,23 +175,17 @@ test('models.factor.risk.decomposeFactors rejects malformed matrices and missing
   );
 });
 
-// Runtime arity gate. `index.d.ts` is hand-maintained, so a declaration with
-// the wrong argument count would compile clean for a TypeScript caller while
-// the extra argument is silently discarded at the JS boundary. Pinning
-// Function.length here forces the real exports to stay at the arity the
-// declarations promise; `dts_contract.rs` pins the declarations themselves.
+// Runtime arity gate. An extra argument is silently discarded at the JS
+// boundary, so pinning Function.length keeps these exports at the arity their
+// callers rely on; the declarations come from the same Rust signatures.
 test('portfolio Campisi exports keep their declared arity', () => {
   assert.equal(portfolio.campisiAttribution.length, 3);
   assert.equal(portfolio.campisiCarinoLink.length, 1);
   assert.equal(portfolio.fiAttributionResultReconciliationCheck.length, 2);
 });
 
-// Same lesson as the Campisi arity gate above, applied to the credit
-// excess-return / grid-attribution / factor-Brinson surfaces landed here:
-// `index.d.ts` is hand-maintained, so a declaration with the wrong argument
-// count would compile clean for a TypeScript caller while an extra argument
-// is silently discarded at the JS boundary. `dts_contract.rs` pins the
-// declared signatures themselves.
+// Same arity gate as above, for the credit excess-return / grid-attribution /
+// factor-Brinson surfaces.
 test('portfolio credit excess / grid / factor-Brinson exports keep their declared arity', () => {
   assert.equal(portfolio.cellReturnsFromReference.length, 3);
   assert.equal(portfolio.cellReturnsFromCurves.length, 6);

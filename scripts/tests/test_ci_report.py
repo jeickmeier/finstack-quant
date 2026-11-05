@@ -149,9 +149,7 @@ def test_build_wasm_report_parses_wasm_pack_and_node_test(tmp_path: Path) -> Non
         "\u2139 cancelled 0\n"
         "\u2139 skipped 0\n"
         "\u2139 todo 0\n"
-        "\u2139 duration_ms 139800.0\n"
-        "> finstack-quant-wasm@0.11.0 docs:check-sync\n"
-        "> node scripts/sync-facade-jsdoc.mjs --check\n",
+        "\u2139 duration_ms 139800.0\n",
         encoding="utf-8",
     )
 
@@ -160,7 +158,6 @@ def test_build_wasm_report_parses_wasm_pack_and_node_test(tmp_path: Path) -> Non
     assert "## WASM Test Summary" in report
     assert "| `wasm-bindgen` (`wasm-pack test --node`) | 238 | 0 | 0 | 3.4s | Passed |" in report
     assert "| Node.js facade (`node --test`) | 950 | 0 | 0 | 139.8s | Passed |" in report
-    assert "| JSDoc sync (`docs:check-sync`) | — | — | — | — | Executed |" in report
     assert "| **Total** | **1,188** | **0** | **0** | **143.2s** | **Passed** |" in report
 
 

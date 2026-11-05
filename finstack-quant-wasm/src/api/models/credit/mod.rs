@@ -37,7 +37,9 @@ use wasm_bindgen::prelude::*;
 /// Throws a `TypeError` if `rating` is not a string, and a `validation` error
 /// if it is not a recognized rating or has no factor in the Moody's table.
 #[wasm_bindgen(js_name = moodysWarfFactor)]
-pub fn moodys_warf_factor(rating: JsValue) -> Result<f64, JsValue> {
+pub fn moodys_warf_factor(
+    #[wasm_bindgen(unchecked_param_type = "string")] rating: JsValue,
+) -> Result<f64, JsValue> {
     credit::moodys_warf_factor(js_parse::<CreditRating>(&rating, "rating")?).map_err(to_js_err)
 }
 
@@ -54,13 +56,24 @@ pub fn moodys_warf_factor(rating: JsValue) -> Result<f64, JsValue> {
 /// Throws with kind `validation` if the request is malformed or has an unknown
 /// field, a horizon is non-finite or not positive, or the equity calibration
 /// rejects its inputs.
-#[wasm_bindgen(js_name = mertonReport)]
-pub fn merton_report(request: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = mertonReport, unchecked_return_type = "generated.models.MertonReport")]
+pub fn merton_report(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.MertonReportRequest | string")] request: JsValue,
+) -> Result<JsValue, JsValue> {
     let request: credit::MertonReportRequest = from_js_json(&request, "request")?;
     to_js_value(&credit::merton_report(&request).map_err(to_js_err)?)
 }
 
 /// Rating-to-factor table used for WARF-style portfolio credit quality.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const table = models.credit.RatingFactorTable.defaultCalibration();
+/// console.log(table.agency, table.getFactor("B2"));
+/// table.free();
+/// ```
 #[wasm_bindgen(js_name = RatingFactorTable)]
 pub struct JsRatingFactorTable {
     pub(crate) inner: RatingFactorTable,
@@ -92,7 +105,9 @@ impl JsRatingFactorTable {
     /// Throws a `TypeError` if `id` is not a string, and a `not_found` error
     /// if no table is registered under it.
     #[wasm_bindgen(js_name = fromRegistryId)]
-    pub fn from_registry_id(id: JsValue) -> Result<JsRatingFactorTable, JsValue> {
+    pub fn from_registry_id(
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsRatingFactorTable, JsValue> {
         let id = js_string(&id, "id")?;
         RatingFactorTable::from_registry_id(&id)
             .map(|inner| Self { inner })
@@ -108,7 +123,10 @@ impl JsRatingFactorTable {
     /// Throws a `TypeError` if `rating` is not a string, and a `validation`
     /// error if it is not a recognized rating.
     #[wasm_bindgen(js_name = getFactor)]
-    pub fn get_factor(&self, rating: JsValue) -> Result<f64, JsValue> {
+    pub fn get_factor(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] rating: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .get_factor(js_parse::<CreditRating>(&rating, "rating")?)
             .map_err(to_js_err)
@@ -135,6 +153,15 @@ impl JsRatingFactorTable {
 
 /// Default-barrier monitoring rule of a structural model: terminal (Merton) or
 /// first-passage (Black-Cox).
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const barrier = models.credit.MertonBarrierType.firstPassage(0.02);
+/// console.log(barrier.toJson());
+/// barrier.free();
+/// ```
 #[wasm_bindgen(js_name = MertonBarrierType)]
 #[derive(Clone, Copy)]
 pub struct JsMertonBarrierType {
@@ -154,14 +181,17 @@ impl JsMertonBarrierType {
     }
 
     /// Default occurs the first time assets touch a growing barrier (Black-Cox 1976).
-    /// @param barrier_growth_rate - Continuously compounded growth rate of the barrier per year, as a decimal (`0.0` keeps the barrier flat).
+    /// @param barrierGrowthRate - Continuously compounded growth rate of the barrier per year, as a decimal (`0.0` keeps the barrier flat).
     /// @returns The first-passage barrier rule.
     ///
     /// # Errors
     ///
     /// Throws a `TypeError` if `barrierGrowthRate` is not a number.
     #[wasm_bindgen(js_name = firstPassage)]
-    pub fn first_passage(barrier_growth_rate: JsValue) -> Result<JsMertonBarrierType, JsValue> {
+    pub fn first_passage(
+        #[wasm_bindgen(js_name = "barrierGrowthRate", unchecked_param_type = "number")]
+        barrier_growth_rate: JsValue,
+    ) -> Result<JsMertonBarrierType, JsValue> {
         let barrier_growth_rate = js_f64(&barrier_growth_rate, "barrierGrowthRate")?;
         Ok(Self {
             inner: MertonBarrierType::FirstPassage {
@@ -173,6 +203,16 @@ impl JsMertonBarrierType {
 
 /// Asset-value dynamics of a structural model: geometric Brownian motion,
 /// Merton jump-diffusion, or CreditGrades.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const dynamics = models.credit.AssetDynamics.jumpDiffusion(0.5, -0.05, 0.1);
+/// const barrier = models.credit.MertonBarrierType.terminal();
+/// const model = models.credit.MertonModel.newWithDynamics(100, 0.2, 60, 0.03, 0.0, barrier, dynamics);
+/// console.log(model.defaultProbability(1));
+/// ```
 #[wasm_bindgen(js_name = AssetDynamics)]
 #[derive(Clone, Copy)]
 pub struct JsAssetDynamics {
@@ -193,9 +233,9 @@ impl JsAssetDynamics {
     }
 
     /// Merton (1976) jump-diffusion with lognormal jump sizes.
-    /// @param jump_intensity - Poisson jump arrival rate per year; non-negative.
-    /// @param jump_mean - Mean of the log jump size (dimensionless).
-    /// @param jump_vol - Standard deviation of the log jump size; non-negative.
+    /// @param jumpIntensity - Poisson jump arrival rate per year; non-negative.
+    /// @param jumpMean - Mean of the log jump size (dimensionless).
+    /// @param jumpVol - Standard deviation of the log jump size; non-negative.
     /// @returns The jump-diffusion dynamics.
     ///
     /// # Errors
@@ -204,9 +244,9 @@ impl JsAssetDynamics {
     /// when the dynamics are attached to a model.
     #[wasm_bindgen(js_name = jumpDiffusion)]
     pub fn jump_diffusion(
-        jump_intensity: JsValue,
-        jump_mean: JsValue,
-        jump_vol: JsValue,
+        #[wasm_bindgen(js_name = "jumpIntensity", unchecked_param_type = "number")] jump_intensity: JsValue,
+        #[wasm_bindgen(js_name = "jumpMean", unchecked_param_type = "number")] jump_mean: JsValue,
+        #[wasm_bindgen(js_name = "jumpVol", unchecked_param_type = "number")] jump_vol: JsValue,
     ) -> Result<JsAssetDynamics, JsValue> {
         Ok(Self {
             inner: AssetDynamics::JumpDiffusion {
@@ -218,8 +258,8 @@ impl JsAssetDynamics {
     }
 
     /// CreditGrades dynamics with an uncertain default barrier (Finger et al. 2002).
-    /// @param barrier_uncertainty - Lognormal dispersion of the default barrier (dimensionless, typically about 0.3).
-    /// @param mean_recovery - Mean global recovery rate as a fraction from 0 through 1.
+    /// @param barrierUncertainty - Lognormal dispersion of the default barrier (dimensionless, typically about 0.3).
+    /// @param meanRecovery - Mean global recovery rate as a fraction from 0 through 1.
     /// @returns The CreditGrades dynamics.
     ///
     /// # Errors
@@ -228,7 +268,9 @@ impl JsAssetDynamics {
     /// when the dynamics are attached to a model.
     #[wasm_bindgen(js_name = creditGrades)]
     pub fn credit_grades(
+        #[wasm_bindgen(js_name = "barrierUncertainty", unchecked_param_type = "number")]
         barrier_uncertainty: JsValue,
+        #[wasm_bindgen(js_name = "meanRecovery", unchecked_param_type = "number")]
         mean_recovery: JsValue,
     ) -> Result<JsAssetDynamics, JsValue> {
         Ok(Self {
@@ -244,6 +286,18 @@ impl JsAssetDynamics {
 ///
 /// Rates and volatilities are annualized decimals, horizons are in years and
 /// monetary inputs share one caller-defined unit.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const model = new models.credit.MertonModel(100, 0.25, 60, 0.03);
+/// console.log(model.defaultProbability(1), model.distanceToDefault(1));
+/// const curve = model.toHazardCurve("ACME", "2025-01-15", [1, 3, 5], 0.4, "act_365f");
+/// console.log(curve.sp(5));
+/// curve.free();
+/// model.free();
+/// ```
 #[wasm_bindgen(js_name = MertonModel)]
 pub struct JsMertonModel {
     pub(crate) inner: MertonModel,
@@ -254,10 +308,10 @@ json_round_trip!(JsMertonModel, MertonModel);
 #[wasm_bindgen(js_class = MertonModel)]
 impl JsMertonModel {
     /// Terminal-barrier Merton model with geometric-Brownian assets and no payout.
-    /// @param asset_value - Current fair value of the firm's assets in monetary units; positive.
-    /// @param asset_vol - Annualized volatility of firm-asset returns, as a decimal; positive.
-    /// @param debt_barrier - Positive debt face value defining the default barrier.
-    /// @param risk_free_rate - Continuously compounded risk-free rate as a decimal, such as 0.05 for 5%.
+    /// @param assetValue - Current fair value of the firm's assets in monetary units; positive.
+    /// @param assetVol - Annualized volatility of firm-asset returns, as a decimal; positive.
+    /// @param debtBarrier - Positive debt face value defining the default barrier.
+    /// @param riskFreeRate - Continuously compounded risk-free rate as a decimal, such as 0.05 for 5%.
     ///
     /// # Errors
     ///
@@ -266,9 +320,12 @@ impl JsMertonModel {
     /// finite or `riskFreeRate` is non-finite.
     #[wasm_bindgen(constructor)]
     pub fn new(
+        #[wasm_bindgen(js_name = "assetValue", unchecked_param_type = "number")]
         asset_value: JsValue,
-        asset_vol: JsValue,
+        #[wasm_bindgen(js_name = "assetVol", unchecked_param_type = "number")] asset_vol: JsValue,
+        #[wasm_bindgen(js_name = "debtBarrier", unchecked_param_type = "number")]
         debt_barrier: JsValue,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
         risk_free_rate: JsValue,
     ) -> Result<JsMertonModel, JsValue> {
         MertonModel::new(
@@ -282,11 +339,11 @@ impl JsMertonModel {
     }
 
     /// Calibrate asset value and volatility from observable equity (KMV iteration).
-    /// @param equity_value - Current market value of equity in the firm's monetary units.
-    /// @param equity_vol - Annualized equity-return volatility as a decimal.
-    /// @param total_debt - Total debt face value used as the default barrier.
-    /// @param risk_free_rate - Continuously compounded risk-free rate as a decimal.
-    /// @param payout_rate - Continuous dividend or payout yield on assets, as a decimal.
+    /// @param equityValue - Current market value of equity in the firm's monetary units.
+    /// @param equityVol - Annualized equity-return volatility as a decimal.
+    /// @param totalDebt - Total debt face value used as the default barrier.
+    /// @param riskFreeRate - Continuously compounded risk-free rate as a decimal.
+    /// @param payoutRate - Continuous dividend or payout yield on assets, as a decimal.
     /// @param maturity - Calibration horizon in years; positive and finite.
     /// @returns The calibrated model.
     ///
@@ -296,12 +353,15 @@ impl JsMertonModel {
     /// `computation` error if the calibration does not converge.
     #[wasm_bindgen(js_name = fromEquity)]
     pub fn from_equity(
+        #[wasm_bindgen(js_name = "equityValue", unchecked_param_type = "number")]
         equity_value: JsValue,
-        equity_vol: JsValue,
-        total_debt: JsValue,
+        #[wasm_bindgen(js_name = "equityVol", unchecked_param_type = "number")] equity_vol: JsValue,
+        #[wasm_bindgen(js_name = "totalDebt", unchecked_param_type = "number")] total_debt: JsValue,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
         risk_free_rate: JsValue,
+        #[wasm_bindgen(js_name = "payoutRate", unchecked_param_type = "number")]
         payout_rate: JsValue,
-        maturity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] maturity: JsValue,
     ) -> Result<JsMertonModel, JsValue> {
         MertonModel::from_equity(
             js_f64(&equity_value, "equityValue")?,
@@ -321,13 +381,13 @@ impl JsMertonModel {
     /// survival curve. A quote that no volatility in `[0.01, 2.0]` reproduces,
     /// or one consistent with several volatilities, is rejected rather than
     /// resolved arbitrarily.
-    /// @param cds_spread_bp - Target CDS par spread in basis points.
+    /// @param cdsSpreadBp - Target CDS par spread in basis points.
     /// @param recovery - Recovery rate at default as a fraction from 0 through 1.
-    /// @param total_debt - Total debt face value in the firm's monetary units.
-    /// @param risk_free_rate - Continuously compounded risk-free rate as a decimal.
+    /// @param totalDebt - Total debt face value in the firm's monetary units.
+    /// @param riskFreeRate - Continuously compounded risk-free rate as a decimal.
     /// @param maturity - CDS maturity in years; positive and finite.
-    /// @param asset_value - Assumed current firm asset value in monetary units.
-    /// @param payout_rate - Continuous payout rate on assets, as a decimal.
+    /// @param assetValue - Assumed current firm asset value in monetary units.
+    /// @param payoutRate - Continuous payout rate on assets, as a decimal.
     /// @returns The calibrated model.
     ///
     /// # Errors
@@ -336,12 +396,16 @@ impl JsMertonModel {
     /// unattainable or ambiguous.
     #[wasm_bindgen(js_name = fromCdsSpread)]
     pub fn from_cds_spread(
+        #[wasm_bindgen(js_name = "cdsSpreadBp", unchecked_param_type = "number")]
         cds_spread_bp: JsValue,
-        recovery: JsValue,
-        total_debt: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] recovery: JsValue,
+        #[wasm_bindgen(js_name = "totalDebt", unchecked_param_type = "number")] total_debt: JsValue,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
         risk_free_rate: JsValue,
-        maturity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] maturity: JsValue,
+        #[wasm_bindgen(js_name = "assetValue", unchecked_param_type = "number")]
         asset_value: JsValue,
+        #[wasm_bindgen(js_name = "payoutRate", unchecked_param_type = "number")]
         payout_rate: JsValue,
     ) -> Result<JsMertonModel, JsValue> {
         MertonModel::from_cds_spread(
@@ -358,11 +422,11 @@ impl JsMertonModel {
     }
 
     /// Calibrate the default barrier to a target cumulative default probability.
-    /// @param asset_value - Current fair value of the firm's assets in monetary units.
-    /// @param asset_vol - Annualized volatility of firm-asset returns as a decimal; positive.
-    /// @param risk_free_rate - Continuously compounded risk-free rate as a decimal; pass the physical asset return to calibrate against a real-world default rate.
-    /// @param payout_rate - Continuous payout rate on assets as a decimal; it enters the calibration drift and is carried on the model.
-    /// @param target_pd - Target cumulative default probability strictly between 0 and 1.
+    /// @param assetValue - Current fair value of the firm's assets in monetary units.
+    /// @param assetVol - Annualized volatility of firm-asset returns as a decimal; positive.
+    /// @param riskFreeRate - Continuously compounded risk-free rate as a decimal; pass the physical asset return to calibrate against a real-world default rate.
+    /// @param payoutRate - Continuous payout rate on assets as a decimal; it enters the calibration drift and is carried on the model.
+    /// @param targetPd - Target cumulative default probability strictly between 0 and 1.
     /// @param maturity - Calibration horizon in years; positive and finite.
     /// @returns The calibrated model.
     ///
@@ -371,12 +435,15 @@ impl JsMertonModel {
     /// Throws a `validation` error if an input is out of range.
     #[wasm_bindgen(js_name = fromTargetPd)]
     pub fn from_target_pd(
+        #[wasm_bindgen(js_name = "assetValue", unchecked_param_type = "number")]
         asset_value: JsValue,
-        asset_vol: JsValue,
+        #[wasm_bindgen(js_name = "assetVol", unchecked_param_type = "number")] asset_vol: JsValue,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
         risk_free_rate: JsValue,
+        #[wasm_bindgen(js_name = "payoutRate", unchecked_param_type = "number")]
         payout_rate: JsValue,
-        target_pd: JsValue,
-        maturity: JsValue,
+        #[wasm_bindgen(js_name = "targetPd", unchecked_param_type = "number")] target_pd: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] maturity: JsValue,
     ) -> Result<JsMertonModel, JsValue> {
         MertonModel::from_target_pd(
             js_f64(&asset_value, "assetValue")?,
@@ -391,8 +458,8 @@ impl JsMertonModel {
     }
 
     /// Moody's KMV default point: short-term debt plus half of long-term debt.
-    /// @param short_term_debt - Liabilities due within one year, in the firm's monetary units.
-    /// @param long_term_debt - Liabilities maturing beyond one year, in the same units; half of it enters the default point.
+    /// @param shortTermDebt - Liabilities due within one year, in the firm's monetary units.
+    /// @param longTermDebt - Liabilities maturing beyond one year, in the same units; half of it enters the default point.
     /// @returns The default point in the same monetary units.
     ///
     /// # Errors
@@ -401,7 +468,8 @@ impl JsMertonModel {
     /// or the resulting default point is zero.
     #[wasm_bindgen(js_name = kmvDefaultPoint)]
     pub fn kmv_default_point(
-        short_term_debt: JsValue,
+        #[wasm_bindgen(js_name = "shortTermDebt", unchecked_param_type = "number")] short_term_debt: JsValue,
+        #[wasm_bindgen(js_name = "longTermDebt", unchecked_param_type = "number")]
         long_term_debt: JsValue,
     ) -> Result<f64, JsValue> {
         MertonModel::kmv_default_point(
@@ -412,12 +480,12 @@ impl JsMertonModel {
     }
 
     /// Model with an explicit barrier rule and asset dynamics.
-    /// @param asset_value - Current fair value of the firm's assets in monetary units; positive.
-    /// @param asset_vol - Annualized volatility of firm-asset returns as a decimal; positive.
-    /// @param debt_barrier - Positive debt face value defining the default barrier.
-    /// @param risk_free_rate - Continuously compounded risk-free rate as a decimal.
-    /// @param payout_rate - Continuous payout rate on assets, as a decimal.
-    /// @param barrier_type - `MertonBarrierType` handle selecting terminal or first-passage default.
+    /// @param assetValue - Current fair value of the firm's assets in monetary units; positive.
+    /// @param assetVol - Annualized volatility of firm-asset returns as a decimal; positive.
+    /// @param debtBarrier - Positive debt face value defining the default barrier.
+    /// @param riskFreeRate - Continuously compounded risk-free rate as a decimal.
+    /// @param payoutRate - Continuous payout rate on assets, as a decimal.
+    /// @param barrierType - `MertonBarrierType` handle selecting terminal or first-passage default.
     /// @param dynamics - `AssetDynamics` handle selecting GBM, jump-diffusion or CreditGrades assets.
     /// @returns The validated model.
     ///
@@ -428,12 +496,16 @@ impl JsMertonModel {
     /// first-passage barrier).
     #[wasm_bindgen(js_name = newWithDynamics)]
     pub fn new_with_dynamics(
+        #[wasm_bindgen(js_name = "assetValue", unchecked_param_type = "number")]
         asset_value: JsValue,
-        asset_vol: JsValue,
+        #[wasm_bindgen(js_name = "assetVol", unchecked_param_type = "number")] asset_vol: JsValue,
+        #[wasm_bindgen(js_name = "debtBarrier", unchecked_param_type = "number")]
         debt_barrier: JsValue,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
         risk_free_rate: JsValue,
+        #[wasm_bindgen(js_name = "payoutRate", unchecked_param_type = "number")]
         payout_rate: JsValue,
-        barrier_type: &JsMertonBarrierType,
+        #[wasm_bindgen(js_name = "barrierType")] barrier_type: &JsMertonBarrierType,
         dynamics: &JsAssetDynamics,
     ) -> Result<JsMertonModel, JsValue> {
         MertonModel::new_with_dynamics(
@@ -450,12 +522,12 @@ impl JsMertonModel {
     }
 
     /// CreditGrades model calibrated from equity observables.
-    /// @param equity_value - Current market value of equity in the firm's monetary units.
-    /// @param equity_vol - Annualized equity-return volatility as a decimal.
-    /// @param total_debt - Total debt face value in the firm's monetary units.
-    /// @param risk_free_rate - Continuously compounded risk-free rate as a decimal.
-    /// @param barrier_uncertainty - Lognormal dispersion of the CreditGrades default barrier.
-    /// @param mean_recovery - Mean recovery rate at default as a fraction from 0 through 1.
+    /// @param equityValue - Current market value of equity in the firm's monetary units.
+    /// @param equityVol - Annualized equity-return volatility as a decimal.
+    /// @param totalDebt - Total debt face value in the firm's monetary units.
+    /// @param riskFreeRate - Continuously compounded risk-free rate as a decimal.
+    /// @param barrierUncertainty - Lognormal dispersion of the CreditGrades default barrier.
+    /// @param meanRecovery - Mean recovery rate at default as a fraction from 0 through 1.
     /// @returns The CreditGrades model.
     ///
     /// # Errors
@@ -463,11 +535,15 @@ impl JsMertonModel {
     /// Throws a `validation` error if an input is out of range.
     #[wasm_bindgen(js_name = creditGrades)]
     pub fn credit_grades(
+        #[wasm_bindgen(js_name = "equityValue", unchecked_param_type = "number")]
         equity_value: JsValue,
-        equity_vol: JsValue,
-        total_debt: JsValue,
+        #[wasm_bindgen(js_name = "equityVol", unchecked_param_type = "number")] equity_vol: JsValue,
+        #[wasm_bindgen(js_name = "totalDebt", unchecked_param_type = "number")] total_debt: JsValue,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
         risk_free_rate: JsValue,
+        #[wasm_bindgen(js_name = "barrierUncertainty", unchecked_param_type = "number")]
         barrier_uncertainty: JsValue,
+        #[wasm_bindgen(js_name = "meanRecovery", unchecked_param_type = "number")]
         mean_recovery: JsValue,
     ) -> Result<JsMertonModel, JsValue> {
         MertonModel::credit_grades(
@@ -539,12 +615,15 @@ impl JsMertonModel {
     ///
     /// Throws a `TypeError` if `horizon` is not a number.
     #[wasm_bindgen(js_name = distanceToDefault)]
-    pub fn distance_to_default(&self, horizon: JsValue) -> Result<f64, JsValue> {
+    pub fn distance_to_default(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
+    ) -> Result<f64, JsValue> {
         Ok(self.inner.distance_to_default(js_f64(&horizon, "horizon")?))
     }
 
     /// Physical-measure (Moody's KMV) distance to default.
-    /// @param asset_drift - Expected physical total return on firm assets as a continuously compounded decimal, replacing the risk-free rate.
+    /// @param assetDrift - Expected physical total return on firm assets as a continuously compounded decimal, replacing the risk-free rate.
     /// @param horizon - Forward-looking horizon in years.
     /// @returns Distance to default in standard deviations under the physical drift.
     ///
@@ -555,8 +634,9 @@ impl JsMertonModel {
     #[wasm_bindgen(js_name = distanceToDefaultWithDrift)]
     pub fn distance_to_default_with_drift(
         &self,
+        #[wasm_bindgen(js_name = "assetDrift", unchecked_param_type = "number")]
         asset_drift: JsValue,
-        horizon: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
     ) -> Result<f64, JsValue> {
         self.inner
             .distance_to_default_with_drift(
@@ -574,7 +654,10 @@ impl JsMertonModel {
     ///
     /// Throws a `TypeError` if `horizon` is not a number.
     #[wasm_bindgen(js_name = defaultProbability)]
-    pub fn default_probability(&self, horizon: JsValue) -> Result<f64, JsValue> {
+    pub fn default_probability(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
+    ) -> Result<f64, JsValue> {
         Ok(self.inner.default_probability(js_f64(&horizon, "horizon")?))
     }
 
@@ -588,7 +671,10 @@ impl JsMertonModel {
     ///
     /// Throws a `TypeError` if `horizons` is not an array of numbers.
     #[wasm_bindgen(js_name = defaultProbabilities)]
-    pub fn default_probabilities(&self, horizons: JsValue) -> Result<Box<[f64]>, JsValue> {
+    pub fn default_probabilities(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] horizons: JsValue,
+    ) -> Result<Box<[f64]>, JsValue> {
         let horizons = js_f64_seq(&horizons, "horizons")?;
         Ok(self
             .inner
@@ -597,7 +683,7 @@ impl JsMertonModel {
     }
 
     /// Physical-measure (Moody's KMV) default probability, the theoretical EDF.
-    /// @param asset_drift - Expected physical total return on firm assets as a continuously compounded decimal, replacing the risk-free rate.
+    /// @param assetDrift - Expected physical total return on firm assets as a continuously compounded decimal, replacing the risk-free rate.
     /// @param horizon - Forward-looking horizon in years.
     /// @returns Default probability in `[0, 1]` under the physical drift.
     ///
@@ -608,8 +694,9 @@ impl JsMertonModel {
     #[wasm_bindgen(js_name = defaultProbabilityWithDrift)]
     pub fn default_probability_with_drift(
         &self,
+        #[wasm_bindgen(js_name = "assetDrift", unchecked_param_type = "number")]
         asset_drift: JsValue,
-        horizon: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
     ) -> Result<f64, JsValue> {
         self.inner
             .default_probability_with_drift(
@@ -629,7 +716,11 @@ impl JsMertonModel {
     /// Throws a `validation` error if `horizon` is not positive and finite or
     /// `recovery` is outside `[0, 1]`.
     #[wasm_bindgen(js_name = impliedSpread)]
-    pub fn implied_spread(&self, horizon: JsValue, recovery: JsValue) -> Result<f64, JsValue> {
+    pub fn implied_spread(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] recovery: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .implied_spread(js_f64(&horizon, "horizon")?, js_f64(&recovery, "recovery")?)
             .map_err(to_js_err)
@@ -645,7 +736,10 @@ impl JsMertonModel {
     /// Throws a `validation` error if `horizon` is not positive, the barrier is
     /// not terminal, or the implied debt value is not positive.
     #[wasm_bindgen(js_name = debtSpread)]
-    pub fn debt_spread(&self, horizon: JsValue) -> Result<f64, JsValue> {
+    pub fn debt_spread(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .debt_spread(js_f64(&horizon, "horizon")?)
             .map_err(to_js_err)
@@ -662,7 +756,11 @@ impl JsMertonModel {
     /// is outside `[0, 1]` or contradicts the CreditGrades `mean_recovery`, or
     /// the implied survival curve cannot be bootstrapped.
     #[wasm_bindgen(js_name = cdsParSpread)]
-    pub fn cds_par_spread(&self, maturity: JsValue, recovery: JsValue) -> Result<f64, JsValue> {
+    pub fn cds_par_spread(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] maturity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] recovery: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .cds_par_spread(
                 js_f64(&maturity, "maturity")?,
@@ -680,7 +778,10 @@ impl JsMertonModel {
     /// Throws a `validation` error if `horizon` is not positive and finite, the
     /// firm is economically in default, or the inversion is ill-conditioned.
     #[wasm_bindgen(js_name = impliedEquity)]
-    pub fn implied_equity(&self, horizon: JsValue) -> Result<Box<[f64]>, JsValue> {
+    pub fn implied_equity(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
+    ) -> Result<Box<[f64]>, JsValue> {
         let (equity, equity_vol) = self
             .inner
             .implied_equity(js_f64(&horizon, "horizon")?)
@@ -691,10 +792,10 @@ impl JsMertonModel {
     /// Bootstrap a piecewise-constant hazard curve from the structural default
     /// probabilities.
     /// @param id - Identifier assigned to the hazard curve.
-    /// @param base_date - Valuation date in ISO-8601 form, such as `"2025-01-15"`.
+    /// @param baseDate - Valuation date in ISO-8601 form, such as `"2025-01-15"`.
     /// @param tenors - Tenor grid in years as a `number[]` or `Float64Array`; non-empty, positive and distinct.
     /// @param recovery - Recovery rate as a fraction from 0 through 1; must equal the model's `mean_recovery` under CreditGrades dynamics.
-    /// @param day_count - Day-count convention the curve uses for year fractions, such as `"act_365f"` or `"act_360"`.
+    /// @param dayCount - Day-count convention the curve uses for year fractions, such as `"act_365f"` or `"act_360"`.
     /// @returns The bootstrapped `core.HazardCurve` handle.
     ///
     /// # Errors
@@ -705,11 +806,11 @@ impl JsMertonModel {
     #[wasm_bindgen(js_name = toHazardCurve)]
     pub fn to_hazard_curve(
         &self,
-        id: JsValue,
-        base_date: JsValue,
-        tenors: JsValue,
-        recovery: JsValue,
-        day_count: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] tenors: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] recovery: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "string")] day_count: JsValue,
     ) -> Result<JsHazardCurve, JsValue> {
         let id = js_string(&id, "id")?;
         let base_date = parse_iso_date(&js_string(&base_date, "baseDate")?)?;
@@ -727,8 +828,8 @@ impl JsMertonModel {
     }
 
     /// Simulate firm-asset paths by Monte Carlo.
-    /// @param num_paths - Number of paths to simulate; a safe non-negative integer.
-    /// @param num_steps - Number of time steps per path; at least 1.
+    /// @param numPaths - Number of paths to simulate; a safe non-negative integer.
+    /// @param numSteps - Number of time steps per path; at least 1.
     /// @param horizon - Simulation horizon in years; positive and finite.
     /// @param seed - Seed for reproducible draws, as a safe integer or `bigint`; the Rust generator (PCG64) gives equal paths for equal seeds in every host.
     /// @param antithetic - When `true`, use antithetic variates for variance reduction.
@@ -742,11 +843,11 @@ impl JsMertonModel {
     #[wasm_bindgen(js_name = simulatePaths)]
     pub fn simulate_paths(
         &self,
-        num_paths: JsValue,
-        num_steps: JsValue,
-        horizon: JsValue,
-        seed: JsValue,
-        antithetic: JsValue,
+        #[wasm_bindgen(js_name = "numPaths", unchecked_param_type = "number")] num_paths: JsValue,
+        #[wasm_bindgen(js_name = "numSteps", unchecked_param_type = "number")] num_steps: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number | bigint")] seed: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "boolean")] antithetic: JsValue,
     ) -> Result<JsSimulatedPaths, JsValue> {
         let num_paths: usize = js_uint(&num_paths, "numPaths")?;
         let num_steps: usize = js_uint(&num_steps, "numSteps")?;
@@ -765,6 +866,16 @@ impl JsMertonModel {
 /// `assetValues` is row-major: path `p` occupies indices
 /// `p * valuesPerPath .. (p + 1) * valuesPerPath`, where
 /// `valuesPerPath == numSteps + 1` (the grid includes `t = 0`).
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const model = new models.credit.MertonModel(100, 0.25, 60, 0.03);
+/// const paths = model.simulatePaths(4, 12, 1.0, 42, false);
+/// const copy = models.credit.SimulatedPaths.fromJson(paths.toJson());
+/// console.log(copy.numPaths, copy.valuesPerPath, copy.get(0, 0));
+/// ```
 #[wasm_bindgen(js_name = SimulatedPaths)]
 pub struct JsSimulatedPaths {
     pub(crate) inner: SimulatedPaths,
@@ -805,27 +916,34 @@ impl JsSimulatedPaths {
     }
 
     /// One asset value by path and time-grid index.
-    /// @param path_idx - Zero-based path index.
-    /// @param time_idx - Zero-based time-grid index (index 0 is `t = 0`).
+    /// @param pathIdx - Zero-based path index.
+    /// @param timeIdx - Zero-based time-grid index (index 0 is `t = 0`).
     /// @returns The asset value, or `undefined` when either index is out of range.
     ///
     /// # Errors
     ///
     /// Throws a `TypeError` if an index is not a safe non-negative integer.
-    pub fn get(&self, path_idx: JsValue, time_idx: JsValue) -> Result<Option<f64>, JsValue> {
+    pub fn get(
+        &self,
+        #[wasm_bindgen(js_name = "pathIdx", unchecked_param_type = "number")] path_idx: JsValue,
+        #[wasm_bindgen(js_name = "timeIdx", unchecked_param_type = "number")] time_idx: JsValue,
+    ) -> Result<Option<f64>, JsValue> {
         let path_idx: usize = js_uint(&path_idx, "pathIdx")?;
         let time_idx: usize = js_uint(&time_idx, "timeIdx")?;
         Ok(self.inner.get(path_idx, time_idx))
     }
 
     /// The contiguous asset-value row of one path.
-    /// @param path_idx - Zero-based path index.
+    /// @param pathIdx - Zero-based path index.
     /// @returns The path's values on the time grid, or `undefined` when the index is out of range.
     ///
     /// # Errors
     ///
     /// Throws a `TypeError` if `pathIdx` is not a safe non-negative integer.
-    pub fn path(&self, path_idx: JsValue) -> Result<Option<Box<[f64]>>, JsValue> {
+    pub fn path(
+        &self,
+        #[wasm_bindgen(js_name = "pathIdx", unchecked_param_type = "number")] path_idx: JsValue,
+    ) -> Result<Option<Box<[f64]>>, JsValue> {
         let path_idx: usize = js_uint(&path_idx, "pathIdx")?;
         Ok(self.inner.path(path_idx).map(Box::from))
     }
@@ -836,13 +954,22 @@ impl JsSimulatedPaths {
     /// # Errors
     ///
     /// Throws a `validation` error if the rows cannot be converted.
-    #[wasm_bindgen(js_name = toNested)]
+    #[wasm_bindgen(js_name = toNested, unchecked_return_type = "number[][]")]
     pub fn to_nested(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.to_nested())
     }
 }
 
 /// Notional-dependent recovery specification for PIK-accreting instruments.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const spec = models.credit.DynamicRecoverySpec.flooredInverse(0.4, 100, 0.1);
+/// console.log(spec.kind, spec.recoveryAtNotional(150));
+/// spec.free();
+/// ```
 #[wasm_bindgen(js_name = DynamicRecoverySpec)]
 pub struct JsDynamicRecoverySpec {
     pub(crate) inner: DynamicRecoverySpec,
@@ -859,15 +986,17 @@ impl JsDynamicRecoverySpec {
     /// # Errors
     ///
     /// Throws a `validation` error if `recovery` is outside `[0, 1]`.
-    pub fn constant(recovery: JsValue) -> Result<JsDynamicRecoverySpec, JsValue> {
+    pub fn constant(
+        #[wasm_bindgen(unchecked_param_type = "number")] recovery: JsValue,
+    ) -> Result<JsDynamicRecoverySpec, JsValue> {
         DynamicRecoverySpec::constant(js_f64(&recovery, "recovery")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
     }
 
     /// Recovery `R0 * N0 / N`: fixed recoverable value spread over a larger claim.
-    /// @param base_recovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
-    /// @param base_notional - Positive reference notional `N0` in the instrument's currency.
+    /// @param baseRecovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
+    /// @param baseNotional - Positive reference notional `N0` in the instrument's currency.
     /// @returns The inverse-linear recovery specification.
     ///
     /// # Errors
@@ -875,7 +1004,9 @@ impl JsDynamicRecoverySpec {
     /// Throws a `validation` error on non-finite or out-of-range inputs.
     #[wasm_bindgen(js_name = inverseLinear)]
     pub fn inverse_linear(
+        #[wasm_bindgen(js_name = "baseRecovery", unchecked_param_type = "number")]
         base_recovery: JsValue,
+        #[wasm_bindgen(js_name = "baseNotional", unchecked_param_type = "number")]
         base_notional: JsValue,
     ) -> Result<JsDynamicRecoverySpec, JsValue> {
         DynamicRecoverySpec::inverse_linear(
@@ -887,8 +1018,8 @@ impl JsDynamicRecoverySpec {
     }
 
     /// Recovery `R0 * (N0 / N)^exponent`.
-    /// @param base_recovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
-    /// @param base_notional - Positive reference notional `N0` in the instrument's currency.
+    /// @param baseRecovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
+    /// @param baseNotional - Positive reference notional `N0` in the instrument's currency.
     /// @param exponent - Non-negative power applied to the notional ratio.
     /// @returns The inverse-power recovery specification.
     ///
@@ -897,9 +1028,11 @@ impl JsDynamicRecoverySpec {
     /// Throws a `validation` error on non-finite or out-of-range inputs.
     #[wasm_bindgen(js_name = inversePower)]
     pub fn inverse_power(
+        #[wasm_bindgen(js_name = "baseRecovery", unchecked_param_type = "number")]
         base_recovery: JsValue,
+        #[wasm_bindgen(js_name = "baseNotional", unchecked_param_type = "number")]
         base_notional: JsValue,
-        exponent: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] exponent: JsValue,
     ) -> Result<JsDynamicRecoverySpec, JsValue> {
         DynamicRecoverySpec::inverse_power(
             js_f64(&base_recovery, "baseRecovery")?,
@@ -911,8 +1044,8 @@ impl JsDynamicRecoverySpec {
     }
 
     /// Inverse-linear recovery that never falls below a floor.
-    /// @param base_recovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
-    /// @param base_notional - Positive reference notional `N0` in the instrument's currency.
+    /// @param baseRecovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
+    /// @param baseNotional - Positive reference notional `N0` in the instrument's currency.
     /// @param floor - Minimum recovery as a fraction in `[0, baseRecovery]`.
     /// @returns The floored-inverse recovery specification.
     ///
@@ -921,9 +1054,11 @@ impl JsDynamicRecoverySpec {
     /// Throws a `validation` error on non-finite or out-of-range inputs.
     #[wasm_bindgen(js_name = flooredInverse)]
     pub fn floored_inverse(
+        #[wasm_bindgen(js_name = "baseRecovery", unchecked_param_type = "number")]
         base_recovery: JsValue,
+        #[wasm_bindgen(js_name = "baseNotional", unchecked_param_type = "number")]
         base_notional: JsValue,
-        floor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] floor: JsValue,
     ) -> Result<JsDynamicRecoverySpec, JsValue> {
         DynamicRecoverySpec::floored_inverse(
             js_f64(&base_recovery, "baseRecovery")?,
@@ -935,8 +1070,8 @@ impl JsDynamicRecoverySpec {
     }
 
     /// Recovery `clamp(R0 * (1 - sensitivity * (N / N0 - 1)), floor, R0)`.
-    /// @param base_recovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
-    /// @param base_notional - Positive reference notional `N0` in the instrument's currency.
+    /// @param baseRecovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
+    /// @param baseNotional - Positive reference notional `N0` in the instrument's currency.
     /// @param sensitivity - Non-negative dimensionless relative recovery sensitivity per unit increase of `N / N0 - 1`.
     /// @param floor - Minimum recovery as a fraction in `[0, baseRecovery]`.
     /// @returns The linear-decline recovery specification.
@@ -946,10 +1081,12 @@ impl JsDynamicRecoverySpec {
     /// Throws a `validation` error on non-finite or out-of-range inputs.
     #[wasm_bindgen(js_name = linearDecline)]
     pub fn linear_decline(
+        #[wasm_bindgen(js_name = "baseRecovery", unchecked_param_type = "number")]
         base_recovery: JsValue,
+        #[wasm_bindgen(js_name = "baseNotional", unchecked_param_type = "number")]
         base_notional: JsValue,
-        sensitivity: JsValue,
-        floor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] sensitivity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] floor: JsValue,
     ) -> Result<JsDynamicRecoverySpec, JsValue> {
         DynamicRecoverySpec::linear_decline(
             js_f64(&base_recovery, "baseRecovery")?,
@@ -983,7 +1120,10 @@ impl JsDynamicRecoverySpec {
 
     /// Notional-to-recovery mapping in canonical JSON form: a tag string for
     /// the parameterless models, or a single-key object carrying the parameters.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(
+        getter,
+        unchecked_return_type = "generated.models.DynamicRecoveryModel"
+    )]
     pub fn model(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.model())
     }
@@ -996,7 +1136,10 @@ impl JsDynamicRecoverySpec {
     ///
     /// Throws a `TypeError` if `notional` is not a number.
     #[wasm_bindgen(js_name = recoveryAtNotional)]
-    pub fn recovery_at_notional(&self, notional: JsValue) -> Result<f64, JsValue> {
+    pub fn recovery_at_notional(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] notional: JsValue,
+    ) -> Result<f64, JsValue> {
         Ok(self
             .inner
             .recovery_at_notional(js_f64(&notional, "notional")?))
@@ -1004,6 +1147,15 @@ impl JsDynamicRecoverySpec {
 }
 
 /// Leverage-dependent hazard-rate feedback for PIK-accreting instruments.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const spec = models.credit.EndogenousHazardSpec.powerLaw(0.05, 0.6, 2.0);
+/// console.log(spec.kind, spec.hazardAtLeverage(0.8));
+/// spec.free();
+/// ```
 #[wasm_bindgen(js_name = EndogenousHazardSpec)]
 pub struct JsEndogenousHazardSpec {
     pub(crate) inner: EndogenousHazardSpec,
@@ -1014,8 +1166,8 @@ json_round_trip!(JsEndogenousHazardSpec, EndogenousHazardSpec);
 #[wasm_bindgen(js_class = EndogenousHazardSpec)]
 impl JsEndogenousHazardSpec {
     /// Power-law mapping `lambda(L) = baseHazard * (L / baseLeverage)^exponent`.
-    /// @param base_hazard - Annualized hazard rate at the base leverage, as a decimal; non-negative.
-    /// @param base_leverage - Positive reference debt-to-assets leverage ratio.
+    /// @param baseHazard - Annualized hazard rate at the base leverage, as a decimal; non-negative.
+    /// @param baseLeverage - Positive reference debt-to-assets leverage ratio.
     /// @param exponent - Power-law exponent applied to the leverage ratio.
     /// @returns The power-law hazard specification.
     ///
@@ -1024,9 +1176,11 @@ impl JsEndogenousHazardSpec {
     /// Throws a `validation` error on non-finite or out-of-range inputs.
     #[wasm_bindgen(js_name = powerLaw)]
     pub fn power_law(
+        #[wasm_bindgen(js_name = "baseHazard", unchecked_param_type = "number")]
         base_hazard: JsValue,
+        #[wasm_bindgen(js_name = "baseLeverage", unchecked_param_type = "number")]
         base_leverage: JsValue,
-        exponent: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] exponent: JsValue,
     ) -> Result<JsEndogenousHazardSpec, JsValue> {
         EndogenousHazardSpec::power_law(
             js_f64(&base_hazard, "baseHazard")?,
@@ -1038,8 +1192,8 @@ impl JsEndogenousHazardSpec {
     }
 
     /// Exponential mapping `lambda(L) = baseHazard * exp(sensitivity * (L - baseLeverage))`.
-    /// @param base_hazard - Annualized hazard rate at the base leverage, as a decimal; non-negative.
-    /// @param base_leverage - Positive reference debt-to-assets leverage ratio.
+    /// @param baseHazard - Annualized hazard rate at the base leverage, as a decimal; non-negative.
+    /// @param baseLeverage - Positive reference debt-to-assets leverage ratio.
     /// @param sensitivity - Log-hazard change per unit of leverage above the base.
     /// @returns The exponential hazard specification.
     ///
@@ -1047,9 +1201,11 @@ impl JsEndogenousHazardSpec {
     ///
     /// Throws a `validation` error on non-finite or out-of-range inputs.
     pub fn exponential(
+        #[wasm_bindgen(js_name = "baseHazard", unchecked_param_type = "number")]
         base_hazard: JsValue,
+        #[wasm_bindgen(js_name = "baseLeverage", unchecked_param_type = "number")]
         base_leverage: JsValue,
-        sensitivity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] sensitivity: JsValue,
     ) -> Result<JsEndogenousHazardSpec, JsValue> {
         EndogenousHazardSpec::exponential(
             js_f64(&base_hazard, "baseHazard")?,
@@ -1061,8 +1217,8 @@ impl JsEndogenousHazardSpec {
     }
 
     /// Piecewise-linear leverage-to-hazard table.
-    /// @param leverage_points - One or more finite non-negative leverage ratios, strictly increasing when multiple points are supplied; a single point gives constant hazard.
-    /// @param hazard_points - Annualized hazard rates at those leverage points; same length, non-negative.
+    /// @param leveragePoints - One or more finite non-negative leverage ratios, strictly increasing when multiple points are supplied; a single point gives constant hazard.
+    /// @param hazardPoints - Annualized hazard rates at those leverage points; same length, non-negative.
     /// @returns The tabular hazard specification, with base leverage and hazard taken from the first pair.
     ///
     /// # Errors
@@ -1071,7 +1227,9 @@ impl JsEndogenousHazardSpec {
     /// are not strictly increasing in leverage, or contain
     /// non-finite or negative values.
     pub fn tabular(
+        #[wasm_bindgen(js_name = "leveragePoints", unchecked_param_type = "NumericArray")]
         leverage_points: JsValue,
+        #[wasm_bindgen(js_name = "hazardPoints", unchecked_param_type = "NumericArray")]
         hazard_points: JsValue,
     ) -> Result<JsEndogenousHazardSpec, JsValue> {
         EndogenousHazardSpec::tabular(
@@ -1103,7 +1261,7 @@ impl JsEndogenousHazardSpec {
 
     /// Leverage-to-hazard mapping in canonical JSON form: a single-key object
     /// (`power_law`, `exponential`, `tabular`) carrying that model's parameters.
-    #[wasm_bindgen(getter, js_name = leverageHazardMap)]
+    #[wasm_bindgen(getter, js_name = leverageHazardMap, unchecked_return_type = "generated.models.LeverageHazardMap")]
     pub fn leverage_hazard_map(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.leverage_hazard_map())
     }
@@ -1116,15 +1274,18 @@ impl JsEndogenousHazardSpec {
     ///
     /// Throws a `TypeError` if `leverage` is not a number.
     #[wasm_bindgen(js_name = hazardAtLeverage)]
-    pub fn hazard_at_leverage(&self, leverage: JsValue) -> Result<f64, JsValue> {
+    pub fn hazard_at_leverage(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] leverage: JsValue,
+    ) -> Result<f64, JsValue> {
         Ok(self
             .inner
             .hazard_at_leverage(js_f64(&leverage, "leverage")?))
     }
 
     /// Hazard rate after PIK accretion, with leverage `accretedNotional / assetValue`.
-    /// @param accreted_notional - Notional outstanding after PIK accrual, in the instrument's currency.
-    /// @param asset_value - Firm asset value in the same currency; strictly positive.
+    /// @param accretedNotional - Notional outstanding after PIK accrual, in the instrument's currency.
+    /// @param assetValue - Firm asset value in the same currency; strictly positive.
     /// @returns Hazard rate per year, as a decimal.
     ///
     /// # Errors
@@ -1133,7 +1294,9 @@ impl JsEndogenousHazardSpec {
     #[wasm_bindgen(js_name = hazardAfterPikAccrual)]
     pub fn hazard_after_pik_accrual(
         &self,
+        #[wasm_bindgen(js_name = "accretedNotional", unchecked_param_type = "number")]
         accreted_notional: JsValue,
+        #[wasm_bindgen(js_name = "assetValue", unchecked_param_type = "number")]
         asset_value: JsValue,
     ) -> Result<f64, JsValue> {
         Ok(self.inner.hazard_after_pik_accrual(
@@ -1145,6 +1308,16 @@ impl JsEndogenousHazardSpec {
 
 /// PIK/cash toggle exercise rule: threshold, stochastic (logistic) or nested
 /// optimal exercise.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const rule = models.credit.ToggleExerciseModel.threshold("leverage", 0.7, "above");
+/// const state = { hazard_rate: 0.05, distance_to_default: null, leverage: 0.8, accreted_notional: 100, coupon_due: 4, asset_value: null };
+/// console.log(rule.kind, rule.shouldPik(state, 0.5));
+/// rule.free();
+/// ```
 #[wasm_bindgen(js_name = ToggleExerciseModel)]
 pub struct JsToggleExerciseModel {
     pub(crate) inner: ToggleExerciseModel,
@@ -1165,9 +1338,9 @@ impl JsToggleExerciseModel {
     /// Throws a `validation` error for an unknown variable or direction, or a
     /// non-finite threshold.
     pub fn threshold(
-        variable: JsValue,
-        threshold: JsValue,
-        direction: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] variable: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] direction: JsValue,
     ) -> Result<JsToggleExerciseModel, JsValue> {
         let variable = serde_parse::<CreditStateVariable>(&js_string(&variable, "variable")?)
             .map_err(to_js_err)?;
@@ -1190,9 +1363,9 @@ impl JsToggleExerciseModel {
     /// Throws a `validation` error for an unknown variable or a non-finite
     /// intercept or sensitivity.
     pub fn stochastic(
-        variable: JsValue,
-        intercept: JsValue,
-        sensitivity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] variable: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] intercept: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] sensitivity: JsValue,
     ) -> Result<JsToggleExerciseModel, JsValue> {
         let variable = serde_parse::<CreditStateVariable>(&js_string(&variable, "variable")?)
             .map_err(to_js_err)?;
@@ -1206,9 +1379,9 @@ impl JsToggleExerciseModel {
     }
 
     /// Nested-Monte-Carlo optimal exercise rule.
-    /// @param nested_paths - Inner simulation paths per decision date; a positive safe integer.
-    /// @param asset_vol - Annualized asset volatility as a decimal; non-negative.
-    /// @param risk_free_rate - Continuously compounded risk-free rate, as a decimal.
+    /// @param nestedPaths - Inner simulation paths per decision date; a positive safe integer.
+    /// @param assetVol - Annualized asset volatility as a decimal; non-negative.
+    /// @param riskFreeRate - Continuously compounded risk-free rate, as a decimal.
     /// @param horizon - Inner simulation horizon in years; positive and finite.
     /// @returns The optimal-exercise rule.
     ///
@@ -1218,10 +1391,12 @@ impl JsToggleExerciseModel {
     /// and a `validation` error if it is zero, a rate is non-finite, `assetVol`
     /// is negative, or `horizon` is not positive and finite.
     pub fn optimal(
+        #[wasm_bindgen(js_name = "nestedPaths", unchecked_param_type = "number")]
         nested_paths: JsValue,
-        asset_vol: JsValue,
+        #[wasm_bindgen(js_name = "assetVol", unchecked_param_type = "number")] asset_vol: JsValue,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
         risk_free_rate: JsValue,
-        horizon: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
     ) -> Result<JsToggleExerciseModel, JsValue> {
         ToggleExerciseModel::optimal(
             js_uint(&nested_paths, "nestedPaths")?,
@@ -1248,7 +1423,12 @@ impl JsToggleExerciseModel {
     /// Throws a `TypeError` if `state` is neither a string nor a plain object
     /// or `u` is not a number, and a `validation` error if `state` is malformed.
     #[wasm_bindgen(js_name = shouldPik)]
-    pub fn should_pik(&self, state: JsValue, u: JsValue) -> Result<bool, JsValue> {
+    pub fn should_pik(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.models.CreditState | string")]
+        state: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] u: JsValue,
+    ) -> Result<bool, JsValue> {
         let state: CreditState = from_js_json(&state, "state")?;
         Ok(self.inner.should_pik(&state, js_f64(&u, "u")?))
     }
@@ -1261,7 +1441,7 @@ impl JsToggleExerciseModel {
     }
 
     /// Parameters of the active rule as a plain object in canonical JSON form.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "Record<string, unknown>")]
     pub fn params(&self) -> Result<JsValue, JsValue> {
         match &self.inner {
             ToggleExerciseModel::Threshold(spec) => to_js_value(spec),

@@ -26,12 +26,12 @@ fn parse_periods(periods: &JsValue) -> Result<Vec<PeriodId>, JsValue> {
 /// is added, and the equity bridge turns enterprise value into equity value.
 /// @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency`.
 /// @param wacc - Weighted average cost of capital as a decimal (`0.10` = 10%).
-/// @param terminal_value - `TerminalValueSpec`, e.g. `{ type: "gordon_growth", stable_growth_rate: 0.02 }` (object or JSON).
-/// @param ufcf_node - Node holding unlevered free cash flow; omitted uses the Rust default `"ufcf"`.
-/// @param net_debt_override - Flat net debt in model currency used instead of the model-derived equity bridge.
+/// @param terminalValue - `TerminalValueSpec`, e.g. `{ type: "gordon_growth", stable_growth_rate: 0.02 }` (object or JSON).
+/// @param ufcfNode - Node holding unlevered free cash flow; omitted uses the Rust default `"ufcf"`.
+/// @param netDebtOverride - Flat net debt in model currency used instead of the model-derived equity bridge.
 /// @param options - Optional Rust `DcfOptions`; every field is optional and a missing one takes its Rust default (`mid_year_convention`, `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `exit_multiple_metric_node`, ...). Unknown keys are rejected (object or JSON).
 /// @param market - Optional `MarketContext` state used for statement evaluation, not for WACC discounting (object or JSON).
-/// @param as_of - Optional ISO 8601 valuation date; required when `market` is supplied. With `market` it is also the statement visibility cutoff: an actual is hidden until its availability date, by default the period's exclusive end (the first day of the next period), so a quarter-end `"2025-03-31"` hides 2025Q1's actuals; pass `"2025-04-01"` or set the nodes' `availability_dates`. Only forecast periods ending after it are discounted.
+/// @param asOf - Optional ISO 8601 valuation date; required when `market` is supplied. With `market` it is also the statement visibility cutoff: an actual is hidden until its availability date, by default the period's exclusive end (the first day of the next period), so a quarter-end `"2025-03-31"` hides 2025Q1's actuals; pass `"2025-04-01"` or set the nodes' `availability_dates`. Only forecast periods ending after it are discounted.
 /// @returns `CorporateValuationResult`: enterprise value, terminal-value PV, net debt and equity value as `Money` wire objects, plus per-share value when shares are supplied, and the DCF working: `wacc`, per-period `periods` rows (flow, discount factor, present value), `pv_explicit`, the undiscounted `terminal_value` with its `terminal_discount_years`, and the `equity_bridge` (gross debt and cash separately).
 ///
 /// # Errors
@@ -41,16 +41,29 @@ fn parse_periods(periods: &JsValue) -> Result<Vec<PeriodId>, JsValue> {
 /// forecast cash flow ends after `asOf`, the WACC and terminal-value
 /// assumptions are inconsistent, or the valuation fails, and kind `not_found`
 /// if the UFCF or exit-multiple metric node is missing.
-#[wasm_bindgen(js_name = evaluateDcf)]
+#[wasm_bindgen(js_name = evaluateDcf, unchecked_return_type = "generated.statements_analytics.CorporateValuationResult")]
 #[allow(clippy::too_many_arguments)]
 pub fn evaluate_dcf(
-    model: JsValue,
-    wacc: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] wacc: JsValue,
+    #[wasm_bindgen(
+        js_name = "terminalValue",
+        unchecked_param_type = "generated.valuations.TerminalValueSpec | string"
+    )]
     terminal_value: JsValue,
+    #[wasm_bindgen(js_name = "ufcfNode", unchecked_optional_param_type = "string | null")]
     ufcf_node: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "netDebtOverride",
+        unchecked_optional_param_type = "number | null"
+    )]
     net_debt_override: Option<JsValue>,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.statements_analytics.DcfOptions | string | null"
+    )]
     options: Option<JsValue>,
-    market: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "JsonInput | null")] market: Option<JsValue>,
+    #[wasm_bindgen(js_name = "asOf", unchecked_optional_param_type = "string | null")]
     as_of: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let model = parse_model(&model)?;
@@ -94,11 +107,14 @@ pub fn evaluate_dcf(
 /// without `terminal_value`, `market` is supplied without `as_of`, a required
 /// check suite is missing, or the pipeline fails, and kind `not_found` if a
 /// referenced node is missing.
-#[wasm_bindgen(js_name = runCorporateAnalysis)]
+#[wasm_bindgen(js_name = runCorporateAnalysis, unchecked_return_type = "generated.statements_analytics.CorporateAnalysis")]
 pub fn run_corporate_analysis(
-    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.statements_analytics.CorporateAnalysisOptions | string | null"
+    )]
     options: Option<JsValue>,
-    market: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "JsonInput | null")] market: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let model = parse_model(&model)?;
     let options: fa::CorporateAnalysisOptions =
@@ -111,7 +127,7 @@ pub fn run_corporate_analysis(
 /// Variance between two evaluated scenarios of a scenario set.
 ///
 /// Twin of Python `scenario_diff` (Rust `ScenarioSet::diff`).
-/// @param scenario_set - `ScenarioSet` that produced the results (object or JSON).
+/// @param scenarioSet - `ScenarioSet` that produced the results (object or JSON).
 /// @param results - Scenario map returned by `evaluateScenarioSet` (object or JSON).
 /// @param baseline - Name of the baseline scenario.
 /// @param comparison - Name of the comparison scenario.
@@ -125,14 +141,18 @@ pub fn run_corporate_analysis(
 /// `periods` is empty, a scenario name is unknown, or a period does not
 /// parse, and kind `not_found` if a metric is missing at a period in either
 /// scenario.
-#[wasm_bindgen(js_name = scenarioDiff)]
+#[wasm_bindgen(js_name = scenarioDiff, unchecked_return_type = "generated.statements_analytics.ScenarioDiff")]
 pub fn scenario_diff(
+    #[wasm_bindgen(
+        js_name = "scenarioSet",
+        unchecked_param_type = "generated.statements_analytics.ScenarioSet | string"
+    )]
     scenario_set: JsValue,
-    results: JsValue,
-    baseline: JsValue,
-    comparison: JsValue,
-    metrics: JsValue,
-    periods: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "ScenarioResults | string")] results: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] baseline: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] comparison: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] metrics: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] periods: JsValue,
 ) -> Result<JsValue, JsValue> {
     let scenario_set: fa::ScenarioSet = from_js_json(&scenario_set, "scenarioSet")?;
     let results: fa::ScenarioResults = from_js_json(&results, "results")?;
@@ -156,11 +176,11 @@ pub fn scenario_diff(
 /// sum to the target variance; the gap is `unexplained`.
 /// @param base - Baseline evaluated `StatementResult` (object or JSON).
 /// @param comparison - Comparison evaluated `StatementResult` (object or JSON).
-/// @param target_metric - Node whose variance is explained.
+/// @param targetMetric - Node whose variance is explained.
 /// @param period - Period identifier, e.g. `"2025Q4"`.
 /// @param drivers - Node identifiers treated as explanatory drivers.
-/// @param baseline_label - Display label of the baseline column.
-/// @param comparison_label - Display label of the comparison column.
+/// @param baselineLabel - Display label of the baseline column.
+/// @param comparisonLabel - Display label of the comparison column.
 /// @returns `BridgeChart`: baseline and comparison values, ordered driver `steps` and the `unexplained` residual.
 ///
 /// # Errors
@@ -168,16 +188,18 @@ pub fn scenario_diff(
 /// Throws with kind `validation` if an input is malformed or `period` does
 /// not parse, and kind `not_found` if the target or a driver is missing from
 /// either result at `period`.
-#[wasm_bindgen(js_name = varianceBridge)]
+#[wasm_bindgen(js_name = varianceBridge, unchecked_return_type = "generated.statements_analytics.BridgeChart")]
 #[allow(clippy::too_many_arguments)]
 pub fn variance_bridge(
-    base: JsValue,
-    comparison: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] base: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] comparison: JsValue,
+    #[wasm_bindgen(js_name = "targetMetric", unchecked_param_type = "string")]
     target_metric: JsValue,
-    period: JsValue,
-    drivers: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] drivers: JsValue,
+    #[wasm_bindgen(js_name = "baselineLabel", unchecked_param_type = "string")]
     baseline_label: JsValue,
-    comparison_label: JsValue,
+    #[wasm_bindgen(js_name = "comparisonLabel", unchecked_param_type = "string")] comparison_label: JsValue,
 ) -> Result<JsValue, JsValue> {
     let base: StatementResult = from_js_json(&base, "base")?;
     let comparison: StatementResult = from_js_json(&comparison, "comparison")?;
@@ -203,7 +225,7 @@ pub fn variance_bridge(
 /// `PLSummaryReport::to_table`); `plSummaryReportText` is the formatted-text
 /// twin of the same report.
 /// @param results - Evaluated `StatementResult` (object or JSON).
-/// @param line_items - Node identifiers to report, in row order.
+/// @param lineItems - Node identifiers to report, in row order.
 /// @param periods - Period identifiers to report, in column order, e.g. `["2025Q1", "2025Q2"]`.
 /// @returns `TableEnvelope` with one row per `(line item, period)` in the result's own units; a missing value is `null`.
 ///
@@ -211,11 +233,11 @@ pub fn variance_bridge(
 ///
 /// Throws with kind `validation` if `results` is malformed, a period does not
 /// parse, or the table cannot be built.
-#[wasm_bindgen(js_name = plSummaryReport)]
+#[wasm_bindgen(js_name = plSummaryReport, unchecked_return_type = "TableEnvelope")]
 pub fn pl_summary_report(
-    results: JsValue,
-    line_items: JsValue,
-    periods: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(js_name = "lineItems", unchecked_param_type = "string[]")] line_items: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] periods: JsValue,
 ) -> Result<JsValue, JsValue> {
     let results: StatementResult = from_js_json(&results, "results")?;
     let report = fa::PLSummaryReport::new(
@@ -230,7 +252,7 @@ pub fn pl_summary_report(
 ///
 /// Free-function twin of Python `CompanyMetrics.get` (Rust
 /// `CompanyMetrics::get`): a canonical named field first, then a custom metric.
-/// @param company_metrics - `CompanyMetrics` (object or JSON).
+/// @param companyMetrics - `CompanyMetrics` (object or JSON).
 /// @param name - Canonical snake_case field (e.g. `"ebitda"`, `"leverage"`) or a key of `custom`.
 /// @returns The metric value in its own units, or `undefined` when it is absent.
 ///
@@ -239,8 +261,12 @@ pub fn pl_summary_report(
 /// Throws with kind `validation` if `companyMetrics` is malformed.
 #[wasm_bindgen(js_name = companyMetricsGet)]
 pub fn company_metrics_get(
+    #[wasm_bindgen(
+        js_name = "companyMetrics",
+        unchecked_param_type = "generated.statements_analytics.CompanyMetrics | string"
+    )]
     company_metrics: JsValue,
-    name: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let metrics: fa::CompanyMetrics = from_js_json(&company_metrics, "companyMetrics")?;
     Ok(metrics.get(&js_string(&name, "name")?))
@@ -258,7 +284,14 @@ pub fn company_metrics_get(
 ///
 /// Throws with kind `validation` if an input is malformed.
 #[wasm_bindgen(js_name = peerFilterAccepts)]
-pub fn peer_filter_accepts(filter: JsValue, company: JsValue) -> Result<bool, JsValue> {
+pub fn peer_filter_accepts(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.PeerFilter | string")]
+    filter: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CompanyMetrics | string"
+    )]
+    company: JsValue,
+) -> Result<bool, JsValue> {
     let filter: fa::PeerFilter = from_js_json(&filter, "filter")?;
     let company: fa::CompanyMetrics = from_js_json(&company, "company")?;
     Ok(filter.accepts(&company))
@@ -271,18 +304,29 @@ pub fn peer_filter_accepts(filter: JsValue, company: JsValue) -> Result<bool, Js
 /// @param subject - `CompanyMetrics` of the company being evaluated (object or JSON).
 /// @param universe - Array of candidate `CompanyMetrics` (array or JSON).
 /// @param filter - `PeerFilter` applied to the universe (object or JSON).
-/// @param period_basis - `"ltm"`, `"ntm"`, or `{custom: "<label>"}` for another basis such as `"FY2025E"`.
+/// @param periodBasis - `"ltm"`, `"ntm"`, or `{custom: "<label>"}` for another basis such as `"FY2025E"`.
 /// @returns `[peerSet, excludedCount]`: the `PeerSet` plain object (`subject`, the accepted `peers` and `period_basis`) and the number of universe members the filter dropped, a member with the subject's id not counted.
 ///
 /// # Errors
 ///
 /// Throws with kind `validation` if an input is malformed or `periodBasis` is
 /// not a period basis.
-#[wasm_bindgen(js_name = peerSetFromUniverse)]
+#[wasm_bindgen(js_name = peerSetFromUniverse, unchecked_return_type = "[generated.statements_analytics.PeerSet, number]")]
 pub fn peer_set_from_universe(
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CompanyMetrics | string"
+    )]
     subject: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CompanyMetrics[] | string"
+    )]
     universe: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.PeerFilter | string")]
     filter: JsValue,
+    #[wasm_bindgen(
+        js_name = "periodBasis",
+        unchecked_param_type = "generated.statements_analytics.PeriodBasis"
+    )]
     period_basis: JsValue,
 ) -> Result<JsValue, JsValue> {
     let subject: fa::CompanyMetrics = from_js_json(&subject, "subject")?;
@@ -307,8 +351,11 @@ pub fn peer_set_from_universe(
 /// # Errors
 ///
 /// Throws with kind `validation` if `results` is malformed.
-#[wasm_bindgen(js_name = scenarioResultsGet)]
-pub fn scenario_results_get(results: JsValue, name: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = scenarioResultsGet, unchecked_return_type = "StatementResult | undefined")]
+pub fn scenario_results_get(
+    #[wasm_bindgen(unchecked_param_type = "ScenarioResults | string")] results: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+) -> Result<JsValue, JsValue> {
     let results: fa::ScenarioResults = from_js_json(&results, "results")?;
     match results.scenarios.get(&js_string(&name, "name")?) {
         Some(result) => to_js_value(result),
@@ -319,7 +366,7 @@ pub fn scenario_results_get(results: JsValue, name: JsValue) -> Result<JsValue, 
 /// Inheritance lineage of a scenario, from the root parent to the scenario itself.
 ///
 /// Free-function twin of Python `ScenarioSet.trace` (Rust `ScenarioSet::trace`).
-/// @param scenario_set - `ScenarioSet` (object or JSON).
+/// @param scenarioSet - `ScenarioSet` (object or JSON).
 /// @param scenario - Name of the scenario to trace.
 /// @returns Scenario names from the outermost ancestor down to `scenario`.
 ///
@@ -327,8 +374,15 @@ pub fn scenario_results_get(results: JsValue, name: JsValue) -> Result<JsValue, 
 ///
 /// Throws with kind `validation` if `scenarioSet` is malformed, the scenario
 /// or one of its parents is unknown, or the parent chain is cyclic.
-#[wasm_bindgen(js_name = scenarioSetTrace)]
-pub fn scenario_set_trace(scenario_set: JsValue, scenario: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = scenarioSetTrace, unchecked_return_type = "string[]")]
+pub fn scenario_set_trace(
+    #[wasm_bindgen(
+        js_name = "scenarioSet",
+        unchecked_param_type = "generated.statements_analytics.ScenarioSet | string"
+    )]
+    scenario_set: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] scenario: JsValue,
+) -> Result<JsValue, JsValue> {
     let scenario_set: fa::ScenarioSet = from_js_json(&scenario_set, "scenarioSet")?;
     to_js_value(
         &scenario_set
@@ -342,7 +396,7 @@ pub fn scenario_set_trace(scenario_set: JsValue, scenario: JsValue) -> Result<Js
 /// Free-function twin of Python `SensitivityResult.get_parameter_value` (Rust
 /// `SensitivityResult::get_parameter_value`).
 /// @param result - `SensitivityResult` returned by `runSensitivity` (object or JSON).
-/// @param scenario_index - Zero-based position of the scenario in `scenarios`.
+/// @param scenarioIndex - Zero-based position of the scenario in `scenarios`.
 /// @param parameter - Parameter key as `node_id@period_id`, e.g. `"revenue@2025Q1"`.
 /// @returns The perturbed value in the node's own units, or `undefined` when the scenario did not vary that parameter.
 ///
@@ -353,9 +407,10 @@ pub fn scenario_set_trace(scenario_set: JsValue, scenario: JsValue) -> Result<Js
 /// non-negative integer.
 #[wasm_bindgen(js_name = sensitivityResultGetParameterValue)]
 pub fn sensitivity_result_get_parameter_value(
-    result: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "SensitivityResult | string")] result: JsValue,
+    #[wasm_bindgen(js_name = "scenarioIndex", unchecked_param_type = "number")]
     scenario_index: JsValue,
-    parameter: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] parameter: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let result: fa::SensitivityResult = from_js_json(&result, "result")?;
     result
@@ -371,8 +426,8 @@ pub fn sensitivity_result_get_parameter_value(
 /// Free-function twin of Python `SensitivityResult.get_value` (Rust
 /// `SensitivityResult::get_value`).
 /// @param result - `SensitivityResult` returned by `runSensitivity` (object or JSON).
-/// @param scenario_index - Zero-based position of the scenario in `scenarios`.
-/// @param node_id - Node identifier to read.
+/// @param scenarioIndex - Zero-based position of the scenario in `scenarios`.
+/// @param nodeId - Node identifier to read.
 /// @param period - Period identifier, e.g. `"2025Q1"`.
 /// @returns The node value in its own units, or `undefined` when the node or period is absent from the scenario.
 ///
@@ -383,10 +438,11 @@ pub fn sensitivity_result_get_parameter_value(
 /// `scenarioIndex` is not a non-negative integer.
 #[wasm_bindgen(js_name = sensitivityResultGetValue)]
 pub fn sensitivity_result_get_value(
-    result: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "SensitivityResult | string")] result: JsValue,
+    #[wasm_bindgen(js_name = "scenarioIndex", unchecked_param_type = "number")]
     scenario_index: JsValue,
-    node_id: JsValue,
-    period: JsValue,
+    #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let result: fa::SensitivityResult = from_js_json(&result, "result")?;
     let period: PeriodId = js_string(&period, "period")?.parse().map_err(to_js_err)?;
@@ -410,7 +466,10 @@ pub fn sensitivity_result_get_value(
 ///
 /// Throws with kind `validation` if `explanation` is malformed.
 #[wasm_bindgen(js_name = explanationToText)]
-pub fn explanation_to_text(explanation: JsValue) -> Result<String, JsValue> {
+pub fn explanation_to_text(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.Explanation | string")]
+    explanation: JsValue,
+) -> Result<String, JsValue> {
     let explanation: fa::Explanation = from_js_json(&explanation, "explanation")?;
     Ok(explanation.to_text())
 }
@@ -426,7 +485,12 @@ pub fn explanation_to_text(explanation: JsValue) -> Result<String, JsValue> {
 ///
 /// Throws with kind `validation` if `metrics` is malformed.
 #[wasm_bindgen(js_name = forecastMetricsSummaryText)]
-pub fn forecast_metrics_summary_text(metrics: JsValue) -> Result<String, JsValue> {
+pub fn forecast_metrics_summary_text(
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.ForecastMetrics | string"
+    )]
+    metrics: JsValue,
+) -> Result<String, JsValue> {
     let metrics: fa::ForecastMetrics = from_js_json(&metrics, "metrics")?;
     Ok(metrics.summary())
 }

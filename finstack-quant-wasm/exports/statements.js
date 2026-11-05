@@ -1,6 +1,15 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
 import { schema } from './statements/schema.js';
 
+/**
+ * Namespaced TypeScript entry points for statements calculations and types.
+ * @example
+ * ```typescript
+ * import init, { statements } from "finstack-quant-wasm";
+ * await init();
+ * console.log(statements.parseFormula("revenue-expenses")); // "revenue - expenses"
+ * ```
+ */
 export const statements = {
   Evaluator: wasm.Evaluator,
   Registry: wasm.Registry,

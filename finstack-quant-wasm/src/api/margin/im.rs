@@ -28,7 +28,9 @@ use wasm_bindgen::prelude::*;
 ///
 /// Throws if `result` is malformed.
 #[wasm_bindgen(js_name = imResultBreakdownKeys)]
-pub fn im_result_breakdown_keys(result: JsValue) -> Result<Vec<String>, JsValue> {
+pub fn im_result_breakdown_keys(
+    #[wasm_bindgen(unchecked_param_type = "ImResult | string")] result: JsValue,
+) -> Result<Vec<String>, JsValue> {
     let result: fm::calculators::ImResult = from_js_json(&result, "result")?;
     Ok(result.breakdown.keys().cloned().collect())
 }
@@ -42,7 +44,10 @@ pub fn im_result_breakdown_keys(result: JsValue) -> Result<Vec<String>, JsValue>
 ///
 /// Throws if `result` is malformed or `key` is not a string.
 #[wasm_bindgen(js_name = imResultBreakdownAmount)]
-pub fn im_result_breakdown_amount(result: JsValue, key: JsValue) -> Result<Option<f64>, JsValue> {
+pub fn im_result_breakdown_amount(
+    #[wasm_bindgen(unchecked_param_type = "ImResult | string")] result: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+) -> Result<Option<f64>, JsValue> {
     let result: fm::calculators::ImResult = from_js_json(&result, "result")?;
     let key = js_string(&key, "key")?;
     Ok(result.breakdown.get(&key).map(|money| money.amount()))
@@ -86,13 +91,16 @@ fn credit_sector(value: &JsValue, label: &str) -> Result<fm::types::SimmCreditSe
 #[wasm_bindgen(js_class = SimmSensitivities)]
 impl JsSimmSensitivities {
     /// Create an empty SIMM sensitivity set.
-    /// @param base_currency - ISO-4217 currency in which every sensitivity amount is expressed.
+    /// @param baseCurrency - ISO-4217 currency in which every sensitivity amount is expressed.
     ///
     /// # Errors
     ///
     /// Throws if `base_currency` is not a known currency code.
     #[wasm_bindgen(constructor)]
-    pub fn new(base_currency: JsValue) -> Result<JsSimmSensitivities, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(js_name = "baseCurrency", unchecked_param_type = "string")]
+        base_currency: JsValue,
+    ) -> Result<JsSimmSensitivities, JsValue> {
         Ok(Self {
             inner: fm::types::SimmSensitivities::new(js_currency(&base_currency, "baseCurrency")?),
         })
@@ -107,7 +115,9 @@ impl JsSimmSensitivities {
     /// Throws if the JSON is malformed, has unknown fields, or carries an
     /// unknown currency, risk class or credit sector.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsSimmSensitivities, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "SimmSensitivitiesJson | string")] json: JsValue,
+    ) -> Result<JsSimmSensitivities, JsValue> {
         let json = crate::utils::input::json_text(&json, "json")?;
         Ok(Self {
             inner: fm::types::SimmSensitivities::from_json(&json).map_err(to_js_err)?,
@@ -136,9 +146,9 @@ impl JsSimmSensitivities {
     #[wasm_bindgen(js_name = addIrDelta)]
     pub fn add_ir_delta(
         &mut self,
-        currency: JsValue,
-        tenor: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let currency = js_currency(&currency, "currency")?;
         let tenor = js_string(&tenor, "tenor")?;
@@ -158,9 +168,9 @@ impl JsSimmSensitivities {
     #[wasm_bindgen(js_name = addIrVega)]
     pub fn add_ir_vega(
         &mut self,
-        currency: JsValue,
-        tenor: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let currency = js_currency(&currency, "currency")?;
         let tenor = js_string(&tenor, "tenor")?;
@@ -181,10 +191,10 @@ impl JsSimmSensitivities {
     #[wasm_bindgen(js_name = addCreditQualifyingDelta)]
     pub fn add_credit_qualifying_delta(
         &mut self,
-        sector: JsValue,
-        name: JsValue,
-        tenor: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] sector: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let sector = credit_sector(&sector, "sector")?;
         let name = js_string(&name, "name")?;
@@ -206,10 +216,10 @@ impl JsSimmSensitivities {
     #[wasm_bindgen(js_name = addCreditQualifyingVega)]
     pub fn add_credit_qualifying_vega(
         &mut self,
-        sector: JsValue,
-        name: JsValue,
-        tenor: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] sector: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let sector = credit_sector(&sector, "sector")?;
         let name = js_string(&name, "name")?;
@@ -230,9 +240,9 @@ impl JsSimmSensitivities {
     #[wasm_bindgen(js_name = addCreditNonQualifyingDelta)]
     pub fn add_credit_non_qualifying_delta(
         &mut self,
-        name: JsValue,
-        tenor: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let name = js_string(&name, "name")?;
         let tenor = js_string(&tenor, "tenor")?;
@@ -252,9 +262,9 @@ impl JsSimmSensitivities {
     #[wasm_bindgen(js_name = addCreditNonQualifyingVega)]
     pub fn add_credit_non_qualifying_vega(
         &mut self,
-        name: JsValue,
-        tenor: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let name = js_string(&name, "name")?;
         let tenor = js_string(&tenor, "tenor")?;
@@ -271,7 +281,11 @@ impl JsSimmSensitivities {
     ///
     /// Throws a `TypeError` for an argument of the wrong type.
     #[wasm_bindgen(js_name = addEquityDelta)]
-    pub fn add_equity_delta(&mut self, underlier: JsValue, amount: JsValue) -> Result<(), JsValue> {
+    pub fn add_equity_delta(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+    ) -> Result<(), JsValue> {
         let underlier = js_string(&underlier, "underlier")?;
         self.inner
             .add_equity_delta(underlier, js_f64(&amount, "amount")?);
@@ -286,7 +300,11 @@ impl JsSimmSensitivities {
     ///
     /// Throws a `TypeError` for an argument of the wrong type.
     #[wasm_bindgen(js_name = addEquityVega)]
-    pub fn add_equity_vega(&mut self, underlier: JsValue, amount: JsValue) -> Result<(), JsValue> {
+    pub fn add_equity_vega(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+    ) -> Result<(), JsValue> {
         let underlier = js_string(&underlier, "underlier")?;
         self.inner
             .add_equity_vega(underlier, js_f64(&amount, "amount")?);
@@ -301,7 +319,11 @@ impl JsSimmSensitivities {
     ///
     /// Throws if `currency` is not a known currency code.
     #[wasm_bindgen(js_name = addFxDelta)]
-    pub fn add_fx_delta(&mut self, currency: JsValue, amount: JsValue) -> Result<(), JsValue> {
+    pub fn add_fx_delta(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+    ) -> Result<(), JsValue> {
         let currency = js_currency(&currency, "currency")?;
         self.inner
             .add_fx_delta(currency, js_f64(&amount, "amount")?);
@@ -319,9 +341,9 @@ impl JsSimmSensitivities {
     #[wasm_bindgen(js_name = addFxVega)]
     pub fn add_fx_vega(
         &mut self,
-        ccy1: JsValue,
-        ccy2: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] ccy1: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] ccy2: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let ccy1 = js_currency(&ccy1, "ccy1")?;
         let ccy2 = js_currency(&ccy2, "ccy2")?;
@@ -338,7 +360,11 @@ impl JsSimmSensitivities {
     ///
     /// Throws a `TypeError` for an argument of the wrong type.
     #[wasm_bindgen(js_name = addCommodityDelta)]
-    pub fn add_commodity_delta(&mut self, bucket: JsValue, amount: JsValue) -> Result<(), JsValue> {
+    pub fn add_commodity_delta(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+    ) -> Result<(), JsValue> {
         let bucket = js_string(&bucket, "bucket")?;
         self.inner
             .add_commodity_delta(bucket, js_f64(&amount, "amount")?);
@@ -353,7 +379,11 @@ impl JsSimmSensitivities {
     ///
     /// Throws a `TypeError` for an argument of the wrong type.
     #[wasm_bindgen(js_name = addCommodityVega)]
-    pub fn add_commodity_vega(&mut self, bucket: JsValue, amount: JsValue) -> Result<(), JsValue> {
+    pub fn add_commodity_vega(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+    ) -> Result<(), JsValue> {
         let bucket = js_string(&bucket, "bucket")?;
         self.inner
             .add_commodity_vega(bucket, js_f64(&amount, "amount")?);
@@ -368,7 +398,11 @@ impl JsSimmSensitivities {
     /// Throws if `sensitivity` is malformed or fails its validation (unknown
     /// risk class or tenor, non-finite vega).
     #[wasm_bindgen(js_name = addCurvature)]
-    pub fn add_curvature(&mut self, sensitivity: JsValue) -> Result<(), JsValue> {
+    pub fn add_curvature(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "SimmCurvatureSensitivity | string")]
+        sensitivity: JsValue,
+    ) -> Result<(), JsValue> {
         let sensitivity: fm::types::SimmCurvatureSensitivity =
             from_js_json(&sensitivity, "sensitivity")?;
         sensitivity.validate().map_err(to_js_err)?;
@@ -394,15 +428,18 @@ impl JsSimmSensitivities {
     /// # Errors
     ///
     /// Throws a `TypeError` when `factor` is not a number.
-    pub fn scaled(&self, factor: JsValue) -> Result<JsSimmSensitivities, JsValue> {
+    pub fn scaled(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] factor: JsValue,
+    ) -> Result<JsSimmSensitivities, JsValue> {
         Ok(Self {
             inner: self.inner.scaled(js_f64(&factor, "factor")?),
         })
     }
 
     /// Copy re-expressed in another currency at a spot FX rate.
-    /// @param target_currency - ISO-4217 currency the amounts should be expressed in.
-    /// @param fx_rate - Value of one unit of the current base currency in `target_currency`; every amount is multiplied by it.
+    /// @param targetCurrency - ISO-4217 currency the amounts should be expressed in.
+    /// @param fxRate - Value of one unit of the current base currency in `target_currency`; every amount is multiplied by it.
     /// @returns A new `SimmSensitivities` handle whose base currency is `target_currency`.
     ///
     /// # Errors
@@ -411,8 +448,9 @@ impl JsSimmSensitivities {
     #[wasm_bindgen(js_name = scaledToCurrency)]
     pub fn scaled_to_currency(
         &self,
+        #[wasm_bindgen(js_name = "targetCurrency", unchecked_param_type = "string")]
         target_currency: JsValue,
-        fx_rate: JsValue,
+        #[wasm_bindgen(js_name = "fxRate", unchecked_param_type = "number")] fx_rate: JsValue,
     ) -> Result<JsSimmSensitivities, JsValue> {
         let target_currency = js_currency(&target_currency, "targetCurrency")?;
         Ok(Self {
@@ -489,7 +527,7 @@ pub struct JsSimmCalculator {
 impl JsSimmCalculator {
     /// Create a SIMM calculator from the embedded margin registry.
     /// @param version - Canonical version label `"v2_6"`; omitted uses the default version.
-    /// @param mpor_days - Margin period of risk override in business days, stamped on results; omitted uses the registry default for the version (10).
+    /// @param mporDays - Margin period of risk override in business days, stamped on results; omitted uses the registry default for the version (10).
     ///
     /// # Errors
     ///
@@ -497,7 +535,8 @@ impl JsSimmCalculator {
     /// integer, or the registry parameters cannot be loaded.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        version: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] version: Option<JsValue>,
+        #[wasm_bindgen(js_name = "mporDays", unchecked_optional_param_type = "number | null")]
         mpor_days: Option<JsValue>,
     ) -> Result<JsSimmCalculator, JsValue> {
         let version = js_opt_string(version.as_ref(), "version")?
@@ -524,7 +563,7 @@ impl JsSimmCalculator {
     /// incomplete SIMM parameters.
     #[wasm_bindgen(js_name = fromFinstackConfig)]
     pub fn from_finstack_config(
-        version: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] version: JsValue,
         config: &JsFinstackConfig,
     ) -> Result<JsSimmCalculator, JsValue> {
         let version = js_string(&version, "version")?
@@ -551,19 +590,19 @@ impl JsSimmCalculator {
     /// Calculate SIMM initial margin from explicit sensitivities.
     /// @param sensitivities - Sensitivity set to aggregate; validated first, so an unknown tenor or commodity bucket throws instead of pricing to zero.
     /// @param currency - Reporting currency; must be `"USD"` and match the sensitivities' base currency (concentration thresholds are in USD).
-    /// @param as_of - ISO-8601 calculation date stamped on the result.
+    /// @param asOf - ISO-8601 calculation date stamped on the result.
     /// @returns The `ImResult` as a plain object: `amount` (Money), `methodology`, `mpor_days`, `as_of`, `approximation`, the SIMM component `breakdown`, and `simm_detail` (per-component buckets with weighted sensitivities, concentration factors and bucket `k`, plus `risk_class_margins` and `mpor_scale`).
     ///
     /// # Errors
     ///
     /// Throws if the sensitivities fail validation, the input or output
     /// currency is not USD, or the date is not ISO 8601.
-    #[wasm_bindgen(js_name = calculateFromSensitivities)]
+    #[wasm_bindgen(js_name = calculateFromSensitivities, unchecked_return_type = "ImResult")]
     pub fn calculate_from_sensitivities(
         &self,
         sensitivities: &JsSimmSensitivities,
-        currency: JsValue,
-        as_of: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let currency = js_currency(&currency, "currency")?;
         let as_of = js_date(&as_of, "asOf")?;

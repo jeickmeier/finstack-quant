@@ -482,11 +482,8 @@ def build_wasm_report(log_path: Path | None) -> str:
     node_skipped = int(node_metrics.get("skipped", 0)) + int(node_metrics.get("todo", 0))
     node_duration = node_metrics.get("duration_ms", 0.0) / 1000.0
 
-    jsdoc_ran = "docs:check-sync" in text or "sync-facade-jsdoc.mjs --check" in text
-
     wb_status = "Passed" if (wb_found and wb_failed == 0) else ("Failed" if wb_failed > 0 else "—")
     node_status = "Passed" if (node_found and node_failed == 0) else ("Failed" if node_failed > 0 else "—")
-    jsdoc_status = "Executed" if jsdoc_ran else "—"
 
     total_passed = wb_passed + node_passed
     total_failed = wb_failed + node_failed
@@ -505,7 +502,6 @@ def build_wasm_report(log_path: Path | None) -> str:
         f"{wb_ignored:,} | {wb_duration:.1f}s | {wb_status} |",
         f"| Node.js facade (`node --test`) | {node_passed:,} | {node_failed:,} | "
         f"{node_skipped:,} | {node_duration:.1f}s | {node_status} |",
-        f"| JSDoc sync (`docs:check-sync`) | — | — | — | — | {jsdoc_status} |",
         f"| **Total** | **{total_passed:,}** | **{total_failed:,}** | "
         f"**{total_skipped:,}** | **{total_duration:.1f}s** | **{overall_status}** |",
     ])

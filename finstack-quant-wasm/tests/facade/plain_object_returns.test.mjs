@@ -1,7 +1,7 @@
 /**
  * Facade-shape tests for map-returning WASM functions.
  *
- * `index.d.ts` declares plain JS objects for these returns; the bindings
+ * The declarations type these returns as plain JS objects; the bindings
  * must therefore serialize with JSON-compatible conventions rather than the
  * serde-wasm-bindgen default, which emits ES2015 `Map`s (whose property
  * reads silently yield `undefined`).

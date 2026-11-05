@@ -13,8 +13,8 @@ use wasm_bindgen::prelude::*;
 /// the rating-downgrade notch test, qualitative flags and curing. The Python
 /// `Exposure` carries the two PDs itself; here they are arguments.
 /// @param exposure - `Exposure` whose days past due, qualitative flags, rating labels and cure state drive the waterfall (object or JSON).
-/// @param current_pd - Current lifetime probability of default as a decimal in `[0, 1]`.
-/// @param origination_pd - Lifetime probability of default at initial recognition as a decimal in `[0, 1]`.
+/// @param currentPd - Current lifetime probability of default as a decimal in `[0, 1]`.
+/// @param originationPd - Lifetime probability of default at initial recognition as a decimal in `[0, 1]`.
 /// @param config - Optional `StagingConfig` thresholds, backstops and curing rules; omitted uses the Rust defaults (object or JSON).
 /// @returns `StageResult`: the assigned `stage`, the ordered `triggers` audit trail and whether the exposure `cured`.
 ///
@@ -23,11 +23,16 @@ use wasm_bindgen::prelude::*;
 /// Throws with kind `validation` if an input is malformed or a PD, maturity
 /// or threshold is non-finite or out of range, and kind `invalid_type` if a
 /// PD is not a number.
-#[wasm_bindgen(js_name = classifyStage)]
+#[wasm_bindgen(js_name = classifyStage, unchecked_return_type = "generated.statements_analytics.StageResult")]
 pub fn classify_stage(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.Exposure | string")]
     exposure: JsValue,
-    current_pd: JsValue,
+    #[wasm_bindgen(js_name = "currentPd", unchecked_param_type = "number")] current_pd: JsValue,
+    #[wasm_bindgen(js_name = "originationPd", unchecked_param_type = "number")]
     origination_pd: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.statements_analytics.StagingConfig | string | null"
+    )]
     config: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let exposure: ecl::Exposure = from_js_json(&exposure, "exposure")?;
@@ -52,10 +57,10 @@ pub fn classify_stage(
 /// anchored at `(0, 0)` when that knot is absent. Classify with
 /// `classifyStage` first and pass its `stage`.
 /// @param exposure - `Exposure` supplying EAD, undrawn amount and CCF, LGD, EIR, remaining maturity and any EAD schedule (object or JSON).
-/// @param pd_schedule - Cumulative PD knots as `[timeYears, cumulativePd]` pairs, ascending in time and non-decreasing in PD (decimals).
+/// @param pdSchedule - Cumulative PD knots as `[timeYears, cumulativePd]` pairs, ascending in time and non-decreasing in PD (decimals).
 /// @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime) or `"stage3"` (credit-impaired).
-/// @param bucket_width_years - Integration bucket width in years (`0.25` = quarterly); omitted uses the Rust policy default.
-/// @param stage3_time_to_recovery_years - Stage 3 discounting horizon to expected recovery in years; omitted uses the Rust policy default.
+/// @param bucketWidthYears - Integration bucket width in years (`0.25` = quarterly); omitted uses the Rust policy default.
+/// @param stage3TimeToRecoveryYears - Stage 3 discounting horizon to expected recovery in years; omitted uses the Rust policy default.
 /// @returns `WeightedEclResult`: the ECL in the exposure's currency units, the stage and the per-scenario bucket audit trail.
 ///
 /// # Errors
@@ -63,12 +68,25 @@ pub fn classify_stage(
 /// Throws with kind `validation` if an input is malformed, `stage` is not a
 /// stage name, the schedule violates the cumulative-PD invariants, or the
 /// exposure fails validation.
-#[wasm_bindgen(js_name = computeEcl)]
+#[wasm_bindgen(js_name = computeEcl, unchecked_return_type = "generated.statements_analytics.WeightedEclResult")]
 pub fn compute_ecl(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.Exposure | string")]
     exposure: JsValue,
+    #[wasm_bindgen(
+        js_name = "pdSchedule",
+        unchecked_param_type = "[number, number][] | string"
+    )]
     pd_schedule: JsValue,
-    stage: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.Stage")] stage: JsValue,
+    #[wasm_bindgen(
+        js_name = "bucketWidthYears",
+        unchecked_optional_param_type = "number | null"
+    )]
     bucket_width_years: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "stage3TimeToRecoveryYears",
+        unchecked_optional_param_type = "number | null"
+    )]
     stage3_time_to_recovery_years: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let exposure: ecl::Exposure = from_js_json(&exposure, "exposure")?;
@@ -94,8 +112,8 @@ pub fn compute_ecl(
 /// @param exposure - `Exposure` supplying EAD, undrawn amount and CCF, LGD, EIR, remaining maturity and any EAD schedule (object or JSON).
 /// @param scenarios - `[weight, schedule]` pairs whose weights sum to `1.0`; each schedule holds `[timeYears, cumulativePd]` knots ascending in time and non-decreasing in PD.
 /// @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime) or `"stage3"` (credit-impaired).
-/// @param bucket_width_years - Integration bucket width in years (`0.25` = quarterly); omitted uses the Rust policy default.
-/// @param stage3_time_to_recovery_years - Stage 3 discounting horizon to expected recovery in years; omitted uses the Rust policy default.
+/// @param bucketWidthYears - Integration bucket width in years (`0.25` = quarterly); omitted uses the Rust policy default.
+/// @param stage3TimeToRecoveryYears - Stage 3 discounting horizon to expected recovery in years; omitted uses the Rust policy default.
 /// @returns `WeightedEclResult`: the probability-weighted ECL in the exposure's currency units and one `scenario_breakdown` entry per scenario.
 ///
 /// # Errors
@@ -104,12 +122,22 @@ pub fn compute_ecl(
 /// empty, the weights do not sum to `1.0`, `stage` is not a stage name, a
 /// schedule violates the cumulative-PD invariants, or the exposure fails
 /// validation.
-#[wasm_bindgen(js_name = computeEclWeighted)]
+#[wasm_bindgen(js_name = computeEclWeighted, unchecked_return_type = "generated.statements_analytics.WeightedEclResult")]
 pub fn compute_ecl_weighted(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.Exposure | string")]
     exposure: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "[number, [number, number][]][] | string")]
     scenarios: JsValue,
-    stage: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.Stage")] stage: JsValue,
+    #[wasm_bindgen(
+        js_name = "bucketWidthYears",
+        unchecked_optional_param_type = "number | null"
+    )]
     bucket_width_years: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "stage3TimeToRecoveryYears",
+        unchecked_optional_param_type = "number | null"
+    )]
     stage3_time_to_recovery_years: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let exposure: ecl::Exposure = from_js_json(&exposure, "exposure")?;

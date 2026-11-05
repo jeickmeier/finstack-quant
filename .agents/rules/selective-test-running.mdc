@@ -64,6 +64,7 @@ Add `--all-features` to `rust-lint-crate` / `rust-fix-crate` when touching featu
 | `finstack-quant/arrow-interchange/` | `finstack-quant-arrow` |
 | `finstack-quant/` (umbrella) | `finstack-quant` |
 | `finstack-quant-py/` | `finstack-quant-py` |
+| `finstack-quant-wasm/macros/` | `finstack-quant-wasm-macros` |
 | `finstack-quant-wasm/` | `finstack-quant-wasm` |
 
 When a change spans multiple crates, lint and test each affected package separately rather than running the full workspace after every edit.

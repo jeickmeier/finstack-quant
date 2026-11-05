@@ -23,9 +23,9 @@ use wasm_bindgen::prelude::*;
 /// @param covenants - `CovenantEngine` handle whose specifications, windows, waivers and threshold schedules are evaluated.
 /// @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per result period in timeline order, with the reports of the covenants applicable on that date keyed by covenant instance key in engine order. (Python returns the same reports as a long DataFrame.)
 /// @throws If `results` is malformed, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).
-#[wasm_bindgen(js_name = evaluateCovenants)]
+#[wasm_bindgen(js_name = evaluateCovenants, unchecked_return_type = "generated.covenants.DatedCovenantReports[]")]
 pub fn evaluate_covenants(
-    results: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
     covenants: &JsCovenantEngine,
 ) -> Result<JsValue, JsValue> {
     let results: StatementResult = from_js_json(&results, "results")?;
@@ -56,10 +56,13 @@ pub fn evaluate_covenants(
 /// @param config - Optional `CovenantForecastConfig` object or JSON text (JSON text keeps a uint64 `random_seed` exact); omitted means deterministic maintenance-scope forecasting.
 /// @returns `FutureBreach` wire objects sorted by breach date, then covenant id.
 /// @throws If `results` or `config` is malformed, the engine or configuration is invalid or a metric an active covenant reads is non-finite (kind `validation`), or such a metric has no value in a period (kind `not_found`).
-#[wasm_bindgen(js_name = statementsAnalyticsForecastBreaches)]
+#[wasm_bindgen(js_name = statementsAnalyticsForecastBreaches, unchecked_return_type = "generated.covenants.FutureBreach[]")]
 pub fn forecast_breaches(
-    results: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
     covenants: &JsCovenantEngine,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.covenants.CovenantForecastConfig | string | null"
+    )]
     config: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let results: StatementResult = from_js_json(&results, "results")?;

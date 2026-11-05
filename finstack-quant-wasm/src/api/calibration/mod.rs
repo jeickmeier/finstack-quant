@@ -59,8 +59,10 @@ use wasm_bindgen::prelude::*;
 /// schema marker is missing or unsupported, or static validation fails
 /// (fail-fast: first error; `dryRun` lists every static error). Throws a
 /// `FinstackError` if a returned integer exceeds JavaScript’s safe integer range.
-#[wasm_bindgen(js_name = validateCalibration)]
-pub fn validate_calibration(envelope: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = validateCalibration, unchecked_return_type = "CalibrationEnvelope")]
+pub fn validate_calibration(
+    #[wasm_bindgen(unchecked_param_type = "CalibrationEnvelope | string")] envelope: JsValue,
+) -> Result<JsValue, JsValue> {
     let envelope: &str = &json_text(&envelope, "envelope")?;
     let parsed =
         validate::parse_envelope(envelope).map_err(|err| execute_error_to_js(err.into()))?;
@@ -72,10 +74,9 @@ pub fn validate_calibration(envelope: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Accepts a serialized `CalibrationEnvelope` (plan + quote sets + optional
 /// flat `market_data` / `prior_market` lists) and returns a plain JavaScript
-/// `CalibrationResultEnvelope` object — the shape `index.d.ts` has always
-/// declared. Re-ingest a sub-document (e.g. `result.result.final_market`) with
+/// `CalibrationResultEnvelope` object, the declared return type. Re-ingest a sub-document (e.g. `result.result.final_market`) with
 /// `JSON.stringify`.
-/// @param envelope_json - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
+/// @param envelopeJson - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
 ///
 /// # Errors
 ///
@@ -84,8 +85,15 @@ pub fn validate_calibration(envelope: JsValue) -> Result<JsValue, JsValue> {
 /// error; `dryRun` lists every static error), solver configuration is invalid,
 /// market context construction or a calibration step fails, a solver does
 /// not converge, or the result envelope cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = calibrate)]
-pub fn calibrate(envelope_json: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Calibration result including the materialized market and per-step reports.
+#[wasm_bindgen(js_name = calibrate, unchecked_return_type = "CalibrationResultEnvelope")]
+pub fn calibrate(
+    #[wasm_bindgen(
+        js_name = "envelopeJson",
+        unchecked_param_type = "CalibrationEnvelope | string"
+    )]
+    envelope_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
     let result = engine::calibrate_from_json(envelope_json).map_err(execute_error_to_js)?;
     to_js_value(&result)
@@ -111,7 +119,7 @@ fn load_result(json: &str) -> Result<CalibrationResultEnvelope, ExecuteError> {
 /// `CalibrationEnvelope::content_hash`): the envelope is strict-loaded through
 /// the same Rust parser `calibrate` uses, then hashed over its canonical JSON,
 /// so the hash does not depend on key order or number spelling.
-/// @param envelope_json - `CalibrationEnvelope` (object or JSON).
+/// @param envelopeJson - `CalibrationEnvelope` (object or JSON).
 /// @returns `"sha256:<hex>"` content hash.
 ///
 /// # Errors
@@ -120,7 +128,13 @@ fn load_result(json: &str) -> Result<CalibrationResultEnvelope, ExecuteError> {
 /// schema marker is missing or unsupported, or it contains a non-finite
 /// number.
 #[wasm_bindgen(js_name = calibrationEnvelopeContentHash)]
-pub fn calibration_envelope_content_hash(envelope_json: JsValue) -> Result<String, JsValue> {
+pub fn calibration_envelope_content_hash(
+    #[wasm_bindgen(
+        js_name = "envelopeJson",
+        unchecked_param_type = "CalibrationEnvelope | string"
+    )]
+    envelope_json: JsValue,
+) -> Result<String, JsValue> {
     let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
     let envelope =
         validate::parse_envelope(envelope_json).map_err(|err| execute_error_to_js(err.into()))?;
@@ -134,7 +148,7 @@ pub fn calibration_envelope_content_hash(envelope_json: JsValue) -> Result<Strin
 /// Free-function twin of Python `CalibrationResultEnvelope.content_hash` (Rust
 /// `CalibrationResultEnvelope::content_hash`): the result is strict-loaded
 /// (default load limits), then hashed over its canonical JSON.
-/// @param result_json - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
+/// @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
 /// @returns `"sha256:<hex>"` content hash.
 ///
 /// # Errors
@@ -143,7 +157,13 @@ pub fn calibration_envelope_content_hash(envelope_json: JsValue) -> Result<Strin
 /// default load limits, its schema marker is missing or unsupported, or it
 /// contains a non-finite number.
 #[wasm_bindgen(js_name = calibrationResultContentHash)]
-pub fn calibration_result_content_hash(result_json: JsValue) -> Result<String, JsValue> {
+pub fn calibration_result_content_hash(
+    #[wasm_bindgen(
+        js_name = "resultJson",
+        unchecked_param_type = "CalibrationResultEnvelope | string"
+    )]
+    result_json: JsValue,
+) -> Result<String, JsValue> {
     let result_json: &str = &json_text(&result_json, "resultJson")?;
     let result = load_result(result_json).map_err(execute_error_to_js)?;
     result
@@ -156,7 +176,7 @@ pub fn calibration_result_content_hash(result_json: JsValue) -> Result<String, J
 /// Returns the `CalibrationValidationReport` as a plain object listing every
 /// static error found (`errors`) plus the dependency graph
 /// (`dependency_graph`). Serialize the returned object when JSON text is needed.
-/// @param envelope_json - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
+/// @param envelopeJson - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
 ///
 /// # Errors
 ///
@@ -164,8 +184,15 @@ pub fn calibration_result_content_hash(result_json: JsValue) -> Result<String, J
 /// marker is missing, malformed, or unsupported, the envelope structure is
 /// invalid, or the validation report cannot be converted to a JavaScript
 /// value. Semantic findings are returned in the report rather than thrown.
-#[wasm_bindgen(js_name = dryRun)]
-pub fn dry_run(envelope_json: JsValue) -> Result<JsValue, JsValue> {
+/// @returns `CalibrationValidationReport` object containing every static error and the dependency graph.
+#[wasm_bindgen(js_name = dryRun, unchecked_return_type = "CalibrationValidationReport")]
+pub fn dry_run(
+    #[wasm_bindgen(
+        js_name = "envelopeJson",
+        unchecked_param_type = "CalibrationEnvelope | string"
+    )]
+    envelope_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
     let report =
         validate::dry_run(envelope_json).map_err(|error| execute_error_to_js(error.into()))?;
@@ -176,9 +203,9 @@ pub fn dry_run(envelope_json: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Callers must place the returned value in `modelConfig.lmmBaseVol` before
 /// pricing; the Bermudan pricer never reads or fits the surface itself.
-/// @param instrument_json - Canonical Bermudan swaption instrument envelope, as a plain object or its JSON string.
+/// @param instrumentJson - Canonical Bermudan swaption instrument envelope, as a plain object or its JSON string.
 /// @param market - Reusable market handle containing discount and swaption-volatility inputs.
-/// @param as_of - ISO-8601 valuation date.
+/// @param asOf - ISO-8601 valuation date.
 /// @returns Positive finite LMM base volatility.
 ///
 /// # Errors
@@ -190,9 +217,13 @@ pub fn dry_run(envelope_json: JsValue) -> Result<JsValue, JsValue> {
 /// inputs are invalid, or the Rebonato calibration cannot be completed.
 #[wasm_bindgen(js_name = calibrateBermudanLmmBaseVol)]
 pub fn calibrate_bermudan_lmm_base_vol(
+    #[wasm_bindgen(
+        js_name = "instrumentJson",
+        unchecked_param_type = "Record<string, unknown> | string"
+    )]
     instrument_json: JsValue,
     market: &crate::api::core::market_context::JsMarketContext,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
 ) -> Result<f64, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;

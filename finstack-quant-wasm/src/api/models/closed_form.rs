@@ -59,8 +59,23 @@ use wasm_bindgen::prelude::*;
 /// Throws a `validation` error for a malformed request, an unknown field or
 /// kind, an input outside the model's domain, or a price whose implied
 /// volatility cannot be solved; `invalid_type` for a non-finite number.
-#[wasm_bindgen(js_name = optionCalculation)]
-pub fn option_calculation(request: JsValue) -> Result<JsValue, JsValue> {
+/// @param request - `OptionCalculation` object or JSON text: `model` tagged by `kind` (`"black_scholes"` with `spot`, `strike`, continuously compounded decimal `rate` and `div_yield`, `expiry` in years, `is_call` and an optional `theta_days_per_year` defaulting to 365; `"black76"` with `forward`, `strike`, discount factor `df`, `expiry`, `is_call`; `"bachelier"` with `forward`, `strike`, `expiry`, `is_call`) and `solve` (`{kind: "price", vol}` with a decimal Black vol or an absolute normal vol for Bachelier, or `{kind: "implied_vol", price}` discounted for Black-Scholes and Black-76, undiscounted for Bachelier).
+/// @returns The price, the volatility both are at (the supplied vol, or the solved implied vol) and the model's Greeks tagged by `kind` (`"black_scholes"` or `"forward"`).
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const result = models.optionCalculation({
+///   model: { kind: "black76", forward: 100, strike: 100, df: 0.98, expiry: 1, is_call: true },
+///   solve: { kind: "price", vol: 0.2 },
+/// });
+/// console.log(result.price, result.greeks.kind); // ..., "forward"
+/// ```
+#[wasm_bindgen(js_name = optionCalculation, unchecked_return_type = "OptionCalculationResult")]
+pub fn option_calculation(
+    #[wasm_bindgen(unchecked_param_type = "OptionCalculation | string")] request: JsValue,
+) -> Result<JsValue, JsValue> {
     let request: OptionCalculation = from_js_json(&request, "request")?;
     let result = option_calculation_core(&request).map_err(to_js_err)?;
     crate::utils::to_js_value(&result)
@@ -103,13 +118,13 @@ pub fn option_calculation(request: JsValue) -> Result<JsValue, JsValue> {
 /// @throws If spot or strike is non-positive, volatility or expiry is negative, any numerical input is non-finite, or discounted legs or price overflow.
 #[wasm_bindgen(js_name = bsPrice)]
 pub fn bs_price(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
@@ -151,9 +166,9 @@ pub fn bs_price(
 /// not strictly positive.
 #[wasm_bindgen(js_name = vanillaExpiryPayoff)]
 pub fn vanilla_expiry_payoff(
-    spot: JsValue,
-    strike: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
@@ -188,16 +203,17 @@ pub fn vanilla_expiry_payoff(
 /// const g = models.bsGreeks(100, 100, 0.05, 0.0, 0.20, 1.0, true);
 /// // g.delta ≈ 0.64, g.gamma ≈ 0.019, g.vega ≈ 0.38 (per 1% vol)
 /// ```
-#[wasm_bindgen(js_name = bsGreeks)]
+#[wasm_bindgen(js_name = bsGreeks, unchecked_return_type = "BsGreeks")]
 #[allow(clippy::too_many_arguments)]
 pub fn bs_greeks(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(js_name = "thetaDaysPerYear", unchecked_optional_param_type = "number")]
     theta_days_per_year: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let spot = js_f64(&spot, "spot")?;
@@ -250,13 +266,13 @@ pub fn bs_greeks(
 /// ```
 #[wasm_bindgen(js_name = bsImpliedVol)]
 pub fn bs_implied_vol(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    expiry: JsValue,
-    price: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] price: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
@@ -285,7 +301,7 @@ pub fn bs_implied_vol(
 /// @param df - Discount factor from valuation to expiry, expressed as a positive decimal.
 /// @param expiry - Time to expiry in years; must be positive.
 /// @param price - Observed option price in the same units as the forward.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
+/// @param isCall - Whether to value a call (`true`) or put (`false`).
 ///
 /// # Errors
 ///
@@ -293,14 +309,15 @@ pub fn bs_implied_vol(
 /// `forward`, `strike`, `df`, or `price` is not positive; the price is not
 /// above intrinsic value or cannot be bracketed; or the implied-volatility
 /// solver does not converge.
+/// @returns Annualized Black-76 implied volatility as a decimal.
 #[wasm_bindgen(js_name = black76ImpliedVol)]
 pub fn black76_implied_vol(
-    forward: JsValue,
-    strike: JsValue,
-    df: JsValue,
-    expiry: JsValue,
-    price: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] df: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] price: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let forward = js_f64(&forward, "forward")?;
     let strike = js_f64(&strike, "strike")?;
@@ -331,21 +348,22 @@ pub fn black76_implied_vol(
 /// strictly greater than zero (the same domain `black76ImpliedVol` accepts).
 /// @param vol - Annualized lognormal (Black) volatility, decimal; non-negative.
 /// @param expiry - Time to expiry in years; non-negative.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
+/// @param isCall - Whether to value a call (`true`) or put (`false`).
 ///
 /// # Errors
 ///
 /// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
 /// `forward`, `strike` or `df` is not positive, `vol` or `expiry` is negative,
 /// or the price is non-finite.
+/// @returns Discounted per-unit option price in the units of `forward`.
 #[wasm_bindgen(js_name = black76Price)]
 pub fn black76_price(
-    forward: JsValue,
-    strike: JsValue,
-    df: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] df: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let forward = js_f64(&forward, "forward")?;
     let strike = js_f64(&strike, "strike")?;
@@ -366,7 +384,7 @@ pub fn black76_price(
 /// @param strike - Strike in the same units as `forward`.
 /// @param vol - Annualized lognormal (Black) volatility, decimal; non-negative.
 /// @param expiry - Time to expiry in years; non-negative.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
+/// @param isCall - Whether to value a call (`true`) or put (`false`).
 /// @returns The Rust `ForwardGreeks` object `{ delta, gamma, vega }`.
 ///
 /// # Errors
@@ -374,13 +392,13 @@ pub fn black76_price(
 /// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
 /// `forward` or `strike` is not positive, `vol` or `expiry` is negative, or a
 /// Greek is non-finite.
-#[wasm_bindgen(js_name = black76Greeks)]
+#[wasm_bindgen(js_name = black76Greeks, unchecked_return_type = "ForwardGreeks")]
 pub fn black76_greeks(
-    forward: JsValue,
-    strike: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<JsValue, JsValue> {
     let forward = js_f64(&forward, "forward")?;
     let strike = js_f64(&strike, "strike")?;
@@ -397,22 +415,23 @@ pub fn black76_greeks(
 /// Bachelier (1900): see docs/REFERENCES.md#bachelier-1900.
 /// @param forward - Forward price or rate at expiry (may be negative).
 /// @param strike - Strike in the same units as `forward`.
-/// @param normal_vol - Annualized **absolute** (normal) volatility in the
+/// @param normalVol - Annualized **absolute** (normal) volatility in the
 /// units of `forward` (e.g. `0.0075` for 75 bp on decimal rates).
 /// @param expiry - Time to expiry in years; non-negative.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
+/// @param isCall - Whether to value a call (`true`) or put (`false`).
 ///
 /// # Errors
 ///
 /// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
 /// `normalVol` or `expiry` is negative, or the price is non-finite.
+/// @returns Undiscounted per-unit option value in the units of `forward`.
 #[wasm_bindgen(js_name = bachelierPrice)]
 pub fn bachelier_price(
-    forward: JsValue,
-    strike: JsValue,
-    normal_vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(js_name = "normalVol", unchecked_param_type = "number")] normal_vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let forward = js_f64(&forward, "forward")?;
     let strike = js_f64(&strike, "strike")?;
@@ -435,22 +454,22 @@ pub fn bachelier_price(
 /// Bachelier (1900): see docs/REFERENCES.md#bachelier-1900.
 /// @param forward - Forward price or rate at expiry (may be negative).
 /// @param strike - Strike in the same units as `forward`.
-/// @param normal_vol - Annualized absolute (normal) volatility in the units of `forward`; non-negative.
+/// @param normalVol - Annualized absolute (normal) volatility in the units of `forward`; non-negative.
 /// @param expiry - Time to expiry in years; non-negative.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
+/// @param isCall - Whether to value a call (`true`) or put (`false`).
 /// @returns The Rust `ForwardGreeks` object `{ delta, gamma, vega }`.
 ///
 /// # Errors
 ///
 /// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
 /// `normalVol` or `expiry` is negative, or a Greek is non-finite.
-#[wasm_bindgen(js_name = bachelierGreeks)]
+#[wasm_bindgen(js_name = bachelierGreeks, unchecked_return_type = "ForwardGreeks")]
 pub fn bachelier_greeks(
-    forward: JsValue,
-    strike: JsValue,
-    normal_vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(js_name = "normalVol", unchecked_param_type = "number")] normal_vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<JsValue, JsValue> {
     let forward = js_f64(&forward, "forward")?;
     let strike = js_f64(&strike, "strike")?;
@@ -477,21 +496,22 @@ pub fn bachelier_greeks(
 /// @param expiry - Time to expiry in years.
 /// @param shift - Displacement added to forward and strike, in rate units
 /// (e.g. `0.03` for a 3% shift); both shifted values must be positive.
-/// @param is_call - Whether to value a call (`true`) or put (`false`).
+/// @param isCall - Whether to value a call (`true`) or put (`false`).
 ///
 /// # Errors
 ///
 /// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
 /// `forward + shift` or `strike + shift` is not positive, `vol` or `expiry` is
 /// negative, or the price is non-finite.
+/// @returns Undiscounted per-unit option value in the units of `forward`.
 #[wasm_bindgen(js_name = blackShiftedPrice)]
 pub fn black_shifted_price(
-    forward: JsValue,
-    strike: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    shift: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] shift: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let forward = js_f64(&forward, "forward")?;
     let strike = js_f64(&strike, "strike")?;
@@ -523,13 +543,14 @@ pub fn black_shifted_price(
 /// Throws a `FinstackError` (`kind: "validation"`) if an input is non-finite,
 /// `forward + shift` or `strike + shift` is not positive, `vol` or `expiry` is
 /// negative, or the vega is non-finite.
+/// @returns Undiscounted vega in the units of `forward` per unit vol.
 #[wasm_bindgen(js_name = blackShiftedVega)]
 pub fn black_shifted_vega(
-    forward: JsValue,
-    strike: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    shift: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] shift: JsValue,
 ) -> Result<f64, JsValue> {
     let forward = js_f64(&forward, "forward")?;
     let strike = js_f64(&strike, "strike")?;
@@ -547,30 +568,33 @@ pub fn black_shifted_vega(
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param barrier - Continuously monitored barrier level in the same price units as spot.
 /// @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-/// @param div_yield - Continuous dividend yield or foreign rate, expressed as a decimal.
+/// @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
 /// @param expiry - Time to expiry in years.
 /// @param direction - Barrier direction: `"up"` for an upper barrier or `"down"` for a lower barrier.
 /// @param knock - Barrier activation: `"in"` for knock-in or `"out"` for knock-out.
-/// @param is_call - Whether to value a call (`true`, default) or put (`false`).
+/// @param isCall - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `direction` or `knock` is unsupported, or
 /// the supplied model inputs produce a non-finite barrier price.
+/// @returns Discounted barrier option price in the same units as `spot`.
 #[wasm_bindgen(js_name = barrierOptionPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn barrier_option_price(
-    spot: JsValue,
-    strike: JsValue,
-    barrier: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    direction: JsValue,
-    knock: JsValue,
-    is_call: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] barrier: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "'up' | 'down'")] direction: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "'in' | 'out'")] knock: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
+        JsValue,
+    >,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
@@ -604,30 +628,35 @@ pub fn barrier_option_price(
 /// @param spot - Current spot price or exchange rate in the same units as the strike.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-/// @param div_yield - Continuous dividend yield or foreign rate, expressed as a decimal.
+/// @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
 /// @param expiry - Time to expiry in years.
-/// @param num_fixings - Non-negative integer number of equally spaced averaging observations, at most 4294967295; zero selects continuous monitoring.
+/// @param numFixings - Non-negative integer number of equally spaced averaging observations, at most 4294967295; zero selects continuous monitoring.
 /// @param averaging - Asian averaging convention: `"arithmetic"` (default) or `"geometric"`.
-/// @param is_call - Whether to value a call (`true`, default) or put (`false`).
+/// @param isCall - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `numFixings` is not a non-negative whole
 /// number, `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied
 /// model inputs produce a non-finite option price.
+/// @returns Discounted Asian option price in the same units as `spot`.
 #[wasm_bindgen(js_name = asianOptionPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn asian_option_price(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    num_fixings: JsValue,
-    averaging: Option<JsValue>,
-    is_call: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "numFixings", unchecked_param_type = "number")] num_fixings: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "'arithmetic' | 'geometric'")] averaging: Option<
+        JsValue,
+    >,
+    #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
+        JsValue,
+    >,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
@@ -665,30 +694,37 @@ pub fn asian_option_price(
 /// @param spot - Current spot price or exchange rate in the same units as the strike.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-/// @param div_yield - Continuous dividend yield or foreign rate, expressed as a decimal.
+/// @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
 /// @param expiry - Time to expiry in years.
 /// @param extremum - Observed maximum for fixed calls or floating puts, minimum for fixed puts or floating calls, including current spot; in spot-price units.
-/// @param strike_type - Lookback payoff convention: `"fixed"` (default) or `"floating"`.
-/// @param is_call - Whether to value a call (`true`, default) or put (`false`).
+/// @param strikeType - Lookback payoff convention: `"fixed"` (default) or `"floating"`.
+/// @param isCall - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `strikeType` is not `"fixed"` or
 /// `"floating"`, or the supplied model inputs produce a non-finite option
 /// price.
+/// @returns Discounted lookback option price in the same units as `spot`.
 #[wasm_bindgen(js_name = lookbackOptionPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn lookback_option_price(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    extremum: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] extremum: JsValue,
+    #[wasm_bindgen(
+        js_name = "strikeType",
+        unchecked_optional_param_type = "'fixed' | 'floating'"
+    )]
     strike_type: Option<JsValue>,
-    is_call: Option<JsValue>,
+    #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
+        JsValue,
+    >,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
@@ -726,26 +762,30 @@ pub fn lookback_option_price(
 /// @param spot - Current spot price or exchange rate in the same units as the strike.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param expiry - Time to expiry in years.
-/// @param rate_domestic - Domestic continuously compounded risk-free rate, expressed as a decimal.
-/// @param rate_foreign - Foreign continuously compounded risk-free rate, expressed as a decimal.
-/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
-/// @param vol_asset - Annualized asset-price volatility expressed as a decimal.
-/// @param vol_fx - Annualized FX-rate volatility expressed as a decimal.
+/// @param rateDomestic - Domestic continuously compounded risk-free rate, expressed as a decimal.
+/// @param rateForeign - Foreign continuously compounded risk-free rate, expressed as a decimal.
+/// @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param volAsset - Annualized asset-price volatility expressed as a decimal.
+/// @param volFx - Annualized FX-rate volatility expressed as a decimal.
 /// @param correlation - Instantaneous correlation between the asset and FX-rate shocks, from -1 to 1.
-/// @param is_call - Whether to value a call (`true`, default) or put (`false`).
+/// @param isCall - Whether to value a call (`true`, default) or put (`false`).
+/// @returns Discounted quanto option price in domestic currency units.
 #[wasm_bindgen(js_name = quantoOptionPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn quanto_option_price(
-    spot: JsValue,
-    strike: JsValue,
-    expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(js_name = "rateDomestic", unchecked_param_type = "number")]
     rate_domestic: JsValue,
-    rate_foreign: JsValue,
-    div_yield: JsValue,
-    vol_asset: JsValue,
-    vol_fx: JsValue,
-    correlation: JsValue,
-    is_call: Option<JsValue>,
+    #[wasm_bindgen(js_name = "rateForeign", unchecked_param_type = "number")] rate_foreign: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(js_name = "volAsset", unchecked_param_type = "number")] vol_asset: JsValue,
+    #[wasm_bindgen(js_name = "volFx", unchecked_param_type = "number")] vol_fx: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] correlation: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
+        JsValue,
+    >,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
@@ -780,32 +820,35 @@ pub fn quanto_option_price(
 /// @param strike - Option strike price.
 /// @param expiry - Time to expiry in years; a non-positive value returns intrinsic.
 /// @param rate - Continuously compounded risk-free rate, decimal.
-/// @param div_yield - Continuous dividend yield or foreign rate, decimal.
+/// @param divYield - Continuous dividend yield or foreign rate, decimal.
 /// @param kappa - Mean-reversion speed of the variance process (per year).
 /// @param theta - Long-run variance level (variance units).
-/// @param sigma_v - Volatility of variance (vol-of-vol).
+/// @param sigmaV - Volatility of variance (vol-of-vol).
 /// @param rho - Spot/variance correlation in `(-1, 1)`.
 /// @param v0 - Initial instantaneous variance (variance, not volatility).
-/// @param is_call - Whether to value a call (`true`, default) or put (`false`).
+/// @param isCall - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if a parameter is non-finite or outside its
 /// domain, or the Fourier integration fails to produce a finite price.
+/// @returns Present-value per-unit option price.
 #[wasm_bindgen(js_name = hestonPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn heston_price(
-    spot: JsValue,
-    strike: JsValue,
-    expiry: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    kappa: JsValue,
-    theta: JsValue,
-    sigma_v: JsValue,
-    rho: JsValue,
-    v0: JsValue,
-    is_call: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] kappa: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] theta: JsValue,
+    #[wasm_bindgen(js_name = "sigmaV", unchecked_param_type = "number")] sigma_v: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rho: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] v0: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
+        JsValue,
+    >,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
@@ -837,7 +880,9 @@ pub fn heston_price(
 /// Throws a `TypeError` if `greeks` is neither a string nor a plain object,
 /// and a `validation` error if it is malformed.
 #[wasm_bindgen(js_name = bsGreeksIsValid)]
-pub fn bs_greeks_is_valid(greeks: JsValue) -> Result<bool, JsValue> {
+pub fn bs_greeks_is_valid(
+    #[wasm_bindgen(unchecked_param_type = "BsGreeks | string")] greeks: JsValue,
+) -> Result<bool, JsValue> {
     let greeks: finstack_quant_models::closed_form::BsGreeks =
         crate::utils::input::from_js_json(&greeks, "greeks")?;
     Ok(greeks.is_valid())

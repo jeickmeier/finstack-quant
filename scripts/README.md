@@ -58,7 +58,6 @@ document each input. These enforce that on each host surface.
 | `check_public_api_input_docs.py` | Rust `# Arguments` coverage for every publicly reachable function, associated function, trait method, and constructor. Builds rustdoc JSON via `cargo public-api`, which needs the nightly toolchain `mise.toml` provisions. | `rust-doc` (nightly) |
 | `check_python_api_input_docs.py` | Substantive summaries plus argument/return/raises/example sections on public classes and callables in `.pyi` stubs and pure-Python modules. NumPy- and Google-style sections both parse. | `python-lint` (PR, through pre-commit) |
 | `check_pyo3_doc_placeholders.py` | Rejects placeholder prose left in public PyO3 runtime doc comments under `finstack-quant-py/src/bindings/`. | `python-lint` (PR, through pre-commit) |
-| `check_wasm_api_input_docs.py` | `@param` coverage in the Rust doc comments under `finstack-quant-wasm/src/api/` attached to `#[wasm_bindgen]` exports — the text wasm-bindgen copies into the generated TypeScript declarations. The comment must precede the attribute or it is dropped. | `wasm-doc` (nightly) |
 | `check_deprecated_annotations.py` | Legacy annotation-format checks: every `#[deprecated]` carries `since = "X.Y.Z"`, a replacement or retention rationale, and a planned removal release. Bare annotations fail. These checks do not implement ADR 0004's development replacement policy; [reconciliation is pending](../docs/decisions/FOLLOW_UPS.md#reconciliation-items). | `rust-doc` (nightly) |
 | `run_python_stub_doctests.py` | Extracts `>>>` examples from `.pyi` and module docstrings and executes them against the compiled `finstack_quant` package, since stubs are not importable. | `python-test --doctest` (nightly), via `finstack-quant-py/tests/test_stub_doctests.py` |
 
@@ -99,8 +98,13 @@ These tests also pin generated files; `gen-write` refreshes each one:
 | --- | --- | --- |
 | `check_wasm_boundary.py` | WASM bindings serialize only through `crate::utils::to_js_value` and build errors only through `to_js_err` (no raw `serde_wasm_bindgen::to_value`, no string errors). | `wasm-lint` (PR, through pre-commit) |
 | `finstack-quant-wasm/scripts/check-exports-boundary.mjs` | The facade (`exports/**`) only re-exports: no arithmetic, and every function carries a comment saying what wasm-bindgen cannot express. | `wasm-lint` (PR, through pre-commit) |
-| `finstack-quant-wasm/scripts/check-typescript-docs.mjs` | JSDoc completeness of the published declarations. | `wasm-doc` (nightly) |
-| `finstack-quant-wasm/scripts/check-dts-docs.mjs` | The `WasmOwned` handle-disposal contract, as text. | `wasm-doc` (nightly) |
+| `finstack-quant-wasm/scripts/check-typescript-docs.mjs` | JSDoc completeness of the published declarations (`pkg/finstack_quant_wasm.d.ts`, from the Rustdoc of `src/api/**`, and the generated `index.d.ts`): summaries, every camelCase `@param`, `@returns`, examples on classes and namespaces. | `wasm-doc` (nightly) |
+| `finstack-quant-wasm/scripts/gen-facade-dts.mjs --check` | The committed `index.d.ts` equals the facade declarations generated from `exports/**` over the built package declarations. | `wasm-test` (PR) |
+| `finstack-quant-wasm/tests/facade/surface.test.mjs` | The runtime facade equals `facade-surface.json`, and `index.d.ts` declares exactly that surface. | `wasm-test` (PR) |
+| `finstack-quant-wasm/tests/facade/typed_declarations.test.mjs` | No `any` in the published declarations: every `JsValue` parameter and return carries an `unchecked_*_type` attribute. | `wasm-test` (PR) |
+| `finstack-quant-wasm/tests/facade/return_shapes.test.mjs` | Declared return shapes: Json/Text suffixes, structured results, `Float64Array` vectors; mirror of `finstack-quant-py/tests/parity/test_return_shapes.py`. | `wasm-test` (PR) |
+| `finstack-quant-wasm/tests/facade/benchmark_names.test.mjs` | `benchmarks/bench.mjs` calls only names the package exports. | `wasm-test` (PR) |
+| `finstack-quant-wasm` `npm run test:dts` | Consumer programs compile against the declarations under ES2020, ESNext disposable and NodeNext, and with `skipLibCheck: false`. | `wasm-test` (PR) |
 | `finstack-quant-wasm/scripts/check-typescript-examples.mjs` | Every documented TypeScript/JavaScript sample type-checks. | `wasm-doc` (nightly) |
 | `finstack-quant-ui/scripts/check-tokens.mjs` | Colours, fonts and spacing come only from the theme tokens. | `ui-check` (PR) |
 | `finstack-quant-ui/scripts/check-registry.mjs` | Registry closures resolve, and domain components never import `@base-ui/*`. | `ui-check` (PR) |
@@ -110,8 +114,8 @@ These tests also pin generated files; `gen-write` refreshes each one:
 | `docs-site/gen/check_{coverage,curriculum,links}.py` | Lesson coverage, curriculum dependencies and evidence, and links in the static export. | `docs-site-build` (local) |
 
 The WASM-side Rust tests `tests/boundary_signatures.rs` (exports take `JsValue`
-arguments), `tests/return_shapes.rs` (result shapes) and `tests/dts_contract.rs`
-(declared signatures) run under `rust-test` (PR).
+arguments) and `tests/return_shapes.rs` (no serializer bypass, no JSON parsing
+in the facade) run under `rust-test` (PR).
 
 ## Benchmarks and regression gates
 

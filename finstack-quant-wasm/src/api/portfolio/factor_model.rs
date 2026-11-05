@@ -28,6 +28,27 @@ fn parse_stresses(stresses: &JsValue) -> Result<Vec<(FactorId, f64)>, JsValue> {
 /// Holds the factor definitions, covariance matrix, dependency matcher and
 /// sensitivity engine so repeated analyses reuse one validated model. Build
 /// it with `FactorModel.fromConfig`; call `free()` when done.
+///
+/// @example
+/// ```typescript
+/// import init, { portfolio } from "finstack-quant-wasm";
+/// await init();
+/// const model = portfolio.FactorModel.fromConfig({
+///   factors: [
+///     {
+///       id: "usd_rates",
+///       factor_type: "rates",
+///       market_mapping: { curve_parallel: { curve_ids: ["USD-OIS"], units: "rate_bp" } },
+///     },
+///   ],
+///   covariance: { factor_ids: ["usd_rates"], n: 1, data: [0.0001] },
+///   matching: {
+///     mapping_table: [{ dependency_filter: {}, attribute_filter: {}, factor_id: "usd_rates" }],
+///   },
+///   risk_measure: "variance",
+/// });
+/// model.free();
+/// ```
 #[wasm_bindgen(js_name = FactorModel)]
 pub struct JsFactorModel {
     pub(crate) inner: FactorModel,
@@ -47,7 +68,9 @@ impl JsFactorModel {
     /// does not match the `FactorModelConfig` schema, a matching rule names an
     /// undeclared factor, or the covariance axes do not align with the factors.
     #[wasm_bindgen(js_name = fromConfig)]
-    pub fn from_config(config: JsValue) -> Result<JsFactorModel, JsValue> {
+    pub fn from_config(
+        #[wasm_bindgen(unchecked_param_type = "FactorModelConfig | string")] config: JsValue,
+    ) -> Result<JsFactorModel, JsValue> {
         let config: FactorModelConfig = from_js_json(&config, "config")?;
         FactorModel::from_config(config)
             .map(|inner| JsFactorModel { inner })
@@ -67,7 +90,7 @@ impl JsFactorModel {
     /// Throws a `FinstackError` (kind `not_found`) if a referenced credit
     /// index is missing from `market`, and kind `validation` if the unmatched
     /// policy is strict and a dependency cannot be mapped.
-    #[wasm_bindgen(js_name = assignFactors)]
+    #[wasm_bindgen(js_name = assignFactors, unchecked_return_type = "FactorAssignmentReport")]
     pub fn assign_factors(
         &self,
         portfolio: &JsPortfolio,
@@ -87,7 +110,7 @@ impl JsFactorModel {
     /// `computeFactorSensitivities` returns and `models.factor.risk.decomposeFactors` accepts.
     /// @param portfolio - Built portfolio; its base currency is the reporting currency of every sensitivity.
     /// @param market - `core.MarketContext` handle bumped by the sensitivity engine, including FX for cross-currency positions.
-    /// @param as_of - ISO-8601 valuation date for sensitivities and spot FX.
+    /// @param asOf - ISO-8601 valuation date for sensitivities and spot FX.
     /// @returns The `SensitivityMatrixJson` object.
     ///
     /// # Errors
@@ -95,12 +118,12 @@ impl JsFactorModel {
     /// Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string,
     /// and a `FinstackError` if it is not an ISO date or factor assignment,
     /// sensitivity generation or FX conversion fails.
-    #[wasm_bindgen(js_name = computeSensitivities)]
+    #[wasm_bindgen(js_name = computeSensitivities, unchecked_return_type = "SensitivityMatrixJson")]
     pub fn compute_sensitivities(
         &self,
         portfolio: &JsPortfolio,
         market: &JsMarketContext,
-        as_of: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
         let matrix = self
@@ -118,7 +141,7 @@ impl JsFactorModel {
     /// Returns the `RiskDecomposition` in the configured risk measure's units.
     /// @param portfolio - Built portfolio to analyze.
     /// @param market - `core.MarketContext` handle used for sensitivity generation.
-    /// @param as_of - ISO-8601 valuation date of the analysis.
+    /// @param asOf - ISO-8601 valuation date of the analysis.
     /// @returns The `RiskDecomposition`.
     ///
     /// # Errors
@@ -126,12 +149,12 @@ impl JsFactorModel {
     /// Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string,
     /// and a `FinstackError` if it is not an ISO date or factor assignment,
     /// sensitivity or decomposition fails.
-    #[wasm_bindgen(js_name = analyze)]
+    #[wasm_bindgen(js_name = analyze, unchecked_return_type = "RiskDecomposition")]
     pub fn analyze(
         &self,
         portfolio: &JsPortfolio,
         market: &JsMarketContext,
-        as_of: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
         let decomposition = self
@@ -147,7 +170,7 @@ impl JsFactorModel {
     /// decompositions and the per-factor `delta`.
     /// @param portfolio - Built portfolio the changes are applied to.
     /// @param market - `core.MarketContext` handle holding the curves, quotes and FX data.
-    /// @param as_of - ISO-8601 valuation date.
+    /// @param asOf - ISO-8601 valuation date.
     /// @param changes - Array of `PositionChange` objects: `{ kind: "remove", position_id }` or `{ kind: "resize", position_id, new_quantity }`.
     /// @returns The `WhatIfResult`.
     ///
@@ -156,13 +179,13 @@ impl JsFactorModel {
     /// Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a
     /// `FinstackError` if the changes are malformed, `asOf` is not an ISO
     /// date, a change names an unknown position, or the analysis fails.
-    #[wasm_bindgen(js_name = positionWhatIf)]
+    #[wasm_bindgen(js_name = positionWhatIf, unchecked_return_type = "WhatIfResult")]
     pub fn position_what_if(
         &self,
         portfolio: &JsPortfolio,
         market: &JsMarketContext,
-        as_of: JsValue,
-        changes: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "PositionChange[] | string")] changes: JsValue,
     ) -> Result<JsValue, JsValue> {
         let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
         let changes: Vec<PositionChange> = from_js_json(&changes, "changes")?;
@@ -179,7 +202,7 @@ impl JsFactorModel {
     /// `position_pnl`, and the `stressed_decomposition`.
     /// @param portfolio - Built portfolio whose positions are revalued.
     /// @param market - `core.MarketContext` handle holding the unstressed market.
-    /// @param as_of - ISO-8601 valuation date for both endpoints.
+    /// @param asOf - ISO-8601 valuation date for both endpoints.
     /// @param stresses - Array of `[factorId, shift]` pairs; each shift is in the factor's configured market-mapping units.
     /// @returns The `StressResult`.
     ///
@@ -189,13 +212,13 @@ impl JsFactorModel {
     /// `FinstackError` if the stresses are malformed, `asOf` is not an ISO
     /// date, a stress names an unknown factor, or repricing or decomposition
     /// fails.
-    #[wasm_bindgen(js_name = factorStress)]
+    #[wasm_bindgen(js_name = factorStress, unchecked_return_type = "StressResult")]
     pub fn factor_stress(
         &self,
         portfolio: &JsPortfolio,
         market: &JsMarketContext,
-        as_of: JsValue,
-        stresses: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "[string, number][] | string")] stresses: JsValue,
     ) -> Result<JsValue, JsValue> {
         let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
         let stresses = parse_stresses(&stresses)?;
@@ -212,7 +235,7 @@ impl JsFactorModel {
     /// `position_pnl` (loss negative).
     /// @param portfolio - Built portfolio whose positions are revalued.
     /// @param market - `core.MarketContext` handle holding the unstressed market.
-    /// @param as_of - ISO-8601 valuation date for both endpoints.
+    /// @param asOf - ISO-8601 valuation date for both endpoints.
     /// @param stresses - Array of `[factorId, shift]` pairs; each shift is in the factor's configured market-mapping units.
     /// @returns The `StressPnl`.
     ///
@@ -221,13 +244,13 @@ impl JsFactorModel {
     /// Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a
     /// `FinstackError` if the stresses are malformed, `asOf` is not an ISO
     /// date, a stress names an unknown factor, or repricing fails.
-    #[wasm_bindgen(js_name = factorStressPnl)]
+    #[wasm_bindgen(js_name = factorStressPnl, unchecked_return_type = "StressPnl")]
     pub fn factor_stress_pnl(
         &self,
         portfolio: &JsPortfolio,
         market: &JsMarketContext,
-        as_of: JsValue,
-        stresses: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "[string, number][] | string")] stresses: JsValue,
     ) -> Result<JsValue, JsValue> {
         let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
         let stresses = parse_stresses(&stresses)?;
@@ -252,8 +275,10 @@ impl JsFactorModel {
 /// Throws a `TypeError` (kind `invalid_type`) if `spec` is not a JSON string
 /// or plain object, and a `FinstackError` (kind `validation`) if it does not
 /// match the `WeightAllocationSpec` schema or violates a scheme invariant.
-#[wasm_bindgen(js_name = allocateWeights)]
-pub fn allocate_weights(spec: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = allocateWeights, unchecked_return_type = "WeightAllocationResult")]
+pub fn allocate_weights(
+    #[wasm_bindgen(unchecked_param_type = "WeightAllocationSpec | string")] spec: JsValue,
+) -> Result<JsValue, JsValue> {
     let spec: WeightAllocationSpec = from_js_json(&spec, "spec")?;
     let result = allocation::allocate_weights(&spec).map_err(to_js_err)?;
     to_js_value(&result)
@@ -267,7 +292,7 @@ pub fn allocate_weights(spec: JsValue) -> Result<JsValue, JsValue> {
 /// when requested, `by_position` rows.
 /// @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `models.factor.risk.decomposeFactors`.
 /// @param model - `models.factor.credit.CreditFactorModel` handle whose hierarchy names the levels.
-/// @param by_position - `true` to include the per-position breakdown; `false` leaves `by_position` `null`.
+/// @param byPosition - `true` to include the per-position breakdown; `false` leaves `by_position` `null`.
 /// @returns The `CreditVolReport`.
 ///
 /// # Errors
@@ -277,11 +302,11 @@ pub fn allocate_weights(spec: JsValue) -> Result<JsValue, JsValue> {
 /// `FinstackError` (kind `validation`) if `decomposition` does not match the
 /// `RiskDecomposition` schema or holds a factor contribution that is neither
 /// the generic credit factor nor a bucket of one of `model`'s hierarchy levels.
-#[wasm_bindgen(js_name = buildCreditVolReport)]
+#[wasm_bindgen(js_name = buildCreditVolReport, unchecked_return_type = "CreditVolReport")]
 pub fn build_credit_vol_report(
-    decomposition: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "RiskDecomposition | string")] decomposition: JsValue,
     model: &JsCreditFactorModel,
-    by_position: JsValue,
+    #[wasm_bindgen(js_name = "byPosition", unchecked_param_type = "boolean")] by_position: JsValue,
 ) -> Result<JsValue, JsValue> {
     let decomposition: finstack_quant_factor::risk::RiskDecomposition =
         from_js_json(&decomposition, "decomposition")?;

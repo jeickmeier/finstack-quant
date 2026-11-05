@@ -26,6 +26,15 @@ fn js_matrix_data(value: &JsValue, n: usize, label: &str) -> Result<Vec<f64>, Js
 }
 
 /// Ordered set of rating states, optionally with an absorbing default state.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+/// console.log(scale.nStates, scale.labels(), scale.defaultState());
+/// scale.free();
+/// ```
 #[wasm_bindgen(js_name = RatingScale)]
 #[derive(Clone)]
 pub struct JsRatingScale {
@@ -69,7 +78,9 @@ impl JsRatingScale {
     ///
     /// Throws a `validation` error if fewer than two labels are given or a
     /// label repeats.
-    pub fn custom(labels: JsValue) -> Result<JsRatingScale, JsValue> {
+    pub fn custom(
+        #[wasm_bindgen(unchecked_param_type = "string[]")] labels: JsValue,
+    ) -> Result<JsRatingScale, JsValue> {
         RatingScale::custom(js_string_seq(&labels, "labels")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -77,7 +88,7 @@ impl JsRatingScale {
 
     /// Custom scale with an explicitly named default state.
     /// @param labels - Distinct state labels in order, at least two.
-    /// @param default_label - Label of the absorbing default state; must be one of `labels`.
+    /// @param defaultLabel - Label of the absorbing default state; must be one of `labels`.
     /// @returns The custom rating scale.
     ///
     /// # Errors
@@ -86,7 +97,8 @@ impl JsRatingScale {
     /// `not_found` error if `defaultLabel` is not among them.
     #[wasm_bindgen(js_name = customWithDefault)]
     pub fn custom_with_default(
-        labels: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string[]")] labels: JsValue,
+        #[wasm_bindgen(js_name = "defaultLabel", unchecked_param_type = "string")]
         default_label: JsValue,
     ) -> Result<JsRatingScale, JsValue> {
         RatingScale::custom_with_default(
@@ -111,7 +123,10 @@ impl JsRatingScale {
     ///
     /// Throws a `TypeError` if `label` is not a string.
     #[wasm_bindgen(js_name = indexOf)]
-    pub fn index_of(&self, label: JsValue) -> Result<Option<usize>, JsValue> {
+    pub fn index_of(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] label: JsValue,
+    ) -> Result<Option<usize>, JsValue> {
         Ok(self.inner.index_of(&js_string(&label, "label")?))
     }
 
@@ -123,7 +138,10 @@ impl JsRatingScale {
     ///
     /// Throws a `not_found` error if the label is not in the scale.
     #[wasm_bindgen(js_name = indexOfRequired)]
-    pub fn index_of_required(&self, label: JsValue) -> Result<usize, JsValue> {
+    pub fn index_of_required(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] label: JsValue,
+    ) -> Result<usize, JsValue> {
         self.inner
             .index_of_required(&js_string(&label, "label")?)
             .map_err(to_js_err)
@@ -137,7 +155,10 @@ impl JsRatingScale {
     ///
     /// Throws a `TypeError` if `index` is not a safe non-negative integer.
     #[wasm_bindgen(js_name = labelOf)]
-    pub fn label_of(&self, index: JsValue) -> Result<Option<String>, JsValue> {
+    pub fn label_of(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] index: JsValue,
+    ) -> Result<Option<String>, JsValue> {
         let index: usize = js_uint(&index, "index")?;
         Ok(self.inner.label_of(index).map(str::to_owned))
     }
@@ -162,7 +183,10 @@ impl JsRatingScale {
     /// # Errors
     ///
     /// Throws a `not_found` error if the label is unknown or has no WARF factor.
-    pub fn warf(&self, label: JsValue) -> Result<f64, JsValue> {
+    pub fn warf(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] label: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .warf(&js_string(&label, "label")?)
             .map_err(to_js_err)
@@ -177,7 +201,10 @@ impl JsRatingScale {
     /// Throws a `validation` error if `warf` is invalid or the scale has no
     /// WARF mapping.
     #[wasm_bindgen(js_name = ratingFromWarf)]
-    pub fn rating_from_warf(&self, warf: JsValue) -> Result<String, JsValue> {
+    pub fn rating_from_warf(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] warf: JsValue,
+    ) -> Result<String, JsValue> {
         self.inner
             .rating_from_warf(js_f64(&warf, "warf")?)
             .map(str::to_owned)
@@ -186,6 +213,19 @@ impl JsRatingScale {
 }
 
 /// Rating transition matrix over a fixed horizon; rows sum to one.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+/// const matrix = new models.credit.migration.TransitionMatrix(
+///   scale,
+///   [[0.9, 0.08, 0.02], [0.1, 0.8, 0.1], [0, 0, 1]],
+///   1.0,
+/// );
+/// console.log(matrix.probability("A", "D"), matrix.defaultProbabilities());
+/// ```
 #[wasm_bindgen(js_name = TransitionMatrix)]
 pub struct JsTransitionMatrix {
     pub(crate) inner: TransitionMatrix,
@@ -208,8 +248,8 @@ impl JsTransitionMatrix {
     #[wasm_bindgen(constructor)]
     pub fn new(
         scale: &JsRatingScale,
-        data: JsValue,
-        horizon: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray | NumericArray[]")] data: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
     ) -> Result<JsTransitionMatrix, JsValue> {
         let data = js_matrix_data(&data, scale.inner.n_states(), "data")?;
         TransitionMatrix::new(scale.inner.clone(), &data, js_f64(&horizon, "horizon")?)
@@ -218,8 +258,8 @@ impl JsTransitionMatrix {
     }
 
     /// Construct a transition matrix from ordered origin and destination labels.
-    /// @param row_labels - Ordered origin labels, one per row.
-    /// @param column_labels - Ordered destination labels; must equal `rowLabels` exactly.
+    /// @param rowLabels - Ordered origin labels, one per row.
+    /// @param columnLabels - Ordered destination labels; must equal `rowLabels` exactly.
     /// @param data - Flat row-major probabilities or square nested rows; each row sums to one.
     /// @param horizon - Positive finite horizon in years covered by the probabilities.
     /// @param scale - Optional `RatingScale` JSON text or plain object, such as `scale.toJson()`; its labels must match both vectors in order. Omit to infer a custom scale with the last label absorbing.
@@ -232,11 +272,14 @@ impl JsTransitionMatrix {
     /// probabilities, horizon or absorbing default row.
     #[wasm_bindgen(js_name = fromLabeled)]
     pub fn from_labeled(
+        #[wasm_bindgen(js_name = "rowLabels", unchecked_param_type = "readonly string[]")]
         row_labels: JsValue,
+        #[wasm_bindgen(js_name = "columnLabels", unchecked_param_type = "readonly string[]")]
         column_labels: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray | readonly NumericArray[]")]
         data: JsValue,
-        horizon: JsValue,
-        scale: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "JsonInput")] scale: Option<JsValue>,
     ) -> Result<JsTransitionMatrix, JsValue> {
         let row_labels = js_string_seq(&row_labels, "rowLabels")?;
         let column_labels = js_string_seq(&column_labels, "columnLabels")?;
@@ -264,7 +307,11 @@ impl JsTransitionMatrix {
     /// # Errors
     ///
     /// Throws a `not_found` error if either label is not in the scale.
-    pub fn probability(&self, from: JsValue, to: JsValue) -> Result<f64, JsValue> {
+    pub fn probability(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] from: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] to: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .probability(&js_string(&from, "from")?, &js_string(&to, "to")?)
             .map_err(to_js_err)
@@ -279,7 +326,11 @@ impl JsTransitionMatrix {
     ///
     /// Throws a `validation` error if either index is outside the scale.
     #[wasm_bindgen(js_name = probabilityByIndex)]
-    pub fn probability_by_index(&self, from: JsValue, to: JsValue) -> Result<f64, JsValue> {
+    pub fn probability_by_index(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] from: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] to: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .probability_by_index(js_uint(&from, "from")?, js_uint(&to, "to")?)
             .map_err(to_js_err)
@@ -292,7 +343,10 @@ impl JsTransitionMatrix {
     /// # Errors
     ///
     /// Throws a `not_found` error if the label is not in the scale.
-    pub fn row(&self, from: JsValue) -> Result<Box<[f64]>, JsValue> {
+    pub fn row(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] from: JsValue,
+    ) -> Result<Box<[f64]>, JsValue> {
         self.inner
             .row(&js_string(&from, "from")?)
             .map(Vec::into_boxed_slice)
@@ -319,7 +373,7 @@ impl JsTransitionMatrix {
     /// # Errors
     ///
     /// Throws a `validation` error if the rows cannot be converted.
-    #[wasm_bindgen(js_name = toRows)]
+    #[wasm_bindgen(js_name = toRows, unchecked_return_type = "number[][]")]
     pub fn to_rows(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.to_rows())
     }
@@ -355,6 +409,19 @@ impl JsTransitionMatrix {
 }
 
 /// Continuous-time Markov-chain generator (intensity) matrix; rows sum to zero.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+/// const generator = new models.credit.migration.GeneratorMatrix(scale, [
+///   [-0.1, 0.08, 0.02],
+///   [0.1, -0.2, 0.1],
+///   [0, 0, 0],
+/// ]);
+/// console.log(generator.exitRate("A"), models.credit.migration.project(generator, 2).probability("A", "D"));
+/// ```
 #[wasm_bindgen(js_name = GeneratorMatrix)]
 pub struct JsGeneratorMatrix {
     pub(crate) inner: GeneratorMatrix,
@@ -373,7 +440,10 @@ impl JsGeneratorMatrix {
     /// Throws a `validation` error if the dimensions do not match the scale or
     /// the entries do not form a valid generator.
     #[wasm_bindgen(constructor)]
-    pub fn new(scale: &JsRatingScale, data: JsValue) -> Result<JsGeneratorMatrix, JsValue> {
+    pub fn new(
+        scale: &JsRatingScale,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray | NumericArray[]")] data: JsValue,
+    ) -> Result<JsGeneratorMatrix, JsValue> {
         let data = js_matrix_data(&data, scale.inner.n_states(), "data")?;
         GeneratorMatrix::new(scale.inner.clone(), &data)
             .map(|inner| Self { inner })
@@ -383,7 +453,7 @@ impl JsGeneratorMatrix {
     /// Estimate the generator of a transition matrix by matrix logarithm with
     /// regularization (Israel-Rosenthal-Wei).
     /// @param p - `TransitionMatrix` whose generator to extract.
-    /// @param round_trip_tol - Optional largest accepted absolute difference between `exp(Q * horizon)` and `p`; omitted or `null` uses the default `1e-2`.
+    /// @param roundTripTol - Optional largest accepted absolute difference between `exp(Q * horizon)` and `p`; omitted or `null` uses the default `1e-2`.
     /// @returns The regularized generator; `roundTripError` reports the fit.
     ///
     /// # Errors
@@ -393,6 +463,10 @@ impl JsGeneratorMatrix {
     #[wasm_bindgen(js_name = fromTransitionMatrix)]
     pub fn from_transition_matrix(
         p: &JsTransitionMatrix,
+        #[wasm_bindgen(
+            js_name = "roundTripTol",
+            unchecked_optional_param_type = "number | null"
+        )]
         round_trip_tol: Option<JsValue>,
     ) -> Result<JsGeneratorMatrix, JsValue> {
         let round_trip_tol = js_opt_f64(round_trip_tol.as_ref(), "roundTripTol")?;
@@ -409,7 +483,11 @@ impl JsGeneratorMatrix {
     /// # Errors
     ///
     /// Throws a `not_found` error if either label is not in the scale.
-    pub fn intensity(&self, from: JsValue, to: JsValue) -> Result<f64, JsValue> {
+    pub fn intensity(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] from: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] to: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .intensity(&js_string(&from, "from")?, &js_string(&to, "to")?)
             .map_err(to_js_err)
@@ -423,7 +501,10 @@ impl JsGeneratorMatrix {
     ///
     /// Throws a `not_found` error if the label is not in the scale.
     #[wasm_bindgen(js_name = exitRate)]
-    pub fn exit_rate(&self, state: JsValue) -> Result<f64, JsValue> {
+    pub fn exit_rate(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] state: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .exit_rate(&js_string(&state, "state")?)
             .map_err(to_js_err)
@@ -435,7 +516,7 @@ impl JsGeneratorMatrix {
     /// # Errors
     ///
     /// Throws a `validation` error if the rows cannot be converted.
-    #[wasm_bindgen(js_name = toRows)]
+    #[wasm_bindgen(js_name = toRows, unchecked_return_type = "number[][]")]
     pub fn to_rows(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.to_rows())
     }
@@ -468,6 +549,17 @@ impl JsGeneratorMatrix {
 }
 
 /// One simulated rating trajectory: piecewise-constant, right-continuous.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+/// const generator = new models.credit.migration.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+/// const path = new models.credit.migration.MigrationSimulator(generator, 5).simulate(0, 1, 7).paths[0];
+/// const copy = models.credit.migration.RatingPath.fromJson(path.toJson());
+/// console.log(copy.labelAt(5), copy.defaulted());
+/// ```
 #[wasm_bindgen(js_name = RatingPath)]
 #[derive(Clone)]
 pub struct JsRatingPath {
@@ -486,7 +578,10 @@ impl JsRatingPath {
     ///
     /// Throws a `TypeError` if `t` is not a number.
     #[wasm_bindgen(js_name = stateAt)]
-    pub fn state_at(&self, t: JsValue) -> Result<usize, JsValue> {
+    pub fn state_at(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+    ) -> Result<usize, JsValue> {
         Ok(self.inner.state_at(js_f64(&t, "t")?))
     }
 
@@ -498,7 +593,10 @@ impl JsRatingPath {
     ///
     /// Throws a `TypeError` if `t` is not a number.
     #[wasm_bindgen(js_name = labelAt)]
-    pub fn label_at(&self, t: JsValue) -> Result<String, JsValue> {
+    pub fn label_at(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+    ) -> Result<String, JsValue> {
         Ok(self.inner.label_at(js_f64(&t, "t")?).to_owned())
     }
 
@@ -528,6 +626,7 @@ impl JsRatingPath {
     /// # Errors
     ///
     /// Throws a `validation` error if the events cannot be converted.
+    #[wasm_bindgen(unchecked_return_type = "[number, number][]")]
     pub fn transitions(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.transitions())
     }
@@ -548,6 +647,17 @@ impl JsRatingPath {
 }
 
 /// A batch of simulated rating paths from `MigrationSimulator.simulate`.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+/// const generator = new models.credit.migration.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+/// const batch = new models.credit.migration.MigrationSimulator(generator, 5).simulate(0, 100, 7);
+/// const copy = models.credit.migration.RatingPaths.fromJson(batch.toJson());
+/// console.log(copy.length, copy.defaultRate);
+/// ```
 #[wasm_bindgen(js_name = RatingPaths)]
 pub struct JsRatingPaths {
     pub(crate) inner: Vec<RatingPath>,
@@ -581,6 +691,17 @@ impl JsRatingPaths {
 }
 
 /// Gillespie simulator of rating migration under a generator matrix.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+/// const generator = new models.credit.migration.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+/// const simulator = new models.credit.migration.MigrationSimulator(generator, 5);
+/// console.log(simulator.simulate(0, 100, 7).defaultRate);
+/// console.log(simulator.empiricalMatrix(200, 7).probability("A", "D"));
+/// ```
 #[wasm_bindgen(js_name = MigrationSimulator)]
 pub struct JsMigrationSimulator {
     pub(crate) inner: MigrationSimulator,
@@ -600,7 +721,7 @@ impl JsMigrationSimulator {
     #[wasm_bindgen(constructor)]
     pub fn new(
         generator: &JsGeneratorMatrix,
-        horizon: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
     ) -> Result<JsMigrationSimulator, JsValue> {
         MigrationSimulator::new(generator.inner.clone(), js_f64(&horizon, "horizon")?)
             .map(|inner| Self { inner })
@@ -608,8 +729,8 @@ impl JsMigrationSimulator {
     }
 
     /// Simulate independent rating paths from one starting state.
-    /// @param initial_state - Zero-based starting state index.
-    /// @param n_paths - Number of paths; a safe non-negative integer.
+    /// @param initialState - Zero-based starting state index.
+    /// @param nPaths - Number of paths; a safe non-negative integer.
     /// @param seed - Seed of the Rust PCG64 generator, as a safe integer or `bigint`; equal seeds give equal paths in every host.
     /// @returns The simulated `RatingPaths` batch.
     ///
@@ -618,9 +739,10 @@ impl JsMigrationSimulator {
     /// Throws a `validation` error if `initialState` is outside the scale.
     pub fn simulate(
         &self,
+        #[wasm_bindgen(js_name = "initialState", unchecked_param_type = "number")]
         initial_state: JsValue,
-        n_paths: JsValue,
-        seed: JsValue,
+        #[wasm_bindgen(js_name = "nPaths", unchecked_param_type = "number")] n_paths: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number | bigint")] seed: JsValue,
     ) -> Result<JsRatingPaths, JsValue> {
         self.inner
             .simulate(
@@ -633,7 +755,7 @@ impl JsMigrationSimulator {
     }
 
     /// Estimate the transition matrix over the horizon by simulation.
-    /// @param n_paths_per_state - Paths simulated from every starting state; positive.
+    /// @param nPathsPerState - Paths simulated from every starting state; positive.
     /// @param seed - Seed of the Rust PCG64 generator, as a safe integer or `bigint`.
     /// @returns The empirical `TransitionMatrix`.
     ///
@@ -643,8 +765,9 @@ impl JsMigrationSimulator {
     #[wasm_bindgen(js_name = empiricalMatrix)]
     pub fn empirical_matrix(
         &self,
+        #[wasm_bindgen(js_name = "nPathsPerState", unchecked_param_type = "number")]
         n_paths_per_state: JsValue,
-        seed: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number | bigint")] seed: JsValue,
     ) -> Result<JsTransitionMatrix, JsValue> {
         self.inner
             .empirical_matrix(
@@ -680,7 +803,10 @@ impl JsMigrationSimulator {
 /// Throws a `validation` error if `t` is not positive and finite, and a
 /// `computation` error if the matrix exponential fails.
 #[wasm_bindgen(js_name = project)]
-pub fn project(generator: &JsGeneratorMatrix, t: JsValue) -> Result<JsTransitionMatrix, JsValue> {
+pub fn project(
+    generator: &JsGeneratorMatrix,
+    #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+) -> Result<JsTransitionMatrix, JsValue> {
     migration::project(&generator.inner, js_f64(&t, "t")?)
         .map(|inner| JsTransitionMatrix { inner })
         .map_err(to_js_err)

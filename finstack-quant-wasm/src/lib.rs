@@ -24,6 +24,13 @@ use wasm_bindgen::prelude::*;
 pub mod api;
 pub mod utils;
 
+/// The package's only hand-written TypeScript: the host-only types the
+/// `unchecked_*_type` attributes name (`JsonInput`, `FinstackError`, ...) and
+/// the imports and root re-exports of the schema-generated types. wasm-bindgen
+/// appends it to `pkg/finstack_quant_wasm.d.ts`.
+#[wasm_bindgen(typescript_custom_section)]
+const PRELUDE: &str = include_str!("prelude.d.ts");
+
 /// Module initializer: installs the panic hook.
 ///
 /// wasm-bindgen runs this once when the module is instantiated, so a Rust

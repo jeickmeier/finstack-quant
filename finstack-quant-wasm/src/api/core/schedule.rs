@@ -56,8 +56,13 @@ impl JsSchedule {
     /// frequency, no stub, no business-day adjustment, strict error policy.
     /// @throws `TypeError` if a date is not an integer; `FinstackError` (kind
     /// `validation`) if a date is out of range or `start` is after `end`.
+    /// @param start - First unadjusted accrual date, as days since 1970-01-01.
+    /// @param end - Last unadjusted accrual date, as days since 1970-01-01; must be on or after `start`.
     #[wasm_bindgen(js_name = builder)]
-    pub fn builder(start: JsValue, end: JsValue) -> Result<JsScheduleBuilder, JsValue> {
+    pub fn builder(
+        #[wasm_bindgen(unchecked_param_type = "number")] start: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] end: JsValue,
+    ) -> Result<JsScheduleBuilder, JsValue> {
         ScheduleSpec::new(js_epoch_days(&start, "start")?, js_epoch_days(&end, "end")?)
             .map(|spec| JsScheduleBuilder { spec })
             .map_err(to_js_err)
@@ -79,8 +84,11 @@ impl JsSchedule {
     /// `FinstackError` (kind `validation`) for an invalid spec, both IMM modes
     /// together, or a generation failure; kind `not_found` for an unknown
     /// calendar under the strict policy.
+    /// @param spec - `ScheduleSpec` JSON text or plain object, such as `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency` (a `{ count, unit }` tenor), `stub`, `business_day_convention`, `calendar_id`, `end_of_month`, `imm_mode`, `cds_imm_mode`, `error_policy`, `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are rejected.
     #[wasm_bindgen(js_name = fromSpec)]
-    pub fn from_spec(spec: JsValue) -> Result<JsSchedule, JsValue> {
+    pub fn from_spec(
+        #[wasm_bindgen(unchecked_param_type = "ScheduleSpec | string")] spec: JsValue,
+    ) -> Result<JsSchedule, JsValue> {
         ScheduleBuilder::from(from_js_json::<ScheduleSpec>(&spec, "spec")?)
             .build()
             .map(|inner| JsSchedule { inner })
@@ -123,7 +131,7 @@ impl JsSchedule {
 
     /// Construction warnings in the Rust `ScheduleWarning` wire form (an
     /// array of single-key objects such as `{ graceful_fallback: { … } }`).
-    #[wasm_bindgen(getter, js_name = warnings)]
+    #[wasm_bindgen(getter, js_name = warnings, unchecked_return_type = "ScheduleWarning[]")]
     pub fn warnings(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.warnings)
     }
@@ -147,8 +155,11 @@ impl JsSchedule {
     /// @returns The parsed `Schedule`.
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) if it does not match the schema.
+    /// @param json - Schedule JSON text or plain object with ISO `dates`, `payment_dates`, `fixing_dates` and optional `warnings`.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsSchedule, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsSchedule, JsValue> {
         from_js_json::<Schedule>(&json, "json").map(|inner| JsSchedule { inner })
     }
 }
@@ -172,6 +183,30 @@ impl JsSchedule {
 /// const schedule = monthly.adjustWith("following", "nyse").paymentLagDays(2).build();
 /// schedule.paymentDates.length; // 6
 /// ```
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const monthly = core.Schedule.builder(
+///   core.createDate(2025, 1, 15),
+///   core.createDate(2025, 7, 15),
+/// ).frequency("1M").adjustWith("modified_following", "nyse");
+/// const schedule = monthly.paymentLagDays(2).build();
+/// schedule.paymentDates.length; // 6
+/// ```
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const monthly = core.Schedule.builder(
+///   core.createDate(2025, 1, 15),
+///   core.createDate(2025, 7, 15),
+/// ).frequency("1M").adjustWith("modified_following", "nyse");
+/// const schedule = monthly.paymentLagDays(2).build();
+/// schedule.paymentDates.length; // 6
+/// ```
 #[wasm_bindgen(js_name = ScheduleBuilder)]
 #[derive(Clone, Debug)]
 pub struct JsScheduleBuilder {
@@ -190,8 +225,12 @@ impl JsScheduleBuilder {
     /// @returns This builder, updated in place.
     /// @throws `TypeError` if `frequency` is not a string; `FinstackError`
     /// (kind `validation`) if it is not a tenor.
+    /// @param frequency - Tenor text such as `"3M"`, `"6M"` or `"1Y"` (use `tenor.toString()` for a `Tenor`).
     #[wasm_bindgen(js_name = frequency)]
-    pub fn frequency(&mut self, frequency: JsValue) -> Result<(), JsValue> {
+    pub fn frequency(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] frequency: JsValue,
+    ) -> Result<(), JsValue> {
         self.spec.frequency =
             Tenor::parse(&js_string(&frequency, "frequency")?).map_err(to_js_err)?;
         Ok(())
@@ -207,8 +246,12 @@ impl JsScheduleBuilder {
     /// @returns This builder, updated in place.
     /// @throws `TypeError` if `stub` is not a string; `FinstackError` (kind
     /// `validation`) if no stub rule matches.
+    /// @param stub - Stub name: `"none"`, `"short_front"`, `"short_back"`, `"long_front"` or `"long_back"`, in any ASCII case.
     #[wasm_bindgen(js_name = stubRule)]
-    pub fn stub_rule(&mut self, stub: JsValue) -> Result<(), JsValue> {
+    pub fn stub_rule(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] stub: JsValue,
+    ) -> Result<(), JsValue> {
         self.spec.stub = js_string(&stub, "stub")?
             .parse::<StubKind>()
             .map_err(to_js_err)?;
@@ -227,8 +270,14 @@ impl JsScheduleBuilder {
     /// @returns This builder, updated in place.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) if the convention is unknown.
+    /// @param convention - Business-day convention name such as `"modified_following"`.
+    /// @param calendar - Registered holiday-calendar id (for example `"nyse"`); it is resolved when the schedule is built, under the error policy.
     #[wasm_bindgen(js_name = adjustWith)]
-    pub fn adjust_with(&mut self, convention: JsValue, calendar: JsValue) -> Result<(), JsValue> {
+    pub fn adjust_with(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] convention: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] calendar: JsValue,
+    ) -> Result<(), JsValue> {
         let convention = js_string(&convention, "convention")?
             .parse::<BusinessDayConvention>()
             .map_err(to_js_err)?;
@@ -247,8 +296,12 @@ impl JsScheduleBuilder {
     ///
     /// @returns This builder, updated in place.
     /// @throws `TypeError` if `lag` is not an integer.
+    /// @param lag - Signed number of business days; `0` pays on the period end. A non-zero lag needs a calendar (`adjustWith`), or `build` fails.
     #[wasm_bindgen(js_name = paymentLagDays)]
-    pub fn payment_lag_days(&mut self, lag: JsValue) -> Result<(), JsValue> {
+    pub fn payment_lag_days(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] lag: JsValue,
+    ) -> Result<(), JsValue> {
         self.spec.payment_lag_days = js_int(&lag, "lag")?;
         Ok(())
     }
@@ -262,8 +315,12 @@ impl JsScheduleBuilder {
     ///
     /// @returns This builder, updated in place.
     /// @throws `TypeError` if `lag` is not an integer.
+    /// @param lag - Number of business days the fixing precedes the accrual start; it needs a calendar (`adjustWith`), or `build` fails.
     #[wasm_bindgen(js_name = fixingLagBusinessDays)]
-    pub fn fixing_lag_business_days(&mut self, lag: JsValue) -> Result<(), JsValue> {
+    pub fn fixing_lag_business_days(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "number")] lag: JsValue,
+    ) -> Result<(), JsValue> {
         self.spec.fixing_lag_business_days = Some(js_int(&lag, "lag")?);
         Ok(())
     }
@@ -277,8 +334,12 @@ impl JsScheduleBuilder {
     ///
     /// @returns This builder, updated in place.
     /// @throws `TypeError` if `eom` is not a boolean.
+    /// @param eom - `true` keeps period ends on the last day of the month when the anchor date is a month end.
     #[wasm_bindgen(js_name = endOfMonth)]
-    pub fn end_of_month(&mut self, eom: JsValue) -> Result<(), JsValue> {
+    pub fn end_of_month(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "boolean")] eom: JsValue,
+    ) -> Result<(), JsValue> {
         self.spec.end_of_month = js_bool(&eom, "eom")?;
         Ok(())
     }
@@ -324,8 +385,12 @@ impl JsScheduleBuilder {
     /// @returns This builder, updated in place.
     /// @throws `TypeError` if `policy` is not a string; `FinstackError` (kind
     /// `validation`) if no policy matches.
+    /// @param policy - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`, in any ASCII case.
     #[wasm_bindgen(js_name = errorPolicy)]
-    pub fn error_policy(&mut self, policy: JsValue) -> Result<(), JsValue> {
+    pub fn error_policy(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] policy: JsValue,
+    ) -> Result<(), JsValue> {
         self.spec.error_policy = js_string(&policy, "policy")?.parse().map_err(to_js_err)?;
         Ok(())
     }
@@ -334,7 +399,7 @@ impl JsScheduleBuilder {
     ///
     /// @returns A plain `ScheduleSpec` object accepted by `Schedule.fromSpec`.
     /// @throws If the specification cannot be serialized (not expected).
-    #[wasm_bindgen(js_name = toSpec)]
+    #[wasm_bindgen(js_name = toSpec, unchecked_return_type = "ScheduleSpec")]
     pub fn to_spec(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.spec)
     }
