@@ -43,9 +43,7 @@ def price_instrument(
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: str = "default",
     metrics: list[str] | None = None,
-    metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-    market_history: MarketHistory | dict[str, Any] | str | None = None,
-    explain: bool = False,
+    extras: dict[str, Any] | str | None = None,
 ) -> ValuationResult:
     """
     Price one instrument and compute explicit risk metric requests.
@@ -87,26 +85,31 @@ def price_instrument(
         Roll specialness is in basis points against the forward curve
         ``repo_curve_id``, or the discount curve when absent; implied
         financing is an ACT/360 decimal rate.
-    metric_pricing_overrides : MetricPricingOverrides or dict or str, optional
-        Metric-time overrides merged into
-        ``instrument.spec.metric_pricing_overrides`` before pricing: ``theta_period`` (a tenor; in
-        dict/JSON form ``{"count": 1, "unit": "weeks"}``), ``breakeven_config``
-        (``{"target": "z_spread", "mode": "linear"}``), ``bump_config``,
-        ``bond_risk_basis``, ``theta_day_basis``, ``var_config``. A dict or
-        JSON string is accepted in place of the typed object.
-        Dict and JSON patches retain omitted fields, including individual
-        ``bump_config`` fields; explicit ``None``/``null`` clears optional fields.
-    market_history : MarketHistory or dict or str, optional
-        Historical scenarios required by the ``"hvar"`` and
-        ``"expected_shortfall"`` metrics; a dict or JSON string is accepted in
-        place of the typed object.
-    explain : bool, default False
-        When ``True``, attach a step trace as ``result.explanation``. For the
-        ``"discounting"`` and ``"hazard_rate"`` models it holds one
-        ``cashflow_pv`` entry per projected cashflow (date, amount, discount
-        factor, curve, survival probability, present value) that sums to the
-        price, capped at 1000 entries. Other models get one
-        ``computation_step`` entry saying no per-flow decomposition exists.
+    extras : dict[str, Any] or str, optional
+        The rarer pricing inputs, as a dict or JSON text in the shape of the
+        Rust ``PriceExtras``; every key is optional and an unknown key raises
+        ``ValueError``.
+        ``metric_pricing_overrides`` (a ``MetricPricingOverrides`` or dict):
+        metric-time overrides merged into
+        ``instrument.spec.metric_pricing_overrides`` before pricing:
+        ``theta_period`` (a tenor; in dict form ``{"count": 1, "unit": "weeks"}``),
+        ``breakeven_config`` (``{"target": "z_spread", "mode": "linear"}``),
+        ``bump_config``, ``bond_risk_basis``, ``theta_day_basis``, ``var_config``.
+        Only the keys present replace stored controls, individual
+        ``bump_config`` fields merge into the stored bump configuration, and an
+        explicit ``None`` clears an optional control; omitted keeps the
+        instrument's overrides.
+        ``market_history`` (a ``MarketHistory`` or dict): the historical
+        scenarios required by the ``"hvar"`` and ``"expected_shortfall"``
+        metrics; omitted prices without history.
+        ``explain`` (bool, default ``False``): when ``True``, attach a step
+        trace as ``result.explanation``. For the ``"discounting"`` and
+        ``"hazard_rate"`` models it holds one ``cashflow_pv`` entry per
+        projected cashflow (date, amount, discount factor, curve, survival
+        probability, present value) that sums to the price, capped at 1000
+        entries. Other models get one ``computation_step`` entry saying no
+        per-flow decomposition exists.
+        ``None`` (the default) means no extras.
 
     Returns
     -------
@@ -124,7 +127,8 @@ def price_instrument(
         If a curve, surface, fixing series or scalar the instrument depends
         on is missing from ``market``.
     ValueError
-        If the instrument, market, date or option payloads are malformed, a
+        If the instrument, market, date or ``extras`` payloads are malformed
+        (including an unknown ``extras`` key), a
         metric is unknown or not applicable to the instrument, or the
         instrument fails validation for the requested model (for example a
         seasoned floating leg without a ``FIXING:<index>`` series).
@@ -166,6 +170,9 @@ def price_instrument(
     >>> result = price_instrument(loan, market, "2024-01-01", metrics=["all_in_rate"])
     >>> (list(result.metrics), round(result.get_metric("all_in_rate"), 4))
     (['all_in_rate'], 0.06)
+    >>> traced = price_instrument(loan, market, "2024-01-01", extras={"explain": True})
+    >>> traced.explanation is not None
+    True
 
     """
     ...

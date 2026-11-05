@@ -181,15 +181,17 @@ def test_metric_pricing_overrides_merge_identically() -> None:
     overrides = {"bump_config": {"rate_bump_bp": 2.5}, "theta_period": {"count": 1, "unit": "weeks"}}
     bond = _fixed_bond()
     kind, _ = _assert_same(
-        lambda: price_instrument(bond, _market(), AS_OF, metrics=["dv01", "theta"], metric_pricing_overrides=overrides),
         lambda: price_instrument(
-            bond.to_json(), _market(), AS_OF, metrics=["dv01", "theta"], metric_pricing_overrides=overrides
+            bond, _market(), AS_OF, metrics=["dv01", "theta"], extras={"metric_pricing_overrides": overrides}
+        ),
+        lambda: price_instrument(
+            bond.to_json(), _market(), AS_OF, metrics=["dv01", "theta"], extras={"metric_pricing_overrides": overrides}
         ),
     )
     assert kind == "ok"
     kind, _ = _assert_same(
-        lambda: price_instrument(bond, _market(), AS_OF, metric_pricing_overrides='{"bogus": 1}'),
-        lambda: price_instrument(bond.to_json(), _market(), AS_OF, metric_pricing_overrides='{"bogus": 1}'),
+        lambda: price_instrument(bond, _market(), AS_OF, extras='{"metric_pricing_overrides": {"bogus": 1}}'),
+        lambda: price_instrument(bond.to_json(), _market(), AS_OF, extras={"metric_pricing_overrides": {"bogus": 1}}),
     )
     assert kind == "ValueError"
 

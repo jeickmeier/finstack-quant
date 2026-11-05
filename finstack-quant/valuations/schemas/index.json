@@ -181,6 +181,15 @@
       "type_name": "OasConfig"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",
+      "bytes": 10300,
+      "kind": "input",
+      "path": "schemas/common/1/price_extras.schema.json",
+      "summary": "Metric-pricing override patch, market history and step-trace flag of one price call.",
+      "title": "PriceExtras",
+      "type_name": "PriceExtras"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
       "bytes": 10046,
       "kind": "component",

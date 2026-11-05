@@ -20729,6 +20729,32 @@ export interface PoolReportFieldUnits {
   warf: MetricFieldUnit;
 }
 /**
+ * Metric-pricing override patch, market history and step-trace flag of one price call.
+ */
+export interface PriceExtras {
+  /**
+   * When `true`, attaches a step trace to the result as `explanation`.
+   * Defaults to `false` (no trace).
+   */
+  explain?: boolean;
+  /**
+   * Historical market scenarios for the historical risk metrics (`hvar`,
+   * `expected_shortfall`). `None` prices without history; requesting
+   * those metrics then fails.
+   */
+  market_history?: MarketHistory | null;
+  /**
+   * JSON object patch merged into `instrument.spec.metric_pricing_overrides`
+   * before validation, in the shape of [`MetricPricingOverrides`]. Only the
+   * keys present replace stored controls (an explicit `null` clears an
+   * optional control) and `bump_config` keys merge into the stored bump
+   * configuration. The field holds the raw patch rather than the typed
+   * struct because key presence decides what is replaced. `None` keeps
+   * the instrument's stored overrides.
+   */
+  metric_pricing_overrides?: MetricPricingOverrides | null;
+}
+/**
  * Market conventions of one interest-rate index.
  */
 export interface RateIndexConventions {

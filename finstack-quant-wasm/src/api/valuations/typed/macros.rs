@@ -116,12 +116,9 @@ macro_rules! instrument_pricing {
             /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             /// @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
-            /// @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
-            /// @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
-            /// @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
+            /// @param extras - Optional `PriceExtras` (plain object or JSON text); omit, `null`, or `undefined` for none. Keys, each optional: `metric_pricing_overrides` - a `MetricPricingOverrides` JSON object patch merged into the envelope before validation (only supplied fields replace stored overrides, `bump_config` fields merge, an explicit `null` clears a nullable field; omitted keeps the stored configuration); `market_history` - a `MarketHistory` object required by historical risk metrics such as `"hvar"` and `"expected_shortfall"` (omitted prices without history); `explain` - boolean, default `false`; `true` attaches a step trace as `result.explanation`.
             /// @returns Structured `ValuationResult` for the selected model.
-            /// @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
-            #[allow(clippy::too_many_arguments)]
+            /// @throws Error - Throws with kind `validation` if a payload (including an unknown `extras` key), `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
             #[wasm_bindgen(unchecked_return_type = "ValuationResult")]
             pub fn price(
                 &self,
@@ -133,22 +130,15 @@ macro_rules! instrument_pricing {
                 model: Option<JsValue>,
                 #[wasm_bindgen(unchecked_optional_param_type = "string[] | null")]
                 metrics: Option<JsValue>,
-                #[wasm_bindgen(js_name = "metricPricingOverrides", unchecked_optional_param_type = "JsonInput | null")]
-                metric_pricing_overrides: Option<JsValue>,
-                #[wasm_bindgen(js_name = "marketHistory", unchecked_optional_param_type = "JsonInput | null")]
-                market_history: Option<JsValue>,
-                #[wasm_bindgen(unchecked_optional_param_type = "boolean | null")]
-                explain: Option<JsValue>,
+                #[wasm_bindgen(unchecked_optional_param_type = "generated.valuations.PriceExtras | JsonInput | null")]
+                extras: Option<JsValue>,
             ) -> Result<JsValue, JsValue> {
-                let mut request = $crate::api::valuations::pricing::PriceRequest::from_js(
+                let request = $crate::api::valuations::pricing::PriceRequest::from_js(
                     &as_of,
                     model.as_ref(),
                     metrics.as_ref(),
-                    metric_pricing_overrides.as_ref(),
-                    market_history.as_ref(),
+                    extras.as_ref(),
                 )?;
-                request.explain =
-                    crate::utils::input::js_opt_bool(explain.as_ref(), "explain")?.unwrap_or(false);
                 let instrument = request.typed_instrument(Box::new(self.inner.clone()))?;
                 request.price(
                     &instrument,
@@ -418,7 +408,7 @@ macro_rules! common_getters {
             /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
             /// @returns The overrides plain object; `{}` when none is set.
             instrument_pricing_overrides as instrumentPricingOverrides: "generated.valuations.InstrumentPricingOverrides" => json(i.instrument_pricing_overrides),
-            /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+            /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; an `extras.metric_pricing_overrides` patch passed to `price` is merged over it per call.
             /// @returns The overrides plain object; unset fields are `null` or omitted.
             metric_pricing_overrides as metricPricingOverrides: "generated.valuations.MetricPricingOverrides" => json(i.metric_pricing_overrides),
             /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).

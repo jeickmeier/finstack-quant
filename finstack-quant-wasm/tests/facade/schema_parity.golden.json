@@ -2754,6 +2754,13 @@
             "bytes": 2370
           },
           {
+            "path": "schemas/common/1/price_extras.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",
+            "type_name": "PriceExtras",
+            "kind": "input",
+            "bytes": 10300
+          },
+          {
             "path": "schemas/common/1/rate_index_conventions.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
             "type_name": "RateIndexConventions",
@@ -4933,6 +4940,14 @@
             "type_name": "OasConfig",
             "kind": "input",
             "bytes": 2370
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/price_extras.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",
+            "type_name": "PriceExtras",
+            "kind": "input",
+            "bytes": 10300
           },
           {
             "domain": "valuations",

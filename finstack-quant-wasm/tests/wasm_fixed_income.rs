@@ -223,8 +223,6 @@ fn bond_typed_to_json_prices_identically_to_handwritten_json() {
         Some(JsValue::from("default".to_string())),
         None,
         None,
-        None,
-        None,
     )
     .expect("price typed");
     let via_json = price_instrument(
@@ -237,8 +235,6 @@ fn bond_typed_to_json_prices_identically_to_handwritten_json() {
         JsValue::from(&market),
         JsValue::from("2024-06-30"),
         Some(JsValue::from("default".to_string())),
-        None,
-        None,
         None,
         None,
     )
@@ -254,8 +250,6 @@ fn rates_credit_values_bond_call_and_put_rights() {
             JsValue::from(market_json),
             JsValue::from("2024-06-30"),
             Some(JsValue::from(model.to_string())),
-            None,
-            None,
             None,
             None,
         )
@@ -298,8 +292,6 @@ fn rates_credit_values_bond_call_and_put_rights() {
         Some(JsValue::from("hazard_rate".to_string())),
         None,
         None,
-        None,
-        None,
     )
     .expect_err("hazard_rate must reject embedded exercise rights");
     let message = js_sys::Reflect::get(&error, &wasm_bindgen::JsValue::from_str("message"))
@@ -332,8 +324,6 @@ fn stochastic_rates_credit_result_exports_full_width_seed_as_bigint() {
         JsValue::from(&credit_market_context_json()),
         JsValue::from("2024-06-30"),
         Some(JsValue::from("rates_credit".to_string())),
-        None,
-        None,
         None,
         None,
     )
@@ -393,8 +383,6 @@ fn term_loan_example_round_trips_and_prices() {
         JsValue::from(&market),
         JsValue::from("2024-06-30"),
         Some(JsValue::from("default".to_string())),
-        None,
-        None,
         None,
         None,
     )

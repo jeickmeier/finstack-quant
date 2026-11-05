@@ -1305,20 +1305,16 @@ export interface FxHandle extends WasmOwned {
    * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @param metrics - Optional canonical metric IDs such as `"delta"`, `"vega"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result.
-   * @param metricPricingOverrides - Optional JSON object patch applied before validation. Only supplied fields replace stored overrides; `{}` preserves them. Supplied `bump_config` fields merge into the stored object. Explicit `null` clears nullable fields to their Rust fallback. Omit the argument or pass JavaScript `null`/`undefined` to retain the envelope configuration.
-   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.
-   * @param explain - Optional boolean; `true` attaches a step trace as `result.explanation`. Omit or pass `false` for no trace.
+   * @param extras - Optional `PriceExtras` (plain object or JSON text); omit, `null`, or `undefined` for none. Keys, each optional: `metric_pricing_overrides` - a `MetricPricingOverrides` JSON object patch applied before validation (only supplied fields replace stored overrides, `bump_config` fields merge, an explicit `null` clears a nullable field; omitted keeps the envelope configuration); `market_history` - a `MarketHistory` object required by historical risk metrics such as `"hvar"` (omitted prices without history); `explain` - boolean, default `false`; `true` attaches a step trace as `result.explanation`.
    * @returns Structured `ValuationResult` for the selected model, preserving Monte Carlo seeds as lossless JavaScript `BigInt` values.
-   * @throws Error - Throws a JavaScript exception if the instrument, market, metric-pricing-override, or market-history JSON is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to JavaScript.
+   * @throws Error - Throws a JavaScript exception if the instrument, market or `extras` JSON is invalid (including an unknown `extras` key); `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to JavaScript.
    */
   price(
     marketJson: JsonInput,
     asOf: string,
     model?: string | null,
     metrics?: string[] | null,
-    metricPricingOverrides?: JsonInput | null,
-    marketHistory?: JsonInput | null,
-    explain?: boolean | null
+    extras?: generated.valuations.PriceExtras | JsonInput | null
   ): ValuationResult;
   /**
    * Compute one metric of this FX instrument against the supplied market.

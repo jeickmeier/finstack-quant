@@ -745,7 +745,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::market::listed::ListedProductCoverage;
     use crate::metrics::risk::MarketHistory;
     use crate::metrics::risk::var_calculator::VarResult;
-    use crate::pricer::MetricMetadata;
+    use crate::pricer::{MetricMetadata, PriceExtras};
     use crate::results::{
         EquityMetricsFieldUnits, MetricFieldUnit, PoolReportFieldUnits, ScenarioTableFieldUnits,
         SimulationFieldUnits, TrancheSolveFieldUnits, ValuationResult,
@@ -1308,6 +1308,15 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
         .with_examples(examples::market_history),
+        finstack_quant_core::schema_artifact!(
+            PriceExtras,
+            "common",
+            "price_extras",
+            Input,
+            "Metric-pricing override patch, market history and step-trace flag of one price call."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::price_extras),
         finstack_quant_core::schema_artifact!(
             RateIndexConventions,
             "common",

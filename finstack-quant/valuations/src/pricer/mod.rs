@@ -23,11 +23,11 @@ pub use catalog::{
     list_standard_metrics_grouped, metric_metadata, metrics_for_instrument,
 };
 pub use json::{
-    ParsedInstrument, STANDARD_OPTION_GREEKS, instrument_envelope_from_spec, instrument_from_spec,
-    metric_value, parse_boxed_instrument_from_json, parse_boxed_instruments_from_json,
-    parse_instrument_from_json, parse_typed_instrument_json, present_standard_option_greeks,
-    pretty_instrument_json, price_instrument, validate_instrument_json,
-    validate_typed_instrument_json,
+    ParsedInstrument, PriceExtras, STANDARD_OPTION_GREEKS, instrument_envelope_from_spec,
+    instrument_from_spec, metric_value, parse_boxed_instrument_from_json,
+    parse_boxed_instruments_from_json, parse_instrument_from_json, parse_typed_instrument_json,
+    present_standard_option_greeks, pretty_instrument_json, price_instrument,
+    validate_instrument_json, validate_typed_instrument_json,
 };
 
 use crate::instruments::credit_derivatives::CREDIT;

@@ -624,6 +624,19 @@ pub(super) fn market_history() -> Result<Vec<Value>> {
     })
 }
 
+/// A one-week theta horizon, the two-scenario market history above, and a
+/// step trace.
+pub(super) fn price_extras() -> Result<Vec<Value>> {
+    let history = market_history()?.into_iter().next().ok_or_else(|| {
+        finstack_quant_core::Error::Internal("market history example is empty".to_string())
+    })?;
+    example_from_json::<crate::pricer::PriceExtras>(json!({
+        "metric_pricing_overrides": {"theta_period": {"count": 1, "unit": "weeks"}},
+        "market_history": history,
+        "explain": true,
+    }))
+}
+
 pub(super) fn rate_index_conventions() -> Result<Vec<Value>> {
     example(
         ConventionRegistry::try_global()?

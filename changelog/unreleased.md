@@ -2,6 +2,25 @@
 
 ## Itemized changes
 
+### Valuations: pricing calls take `model`, `metrics` and one `extras` object
+
+`price_instrument` and every typed instrument's `price` keep `model` and
+`metrics` and take the three rarer inputs as one optional `extras` object, the
+serde form of the new Rust `pricer::PriceExtras` (a new `valuations` schema):
+`metric_pricing_overrides` (the same JSON patch as before: present keys
+replace, `bump_config` keys merge, an explicit `null` clears), `market_history`
+(a `MarketHistory`) and `explain` (default `false`). Python reads a dict or JSON
+text (typed `MetricPricingOverrides` / `MarketHistory` objects may sit inside
+the dict); WASM a plain object or JSON text. An unknown key is rejected, and a
+non-boolean `explain` is now a `validation` error rather than a `TypeError`.
+Inside `extras`, the overrides and history are objects, not JSON strings.
+Rust `pricer::price_instrument` takes `market_history: Option<&MarketHistory>`
+instead of `Option<&str>` JSON. Results are unchanged. Old → new:
+
+- `price_instrument(instrument, market, as_of, model, metrics, metric_pricing_overrides=None, market_history=None, explain=False)` → `price_instrument(instrument, market, as_of, model="default", metrics=None, extras=None)`
+- `Instrument.price(market, as_of, model, metrics, metric_pricing_overrides=None, market_history=None, explain=False)` → `Instrument.price(market, as_of, model="default", metrics=None, extras=None)`
+- WASM `priceInstrument(instrumentJson, marketJson, asOf, model?, metrics?, metricPricingOverrides?, marketHistory?, explain?)` → `priceInstrument(instrumentJson, marketJson, asOf, model?, metrics?, extras?)`; the same for `priceInstrumentWithMarket(instrumentJson, market, asOf, …)` and the typed `price(marketJson, asOf, model?, metrics?, extras?)`
+
 ### Statements: capital-structure swap and convention-bond setters take the Rust params objects
 
 `ModelBuilder.add_swap`, `add_bond_with_convention` and

@@ -30,11 +30,13 @@ use super::results::valuation_result_json;
 use super::results::valuation_result_value;
 use crate::api::core::market_context::JsMarketContext;
 use crate::utils::input::{
-    js_opt_bool, js_opt_f64, js_opt_string, js_opt_string_seq, js_string, js_string_seq, json_text,
-    opt_json_text,
+    js_opt_f64, js_opt_string, js_opt_string_seq, js_string, js_string_seq, json_text,
+    opt_from_js_json, opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_valuations::metrics::risk::MarketHistory;
+use finstack_quant_valuations::pricer::PriceExtras;
 use finstack_quant_valuations::results::ValuationResult;
 use wasm_bindgen::prelude::*;
 
@@ -60,7 +62,7 @@ pub(super) fn price_result_with_context(
     as_of: &str,
     model: &str,
     metrics: Vec<String>,
-    market_history_json: Option<&str>,
+    market_history: Option<&MarketHistory>,
     explain: bool,
 ) -> Result<ValuationResult, JsValue> {
     let options = finstack_quant_calibration::recalibration::pricing_options();
@@ -75,7 +77,7 @@ pub(super) fn price_result_with_context(
         as_of,
         model,
         &metrics,
-        market_history_json,
+        market_history,
         options,
     )
     .map_err(to_js_err)
@@ -192,19 +194,22 @@ pub fn bond_from_cashflows_json(
 /// FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years.
 /// Roll specialness is in basis points versus `repo_curve_id` (a discount curve),
 /// or the discount curve when omitted; implied financing is an ACT/360 decimal.
-/// @param metricPricingOverrides - Optional JSON object patch applied before validation.
-/// Only supplied fields replace stored overrides; `{}` preserves them. Supplied
-/// `bump_config` fields merge into the stored object. Explicit `null` clears
-/// nullable fields to their Rust fallback. Omit the argument or pass JavaScript
-/// `null`/`undefined` to retain the envelope configuration.
-/// @param marketHistory - Optional serialized market-history JSON required by
-/// historical risk metrics such as historical VaR.
-/// @param explain - Optional boolean; `true` attaches a step trace as
+/// @param extras - Optional `PriceExtras` (plain object or JSON text); omit,
+/// `null`, or `undefined` for none. Keys, each optional:
+/// `metric_pricing_overrides` - a `MetricPricingOverrides` JSON object patch
+/// applied before validation; only supplied fields replace stored overrides
+/// (`{}` preserves them), supplied `bump_config` fields merge into the stored
+/// object, and an explicit `null` clears a nullable field to its Rust fallback.
+/// Omitted keeps the envelope configuration.
+/// `market_history` - a `MarketHistory` object (base date, window and daily
+/// risk-factor shifts) required by historical risk metrics such as `"hvar"` and
+/// `"expected_shortfall"`. Omitted prices without history.
+/// `explain` - boolean, default `false`; `true` attaches a step trace as
 /// `result.explanation`. Under `"discounting"` and `"hazard_rate"` it holds one
 /// `cashflow_pv` entry per projected cashflow (date, amount, discount factor,
 /// curve, survival probability, present value) summing to the price, capped at
 /// 1000 entries; other models get one `computation_step` entry stating that no
-/// per-flow decomposition exists. Omit or pass `false` for no trace.
+/// per-flow decomposition exists.
 /// @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`,
 /// `value`, `measures`, `meta`, `provenance`, …). `provenance` records the
 /// model, requested date, declared market dependencies, scenario adjustment and,
@@ -212,13 +217,12 @@ pub fn bond_from_cashflows_json(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if an instrument, market, metric-pricing-override, or
-/// market-history payload is invalid; `metrics` is not a string array; `asOf`,
+/// Throws a JavaScript exception if an instrument, market or `extras` payload is
+/// invalid (including an unknown `extras` key); `metrics` is not a string array; `asOf`,
 /// `model`, or a metric identifier is invalid; required market data is missing;
 /// pricing or a metric calculation fails; or the valuation cannot be converted
 /// to a JavaScript value.
 #[wasm_bindgen(js_name = priceInstrument, unchecked_return_type = "ValuationResult")]
-#[allow(clippy::too_many_arguments)]
 pub fn price_instrument(
     #[wasm_bindgen(js_name = "instrumentJson", unchecked_param_type = "JsonInput")] instrument_json: JsValue,
     #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
@@ -227,26 +231,12 @@ pub fn price_instrument(
     #[wasm_bindgen(unchecked_optional_param_type = "string | null")] model: Option<JsValue>,
     #[wasm_bindgen(unchecked_optional_param_type = "string[] | null")] metrics: Option<JsValue>,
     #[wasm_bindgen(
-        js_name = "metricPricingOverrides",
-        unchecked_optional_param_type = "JsonInput | null"
+        unchecked_optional_param_type = "generated.valuations.PriceExtras | JsonInput | null"
     )]
-    metric_pricing_overrides: Option<JsValue>,
-    #[wasm_bindgen(
-        js_name = "marketHistory",
-        unchecked_optional_param_type = "JsonInput | null"
-    )]
-    market_history: Option<JsValue>,
-    #[wasm_bindgen(unchecked_optional_param_type = "boolean | null")] explain: Option<JsValue>,
+    extras: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json = json_text(&instrument_json, "instrumentJson")?;
-    let mut request = PriceRequest::from_js(
-        &as_of,
-        model.as_ref(),
-        metrics.as_ref(),
-        metric_pricing_overrides.as_ref(),
-        market_history.as_ref(),
-    )?;
-    request.explain = js_opt_bool(explain.as_ref(), "explain")?.unwrap_or(false);
+    let request = PriceRequest::from_js(&as_of, model.as_ref(), metrics.as_ref(), extras.as_ref())?;
     // Parse the instrument before the market so instrument errors surface first.
     let instrument = request.instrument(&instrument_json)?;
     request.price(&instrument, &parse_market(&market_json)?)
@@ -261,33 +251,38 @@ pub(super) struct PriceRequest {
     pub(super) model: Option<String>,
     /// Canonical metric identifiers to compute.
     pub(super) metrics: Vec<String>,
-    /// Metric-pricing overrides JSON merged into the envelope.
+    /// Metric-pricing override patch (`extras.metric_pricing_overrides`) as
+    /// JSON text, merged into the envelope when the instrument is parsed.
     pub(super) metric_pricing_overrides: Option<String>,
-    /// Market-history JSON for historical risk metrics.
-    pub(super) market_history: Option<String>,
-    /// Whether to attach the per-flow step trace as `result.explanation`.
+    /// Market history (`extras.market_history`) for historical risk metrics.
+    pub(super) market_history: Option<MarketHistory>,
+    /// Whether to attach the per-flow step trace as `result.explanation`
+    /// (`extras.explain`).
     pub(super) explain: bool,
 }
 
 impl PriceRequest {
     /// Convert the JavaScript pricing arguments, rejecting wrong types.
+    ///
+    /// `extras` is read once as `PriceExtras`: its override patch is kept for
+    /// instrument parsing, its history and `explain` flag for the price call.
     pub(super) fn from_js(
         as_of: &JsValue,
         model: Option<&JsValue>,
         metrics: Option<&JsValue>,
-        metric_pricing_overrides: Option<&JsValue>,
-        market_history: Option<&JsValue>,
+        extras: Option<&JsValue>,
     ) -> Result<Self, JsValue> {
+        let as_of = js_string(as_of, "asOf")?;
+        let model = js_opt_string(model, "model")?;
+        let metrics = js_opt_string_seq(metrics, "metrics")?.unwrap_or_default();
+        let extras: PriceExtras = opt_from_js_json(extras, "extras")?.unwrap_or_default();
         Ok(Self {
-            as_of: js_string(as_of, "asOf")?,
-            model: js_opt_string(model, "model")?,
-            metrics: js_opt_string_seq(metrics, "metrics")?.unwrap_or_default(),
-            metric_pricing_overrides: opt_json_text(
-                metric_pricing_overrides,
-                "metricPricingOverrides",
-            )?,
-            market_history: opt_json_text(market_history, "marketHistory")?,
-            explain: false,
+            as_of,
+            model,
+            metrics,
+            metric_pricing_overrides: extras.metric_pricing_overrides_json(),
+            market_history: extras.market_history,
+            explain: extras.explain,
         })
     }
 
@@ -323,7 +318,7 @@ impl PriceRequest {
             &self.as_of,
             self.model.as_deref().unwrap_or("default"),
             self.metrics,
-            self.market_history.as_deref(),
+            self.market_history.as_ref(),
             self.explain,
         )?;
         valuation_result_value(&result)
@@ -676,19 +671,22 @@ pub fn list_models_grouped() -> Result<JsValue, JsValue> {
 /// @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`,
 /// `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a
 /// valuation-only result.
-/// @param metricPricingOverrides - Optional JSON object patch applied before validation.
-/// Only supplied fields replace stored overrides; `{}` preserves them. Supplied
-/// `bump_config` fields merge into the stored object. Explicit `null` clears
-/// nullable fields to their Rust fallback. Omit the argument or pass JavaScript
-/// `null`/`undefined` to retain the envelope configuration.
-/// @param marketHistory - Optional serialized market-history JSON required by
-/// historical risk metrics such as historical VaR.
-/// @param explain - Optional boolean; `true` attaches a step trace as
+/// @param extras - Optional `PriceExtras` (plain object or JSON text); omit,
+/// `null`, or `undefined` for none. Keys, each optional:
+/// `metric_pricing_overrides` - a `MetricPricingOverrides` JSON object patch
+/// applied before validation; only supplied fields replace stored overrides
+/// (`{}` preserves them), supplied `bump_config` fields merge into the stored
+/// object, and an explicit `null` clears a nullable field to its Rust fallback.
+/// Omitted keeps the envelope configuration.
+/// `market_history` - a `MarketHistory` object (base date, window and daily
+/// risk-factor shifts) required by historical risk metrics such as `"hvar"` and
+/// `"expected_shortfall"`. Omitted prices without history.
+/// `explain` - boolean, default `false`; `true` attaches a step trace as
 /// `result.explanation`. Under `"discounting"` and `"hazard_rate"` it holds one
 /// `cashflow_pv` entry per projected cashflow (date, amount, discount factor,
 /// curve, survival probability, present value) summing to the price, capped at
 /// 1000 entries; other models get one `computation_step` entry stating that no
-/// per-flow decomposition exists. Omit or pass `false` for no trace.
+/// per-flow decomposition exists.
 /// @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`,
 /// `value`, `measures`, `meta`, `provenance`, …). `provenance` records the
 /// model, requested date, declared market dependencies, scenario adjustment and,
@@ -696,13 +694,12 @@ pub fn list_models_grouped() -> Result<JsValue, JsValue> {
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if an instrument, metric-pricing-override, or market-
-/// history payload is invalid; `metrics` is not a string array; `asOf`, `model`,
+/// Throws a JavaScript exception if an instrument or `extras` payload is invalid
+/// (including an unknown `extras` key); `metrics` is not a string array; `asOf`, `model`,
 /// or a metric identifier is invalid; required market data is missing; pricing
 /// or a metric calculation fails; or the valuation cannot be converted to a
 /// JavaScript value.
 #[wasm_bindgen(js_name = priceInstrumentWithMarket, unchecked_return_type = "ValuationResult")]
-#[allow(clippy::too_many_arguments)]
 pub fn price_instrument_with_market(
     #[wasm_bindgen(js_name = "instrumentJson", unchecked_param_type = "JsonInput")] instrument_json: JsValue,
     market: &JsMarketContext,
@@ -710,26 +707,12 @@ pub fn price_instrument_with_market(
     #[wasm_bindgen(unchecked_optional_param_type = "string | null")] model: Option<JsValue>,
     #[wasm_bindgen(unchecked_optional_param_type = "string[] | null")] metrics: Option<JsValue>,
     #[wasm_bindgen(
-        js_name = "metricPricingOverrides",
-        unchecked_optional_param_type = "JsonInput | null"
+        unchecked_optional_param_type = "generated.valuations.PriceExtras | JsonInput | null"
     )]
-    metric_pricing_overrides: Option<JsValue>,
-    #[wasm_bindgen(
-        js_name = "marketHistory",
-        unchecked_optional_param_type = "JsonInput | null"
-    )]
-    market_history: Option<JsValue>,
-    #[wasm_bindgen(unchecked_optional_param_type = "boolean | null")] explain: Option<JsValue>,
+    extras: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json = json_text(&instrument_json, "instrumentJson")?;
-    let mut request = PriceRequest::from_js(
-        &as_of,
-        model.as_ref(),
-        metrics.as_ref(),
-        metric_pricing_overrides.as_ref(),
-        market_history.as_ref(),
-    )?;
-    request.explain = js_opt_bool(explain.as_ref(), "explain")?.unwrap_or(false);
+    let request = PriceRequest::from_js(&as_of, model.as_ref(), metrics.as_ref(), extras.as_ref())?;
     let instrument = request.instrument(&instrument_json)?;
     request.price(&instrument, market.inner())
 }
@@ -786,7 +769,7 @@ pub(super) mod tests {
         model: &str,
         metrics: Vec<String>,
         metric_pricing_overrides: Option<&str>,
-        market_history_json: Option<&str>,
+        market_history: Option<&MarketHistory>,
     ) -> Result<String, JsValue> {
         let instrument = parse_pricing_instrument_json(instrument_json, metric_pricing_overrides)?;
         valuation_result_json(price_result_with_context(
@@ -795,7 +778,7 @@ pub(super) mod tests {
             as_of,
             model,
             metrics,
-            market_history_json,
+            market_history,
             false,
         )?)
     }

@@ -11,6 +11,7 @@ use crate::instruments::envelope::{MAX_JSON_BYTES, instrument_load_error};
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use crate::instruments::pricing_overrides::MetricPricingOverrides;
 use crate::metrics::MetricId;
+use crate::metrics::risk::MarketHistory;
 use crate::results::ValuationResult;
 use finstack_quant_core::Error;
 use finstack_quant_core::contract::{LoadLimits, parse_json_value};
@@ -381,6 +382,73 @@ fn resolve_model_key(
     }
 }
 
+/// The rarer inputs of a host pricing call, read from one object.
+///
+/// Python `price_instrument(..., extras=...)`, WASM `priceInstrument(...,
+/// extras)` and every typed instrument's `price` take this beside `model` and
+/// `metrics`. The bindings read it once and route its fields to two places:
+/// `metric_pricing_overrides` is merged into the instrument when it is parsed
+/// ([`ParsedInstrument::from_instrument`] / [`parse_boxed_instrument_from_json`]),
+/// while `market_history` and `explain` apply at the [`price_instrument`] call.
+/// The bindings map `explain` onto
+/// [`PricingOptions::with_explain`](crate::instruments::PricingOptions::with_explain)
+/// together with the calibration crate's recalibration provider.
+///
+/// Every field is optional; `PriceExtras::default()` (or an empty object)
+/// prices with the instrument's stored overrides, no market history and no
+/// step trace.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_valuations::pricer::PriceExtras;
+///
+/// let extras: PriceExtras = serde_json::from_str(
+///     r#"{"metric_pricing_overrides": {"theta_period": {"count": 1, "unit": "weeks"}}, "explain": true}"#,
+/// )?;
+/// assert!(extras.explain);
+/// assert!(extras.market_history.is_none());
+/// # Ok::<(), serde_json::Error>(())
+/// ```
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PriceExtras {
+    /// JSON object patch merged into `instrument.spec.metric_pricing_overrides`
+    /// before validation, in the shape of [`MetricPricingOverrides`]. Only the
+    /// keys present replace stored controls (an explicit `null` clears an
+    /// optional control) and `bump_config` keys merge into the stored bump
+    /// configuration. The field holds the raw patch rather than the typed
+    /// struct because key presence decides what is replaced. `None` keeps
+    /// the instrument's stored overrides.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<MetricPricingOverrides>")
+    )]
+    pub metric_pricing_overrides: Option<Value>,
+    /// Historical market scenarios for the historical risk metrics (`hvar`,
+    /// `expected_shortfall`). `None` prices without history; requesting
+    /// those metrics then fails.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub market_history: Option<MarketHistory>,
+    /// When `true`, attaches a step trace to the result as `explanation`.
+    /// Defaults to `false` (no trace).
+    #[serde(default)]
+    pub explain: bool,
+}
+
+impl PriceExtras {
+    /// The metric-pricing override patch as JSON text, for
+    /// [`ParsedInstrument::from_instrument`] and [`parse_boxed_instrument_from_json`].
+    ///
+    /// Returns `None` when no patch is set.
+    #[must_use]
+    pub fn metric_pricing_overrides_json(&self) -> Option<String> {
+        self.metric_pricing_overrides.as_ref().map(Value::to_string)
+    }
+}
+
 /// Price an already parsed and validated instrument using the caller-selected
 /// registry or the shared standard registry.
 ///
@@ -397,8 +465,9 @@ fn resolve_model_key(
 /// * `model` - Concrete model key or `"default"` to use the instrument's
 ///   native default model.
 /// * `metrics` - Strict metric identifiers requested with the valuation.
-/// * `market_history_json` - Optional serialized market history required by
-///   historical risk metrics.
+/// * `market_history` - Optional historical market scenarios required by the
+///   historical risk metrics (`hvar`, `expected_shortfall`); cloned into the
+///   pricing options.
 /// * `pricing_options` - Pricing services and configuration supplied by the
 ///   caller. When it contains a pricer registry, that registry drives both the
 ///   base value and every nested metric reprice; otherwise the shared standard
@@ -406,8 +475,8 @@ fn resolve_model_key(
 ///
 /// # Errors
 ///
-/// Returns an error for an invalid date, model, metric identifier, or market
-/// history; missing required market data; or a failure in the selected pricer
+/// Returns an error for an invalid date, model or metric identifier; missing
+/// required market data; or a failure in the selected pricer
 /// or metric calculation.
 pub fn price_instrument(
     instrument: &ParsedInstrument,
@@ -415,7 +484,7 @@ pub fn price_instrument(
     as_of: &str,
     model: &str,
     metrics: &[String],
-    market_history_json: Option<&str>,
+    market_history: Option<&MarketHistory>,
     pricing_options: crate::instruments::PricingOptions,
 ) -> finstack_quant_core::Result<ValuationResult> {
     let instrument = instrument.as_instrument();
@@ -430,12 +499,9 @@ pub fn price_instrument(
         .as_deref()
         .unwrap_or_else(|| crate::pricer::STANDARD.metrics());
     let metric_ids = metric_registry.resolve_metric_ids(metrics)?;
-    let pricing_options = if let Some(json) = market_history_json {
-        let history: crate::metrics::risk::MarketHistory = serde_json::from_str(json)
-            .map_err(|e| Error::Validation(format!("invalid market history JSON: {e}")))?;
-        pricing_options.with_market_history(std::sync::Arc::new(history))
-    } else {
-        pricing_options
+    let pricing_options = match market_history {
+        Some(history) => pricing_options.with_market_history(Arc::new(history.clone())),
+        None => pricing_options,
     };
     let pricing_options = pricing_options.mark_instrument_validated();
     registry
@@ -709,7 +775,7 @@ mod tests {
         model: &str,
         metrics: &[String],
         metric_pricing_overrides_json: Option<&str>,
-        market_history_json: Option<&str>,
+        market_history: Option<&MarketHistory>,
     ) -> finstack_quant_core::Result<ValuationResult> {
         let instrument =
             parse_boxed_instrument_from_json(instrument_json, metric_pricing_overrides_json)?;
@@ -719,7 +785,7 @@ mod tests {
             as_of,
             model,
             metrics,
-            market_history_json,
+            market_history,
             crate::instruments::PricingOptions::default(),
         )
     }
@@ -1612,8 +1678,6 @@ mod tests {
                 ),
             ],
         );
-        let history_json = serde_json::to_string(&history).expect("history JSON");
-
         let result = price_instrument_from_json(
             &bond_instrument_json(),
             &market_context(),
@@ -1621,7 +1685,7 @@ mod tests {
             "discounting",
             &["hvar".to_string(), "expected_shortfall".to_string()],
             None,
-            Some(&history_json),
+            Some(&history),
         )
         .expect("HVar should price when market history is supplied");
 

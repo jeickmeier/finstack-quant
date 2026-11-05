@@ -22,9 +22,8 @@ macro_rules! instrument_pricing_methods {
         #[pymethods]
         impl $ty {
             #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".price"))]
-            #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None, explain=false))]
-            #[pyo3(text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None, explain=False)")]
-            #[allow(clippy::too_many_arguments)]
+            #[pyo3(signature = (market, as_of, model="default", metrics=None, extras=None))]
+            #[pyo3(text_signature = "($self, market, as_of, model='default', metrics=None, extras=None)")]
             fn price(
                 &self,
                 py: Python<'_>,
@@ -32,10 +31,9 @@ macro_rules! instrument_pricing_methods {
                 as_of: &Bound<'_, PyAny>,
                 model: &str,
                 metrics: Option<Vec<String>>,
-                metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
-                market_history: Option<&Bound<'_, PyAny>>,
-                explain: bool,
+                extras: Option<&Bound<'_, PyAny>>,
             ) -> PyResult<$crate::bindings::valuations::PyValuationResult> {
+                let extras = $crate::bindings::valuations::pricing::price_extras_from_py(py, extras)?;
                 $crate::bindings::valuations::pricing::price_typed(
                     py,
                     Box::new(self.inner.clone()),
@@ -43,9 +41,7 @@ macro_rules! instrument_pricing_methods {
                     as_of,
                     model,
                     metrics,
-                    metric_pricing_overrides,
-                    market_history,
-                    explain,
+                    extras,
                 )
             }
 

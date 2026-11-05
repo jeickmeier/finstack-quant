@@ -126,7 +126,6 @@ function priceWithMetrics(instrumentJson, metrics) {
     '2024-01-01',
     'tree',
     metrics,
-    null,
     null
   );
 }
@@ -188,7 +187,6 @@ test('priceInstrumentWithMarket / …WithMetricsAndMarket return objects too', (
       '2024-01-01',
       'discounting',
       ['moic'],
-      null,
       null
     );
     assert.equal(typeof withMetrics, 'object');

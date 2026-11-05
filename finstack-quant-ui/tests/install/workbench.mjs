@@ -6,6 +6,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { openConsumer, closeConsumer } from "../browser/consumer.mjs";
+import { priceExtras } from "../shared/price-extras.mjs";
 for (const name of [
   "REGISTRY_EXPORT_DIR",
   "REGISTRY_WORKBENCH_REPORT",
@@ -96,8 +97,7 @@ try {
     request.asOf,
     request.model,
     request.metrics,
-    request.metricPricingOverrides,
-    request.marketHistory,
+    priceExtras(request),
   );
   await results
     .getByRole("tab", { name: "4 Diagnostics", exact: true })
@@ -212,8 +212,7 @@ try {
         priced.asOf,
         priced.model,
         priced.metrics,
-        priced.metricPricingOverrides,
-        priced.marketHistory,
+        priceExtras(priced),
       );
       await results
         .getByRole("tab", { name: "4 Diagnostics", exact: true })

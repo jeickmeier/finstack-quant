@@ -8226,19 +8226,22 @@ export interface ValuationsInstrumentsNamespace {
    * FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years.
    * Roll specialness is in basis points versus `repo_curve_id` (a discount curve),
    * or the discount curve when omitted; implied financing is an ACT/360 decimal.
-   * @param metricPricingOverrides - Optional JSON object patch applied before validation.
-   * Only supplied fields replace stored overrides; `{}` preserves them. Supplied
-   * `bump_config` fields merge into the stored object. Explicit `null` clears
-   * nullable fields to their Rust fallback. Omit the argument or pass JavaScript
-   * `null`/`undefined` to retain the envelope configuration.
-   * @param marketHistory - Optional serialized market-history JSON required by
-   * historical risk metrics such as historical VaR.
-   * @param explain - Optional boolean; `true` attaches a step trace as
+   * @param extras - Optional `PriceExtras` (plain object or JSON text); omit,
+   * `null`, or `undefined` for none. Keys, each optional:
+   * `metric_pricing_overrides` - a `MetricPricingOverrides` JSON object patch
+   * applied before validation; only supplied fields replace stored overrides
+   * (`{}` preserves them), supplied `bump_config` fields merge into the stored
+   * object, and an explicit `null` clears a nullable field to its Rust fallback.
+   * Omitted keeps the envelope configuration.
+   * `market_history` - a `MarketHistory` object (base date, window and daily
+   * risk-factor shifts) required by historical risk metrics such as `"hvar"` and
+   * `"expected_shortfall"`. Omitted prices without history.
+   * `explain` - boolean, default `false`; `true` attaches a step trace as
    * `result.explanation`. Under `"discounting"` and `"hazard_rate"` it holds one
    * `cashflow_pv` entry per projected cashflow (date, amount, discount factor,
    * curve, survival probability, present value) summing to the price, capped at
    * 1000 entries; other models get one `computation_step` entry stating that no
-   * per-flow decomposition exists. Omit or pass `false` for no trace.
+   * per-flow decomposition exists.
    * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`,
    * `value`, `measures`, `meta`, `provenance`, …). `provenance` records the
    * model, requested date, declared market dependencies, scenario adjustment and,
@@ -8246,8 +8249,8 @@ export interface ValuationsInstrumentsNamespace {
    *
    * # Errors
    *
-   * Throws a JavaScript exception if an instrument, market, metric-pricing-override, or
-   * market-history payload is invalid; `metrics` is not a string array; `asOf`,
+   * Throws a JavaScript exception if an instrument, market or `extras` payload is
+   * invalid (including an unknown `extras` key); `metrics` is not a string array; `asOf`,
    * `model`, or a metric identifier is invalid; required market data is missing;
    * pricing or a metric calculation fails; or the valuation cannot be converted
    * to a JavaScript value.
@@ -8271,19 +8274,22 @@ export interface ValuationsInstrumentsNamespace {
    * @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`,
    * `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a
    * valuation-only result.
-   * @param metricPricingOverrides - Optional JSON object patch applied before validation.
-   * Only supplied fields replace stored overrides; `{}` preserves them. Supplied
-   * `bump_config` fields merge into the stored object. Explicit `null` clears
-   * nullable fields to their Rust fallback. Omit the argument or pass JavaScript
-   * `null`/`undefined` to retain the envelope configuration.
-   * @param marketHistory - Optional serialized market-history JSON required by
-   * historical risk metrics such as historical VaR.
-   * @param explain - Optional boolean; `true` attaches a step trace as
+   * @param extras - Optional `PriceExtras` (plain object or JSON text); omit,
+   * `null`, or `undefined` for none. Keys, each optional:
+   * `metric_pricing_overrides` - a `MetricPricingOverrides` JSON object patch
+   * applied before validation; only supplied fields replace stored overrides
+   * (`{}` preserves them), supplied `bump_config` fields merge into the stored
+   * object, and an explicit `null` clears a nullable field to its Rust fallback.
+   * Omitted keeps the envelope configuration.
+   * `market_history` - a `MarketHistory` object (base date, window and daily
+   * risk-factor shifts) required by historical risk metrics such as `"hvar"` and
+   * `"expected_shortfall"`. Omitted prices without history.
+   * `explain` - boolean, default `false`; `true` attaches a step trace as
    * `result.explanation`. Under `"discounting"` and `"hazard_rate"` it holds one
    * `cashflow_pv` entry per projected cashflow (date, amount, discount factor,
    * curve, survival probability, present value) summing to the price, capped at
    * 1000 entries; other models get one `computation_step` entry stating that no
-   * per-flow decomposition exists. Omit or pass `false` for no trace.
+   * per-flow decomposition exists.
    * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`,
    * `value`, `measures`, `meta`, `provenance`, …). `provenance` records the
    * model, requested date, declared market dependencies, scenario adjustment and,
@@ -8291,8 +8297,8 @@ export interface ValuationsInstrumentsNamespace {
    *
    * # Errors
    *
-   * Throws a JavaScript exception if an instrument, metric-pricing-override, or market-
-   * history payload is invalid; `metrics` is not a string array; `asOf`, `model`,
+   * Throws a JavaScript exception if an instrument or `extras` payload is invalid
+   * (including an unknown `extras` key); `metrics` is not a string array; `asOf`, `model`,
    * or a metric identifier is invalid; required market data is missing; pricing
    * or a metric calculation fails; or the valuation cannot be converted to a
    * JavaScript value.

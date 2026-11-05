@@ -7,6 +7,7 @@ import init, { valuations } from "../../../finstack-quant-wasm/index.js";
 import { serializeHost } from "../../src/codec.mjs";
 import { pricingCases } from "./cases.mjs";
 import { serveExport } from "./static-server.mjs";
+import { priceExtras } from "../shared/price-extras.mjs";
 
 const repo = resolve(import.meta.dirname, "../../..");
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -26,8 +27,7 @@ function baseline(request) {
         request.asOf,
         request.model,
         request.metrics,
-        request.metricPricingOverrides,
-        request.marketHistory,
+        priceExtras(request),
       ),
     };
   } catch (error) {

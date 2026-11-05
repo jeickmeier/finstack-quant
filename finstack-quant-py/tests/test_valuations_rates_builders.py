@@ -490,7 +490,7 @@ def test_bond_getters_and_pricing_helpers() -> None:
         _market(),
         AS_OF,
         metrics=["ytm", "dv01"],
-        metric_pricing_overrides={"theta_period": {"count": 1, "unit": "days"}},
+        extras={"metric_pricing_overrides": {"theta_period": {"count": 1, "unit": "days"}}},
     )
     assert result.get_metric("ytm") is not None
     assert bond.metric(_market(), AS_OF, "ytm") == pytest.approx(result.get_metric("ytm"))
