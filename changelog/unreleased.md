@@ -2,6 +2,14 @@
 
 ## Itemized changes
 
+### Python: params dicts accept `Tenor` and `DayCount` objects
+
+Every Python params object (dict passed to a binding that reads a Rust serde
+struct) now encodes a `Tenor` as its wire form `{"count": 6, "unit": "months"}`
+and a `DayCount` as its label (`"act_360"`), as it already encoded `Money`,
+`Currency` and `datetime.date`. `Tenor.semi_annual()` and `DayCount.ACT_360`
+can stand where the wire values go; the wire values still work.
+
 ### Valuations: pricing calls take `model`, `metrics` and one `extras` object
 
 `price_instrument` and every typed instrument's `price` keep `model` and

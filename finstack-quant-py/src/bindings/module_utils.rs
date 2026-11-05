@@ -112,32 +112,58 @@ pub(crate) fn attach_submodule(
     Ok(())
 }
 
-/// Build the `json.dumps` ``default`` hook that encodes typed wrappers.
+/// Encode one object `json.dumps` cannot serialize; the ``default`` hook.
 ///
 /// Typed wrappers serialize through their canonical form, standalone or
-/// nested inside lists and dicts: ``to_dict`` when they carry one, otherwise
-/// the ``to_json`` every result and spec wrapper exposes. A ``datetime.date``
-/// serializes to its ISO-8601 string, the wire form of every date field (a
-/// ``datetime.datetime`` gives a timestamp string, which date fields reject).
-/// NumPy arrays and scalars serialize through ``tolist``. Objects with none of
-/// these keep the standard ``TypeError: Object of type ... is not JSON
-/// serializable``.
-fn typed_wrapper_json_hook<'py>(
-    py: Python<'py>,
-    json_mod: &Bound<'py, PyModule>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let globals = pyo3::types::PyDict::new(py);
-    globals.set_item("json", json_mod)?;
-    globals.set_item("date", py.import("datetime")?.getattr("date")?)?;
-    py.eval(
-        c"lambda o: o.to_dict() if hasattr(o, 'to_dict') \
-           else json.loads(o.to_json()) if hasattr(o, 'to_json') \
-           else o.isoformat() if isinstance(o, date) \
-           else o.tolist() if hasattr(o, 'tolist') \
-           else json.JSONEncoder().default(o)",
-        Some(&globals),
-        None,
-    )
+/// nested inside lists and dicts:
+///
+/// - `Tenor` and `DayCount` give their serde wire form (`{"count": 6,
+///   "unit": "months"}`, `"act_360"`), the form every tenor and day-count
+///   field takes; neither carries a ``to_json`` of its own.
+/// - Wrappers with ``to_dict`` use it; the others use the ``to_json`` every
+///   result and spec wrapper (and `Money`, `Currency`) exposes.
+/// - A ``datetime.date`` gives its ISO-8601 string, the wire form of every
+///   date field (a ``datetime.datetime`` gives a timestamp string, which date
+///   fields reject).
+/// - NumPy arrays and scalars serialize through ``tolist``.
+///
+/// Anything else raises the standard ``TypeError: Object of type ... is not
+/// JSON serializable``.
+#[pyfunction]
+fn json_default<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    use crate::bindings::core::dates::daycount::PyDayCount;
+    use crate::bindings::core::dates::tenor::PyTenor;
+    use crate::bindings::pandas_utils::serde_to_py;
+
+    if let Ok(tenor) = obj.cast::<PyTenor>() {
+        return serde_to_py(py, &tenor.get().inner);
+    }
+    if let Ok(day_count) = obj.cast::<PyDayCount>() {
+        return serde_to_py(py, &day_count.get().inner);
+    }
+    if obj.hasattr("to_dict")? {
+        return obj.call_method0("to_dict");
+    }
+    let json_mod = py.import("json")?;
+    if obj.hasattr("to_json")? {
+        return json_mod.call_method1("loads", (obj.call_method0("to_json")?,));
+    }
+    if obj.is_instance(&py.import("datetime")?.getattr("date")?)? {
+        return obj.call_method0("isoformat");
+    }
+    if obj.hasattr("tolist")? {
+        return obj.call_method0("tolist");
+    }
+    json_mod
+        .getattr("JSONEncoder")?
+        .call0()?
+        .call_method1("default", (obj,))
+}
+
+/// The `json.dumps` ``default`` hook that encodes typed wrappers
+/// ([`json_default`]).
+fn typed_wrapper_json_hook<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    Ok(wrap_pyfunction!(json_default, py)?.into_any())
 }
 
 /// Convert a Python object (e.g. dict or string) to a `serde_json::Value`.
@@ -158,7 +184,7 @@ pub(crate) fn py_to_json_value<'py>(
 
     let json_mod = py.import("json")?;
     let kwargs = pyo3::types::PyDict::new(py);
-    kwargs.set_item("default", typed_wrapper_json_hook(py, &json_mod)?)?;
+    kwargs.set_item("default", typed_wrapper_json_hook(py)?)?;
     let json: String = json_mod
         .call_method("dumps", (obj,), Some(&kwargs))
         .and_then(|value| value.extract())
@@ -193,7 +219,7 @@ pub(crate) fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
 ) -> PyResult<T> {
     let json_mod = py.import("json")?;
     let kwargs = pyo3::types::PyDict::new(py);
-    kwargs.set_item("default", typed_wrapper_json_hook(py, &json_mod)?)?;
+    kwargs.set_item("default", typed_wrapper_json_hook(py)?)?;
     let json_str: String = json_mod
         .call_method("dumps", (obj,), Some(&kwargs))?
         .extract()?;

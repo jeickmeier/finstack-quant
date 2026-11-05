@@ -299,3 +299,37 @@ def test_accounting_overflow_is_an_error_without_invalid_numbers() -> None:
     assert finding["severity"] == "error"
     assert finding.get("comparison") is None
     assert finding.get("materiality") is None
+
+
+def test_swap_conventions_take_tenor_and_day_count_objects() -> None:
+    """``Tenor`` and ``DayCount`` objects in a params dict serialize to their wire form."""
+    from finstack_quant.core.dates import DayCount, Tenor
+
+    swap = {
+        "id": "swap",
+        "notional": Money(100, Currency("USD")),
+        "fixed_rate": 0.05,
+        "start_date": "2025-01-01",
+        "maturity_date": "2030-01-01",
+        "discount_curve_id": "USD-OIS",
+        "forward_curve_id": "USD-SOFR-3M",
+    }
+    wire = {
+        "fixed_frequency": {"count": 6, "unit": "months"},
+        "fixed_day_count": "30_360",
+        "float_frequency": {"count": 3, "unit": "months"},
+        "float_day_count": "act_360",
+    }
+    typed = {
+        "fixed_frequency": Tenor.semi_annual(),
+        "fixed_day_count": DayCount.THIRTY_360,
+        "float_frequency": Tenor.quarterly(),
+        "float_day_count": DayCount.ACT_360,
+    }
+
+    def build(conventions: dict[str, object]) -> str:
+        builder = s.ModelBuilder("m").periods("2025Q1..Q2", "2025Q1")
+        builder.value_scalar("revenue", {"2025Q1": 1.0})
+        return builder.add_swap_with_conventions(swap, conventions).build().to_json()
+
+    assert build(typed) == build(wire)
