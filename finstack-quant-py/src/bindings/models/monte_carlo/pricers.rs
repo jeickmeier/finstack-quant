@@ -2,13 +2,13 @@
 
 use super::engine::extract_optional_currency;
 use super::results::{PyLrmGreeks, PyMoneyEstimate};
+use crate::bindings::models::closed_form::option_market;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_models::monte_carlo::convenience;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
-use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use pyo3::prelude::*;
 
 /// Render a bool the way Python's `repr` does.
@@ -58,40 +58,20 @@ impl PyEuropeanPricer {
     }
 
     #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.price_gbm")]
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
+    #[pyo3(signature = (market, num_steps=None, currency=None))]
     fn price_gbm(
         &self,
         py: Python<'_>,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        is_call: bool,
+        market: &Bound<'_, PyAny>,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
+        let market = option_market(market)?;
         let ccy = extract_optional_currency(currency)?;
         let pricer = &self.inner;
-        py.detach(|| {
-            pricer.price_gbm(
-                &OptionMarketParams {
-                    option_type: OptionType::from(is_call),
-                    spot,
-                    strike,
-                    rate,
-                    dividend_yield: div_yield,
-                    volatility: vol,
-                    time_to_expiry: expiry,
-                },
-                num_steps,
-                ccy,
-            )
-        })
-        .map(PyMoneyEstimate::from_inner)
-        .map_err(core_to_py)
+        py.detach(|| pricer.price_gbm(&market, num_steps, ccy))
+            .map(PyMoneyEstimate::from_inner)
+            .map_err(core_to_py)
     }
 
     fn __repr__(&self) -> String {
@@ -143,77 +123,37 @@ impl PyPathDependentPricer {
     }
 
     #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.price_asian")]
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
+    #[pyo3(signature = (market, num_steps=None, currency=None))]
     fn price_asian(
         &self,
         py: Python<'_>,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        is_call: bool,
+        market: &Bound<'_, PyAny>,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
+        let market = option_market(market)?;
         let ccy = extract_optional_currency(currency)?;
         let pricer = &self.inner;
-        py.detach(|| {
-            pricer.price_asian(
-                &OptionMarketParams {
-                    option_type: OptionType::from(is_call),
-                    spot,
-                    strike,
-                    rate,
-                    dividend_yield: div_yield,
-                    volatility: vol,
-                    time_to_expiry: expiry,
-                },
-                num_steps,
-                ccy,
-            )
-        })
-        .map(PyMoneyEstimate::from_inner)
-        .map_err(core_to_py)
+        py.detach(|| pricer.price_asian(&market, num_steps, ccy))
+            .map(PyMoneyEstimate::from_inner)
+            .map_err(core_to_py)
     }
 
     #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.price_with_lrm_greeks")]
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
+    #[pyo3(signature = (market, num_steps=None, currency=None))]
     fn price_with_lrm_greeks(
         &self,
         py: Python<'_>,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        is_call: bool,
+        market: &Bound<'_, PyAny>,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyLrmGreeks> {
+        let market = option_market(market)?;
         let ccy = extract_optional_currency(currency)?;
         let pricer = &self.inner;
-        py.detach(|| {
-            pricer.price_with_lrm_greeks(
-                &OptionMarketParams {
-                    option_type: OptionType::from(is_call),
-                    spot,
-                    strike,
-                    rate,
-                    dividend_yield: div_yield,
-                    volatility: vol,
-                    time_to_expiry: expiry,
-                },
-                num_steps,
-                ccy,
-            )
-        })
-        .map(PyLrmGreeks::from_inner)
-        .map_err(core_to_py)
+        py.detach(|| pricer.price_with_lrm_greeks(&market, num_steps, ccy))
+            .map(PyLrmGreeks::from_inner)
+            .map_err(core_to_py)
     }
 
     #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.num_paths")]
@@ -338,88 +278,55 @@ impl PyLsmcPricer {
     }
 
     #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.price_american")]
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, currency=None, num_steps=None, basis=None, basis_degree=None))]
+    #[pyo3(signature = (market, currency=None, num_steps=None, basis=None, basis_degree=None))]
     fn price_american(
         &self,
         py: Python<'_>,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        is_call: bool,
+        market: &Bound<'_, PyAny>,
         currency: Option<&Bound<'_, PyAny>>,
         num_steps: Option<usize>,
         basis: Option<&str>,
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
+        let market = option_market(market)?;
         let currency = extract_optional_currency(currency)?;
         py.detach(|| {
-            self.inner.price_american(
-                &OptionMarketParams {
-                    option_type: OptionType::from(is_call),
-                    spot,
-                    strike,
-                    rate,
-                    dividend_yield: div_yield,
-                    volatility: vol,
-                    time_to_expiry: expiry,
-                },
-                num_steps,
-                currency,
-                basis,
-                basis_degree,
-            )
+            self.inner
+                .price_american(&market, num_steps, currency, basis, basis_degree)
         })
         .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
     }
 
     #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.price_american_unbiased")]
-    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
-        spot, strike, rate, div_yield, vol, expiry, is_call, pricing_seed, currency=None,
-        num_steps=None, basis=None, basis_degree=None,
+        market, pricing_seed, currency=None, num_steps=None, basis=None, basis_degree=None,
     ))]
     fn price_american_unbiased(
-        &self,
-        py: Python<'_>,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        is_call: bool,
+        slf: PyRef<'_, Self>,
+        market: &Bound<'_, PyAny>,
         pricing_seed: u64,
         currency: Option<&Bound<'_, PyAny>>,
         num_steps: Option<usize>,
         basis: Option<&str>,
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
+        let market = option_market(market)?;
         let currency = extract_optional_currency(currency)?;
-        py.detach(|| {
-            self.inner.price_american_unbiased(
-                &OptionMarketParams {
-                    option_type: OptionType::from(is_call),
-                    spot,
-                    strike,
-                    rate,
-                    dividend_yield: div_yield,
-                    volatility: vol,
-                    time_to_expiry: expiry,
-                },
-                num_steps,
-                currency,
-                basis,
-                basis_degree,
-                pricing_seed,
-            )
-        })
-        .map(PyMoneyEstimate::from_inner)
-        .map_err(core_to_py)
+        let pricer = &slf.inner;
+        slf.py()
+            .detach(|| {
+                pricer.price_american_unbiased(
+                    &market,
+                    num_steps,
+                    currency,
+                    basis,
+                    basis_degree,
+                    pricing_seed,
+                )
+            })
+            .map(PyMoneyEstimate::from_inner)
+            .map_err(core_to_py)
     }
 
     fn __repr__(&self) -> String {

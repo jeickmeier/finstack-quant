@@ -2,6 +2,45 @@
 
 ## Itemized changes
 
+### Models: option pricers take one market object in Rust, Python and WASM
+
+The option market inputs travel as one object. Rust: `closed_form::bs_greeks`
+and `bs_greeks_unchecked` take `(&OptionMarketParams, theta_days_per_year)`;
+`barrier_option_price`, `asian_option_price`, `lookback_option_price`,
+`quanto_option_price`, `quanto_price`, `geometric_asian_price` and
+`arithmetic_asian_tw_price` take `&OptionMarketParams` plus their product
+inputs (for the quanto, `rate` is the domestic rate and `volatility` the asset
+volatility); `geometric_asian_price_times` and
+`arithmetic_asian_tw_price_times` take the new `AsianFixingSchedule`
+(expiry, discount factor, fixing times). `OptionMarketParams`,
+`CosMarketParams`, `GbmEuropeanFdSpec` and `HestonMcSettings` are serde types
+with JSON schemas (`option_market_params`, `cos_market_params`,
+`gbm_european_fd_spec`, `heston_mc_settings`).
+
+Python passes them as a dict or JSON text, WASM as the schema-typed object or
+JSON text. The `market` keys are `spot, strike, rate, dividend_yield,
+volatility, time_to_expiry, option_type` (`"call"`/`"put"`, replacing `is_call`);
+the COS `market` keeps `spot, strike, rate, div_yield, expiry, option_type`
+plus optional `n_terms`; Heston `params` are `r, q, v0, kappa, theta,
+sigma_v, rho`. A non-finite number inside one of these objects is rejected
+when the object is read (Python `ValueError`, WASM `TypeError`). Prices are
+unchanged. Old → new (WASM: the camelCase twin with the same arguments):
+
+- `bs_greeks(spot, strike, rate, div_yield, vol, expiry, is_call, theta_days_per_year)` → `bs_greeks(market, theta_days_per_year)`
+- `barrier_option_price(spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock, is_call)` → `barrier_option_price(market, barrier, direction, knock)`
+- `asian_option_price(spot, strike, rate, div_yield, vol, expiry, num_fixings, averaging, is_call)` → `asian_option_price(market, num_fixings, averaging)`
+- `lookback_option_price(spot, strike, rate, div_yield, vol, expiry, extremum, strike_type, is_call)` → `lookback_option_price(market, extremum, strike_type)`
+- `quanto_option_price(spot, strike, expiry, rate_domestic, rate_foreign, div_yield, vol_asset, vol_fx, correlation, is_call)` → `quanto_option_price(market, rate_foreign, vol_fx, correlation)`
+- `heston_price(spot, strike, expiry, rate, div_yield, kappa, theta, sigma_v, rho, v0, is_call)` → `heston_price(spot, strike, expiry, params, is_call)`
+- `bs_cos_price(spot, strike, rate, div_yield, vol, expiry, is_call, n_terms)` → `bs_cos_price(market, vol)`
+- `vg_cos_price(spot, strike, rate, div_yield, sigma, theta, nu, expiry, is_call, n_terms)` → `vg_cos_price(market, sigma, theta, nu)`
+- `merton_jump_cos_price(spot, strike, rate, div_yield, sigma, mu_jump, sigma_jump, lambda_, expiry, is_call, n_terms)` → `merton_jump_cos_price(market, sigma, mu_jump, sigma_jump, lambda_)` (WASM `lambda`)
+- `monte_carlo.price_heston(spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, is_call, num_paths, seed, num_steps, currency)` → `price_heston(spot, strike, expiry, params, is_call, settings)` (`settings`: optional `num_paths`, `seed`, `num_steps`, `currency`)
+- `monte_carlo.finite_diff_delta` / `finite_diff_gamma(spot, strike, rate, div_yield, vol, expiry, is_call, num_paths, seed, num_steps, bump_size, currency)` → `finite_diff_delta(spec)` / `finite_diff_gamma(spec)`
+- `EuropeanPricer.price_gbm`, `PathDependentPricer.price_asian` and `price_with_lrm_greeks(spot, strike, rate, div_yield, vol, expiry, is_call, num_steps, currency)` → `(market, num_steps, currency)`
+- `LsmcPricer.price_american(spot, …, is_call, currency, num_steps, basis, basis_degree)` → `price_american(market, currency, num_steps, basis, basis_degree)`
+- `LsmcPricer.price_american_unbiased(spot, …, is_call, pricing_seed, currency, num_steps, basis, basis_degree)` → `price_american_unbiased(market, pricing_seed, currency, num_steps, basis, basis_degree)`
+
 ### Models: Monte Carlo, payoff and Hull-White caplet entry points take one inputs struct
 
 Rust functions with more than seven inputs now take a struct. `McEngine::price`

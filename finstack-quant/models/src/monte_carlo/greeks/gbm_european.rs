@@ -25,7 +25,12 @@ use finstack_quant_core::math::time_grid::TimeGrid;
 const CI_95_Z: f64 = 1.96;
 
 /// Inputs for the GBM European finite-difference Greek convenience functions.
-#[derive(Debug, Clone)]
+///
+/// The serde form is the host-facing `spec` of `finite_diff_delta` and
+/// `finite_diff_gamma`; the `Option` fields may be omitted.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct GbmEuropeanFdSpec {
     /// Spot level at time `0`.
     pub spot: f64,
@@ -41,18 +46,23 @@ pub struct GbmEuropeanFdSpec {
     pub expiry: f64,
     /// Independent estimators; `None` uses the registry binding default.
     /// Each estimator uses two physical paths when the registry enables antithetics.
+    #[serde(default)]
     pub num_paths: Option<usize>,
     /// RNG seed; `None` uses the registry binding default.
+    #[serde(default)]
     pub seed: Option<u64>,
     /// Time steps per path; `None` uses the registry binding default.
+    #[serde(default)]
     pub num_steps: Option<usize>,
     /// Relative spot bump used as an MC finite-difference shock; `None` uses
     /// the registry binding default (a 1% of spot MC shock, not a local
     /// closed-form step).
+    #[serde(default)]
     pub bump_size: Option<f64>,
     /// Call or put payoff. Required; there is no default option type.
     pub option_type: OptionType,
     /// Currency stamped on simulated payoffs; `None` uses the registry default.
+    #[serde(default)]
     pub currency: Option<Currency>,
 }
 

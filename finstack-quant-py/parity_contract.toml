@@ -468,7 +468,14 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 
 [crates.models.symbols]
 # Kwarg vocabulary is crate-wide: `spot, strike, rate, div_yield, vol, expiry,
-# is_call` (Rust parameter names == Python kwargs; WASM camelCase). `bs_greeks`
+# is_call` (Rust parameter names == Python kwargs; WASM camelCase). The
+# functions whose Rust signature takes `&OptionMarketParams` (`bs_greeks`, the
+# barrier / Asian / lookback / quanto dispatchers) take its serde form as one
+# `market` argument (a dict / JSON text in Python, the schema-generated object /
+# JSON text in WASM: `spot, strike, rate, dividend_yield, volatility,
+# time_to_expiry, option_type`), the COS pricers take `CosMarketParams` the same
+# way, and `heston_price` takes `HestonPricingParams` as `params`, so those
+# types have no host class. `bs_greeks`
 # returns the typed `BsGreeks` (`rho_r`, not `rho`); `black76_greeks` /
 # `bachelier_greeks` return the typed `ForwardGreeks`. Each host function makes
 # one call into the same-named checked Rust entry point in `closed_form`
@@ -477,15 +484,18 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # `DEFAULT_ASIAN_AVERAGING` (an `AveragingMethod`; hosts parse its serde label),
 # `strike_type` = `DEFAULT_LOOKBACK_STRIKE_TYPE`. The
 # optional `is_call` of `barrier_option_price` / `asian_option_price` /
-# `lookback_option_price` / `quanto_option_price` / `heston_price` defaults to a call in both hosts (a
-# host signature default mapped to `OptionType::Call`). Rust-only closed-form
+# `lookback_option_price` / `quanto_option_price` / `heston_price` is gone with the
+# `market` object (its `option_type` is required); `heston_price` keeps an
+# optional `is_call` that defaults to a call in both hosts (a host signature
+# default mapped to `OptionType::Call`). Rust-only closed-form
 # items, deliberately not bound: `bs_price_unchecked` / `bs_greeks_unchecked`,
 # `barrier_rebate` / `PayoutTiming` /
 # `BarrierParams` / `barrier_touch_probability`, `quanto_price` /
 # `quanto_drift_adjustment` (use `quanto_option_price`),
 # `HestonStripPricer` / `HestonFourierSettings` /
-# `heston_*_prices_fourier` strips, `OptionMarketParams`, `ExerciseStyle`,
-# `OptionType` (hosts pass `is_call`), `ONE_PERCENT`, and the per-model COS
+# `heston_*_prices_fourier` strips, `AsianFixingSchedule` and the
+# `*_asian_price*` leaves, `ExerciseStyle`, `OptionType` (hosts pass `is_call`
+# or the serde `option_type`), `ONE_PERCENT`, and the per-model COS
 # `CosPricer` / `CosConfig` / characteristic functions (hosts use `*_cos_price`).
 public = [
     "BsGreeks",
@@ -517,20 +527,25 @@ public = [
 python_package = "finstack_quant.models.monte_carlo"
 # `finite_diff_delta` / `finite_diff_gamma` bind the Rust
 # `greeks::gbm_european` functions of the same names (the generic kernels are
-# Rust-only `finite_diff_*_from_inputs`). The hosts take `is_call: bool`
-# where the Rust `GbmEuropeanFdSpec` field is `option_type: OptionType`
-# (`true` is `Call`), and return a typed `Estimate` whose
+# Rust-only `finite_diff_*_from_inputs`). The hosts take the serde form of the
+# Rust `GbmEuropeanFdSpec` as one `spec` argument (dict / JSON text in Python,
+# schema-typed object / JSON text in WASM), and return a typed `Estimate` whose
 # `stderr` is the paired (common-random-number) standard error. The
 # closed-form Black-Scholes reference is `models.bs_price`. Rust-only:
 # engine/process/discretization/RNG/payoff
-# graph, `GbmEuropeanFdSpec` (flattened into kwargs), `PathDependentPricerConfig`
+# graph, `PathDependentPricerConfig`
 # / `LsmcConfig` (flattened into constructor kwargs), captured-path datasets,
 # `PathSimulationSpec` / `ProcessSpec` / `SchemeSpec` / `TimeGridSpec` / `FbmSpec` (plain
 # data: `simulate_paths` takes the spec as a dict or JSON text in Python and
 # as the schema-typed object in WASM, validated by the Rust deserializer),
 # the registry defaults module, and `monte_carlo::convenience` (the one place
 # that resolves an omitted pricer setting, step count or currency to its
-# registry default; both hosts build their pricers through it).
+# registry default; both hosts build their pricers through it). The pricer
+# methods (`price_gbm`, `price_asian`, `price_with_lrm_greeks`,
+# `price_american`, `price_american_unbiased`) take the serde form of the Rust
+# `OptionMarketParams` as one `market` argument, and `price_heston` takes
+# `HestonPricingParams` (`params`) and an optional `HestonMcSettings`
+# (`settings`) the same way, mirroring the closed-form `heston_price`.
 public = [
     "Estimate",
     "EuropeanPricer",

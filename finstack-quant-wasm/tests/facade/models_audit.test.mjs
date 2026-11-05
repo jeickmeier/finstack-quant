@@ -14,25 +14,76 @@ test('checked Black-Scholes rejects invalid spot inputs', () => {
 });
 
 test('COS rejects an empty expansion', () => {
-  assert.throws(() => facade.models.bsCosPrice(100, 100, 0.05, 0, 0.2, 1, true, 0));
+  assert.throws(() =>
+    facade.models.bsCosPrice(
+      {
+        spot: 100,
+        strike: 100,
+        rate: 0.05,
+        div_yield: 0,
+        expiry: 1,
+        option_type: 'call',
+        n_terms: 0,
+      },
+      0.2
+    )
+  );
 });
 
 test('COS reports invalid market inputs as exceptions without a panic', () => {
   for (const invalid of [NaN, Infinity, -100, 0]) {
     for (const isCall of [true, false]) {
-      assert.throws(() => facade.models.bsCosPrice(invalid, 100, 0.05, 0, 0.2, 1, isCall), /spot/);
       assert.throws(
-        () => facade.models.bsCosPrice(100, invalid, 0.05, 0, 0.2, 1, isCall),
+        () =>
+          facade.models.bsCosPrice(
+            {
+              spot: invalid,
+              strike: 100,
+              rate: 0.05,
+              div_yield: 0,
+              expiry: 1,
+              option_type: isCall ? 'call' : 'put',
+            },
+            0.2
+          ),
+        /spot/
+      );
+      assert.throws(
+        () =>
+          facade.models.bsCosPrice(
+            {
+              spot: 100,
+              strike: invalid,
+              rate: 0.05,
+              div_yield: 0,
+              expiry: 1,
+              option_type: isCall ? 'call' : 'put',
+            },
+            0.2
+          ),
         /strike/
       );
     }
   }
   assert.throws(
-    () => facade.models.vgCosPrice(100, 100, 0.05, 0, -0.2, -0.1, 0.2, 1, true),
+    () =>
+      facade.models.vgCosPrice(
+        { spot: 100, strike: 100, rate: 0.05, div_yield: 0, expiry: 1, option_type: 'call' },
+        -0.2,
+        -0.1,
+        0.2
+      ),
     /sigma/
   );
   assert.throws(
-    () => facade.models.mertonJumpCosPrice(100, 100, 0.05, 0, 0.2, -0.1, 0.1, -0.1, 1, true),
+    () =>
+      facade.models.mertonJumpCosPrice(
+        { spot: 100, strike: 100, rate: 0.05, div_yield: 0, expiry: 1, option_type: 'call' },
+        0.2,
+        -0.1,
+        0.1,
+        -0.1
+      ),
     /lambda/
   );
 });
@@ -65,15 +116,17 @@ test('seasoned lookbacks match independent continuous-maximum payoff values', ()
     ['floating', false, 21.429719498063],
   ]) {
     const price = facade.models.lookbackOptionPrice(
-      100,
-      100,
-      0.05,
-      0.02,
-      0.2,
-      1,
+      {
+        spot: 100,
+        strike: 100,
+        rate: 0.05,
+        dividend_yield: 0.02,
+        volatility: 0.2,
+        time_to_expiry: 1,
+        option_type: isCall ? 'call' : 'put',
+      },
       120,
-      strikeType,
-      isCall
+      strikeType
     );
     assert.ok(Math.abs(price - expected) < 1e-8, `${strikeType}: ${price} vs ${expected}`);
   }

@@ -5602,14 +5602,14 @@ export interface ModelsLiquidityNamespace {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const est = models.monteCarlo.priceHeston(
- *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, true, 5000, 42n,
- * );
+ * const params = { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7 };
+ * const est = models.monteCarlo.priceHeston(100, 100, 1.0, params, true, {
+ *   num_paths: 5000,
+ *   seed: 42,
+ * });
  * console.log(est.mean.amount, est.mean.currency);
  * // Path count and seed default to the Rust registry values.
- * const byDefault = models.monteCarlo.priceHeston(
- *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, false,
- * );
+ * const byDefault = models.monteCarlo.priceHeston(100, 100, 1.0, params, false);
  * console.log(byDefault.num_paths); // 100000
  * ```
  */
@@ -5618,37 +5618,44 @@ export interface ModelsMonteCarloNamespace {
   readonly PathDependentPricer: typeof wasm.PathDependentPricer;
   readonly LsmcPricer: typeof wasm.LsmcPricer;
   /**
-   * Price a European option under Heston stochastic volatility.
+   * Price a European option under Heston stochastic volatility by Monte Carlo.
+   *
+   * Twin of the Rust `price_heston` and the Fourier `models.hestonPrice`: same
+   * market and model inputs, with Monte Carlo settings in place of the Fourier
+   * settings. Paths use the Andersen (2008) QE discretization.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be
-   * loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite;
-   * `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive;
-   * `rho` is outside `[-1, 1]`; a count is fractional or exceeds the wasm32 integer range; the expiry, step count, path count, or computed
-   * discount factor fails validation; a simulated discounted payoff is
-   * non-finite; or the result cannot be serialized.
+   * Throws a `validation` error if `params` does not match
+   * `HestonPricingParams` (non-finite `r`/`q`, non-positive or non-finite
+   * `kappa`, `theta`, `sigma_v` or `v0`, `rho` outside `[-1, 1]`) or
+   * `settings` does not match `HestonMcSettings` (unknown currency, a
+   * fractional or out-of-range count), if the embedded defaults cannot be
+   * loaded, the expiry, step count, path count or computed discount factor
+   * fails validation, a simulated discounted payoff is non-finite, or the
+   * result cannot be serialized.
    * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as
    * `{amount, currency}` money, plus `stderr`, `num_paths`,
    * `num_simulated_paths` and the optional statistics (`null` when not captured).
    * @param spot - Current spot price or exchange rate in the same units as the strike.
    * @param strike - Option strike price in the same price units as the underlying.
-   * @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
-   * @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
-   * @param kappa - Mean-reversion speed of variance in the Heston stochastic-volatility model.
-   * @param theta - Long-run variance level in the Heston stochastic-volatility model.
-   * @param volOfVol - Annualized volatility of variance in the Heston stochastic-volatility model.
-   * @param rho - Instantaneous correlation between the asset and variance shocks.
-   * @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
    * @param expiry - Time to option expiry in years on the model's annual time basis.
+   * @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield, decimal), `v0` (initial instantaneous variance), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `sigma_v` (annualized volatility of variance) and `rho` (asset/variance shock correlation in `[-1, 1]`).
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param numPaths - Integer number of independent path estimators in [2, 10000000]; each
-   * antithetic pair counts once. Omitted or `null` uses the Rust registry European-pricer
-   * default (100 000).
-   * @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses
-   * the Rust registry default seed, so results stay reproducible.
-   * @param numSteps - Optional positive integer number of time steps per simulated path; omitted uses the Rust registry default.
-   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
+   * @param settings - Optional `HestonMcSettings` object or JSON text; every key may be omitted and an omitted key uses the Rust registry European-pricer default: `num_paths` (independent path estimators in `[2, 10000000]`, each antithetic pair counts once; default 100 000), `seed` (Philox root seed, number or BigInt), `num_steps` (positive time steps per path) and `currency` (ISO-4217 code stamped on the estimate).
+   *
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const estimate = models.monteCarlo.priceHeston(
+   *   100, 100, 1.0,
+   *   { r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7 },
+   *   true,
+   *   { num_paths: 2000, seed: 42, num_steps: 16 },
+   * );
+   * console.log(estimate.mean.amount, estimate.stderr);
+   * ```
    */
   readonly priceHeston: typeof wasm.priceHeston;
   /**
@@ -5705,24 +5712,24 @@ export interface ModelsMonteCarloNamespace {
    * The up and down valuations share each path's random draws; the estimate
    * is the mean of the per-path central differences and `stderr` is their
    * paired (common-random-number) standard error.
-   * @param spot - Spot level at time 0.
-   * @param strike - Exercise price in the same units as `spot`.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal); positive.
-   * @param expiry - Time to expiry in years.
-   * @param isCall - `true` for a call payoff, `false` for a put.
-   * @param numPaths - Optional paths per evaluation; omitted uses the registry default.
-   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
-   * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
-   * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
+   * @param spec - `GbmEuropeanFdSpec` object or JSON text: `spot` (spot level at time 0), `strike` (same units as `spot`), `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `vol` (annualized GBM volatility, decimal; positive), `expiry` (years) and `option_type` (`"call"` or `"put"`) are required; `num_paths` (paths per evaluation), `seed` (RNG seed, number or BigInt), `num_steps` (time-grid steps), `bump_size` (relative spot shock, 0.01 is 1% of spot) and `currency` (ISO-4217 code of the simulated payoffs) may be omitted or `null`, which uses the registry default.
    * @returns The `Estimate` object for delta (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   *
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const delta = models.monteCarlo.finiteDiffDelta({
+   *   spot: 100, strike: 100, rate: 0.05, div_yield: 0.0, vol: 0.2, expiry: 1.0,
+   *   option_type: "call", num_paths: 2000, seed: 42, num_steps: 16,
+   * });
+   * console.log(delta.mean, delta.stderr);
+   * ```
    *
    * # Errors
    *
-   * Throws a `validation` error if an input is non-finite or out of range or
-   * the currency code is unknown.
+   * Throws a `validation` error if `spec` does not match `GbmEuropeanFdSpec`,
+   * an input is non-finite or out of range or the currency code is unknown.
    */
   readonly finiteDiffDelta: typeof wasm.finiteDiffDelta;
   /**
@@ -5731,24 +5738,13 @@ export interface ModelsMonteCarloNamespace {
    * The three stencil valuations share each path's random draws; the estimate
    * is the mean of the per-path second differences and `stderr` is their
    * paired (common-random-number) standard error.
-   * @param spot - Spot level at time 0.
-   * @param strike - Exercise price in the same units as `spot`.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal); positive.
-   * @param expiry - Time to expiry in years.
-   * @param isCall - `true` for a call payoff, `false` for a put.
-   * @param numPaths - Optional paths per evaluation; omitted uses the registry default.
-   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
-   * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
-   * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
+   * @param spec - `GbmEuropeanFdSpec` object or JSON text: `spot` (spot level at time 0), `strike` (same units as `spot`), `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `vol` (annualized GBM volatility, decimal; positive), `expiry` (years) and `option_type` (`"call"` or `"put"`) are required; `num_paths` (paths per evaluation), `seed` (RNG seed, number or BigInt), `num_steps` (time-grid steps), `bump_size` (relative spot shock, 0.01 is 1% of spot) and `currency` (ISO-4217 code of the simulated payoffs) may be omitted or `null`, which uses the registry default.
    * @returns The `Estimate` object for gamma (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    *
    * # Errors
    *
-   * Throws a `validation` error if an input is non-finite or out of range or
-   * the currency code is unknown.
+   * Throws a `validation` error if `spec` does not match `GbmEuropeanFdSpec`,
+   * an input is non-finite or out of range or the currency code is unknown.
    */
   readonly finiteDiffGamma: typeof wasm.finiteDiffGamma;
   /**
@@ -6617,25 +6613,21 @@ export interface ModelsNamespace {
    * Merton (1973): see docs/REFERENCES.md#merton-1973.
    * Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983.
    *
-   * @param spot - Spot price of the underlying.
-   * @param strike - Strike of the option.
-   * @param rate - Risk-free rate, **decimal** continuously compounded.
-   * @param divYield - Dividend yield (or foreign rate for FX), **decimal**
-   * continuously compounded.
-   * @param vol - Annualized volatility, **decimal**; must be positive.
-   * @param expiry - Time to expiry in **years**; must be positive.
-   * @param isCall - `true` for a call, `false` for a put.
+   * @param market - `OptionMarketParams` object or JSON text, every key required: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield or foreign rate, decimal), `volatility` (annualized, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`). `volatility` and `time_to_expiry` must be positive.
    * @param thetaDaysPerYear - Day-count denominator for theta. Default `365`.
    * Pass `252` for trading-day theta.
    * @returns Object `{ delta, gamma, vega, theta, rho_r, rho_q }` (snake_case keys
    * matching the Rust/Python canonical `BsGreeks` fields). `vega` and
    * both rho values are **per 1% move**; `theta` is **per day** under
    * `thetaDaysPerYear`.
-   * @throws `FinstackError` (kind `validation`) if any input is non-finite, `spot` or `strike` is not positive, `vol`, `expiry` or `thetaDaysPerYear` is not positive, or a computed Greek is non-finite.
+   * @throws `FinstackError` (kind `validation`) if `market` does not match `OptionMarketParams`, any input is non-finite, `spot` or `strike` is not positive, `volatility`, `time_to_expiry` or `thetaDaysPerYear` is not positive, or a computed Greek is non-finite.
    *
    * @example
    * ```javascript
-   * const g = models.bsGreeks(100, 100, 0.05, 0.0, 0.20, 1.0, true);
+   * const g = models.bsGreeks({
+   *   spot: 100, strike: 100, rate: 0.05, dividend_yield: 0.0,
+   *   volatility: 0.20, time_to_expiry: 1.0, option_type: "call",
+   * });
    * // g.delta ≈ 0.64, g.gamma ≈ 0.019, g.vega ≈ 0.38 (per 1% vol)
    * ```
    */
@@ -6821,21 +6813,16 @@ export interface ModelsNamespace {
    *
    * `direction` is `"up"` or `"down"`, `knock` is `"in"` or `"out"`.
    * Reiner-Rubinstein (1991): see docs/REFERENCES.md#reiner-rubinstein-1991.
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
+   * @param market - `OptionMarketParams` object or JSON text, every key required: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield or foreign rate, decimal), `volatility` (annualized, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`).
    * @param barrier - Continuously monitored barrier level in the same price units as spot.
-   * @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-   * @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
-   * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-   * @param expiry - Time to expiry in years.
    * @param direction - Barrier direction: `"up"` for an upper barrier or `"down"` for a lower barrier.
    * @param knock - Barrier activation: `"in"` for knock-in or `"out"` for knock-out.
-   * @param isCall - Whether to value a call (`true`, default) or put (`false`).
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `direction` or `knock` is unsupported, or
-   * the supplied model inputs produce a non-finite barrier price.
+   * Throws a JavaScript exception if `market` does not match
+   * `OptionMarketParams`, `direction` or `knock` is unsupported, or the
+   * supplied model inputs produce a non-finite barrier price.
    * @returns Discounted barrier option price in the same units as `spot`.
    */
   readonly barrierOptionPrice: typeof wasm.barrierOptionPrice;
@@ -6844,21 +6831,16 @@ export interface ModelsNamespace {
    *
    * Kemna-Vorst (1990): see docs/REFERENCES.md#kemna-vorst-1990.
    * Turnbull-Wakeman (1991): see docs/REFERENCES.md#turnbull-wakeman-1991.
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-   * @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
-   * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-   * @param expiry - Time to expiry in years.
-   * @param numFixings - Non-negative integer number of equally spaced averaging observations, at most 4294967295; zero selects continuous monitoring.
+   * @param market - `OptionMarketParams` object or JSON text, every key required: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield or foreign rate, decimal), `volatility` (annualized, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`).
+   * @param numFixings - Positive integer number of equally spaced averaging observations, at most 4294967295.
    * @param averaging - Asian averaging convention: `"arithmetic"` (default) or `"geometric"`.
-   * @param isCall - Whether to value a call (`true`, default) or put (`false`).
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `numFixings` is not a non-negative whole
-   * number, `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied
-   * model inputs produce a non-finite option price.
+   * Throws a JavaScript exception if `market` does not match
+   * `OptionMarketParams`, `numFixings` is not a positive whole number,
+   * `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied model
+   * inputs produce a non-finite option price.
    * @returns Discounted Asian option price in the same units as `spot`.
    */
   readonly asianOptionPrice: typeof wasm.asianOptionPrice;
@@ -6868,21 +6850,15 @@ export interface ModelsNamespace {
    * `strike_type` is `"fixed"` (default) or `"floating"`. For `"floating"`,
    * `strike` is ignored and `extremum` is the observed min/max to date.
    * Conze-Viswanathan (1991): see docs/REFERENCES.md#conze-viswanathan-1991.
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-   * @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
-   * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-   * @param expiry - Time to expiry in years.
+   * @param market - `OptionMarketParams` object or JSON text, every key required: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield or foreign rate, decimal), `volatility` (annualized, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`). `strike` is ignored (but must be finite) for `"floating"`.
    * @param extremum - Observed maximum for fixed calls or floating puts, minimum for fixed puts or floating calls, including current spot; in spot-price units.
    * @param strikeType - Lookback payoff convention: `"fixed"` (default) or `"floating"`.
-   * @param isCall - Whether to value a call (`true`, default) or put (`false`).
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `strikeType` is not `"fixed"` or
-   * `"floating"`, or the supplied model inputs produce a non-finite option
-   * price.
+   * Throws a JavaScript exception if `market` does not match
+   * `OptionMarketParams`, `strikeType` is not `"fixed"` or `"floating"`, or
+   * the supplied model inputs produce a non-finite option price.
    * @returns Discounted lookback option price in the same units as `spot`.
    */
   readonly lookbackOptionPrice: typeof wasm.lookbackOptionPrice;
@@ -6892,17 +6868,11 @@ export interface ModelsNamespace {
    * Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983.
    * Brigo-Mercurio (2006): see docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models.
    *
-   * @throws If the inputs produce a non-finite price.
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param expiry - Time to expiry in years.
-   * @param rateDomestic - Domestic continuously compounded risk-free rate, expressed as a decimal.
+   * @throws If `market` does not match `OptionMarketParams` or the inputs produce a non-finite price.
+   * @param market - `OptionMarketParams` object or JSON text for the foreign asset, every key required: `spot` and `strike` in foreign currency, `rate` (the **domestic** continuously compounded risk-free rate, decimal), `dividend_yield` (the asset's continuous dividend yield, decimal), `volatility` (annualized asset-price volatility, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`).
    * @param rateForeign - Foreign continuously compounded risk-free rate, expressed as a decimal.
-   * @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
-   * @param volAsset - Annualized asset-price volatility expressed as a decimal.
    * @param volFx - Annualized FX-rate volatility expressed as a decimal.
    * @param correlation - Instantaneous correlation between the asset and FX-rate shocks, from -1 to 1.
-   * @param isCall - Whether to value a call (`true`, default) or put (`false`).
    * @returns Discounted quanto option price in domestic currency units.
    */
   readonly quantoOptionPrice: typeof wasm.quantoOptionPrice;
@@ -6914,20 +6884,23 @@ export interface ModelsNamespace {
    * @param spot - Current spot price in the same units as the strike.
    * @param strike - Option strike price.
    * @param expiry - Time to expiry in years; a non-positive value returns intrinsic.
-   * @param rate - Continuously compounded risk-free rate, decimal.
-   * @param divYield - Continuous dividend yield or foreign rate, decimal.
-   * @param kappa - Mean-reversion speed of the variance process (per year).
-   * @param theta - Long-run variance level (variance units).
-   * @param sigmaV - Volatility of variance (vol-of-vol).
-   * @param rho - Spot/variance correlation in `(-1, 1)`.
-   * @param v0 - Initial instantaneous variance (variance, not volatility).
+   * @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield or foreign rate, decimal), `v0` (initial instantaneous variance, not volatility), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `sigma_v` (volatility of variance) and `rho` (spot/variance correlation in `[-1, 1]`).
    * @param isCall - Whether to value a call (`true`, default) or put (`false`).
    *
    * # Errors
    *
-   * Throws a JavaScript exception if a parameter is non-finite or outside its
-   * domain, or the Fourier integration fails to produce a finite price.
+   * Throws a JavaScript exception if `params` does not match
+   * `HestonPricingParams` or a parameter is non-finite or outside its domain,
+   * or the Fourier integration fails to produce a finite price.
    * @returns Present-value per-unit option price.
+   *
+   * @example
+   * ```javascript
+   * const price = models.hestonPrice(100, 100, 1.0, {
+   *   r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7,
+   * });
+   * // price ≈ 9.24
+   * ```
    */
   readonly hestonPrice: typeof wasm.hestonPrice;
   /**
@@ -6935,24 +6908,27 @@ export interface ModelsNamespace {
    *
    * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
    * Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
-   * @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
    * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
-   * @param expiry - Time to option expiry in years.
-   * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param nTerms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
    *
    * # Errors
    *
-   * Throws if spot, strike, expiry, or volatility is not finite and positive,
-   * or rates/carry are non-finite. Throws a `validation` error if `nTerms` is
-   * outside `1..=65536` or `vol` is not positive, and a `computation` error if
-   * the model produces a degenerate or invalid COS truncation range, a
-   * non-finite characteristic-function value or forward moment, or a
-   * non-finite option price.
+   * Throws a `validation` error if `market` does not match `CosMarketParams`,
+   * spot, strike, expiry, or volatility is not finite and positive, rates/carry
+   * are non-finite, `n_terms` is outside `1..=65536` or `vol` is not positive,
+   * and a `computation` error if the model produces a degenerate or invalid COS
+   * truncation range, a non-finite characteristic-function value or forward
+   * moment, or a non-finite option price.
    * @returns Discounted European option price in the same units as `spot`.
+   *
+   * @example
+   * ```javascript
+   * const call = models.bsCosPrice(
+   *   { spot: 100, strike: 100, rate: 0.05, div_yield: 0.0, expiry: 1.0, option_type: "call" },
+   *   0.2,
+   * );
+   * // call ≈ 10.45, the Black-Scholes price
+   * ```
    */
   readonly bsCosPrice: typeof wasm.bsCosPrice;
   /**
@@ -6960,25 +6936,20 @@ export interface ModelsNamespace {
    *
    * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
    * Madan-Carr-Chang (1998): see docs/REFERENCES.md#madan-carr-chang-1998.
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
-   * @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
    * @param sigma - Positive finite volatility of the subordinated Brownian motion, as a decimal.
    * @param theta - Finite annual log-return drift of the subordinated Brownian motion; its sign controls skew.
    * @param nu - Positive finite variance rate of the Gamma time change, in years; larger values increase tail thickness.
-   * @param expiry - Time to option expiry in years.
-   * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param nTerms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
    *
    * # Errors
    *
-   * Throws if spot, strike, expiry, sigma, or nu is not finite and positive,
-   * rates/carry/theta are non-finite, or the VG martingale condition fails.
-   * Throws a `validation` error if `nTerms` is outside `1..=65536`, and a
-   * `computation` error if the model produces a degenerate or invalid COS
-   * truncation range, a non-finite characteristic-function value or forward
-   * moment, or a non-finite option price.
+   * Throws a `validation` error if `market` does not match `CosMarketParams`,
+   * spot, strike, expiry, sigma, or nu is not finite and positive,
+   * rates/carry/theta are non-finite, the VG martingale condition fails or
+   * `n_terms` is outside `1..=65536`, and a `computation` error if the model
+   * produces a degenerate or invalid COS truncation range, a non-finite
+   * characteristic-function value or forward moment, or a non-finite option
+   * price.
    * @returns Discounted European option price in the same units as `spot`.
    */
   readonly vgCosPrice: typeof wasm.vgCosPrice;
@@ -6987,27 +6958,21 @@ export interface ModelsNamespace {
    *
    * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
    * Merton jump-diffusion (1976): see docs/REFERENCES.md#merton-1976-jump.
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
-   * @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
    * @param sigma - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
    * @param muJump - Mean log jump size in the Merton jump-diffusion model.
    * @param sigmaJump - Standard deviation of log jump sizes in the Merton jump-diffusion model.
    * @param lambda - Annual jump-arrival intensity in the Merton jump-diffusion model.
-   * @param expiry - Time to option expiry in years.
-   * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param nTerms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
    *
    * # Errors
    *
-   * Throws if spot, strike, or expiry is not finite and positive, rates/carry
-   * or log-jump mean are non-finite, volatility/intensity is negative or
-   * non-finite, or the jump compensator overflows. Throws a `validation` error
-   * if `nTerms` is outside `1..=65536`, and a `computation` error if the model
-   * produces a degenerate or invalid COS
-   * truncation range, a non-finite characteristic-function value or forward
-   * moment, or a non-finite option price.
+   * Throws a `validation` error if `market` does not match `CosMarketParams`,
+   * spot, strike, or expiry is not finite and positive, rates/carry or
+   * log-jump mean are non-finite, volatility/intensity is negative or
+   * non-finite, the jump compensator overflows or `n_terms` is outside
+   * `1..=65536`, and a `computation` error if the model produces a degenerate
+   * or invalid COS truncation range, a non-finite characteristic-function
+   * value or forward moment, or a non-finite option price.
    * @returns Discounted European option price in the same units as `spot`.
    */
   readonly mertonJumpCosPrice: typeof wasm.mertonJumpCosPrice;

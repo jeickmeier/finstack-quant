@@ -51,7 +51,12 @@ impl Default for CosConfig {
 }
 
 /// Option and market inputs shared by the COS entry points.
-#[derive(Debug, Clone, Copy)]
+///
+/// The serde form is the host-facing `market` object of `bs_cos_price`,
+/// `vg_cos_price` and `merton_jump_cos_price`; `n_terms` may be omitted.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CosMarketParams {
     /// Current spot price of the underlying.
     pub spot: f64,
@@ -67,6 +72,7 @@ pub struct CosMarketParams {
     pub option_type: OptionType,
     /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
     /// [`CosConfig::default`].
+    #[serde(default)]
     pub n_terms: Option<usize>,
 }
 

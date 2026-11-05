@@ -2,7 +2,7 @@
 
 use super::results::{PyMoneyEstimate, PyPathSummary};
 use crate::bindings::core::currency::extract_currency;
-use crate::bindings::module_utils::py_to_json_value;
+use crate::bindings::module_utils::{opt_spec_from_py, py_to_json_value, spec_from_py};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::currency::Currency;
@@ -42,49 +42,31 @@ pub(super) fn extract_optional_currency(
 
 #[doc = pydoc!("finstack_quant.models.monte_carlo._engine", "price_heston")]
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, is_call, num_paths=None, seed=None, num_steps=None, currency=None))]
+#[pyo3(signature = (spot, strike, expiry, params, is_call, settings=None))]
 fn price_heston(
     py: Python<'_>,
     spot: f64,
     strike: f64,
-    rate: f64,
-    div_yield: f64,
-    kappa: f64,
-    theta: f64,
-    vol_of_vol: f64,
-    rho: f64,
-    v0: f64,
     expiry: f64,
+    params: &Bound<'_, PyAny>,
     is_call: bool,
-    num_paths: Option<usize>,
-    seed: Option<u64>,
-    num_steps: Option<usize>,
-    currency: Option<&Bound<'_, PyAny>>,
+    settings: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyMoneyEstimate> {
     use finstack_quant_models::closed_form::HestonPricingParams;
     use finstack_quant_models::monte_carlo::pricer::heston as canonical;
     use finstack_quant_models::types::OptionType;
 
-    let ccy = extract_optional_currency(currency)?;
-    let settings = canonical::HestonMcSettings {
-        num_paths,
-        seed,
-        num_steps,
-        currency: ccy,
-    };
+    let params: HestonPricingParams = spec_from_py(py, params, "HestonPricingParams")?;
+    let settings: canonical::HestonMcSettings =
+        opt_spec_from_py(py, settings, "HestonMcSettings")?.unwrap_or_default();
     py.detach(|| {
-        HestonPricingParams::new(rate, div_yield, kappa, theta, vol_of_vol, rho, v0).and_then(
-            |params| {
-                canonical::price_heston(
-                    spot,
-                    strike,
-                    expiry,
-                    &params,
-                    OptionType::from(is_call),
-                    &settings,
-                )
-            },
+        canonical::price_heston(
+            spot,
+            strike,
+            expiry,
+            &params,
+            OptionType::from(is_call),
+            &settings,
         )
     })
     .map(PyMoneyEstimate::from_inner)

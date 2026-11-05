@@ -1,38 +1,28 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/models/fourier.rs``."""
 
+from typing import Any
+
 # Fourier option pricing helpers
 
 def bs_cos_price(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
+    market: dict[str, Any] | str,
     vol: float,
-    expiry: float,
-    is_call: bool,
-    n_terms: int | None = None,
 ) -> float:
     """
     Price a European option under Black-Scholes with the COS method.
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike.
-    rate : float
-        Continuously compounded risk-free rate (decimal).
-    div_yield : float
-        Continuous dividend yield (decimal).
+    market : dict or str
+        Serde form of the Rust ``CosMarketParams``, as a dict or JSON text:
+        ``spot`` and ``strike`` (float, the same price units); ``rate``
+        (continuously compounded risk-free rate, decimal); ``div_yield``
+        (continuous dividend yield, decimal); ``expiry`` (years);
+        ``option_type`` (``"call"`` or ``"put"``) are required; ``n_terms``
+        (int, number of COS terms in ``1..=65536``) is optional and defaults
+        to 128 when omitted or ``None``.
     vol : float
         Annualized volatility (decimal); must be strictly positive.
-    expiry : float
-        Time to expiry in years.
-    is_call : bool
-        ``True`` for a call, ``False`` for a put.
-    n_terms : int, optional
-        Number of COS terms in ``1..=65536``. Uses 128 when ``None``.
 
     Returns
     -------
@@ -42,7 +32,7 @@ def bs_cos_price(
     Raises
     ------
     ValueError
-        If ``spot``, ``strike``, ``expiry`` or ``vol`` is not finite and
+        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike``, ``expiry`` or ``vol`` is not finite and
         positive, ``rate`` or ``div_yield`` is non-finite, or ``n_terms`` is
         outside ``1..=65536``.
     RuntimeError
@@ -52,7 +42,13 @@ def bs_cos_price(
     Examples
     --------
     >>> from finstack_quant.models import bs_cos_price
-    >>> round(bs_cos_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True), 4)
+    >>> round(
+    ...     bs_cos_price(
+    ...         {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 1.0, "option_type": "call"},
+    ...         0.2,
+    ...     ),
+    ...     4,
+    ... )
     10.4506
 
     Sources
@@ -64,30 +60,24 @@ def bs_cos_price(
     ...
 
 def vg_cos_price(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
+    market: dict[str, Any] | str,
     sigma: float,
     theta: float,
     nu: float,
-    expiry: float,
-    is_call: bool,
-    n_terms: int | None = None,
 ) -> float:
     """
     Price a European option under Variance Gamma with the COS method.
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike.
-    rate : float
-        Continuously compounded risk-free rate (decimal).
-    div_yield : float
-        Continuous dividend yield (decimal).
+    market : dict or str
+        Serde form of the Rust ``CosMarketParams``, as a dict or JSON text:
+        ``spot`` and ``strike`` (float, the same price units); ``rate``
+        (continuously compounded risk-free rate, decimal); ``div_yield``
+        (continuous dividend yield, decimal); ``expiry`` (years);
+        ``option_type`` (``"call"`` or ``"put"``) are required; ``n_terms``
+        (int, number of COS terms in ``1..=65536``) is optional and defaults
+        to 128 when omitted or ``None``.
     sigma : float
         Positive finite volatility of the subordinated Brownian motion.
     theta : float
@@ -96,12 +86,6 @@ def vg_cos_price(
     nu : float
         Positive finite variance rate of the Gamma time change, in years;
         larger values increase log-return tail thickness.
-    expiry : float
-        Time to expiry in years.
-    is_call : bool
-        ``True`` for a call, ``False`` for a put.
-    n_terms : int, optional
-        Number of COS terms in ``1..=65536``. Uses 128 when ``None``.
 
     Returns
     -------
@@ -111,7 +95,7 @@ def vg_cos_price(
     Raises
     ------
     ValueError
-        If ``spot``, ``strike`` or ``expiry`` is not finite and positive, a
+        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike`` or ``expiry`` is not finite and positive, a
         model input is non-finite, ``sigma`` or ``nu`` is not positive, the
         martingale condition ``1 - theta*nu - 0.5*sigma**2*nu > 0`` fails, or
         ``n_terms`` is outside ``1..=65536``.
@@ -123,7 +107,15 @@ def vg_cos_price(
     Examples
     --------
     >>> from finstack_quant.models import vg_cos_price
-    >>> round(vg_cos_price(100.0, 100.0, 0.05, 0.0, 0.2, -0.1, 0.2, 1.0, True), 4)
+    >>> round(
+    ...     vg_cos_price(
+    ...         {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 1.0, "option_type": "call"},
+    ...         0.2,
+    ...         -0.1,
+    ...         0.2,
+    ...     ),
+    ...     4,
+    ... )
     10.4445
 
     Sources
@@ -135,31 +127,25 @@ def vg_cos_price(
     ...
 
 def merton_jump_cos_price(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
+    market: dict[str, Any] | str,
     sigma: float,
     mu_jump: float,
     sigma_jump: float,
     lambda_: float,
-    expiry: float,
-    is_call: bool,
-    n_terms: int | None = None,
 ) -> float:
     """
     Price a European option under Merton jump-diffusion with the COS method.
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike.
-    rate : float
-        Continuously compounded risk-free rate (decimal).
-    div_yield : float
-        Continuous dividend yield (decimal).
+    market : dict or str
+        Serde form of the Rust ``CosMarketParams``, as a dict or JSON text:
+        ``spot`` and ``strike`` (float, the same price units); ``rate``
+        (continuously compounded risk-free rate, decimal); ``div_yield``
+        (continuous dividend yield, decimal); ``expiry`` (years);
+        ``option_type`` (``"call"`` or ``"put"``) are required; ``n_terms``
+        (int, number of COS terms in ``1..=65536``) is optional and defaults
+        to 128 when omitted or ``None``.
     sigma : float
         Diffusion volatility (decimal).
     mu_jump : float
@@ -168,12 +154,6 @@ def merton_jump_cos_price(
         Standard deviation of the jump size.
     lambda_ : float
         Jump intensity (expected jumps per year).
-    expiry : float
-        Time to expiry in years.
-    is_call : bool
-        ``True`` for a call, ``False`` for a put.
-    n_terms : int, optional
-        Number of COS terms in ``1..=65536``. Uses 128 when ``None``.
 
     Returns
     -------
@@ -183,7 +163,7 @@ def merton_jump_cos_price(
     Raises
     ------
     ValueError
-        If ``spot``, ``strike`` or ``expiry`` is not finite and positive, a
+        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike`` or ``expiry`` is not finite and positive, a
         model input is non-finite, ``sigma``, ``sigma_jump`` or ``lambda_`` is
         negative, the jump compensator is non-finite, or ``n_terms`` is
         outside ``1..=65536``.
@@ -195,7 +175,16 @@ def merton_jump_cos_price(
     Examples
     --------
     >>> from finstack_quant.models import merton_jump_cos_price
-    >>> round(merton_jump_cos_price(100.0, 100.0, 0.05, 0.0, 0.2, -0.1, 0.2, 0.5, 1.0, True), 4)
+    >>> round(
+    ...     merton_jump_cos_price(
+    ...         {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 1.0, "option_type": "call"},
+    ...         0.2,
+    ...         -0.1,
+    ...         0.2,
+    ...         0.5,
+    ...     ),
+    ...     4,
+    ... )
     12.1642
 
     Sources

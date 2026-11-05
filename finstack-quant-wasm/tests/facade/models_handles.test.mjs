@@ -451,17 +451,50 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
   assert.equal(explicit.numPaths, 500);
   assert.equal(explicit.seed, 7n);
   // The default currency and step count come from the registry too.
-  const call = explicit.priceGbm(100, 100, 0.05, 0, 0.2, 1, true);
+  const call = explicit.priceGbm({
+    spot: 100,
+    strike: 100,
+    rate: 0.05,
+    dividend_yield: 0,
+    volatility: 0.2,
+    time_to_expiry: 1,
+    option_type: 'call',
+  });
   assert.equal(typeof call.mean.currency, 'string');
   assert.equal(call.num_paths, 500);
   assert.equal(
-    explicit.priceGbm(100, 100, 0.05, 0, 0.2, 1, true, undefined, 'EUR').mean.currency,
+    explicit.priceGbm(
+      {
+        spot: 100,
+        strike: 100,
+        rate: 0.05,
+        dividend_yield: 0,
+        volatility: 0.2,
+        time_to_expiry: 1,
+        option_type: 'call',
+      },
+      undefined,
+      'EUR'
+    ).mean.currency,
     'EUR'
   );
   assert.throws(() => new monteCarlo.EuropeanPricer(0), kind('validation'));
   assert.throws(() => new monteCarlo.EuropeanPricer('100'), invalidType);
   assert.throws(
-    () => explicit.priceGbm(100, 100, 0.05, 0, 0.2, 1, true, 4, 'ZZZZ'),
+    () =>
+      explicit.priceGbm(
+        {
+          spot: 100,
+          strike: 100,
+          rate: 0.05,
+          dividend_yield: 0,
+          volatility: 0.2,
+          time_to_expiry: 1,
+          option_type: 'call',
+        },
+        4,
+        'ZZZZ'
+      ),
     kind('validation')
   );
 
@@ -474,35 +507,46 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
   assert.equal(asian.useParallel, false);
 
   const lrmPricer = new monteCarlo.PathDependentPricer(20000, 7, false);
-  const gbm = [100, 100, 0.04, 0.01, 0.25, 1];
-  const greeks = lrmPricer.priceWithLrmGreeks(...gbm, true, 12);
+  const gbm = {
+    spot: 100,
+    strike: 100,
+    rate: 0.04,
+    dividend_yield: 0.01,
+    volatility: 0.25,
+    time_to_expiry: 1,
+    option_type: 'call',
+  };
+  const greeks = lrmPricer.priceWithLrmGreeks(gbm, 12);
   assert.deepEqual(Object.keys(greeks).sort(), ['delta', 'price', 'vega']);
-  assert.equal(greeks.price.mean.amount, lrmPricer.priceAsian(...gbm, true, 12).mean.amount);
+  assert.equal(greeks.price.mean.amount, lrmPricer.priceAsian(gbm, 12).mean.amount);
   assert.equal(greeks.delta.num_paths, 20000);
   const bumpDelta =
-    (lrmPricer.priceAsian(100.5, ...gbm.slice(1), true, 12).mean.amount -
-      lrmPricer.priceAsian(99.5, ...gbm.slice(1), true, 12).mean.amount) /
+    (lrmPricer.priceAsian({ ...gbm, spot: 100.5 }, 12).mean.amount -
+      lrmPricer.priceAsian({ ...gbm, spot: 99.5 }, 12).mean.amount) /
     1.0;
   assert.ok(Math.abs(greeks.delta.mean - bumpDelta) < 5 * greeks.delta.stderr);
   assert.ok(greeks.vega.stderr > 0);
   assert.deepEqual(JSON.parse(JSON.stringify(greeks)), greeks);
-  assert.equal(lrmPricer.priceWithLrmGreeks(...gbm, false, 12, 'EUR').price.mean.currency, 'EUR');
+  assert.equal(
+    lrmPricer.priceWithLrmGreeks({ ...gbm, option_type: 'put' }, 12, 'EUR').price.mean.currency,
+    'EUR'
+  );
   // The default step count keeps a default pricer under the path-capture cap.
   assert.equal(
-    new monteCarlo.PathDependentPricer().priceWithLrmGreeks(...gbm, true).price.num_paths,
+    new monteCarlo.PathDependentPricer().priceWithLrmGreeks(gbm).price.num_paths,
     100000
   );
   assert.throws(
-    () => new monteCarlo.PathDependentPricer().priceWithLrmGreeks(...gbm, true, 252),
+    () => new monteCarlo.PathDependentPricer().priceWithLrmGreeks(gbm, 252),
     (e) => kind('validation')(e) && /must not exceed 4000000/.test(e.message)
   );
-  assert.throws(() => lrmPricer.priceWithLrmGreeks(...gbm, 'call', 12), invalidType);
-  assert.throws(() => lrmPricer.priceWithLrmGreeks(...gbm, true, 1.5), invalidType);
   assert.throws(
-    () => lrmPricer.priceWithLrmGreeks(0, ...gbm.slice(1), true, 12),
+    () => lrmPricer.priceWithLrmGreeks({ ...gbm, option_type: true }, 12),
     kind('validation')
   );
-  assert.throws(() => asian.priceWithLrmGreeks(...gbm, true, 12), kind('validation'));
+  assert.throws(() => lrmPricer.priceWithLrmGreeks(gbm, 1.5), invalidType);
+  assert.throws(() => lrmPricer.priceWithLrmGreeks({ ...gbm, spot: 0 }, 12), kind('validation'));
+  assert.throws(() => asian.priceWithLrmGreeks(gbm, 12), kind('validation'));
 
   const lsmc = new monteCarlo.LsmcPricer(500, 7, false, 10, 'polynomial', 3, false);
   assert.equal(lsmc.basis, 'polynomial');
@@ -513,7 +557,21 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
   assert.equal(lsmc.useParallel, false);
   assert.throws(() => new monteCarlo.LsmcPricer(500, 7, false, 10, 'nope'), kind('validation'));
   assert.throws(
-    () => lsmc.priceAmerican(100, 100, 0.05, 0, 0.2, 1, false, undefined, undefined, 'nope'),
+    () =>
+      lsmc.priceAmerican(
+        {
+          spot: 100,
+          strike: 100,
+          rate: 0.05,
+          dividend_yield: 0,
+          volatility: 0.2,
+          time_to_expiry: 1,
+          option_type: 'put',
+        },
+        undefined,
+        undefined,
+        'nope'
+      ),
     kind('validation')
   );
   const spec = {
@@ -541,7 +599,19 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
       }),
     kind('validation')
   );
-  assert.throws(() => monteCarlo.finiteDiffDelta(100, 100, 0.05, 0, 0.2, 1, 'call'), invalidType);
+  assert.throws(
+    () =>
+      monteCarlo.finiteDiffDelta({
+        spot: 100,
+        strike: 100,
+        rate: 0.05,
+        div_yield: 0,
+        vol: 0.2,
+        expiry: 1,
+        option_type: true,
+      }),
+    kind('validation')
+  );
   assert.equal(
     monteCarlo.relativeStderr({ ...call, mean: { ...call.mean, amount: '0' } }),
     Infinity
@@ -706,7 +776,18 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
     kind('validation')
   );
   assert.equal(
-    models.bsGreeksIsValid({ ...models.bsGreeks(100, 100, 0.05, 0, 0.2, 1, true), gamma: -1 }),
+    models.bsGreeksIsValid({
+      ...models.bsGreeks({
+        spot: 100,
+        strike: 100,
+        rate: 0.05,
+        dividend_yield: 0,
+        volatility: 0.2,
+        time_to_expiry: 1,
+        option_type: 'call',
+      }),
+      gamma: -1,
+    }),
     false
   );
 });

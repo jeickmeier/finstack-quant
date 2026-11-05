@@ -35,7 +35,6 @@ const NON_FINITE_MSG: &str = "Implied volatility solver received non-finite inpu
 /// * `price` - Observed per-unit option premium to match, excluding any
 ///   contract multiplier.
 /// * `option_type` - Call or put payoff convention to invert.
-#[allow(clippy::too_many_arguments)]
 pub fn bs_implied_vol(
     spot: f64,
     strike: f64,

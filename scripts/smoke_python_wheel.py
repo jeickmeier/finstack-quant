@@ -73,13 +73,15 @@ def main() -> None:
             use_parallel=False,
         )
         .price_gbm(
-            spot,
-            strike,
-            rate,
-            dividend_yield,
-            volatility,
-            expiry,
-            True,
+            {
+                "spot": spot,
+                "strike": strike,
+                "rate": rate,
+                "dividend_yield": dividend_yield,
+                "volatility": volatility,
+                "time_to_expiry": expiry,
+                "option_type": "call",
+            },
             num_steps=1,
         )
     )

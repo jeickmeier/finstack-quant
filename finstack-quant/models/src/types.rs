@@ -108,7 +108,27 @@ impl std::str::FromStr for ExerciseStyle {
 }
 
 /// Common market inputs for product-independent option model functions.
-#[derive(Debug, Clone)]
+///
+/// The serde form is the host-facing `market` object of the closed-form and
+/// Monte Carlo option entry points: every field is required, rates and
+/// volatility are decimals, `time_to_expiry` is in years and `option_type` is
+/// `"call"` or `"put"`.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_models::types::{OptionMarketParams, OptionType};
+///
+/// let market: OptionMarketParams = serde_json::from_str(
+///     r#"{"spot": 100.0, "strike": 100.0, "rate": 0.05, "volatility": 0.2,
+///         "time_to_expiry": 1.0, "dividend_yield": 0.0, "option_type": "call"}"#,
+/// )?;
+/// assert_eq!(market.option_type, OptionType::Call);
+/// # Ok::<(), serde_json::Error>(())
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct OptionMarketParams {
     /// Current spot or forward price in the instrument's quote units.
     pub spot: f64,

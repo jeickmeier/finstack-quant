@@ -44,8 +44,12 @@ use finstack_quant_core::math::time_grid::TimeGrid;
 ///
 /// Every field is optional; `None` takes the registry binding default
 /// (`convenience.european_pricer` and `convenience.default_currency`), so
-/// `HestonMcSettings::default()` reproduces the host defaults.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+/// `HestonMcSettings::default()` reproduces the host defaults. The serde form
+/// is the host-facing `settings` object of `price_heston`; every key may be
+/// omitted.
+#[derive(Debug, Clone, Copy, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(default, deny_unknown_fields)]
 pub struct HestonMcSettings {
     /// Independent path estimators in `2..=10_000_000`; each antithetic pair
     /// counts once.

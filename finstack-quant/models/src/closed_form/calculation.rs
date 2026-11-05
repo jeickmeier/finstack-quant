@@ -38,7 +38,7 @@ use crate::closed_form::{
     BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR, ForwardGreeks, bachelier_greeks, bachelier_price,
     black76_greeks, black76_implied_vol, black76_price, bs_greeks, bs_implied_vol, bs_price,
 };
-use crate::types::OptionType;
+use crate::types::{OptionMarketParams, OptionType};
 use crate::volatility::implied_vol_bachelier;
 
 /// A closed-form model and the option terms it reads.
@@ -260,13 +260,15 @@ fn greeks_at(model: &OptionModel, vol: f64) -> Result<OptionGreeks> {
             is_call,
             theta_days_per_year,
         } => bs_greeks(
-            spot,
-            strike,
-            rate,
-            div_yield,
-            vol,
-            expiry,
-            OptionType::from(is_call),
+            &OptionMarketParams {
+                spot,
+                strike,
+                rate,
+                volatility: vol,
+                time_to_expiry: expiry,
+                dividend_yield: div_yield,
+                option_type: OptionType::from(is_call),
+            },
             theta_days_per_year.unwrap_or(DEFAULT_THETA_DAYS_PER_YEAR),
         )
         .map(OptionGreeks::BlackScholes),
@@ -319,13 +321,15 @@ mod tests {
         assert_eq!(
             result.greeks,
             OptionGreeks::BlackScholes(bs_greeks(
-                100.0,
-                105.0,
-                0.03,
-                0.01,
-                0.25,
-                0.75,
-                put,
+                &OptionMarketParams {
+                    spot: 100.0,
+                    strike: 105.0,
+                    rate: 0.03,
+                    volatility: 0.25,
+                    time_to_expiry: 0.75,
+                    dividend_yield: 0.01,
+                    option_type: put
+                },
                 DEFAULT_THETA_DAYS_PER_YEAR
             )?)
         );

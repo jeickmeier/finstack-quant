@@ -19,6 +19,17 @@ const invalidCount = (name) => (error) => {
   return true;
 };
 
+/**
+ * A count inside a params object: the JSON writer rejects a non-finite number
+ * (`invalid_type`) and the Rust deserializer a negative, fractional or
+ * oversized one (`validation`), both naming the argument.
+ */
+const invalidObjectCount = (label) => (error) => {
+  assert.ok(['invalid_type', 'validation'].includes(error.kind), `unexpected kind ${error.kind}`);
+  assert.match(error.message, new RegExp(`${label}: `));
+  return true;
+};
+
 test('forward option APIs validate input domains before intrinsic branches', () => {
   for (const invalid of [NaN, Infinity, -Infinity]) {
     for (const expiry of [0, 1]) {
@@ -65,30 +76,91 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
   try {
     for (const count of invalidCounts) {
       assert.throws(
-        () => models.asianOptionPrice(100, 100, 0.05, 0, 0.2, 1, count),
+        () =>
+          models.asianOptionPrice(
+            {
+              spot: 100,
+              strike: 100,
+              rate: 0.05,
+              dividend_yield: 0,
+              volatility: 0.2,
+              time_to_expiry: 1,
+              option_type: 'call',
+            },
+            count
+          ),
         invalidCount('numFixings')
       );
       assert.throws(
-        () => models.bsCosPrice(100, 100, 0.05, 0, 0.2, 1, true, count),
-        invalidCount('nTerms')
+        () =>
+          models.bsCosPrice(
+            {
+              spot: 100,
+              strike: 100,
+              rate: 0.05,
+              div_yield: 0,
+              expiry: 1,
+              option_type: 'call',
+              n_terms: count,
+            },
+            0.2
+          ),
+        invalidObjectCount('market')
       );
       assert.throws(
-        () => models.vgCosPrice(100, 100, 0.05, 0, 0.2, -0.1, 0.2, 1, true, count),
-        invalidCount('nTerms')
+        () =>
+          models.vgCosPrice(
+            {
+              spot: 100,
+              strike: 100,
+              rate: 0.05,
+              div_yield: 0,
+              expiry: 1,
+              option_type: 'call',
+              n_terms: count,
+            },
+            0.2,
+            -0.1,
+            0.2
+          ),
+        invalidObjectCount('market')
       );
       assert.throws(
-        () => models.mertonJumpCosPrice(100, 100, 0.05, 0, 0.2, -0.1, 0.1, 0.1, 1, true, count),
-        invalidCount('nTerms')
+        () =>
+          models.mertonJumpCosPrice(
+            {
+              spot: 100,
+              strike: 100,
+              rate: 0.05,
+              div_yield: 0,
+              expiry: 1,
+              option_type: 'call',
+              n_terms: count,
+            },
+            0.2,
+            -0.1,
+            0.1,
+            0.1
+          ),
+        invalidObjectCount('market')
       );
       for (const isCall of [true, false]) {
-        const price = models.monteCarlo.priceHeston;
+        const price = (settings) =>
+          models.monteCarlo.priceHeston(
+            100,
+            100,
+            1,
+            { r: 0.05, q: 0, v0: 0.04, kappa: 2, theta: 0.04, sigma_v: 0.3, rho: -0.7 },
+            isCall,
+            settings
+          );
         assert.throws(
-          () => price(100, 100, 0.05, 0, 2, 0.04, 0.3, -0.7, 0.04, 1, isCall, count, 42n, 1),
-          invalidCount('numPaths')
+          () => price({ num_paths: count, seed: 42n, num_steps: 1 }),
+          invalidObjectCount('settings')
         );
         assert.throws(
-          () => price(100, 100, 0.05, 0, 2, 0.04, 0.3, -0.7, 0.04, 1, isCall, 2, 42n, count),
-          invalidCount('numSteps')
+          () => price({ num_paths: 2, seed: 42n, num_steps: count }),
+          invalidObjectCount('settings')
         );
       }
       assert.throws(() => model.simulatePaths(count, 1, 1, 42n, false), invalidCount('numPaths'));
@@ -102,18 +174,10 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
     const estimate = models.monteCarlo.priceHeston(
       100,
       100,
-      0.05,
-      0,
-      2,
-      0.04,
-      0.3,
-      -0.7,
-      0.04,
       1,
+      { r: 0.05, q: 0, v0: 0.04, kappa: 2, theta: 0.04, sigma_v: 0.3, rho: -0.7 },
       true,
-      2,
-      42n,
-      1
+      { num_paths: 2, seed: 42n, num_steps: 1 }
     );
     assert.equal(estimate.num_paths, 2);
     assert.ok(Number.isFinite(Number(estimate.mean.amount)));

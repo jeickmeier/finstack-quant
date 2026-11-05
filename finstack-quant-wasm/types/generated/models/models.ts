@@ -202,6 +202,10 @@ export type CorrelationStructure =
  */
 export type CorrelationWire = number;
 /**
+ * Option payoff direction used by analytical and numerical model engines.
+ */
+export type OptionType = "call" | "put";
+/**
  * Strategy for assembling the factor covariance matrix.
  */
 export type CovarianceStrategy =
@@ -1327,10 +1331,6 @@ export type OptionGreeks =
        */
       vega: number;
     };
-/**
- * Option payoff direction used by analytical and numerical model engines.
- */
-export type OptionType = "call" | "put";
 /**
  * Stochastic process to simulate, with its parameters.
  *
@@ -2618,6 +2618,40 @@ export interface CosConfig {
    */
   truncation_l: number;
   [k: string]: unknown;
+}
+/**
+ * Option and market inputs of the COS Fourier pricers.
+ */
+export interface CosMarketParams {
+  /**
+   * Continuous dividend yield (decimal, annualized).
+   */
+  div_yield: number;
+  /**
+   * Time to expiry in years.
+   */
+  expiry: number;
+  /**
+   * Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
+   * [`CosConfig::default`].
+   */
+  n_terms?: number | null;
+  /**
+   * Call or put payoff.
+   */
+  option_type: OptionType;
+  /**
+   * Continuously-compounded risk-free rate.
+   */
+  rate: number;
+  /**
+   * Current spot price of the underlying.
+   */
+  spot: number;
+  /**
+   * Option strike.
+   */
+  strike: number;
 }
 /**
  * Configuration for the deterministic credit factor-model calibrator.
@@ -4000,6 +4034,62 @@ export interface ForwardGreeks {
   vega: number;
 }
 /**
+ * Inputs of the GBM European Monte Carlo finite-difference Greeks.
+ */
+export interface GbmEuropeanFdSpec {
+  /**
+   * Relative spot bump used as an MC finite-difference shock; `None` uses
+   * the registry binding default (a 1% of spot MC shock, not a local
+   * closed-form step).
+   */
+  bump_size?: number | null;
+  /**
+   * Currency stamped on simulated payoffs; `None` uses the registry default.
+   */
+  currency?: Currency | null;
+  /**
+   * Continuous dividend yield (decimal, annualized).
+   */
+  div_yield: number;
+  /**
+   * Time to expiry in years; also the uniform-grid horizon.
+   */
+  expiry: number;
+  /**
+   * Independent estimators; `None` uses the registry binding default.
+   * Each estimator uses two physical paths when the registry enables antithetics.
+   */
+  num_paths?: number | null;
+  /**
+   * Time steps per path; `None` uses the registry binding default.
+   */
+  num_steps?: number | null;
+  /**
+   * Call or put payoff. Required; there is no default option type.
+   */
+  option_type: OptionType;
+  /**
+   * Continuously compounded risk-free rate (decimal, annualized).
+   */
+  rate: number;
+  /**
+   * RNG seed; `None` uses the registry binding default.
+   */
+  seed?: number | null;
+  /**
+   * Spot level at time `0`.
+   */
+  spot: number;
+  /**
+   * Exercise price in the same units as `spot`.
+   */
+  strike: number;
+  /**
+   * Annualized GBM volatility (decimal); must be strictly positive.
+   */
+  vol: number;
+}
+/**
  * Geometric Brownian Motion parameters.
  */
 export interface GbmParams {
@@ -4059,6 +4149,28 @@ export interface RatingScale {
     [k: string]: number;
   };
   labels: string[];
+}
+/**
+ * Monte Carlo run settings of the Heston European pricer.
+ */
+export interface HestonMcSettings {
+  /**
+   * Currency stamped on the result.
+   */
+  currency?: Currency | null;
+  /**
+   * Independent path estimators in `2..=10_000_000`; each antithetic pair
+   * counts once.
+   */
+  num_paths?: number | null;
+  /**
+   * Uniform time steps per path between `0` and expiry.
+   */
+  num_steps?: number | null;
+  /**
+   * Root seed of the Philox path streams.
+   */
+  seed?: number | null;
 }
 /**
  * Heston stochastic volatility model parameters.
@@ -5103,6 +5215,39 @@ export interface OptionCalculationResult {
    * for an implied-volatility solve.
    */
   price: number;
+}
+/**
+ * Spot, strike, rates, volatility, expiry and payoff direction of an option model call.
+ */
+export interface OptionMarketParams {
+  /**
+   * Continuous dividend yield or cost of carry as a decimal.
+   */
+  dividend_yield: number;
+  /**
+   * Call or put payoff direction.
+   */
+  option_type: OptionType;
+  /**
+   * Continuously compounded annual risk-free rate as a decimal.
+   */
+  rate: number;
+  /**
+   * Current spot or forward price in the instrument's quote units.
+   */
+  spot: number;
+  /**
+   * Strike price in the same quote units as `spot`.
+   */
+  strike: number;
+  /**
+   * Time to expiry in years.
+   */
+  time_to_expiry: number;
+  /**
+   * Annualized volatility as a decimal.
+   */
+  volatility: number;
 }
 /**
  * Complete, serializable description of one path simulation.

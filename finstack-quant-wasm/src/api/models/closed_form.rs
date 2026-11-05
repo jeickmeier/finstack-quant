@@ -8,7 +8,10 @@
 //! Bachelier vol in the forward's units; `expiry` is time to expiry in years.
 //! Greeks scale matches the Rust crate: `vega` and both rho values are per 1%
 //! move, `theta` is per-day under the `thetaDaysPerYear` day-count (ACT/365 by
-//! default).
+//! default). `bsGreeks` and the barrier, Asian, lookback and quanto prices
+//! take the shared `OptionMarketParams` object (`market`: `spot`, `strike`,
+//! `rate`, `dividend_yield`, `volatility`, `time_to_expiry`, `option_type`);
+//! `hestonPrice` takes `HestonPricingParams` (`params`).
 //!
 //! Named-model sources: `docs/REFERENCES.md#black-scholes-1973`,
 //! `docs/REFERENCES.md#merton-1973`, `docs/REFERENCES.md#garman-kohlhagen-1983`,
@@ -33,7 +36,7 @@ use finstack_quant_models::closed_form::{
     vanilla_expiry_payoff as vanilla_expiry_payoff_core,
 };
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
-use finstack_quant_models::types::OptionType;
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use wasm_bindgen::prelude::*;
 
 /// Price a closed-form option or invert its price, with Greeks at the
@@ -182,61 +185,35 @@ pub fn vanilla_expiry_payoff(
 /// Merton (1973): see docs/REFERENCES.md#merton-1973.
 /// Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983.
 ///
-/// @param spot - Spot price of the underlying.
-/// @param strike - Strike of the option.
-/// @param rate - Risk-free rate, **decimal** continuously compounded.
-/// @param divYield - Dividend yield (or foreign rate for FX), **decimal**
-/// continuously compounded.
-/// @param vol - Annualized volatility, **decimal**; must be positive.
-/// @param expiry - Time to expiry in **years**; must be positive.
-/// @param isCall - `true` for a call, `false` for a put.
+/// @param market - `OptionMarketParams` object or JSON text, every key required: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield or foreign rate, decimal), `volatility` (annualized, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`). `volatility` and `time_to_expiry` must be positive.
 /// @param thetaDaysPerYear - Day-count denominator for theta. Default `365`.
 /// Pass `252` for trading-day theta.
 /// @returns Object `{ delta, gamma, vega, theta, rho_r, rho_q }` (snake_case keys
 /// matching the Rust/Python canonical `BsGreeks` fields). `vega` and
 /// both rho values are **per 1% move**; `theta` is **per day** under
 /// `thetaDaysPerYear`.
-/// @throws `FinstackError` (kind `validation`) if any input is non-finite, `spot` or `strike` is not positive, `vol`, `expiry` or `thetaDaysPerYear` is not positive, or a computed Greek is non-finite.
+/// @throws `FinstackError` (kind `validation`) if `market` does not match `OptionMarketParams`, any input is non-finite, `spot` or `strike` is not positive, `volatility`, `time_to_expiry` or `thetaDaysPerYear` is not positive, or a computed Greek is non-finite.
 ///
 /// @example
 /// ```javascript
-/// const g = models.bsGreeks(100, 100, 0.05, 0.0, 0.20, 1.0, true);
+/// const g = models.bsGreeks({
+///   spot: 100, strike: 100, rate: 0.05, dividend_yield: 0.0,
+///   volatility: 0.20, time_to_expiry: 1.0, option_type: "call",
+/// });
 /// // g.delta ≈ 0.64, g.gamma ≈ 0.019, g.vega ≈ 0.38 (per 1% vol)
 /// ```
 #[wasm_bindgen(js_name = bsGreeks, unchecked_return_type = "BsGreeks")]
-#[allow(clippy::too_many_arguments)]
 pub fn bs_greeks(
-    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
-    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
-    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
+    market: JsValue,
     #[wasm_bindgen(js_name = "thetaDaysPerYear", unchecked_optional_param_type = "number")]
     theta_days_per_year: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let spot = js_f64(&spot, "spot")?;
-    let strike = js_f64(&strike, "strike")?;
-    let rate = js_f64(&rate, "rate")?;
-    let div_yield = js_f64(&div_yield, "divYield")?;
-    let vol = js_f64(&vol, "vol")?;
-    let expiry = js_f64(&expiry, "expiry")?;
+    let market: OptionMarketParams = from_js_json(&market, "market")?;
     let theta_days_per_year = js_opt_f64(theta_days_per_year.as_ref(), "thetaDaysPerYear")?;
-    let is_call = js_bool(&is_call, "isCall")?;
     // theta_days_per_year validation (finite, > 0) lives in canonical `bs_greeks`.
     let theta_days_per_year = theta_days_per_year.unwrap_or(DEFAULT_THETA_DAYS_PER_YEAR);
-    let g = bs_greeks_core(
-        spot,
-        strike,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        OptionType::from(is_call),
-        theta_days_per_year,
-    )
-    .map_err(to_js_err)?;
+    let g = bs_greeks_core(&market, theta_days_per_year).map_err(to_js_err)?;
     // Serialize the canonical `BsGreeks` struct so the keys are exactly the
     // Rust / Python field names (`rho_r`, `rho_q`, ...).
     crate::utils::to_js_value(&g)
@@ -564,126 +541,64 @@ pub fn black_shifted_vega(
 ///
 /// `direction` is `"up"` or `"down"`, `knock` is `"in"` or `"out"`.
 /// Reiner-Rubinstein (1991): see docs/REFERENCES.md#reiner-rubinstein-1991.
-/// @param spot - Current spot price or exchange rate in the same units as the strike.
-/// @param strike - Option strike price in the same price units as the underlying.
+/// @param market - `OptionMarketParams` object or JSON text, every key required: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield or foreign rate, decimal), `volatility` (annualized, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`).
 /// @param barrier - Continuously monitored barrier level in the same price units as spot.
-/// @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-/// @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
-/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-/// @param expiry - Time to expiry in years.
 /// @param direction - Barrier direction: `"up"` for an upper barrier or `"down"` for a lower barrier.
 /// @param knock - Barrier activation: `"in"` for knock-in or `"out"` for knock-out.
-/// @param isCall - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `direction` or `knock` is unsupported, or
-/// the supplied model inputs produce a non-finite barrier price.
+/// Throws a JavaScript exception if `market` does not match
+/// `OptionMarketParams`, `direction` or `knock` is unsupported, or the
+/// supplied model inputs produce a non-finite barrier price.
 /// @returns Discounted barrier option price in the same units as `spot`.
 #[wasm_bindgen(js_name = barrierOptionPrice)]
-#[allow(clippy::too_many_arguments)]
 pub fn barrier_option_price(
-    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
+    market: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] barrier: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
-    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
     #[wasm_bindgen(unchecked_param_type = "'up' | 'down'")] direction: JsValue,
     #[wasm_bindgen(unchecked_param_type = "'in' | 'out'")] knock: JsValue,
-    #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
-        JsValue,
-    >,
 ) -> Result<f64, JsValue> {
-    let spot = js_f64(&spot, "spot")?;
-    let strike = js_f64(&strike, "strike")?;
+    let market: OptionMarketParams = from_js_json(&market, "market")?;
     let barrier = js_f64(&barrier, "barrier")?;
-    let rate = js_f64(&rate, "rate")?;
-    let div_yield = js_f64(&div_yield, "divYield")?;
-    let vol = js_f64(&vol, "vol")?;
-    let expiry = js_f64(&expiry, "expiry")?;
     let direction: &str = &js_string(&direction, "direction")?;
     let knock: &str = &js_string(&knock, "knock")?;
-    let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
-    barrier_option_price_core(
-        spot,
-        strike,
-        barrier,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        direction,
-        knock,
-        OptionType::from(is_call.unwrap_or(true)),
-    )
-    .map_err(to_js_err)
+    barrier_option_price_core(&market, barrier, direction, knock).map_err(to_js_err)
 }
 
 /// Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option.
 ///
 /// Kemna-Vorst (1990): see docs/REFERENCES.md#kemna-vorst-1990.
 /// Turnbull-Wakeman (1991): see docs/REFERENCES.md#turnbull-wakeman-1991.
-/// @param spot - Current spot price or exchange rate in the same units as the strike.
-/// @param strike - Option strike price in the same price units as the underlying.
-/// @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-/// @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
-/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-/// @param expiry - Time to expiry in years.
-/// @param numFixings - Non-negative integer number of equally spaced averaging observations, at most 4294967295; zero selects continuous monitoring.
+/// @param market - `OptionMarketParams` object or JSON text, every key required: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield or foreign rate, decimal), `volatility` (annualized, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`).
+/// @param numFixings - Positive integer number of equally spaced averaging observations, at most 4294967295.
 /// @param averaging - Asian averaging convention: `"arithmetic"` (default) or `"geometric"`.
-/// @param isCall - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `numFixings` is not a non-negative whole
-/// number, `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied
-/// model inputs produce a non-finite option price.
+/// Throws a JavaScript exception if `market` does not match
+/// `OptionMarketParams`, `numFixings` is not a positive whole number,
+/// `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied model
+/// inputs produce a non-finite option price.
 /// @returns Discounted Asian option price in the same units as `spot`.
 #[wasm_bindgen(js_name = asianOptionPrice)]
-#[allow(clippy::too_many_arguments)]
 pub fn asian_option_price(
-    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
-    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
+    market: JsValue,
     #[wasm_bindgen(js_name = "numFixings", unchecked_param_type = "number")] num_fixings: JsValue,
     #[wasm_bindgen(unchecked_optional_param_type = "'arithmetic' | 'geometric'")] averaging: Option<
         JsValue,
     >,
-    #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
-        JsValue,
-    >,
 ) -> Result<f64, JsValue> {
-    let spot = js_f64(&spot, "spot")?;
-    let strike = js_f64(&strike, "strike")?;
-    let rate = js_f64(&rate, "rate")?;
-    let div_yield = js_f64(&div_yield, "divYield")?;
-    let vol = js_f64(&vol, "vol")?;
-    let expiry = js_f64(&expiry, "expiry")?;
+    let market: OptionMarketParams = from_js_json(&market, "market")?;
     let num_fixings: usize = js_uint(&num_fixings, "numFixings")?;
     let averaging = js_opt_string(averaging.as_ref(), "averaging")?
         .map(|label| serde_parse::<AveragingMethod>(&label))
         .transpose()
         .map_err(to_js_err)?
         .unwrap_or(DEFAULT_ASIAN_AVERAGING);
-    let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
-    let option_type = OptionType::from(is_call.unwrap_or(true));
-    asian_option_price_core(
-        spot,
-        strike,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        num_fixings,
-        averaging,
-        option_type,
-    )
-    .map_err(to_js_err)
+    asian_option_price_core(&market, num_fixings, averaging).map_err(to_js_err)
 }
 
 /// Conze-Viswanathan lookback option.
@@ -691,66 +606,34 @@ pub fn asian_option_price(
 /// `strike_type` is `"fixed"` (default) or `"floating"`. For `"floating"`,
 /// `strike` is ignored and `extremum` is the observed min/max to date.
 /// Conze-Viswanathan (1991): see docs/REFERENCES.md#conze-viswanathan-1991.
-/// @param spot - Current spot price or exchange rate in the same units as the strike.
-/// @param strike - Option strike price in the same price units as the underlying.
-/// @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-/// @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
-/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-/// @param expiry - Time to expiry in years.
+/// @param market - `OptionMarketParams` object or JSON text, every key required: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield or foreign rate, decimal), `volatility` (annualized, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`). `strike` is ignored (but must be finite) for `"floating"`.
 /// @param extremum - Observed maximum for fixed calls or floating puts, minimum for fixed puts or floating calls, including current spot; in spot-price units.
 /// @param strikeType - Lookback payoff convention: `"fixed"` (default) or `"floating"`.
-/// @param isCall - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `strikeType` is not `"fixed"` or
-/// `"floating"`, or the supplied model inputs produce a non-finite option
-/// price.
+/// Throws a JavaScript exception if `market` does not match
+/// `OptionMarketParams`, `strikeType` is not `"fixed"` or `"floating"`, or
+/// the supplied model inputs produce a non-finite option price.
 /// @returns Discounted lookback option price in the same units as `spot`.
 #[wasm_bindgen(js_name = lookbackOptionPrice)]
-#[allow(clippy::too_many_arguments)]
 pub fn lookback_option_price(
-    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
-    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
+    market: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] extremum: JsValue,
     #[wasm_bindgen(
         js_name = "strikeType",
         unchecked_optional_param_type = "'fixed' | 'floating'"
     )]
     strike_type: Option<JsValue>,
-    #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
-        JsValue,
-    >,
 ) -> Result<f64, JsValue> {
-    let spot = js_f64(&spot, "spot")?;
-    let strike = js_f64(&strike, "strike")?;
-    let rate = js_f64(&rate, "rate")?;
-    let div_yield = js_f64(&div_yield, "divYield")?;
-    let vol = js_f64(&vol, "vol")?;
-    let expiry = js_f64(&expiry, "expiry")?;
+    let market: OptionMarketParams = from_js_json(&market, "market")?;
     let extremum = js_f64(&extremum, "extremum")?;
     let strike_type = js_opt_string(strike_type.as_ref(), "strikeType")?;
-    let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
     let strike_type = strike_type
         .as_deref()
         .unwrap_or(DEFAULT_LOOKBACK_STRIKE_TYPE);
-    let option_type = OptionType::from(is_call.unwrap_or(true));
-    lookback_option_price_core(
-        spot,
-        strike,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        extremum,
-        strike_type,
-        option_type,
-    )
-    .map_err(to_js_err)
+    lookback_option_price_core(&market, extremum, strike_type).map_err(to_js_err)
 }
 
 /// Quanto option (FX-adjusted cross-currency) price in domestic currency.
@@ -758,58 +641,25 @@ pub fn lookback_option_price(
 /// Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983.
 /// Brigo-Mercurio (2006): see docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models.
 ///
-/// @throws If the inputs produce a non-finite price.
-/// @param spot - Current spot price or exchange rate in the same units as the strike.
-/// @param strike - Option strike price in the same price units as the underlying.
-/// @param expiry - Time to expiry in years.
-/// @param rateDomestic - Domestic continuously compounded risk-free rate, expressed as a decimal.
+/// @throws If `market` does not match `OptionMarketParams` or the inputs produce a non-finite price.
+/// @param market - `OptionMarketParams` object or JSON text for the foreign asset, every key required: `spot` and `strike` in foreign currency, `rate` (the **domestic** continuously compounded risk-free rate, decimal), `dividend_yield` (the asset's continuous dividend yield, decimal), `volatility` (annualized asset-price volatility, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`).
 /// @param rateForeign - Foreign continuously compounded risk-free rate, expressed as a decimal.
-/// @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
-/// @param volAsset - Annualized asset-price volatility expressed as a decimal.
 /// @param volFx - Annualized FX-rate volatility expressed as a decimal.
 /// @param correlation - Instantaneous correlation between the asset and FX-rate shocks, from -1 to 1.
-/// @param isCall - Whether to value a call (`true`, default) or put (`false`).
 /// @returns Discounted quanto option price in domestic currency units.
 #[wasm_bindgen(js_name = quantoOptionPrice)]
-#[allow(clippy::too_many_arguments)]
 pub fn quanto_option_price(
-    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
-    #[wasm_bindgen(js_name = "rateDomestic", unchecked_param_type = "number")]
-    rate_domestic: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
+    market: JsValue,
     #[wasm_bindgen(js_name = "rateForeign", unchecked_param_type = "number")] rate_foreign: JsValue,
-    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
-    #[wasm_bindgen(js_name = "volAsset", unchecked_param_type = "number")] vol_asset: JsValue,
     #[wasm_bindgen(js_name = "volFx", unchecked_param_type = "number")] vol_fx: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] correlation: JsValue,
-    #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
-        JsValue,
-    >,
 ) -> Result<f64, JsValue> {
-    let spot = js_f64(&spot, "spot")?;
-    let strike = js_f64(&strike, "strike")?;
-    let expiry = js_f64(&expiry, "expiry")?;
-    let rate_domestic = js_f64(&rate_domestic, "rateDomestic")?;
+    let market: OptionMarketParams = from_js_json(&market, "market")?;
     let rate_foreign = js_f64(&rate_foreign, "rateForeign")?;
-    let div_yield = js_f64(&div_yield, "divYield")?;
-    let vol_asset = js_f64(&vol_asset, "volAsset")?;
     let vol_fx = js_f64(&vol_fx, "volFx")?;
     let correlation = js_f64(&correlation, "correlation")?;
-    let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
-    quanto_option_price_core(
-        spot,
-        strike,
-        expiry,
-        rate_domestic,
-        rate_foreign,
-        div_yield,
-        vol_asset,
-        vol_fx,
-        correlation,
-        OptionType::from(is_call.unwrap_or(true)),
-    )
-    .map_err(to_js_err)
+    quanto_option_price_core(&market, rate_foreign, vol_fx, correlation).map_err(to_js_err)
 }
 
 /// Closed-form (Fourier) Heston price of a European option.
@@ -819,33 +669,30 @@ pub fn quanto_option_price(
 /// @param spot - Current spot price in the same units as the strike.
 /// @param strike - Option strike price.
 /// @param expiry - Time to expiry in years; a non-positive value returns intrinsic.
-/// @param rate - Continuously compounded risk-free rate, decimal.
-/// @param divYield - Continuous dividend yield or foreign rate, decimal.
-/// @param kappa - Mean-reversion speed of the variance process (per year).
-/// @param theta - Long-run variance level (variance units).
-/// @param sigmaV - Volatility of variance (vol-of-vol).
-/// @param rho - Spot/variance correlation in `(-1, 1)`.
-/// @param v0 - Initial instantaneous variance (variance, not volatility).
+/// @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield or foreign rate, decimal), `v0` (initial instantaneous variance, not volatility), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `sigma_v` (volatility of variance) and `rho` (spot/variance correlation in `[-1, 1]`).
 /// @param isCall - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if a parameter is non-finite or outside its
-/// domain, or the Fourier integration fails to produce a finite price.
+/// Throws a JavaScript exception if `params` does not match
+/// `HestonPricingParams` or a parameter is non-finite or outside its domain,
+/// or the Fourier integration fails to produce a finite price.
 /// @returns Present-value per-unit option price.
+///
+/// @example
+/// ```javascript
+/// const price = models.hestonPrice(100, 100, 1.0, {
+///   r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7,
+/// });
+/// // price ≈ 9.24
+/// ```
 #[wasm_bindgen(js_name = hestonPrice)]
-#[allow(clippy::too_many_arguments)]
 pub fn heston_price(
     #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
-    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] kappa: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] theta: JsValue,
-    #[wasm_bindgen(js_name = "sigmaV", unchecked_param_type = "number")] sigma_v: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] rho: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] v0: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.HestonPricingParams | string")]
+    params: JsValue,
     #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
         JsValue,
     >,
@@ -853,16 +700,8 @@ pub fn heston_price(
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
     let expiry = js_f64(&expiry, "expiry")?;
-    let rate = js_f64(&rate, "rate")?;
-    let div_yield = js_f64(&div_yield, "divYield")?;
-    let kappa = js_f64(&kappa, "kappa")?;
-    let theta = js_f64(&theta, "theta")?;
-    let sigma_v = js_f64(&sigma_v, "sigmaV")?;
-    let rho = js_f64(&rho, "rho")?;
-    let v0 = js_f64(&v0, "v0")?;
+    let params: HestonPricingParams = from_js_json(&params, "params")?;
     let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
-    let params = HestonPricingParams::new(rate, div_yield, kappa, theta, sigma_v, rho, v0)
-        .map_err(to_js_err)?;
     let option_type = OptionType::from(is_call.unwrap_or(true));
     heston_price_core(spot, strike, expiry, &params, option_type, None).map_err(to_js_err)
 }

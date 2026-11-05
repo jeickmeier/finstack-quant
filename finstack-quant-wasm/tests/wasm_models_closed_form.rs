@@ -9,33 +9,23 @@ use wasm_bindgen_test::*;
 
 #[wasm_bindgen_test]
 fn barrier_put_dispatches() {
-    let p = barrier_option_price(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
+    let p = barrier_option_price(JsValue::from_str(
+            r#"{"spot": 100.0, "strike": 100.0, "rate": 0.05, "volatility": 0.2, "time_to_expiry": 1.0, "dividend_yield": 0.0, "option_type": "put"}"#,
+        ),
         JsValue::from(80.0),
-        JsValue::from(0.05),
-        JsValue::from(0.0),
-        JsValue::from(0.2),
-        JsValue::from(1.0),
         JsValue::from("down"),
         JsValue::from("out"),
-        Some(JsValue::from(false)),
     )
     .expect("finite price");
     assert!(p > 0.0);
     assert!(
-        barrier_option_price(
-            JsValue::from(100.0),
-            JsValue::from(100.0),
-            JsValue::from(80.0),
-            JsValue::from(0.05),
-            JsValue::from(0.0),
-            JsValue::from(0.2),
-            JsValue::from(1.0),
-            JsValue::from("sideways"),
-            JsValue::from("out"),
-            Some(JsValue::from(false))
-        )
+        barrier_option_price(JsValue::from_str(
+            r#"{"spot": 100.0, "strike": 100.0, "rate": 0.05, "volatility": 0.2, "time_to_expiry": 1.0, "dividend_yield": 0.0, "option_type": "put"}"#,
+        ),
+        JsValue::from(80.0),
+        JsValue::from("sideways"),
+        JsValue::from("out"),
+    )
         .is_err()
     );
 }
@@ -225,16 +215,12 @@ fn bs_price_rejects_non_finite_result() {
 fn quanto_option_price_rejects_non_finite_result() {
     // Same degenerate-maturity path: a non-finite quanto price must throw.
     let result = quanto_option_price(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(1.0e6),
-        JsValue::from(-1.0),
+        JsValue::from_str(
+            r#"{"spot": 100.0, "strike": 100.0, "rate": -1.0, "volatility": 0.20, "time_to_expiry": 1.0e6, "dividend_yield": 0.0, "option_type": "put"}"#,
+        ),
         JsValue::from(0.01),
-        JsValue::from(0.0),
-        JsValue::from(0.20),
         JsValue::from(0.10),
         JsValue::from(0.3),
-        Some(JsValue::from(false)),
     );
     assert!(
         result.is_err(),
@@ -242,33 +228,23 @@ fn quanto_option_price_rejects_non_finite_result() {
     );
     // A well-posed input still returns a finite price.
     assert!(
-        quanto_option_price(
-            JsValue::from(100.0),
-            JsValue::from(100.0),
-            JsValue::from(1.0),
-            JsValue::from(0.03),
-            JsValue::from(0.01),
-            JsValue::from(0.0),
-            JsValue::from(0.20),
-            JsValue::from(0.10),
-            JsValue::from(0.3),
-            Some(JsValue::from(true))
-        )
+        quanto_option_price(JsValue::from_str(
+            r#"{"spot": 100.0, "strike": 100.0, "rate": 0.03, "volatility": 0.20, "time_to_expiry": 1.0, "dividend_yield": 0.0, "option_type": "call"}"#,
+        ),
+        JsValue::from(0.01),
+        JsValue::from(0.10),
+        JsValue::from(0.3),
+    )
         .is_ok()
     );
 }
 
 #[wasm_bindgen_test]
 fn bs_cos_call_atm_is_positive() {
-    let p = bs_cos_price(
-        JsValue::from(100.0),
-        JsValue::from(100.0),
-        JsValue::from(0.05),
-        JsValue::from(0.02),
+    let p = bs_cos_price(JsValue::from_str(
+            r#"{"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.02, "expiry": 1.0, "option_type": "call"}"#,
+        ),
         JsValue::from(0.2),
-        JsValue::from(1.0),
-        JsValue::from(true),
-        None,
     )
     .expect("price");
     assert!(p > 0.0);
@@ -276,17 +252,12 @@ fn bs_cos_call_atm_is_positive() {
 
 #[wasm_bindgen_test]
 fn heston_price_call_atm_is_reasonable() {
-    let p = heston_price(
-        JsValue::from(100.0),
+    let p = heston_price(JsValue::from(100.0),
         JsValue::from(100.0),
         JsValue::from(1.0),
-        JsValue::from(0.05),
-        JsValue::from(0.02),
-        JsValue::from(2.0),
-        JsValue::from(0.04),
-        JsValue::from(0.3),
-        JsValue::from(-0.7),
-        JsValue::from(0.04),
+        JsValue::from_str(
+            r#"{"r": 0.05, "q": 0.02, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7, "v0": 0.04}"#,
+        ),
         None,
     )
     .expect("finite price");

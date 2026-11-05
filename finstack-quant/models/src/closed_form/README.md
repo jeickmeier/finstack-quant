@@ -65,7 +65,7 @@ d₂ = d₁ - σ√T
 |------|------------------|
 | `bs_price` | `(spot, strike, r, q, sigma, t, OptionType) -> Result<f64>` |
 | `bs_price_unchecked` | same inputs, `-> f64`; raw formula for validated Rust call sites |
-| `bs_greeks` | `(spot, strike, r, q, sigma, t, OptionType, theta_days_per_year) -> Result<BsGreeks>` |
+| `bs_greeks` | `(&OptionMarketParams, theta_days_per_year) -> Result<BsGreeks>` |
 | `bs_greeks_unchecked` | same inputs, `-> BsGreeks`; raw formula for validated Rust call sites |
 | `bs_vega_unchecked` | crate-internal vega primitive |
 | `black_call` / `black_put` | `(forward, strike, sigma, t) -> f64` — undiscounted |
@@ -90,7 +90,7 @@ References: Black & Scholes (1973); Merton (1973); Garman & Kohlhagen (1983).
 |------|-------|
 | `geometric_asian_price` | Exact under geometric averaging (Kemna-Vorst) |
 | `arithmetic_asian_tw_price` | Turnbull-Wakeman two-moment lognormal match |
-| `geometric_asian_price_times` | Arbitrary (unequally spaced) fixing schedule, `-> Result<f64>` |
+| `geometric_asian_price_times` | Arbitrary (unequally spaced) fixing schedule (`AsianFixingSchedule`: expiry, discount factor, fixing times), `-> Result<f64>` |
 | `arithmetic_asian_tw_price_times` | Same, Turnbull-Wakeman |
 
 Equal-spacing entry points take `(spot, strike, time, rate, div_yield, vol,
@@ -210,9 +210,10 @@ C        = e^(-r_dom·T) · [F_adj·N(d₁) - K·N(d₂)]
 ```
 
 `quanto_drift_adjustment(correlation, vol_asset, vol_fx)` returns `-ρ·σ_S·σ_X`.
-`quanto_price` takes `(spot, strike, time, rate_domestic, rate_foreign,
-div_yield, vol_asset, vol_fx, correlation, option_type)` and returns the price
-in domestic currency per unit of foreign notional.
+`quanto_price` takes `(&OptionMarketParams, rate_foreign, vol_fx, correlation)`,
+where the market block carries the asset (`rate` is the domestic rate,
+`dividend_yield` the asset yield, `volatility` the asset volatility), and
+returns the price in domestic currency per unit of foreign notional.
 
 References: Garman & Kohlhagen (1983); Derman, Karasinski & Wecker (1990);
 Brigo & Mercurio (2006) §13.16.
@@ -281,8 +282,14 @@ apart on selector spelling or error text. Every dispatcher finishes through
 `checked_closed_form_value`, so a non-finite price from a degenerate input
 surfaces as a validation error instead of crossing the host boundary.
 
-Arguments follow the host order `(spot, strike, [barrier,] rate, div_yield,
-vol, expiry, ...)`, matching `bs_price`.
+Each takes the shared `&OptionMarketParams` (spot, strike, rate,
+volatility, time to expiry, dividend yield, option type) followed by its
+product inputs: `barrier_option_price(market, barrier, direction, knock)`,
+`asian_option_price(market, num_fixings, averaging)`,
+`lookback_option_price(market, extremum, strike_type)` and
+`quanto_option_price(market, rate_foreign, vol_fx, correlation)` (for the
+quanto, `market.rate` is the domestic rate and `market.volatility` the asset
+volatility).
 
 | Function | Selectors |
 |----------|-----------|
@@ -322,7 +329,7 @@ Decimal/f64 split.
 
 ```rust
 use finstack_quant_core::types::BarrierType;
-use finstack_quant_models::types::OptionType;
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use finstack_quant_models::closed_form::{
     barrier::{barrier_price, BarrierParams},
     bs_greeks, bs_price,
@@ -334,7 +341,16 @@ let (spot, strike, r, q, vol, t) = (100.0, 100.0, 0.05, 0.02, 0.20, 1.0);
 
 // Vanilla price and Greeks on a 365-day theta basis.
 let price = bs_price(spot, strike, r, q, vol, t, OptionType::Call);
-let greeks = bs_greeks(spot, strike, r, q, vol, t, OptionType::Call, 365.0);
+let market = OptionMarketParams {
+    spot,
+    strike,
+    rate: r,
+    volatility: vol,
+    time_to_expiry: t,
+    dividend_yield: q,
+    option_type: OptionType::Call,
+};
+let greeks = bs_greeks(&market, 365.0)?;
 assert!(greeks.is_valid());
 
 // Invert the same price back to the input vol.
@@ -361,8 +377,11 @@ Both hosts (Python `finstack_quant.models`, WASM `models` namespace) bind
 `black76_price`, `black76_greeks`, `bachelier_price`, `bachelier_greeks`,
 `black_shifted_price`, `black_shifted_vega`, `barrier_option_price`,
 `asian_option_price`, `lookback_option_price`, `quanto_option_price` and
-`heston_price` under the same names (camelCase in WASM). Each binding converts
-`is_call` to `OptionType` and makes one call. The Asian `_times` variants are
+`heston_price` under the same names (camelCase in WASM). A function whose
+Rust signature takes `&OptionMarketParams` takes its serde form as one
+`market` dict / object (`option_type` `"call"` or `"put"`), `heston_price`
+takes `HestonPricingParams` as `params`, and the other bindings convert
+`is_call` to `OptionType`; each makes one call. The Asian `_times` variants are
 Rust-only.
 
 ## Verification

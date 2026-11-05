@@ -32,73 +32,73 @@ class TestEuropeanPricer:
 
     def test_call_price_positive(self, pricer: EuropeanPricer) -> None:
         """ATM call price should be positive."""
-        result = pricer.price_gbm(
-            spot=100.0,
-            strike=100.0,
-            rate=0.05,
-            div_yield=0.0,
-            vol=0.20,
-            expiry=1.0,
-            is_call=True,
-        )
+        result = pricer.price_gbm({
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.20,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        })
         assert result.mean.amount > 0.0
 
     def test_put_price_positive(self, pricer: EuropeanPricer) -> None:
         """ATM put price should be positive."""
-        result = pricer.price_gbm(
-            spot=100.0,
-            strike=100.0,
-            rate=0.05,
-            div_yield=0.0,
-            vol=0.20,
-            expiry=1.0,
-            is_call=False,
-        )
+        result = pricer.price_gbm({
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.20,
+            "time_to_expiry": 1.0,
+            "option_type": "put",
+        })
         assert result.mean.amount > 0.0
 
     def test_call_itm_more_expensive(self, pricer: EuropeanPricer) -> None:
         """A lower strike (deeper ITM) call should be more expensive."""
-        atm = pricer.price_gbm(
-            spot=100.0,
-            strike=100.0,
-            rate=0.05,
-            div_yield=0.0,
-            vol=0.20,
-            expiry=1.0,
-            is_call=True,
-        )
-        itm = pricer.price_gbm(
-            spot=100.0,
-            strike=80.0,
-            rate=0.05,
-            div_yield=0.0,
-            vol=0.20,
-            expiry=1.0,
-            is_call=True,
-        )
+        atm = pricer.price_gbm({
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.20,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        })
+        itm = pricer.price_gbm({
+            "spot": 100.0,
+            "strike": 80.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.20,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        })
         assert itm.mean.amount > atm.mean.amount
 
     def test_put_call_parity_approx(self, pricer: EuropeanPricer) -> None:
         """Put-call parity: C - P ≈ e^(-rT) * (S*e^((r-q)T) - K)."""
         spot, strike, r, q, vol, expiry = 100.0, 100.0, 0.05, 0.0, 0.20, 1.0
-        call = pricer.price_gbm(
-            spot=spot,
-            strike=strike,
-            rate=r,
-            div_yield=q,
-            vol=vol,
-            expiry=expiry,
-            is_call=True,
-        )
-        put = pricer.price_gbm(
-            spot=spot,
-            strike=strike,
-            rate=r,
-            div_yield=q,
-            vol=vol,
-            expiry=expiry,
-            is_call=False,
-        )
+        call = pricer.price_gbm({
+            "spot": spot,
+            "strike": strike,
+            "rate": r,
+            "dividend_yield": q,
+            "volatility": vol,
+            "time_to_expiry": expiry,
+            "option_type": "call",
+        })
+        put = pricer.price_gbm({
+            "spot": spot,
+            "strike": strike,
+            "rate": r,
+            "dividend_yield": q,
+            "volatility": vol,
+            "time_to_expiry": expiry,
+            "option_type": "put",
+        })
         lhs = call.mean.amount - put.mean.amount
         forward = spot * math.exp((r - q) * expiry)
         rhs = math.exp(-r * expiry) * (forward - strike)
@@ -106,15 +106,15 @@ class TestEuropeanPricer:
 
     def test_result_attributes(self, pricer: EuropeanPricer) -> None:
         """MoneyEstimate exposes stderr, ci_lower, ci_upper, num_paths."""
-        result = pricer.price_gbm(
-            spot=100.0,
-            strike=100.0,
-            rate=0.05,
-            div_yield=0.0,
-            vol=0.20,
-            expiry=1.0,
-            is_call=True,
-        )
+        result = pricer.price_gbm({
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.20,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        })
         assert result.stderr > 0.0
         assert result.ci_lower.amount < result.mean.amount
         assert result.ci_upper.amount > result.mean.amount
@@ -124,8 +124,24 @@ class TestEuropeanPricer:
         """Same seed produces identical results."""
         p1 = EuropeanPricer(num_paths=10_000, seed=123)
         p2 = EuropeanPricer(num_paths=10_000, seed=123)
-        r1 = p1.price_gbm(spot=100.0, strike=100.0, rate=0.05, div_yield=0.0, vol=0.20, expiry=1.0, is_call=True)
-        r2 = p2.price_gbm(spot=100.0, strike=100.0, rate=0.05, div_yield=0.0, vol=0.20, expiry=1.0, is_call=True)
+        r1 = p1.price_gbm({
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.20,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        })
+        r2 = p2.price_gbm({
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.20,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        })
         assert r1.mean.amount == pytest.approx(r2.mean.amount, abs=1e-10)
 
 
@@ -261,28 +277,45 @@ def test_simulate_paths_maps_invalid_specs_to_value_error(spec: object, message:
 
 def test_lrm_greeks_share_the_plain_asian_price_and_bracket_the_bump_delta() -> None:
     pricer = PathDependentPricer(20_000, 7, use_parallel=False)
-    args = (100.0, 100.0, 0.04, 0.01, 0.25, 1.0)
-    greeks = pricer.price_with_lrm_greeks(*args, True, num_steps=12)
+    call = {
+        "spot": 100.0,
+        "strike": 100.0,
+        "rate": 0.04,
+        "dividend_yield": 0.01,
+        "volatility": 0.25,
+        "time_to_expiry": 1.0,
+        "option_type": "call",
+    }
+    greeks = pricer.price_with_lrm_greeks(call, num_steps=12)
 
     assert isinstance(greeks, LrmGreeks)
-    assert greeks.price.mean.amount == pricer.price_asian(*args, True, num_steps=12).mean.amount
+    assert greeks.price.mean.amount == pricer.price_asian(call, num_steps=12).mean.amount
     assert str(greeks.price.mean.currency) == "USD"
     assert greeks.delta.num_paths == greeks.vega.num_paths == 20_000
 
     bump = 0.5
-    up = pricer.price_asian(100.0 + bump, *args[1:], True, num_steps=12).mean.amount
-    down = pricer.price_asian(100.0 - bump, *args[1:], True, num_steps=12).mean.amount
+    up = pricer.price_asian({**call, "spot": 100.0 + bump}, num_steps=12).mean.amount
+    down = pricer.price_asian({**call, "spot": 100.0 - bump}, num_steps=12).mean.amount
     assert abs(greeks.delta.mean - (up - down) / (2 * bump)) < 5 * greeks.delta.stderr
     assert greeks.vega.stderr > 0.0
 
-    put = pricer.price_with_lrm_greeks(*args, False, num_steps=12, currency="EUR")
+    put = pricer.price_with_lrm_greeks({**call, "option_type": "put"}, num_steps=12, currency="EUR")
     assert put.delta.mean < 0.0
     assert str(put.price.mean.currency) == "EUR"
 
 
 def test_lrm_greeks_round_trip_and_tabulate() -> None:
     greeks = PathDependentPricer(2_000, 7, use_parallel=False).price_with_lrm_greeks(
-        100.0, 100.0, 0.04, 0.01, 0.25, 1.0, True, num_steps=12
+        {
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.04,
+            "dividend_yield": 0.01,
+            "volatility": 0.25,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        },
+        num_steps=12,
     )
 
     assert set(json.loads(greeks.to_json())) == {"price", "delta", "vega"}
@@ -303,7 +336,15 @@ def test_lrm_greeks_round_trip_and_tabulate() -> None:
 
 def test_lrm_greeks_default_arguments_fit_the_capture_cap() -> None:
     # 100,000 default paths x (32 default steps + 1) stays under 4,000,000 points.
-    greeks = PathDependentPricer().price_with_lrm_greeks(100.0, 100.0, 0.04, 0.01, 0.25, 1.0, True)
+    greeks = PathDependentPricer().price_with_lrm_greeks({
+        "spot": 100.0,
+        "strike": 100.0,
+        "rate": 0.04,
+        "dividend_yield": 0.01,
+        "volatility": 0.25,
+        "time_to_expiry": 1.0,
+        "option_type": "call",
+    })
     assert greeks.price.num_paths == 100_000
     assert 0.0 < greeks.delta.mean < 1.0
 
@@ -313,8 +354,8 @@ def test_lrm_greeks_default_arguments_fit_the_capture_cap() -> None:
     [
         ({}, {"num_steps": 252}, "must not exceed 4000000"),
         ({"num_paths": 500}, {"spot": 0.0}, "initial_spot|spot"),
-        ({"num_paths": 500}, {"vol": 0.0}, "vol"),
-        ({"num_paths": 500}, {"expiry": 0.0}, "."),
+        ({"num_paths": 500}, {"volatility": 0.0}, "vol"),
+        ({"num_paths": 500}, {"time_to_expiry": 0.0}, "."),
         ({"num_paths": 500, "antithetic": True}, {}, "antithetic"),
         ({"num_paths": 512, "use_sobol": True, "use_parallel": False}, {}, "Sobol"),
     ],
@@ -322,18 +363,18 @@ def test_lrm_greeks_default_arguments_fit_the_capture_cap() -> None:
 def test_lrm_greeks_map_unsupported_runs_to_value_error(
     pricer_kwargs: dict[str, object], overrides: dict[str, float], message: str
 ) -> None:
-    inputs = {
+    num_steps = int(overrides.pop("num_steps", 12))
+    market = {
         "spot": 100.0,
         "strike": 100.0,
         "rate": 0.04,
-        "div_yield": 0.01,
-        "vol": 0.25,
-        "expiry": 1.0,
-        "is_call": True,
-        "num_steps": 12,
+        "dividend_yield": 0.01,
+        "volatility": 0.25,
+        "time_to_expiry": 1.0,
+        "option_type": "call",
     } | overrides
     with pytest.raises(ValueError, match=message):
-        PathDependentPricer(**pricer_kwargs).price_with_lrm_greeks(**inputs)
+        PathDependentPricer(**pricer_kwargs).price_with_lrm_greeks(market, num_steps=num_steps)
 
 
 def test_heston_feller_uses_inclusive_predicate_without_validation() -> None:
@@ -354,9 +395,10 @@ def test_heston_feller_uses_inclusive_predicate_without_validation() -> None:
     ("spot", "bump_size", "message"),
     [
         (0.0, 0.01, "initial_spot"),
-        (float("nan"), 0.01, "initial_spot"),
+        # A non-finite float has no JSON form, so the spec itself is rejected.
+        (float("nan"), 0.01, "invalid GbmEuropeanFdSpec"),
         (100.0, 0.0, "bump_size"),
-        (100.0, float("inf"), "bump_size"),
+        (100.0, float("inf"), "invalid GbmEuropeanFdSpec"),
         (1e-8, 2.0, "central stencil"),
     ],
 )
@@ -367,15 +409,15 @@ def test_finite_difference_greeks_map_invalid_stencils_to_value_error(
     message: str,
 ) -> None:
     with pytest.raises(ValueError, match=message):
-        greek(
-            spot=spot,
-            strike=100.0,
-            rate=0.05,
-            div_yield=0.0,
-            vol=0.2,
-            expiry=1.0,
-            num_paths=8,
-            num_steps=1,
-            bump_size=bump_size,
-            is_call=True,
-        )
+        greek({
+            "spot": spot,
+            "strike": 100.0,
+            "rate": 0.05,
+            "div_yield": 0.0,
+            "vol": 0.2,
+            "expiry": 1.0,
+            "option_type": "call",
+            "num_paths": 8,
+            "num_steps": 1,
+            "bump_size": bump_size,
+        })

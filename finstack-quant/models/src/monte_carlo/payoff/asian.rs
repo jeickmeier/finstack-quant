@@ -377,6 +377,7 @@ impl Payoff for Asian {
 mod tests {
     use super::*;
     use crate::monte_carlo::traits::state_keys;
+    use crate::types::OptionMarketParams;
 
     fn create_state(step: usize, spot: f64) -> PathState {
         let mut state = PathState::new(step, step as f64 * 0.1);
@@ -590,14 +591,16 @@ mod tests {
     #[test]
     fn test_geometric_asian_closed_form() {
         let price = crate::closed_form::geometric_asian_price(
-            100.0,
-            100.0,
-            1.0,
-            0.05,
-            0.02,
-            0.2,
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.2,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.02,
+                option_type: OptionType::Call,
+            },
             12,
-            OptionType::Call,
         );
 
         assert!(price > 0.0);

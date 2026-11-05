@@ -157,6 +157,36 @@ PATH_SPECS = {
     },
 }
 GBM = (100.0, 100.0, 0.05, 0.0, 0.2, 1.0)
+
+
+def _gbm(option_type: str) -> dict[str, Any]:
+    """``GBM`` as the serde ``OptionMarketParams`` of the closed-form and Monte Carlo pricers."""
+    spot, strike, rate, div_yield, vol, expiry = GBM
+    return {
+        "spot": spot,
+        "strike": strike,
+        "rate": rate,
+        "dividend_yield": div_yield,
+        "volatility": vol,
+        "time_to_expiry": expiry,
+        "option_type": option_type,
+    }
+
+
+def _fd_spec(option_type: str) -> dict[str, Any]:
+    """``GBM`` as the serde ``GbmEuropeanFdSpec`` of the finite-difference Greeks."""
+    spot, strike, rate, div_yield, vol, expiry = GBM
+    return {
+        "spot": spot,
+        "strike": strike,
+        "rate": rate,
+        "div_yield": div_yield,
+        "vol": vol,
+        "expiry": expiry,
+        "option_type": option_type,
+    }
+
+
 STATE = {
     "hazard_rate": 0.05,
     "distance_to_default": None,
@@ -669,28 +699,28 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
     fd = {"num_paths": 2000, "seed": 42}
     return {
         "monte_carlo.european": lambda: [
-            _money(european().price_gbm(*GBM, True)),
-            _money(european().price_gbm(*GBM, False, 16, "EUR")),
+            _money(european().price_gbm(_gbm("call"))),
+            _money(european().price_gbm(_gbm("put"), 16, "EUR")),
         ],
         "monte_carlo.asian": lambda: [
-            _money(asian().price_asian(*GBM, True, 12)),
-            _money(asian().price_asian(*GBM, False, 12)),
+            _money(asian().price_asian(_gbm("call"), 12)),
+            _money(asian().price_asian(_gbm("put"), 12)),
         ],
         "monte_carlo.lrm_greeks": lambda: [
-            _numeric_amounts(json.loads(asian().price_with_lrm_greeks(*GBM, True, 12).to_json())),
-            _numeric_amounts(json.loads(asian().price_with_lrm_greeks(*GBM, False, 12, "EUR").to_json())),
+            _numeric_amounts(json.loads(asian().price_with_lrm_greeks(_gbm("call"), 12).to_json())),
+            _numeric_amounts(json.loads(asian().price_with_lrm_greeks(_gbm("put"), 12, "EUR").to_json())),
         ],
         "monte_carlo.lsmc": lambda: [
-            _money(lsmc().price_american(*GBM, False)),
-            _money(lsmc().price_american(*GBM, True, num_steps=10, basis="polynomial", basis_degree=2)),
-            _money(lsmc().price_american_unbiased(*GBM, False, 99)),
-            _money(lsmc().price_american_unbiased(*GBM, True, 99)),
+            _money(lsmc().price_american(_gbm("put"))),
+            _money(lsmc().price_american(_gbm("call"), num_steps=10, basis="polynomial", basis_degree=2)),
+            _money(lsmc().price_american_unbiased(_gbm("put"), 99)),
+            _money(lsmc().price_american_unbiased(_gbm("call"), 99)),
             lsmc().basis,
             lsmc().basis_degree,
         ],
         "monte_carlo.finite_diff": lambda: [
-            monte_carlo.finite_diff_delta(*GBM, True, **fd).mean,
-            monte_carlo.finite_diff_gamma(*GBM, False, **fd).mean,
+            monte_carlo.finite_diff_delta(_fd_spec("call") | fd).mean,
+            monte_carlo.finite_diff_gamma(_fd_spec("put") | fd).mean,
         ],
         **{
             f"monte_carlo.simulate_paths.{name}": (
@@ -703,8 +733,8 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
             monte_carlo.heston_satisfies_feller(0.5, 0.04, 0.5),
         ],
         "monte_carlo.relative_stderr": lambda: [
-            european().price_gbm(*GBM, True).relative_stderr(),
-            european().price_gbm(*GBM, True).stderr / abs(european().price_gbm(*GBM, True).mean.amount),
+            european().price_gbm(_gbm("call")).relative_stderr(),
+            european().price_gbm(_gbm("call")).stderr / abs(european().price_gbm(_gbm("call")).mean.amount),
         ],
     }
 
@@ -770,7 +800,7 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
         "GRID", 1.0, [2.0, 5.0], [0.02, 0.03, 0.04], [0.3, 0.25, 0.27, 0.28, 0.24, 0.26]
     )
     fx = lambda: FxDeltaVolSurface("EURUSD", [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.002, 0.003])  # noqa: E731
-    greeks = lambda: models.bs_greeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)  # noqa: E731
+    greeks = lambda: models.bs_greeks(_gbm("call"))  # noqa: E731
     smile = lambda: volatility.SabrSmile(volatility.SabrParameters(0.2, 1.0, 0.3, -0.2), 100.0, 1.5)  # noqa: E731
     implied = lambda: VolSurface("SKEW", LV_EXPIRIES, STRIKES, [LV_SMILE] * 4)  # noqa: E731
     local_vol = lambda: volatility.LocalVolSurface.from_implied_vol(implied(), LV_FORWARDS)  # noqa: E731
@@ -828,28 +858,116 @@ def _analytic_cases() -> dict[str, Callable[[], Any]]:
             models.black_shifted_vega(-0.002, 0.001, 0.3, 2.0, 0.03),
         ],
         "closed_form.barrier_option_price": lambda: [
-            models.barrier_option_price(100.0, 100.0, barrier, 0.05, 0.01, 0.2, 1.0, direction, knock)
+            models.barrier_option_price(
+                {
+                    "spot": 100.0,
+                    "strike": 100.0,
+                    "rate": 0.05,
+                    "dividend_yield": 0.01,
+                    "volatility": 0.2,
+                    "time_to_expiry": 1.0,
+                    "option_type": "call",
+                },
+                barrier,
+                direction,
+                knock,
+            )
             for barrier, direction in ((120.0, "up"), (85.0, "down"))
             for knock in ("in", "out")
         ],
         "closed_form.asian": lambda: [
-            models.asian_option_price(*GBM, 12),
-            models.asian_option_price(*GBM, 12, "geometric", False),
-            models.asian_option_price(*GBM, 1, "arithmetic", True),
+            models.asian_option_price(_gbm("call"), 12),
+            models.asian_option_price(_gbm("put"), 12, "geometric"),
+            models.asian_option_price(_gbm("call"), 1, "arithmetic"),
         ],
         "closed_form.quanto": lambda: [
-            models.quanto_option_price(100.0, 105.0, 1.5, 0.04, 0.01, 0.02, 0.25, 0.1, -0.3),
-            models.quanto_option_price(100.0, 105.0, 1.5, 0.04, 0.01, 0.02, 0.25, 0.1, -0.3, False),
+            models.quanto_option_price(
+                {
+                    "spot": 100.0,
+                    "strike": 105.0,
+                    "rate": 0.04,
+                    "dividend_yield": 0.02,
+                    "volatility": 0.25,
+                    "time_to_expiry": 1.5,
+                    "option_type": "call",
+                },
+                0.01,
+                0.1,
+                -0.3,
+            ),
+            models.quanto_option_price(
+                {
+                    "spot": 100.0,
+                    "strike": 105.0,
+                    "rate": 0.04,
+                    "dividend_yield": 0.02,
+                    "volatility": 0.25,
+                    "time_to_expiry": 1.5,
+                    "option_type": "put",
+                },
+                0.01,
+                0.1,
+                -0.3,
+            ),
         ],
         "fourier.heston": lambda: [
-            models.heston_price(100.0, 100.0, 1.0, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04),
-            models.heston_price(100.0, 110.0, 1.0, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, False),
+            models.heston_price(
+                100.0,
+                100.0,
+                1.0,
+                {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7},
+            ),
+            models.heston_price(
+                100.0,
+                110.0,
+                1.0,
+                {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7},
+                False,
+            ),
         ],
         "fourier.cos": lambda: [
-            models.vg_cos_price(100.0, 100.0, 0.05, 0.0, 0.2, -0.14, 0.2, 1.0, True),
-            models.vg_cos_price(100.0, 95.0, 0.05, 0.0, 0.2, -0.14, 0.2, 1.0, False, 512),
-            models.merton_jump_cos_price(100.0, 100.0, 0.05, 0.0, 0.2, -0.1, 0.15, 0.5, 1.0, True),
-            models.merton_jump_cos_price(100.0, 95.0, 0.05, 0.0, 0.2, -0.1, 0.15, 0.5, 1.0, False, 512),
+            models.vg_cos_price(
+                {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 1.0, "option_type": "call"},
+                0.2,
+                -0.14,
+                0.2,
+            ),
+            models.vg_cos_price(
+                {
+                    "spot": 100.0,
+                    "strike": 95.0,
+                    "rate": 0.05,
+                    "div_yield": 0.0,
+                    "expiry": 1.0,
+                    "option_type": "put",
+                    "n_terms": 512,
+                },
+                0.2,
+                -0.14,
+                0.2,
+            ),
+            models.merton_jump_cos_price(
+                {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 1.0, "option_type": "call"},
+                0.2,
+                -0.1,
+                0.15,
+                0.5,
+            ),
+            models.merton_jump_cos_price(
+                {
+                    "spot": 100.0,
+                    "strike": 95.0,
+                    "rate": 0.05,
+                    "div_yield": 0.0,
+                    "expiry": 1.0,
+                    "option_type": "put",
+                    "n_terms": 512,
+                },
+                0.2,
+                -0.1,
+                0.15,
+                0.5,
+            ),
         ],
         "volatility.convert_atm": lambda: [
             volatility.convert_atm_volatility(0.2, "lognormal", "normal", 0.03, 2.0),

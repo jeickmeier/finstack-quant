@@ -93,16 +93,51 @@ def test_monte_carlo_pricers_resolve_defaults_in_rust() -> None:
     assert default.num_paths > 0
     explicit = monte_carlo.EuropeanPricer(500, 7, False)
     assert (explicit.num_paths, explicit.seed, explicit.use_parallel) == (500, 7, False)
-    call = explicit.price_gbm(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+    call = explicit.price_gbm({
+        "spot": 100.0,
+        "strike": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0,
+        "volatility": 0.2,
+        "time_to_expiry": 1.0,
+        "option_type": "call",
+    })
     assert call.num_paths == 500
-    assert str(explicit.price_gbm(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True, currency="EUR").mean.currency) == "EUR"
+    assert (
+        str(
+            explicit.price_gbm(
+                {
+                    "spot": 100.0,
+                    "strike": 100.0,
+                    "rate": 0.05,
+                    "dividend_yield": 0.0,
+                    "volatility": 0.2,
+                    "time_to_expiry": 1.0,
+                    "option_type": "call",
+                },
+                currency="EUR",
+            ).mean.currency
+        )
+        == "EUR"
+    )
 
     lsmc = monte_carlo.LsmcPricer(500, 7, False, 10, "polynomial", 3, False)
     assert (lsmc.basis, lsmc.basis_degree, lsmc.antithetic) == ("polynomial", 3, False)
     with pytest.raises(ValueError, match="unknown basis"):
         monte_carlo.LsmcPricer(500, 7, False, 10, "nope")
     with pytest.raises(ValueError, match="unknown basis"):
-        lsmc.price_american(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, False, basis="nope")
+        lsmc.price_american(
+            {
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "put",
+            },
+            basis="nope",
+        )
 
     asian = monte_carlo.PathDependentPricer(500, 7, False, True)
     assert (asian.num_paths, asian.seed, asian.antithetic) == (500, 7, True)
