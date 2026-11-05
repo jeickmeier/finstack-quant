@@ -125,7 +125,7 @@ pub(super) struct PyRiskBudgetResult {
 }
 
 impl PyRiskBudgetResult {
-    fn from_inner(inner: RiskBudgetResult) -> Self {
+    pub(super) fn from_inner(inner: RiskBudgetResult) -> Self {
         Self { inner }
     }
 }

@@ -57,7 +57,7 @@
       "type": "registry:hook",
       "title": "useLiabilityManagement",
       "description": "Runs the native exchange-offer and LME analyses and reads the tender hurdle through the WASM worker.",
-      "docs": "useExchangeOffer calls models.credit.liabilityManagement.analyzeExchangeOffer, useLme calls analyzeLme and useTenderRecommendationHurdle calls tenderRecommendationHurdle, each one native call with its arguments in the binding's positions. Null means no request. Requires FinstackQueryProvider. A rejected input is the hook error.",
+      "docs": "useExchangeOffer passes a Rust ExchangeOffer wire value to models.credit.liabilityManagement.analyzeExchangeOffer, useLme a Rust LmeTerms wire value to analyzeLme, and useTenderRecommendationHurdle calls tenderRecommendationHurdle, each one native call. Null means no request. Requires FinstackQueryProvider. A rejected input is the hook error.",
       "files": [
         {
           "path": "hooks/use-liability-management/use-liability-management.ts",
@@ -149,7 +149,7 @@
       "type": "registry:hook",
       "title": "useRecoveryWaterfall",
       "description": "Runs the native recovery waterfall, workout LGD and seniority recovery statistics and lists the calibration ids through the WASM worker.",
-      "docs": "useAllocateRecovery calls models.credit.recoveryWaterfall.allocateRecovery, useWorkoutLgd calls models.credit.lgd.workoutLgd, useSeniorityRecoveryStats calls seniorityRecoveryStats (the worker reads the BetaRecovery handle's getters and frees it) and useSeniorityCalibrationIds calls seniorityCalibrationIds, each one native call with its arguments in the binding's positions. Null means no request. Requires FinstackQueryProvider. A rejected input is the hook error.",
+      "docs": "useAllocateRecovery calls models.credit.recoveryWaterfall.allocateRecovery, useWorkoutLgd evaluates the request's canonical WorkoutLgd (models.credit.lgd.WorkoutLgd.fromJson, then evaluate at the request's EAD; the handle is freed), useSeniorityRecoveryStats calls seniorityRecoveryStats (the worker reads the BetaRecovery handle's getters and frees it) and useSeniorityCalibrationIds calls seniorityCalibrationIds, each one native call. Null means no request. Requires FinstackQueryProvider. A rejected input is the hook error.",
       "files": [
         {
           "path": "hooks/use-recovery-waterfall/use-recovery-waterfall.ts",
@@ -175,7 +175,7 @@
       "type": "registry:component",
       "title": "Option calculator",
       "description": "Calculator of a European option under Black-Scholes, Black-76 or Bachelier: the price or implied volatility and the Greeks, as Rust returned them.",
-      "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. A price Rust cannot invert is the whole error; Greeks Rust rejects (at zero volatility under Black-Scholes) show their native error beside the price. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
+      "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. The request and result are Rust's OptionCalculation and OptionCalculationResult wire values; the labels follow the last submitted request. A price Rust cannot invert or Greeks it rejects (at zero volatility under Black-Scholes) is the whole error. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
       "files": [
         {
           "path": "components/option-calculator/option-calculator.tsx",
@@ -212,7 +212,7 @@
       "type": "registry:hook",
       "title": "useOptionCalculator",
       "description": "Runs a native Black-Scholes, Black-76 or Bachelier price or implied volatility with its Greeks through the WASM worker.",
-      "docs": "One closed-form price or implied-volatility solve (models.bsPrice, black76Price, bachelierPrice, bsImpliedVol, black76ImpliedVol, models.volatility.impliedVolBachelier) in the facade's positional order, then the model's Greeks at that volatility. Null means no request. Requires FinstackQueryProvider. A price or solve Rust rejects is the hook error; Greeks Rust rejects carry their native error beside the value.",
+      "docs": "One models.optionCalculation of a Rust OptionCalculation (a closed-form model and a price or implied-volatility solve), returning the price, the volatility and the model's Greeks at it. Null means no request. Requires FinstackQueryProvider. A calculation Rust rejects is the hook error.",
       "files": [
         {
           "path": "hooks/use-option-calculator/use-option-calculator.ts",
@@ -337,7 +337,7 @@
       "type": "registry:hook",
       "title": "useCubeSlice",
       "description": "Materializes a fixed-tenor or fixed-expiry slice of a SABR volatility cube at explicit strikes through the WASM worker.",
-      "docs": "Native models.volatility.materializeCubeTenorSlice/ExpirySlice and their Normal variants with complete immutable cube/axis/value/strike/convention keys. Null means no request. Strikes are absolute in the stored forwards' rate units; off-node values are Rust-interpolated. Requires FinstackQueryProvider; returns the canonical slice JSON or native errors.",
+      "docs": "Native models.volatility.materializeCubeTenorSlice/ExpirySlice in the request's wire VolatilityConvention with complete immutable cube/axis/value/strike/convention keys. Null means no request. Strikes are absolute in the stored forwards' rate units; off-node values are Rust-interpolated. Requires FinstackQueryProvider; returns the canonical slice JSON or native errors.",
       "files": [
         {
           "path": "hooks/use-cube-slice/use-cube-slice.ts",
@@ -389,7 +389,7 @@
       "type": "registry:hook",
       "title": "useCheckSurface",
       "description": "Checks a stored volatility surface for static arbitrage with host-supplied forwards through the WASM worker.",
-      "docs": "core.VolSurface.fromJson of the canonical stored surface, then models.volatility.checkSurface with every check enabled (butterfly, calendar spread, local-vol density), the supplied forward prices (one to broadcast or one per expiry, in the surface strike units) and the tolerance only when supplied (Rust DEFAULT_ARBITRAGE_TOLERANCE otherwise); the handle is freed. Keyed on the complete surface, forwards and tolerance and the worker session; null means no request. Rust rejects normal-quoted, shifted-Black and tenor-axis surfaces and missing or mis-sized forwards with a validation error, returned unchanged. Requires FinstackQueryProvider.",
+      "docs": "core.VolSurface.fromJson of the canonical stored surface, then models.volatility.checkSurface with the request's Rust ArbitrageCheckConfig unchanged (host-supplied forward_prices, one to broadcast or one per expiry in the surface strike units; an omitted tolerance, check switch or minimum severity leaves Rust's default); the handle is freed. Keyed on the complete surface and config and the worker session; null means no request. Rust rejects normal-quoted, shifted-Black and tenor-axis surfaces and missing or mis-sized forwards with a validation error, returned unchanged. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "hooks/use-check-surface/use-check-surface.ts",
@@ -447,7 +447,7 @@
       "type": "registry:component",
       "title": "Volatility cube slice",
       "description": "Rust-materialized fixed-tenor or fixed-expiry slice of a SABR volatility cube, plus one node's native SABR smile, arbitrage check and repair.",
-      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice[Normal], rendered by the shared surface view with an explicit color extent per convention. The node smile comes from SabrSmile at the selected expiry/tenor node: normal volatility when beta < 1e-4, Black otherwise, as the facade documents; the arbitrage check needs an explicit continuously compounded decimal rate (initialRate, never defaulted) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
+      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice in the selected convention (\"normal\" or \"lognormal\"), rendered by the shared surface view with an explicit color extent per convention. The node smile comes from SabrSmile at the selected expiry/tenor node: normal volatility when beta < 1e-4, Black otherwise, as the facade documents; the arbitrage check needs an explicit continuously compounded decimal rate (initialRate, never defaulted) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "components/vol-cube-slice/vol-cube-slice.tsx",
@@ -483,7 +483,7 @@
       "type": "registry:component",
       "title": "Surface arbitrage badge",
       "description": "Badge and popover of a stored volatility surface native static-arbitrage report: passed, violations by type and severity, not checked, or forwards not supplied.",
-      "docs": "Runs models.volatility.checkSurface (through useCheckSurface) on a canonical stored surface with host-supplied forwards (one to broadcast or one per expiry, in the surface strike units; never inferred) and an optional tolerance. The badge shows Passed, the violation count, Not checked (the native error, such as a normal-quoted, shifted-Black or tenor-axis surface Rust does not check) or Forwards not supplied (no request is made). The popover lists the returned counts by type and severity and every violation (type, severity, expiry, adjacent expiry, strike, magnitude in total variance, suggested fix, description) in the order Rust returned them. Requires FinstackQueryProvider.",
+      "docs": "Runs models.volatility.checkSurface (through useCheckSurface) on a canonical stored surface with a host-supplied Rust ArbitrageCheckConfig (forward_prices one to broadcast or one per expiry, in the surface strike units, never inferred; optional tolerance and check switches). The badge shows Passed, the violation count, Not checked (the native error, such as a normal-quoted, shifted-Black or tenor-axis surface Rust does not check) or Forwards not supplied (no config, so no request is made). The popover lists the returned counts by type and severity and every violation (type, severity, expiry, adjacent expiry, strike, magnitude in total variance, suggested fix, description) in the order Rust returned them. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "components/surface-arbitrage-badge/surface-arbitrage-badge.tsx",
@@ -639,7 +639,7 @@
       "type": "registry:component",
       "title": "Credit scorecard",
       "description": "Scorecard of a native models.credit.scoring model: the generated input-ratio form of Altman Z, Z', Z'' and EM, Ohlson O or Zmijewski, then the returned score, zone, implied PD and default master-scale grade.",
-      "docs": "Edits the input ratios of one accounting-based credit model (Altman Z-Score, Z'-Score, Z''-Score or EM-Score, Ohlson O-Score, Zmijewski probit). The fields, their order and their help text come from the generated input contract of the selected model (altman_z_score_input, altman_z_prime_input, altman_z_double_prime_input for both Z'' and EM, ohlson_o_score_input, zmijewski_input); each model keeps its own entries when another is selected. Score passes the model and the ratios to the caller (usually the useCreditScore request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned score, zone and implied PD are shown as Rust returned them, with the default PD master scale's grade and central PD of the implied PD, or Rust's error when the model returns no implied PD (the Altman models). Nothing is computed or classified here. Accepts defaultModel, defaultInputs, onSubmit, score, loading, error, formatValue and density props.",
+      "docs": "Edits the input ratios of one accounting-based credit model (Altman Z-Score, Z'-Score, Z''-Score or EM-Score, Ohlson O-Score, Zmijewski probit). The fields, their order and their help text come from the generated input contract of the selected model (altman_z_score_input, altman_z_prime_input, altman_z_double_prime_input for both Z'' and EM, ohlson_o_score_input, zmijewski_input); each model keeps its own entries when another is selected. Score passes the Rust CreditScoreRequest (the model tag and its ratios) to the caller (usually the useCreditScore request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned score, zone and implied PD are shown as Rust returned them, with the grade and central PD Rust assigns the implied PD on the default PD master scale, or no grade when the model returns no implied PD (the Altman models). Nothing is computed or classified here. Accepts defaultModel, defaultInputs, onSubmit, score, loading, error, formatValue and density props.",
       "files": [
         {
           "path": "components/credit-scorecard/credit-scorecard.tsx",
@@ -686,7 +686,7 @@
       "type": "registry:component",
       "title": "Portfolio risk report",
       "description": "Report of native models.factor.risk results: portfolio VaR and ES, component-VaR bars, VaR and ES contributions, the risk budget, the tail stress attribution and a book's factor contributions as returned.",
-      "docs": "Presents the report the worker positionRisk returns (usually through usePositionRisk): portfolio VaR, ES, confidence, method, position count and the Euler residual stamp (none for a historical decomposition); bars of each returned component VaR; the VaR contributions (component, relative, marginal and incremental VaR) and ES contributions tables; the risk budget (has_breach, total_overbudget and per-position actual and target component VaR, utilization and excess) when one was requested; and, for a historical source, the tail stress attribution (VaR threshold, tail scenario count, per-position tail contributions in Rust's largest-driver-first order and the tail scenarios worst first). A budget or stress attribution Rust rejects shows its native error beside the rest. Values are as returned: losses negative, in the units of the supplied weights or P&L, shares as fractions; nothing is summed, flagged or re-sorted. With factors (usually from useFactorRisk) it adds a Factor contributions section: total and residual risk under the returned measure, risk by factor (absolute, relative and marginal), risk by position and factor, any residual risk by position, and the portfolio.computeFactorSensitivities matrix it decomposed in the book's base currency; the factor chain's native error shows in that section. Either part renders without the other. Accepts report, factors, factorsError, loading, error, formatValue and density props.",
+      "docs": "Presents the Rust PositionRiskReport the worker positionRisk returns (usually through usePositionRisk): portfolio VaR, ES, confidence, method, position count and the Euler residual stamp (none for a historical decomposition); bars of each returned component VaR; the VaR contributions (component, relative, marginal and incremental VaR) and ES contributions tables; the risk budget (has_breach, total_overbudget and per-position actual and target component VaR, utilization and excess) when one was requested; and, for a historical source, the tail stress attribution (VaR threshold, tail scenario count, per-position tail contributions in Rust's largest-driver-first order and the tail scenarios worst first). Values are as returned: losses negative, in the units of the supplied weights or P&L, shares as fractions; nothing is summed, flagged or re-sorted. With factors (usually from useFactorRisk) it adds a Factor contributions section: total and residual risk under the returned measure, risk by factor (absolute, relative and marginal), risk by position and factor, any residual risk by position, and the portfolio.computeFactorSensitivities matrix it decomposed in the book's base currency; the factor chain's native error shows in that section. Either part renders without the other. Accepts report, factors, factorsError, loading, error, formatValue and density props.",
       "files": [
         {
           "path": "components/portfolio-risk-report/portfolio-risk-report.tsx",
@@ -713,7 +713,7 @@
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/models/1/position_risk_decomposition.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/position_risk_report.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
@@ -827,7 +827,7 @@
       "type": "registry:hook",
       "title": "useCreditScore",
       "description": "Scores a firm with a native models.credit.scoring model graded on the default PD master scale through the WASM worker.",
-      "docs": "Calls one models.credit.scoring function (altmanZScore, altmanZPrime, altmanZDoublePrime, altmanEmScore, ohlsonOScore or zmijewskiScore) with the request's named ratios in the facade's positional order, then models.credit.pd.MasterScale.defaultCalibration().mapScore of the result; a result Rust cannot grade (no implied PD) keeps its native error beside the score. The scale handle is freed. Keyed on the complete request (non-finite ratios stay distinct) and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "docs": "Calls models.credit.scoring.creditScoreReport with the Rust CreditScoreRequest (model tag altman_z_score, altman_z_prime, altman_z_double_prime, altman_em_score, ohlson_o_score or zmijewski_score, and its input ratios); Rust scores the model and grades its implied PD on the default PD master scale, returning no grade for a model without an implied PD. Keyed on the complete request (non-finite ratios stay distinct) and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
       "files": [
         {
           "path": "hooks/use-credit-score/use-credit-score.ts",
@@ -853,7 +853,7 @@
       "type": "registry:hook",
       "title": "usePositionRisk",
       "description": "Decomposes position VaR and ES with native models.factor.risk, evaluates a risk budget and attributes tail stress through the WASM worker.",
-      "docs": "models.factor.risk.parametricVarDecomposition(positionIds, weights, covariance, confidence, computeIncremental) or historicalVarDecomposition(positionIds, pnls, confidence); then, when a budget is requested, evaluateRiskBudgetFromDecomposition over the decomposition and the targets; and, for a historical source, buildStressAttribution of the same P&L. Omitted confidence, incremental flag and utilization threshold are left to Rust. The budget and stress attribution keep their own native errors beside the decomposition. Keyed on the complete request (non-finite values stay distinct) and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "docs": "models.factor.risk.positionRiskReport of a Rust PositionRiskRequest: the parametric or historical VaR/ES decomposition, the risk budget when one is requested and, for a historical source, the tail stress attribution. Omitted confidence, incremental flag and utilization threshold are left to Rust; a rejected budget fails the whole report. Keyed on the complete request (non-finite values stay distinct) and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
       "files": [
         {
           "path": "hooks/use-position-risk/use-position-risk.ts",

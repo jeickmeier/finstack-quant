@@ -18,14 +18,12 @@ import type {
   ValuationResult,
   VmResult,
 } from "finstack-quant-wasm";
+import type { models as modelsWire } from "finstack-quant-wasm/types";
 import type {
   BenchmarkReportData,
   PerformanceReportData,
 } from "@/components/finstack/analytics/lib/analytics-report-types";
-import type {
-  FactorRiskData,
-  PositionRiskData,
-} from "@/components/finstack/models/components/portfolio-risk-report/portfolio-risk-report";
+import type { FactorRiskData } from "@/components/finstack/models/components/portfolio-risk-report/portfolio-risk-report";
 import type {
   MigrationMatrixData,
   MigrationProjectionData,
@@ -196,8 +194,8 @@ export const migration = data.credit as unknown as Retyped<
 export const positionRisk = data.positionRisk as unknown as Retyped<
   typeof data.positionRisk,
   {
-    parametric: { report: PositionRiskData };
-    historical: { report: PositionRiskData };
+    parametric: { report: modelsWire.PositionRiskReport };
+    historical: { report: modelsWire.PositionRiskReport };
     factor: { report: FactorRiskData };
   }
 >;

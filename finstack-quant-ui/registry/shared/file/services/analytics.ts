@@ -10,7 +10,6 @@ import type {
   BenchmarkReportRequest,
   CorrelationMatrixReport,
   PerformanceReport,
-  PerformanceReportRequest,
   PerformanceSeries,
 } from "../finstack-contract";
 import { attempt, type ServiceContext } from "./context";
@@ -32,37 +31,13 @@ export function createAnalyticsService(
   context: ServiceContext,
 ): AnalyticsApi {
   type Engine = InstanceType<AnalyticsNative["analytics"]["Performance"]>;
-  /** fromReturns or the price constructor over a host panel. */
-  const build = (
-    request: Pick<
-      PerformanceReportRequest,
-      | "dates"
-      | "values"
-      | "kind"
-      | "tickerNames"
-      | "benchmarkTicker"
-      | "frequency"
-    >,
-  ): Engine => {
-    const { Performance: Engine } = native.analytics;
-    const args: Parameters<typeof Engine.fromReturns> = [
-      [...request.dates],
-      request.values.map((row) => [...row]),
-      [...request.tickerNames],
-      option(request.benchmarkTicker),
-      option(request.frequency),
-    ];
-    return request.kind === "returns"
-      ? Engine.fromReturns(...args)
-      : new Engine(...args);
-  };
   return {
     performanceReport(request) {
       return context.result((): PerformanceReport => {
         let performance: Engine | undefined;
         let fiscal: FiscalConfig | undefined;
         try {
-          performance = build(request);
+          performance = new native.analytics.Performance(request.panel);
           const handle = performance;
           if (request.fiscalYearStart)
             fiscal = new native.core.FiscalConfig(
@@ -82,7 +57,7 @@ export function createAnalyticsService(
           const correlation = handle.correlationMatrix();
           return {
             tickerNames,
-            benchmarkIdx: request.benchmarkTicker
+            benchmarkIdx: request.panel.benchmark_ticker
               ? handle.getBenchmarkIdx()
               : null,
             frequency: handle.getFrequency(),
@@ -125,7 +100,7 @@ export function createAnalyticsService(
     },
     correlationMatrix(request) {
       return context.result((): CorrelationMatrixReport => {
-        const performance = build(request);
+        const performance = new native.analytics.Performance(request.panel);
         try {
           const correlation = performance.correlationMatrix();
           return {
@@ -141,7 +116,7 @@ export function createAnalyticsService(
     },
     benchmarkReport(request: BenchmarkReportRequest) {
       return context.result((): BenchmarkReport => {
-        const performance = build(request);
+        const performance = new native.analytics.Performance(request.panel);
         try {
           const rate = option(request.riskFreeRate);
           const window = option(request.window);

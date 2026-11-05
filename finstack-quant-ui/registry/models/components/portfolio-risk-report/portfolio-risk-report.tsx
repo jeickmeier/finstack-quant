@@ -18,18 +18,6 @@ import {
   shownValue,
 } from "@/components/finstack/shared/primitives/native-display/native-display";
 
-/** A native result or the native error of that one call. */
-type Outcome<T> =
-  { ok: true; value: T } | { ok: false; error: { message: string } };
-/** The native report the worker's positionRisk returns. */
-export interface PositionRiskData {
-  /** The returned PositionRiskDecomposition (losses negative). */
-  decomposition: modelsWire.PositionRiskDecomposition;
-  /** The returned RiskBudgetResult or its native error; null without a budget. */
-  budget: Outcome<modelsWire.RiskBudgetResult> | null;
-  /** The returned StressAttribution or its native error; null for a parametric source. */
-  stress: Outcome<modelsWire.StressAttribution> | null;
-}
 /** A book's native factor sensitivities and their decomposition (the useFactorRisk result). */
 export interface FactorRiskData {
   /** portfolio.computeFactorSensitivities: position-by-factor rows in the base currency. */
@@ -38,8 +26,8 @@ export interface FactorRiskData {
   decomposition: modelsWire.RiskDecomposition;
 }
 export interface PortfolioRiskReportProps {
-  /** The returned position report; null while none is available. */
-  report: PositionRiskData | null;
+  /** The returned PositionRiskReport (budget null without one, stress null for a parametric source); null while none is available. */
+  report: modelsWire.PositionRiskReport | null;
   /** A book's returned factor sensitivities and decomposition, shown as the Factor contributions section. */
   factors?: FactorRiskData | null;
   /** The native error of the factor chain, shown in that section as returned. */
@@ -82,13 +70,6 @@ function Tile({ label, children }: { label: string; children: ReactNode }) {
       <h4 className="text-xs font-medium text-muted-foreground">{label}</h4>
       <p className="finstack-numeric text-base">{children}</p>
     </section>
-  );
-}
-function Failure({ outcome }: { outcome: { error: { message: string } } }) {
-  return (
-    <p role="alert" className="text-xs text-error">
-      {outcome.error.message}
-    </p>
   );
 }
 /** Bars of each returned component VaR, in returned order; nothing summed or stacked. */
@@ -299,43 +280,33 @@ export function PortfolioRiskReport({
       </ReportSection>
       {budget && (
         <ReportSection title="Risk budget">
-          {budget.ok ? (
-            <>
-              <div className="grid grid-cols-1 gap-2 @lg:grid-cols-3">
-                <Tile label={labelFor("has_breach")}>
-                  {String(budget.value.has_breach)}
-                </Tile>
-                <Tile label={labelFor("total_overbudget")}>
-                  {shownValue(budget.value.total_overbudget, format)}
-                </Tile>
-              </div>
-              <FinstackTable
-                data={budget.value.positions}
-                columns={budgetColumns}
-                getRowId={(row) => row.position_id}
-                caption="Risk budget by position"
-                captionVisibility="sr-only"
-                density={density}
-                emptyState="No budget rows returned"
-              />
-            </>
-          ) : (
-            <Failure outcome={budget} />
-          )}
+          <div className="grid grid-cols-1 gap-2 @lg:grid-cols-3">
+            <Tile label={labelFor("has_breach")}>
+              {String(budget.has_breach)}
+            </Tile>
+            <Tile label={labelFor("total_overbudget")}>
+              {shownValue(budget.total_overbudget, format)}
+            </Tile>
+          </div>
+          <FinstackTable
+            data={budget.positions}
+            columns={budgetColumns}
+            getRowId={(row) => row.position_id}
+            caption="Risk budget by position"
+            captionVisibility="sr-only"
+            density={density}
+            emptyState="No budget rows returned"
+          />
         </ReportSection>
       )}
       {stress && (
         <ReportSection title="Stress attribution">
-          {stress.ok ? (
-            <StressView
-              stress={stress.value}
-              columns={stressColumns}
-              format={format}
-              density={density}
-            />
-          ) : (
-            <Failure outcome={stress} />
-          )}
+          <StressView
+            stress={stress}
+            columns={stressColumns}
+            format={format}
+            density={density}
+          />
         </ReportSection>
       )}
       {factorSection}

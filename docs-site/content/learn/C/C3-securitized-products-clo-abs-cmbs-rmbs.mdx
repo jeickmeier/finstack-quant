@@ -127,7 +127,7 @@ The floating/rated copy exists only for its explicitly stated collateral-statist
 
 {/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-pool-models" role="build" */}
 ```python exec id=c3-pool-models role=build
-from finstack_quant.valuations.instruments import StructuredCredit,AssetPool,TrancheStructure,validate_instrument_json
+from finstack_quant.valuations.instruments import StructuredCredit,StandardDealParams,AssetPool,TrancheStructure,validate_instrument_json
 from finstack_quant.cashflows.builder import PrepaymentModelSpec
 rated=deepcopy(deal)
 for asset,rating,spread in zip(rated["instrument"]["spec"]["pool"]["assets"],
@@ -137,9 +137,10 @@ pool_metrics=price_instrument(json.dumps(rated),market,AS_OF,metrics=["clo_warf"
 print(pd.Series(pool_metrics.metrics))
 preset_rows=[];presets={}
 for kind in ["clo","abs","cmbs","rmbs"]:
-    p=AssetPool.from_json(json.dumps(spec["pool"]))
+    pool_payload=deepcopy(spec["pool"]);pool_payload["deal_type"]=kind
+    p=AssetPool.from_json(json.dumps(pool_payload))
     tr=TrancheStructure.from_json(json.dumps(spec["tranches"]))
-    native_deal=getattr(StructuredCredit,"new_"+kind)("C3-"+kind,p,tr,AS_OF,date(2030,1,15),"USD-OIS")
+    native_deal=StructuredCredit.new_standard(kind,StandardDealParams("C3-"+kind,p,tr,AS_OF,date(2030,1,15),"USD-OIS",calendar_id="weekends_only"))
     payload=json.loads(native_deal.to_json());s=payload["instrument"]["spec"]
     s.update(calendar_id="weekends_only",business_day_convention="following")
     s["pool"]["deal_type"]=kind

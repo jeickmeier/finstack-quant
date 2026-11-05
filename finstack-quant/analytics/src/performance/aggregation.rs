@@ -464,31 +464,31 @@ mod tests {
         let n = dates.len();
         let returns = vec![vec![0.001_f64; n]];
 
-        Performance::from_returns(
+        Performance::new(&crate::performance::returns_panel(
             dates,
             returns,
             vec!["TEST".to_string()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .unwrap()
     }
 
     fn rectangular_perf() -> Performance {
         let dates = vec![jan(2), jan(3), jan(4), jan(5)];
-        Performance::from_returns(
+        Performance::new(&crate::performance::returns_panel(
             dates,
             vec![vec![0.01, 0.02, 0.03, 0.04], vec![0.05, 0.06, 0.07, 0.08]],
             vec!["A".into(), "B".into()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .expect("rectangular panel")
     }
 
     fn ragged_perf() -> Performance {
         let dates = vec![jan(2), jan(3), jan(4), jan(5)];
-        Performance::from_returns(
+        Performance::new(&crate::performance::returns_panel(
             dates,
             vec![
                 vec![0.01, 0.02, 0.03, 0.04],
@@ -497,7 +497,7 @@ mod tests {
             vec!["A".into(), "B".into()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .expect("ragged panel")
     }
 
@@ -521,13 +521,13 @@ mod tests {
         let r = [
             0.01, 0.02, -0.03, 0.04, 0.05, -0.06, 0.07, 0.08, -0.09, 0.10,
         ];
-        let perf = Performance::from_returns(
+        let perf = Performance::new(&crate::performance::returns_panel(
             dates,
             vec![r.to_vec()],
             vec!["A".to_string()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .expect("panel");
         let ref_date = on(2025, Month::May, 15);
 
@@ -655,13 +655,13 @@ mod tests {
     fn correlation_matrix_two_asset_rectangular_identity() {
         let dates = vec![jan(2), jan(3), jan(4), jan(5)];
         let r = vec![0.01, 0.02, -0.01, 0.03];
-        let perf = Performance::from_returns(
+        let perf = Performance::new(&crate::performance::returns_panel(
             dates,
             vec![r.clone(), r],
             vec!["A".into(), "B".into()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .expect("panel");
         let (m, repaired) = perf.correlation_matrix().expect("psd correlation");
         assert!(!repaired);
@@ -728,13 +728,13 @@ mod tests {
     #[test]
     fn correlation_matrix_zero_variance_pair_is_error() {
         let dates = vec![jan(2), jan(3), jan(4), jan(5)];
-        let perf = Performance::from_returns(
+        let perf = Performance::new(&crate::performance::returns_panel(
             dates,
             vec![vec![0.01, 0.02, -0.01, 0.03], vec![0.05, 0.05, 0.05, 0.05]],
             vec!["A".into(), "B".into()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .expect("panel");
         let err = perf.correlation_matrix().expect_err("zero-variance pair");
         let msg = err.to_string();

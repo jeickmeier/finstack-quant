@@ -1,0 +1,42 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/wacc_inputs.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Capital-structure inputs of a weighted-average cost of capital calculation.",
+  "properties": {
+    "cost_of_debt": {
+      "description": "**Pre-tax** cost of debt in decimal form: the marginal borrowing yield\nbefore the tax shield (`0.06` means `6%`).",
+      "format": "double",
+      "type": "number"
+    },
+    "cost_of_equity": {
+      "description": "Required return on equity in decimal form, typically from CAPM\n(`0.115` means `11.5%`).",
+      "format": "double",
+      "type": "number"
+    },
+    "debt_weight": {
+      "description": "Debt share of total capital as a decimal fraction (`0.4` means 40%\ndebt-funded); non-negative, and sums with `equity_weight` to `1.0`.",
+      "format": "double",
+      "type": "number"
+    },
+    "equity_weight": {
+      "description": "Equity share of total capital as a decimal fraction (`0.6` means 60%\nequity-funded); non-negative.",
+      "format": "double",
+      "type": "number"
+    },
+    "tax_rate": {
+      "description": "Marginal corporate tax rate as a decimal fraction in `[0, 1]` (`0.25`\nmeans `25%`).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "equity_weight",
+    "cost_of_equity",
+    "debt_weight",
+    "cost_of_debt",
+    "tax_rate"
+  ],
+  "title": "WaccInputs",
+  "type": "object"
+}

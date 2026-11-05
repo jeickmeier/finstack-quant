@@ -470,7 +470,7 @@
       "type": "registry:component",
       "title": "Statement sensitivity",
       "description": "Edits a native statements_analytics sensitivity run of a statement model and presents its tornado and the target metric in every returned scenario.",
-      "docs": "Edit a sensitivity run: the SensitivityMode (the wire values read from the generated sensitivity_result contract), the target metric as an id-combobox, the tornado period, and each varied node and period with comma-separated percentage moves. Each parameter's base value is read from the supplied evaluated result (a missing or non-finite cell is sent as NaN, never defaulted) and passed with the moves to statements_analytics.parameterSpecWithPercentages; an empty move is NaN, so Rust rejects it. Run sensitivity passes the run to the caller (usually the useRunSensitivity request). The native tornado is shown through tornado-chart, parameter keys (node@period) labelled by node and period, and the target metric at the tornado period in the baseline and every returned scenario in Rust's order. A full-grid run has no tornado; the scenarios are still shown. Nothing is calculated. Accepts result, nodeIds, periods, defaultValues, onSubmit, data, loading, error, disabled and density props.",
+      "docs": "Edit a sensitivity run: the SensitivityMode (the wire values read from the generated sensitivity_result contract), the target metric as an id-combobox, the tornado period, and each varied node and period with comma-separated percentage moves. Each parameter's base value is read from the supplied evaluated result (a missing or non-finite cell is sent as NaN, never defaulted) and sent with the moves as the Rust ParameterSpec pct_range of the submitted SensitivityConfig; an empty move is NaN, so Rust rejects it. Run sensitivity passes the run to the caller (usually the useRunSensitivity request). The native tornado is shown through tornado-chart, parameter keys (node@period) labelled by node and period, and the target metric at the tornado period in the baseline and every returned scenario in Rust's order. A full-grid run has no tornado; the scenarios are still shown. Nothing is calculated. Accepts result, nodeIds, periods, defaultValues, onSubmit, data, loading, error, disabled and density props.",
       "files": [
         {
           "path": "components/statement-sensitivity/statement-sensitivity.tsx",
@@ -830,7 +830,7 @@
       "type": "registry:hook",
       "title": "useRunStatementChecks",
       "description": "Runs a statement check suite or mapping against an evaluated result through the WASM worker.",
-      "docs": "Native CheckReport for the supplied model, matching result, runner kind and canonical configuration JSON, keyed by the complete immutable request and worker session. Null disables the run; no suite or mapping is synthesized.",
+      "docs": "Native CheckReport of one runner worker method (runChecks with a CheckSuiteSpec, runThreeStatementChecks or runCreditUnderwritingChecks with a mapping) for the supplied model and matching result, keyed by the method, the complete immutable request and the worker session. Null disables the run; no suite or mapping is synthesized.",
       "files": [
         {
           "path": "hooks/use-run-statement-checks/use-run-statement-checks.ts",
@@ -1231,7 +1231,7 @@
       "type": "registry:hook",
       "title": "useWacc",
       "description": "Blends capital weights, costs and a tax rate into a WACC through the WASM worker.",
-      "docs": "Native statements_analytics.wacc of the five supplied decimals. Keyed by the complete immutable request and worker session, with a NaN from an empty field kept distinct from null; null disables the query. A rejection (weights that do not sum to one, a tax rate out of range, a non-finite input) is the hook error, unchanged.",
+      "docs": "Native statements_analytics.wacc of a Rust WaccInputs wire value (five decimals). Keyed by the complete immutable request and worker session, with a NaN from an empty field kept distinct from null; null disables the query. A rejection (weights that do not sum to one, a tax rate out of range, a non-finite input) is the hook error, unchanged.",
       "files": [
         {
           "path": "hooks/use-wacc/use-wacc.ts",
@@ -1465,7 +1465,7 @@
       "type": "registry:hook",
       "title": "useRunSensitivity",
       "description": "Runs a native sensitivity analysis of a statement model and its tornado through the WASM worker.",
-      "docs": "Native statements_analytics.parameterSpecWithPercentages for each parameter (node, period, base value and percentage moves), runSensitivity over the SensitivityConfig of the mode, those parameters and the target metric, then generateTornadoEntries of the result at the target metric and period; Rust returns a null tornado for a full_grid run it cannot rank. Returns {result, tornado}. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
+      "docs": "Native statements_analytics.runSensitivity over the request's Rust SensitivityConfig unchanged (Rust converts each parameter's pct_range percentage moves of its base value into absolute shocks), then generateTornadoEntries of the result at the target metric and period; Rust returns a null tornado for a full_grid run it cannot rank. Returns {result, tornado}. Keyed by the complete immutable request (non-finite numbers kept distinct) and worker session; null disables the query. Native errors are returned unchanged.",
       "files": [
         {
           "path": "hooks/use-run-sensitivity/use-run-sensitivity.ts",
@@ -1798,6 +1798,7 @@
         "@finstack/contract-forecast-parameters",
         "@finstack/contract-rollup-spec",
         "@finstack/contract-scenario-set",
+        "@finstack/contract-variance-config",
         "@finstack/primitive-contracts",
         "@finstack/finstack-surface",
         "@finstack/field-frame",
@@ -1819,6 +1820,7 @@
           "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
           "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json",
           "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_template.schema.json",
           "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
           "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
@@ -1844,6 +1846,7 @@
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
           "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json",
+          "https://finstack_quant.dev/schemas/statements_analytics/1/variance_config.schema.json",
           "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }

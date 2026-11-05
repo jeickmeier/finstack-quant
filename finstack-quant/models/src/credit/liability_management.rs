@@ -39,10 +39,16 @@
 //!
 //! ```
 //! use finstack_quant_models::credit::liability_management::{
-//!     analyze_exchange_offer, ExchangeType,
+//!     analyze_exchange_offer, ExchangeOffer, ExchangeType,
 //! };
 //! # fn main() -> finstack_quant_core::Result<()> {
-//! let offer = analyze_exchange_offer(45.0, 80.0, 2.0, 0.0, ExchangeType::Discount)?;
+//! let offer = analyze_exchange_offer(&ExchangeOffer {
+//!     old_pv: 45.0,
+//!     new_pv: 80.0,
+//!     consent_fee: 2.0,
+//!     equity_sweetener_value: 0.0,
+//!     exchange_type: ExchangeType::Discount,
+//! })?;
 //! assert!(offer.tender_recommended);
 //! assert_eq!(offer.tender_total, 82.0);
 //! # Ok(())
@@ -107,6 +113,29 @@ pub struct ExchangeOfferAnalysis {
     pub tender_recommended: bool,
 }
 
+/// Terms of a distressed exchange offer, from the creditor's side.
+///
+/// Every amount is in one caller-defined monetary unit.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ExchangeOffer {
+    /// Present value of the existing claim if it is not tendered;
+    /// non-negative.
+    pub old_pv: f64,
+    /// Present value of the new instrument received on tendering;
+    /// non-negative.
+    pub new_pv: f64,
+    /// Cash consent or early-tender fee paid to participating holders;
+    /// non-negative.
+    pub consent_fee: f64,
+    /// Estimated value of equity or warrants attached to the new instrument;
+    /// non-negative.
+    pub equity_sweetener_value: f64,
+    /// Structure of the offer, echoed onto the result.
+    pub exchange_type: ExchangeType,
+}
+
 /// Compare hold-versus-tender economics for a distressed exchange offer.
 ///
 /// The tender consideration is the sum of the new instrument's present value,
@@ -126,15 +155,9 @@ pub struct ExchangeOfferAnalysis {
 ///
 /// # Arguments
 ///
-/// * `old_pv` - Present value of the existing claim if it is not tendered, in
-///   the caller's monetary unit.
-/// * `new_pv` - Present value of the new instrument received on tendering, in
-///   the same unit as `old_pv`.
-/// * `consent_fee` - Cash consent or early-tender fee paid to participating
-///   holders, in the same unit as `old_pv`.
-/// * `equity_sweetener_value` - Estimated value of equity or warrants attached
-///   to the new instrument, in the same unit as `old_pv`.
-/// * `exchange_type` - Structure of the offer, echoed onto the result.
+/// * `offer` - The hold-out and new-instrument present values, consent fee
+///   and equity sweetener (one monetary unit, non-negative) and the offer
+///   structure (see [`ExchangeOffer`]).
 ///
 /// # Returns
 ///
@@ -145,22 +168,29 @@ pub struct ExchangeOfferAnalysis {
 ///
 /// ```
 /// use finstack_quant_models::credit::liability_management::{
-///     analyze_exchange_offer, ExchangeType,
+///     analyze_exchange_offer, ExchangeOffer, ExchangeType,
 /// };
 /// # fn main() -> finstack_quant_core::Result<()> {
-/// let offer = analyze_exchange_offer(45.0, 80.0, 2.0, 0.0, ExchangeType::Discount)?;
+/// let offer = analyze_exchange_offer(&ExchangeOffer {
+///     old_pv: 45.0,
+///     new_pv: 80.0,
+///     consent_fee: 2.0,
+///     equity_sweetener_value: 0.0,
+///     exchange_type: ExchangeType::Discount,
+/// })?;
 /// assert_eq!(offer.delta_npv, 37.0);
 /// assert_eq!(offer.breakeven_recovery, 1.0);
 /// # Ok(())
 /// # }
 /// ```
-pub fn analyze_exchange_offer(
-    old_pv: f64,
-    new_pv: f64,
-    consent_fee: f64,
-    equity_sweetener_value: f64,
-    exchange_type: ExchangeType,
-) -> Result<ExchangeOfferAnalysis> {
+pub fn analyze_exchange_offer(offer: &ExchangeOffer) -> Result<ExchangeOfferAnalysis> {
+    let ExchangeOffer {
+        old_pv,
+        new_pv,
+        consent_fee,
+        equity_sweetener_value,
+        exchange_type,
+    } = *offer;
     validate_f64_non_negative(old_pv, "old_pv")?;
     validate_f64_non_negative(new_pv, "new_pv")?;
     validate_f64_non_negative(consent_fee, "consent_fee")?;
@@ -190,8 +220,8 @@ pub fn analyze_exchange_offer(
 
 /// Structure of a liability management exercise.
 ///
-/// Each variant reinterprets the `repurchase_price_pct` argument of
-/// [`analyze_lme`]; see that function's documentation for the per-variant
+/// Each variant reinterprets the `repurchase_price_pct` field of
+/// [`LmeTerms`]; see that function's documentation for the per-variant
 /// meaning and admissible range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -206,6 +236,29 @@ pub enum LmeType {
     /// Transfer of collateral to an unrestricted subsidiary; no par is
     /// retired and remaining holders are structurally diluted.
     Dropdown,
+}
+
+/// Terms of a liability management exercise, from the issuer's side.
+///
+/// Amounts are in one caller-defined monetary unit; percentages are
+/// fractions, never points.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct LmeTerms {
+    /// Structure of the exercise, which selects how `repurchase_price_pct` is
+    /// interpreted (see [`analyze_lme`]).
+    pub lme_type: LmeType,
+    /// Outstanding face amount of the target instrument; strictly positive.
+    pub notional: f64,
+    /// Price, extension fee, or transferred-asset fraction, by `lme_type`.
+    pub repurchase_price_pct: f64,
+    /// Fraction of holders participating, in `[0, 1]`.
+    pub opt_acceptance_pct: f64,
+    /// Optional EBITDA in the same unit as `notional`; a positive value
+    /// produces the leverage-impact block.
+    #[serde(default)]
+    pub ebitda: Option<f64>,
 }
 
 /// Gross-leverage impact of a liability management exercise.
@@ -275,17 +328,12 @@ pub struct LmeAnalysis {
 ///
 /// # Arguments
 ///
-/// * `lme_type` - Structure of the exercise, which selects how
-///   `repurchase_price_pct` is interpreted.
-/// * `notional` - Outstanding face amount of the target instrument, in the
-///   caller's monetary unit. Must be strictly positive.
-/// * `repurchase_price_pct` - Price, fee, or transferred-asset fraction as
-///   described in the table above. Always a fraction, never points.
-/// * `opt_acceptance_pct` - Fraction of holders participating, in `[0, 1]`.
-///   Use `1.0` for full participation.
-/// * `ebitda` - Optional EBITDA in the same unit as `notional`. A positive
-///   value produces the `leverage_impact` block; `None` or a non-positive
-///   value omits it.
+/// * `terms` - The exercise structure, the target notional (strictly
+///   positive), the price, fee or transferred-asset fraction described in the
+///   table above (always a fraction, never points), the participating
+///   fraction in `[0, 1]`, and an optional EBITDA in the notional's unit (a
+///   positive value produces the `leverage_impact` block; `None` or a
+///   non-positive value omits it). See [`LmeTerms`].
 ///
 /// # Returns
 ///
@@ -296,29 +344,30 @@ pub struct LmeAnalysis {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_models::credit::liability_management::{analyze_lme, LmeType};
+/// use finstack_quant_models::credit::liability_management::{analyze_lme, LmeTerms, LmeType};
 /// # fn main() -> finstack_quant_core::Result<()> {
 /// // Buy back 40% of a 200mm bond at 60 cents, against 25mm of EBITDA.
-/// let lme = analyze_lme(
-///     LmeType::OpenMarketRepurchase,
-///     200_000_000.0,
-///     0.60,
-///     0.40,
-///     Some(25_000_000.0),
-/// )?;
+/// let lme = analyze_lme(&LmeTerms {
+///     lme_type: LmeType::OpenMarketRepurchase,
+///     notional: 200_000_000.0,
+///     repurchase_price_pct: 0.60,
+///     opt_acceptance_pct: 0.40,
+///     ebitda: Some(25_000_000.0),
+/// })?;
 /// assert_eq!(lme.cost, 48_000_000.0);
 /// assert_eq!(lme.notional_reduction, 80_000_000.0);
 /// assert_eq!(lme.discount_capture, 32_000_000.0);
 /// # Ok(())
 /// # }
 /// ```
-pub fn analyze_lme(
-    lme_type: LmeType,
-    notional: f64,
-    repurchase_price_pct: f64,
-    opt_acceptance_pct: f64,
-    ebitda: Option<f64>,
-) -> Result<LmeAnalysis> {
+pub fn analyze_lme(terms: &LmeTerms) -> Result<LmeAnalysis> {
+    let LmeTerms {
+        lme_type,
+        notional,
+        repurchase_price_pct,
+        opt_acceptance_pct,
+        ebitda,
+    } = *terms;
     if !notional.is_finite() || notional <= 0.0 {
         return Err(invalid_input(format!(
             "notional must be finite and positive, got {notional}"

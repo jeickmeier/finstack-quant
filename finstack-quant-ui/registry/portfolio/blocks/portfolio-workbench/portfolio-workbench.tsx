@@ -57,7 +57,7 @@ export interface PortfolioWorkbenchProps {
   seriesBase?: string;
   /** The host's exposure choices for the Risk tab: additive metric ids per primitive (omitted is quantity and value only) and FactorDefinition JSON with an optional BumpSizeConfig for the sensitivity matrix (omitted shows none). The book's primitive exposures show on the Risk tab whether or not this is supplied. */
   exposures?: ExposureReportInputs | null;
-  /** The host's return (or price) panel for the Risk tab's correlation heatmap: ISO dates, ticker-major values, their kind, ticker names and an optional frequency; the heatmap appears only when supplied. */
+  /** The host's return (or price) PerformancePanel for the Risk tab's correlation heatmap; the heatmap appears only when supplied. */
   correlation?: CorrelationMatrixRequest | null;
   /** ScenarioSpec JSON texts in batch order, never parsed here; the Scenarios tab appears only when some are supplied. */
   scenarioJsons?: readonly string[];

@@ -1,0 +1,142 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_template.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One standard covenant package and its thresholds.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Sponsor-backed leveraged loan: quarterly maintenance tests for maximum\nDebt / EBITDA, minimum interest and fixed-charge coverage, and an annual\nmaximum capex. Leverage and interest coverage carry 30-day cure\nperiods; a leverage breach steps the rate up 200bp and an\ninterest-coverage breach blocks distributions.",
+      "properties": {
+        "fixed_charge_coverage": {
+          "description": "Minimum fixed-charge-coverage threshold in turns.",
+          "format": "double",
+          "type": "number"
+        },
+        "initial_leverage": {
+          "description": "Maximum debt-to-EBITDA threshold in turns.",
+          "format": "double",
+          "type": "number"
+        },
+        "interest_coverage": {
+          "description": "Minimum interest-coverage threshold in turns.",
+          "format": "double",
+          "type": "number"
+        },
+        "kind": {
+          "const": "lbo_standard",
+          "type": "string"
+        },
+        "max_capex": {
+          "description": "Maximum annual capital expenditure in the reporting currency.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "initial_leverage",
+        "interest_coverage",
+        "fixed_charge_coverage",
+        "max_capex"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Covenant-lite leveraged loan: quarterly incurrence tests for maximum\ntotal and senior leverage, and an annual negative covenant on\nadditional secured debt. No maintenance covenants.",
+      "properties": {
+        "kind": {
+          "const": "cov_lite",
+          "type": "string"
+        },
+        "max_leverage": {
+          "description": "Maximum total debt-to-EBITDA incurrence threshold in turns.",
+          "format": "double",
+          "type": "number"
+        },
+        "max_senior_leverage": {
+          "description": "Maximum senior-debt-to-EBITDA incurrence threshold in turns.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "max_leverage",
+        "max_senior_leverage"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Commercial real estate: quarterly maintenance tests for minimum DSCR\n(30-day cure, 100% cash sweep), minimum debt yield and maximum\nloan-to-value (50% cash sweep).",
+      "properties": {
+        "kind": {
+          "const": "real_estate",
+          "type": "string"
+        },
+        "max_ltv": {
+          "description": "Maximum loan-to-value ratio as a decimal fraction.",
+          "format": "double",
+          "type": "number"
+        },
+        "min_debt_yield": {
+          "description": "Minimum debt yield as a decimal fraction.",
+          "format": "double",
+          "type": "number"
+        },
+        "min_dscr": {
+          "description": "Minimum debt-service-coverage ratio in turns.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "min_dscr",
+        "min_debt_yield",
+        "max_ltv"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Infrastructure / project finance: quarterly maintenance tests for a\ndefault DSCR (60-day cure, event of default), a higher distribution\nlock-up DSCR (blocks distributions only), minimum debt-service-reserve\nliquidity and maximum net Debt / EBITDA.",
+      "properties": {
+        "distribution_lockup_dscr": {
+          "description": "Higher DSCR threshold in turns that blocks distributions.",
+          "format": "double",
+          "type": "number"
+        },
+        "kind": {
+          "const": "project_finance",
+          "type": "string"
+        },
+        "max_net_leverage": {
+          "description": "Maximum net-debt-to-EBITDA threshold in turns.",
+          "format": "double",
+          "type": "number"
+        },
+        "min_dscr": {
+          "description": "Minimum default DSCR in turns.",
+          "format": "double",
+          "type": "number"
+        },
+        "min_liquidity": {
+          "description": "Minimum debt-service-reserve amount in the reporting currency.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "min_dscr",
+        "distribution_lockup_dscr",
+        "min_liquidity",
+        "max_net_leverage"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "CovenantTemplate"
+}

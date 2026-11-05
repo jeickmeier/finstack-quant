@@ -143,18 +143,8 @@ fn credit_factor_hierarchy_dts_exposes_public_surface() {
 fn analytics_dts_matches_runtime_hotspots() {
     let dts = index_dts();
     let numeric_matrix_docs = preceding_jsdoc(&dts, "export type NumericMatrix = NumericArray[];");
-    let constructor_docs = preceding_jsdoc(
-        &dts,
-        "  constructor(
-    dates: string[],
-    prices: NumericMatrix,",
-    );
-    let from_returns_docs = preceding_jsdoc(
-        &dts,
-        "  static fromReturns(
-    dates: string[],
-    returns: NumericMatrix,",
-    );
+    let constructor_docs =
+        preceding_jsdoc(&dts, "  constructor(panel: PerformancePanel | string);");
     let ticker_names_docs = preceding_jsdoc(&dts, "  getTickerNames(): string[];");
     let drawdown_duration_docs = preceding_jsdoc(&dts, "  maxDrawdownDuration(): number[];");
     let periodic_returns_docs = preceding_jsdoc(
@@ -164,10 +154,7 @@ fn analytics_dts_matches_runtime_hotspots() {
 
     assert!(dts.contains("declare class Performance {"));
     assert!(dts.contains("Performance: typeof Performance;"));
-    assert!(contains_ignoring_ws(
-        &dts,
-        "static fromReturns(dates: string[], returns: NumericMatrix, tickerNames: string[], benchmarkTicker?: string | null, frequency?: string): Performance;",
-    ));
+    assert!(!dts.contains("static fromReturns("));
     assert!(contains_ignoring_ws(
         &dts,
         "rollingGreeks(tickerIdx: number, window?: number, riskFreeRate?: number): RollingGreeks;",
@@ -198,8 +185,9 @@ fn analytics_dts_matches_runtime_hotspots() {
     assert!(dts.contains("export type NumericMatrix = NumericArray[];"));
     assert!(contains_signature(
         &dts,
-        "constructor(dates: string[], prices: NumericMatrix, tickerNames: string[], benchmarkTicker?: string | null, frequency?: string);",
+        "constructor(panel: PerformancePanel | string);",
     ));
+    assert!(declares_type(&dts, "PerformancePanel"));
     assert!(
         numeric_matrix_docs.contains(
             "Nested numeric arrays represented as an outer collection of numeric vectors."
@@ -210,16 +198,12 @@ fn analytics_dts_matches_runtime_hotspots() {
         "Each API specifies the semantic meaning and required length of the outer and inner dimensions."
     ));
     assert!(!numeric_matrix_docs.contains("one inner array per row"));
-    assert!(constructor_docs.contains(
-        "@param prices - Ticker-major, column-oriented matrix where `prices[tickerIdx][dateIdx]` is the price for `tickerIdx` at `dates[dateIdx]`."
-    ));
+    assert!(
+        constructor_docs
+            .contains("ticker-major `series` (`series[i][t]` is ticker `i` at `dates[t]`")
+    );
     assert!(!constructor_docs.contains("Row-major"));
     assert!(!constructor_docs.contains("one row per"));
-    assert!(from_returns_docs.contains(
-        "@param returns - Ticker-major, column-oriented simple decimal return matrix where `returns[tickerIdx][dateIdx]` is the return for `tickerIdx` at `dates[dateIdx]`."
-    ));
-    assert!(!from_returns_docs.contains("Row-major"));
-    assert!(!from_returns_docs.contains("one row per"));
     assert!(contains_signature(&dts, "getTickerNames(): string[];"));
     assert!(contains_signature(
         &dts,
@@ -804,14 +788,9 @@ fn portfolio_dts_pins_python_parity_optional_parameters() {
         &dts,
         "valuePortfolio(portfolio: Portfolio, market: MarketContext, strictRisk?: boolean, metrics?: string[]): PortfolioValuation;",
     ));
-    // Python defaults `confidence` from the Rust 95% presets; WASM does too.
     assert!(contains_ignoring_ws(
         &dts,
-        "parametricVarDecomposition(positionIds: string[], weights: NumericArray, covariance: NumericArray[], confidence?: number | null, computeIncremental?: boolean | null): PositionRiskDecomposition;",
-    ));
-    assert!(contains_ignoring_ws(
-        &dts,
-        "historicalVarDecomposition(positionIds: string[], positionPnls: NumericArray[], confidence?: number | null): PositionRiskDecomposition;",
+        "positionRiskReport(request: PositionRiskRequest | string): PositionRiskReport;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
@@ -1035,8 +1014,6 @@ fn covenants_dts_separates_typed_results_from_json_bridges() {
         "validateCovenantSpecJson(specJson: JsonInput): string;",
         "validateCovenantReportJson(reportJson: JsonInput): string;",
         "validateCovenantEngineJson(engineJson: JsonInput): string;",
-        "covLiteJson(maxLeverage: number, maxSeniorLeverage: number): string;",
-        "realEstateJson(minDscr: number, minDebtYield: number, maxLtv: number): string;",
     ] {
         assert!(contains_ignoring_ws(&dts, wire), "missing: {wire}");
     }
@@ -1882,7 +1859,7 @@ fn typed_cashflows_and_covenants_surface_is_declared() {
         "materializeFixings(market: MarketContext, schedules: readonly (CashFlowSchedule | JsonInput)[], oldDate: string, newDate: string): MarketContext;",
         "cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;",
         "scheduleParamsUsdSofrSwap(): generated.cashflows.ScheduleParams;",
-        "covLite(maxLeverage: number, maxSeniorLeverage: number): generated.covenants.CovenantSpec[];",
+        "covenantTemplate(template: generated.covenants.CovenantTemplate | string): generated.covenants.CovenantSpec[];",
         "evaluate(metrics: Record<string, number> | string, asOf: string): Record<string, CovenantReport>;",
         "evaluateSeries(metrics: readonly generated.covenants.DatedMetrics[]): generated.covenants.DatedCovenantReports[];",
         "readonly breachHistory: generated.covenants.CovenantBreach[];",

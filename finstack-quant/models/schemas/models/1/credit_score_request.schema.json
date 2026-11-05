@@ -1,0 +1,319 @@
+{
+  "$defs": {
+    "AltmanZDoublePrimeInput": {
+      "additionalProperties": false,
+      "description": "Input ratios for the Altman Z''-Score (non-manufacturing firms).\n\nDrops the Sales/Total Assets ratio to remove industry bias. Used for both\nthe constant-free Z'' model and the emerging-market EM-Score variant\n(see [`altman_em_score`]).\n\n# References\n\n- Altman, E. I. (1993). *Corporate Financial Distress and Bankruptcy*.\n  Wiley. (Four-variable Z'' for non-manufacturers.)\n- Altman, E. I. (2005). \"An Emerging Market Credit Scoring System for\n  Corporate Bonds.\" *Emerging Markets Review*, 6(4), 311-323. (EM-Score\n  variant with +3.25 constant.)",
+      "properties": {
+        "book_equity_to_total_liabilities": {
+          "description": "X4: Book Value of Equity / Book Value of Total Liabilities.",
+          "format": "double",
+          "type": "number"
+        },
+        "ebit_to_total_assets": {
+          "description": "X3: EBIT / Total Assets.",
+          "format": "double",
+          "type": "number"
+        },
+        "retained_earnings_to_total_assets": {
+          "description": "X2: Retained Earnings / Total Assets.",
+          "format": "double",
+          "type": "number"
+        },
+        "working_capital_to_total_assets": {
+          "description": "X1: Working Capital / Total Assets.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "working_capital_to_total_assets",
+        "retained_earnings_to_total_assets",
+        "ebit_to_total_assets",
+        "book_equity_to_total_liabilities"
+      ],
+      "type": "object"
+    },
+    "AltmanZPrimeInput": {
+      "additionalProperties": false,
+      "description": "Input ratios for the Altman Z'-Score (private firms).\n\nReplaces market equity with book equity in X4. Coefficients are\nre-estimated for the private-firm sample.",
+      "properties": {
+        "book_equity_to_total_liabilities": {
+          "description": "X4: Book Value of Equity / Book Value of Total Liabilities.",
+          "format": "double",
+          "type": "number"
+        },
+        "ebit_to_total_assets": {
+          "description": "X3: EBIT / Total Assets.",
+          "format": "double",
+          "type": "number"
+        },
+        "retained_earnings_to_total_assets": {
+          "description": "X2: Retained Earnings / Total Assets.",
+          "format": "double",
+          "type": "number"
+        },
+        "sales_to_total_assets": {
+          "description": "X5: Sales / Total Assets.",
+          "format": "double",
+          "type": "number"
+        },
+        "working_capital_to_total_assets": {
+          "description": "X1: Working Capital / Total Assets.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "working_capital_to_total_assets",
+        "retained_earnings_to_total_assets",
+        "ebit_to_total_assets",
+        "book_equity_to_total_liabilities",
+        "sales_to_total_assets"
+      ],
+      "type": "object"
+    },
+    "AltmanZScoreInput": {
+      "additionalProperties": false,
+      "description": "Input ratios for the original Altman Z-Score (1968).\n\nDesigned for publicly traded manufacturing firms. Uses market value\nof equity in the X4 ratio.\n\n# References\n\nAltman, E. I. (1968). \"Financial Ratios, Discriminant Analysis and the\nPrediction of Corporate Bankruptcy.\" *Journal of Finance*, 23(4), 589-609. `docs/REFERENCES.md#altman-1968`",
+      "properties": {
+        "ebit_to_total_assets": {
+          "description": "X3: EBIT / Total Assets.",
+          "format": "double",
+          "type": "number"
+        },
+        "market_equity_to_total_liabilities": {
+          "description": "X4: Market Value of Equity / Book Value of Total Liabilities.",
+          "format": "double",
+          "type": "number"
+        },
+        "retained_earnings_to_total_assets": {
+          "description": "X2: Retained Earnings / Total Assets.",
+          "format": "double",
+          "type": "number"
+        },
+        "sales_to_total_assets": {
+          "description": "X5: Sales / Total Assets.",
+          "format": "double",
+          "type": "number"
+        },
+        "working_capital_to_total_assets": {
+          "description": "X1: Working Capital / Total Assets.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "working_capital_to_total_assets",
+        "retained_earnings_to_total_assets",
+        "ebit_to_total_assets",
+        "market_equity_to_total_liabilities",
+        "sales_to_total_assets"
+      ],
+      "type": "object"
+    },
+    "OhlsonOScoreInput": {
+      "additionalProperties": false,
+      "description": "Input for the Ohlson O-Score logistic model (1980).\n\nNine predictors capturing size, leverage, performance, and liquidity.\n\n# References\n\nOhlson, J. A. (1980). \"Financial Ratios and the Probabilistic Prediction\nof Bankruptcy.\" *Journal of Accounting Research*, 18(1), 109-131. `docs/REFERENCES.md#ohlson-1980`",
+      "properties": {
+        "current_liabilities_to_current_assets": {
+          "description": "Current Liabilities / Current Assets.",
+          "format": "double",
+          "type": "number"
+        },
+        "funds_from_operations_to_total_liabilities": {
+          "description": "Funds from Operations / Total Liabilities.",
+          "format": "double",
+          "type": "number"
+        },
+        "liabilities_exceed_assets": {
+          "description": "1 if Total Liabilities > Total Assets, else 0.",
+          "format": "double",
+          "type": "number"
+        },
+        "log_total_assets_adjusted": {
+          "description": "Ohlson's SIZE variable: `ln(Total Assets / GNP price-level index)`.\n\nThe published coefficient `-0.407` is calibrated to this specific\nscale using the US GNP deflator with Ohlson's 1970s base period\n(Ohlson 1980, Table 4). The deflator normalises for inflation so\nfirms are compared on a constant-dollar basis.\n\n# Unit sensitivity (IMPORTANT)\n\nBecause the coefficient is calibrated to Ohlson's specific scale,\nsubstituting a different unit shifts the score by a constant and\ntherefore shifts every implied PD and every zone boundary. For\nexample, `ln(total_assets_millions)` differs from Ohlson's SIZE\nby `+ ln(10^6 / GNP_deflator_1970s)`, which multiplied by\n`-0.407` shifts the O-score by roughly `-2.8` - i.e. every firm\nlooks ~60%+ \"safer\" than it should.\n\nRecommended inputs, in order of fidelity:\n1. `ln(total_assets_nominal_USD / GNP_deflator)` using a deflator\n   with an explicit base period close to 1968-70. This reproduces\n   Ohlson's original scale.\n2. `ln(total_assets_deflated_to_Ohlson_base_USD)` if you have\n   pre-deflated real dollars.\n3. Any other rescaling, together with a re-estimated intercept and\n   re-calibrated zone thresholds on your own sample.\n\nDo **not** feed raw `ln(total_assets_millions)` or\n`ln(total_assets_billions)` unless you have re-estimated the model\n- the out-of-the-box thresholds will mis-rank.",
+          "format": "double",
+          "type": "number"
+        },
+        "negative_net_income_two_years": {
+          "description": "1 if net income was negative for the last two years, else 0.",
+          "format": "double",
+          "type": "number"
+        },
+        "net_income_change": {
+          "description": "(NI_t - NI_{t-1}) / (|NI_t| + |NI_{t-1}|) -- change in net income.",
+          "format": "double",
+          "type": "number"
+        },
+        "net_income_to_total_assets": {
+          "description": "Net Income / Total Assets (ROA).",
+          "format": "double",
+          "type": "number"
+        },
+        "total_liabilities_to_total_assets": {
+          "description": "Total Liabilities / Total Assets.",
+          "format": "double",
+          "type": "number"
+        },
+        "working_capital_to_total_assets": {
+          "description": "Working Capital / Total Assets.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "log_total_assets_adjusted",
+        "total_liabilities_to_total_assets",
+        "working_capital_to_total_assets",
+        "current_liabilities_to_current_assets",
+        "liabilities_exceed_assets",
+        "net_income_to_total_assets",
+        "funds_from_operations_to_total_liabilities",
+        "negative_net_income_two_years",
+        "net_income_change"
+      ],
+      "type": "object"
+    },
+    "ZmijewskiInput": {
+      "additionalProperties": false,
+      "description": "Input for the Zmijewski (1984) probit bankruptcy prediction model.\n\n# References\n\nZmijewski, M. E. (1984). \"Methodological Issues Related to the Estimation\nof Financial Distress Prediction Models.\" *Journal of Accounting Research*,\n22, 59-82. `docs/REFERENCES.md#zmijewski-1984`",
+      "properties": {
+        "current_assets_to_current_liabilities": {
+          "description": "Current Assets / Current Liabilities (current ratio / liquidity).",
+          "format": "double",
+          "type": "number"
+        },
+        "net_income_to_total_assets": {
+          "description": "Net Income / Total Assets (ROA).",
+          "format": "double",
+          "type": "number"
+        },
+        "total_liabilities_to_total_assets": {
+          "description": "Total Liabilities / Total Assets (leverage / financial leverage ratio).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "net_income_to_total_assets",
+        "total_liabilities_to_total_assets",
+        "current_assets_to_current_liabilities"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/credit_score_request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One scoring model and its input ratios.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "[`altman_z_score`]: original Altman Z-Score for public manufacturers.",
+      "properties": {
+        "input": {
+          "$ref": "#/$defs/AltmanZScoreInput"
+        },
+        "model": {
+          "const": "altman_z_score",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "input"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "[`altman_z_prime`]: Altman Z'-Score for private firms.",
+      "properties": {
+        "input": {
+          "$ref": "#/$defs/AltmanZPrimeInput"
+        },
+        "model": {
+          "const": "altman_z_prime",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "input"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "[`altman_z_double_prime`]: Altman Z''-Score for non-manufacturers.",
+      "properties": {
+        "input": {
+          "$ref": "#/$defs/AltmanZDoublePrimeInput"
+        },
+        "model": {
+          "const": "altman_z_double_prime",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "input"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "[`altman_em_score`]: Altman EM-Score for emerging-market corporates.",
+      "properties": {
+        "input": {
+          "$ref": "#/$defs/AltmanZDoublePrimeInput"
+        },
+        "model": {
+          "const": "altman_em_score",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "input"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "[`ohlson_o_score`]: Ohlson O-Score logistic model.",
+      "properties": {
+        "input": {
+          "$ref": "#/$defs/OhlsonOScoreInput"
+        },
+        "model": {
+          "const": "ohlson_o_score",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "input"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "[`zmijewski_score`]: Zmijewski probit model.",
+      "properties": {
+        "input": {
+          "$ref": "#/$defs/ZmijewskiInput"
+        },
+        "model": {
+          "const": "zmijewski_score",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "input"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "CreditScoreRequest"
+}

@@ -1,34 +1,36 @@
 {
   "description": "Native analytics.Performance benchmark report of the shared analytics invariants panel (finstack-quant/analytics/tests/data/api_invariants_data.json: TARGET against BENCH, daily, a five-observation rolling window and its two factors); TARGET's rolling greeks and multi-factor regression equal that file's expected values to 1e-12.",
   "request": {
-    "dates": [
-      "2025-01-01",
-      "2025-01-02",
-      "2025-01-03",
-      "2025-01-04",
-      "2025-01-05",
-      "2025-01-06",
-      "2025-01-07",
-      "2025-01-08",
-      "2025-01-09",
-      "2025-01-10",
-      "2025-01-11",
-      "2025-01-12"
-    ],
-    "values": [
-      [
-        0.012, -0.006, 0.018, -0.011, 0.009, 0.004, -0.014, 0.021, 0.006,
-        -0.008, 0.013, -0.004
+    "panel": {
+      "dates": [
+        "2025-01-01",
+        "2025-01-02",
+        "2025-01-03",
+        "2025-01-04",
+        "2025-01-05",
+        "2025-01-06",
+        "2025-01-07",
+        "2025-01-08",
+        "2025-01-09",
+        "2025-01-10",
+        "2025-01-11",
+        "2025-01-12"
       ],
-      [
-        0.009, -0.004, 0.015, -0.009, 0.006, 0.005, -0.011, 0.017, 0.004,
-        -0.006, 0.01, -0.003
-      ]
-    ],
-    "kind": "returns",
-    "tickerNames": ["TARGET", "BENCH"],
-    "benchmarkTicker": "BENCH",
-    "frequency": "daily",
+      "series": [
+        [
+          0.012, -0.006, 0.018, -0.011, 0.009, 0.004, -0.014, 0.021, 0.006,
+          -0.008, 0.013, -0.004
+        ],
+        [
+          0.009, -0.004, 0.015, -0.009, 0.006, 0.005, -0.011, 0.017, 0.004,
+          -0.006, 0.01, -0.003
+        ]
+      ],
+      "kind": "returns",
+      "ticker_names": ["TARGET", "BENCH"],
+      "benchmark_ticker": "BENCH",
+      "frequency": "daily"
+    },
     "window": 5,
     "factors": {
       "names": ["Factor 1", "Factor 2"],

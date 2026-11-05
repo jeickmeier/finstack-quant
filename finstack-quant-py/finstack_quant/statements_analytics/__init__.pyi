@@ -108,6 +108,7 @@ from finstack_quant.statements_analytics._valuation import (
     evaluate_dcf as evaluate_dcf,
     evaluate_lbo as evaluate_lbo,
     run_corporate_analysis as run_corporate_analysis,
+    WaccInputs as WaccInputs,
     wacc as wacc,
 )
 from finstack_quant.statements_analytics._capital_structure import (
@@ -270,6 +271,7 @@ __all__ = [
     "scenario_diff",
     "score_relative_value",
     "variance_bridge",
+    "WaccInputs",
     "wacc",
     "z_score",
 ]

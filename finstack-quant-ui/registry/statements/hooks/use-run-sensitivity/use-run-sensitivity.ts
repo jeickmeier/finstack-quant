@@ -7,10 +7,9 @@ import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { RunSensitivityRequest } from "@/workers/finstack-contract";
 export type {
   RunSensitivityRequest,
-  SensitivityParameterRequest,
   StatementSensitivity,
 } from "@/workers/finstack-contract";
-/** Snapshot the model, mode, parameters, target metric and period. Null disables the run. A non-finite input stays distinct in the key and reaches Rust as entered. */
+/** Snapshot the model, the SensitivityConfig, target metric and period. Null disables the run. A non-finite input stays distinct in the key and reaches Rust as entered. */
 export function runSensitivityOptions(
   client: FinstackClient | null,
   session: number,

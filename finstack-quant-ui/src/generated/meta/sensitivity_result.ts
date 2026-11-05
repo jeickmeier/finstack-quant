@@ -452,18 +452,29 @@ export default [
   {
     "path": "#/$defs/d_6df778c161860d725fb3",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/ParameterSpec",
-    "description": "Parameter to vary in sensitivity analysis."
+    "description": "Parameter to vary in sensitivity analysis.\n\nThe wire form carries exactly one of `perturbations` (absolute values) or\n`pct_range` (percentage moves of `base_value`, converted on deserialization\nas by [`Self::with_percentages`]); it always serializes the absolute values."
   },
   {
     "path": "#/$defs/d_6df778c161860d725fb3/properties/base_value",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/ParameterSpec/properties/base_value",
-    "description": "Base value",
+    "description": "Base value in the node's units; `pct_range` moves are applied to it.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_6df778c161860d725fb3/properties/node_id",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/ParameterSpec/properties/node_id",
     "description": "Node identifier"
+  },
+  {
+    "path": "#/$defs/d_6df778c161860d725fb3/properties/pct_range",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/ParameterSpec/properties/pct_range",
+    "default": null,
+    "description": "Percentage moves of `base_value` (`10.0` is a 10% increase), each\nsubstituted as `base_value * (1 + pct / 100)`; give exactly one of\n`perturbations` and `pct_range`."
+  },
+  {
+    "path": "#/$defs/d_6df778c161860d725fb3/properties/pct_range/items",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/ParameterSpec/properties/pct_range/items",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_6df778c161860d725fb3/properties/period_id",
@@ -475,7 +486,8 @@ export default [
   {
     "path": "#/$defs/d_6df778c161860d725fb3/properties/perturbations",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/ParameterSpec/properties/perturbations",
-    "description": "Absolute values to substitute for this node/period; use\n[`Self::with_percentages`] to construct shocks from percentage inputs."
+    "default": null,
+    "description": "Absolute values to substitute for this node/period; give exactly one of\n`perturbations` and `pct_range`."
   },
   {
     "path": "#/$defs/d_6df778c161860d725fb3/properties/perturbations/items",

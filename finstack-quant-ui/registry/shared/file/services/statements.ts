@@ -36,7 +36,6 @@ export type StatementsNative = {
     | "evaluateLbo"
     | "capitalStructureSummary"
     | "relativeValueReport"
-    | "parameterSpecWithPercentages"
     | "runSensitivity"
     | "generateTornadoEntries"
     | "goalSeek"
@@ -111,34 +110,32 @@ export function createStatementsService(
         }
       });
     },
-    runStatementChecks(request) {
-      return context.result(() => {
-        const { modelJson, resultsJson, configJson, kind } = request;
-        switch (kind) {
-          case "suite":
-            return native.statements_analytics.runChecks(
-              modelJson,
-              native.statements.validateCheckSuiteSpecJson(configJson),
-              resultsJson,
-            );
-          case "three-statement":
-            return native.statements_analytics.runThreeStatementChecks(
-              modelJson,
-              configJson,
-              resultsJson,
-            );
-          case "credit-underwriting":
-            return native.statements_analytics.runCreditUnderwritingChecks(
-              modelJson,
-              configJson,
-              resultsJson,
-            );
-          default: {
-            const unhandled: never = kind;
-            throw new RangeError(String(unhandled));
-          }
-        }
-      });
+    runChecks(request) {
+      return context.result(() =>
+        native.statements_analytics.runChecks(
+          request.modelJson,
+          native.statements.validateCheckSuiteSpecJson(request.suiteSpecJson),
+          request.resultsJson,
+        ),
+      );
+    },
+    runThreeStatementChecks(request) {
+      return context.result(() =>
+        native.statements_analytics.runThreeStatementChecks(
+          request.modelJson,
+          request.mappingJson,
+          request.resultsJson,
+        ),
+      );
+    },
+    runCreditUnderwritingChecks(request) {
+      return context.result(() =>
+        native.statements_analytics.runCreditUnderwritingChecks(
+          request.modelJson,
+          request.mappingJson,
+          request.resultsJson,
+        ),
+      );
     },
     evaluateStatementScenarios(request) {
       return context.result(() => {
@@ -220,15 +217,7 @@ export function createStatementsService(
       );
     },
     wacc(request) {
-      return context.result(() =>
-        native.statements_analytics.wacc(
-          request.equityWeight,
-          request.costOfEquity,
-          request.debtWeight,
-          request.costOfDebt,
-          request.taxRate,
-        ),
-      );
+      return context.result(() => native.statements_analytics.wacc(request));
     },
     evaluateDcf(request) {
       return context.result(() =>
@@ -285,22 +274,7 @@ export function createStatementsService(
     runSensitivity(request) {
       return context.result(() => {
         const api = native.statements_analytics;
-        const config = {
-          mode: request.mode,
-          parameters: request.parameters.map((parameter) =>
-            api.parameterSpecWithPercentages(
-              parameter.nodeId,
-              parameter.periodId,
-              parameter.baseValue,
-              [...parameter.pctRange],
-            ),
-          ),
-          target_metrics: [request.targetMetric],
-        };
-        const result = api.runSensitivity(
-          request.modelJson,
-          JSON.stringify(config),
-        );
+        const result = api.runSensitivity(request.modelJson, request.config);
         return {
           result,
           tornado: api.generateTornadoEntries(

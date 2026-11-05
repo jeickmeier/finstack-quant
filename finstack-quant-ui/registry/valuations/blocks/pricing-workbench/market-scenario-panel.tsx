@@ -9,7 +9,6 @@ import {
   EnumField,
   type EnumOption,
 } from "@/components/finstack/shared/primitives/enum-field/enum-field";
-import { useBuildMarketScenario } from "@/hooks/scenarios/use-market-scenario/use-market-scenario";
 import { useScenarioSpecValidator } from "@/hooks/scenarios/use-scenario-spec-validator/use-scenario-spec-validator";
 import { useListBuiltinTemplateMetadata } from "@/hooks/scenarios/use-list-builtin-template-metadata/use-list-builtin-template-metadata";
 import { useBuildFromTemplate } from "@/hooks/scenarios/use-build-from-template/use-build-from-template";
@@ -193,7 +192,6 @@ export function MarketScenarioInputs({
   const buildFromTemplate = useBuildFromTemplate();
   const buildTemplateComponent = useBuildTemplateComponent();
   const composeScenarios = useComposeScenarios();
-  const buildMarketScenario = useBuildMarketScenario();
   return (
     <div className="flex flex-col gap-3">
       <MarketScenarioBuilder
@@ -206,7 +204,6 @@ export function MarketScenarioInputs({
         buildFromTemplate={buildFromTemplate}
         buildTemplateComponent={buildTemplateComponent}
         composeScenarios={composeScenarios}
-        buildMarketScenario={buildMarketScenario}
         density={density}
       />
       <div className="flex flex-wrap items-center gap-2">

@@ -5,8 +5,9 @@
 //! [`CovenantMetricSource`]. [`ThresholdSchedule`] supports step-down limits,
 //! [`forecast_covenant_generic`] projects future compliance from any
 //! [`ModelTimeSeries`] ([`forecast_covenant`] from plain dated rows), and
-//! [`templates`] and the JSON entry points ([`evaluate_engine`],
-//! [`validate_covenant_spec_json`], ...) provide standard packages and the
+//! [`templates::covenant_template`] builds standard packages from a
+//! [`templates::CovenantTemplate`], and the JSON entry points
+//! ([`evaluate_engine`], [`validate_covenant_spec_json`], ...) provide the
 //! serde-first binding surface.
 //!
 //! # Conventions
@@ -91,8 +92,7 @@ pub use forward::{
     forecast_breaches_generic, forecast_covenant_generic,
 };
 pub use json::{
-    cov_lite_json, evaluate_engine, evaluate_engine_with_source, lbo_standard_json,
-    project_finance_json, real_estate_json, validate_covenant_engine_json,
+    evaluate_engine, evaluate_engine_with_source, validate_covenant_engine_json,
     validate_covenant_report_json, validate_covenant_spec_json,
 };
 pub use metric::{CovenantMetricId, CovenantMetricSource, HashMapMetricSource};

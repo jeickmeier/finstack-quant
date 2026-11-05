@@ -7,13 +7,13 @@ await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
 const panel = (frequency = 'daily') =>
-  analytics.Performance.fromReturns(
-    ['2025-01-01', '2025-01-02', '2025-01-03', '2025-01-04'],
-    [[0.01, -0.02, 0.03, 0.005]],
-    ['FUND'],
-    undefined,
-    frequency
-  );
+  new analytics.Performance({
+    dates: ['2025-01-01', '2025-01-02', '2025-01-03', '2025-01-04'],
+    series: [[0.01, -0.02, 0.03, 0.005]],
+    kind: 'returns',
+    ticker_names: ['FUND'],
+    frequency,
+  });
 
 test('canonical frequencies are accepted by core and analytics', () => {
   for (const label of ['daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual']) {

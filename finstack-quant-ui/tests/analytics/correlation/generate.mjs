@@ -1,17 +1,11 @@
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
 import { native } from "../../../scripts/fixture-inputs.mjs";
 import { panel, failures } from "./panels.mjs";
-// The worker's AnalyticsApi.correlationMatrix over the raw package:
-// Performance.fromReturns of the host panel, getTickerNames and
-// correlationMatrix, then free.
+// The worker's AnalyticsApi.correlationMatrix over the raw package: a
+// Performance of the request's panel, getTickerNames and correlationMatrix,
+// then free.
 function correlation(request) {
-  const performance = native.Performance.fromReturns(
-    request.dates,
-    request.values,
-    request.tickerNames,
-    undefined,
-    request.frequency ?? undefined,
-  );
+  const performance = new native.Performance(request.panel);
   try {
     const result = performance.correlationMatrix();
     return {
@@ -33,11 +27,14 @@ function failure(request) {
 }
 const value = {
   description:
-    "Native analytics.Performance correlation matrix of a host panel of four sleeves' daily decimal returns over 60 business days from 2024-01-02 (tests/analytics/correlation/panels.mjs), with Rust's repaired flag, and the native errors of a zero-variance series, an interior missing return and two series with no overlapping observations. The panels are rebuilt from panels.mjs because JSON cannot carry their NaN gaps; only the valid panel is stored.",
-  request: panel,
-  result: correlation(panel),
+    "Native analytics.Performance correlation matrix of a host panel of four sleeves' daily decimal returns over 60 business days from 2024-01-02 (tests/analytics/correlation/panels.mjs), with Rust's repaired flag, and the native errors of a zero-variance series, an interior missing return and two series with no overlapping observations. Gaps are null; the panels live in panels.mjs and only the valid one is stored.",
+  request: { panel },
+  result: correlation({ panel }),
   errors: Object.fromEntries(
-    Object.entries(failures).map(([name, request]) => [name, failure(request)]),
+    Object.entries(failures).map(([name, failed]) => [
+      name,
+      failure({ panel: failed }),
+    ]),
   ),
 };
 await emit(

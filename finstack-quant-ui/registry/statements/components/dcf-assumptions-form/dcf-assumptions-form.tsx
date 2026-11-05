@@ -213,7 +213,7 @@ export function DcfAssumptionsForm({
         <div className="pt-3">
           <SchemaForm
             module={dcfOptionsModule}
-            defaultValues={initial?.options as Record<string, unknown>}
+            defaultValues={initial?.options}
             layout="basic"
             actions={false}
             explicitNull={false}

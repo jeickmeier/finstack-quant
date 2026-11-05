@@ -1,5 +1,5 @@
 {
-  "description": "Native market scenarios on the results-fixture bond: the Rust-built spec, the applyScenario report and the bond repriced with the same model and metrics on the shocked market at the returned valuation date. The shocked market itself is not stored.",
+  "description": "Native market scenarios on the results-fixture bond: the ScenarioSpec as written and its canonical form from parseScenarioSpec, the applyScenario report and the bond repriced with the same model and metrics on the shocked market at the returned valuation date. The shocked market itself is not stored.",
   "sources": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
@@ -16,17 +16,16 @@
   "cases": [
     {
       "name": "usd-ois-50bp",
-      "draft": {
+      "spec": {
         "id": "usd-ois-50bp",
-        "shifts": [
+        "operations": [
           {
-            "curveKind": "discount",
-            "curveId": "USD-OIS",
-            "bp": "50"
+            "kind": "curve_parallel_bp",
+            "curve_kind": "discount",
+            "curve_id": "USD-OIS",
+            "bp": 50
           }
-        ],
-        "roll": null,
-        "hazardBumpMode": ""
+        ]
       },
       "scenarioJson": "{\"id\":\"usd-ois-50bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":50}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
       "report": {
@@ -382,20 +381,20 @@
     },
     {
       "name": "roll-1m-25bp",
-      "draft": {
+      "spec": {
         "id": "roll-1m-25bp",
-        "shifts": [
+        "operations": [
           {
-            "curveKind": "discount",
-            "curveId": "USD-OIS",
-            "bp": "25"
+            "kind": "time_roll_forward",
+            "period": "1M"
+          },
+          {
+            "kind": "curve_parallel_bp",
+            "curve_kind": "discount",
+            "curve_id": "USD-OIS",
+            "bp": 25
           }
-        ],
-        "roll": {
-          "period": "1M",
-          "rollMode": ""
-        },
-        "hazardBumpMode": ""
+        ]
       },
       "scenarioJson": "{\"id\":\"roll-1m-25bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"time_roll_forward\",\"period\":\"1M\",\"apply_shocks\":true,\"roll_mode\":\"business_days\"},{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":25}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
       "report": {
@@ -774,17 +773,17 @@
     },
     {
       "name": "hz-par-cds-25bp",
-      "draft": {
+      "spec": {
         "id": "hz-par-cds-25bp",
-        "shifts": [
+        "operations": [
           {
-            "curveKind": "par_cds",
-            "curveId": "HZ",
-            "bp": "25"
+            "kind": "curve_parallel_bp",
+            "curve_kind": "par_cds",
+            "curve_id": "HZ",
+            "bp": 25
           }
         ],
-        "roll": null,
-        "hazardBumpMode": "first_order_shift"
+        "hazard_bump_mode": "first_order_shift"
       },
       "scenarioJson": "{\"id\":\"hz-par-cds-25bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"par_cds\",\"curve_id\":\"HZ\",\"bp\":25}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\",\"hazard_bump_mode\":\"first_order_shift\"}",
       "report": {

@@ -73,7 +73,12 @@ function creditModel() {
 function performance() {
   const dates = Array.from({ length: 10 }, (_, i) => `2024-01-${String(i + 1).padStart(2, '0')}`);
   const returns = [0.01, -0.01, 0.02, 0.0, 0.01, -0.02, 0.01, 0.0, 0.01, 0.01];
-  return analytics.Performance.fromReturns(dates, [returns], ['A']);
+  return new analytics.Performance({
+    dates,
+    series: [returns],
+    kind: 'returns',
+    ticker_names: ['A'],
+  });
 }
 
 test('a statements dependency cycle is a computation failure', () => {
@@ -186,10 +191,22 @@ test('an unknown benchmark ticker is not found', () => {
     [0, 0.01, 0.02],
   ];
   assert.throws(
-    () => analytics.Performance.fromReturns(dates, returns, ['A', 'B'], 'NOPE'),
+    () =>
+      new analytics.Performance({
+        dates,
+        series: returns,
+        kind: 'returns',
+        ticker_names: ['A', 'B'],
+        benchmark_ticker: 'NOPE',
+      }),
     kind('not_found', /NOPE/)
   );
-  const panel = analytics.Performance.fromReturns(dates, returns, ['A', 'B']);
+  const panel = new analytics.Performance({
+    dates,
+    series: returns,
+    kind: 'returns',
+    ticker_names: ['A', 'B'],
+  });
   assert.throws(() => panel.resetBenchTicker('NOPE'), kind('not_found', /NOPE/));
   assert.equal(panel.getBenchmarkIdx(), 0);
   panel.free();

@@ -3604,10 +3604,14 @@ export interface ManagementFeeSpec {
 }
 /**
  * Parameter to vary in sensitivity analysis.
+ *
+ * The wire form carries exactly one of `perturbations` (absolute values) or
+ * `pct_range` (percentage moves of `base_value`, converted on deserialization
+ * as by [`Self::with_percentages`]); it always serializes the absolute values.
  */
 export interface ParameterSpec {
   /**
-   * Base value
+   * Base value in the node's units; `pct_range` moves are applied to it.
    */
   base_value: number;
   /**
@@ -3615,15 +3619,20 @@ export interface ParameterSpec {
    */
   node_id: string;
   /**
+   * Percentage moves of `base_value` (`10.0` is a 10% increase), each
+   * substituted as `base_value * (1 + pct / 100)`; give exactly one of
+   * `perturbations` and `pct_range`.
+   */
+  pct_range?: number[] | null;
+  /**
    * Period to vary
    */
   period_id: PeriodId;
   /**
-   * Absolute values to substitute for this node/period; use
-   * [`Self::with_percentages`] to construct shocks from percentage inputs.
+   * Absolute values to substitute for this node/period; give exactly one of
+   * `perturbations` and `pct_range`.
    */
-  perturbations: number[];
-  [k: string]: unknown;
+  perturbations?: number[] | null;
 }
 /**
  * Criteria for filtering companies into a peer set.
@@ -4486,6 +4495,36 @@ export interface VarianceConfig {
    * Periods to include in the variance report.
    */
   periods: PeriodId[];
+}
+/**
+ * Capital-structure inputs of a weighted-average cost of capital calculation.
+ */
+export interface WaccInputs {
+  /**
+   * **Pre-tax** cost of debt in decimal form: the marginal borrowing yield
+   * before the tax shield (`0.06` means `6%`).
+   */
+  cost_of_debt: number;
+  /**
+   * Required return on equity in decimal form, typically from CAPM
+   * (`0.115` means `11.5%`).
+   */
+  cost_of_equity: number;
+  /**
+   * Debt share of total capital as a decimal fraction (`0.4` means 40%
+   * debt-funded); non-negative, and sums with `equity_weight` to `1.0`.
+   */
+  debt_weight: number;
+  /**
+   * Equity share of total capital as a decimal fraction (`0.6` means 60%
+   * equity-funded); non-negative.
+   */
+  equity_weight: number;
+  /**
+   * Marginal corporate tax rate as a decimal fraction in `[0, 1]` (`0.25`
+   * means `25%`).
+   */
+  tax_rate: number;
 }
 /**
  * Probability-weighted ECL across macro scenarios with the per-scenario audit trail.

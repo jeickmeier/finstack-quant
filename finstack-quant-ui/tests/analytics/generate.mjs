@@ -8,17 +8,18 @@ for (let day = Date.UTC(2023, 0, 2); dates.length < 756; day += 86_400_000) {
   if (weekday !== 0 && weekday !== 6)
     dates.push(new Date(day).toISOString().slice(0, 10));
 }
+// The Rust PerformancePanel wire value every report case is built from.
 const panel = {
   dates,
-  values: [
+  series: [
     dates.map((_, i) => 0.0008 + 0.012 * Math.sin(i / 30)),
     dates.map((_, i) => 0.0004 + 0.008 * Math.sin(i / 45)),
   ],
   kind: "returns",
-  tickerNames: ["Global Macro Composite", "Benchmark"],
-  benchmarkTicker: "Benchmark",
+  ticker_names: ["Global Macro Composite", "Benchmark"],
+  benchmark_ticker: "Benchmark",
 };
-// Each case's request is the panel plus its options.
+// Each case's request is its panel plus its options.
 const requests = [
   // Every option omitted: Rust's defaults apply (window 63, five episodes,
   // rf 0, confidence 0.95, calendar-year FYTD); the lookback ends on the last
@@ -26,14 +27,15 @@ const requests = [
   {
     name: "defaults",
     summary: "with every option left to Rust",
+    panel,
     options: {},
   },
   {
     name: "explicit",
     summary:
-      "with an explicit rate, confidence, window, episode count, lookback date and April fiscal year",
+      "with an explicit frequency, rate, confidence, window, episode count, lookback date and April fiscal year",
+    panel: { ...panel, frequency: "daily" },
     options: {
-      frequency: "daily",
       riskFreeRate: 0.02,
       confidence: 0.99,
       window: 126,
@@ -50,22 +52,7 @@ const series = (value) => ({ ...value, values: Array.from(value.values) });
 // lookbackReturnsWithFiscalConfig export; the raw lookbackReturns takes no
 // fiscal argument.
 function report(request) {
-  const performance =
-    request.kind === "returns"
-      ? native.Performance.fromReturns(
-          request.dates,
-          request.values,
-          request.tickerNames,
-          option(request.benchmarkTicker),
-          option(request.frequency),
-        )
-      : new native.Performance(
-          request.dates,
-          request.values,
-          request.tickerNames,
-          option(request.benchmarkTicker),
-          option(request.frequency),
-        );
+  const performance = new native.Performance(request.panel);
   let fiscal;
   try {
     if (request.fiscalYearStart)
@@ -88,7 +75,7 @@ function report(request) {
     const correlation = performance.correlationMatrix();
     return {
       tickerNames,
-      benchmarkIdx: request.benchmarkTicker
+      benchmarkIdx: request.panel.benchmark_ticker
         ? performance.getBenchmarkIdx()
         : null,
       frequency: performance.getFrequency(),
@@ -134,8 +121,8 @@ function assertFinite(value, path) {
 }
 // One file per case keeps each under the repository's 500 KB added-file limit;
 // the gallery reads only the explicit case.
-for (const { name, options, summary } of requests) {
-  const request = { ...panel, ...options };
+for (const { name, panel: casePanel, options, summary } of requests) {
+  const request = { panel: casePanel, ...options };
   const value = report(request);
   assertFinite(value, name);
   await emit(
@@ -151,13 +138,7 @@ for (const { name, options, summary } of requests) {
 // The worker's AnalyticsApi.benchmarkReport over the raw package; every
 // benchmark-relative method is a plain raw export.
 function benchmarkReport(request) {
-  const performance = native.Performance.fromReturns(
-    request.dates,
-    request.values,
-    request.tickerNames,
-    request.benchmarkTicker,
-    option(request.frequency),
-  );
+  const performance = new native.Performance(request.panel);
   try {
     const rate = option(request.riskFreeRate);
     const window = option(request.window);
@@ -223,7 +204,7 @@ function benchmarkReport(request) {
 // left to Rust (rolling window 63, rf 0) and two illustrative already-excess
 // factor waves.
 const benchmarkRequest = {
-  ...panel,
+  panel,
   factors: {
     names: ["Market", "Carry"],
     returns: [
@@ -239,12 +220,14 @@ const invariants = await readRepoJson(
   "finstack-quant/analytics/tests/data/api_invariants_data.json",
 );
 const invariantsRequest = {
-  dates: invariants.dates,
-  values: [invariants.returns, invariants.benchmark],
-  kind: "returns",
-  tickerNames: ["TARGET", "BENCH"],
-  benchmarkTicker: "BENCH",
-  frequency: "daily",
+  panel: {
+    dates: invariants.dates,
+    series: [invariants.returns, invariants.benchmark],
+    kind: "returns",
+    ticker_names: ["TARGET", "BENCH"],
+    benchmark_ticker: "BENCH",
+    frequency: "daily",
+  },
   window: 5,
   factors: { names: ["Factor 1", "Factor 2"], returns: invariants.factors },
 };

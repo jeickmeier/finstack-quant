@@ -46,7 +46,7 @@ export function ExchangeOfferCard({
   formatValue = String,
   density = "compact",
 }: ExchangeOfferCardProps) {
-  const [exchangeType, setExchangeType] = useState(defaultTerms.exchangeType);
+  const [exchangeType, setExchangeType] = useState(defaultTerms.exchange_type);
   const offer = useFields(defaultTerms);
   return (
     <section
@@ -61,13 +61,13 @@ export function ExchangeOfferCard({
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit({
-            oldPv: typedNumber(offer.values.oldPv),
-            newPv: typedNumber(offer.values.newPv),
-            consentFee: typedNumber(offer.values.consentFee),
-            equitySweetenerValue: typedNumber(
-              offer.values.equitySweetenerValue,
+            old_pv: typedNumber(offer.values.old_pv),
+            new_pv: typedNumber(offer.values.new_pv),
+            consent_fee: typedNumber(offer.values.consent_fee),
+            equity_sweetener_value: typedNumber(
+              offer.values.equity_sweetener_value,
             ),
-            exchangeType,
+            exchange_type: exchangeType,
           });
         }}
       >
@@ -85,22 +85,22 @@ export function ExchangeOfferCard({
             }))}
           />
           {offer.field(
-            "oldPv",
+            "old_pv",
             "Hold-out PV",
             "Present value of the existing claim if not tendered, in one monetary unit you choose.",
           )}
           {offer.field(
-            "newPv",
+            "new_pv",
             "New instrument PV",
             "Present value of what a tender receives, same unit.",
           )}
           {offer.field(
-            "consentFee",
+            "consent_fee",
             "Consent fee",
             "Cash consent or early-tender fee, same unit.",
           )}
           {offer.field(
-            "equitySweetenerValue",
+            "equity_sweetener_value",
             "Equity sweetener",
             "Estimated value of attached equity or warrants, same unit.",
           )}

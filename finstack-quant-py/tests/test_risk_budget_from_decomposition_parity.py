@@ -19,8 +19,8 @@ from finstack_quant.models.factor.risk import (
     PositionRiskDecomposition,
     evaluate_risk_budget,
     evaluate_risk_budget_from_decomposition,
-    parametric_var_decomposition,
     position_component_var,
+    position_risk_report,
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "risk_budget_from_decomposition.json"
@@ -28,7 +28,10 @@ TARGETS = [0.5, 0.5]
 
 
 def _decomposition() -> PositionRiskDecomposition:
-    return parametric_var_decomposition(["A", "B"], [0.6, 0.4], [[0.04, 0.0], [0.0, 0.01]])
+    return position_risk_report({
+        "position_ids": ["A", "B"],
+        "source": {"kind": "parametric", "weights": [0.6, 0.4], "covariance": [[0.04, 0.0], [0.0, 0.01]]},
+    }).decomposition
 
 
 def test_result_matches_the_record_pinned_for_both_hosts() -> None:

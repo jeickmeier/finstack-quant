@@ -121,7 +121,7 @@
       "type": "registry:hook",
       "title": "usePerformanceReport",
       "description": "Builds a native analytics.Performance report of a host-supplied returns or price panel through the WASM worker.",
-      "docs": "analytics.Performance.fromReturns (or the price constructor) over the panel, then summary, cumulativeReturns, getDrawdownSeries, drawdownDetails, rollingSharpe, rollingVolatility and getActiveDatesForTicker per ticker, periodicReturns monthly and annual, lookbackReturns (an omitted date left to Rust, which uses the last active date; with a core.FiscalConfig only when a fiscal-year start is supplied) and correlationMatrix. Omitted options (benchmark, frequency, risk-free rate, confidence, rolling window, episode count) stay unset so Rust applies its defaults; the lookback date defaults to the last active panel date. Every handle is freed. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "docs": "new analytics.Performance of the request's PerformancePanel (prices or returns), then summary, cumulativeReturns, getDrawdownSeries, drawdownDetails, rollingSharpe, rollingVolatility and getActiveDatesForTicker per ticker, periodicReturns monthly and annual, lookbackReturns (an omitted date left to Rust, which uses the last active date; with a core.FiscalConfig only when a fiscal-year start is supplied) and correlationMatrix. Omitted options (benchmark, frequency, risk-free rate, confidence, rolling window, episode count) stay unset so Rust applies its defaults; the lookback date defaults to the last active panel date. Every handle is freed. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
       "files": [
         {
           "path": "hooks/use-performance-report/use-performance-report.ts",
@@ -147,7 +147,7 @@
       "type": "registry:hook",
       "title": "useBenchmarkReport",
       "description": "Builds a native analytics.Performance benchmark report of a host-supplied returns or price panel through the WASM worker.",
-      "docs": "analytics.Performance.fromReturns (or the price constructor) with the named benchmark, then greeks, beta, trackingError, informationRatio, treynor, mSquared, upCapture, downCapture, captureRatio and battingAverage, and per ticker getActiveDatesForTicker, cumulativeReturnsOutperformance, drawdownDifference, rollingGreeks and, when a factor panel is supplied, multiFactorGreeks (a ticker's rejected regression is returned as its native error). Omitted options (frequency, risk-free rate, rolling window, factor return kind and rate) stay unset so Rust applies its defaults. The handle is freed. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "docs": "new analytics.Performance of the request's PerformancePanel, whose benchmark_ticker names the benchmark, then greeks, beta, trackingError, informationRatio, treynor, mSquared, upCapture, downCapture, captureRatio and battingAverage, and per ticker getActiveDatesForTicker, cumulativeReturnsOutperformance, drawdownDifference, rollingGreeks and, when a factor panel is supplied, multiFactorGreeks (a ticker's rejected regression is returned as its native error). Omitted options (frequency, risk-free rate, rolling window, factor return kind and rate) stay unset so Rust applies its defaults. The handle is freed. Keyed on the complete request and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
       "files": [
         {
           "path": "hooks/use-benchmark-report/use-benchmark-report.ts",
@@ -173,7 +173,7 @@
       "type": "registry:hook",
       "title": "useCorrelationMatrix",
       "description": "Pearson correlation matrix of a host-supplied return or price panel, with Rust's repaired flag, through the WASM worker.",
-      "docs": "useCorrelationMatrix builds analytics.Performance from the host panel (Performance.fromReturns for kind \"returns\", the price constructor for \"prices\"), then getTickerNames and correlationMatrix, freeing the handle: one native chain keyed on the snapshotted panel and worker session; null means no request. Returns { tickerNames, matrix, repaired } as Rust returned them. A panel Rust rejects (a zero-variance series, an interior missing value, a pair with fewer than two overlapping observations) is the hook error. Requires FinstackQueryProvider.",
+      "docs": "useCorrelationMatrix builds new analytics.Performance from the host PerformancePanel (prices or returns), then getTickerNames and correlationMatrix, freeing the handle: one native chain keyed on the snapshotted panel and worker session; null means no request. Returns { tickerNames, matrix, repaired } as Rust returned them. A panel Rust rejects (a zero-variance series, an interior missing value, a pair with fewer than two overlapping observations) is the hook error. Requires FinstackQueryProvider.",
       "files": [
         {
           "path": "hooks/use-correlation-matrix/use-correlation-matrix.ts",

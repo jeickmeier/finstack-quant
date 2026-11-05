@@ -22,6 +22,7 @@ import {
   passThrough,
   UndefinedValue,
 } from "@/components/finstack/shared/primitives/native-display/native-display";
+import type { CapitalStructureSummaryConfigWire } from "@/lib/finstack/generated/types/capital_structure_summary_config";
 
 type Tranche = CapitalStructureSummary["tranches"][number];
 type Money = CapitalStructureSummary["total_debt"];
@@ -97,7 +98,7 @@ const isStringType = (type: unknown) =>
   type === "string" || (Array.isArray(type) && type.includes("string"));
 export interface CapitalStructureReportProps {
   /** Initial CapitalStructureSummaryConfig; remount to load another. Omitted starts empty. */
-  defaultConfig?: Record<string, unknown>;
+  defaultConfig?: CapitalStructureSummaryConfigWire;
   /** Statement node ids offered for the EBITDA and cash nodes. */
   nodeIds: readonly string[];
   /** The model's period ids, in its order, offered for the reporting period. */

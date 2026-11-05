@@ -32,13 +32,14 @@ test('periodicReturns exposes ticker-major dated points that reconcile', () => {
     [0.01, 0.02, -0.01],
     [0.005, -0.002, 0.015],
   ];
-  const perf = analytics.Performance.fromReturns(
+  const perf = new analytics.Performance({
     dates,
-    returns,
-    ['FUND', 'BENCH'],
-    'BENCH',
-    'daily'
-  );
+    series: returns,
+    kind: 'returns',
+    ticker_names: ['FUND', 'BENCH'],
+    benchmark_ticker: 'BENCH',
+    frequency: 'daily',
+  });
 
   assert.equal(typeof perf.periodicReturns, 'function');
   const panel = perf.periodicReturns();
@@ -60,10 +61,11 @@ test('periodicReturns exposes ticker-major dated points that reconcile', () => {
 });
 
 test('periodicReturns rejects unsupported frequency tokens', () => {
-  const perf = analytics.Performance.fromReturns(
-    ['2025-01-30', '2025-01-31'],
-    [[0.01, 0.02]],
-    ['FUND']
-  );
+  const perf = new analytics.Performance({
+    dates: ['2025-01-30', '2025-01-31'],
+    series: [[0.01, 0.02]],
+    kind: 'returns',
+    ticker_names: ['FUND'],
+  });
   assert.throws(() => perf.periodicReturns('hourly'), /unknown period kind 'hourly'/);
 });

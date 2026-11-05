@@ -29,7 +29,6 @@ __all__ = [
     "WorkoutLgdResult",
     "seniority_calibration_ids",
     "seniority_recovery_stats",
-    "workout_lgd",
 ]
 
 class BetaRecovery:
@@ -675,7 +674,12 @@ class WorkoutLgdResult:
     Examples
     --------
     >>> from finstack_quant.models.credit import lgd
-    >>> result = lgd.workout_lgd(100.0, [("real_estate", 80.0, 0.3)], 0.05, 0.03, 2.0, 0.05)
+    >>> model = lgd.WorkoutLgd.from_json(
+    ...     '{"collateral": [{"collateral_type": "real_estate", "book_value": 80.0, "haircut": 0.3}],'
+    ...     ' "costs": {"direct_cost_rate": 0.05, "indirect_cost_rate": 0.03},'
+    ...     ' "workout_years": 2.0, "discount_rate": 0.05}'
+    ... )
+    >>> result = model.evaluate(100.0)
     >>> round(result.lgd + result.recovery_rate, 12)
     1.0
 
@@ -750,7 +754,8 @@ class WorkoutLgdResult:
         Examples
         --------
         >>> from finstack_quant.models.credit import lgd
-        >>> value = lgd.workout_lgd(100.0, [("cash", 50.0, 0.0)], 0.0, 0.0, 1.0, 0.0)
+        >>> piece = lgd.CollateralPiece("cash", 50.0, 0.0)
+        >>> value = lgd.WorkoutLgd.builder().collateral(piece).costs(lgd.WorkoutCosts.zero()).build().evaluate(100.0)
         >>> lgd.WorkoutLgdResult.from_json(value.to_json()) == value
         True
         """
@@ -1746,55 +1751,6 @@ def seniority_recovery_stats(
     >>> from finstack_quant.models.credit import lgd
     >>> lgd.seniority_recovery_stats("senior_secured", "moodys_recovery_1982_2023").mean
     0.52
-
-    """
-    ...
-
-def workout_lgd(
-    ead: float,
-    collateral: list[tuple[str, float, float]],
-    direct_cost_pct: float,
-    indirect_cost_pct: float,
-    time_to_resolution_years: float,
-    discount_rate: float,
-) -> WorkoutLgdResult:
-    """
-    Workout net recovery, LGD, and recovery rate in one call.
-
-    One-shot twin of ``WorkoutLgd.builder()...build().evaluate(ead)``.
-
-    Parameters
-    ----------
-    ead : float
-        Exposure at default (> 0).
-    collateral : list[tuple[str, float, float]]
-        ``(collateral_type, book_value, haircut)`` triples; the type is one
-        of ``cash``, ``securities``, ``receivables``, ``inventory``, ``equipment``, ``real_estate``, ``intellectual_property``, ``other`` and ``haircut`` is a decimal in ``[0, 1]``.
-    direct_cost_pct : float
-        Direct resolution costs as a decimal fraction of EAD (>= 0).
-    indirect_cost_pct : float
-        Indirect resolution costs as a decimal fraction of EAD (>= 0).
-    time_to_resolution_years : float
-        Expected workout duration in years (>= 0).
-    discount_rate : float
-        Annual decimal discount rate for the workout period (>= 0).
-
-    Returns
-    -------
-    WorkoutLgdResult
-        ``net_recovery``, ``lgd`` and ``recovery_rate``.
-
-    Raises
-    ------
-    ValueError
-        For an unknown collateral type or any invalid input.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.credit import lgd
-    >>> result = lgd.workout_lgd(100.0, [("cash", 50.0, 0.0)], 0.0, 0.0, 0.0, 0.0)
-    >>> (result.net_recovery, result.lgd)
-    (50.0, 0.5)
 
     """
     ...

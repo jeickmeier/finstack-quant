@@ -9,6 +9,7 @@
 
 use finstack_quant_core::schema::SchemaArtifact;
 
+use crate::templates::CovenantTemplate;
 use crate::{
     ConsequenceApplication, CovenantEngine, CovenantForecast, CovenantForecastConfig,
     CovenantReport, DatedCovenantReports, DatedMetrics, FutureBreach, HashMapMetricSource,
@@ -50,6 +51,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "covenant_report",
         Output,
         "Covenant check result."
+    ),
+    finstack_quant_core::schema_artifact!(
+        CovenantTemplate,
+        "covenants",
+        "covenant_template",
+        Input,
+        "One standard covenant package and its thresholds."
     ),
     finstack_quant_core::schema_artifact!(
         DatedCovenantReports,

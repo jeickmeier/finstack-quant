@@ -443,13 +443,13 @@ mod tests {
             vec![100.0, 101.0, 102.0, 103.0, 104.0, 105.0],
             vec![100.0, 100.5, 101.0, 101.5, 102.0, 102.5],
         ];
-        let perf = Performance::new(
+        let perf = Performance::new(&crate::performance::prices_panel(
             dates,
             prices,
             vec!["BENCH".to_string(), "PORT".to_string()],
             Some("BENCH"),
             PeriodKind::Daily,
-        )
+        ))
         .expect("performance should build");
 
         let invalid_factor = [0.01, 0.02];

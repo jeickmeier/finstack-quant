@@ -36,7 +36,14 @@ const close = (actual, expected, rel, label) =>
     `${label}: ${actual} vs ${expected}`
   );
 const pricePanel = () =>
-  new Performance(PRICES.dates, PRICES.values, NAMES, PRICES.benchmark_ticker, PRICES.frequency);
+  new Performance({
+    dates: PRICES.dates,
+    series: PRICES.values,
+    kind: 'prices',
+    ticker_names: NAMES,
+    benchmark_ticker: PRICES.benchmark_ticker,
+    frequency: PRICES.frequency,
+  });
 
 test('Performance constructor matches the shared Python price golden', () => {
   const panel = pricePanel();
@@ -44,20 +51,32 @@ test('Performance constructor matches the shared Python price golden', () => {
   sharpe.forEach((value, index) => close(value, PRICES.sharpe[index], 1e-12, `sharpe[${index}]`));
   assert.equal('fromArrays' in Performance, false);
   assert.throws(
-    () => new Performance(PRICES.dates, PRICES.values, NAMES, 'missing'),
+    () =>
+      new Performance({
+        dates: PRICES.dates,
+        series: PRICES.values,
+        kind: 'prices',
+        ticker_names: NAMES,
+        benchmark_ticker: 'missing',
+      }),
     (error) => error.name === 'FinstackError' && error.kind === 'not_found'
   );
   panel.free();
 });
 
-test('Performance.fromReturns matches the shared Python return golden', () => {
+test('a return panel matches the shared Python return golden', () => {
   const returns = GOLDEN.returns;
-  const panel = Performance.fromReturns(returns.dates, returns.values, NAMES);
+  const panel = new Performance({
+    dates: returns.dates,
+    series: returns.values,
+    kind: 'returns',
+    ticker_names: NAMES,
+  });
   const volatility = Array.from(panel.volatility());
   volatility.forEach((value, index) =>
     close(value, returns.volatility[index], 1e-12, `volatility[${index}]`)
   );
-  assert.equal('fromReturnsArrays' in Performance, false);
+  assert.equal('fromReturns' in Performance, false);
   panel.free();
 });
 

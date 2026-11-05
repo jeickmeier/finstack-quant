@@ -201,7 +201,7 @@ forward, expiry = 5200.0, 1.0
 strikes = [4160.0, 4680.0, 5200.0, 5720.0, 6240.0]
 truth = SabrParameters(0.20, 1.0, 0.30, -0.20)
 quotes = SabrSmile(truth, forward, expiry).generate_smile(strikes)
-fitted = SabrCalibrator().calibrate(forward, strikes, quotes, expiry, 1.0)
+fitted = SabrCalibrator().calibrate(forward, strikes, quotes, expiry, 1.0).parameters
 repriced = SabrSmile(fitted, forward, expiry).generate_smile(strikes)
 print({'alpha': fitted.alpha, 'beta': fitted.beta, 'rho': fitted.rho, 'nu': fitted.nu})
 ```
@@ -276,7 +276,7 @@ import matplotlib.pyplot as plt
 from finstack_quant.models.volatility import SabrParameters,SabrSmile,SabrCalibrator
 strikes=[4160.,4680.,5200.,5720.,6240.]
 quotes=SabrSmile(SabrParameters(.2,1.,.3,-.2),5200.,1.).generate_smile(strikes)
-fitted=SabrCalibrator().calibrate(5200.,strikes,quotes,1.,1.)
+fitted=SabrCalibrator().calibrate(5200.,strikes,quotes,1.,1.).parameters
 fit=SabrSmile(fitted,5200.,1.).generate_smile(strikes)
 fig,ax=plt.subplots(figsize=(7,4));ax.scatter(strikes,quotes,label='Synthetic quotes');ax.plot(strikes,fit,label='Fitted SABR')
 ax.set(xlabel='SPX strike',ylabel='Implied volatility decimal');ax.legend();ax.grid(alpha=.25);fig.tight_layout()
@@ -389,7 +389,7 @@ forward=100.;strikes=[80.,90.,100.,110.,120.];expiry=1.
 quotes=SabrSmile(SabrParameters(.2,1.,.3,-.2),forward,expiry).generate_smile(strikes)
 fits=[]
 for beta in (.5,1.):
- fitted=SabrCalibrator().with_tolerance(.002 / max(quotes)).calibrate(forward,strikes,quotes,expiry,beta)
+ fitted=SabrCalibrator().with_tolerance(.002 / max(quotes)).calibrate(forward,strikes,quotes,expiry,beta).parameters
  values=SabrSmile(fitted,forward,expiry).generate_smile(strikes)
  error=max(abs(a-b) for a,b in zip(quotes,values))
  fits.append({'beta':beta,'alpha':fitted.alpha,'rho':fitted.rho,'nu':fitted.nu,'max_vol_error':error})

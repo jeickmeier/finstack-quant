@@ -113,7 +113,7 @@ impl VolSource {
                         "normal SABR cube cannot supply a Black volatility quote".into(),
                     ));
                 }
-                get_cube_vol(cube, expiry, tenor, strike)
+                get_cube_vol(cube, expiry, tenor, strike, VolatilityConvention::Lognormal)
             }
             Self::FxDelta(surface) => get_fx_delta_vol(surface, expiry, strike, tenor),
         }
@@ -158,7 +158,9 @@ impl VolSource {
                 };
                 get_surface_vol(surface, expiry, secondary)
             }
-            Self::Cube(cube) => get_cube_normal_vol(cube, expiry, tenor, strike),
+            Self::Cube(cube) => {
+                get_cube_vol(cube, expiry, tenor, strike, VolatilityConvention::Normal)
+            }
             Self::CubeExpirySlice(slice) => {
                 segment(&[slice.expiry()], expiry)?;
                 if slice.quote_type() != VolQuoteType::Normal {
@@ -508,7 +510,23 @@ fn cube_vol(cube: &VolCube, expiry: f64, tenor: f64, strike: f64, normal: bool) 
     }
 }
 
-/// Evaluate checked lognormal SABR cube volatility.
+/// Whether a cube output convention is normal; a shifted-lognormal output is
+/// not a cube quote (the cube's own shifts apply to its lognormal output).
+fn normal_output(convention: VolatilityConvention) -> Result<bool> {
+    match convention {
+        VolatilityConvention::Normal => Ok(true),
+        VolatilityConvention::Lognormal => Ok(false),
+        VolatilityConvention::ShiftedLognormal { .. } => {
+            Err(finstack_quant_core::Error::Validation(
+                "SABR cube volatilities are quoted normal or lognormal (the cube's own shifts \
+                 apply to lognormal); a shifted-lognormal output convention is not supported"
+                    .to_string(),
+            ))
+        }
+    }
+}
+
+/// Evaluate checked SABR cube volatility in one output convention.
 ///
 /// # Arguments
 ///
@@ -516,21 +534,32 @@ fn cube_vol(cube: &VolCube, expiry: f64, tenor: f64, strike: f64, normal: bool) 
 /// * `expiry` - Option expiry in years within the stored expiry axis.
 /// * `tenor` - Underlying tenor in years within the stored tenor axis.
 /// * `strike` - Strike in the same decimal-rate units as the cube forwards.
+/// * `convention` - Output quote: [`VolatilityConvention::Lognormal`] (Black,
+///   shifted by the cube's own shifts where it stores them) or
+///   [`VolatilityConvention::Normal`] (absolute, decimal rate units).
 ///
 /// # Errors
 ///
-/// Returns an input error for non-finite or out-of-grid coordinates and a
-/// validation error when the interpolated SABR expansion is undefined.
-pub fn get_cube_vol(cube: &VolCube, expiry: f64, tenor: f64, strike: f64) -> Result<f64> {
+/// Returns an input error for non-finite or out-of-grid coordinates, a
+/// validation error for a shifted-lognormal `convention`, and a validation
+/// error when the interpolated SABR expansion is undefined.
+pub fn get_cube_vol(
+    cube: &VolCube,
+    expiry: f64,
+    tenor: f64,
+    strike: f64,
+    convention: VolatilityConvention,
+) -> Result<f64> {
+    let normal = normal_output(convention)?;
     segment(cube.expiries(), expiry)?;
     segment(cube.tenors(), tenor)?;
     if cube.interpolation_mode() == VolInterpolationMode::TotalVariance {
-        return cube_total_variance(cube, expiry, tenor, strike, false);
+        return cube_total_variance(cube, expiry, tenor, strike, normal);
     }
-    cube_vol(cube, expiry, tenor, strike, false)
+    cube_vol(cube, expiry, tenor, strike, normal)
 }
 
-/// Evaluate clamped lognormal SABR cube volatility.
+/// Evaluate clamped SABR cube volatility in one output convention.
 ///
 /// # Arguments
 ///
@@ -538,9 +567,21 @@ pub fn get_cube_vol(cube: &VolCube, expiry: f64, tenor: f64, strike: f64) -> Res
 /// * `expiry` - Option expiry in years; finite values are clamped to the grid.
 /// * `tenor` - Underlying tenor in years; finite values are clamped to the grid.
 /// * `strike` - Strike in the same decimal-rate units as the cube forwards.
+/// * `convention` - Output quote: [`VolatilityConvention::Lognormal`] or
+///   [`VolatilityConvention::Normal`].
 ///
-/// Non-finite inputs or an invalid SABR expansion return `NaN`.
-pub fn get_cube_vol_clamped(cube: &VolCube, expiry: f64, tenor: f64, strike: f64) -> f64 {
+/// Non-finite inputs, a shifted-lognormal `convention` or an invalid SABR
+/// expansion return `NaN`.
+pub fn get_cube_vol_clamped(
+    cube: &VolCube,
+    expiry: f64,
+    tenor: f64,
+    strike: f64,
+    convention: VolatilityConvention,
+) -> f64 {
+    let Ok(normal) = normal_output(convention) else {
+        return f64::NAN;
+    };
     if !expiry.is_finite() || !tenor.is_finite() || !strike.is_finite() {
         return f64::NAN;
     }
@@ -549,6 +590,21 @@ pub fn get_cube_vol_clamped(cube: &VolCube, expiry: f64, tenor: f64, strike: f64
         cube.expiries()[cube.expiries().len() - 1],
     );
     let tenor = tenor.clamp(cube.tenors()[0], cube.tenors()[cube.tenors().len() - 1]);
+    if normal {
+        let (params, forward, _) = cube_params(cube, expiry, tenor);
+        let shift = params.shift.unwrap_or(0.0);
+        if params.quote_convention() != VolatilityConvention::Normal
+            && (forward + shift <= 0.0 || strike + shift <= 0.0)
+        {
+            return f64::NAN;
+        }
+        let result = if cube.interpolation_mode() == VolInterpolationMode::TotalVariance {
+            cube_total_variance(cube, expiry, tenor, strike, true)
+        } else {
+            params.implied_vol_normal(forward, strike, expiry)
+        };
+        return result.unwrap_or(f64::NAN);
+    }
     let result = if cube.interpolation_mode() == VolInterpolationMode::TotalVariance {
         cube_total_variance(cube, expiry, tenor, strike, false)
     } else {
@@ -557,100 +613,29 @@ pub fn get_cube_vol_clamped(cube: &VolCube, expiry: f64, tenor: f64, strike: f64
     result.unwrap_or(f64::NAN)
 }
 
-/// Evaluate checked normal SABR cube volatility.
-///
-/// # Arguments
-///
-/// * `cube` - Structurally validated SABR parameter and forward grid.
-/// * `expiry` - Option expiry in years within the stored expiry axis.
-/// * `tenor` - Underlying tenor in years within the stored tenor axis.
-/// * `strike` - Strike in the same decimal-rate units as the cube forwards.
-///
-/// # Errors
-///
-/// Returns an input error for non-finite or out-of-grid coordinates and a
-/// validation error when the interpolated normal SABR expansion is undefined.
-pub fn get_cube_normal_vol(cube: &VolCube, expiry: f64, tenor: f64, strike: f64) -> Result<f64> {
-    segment(cube.expiries(), expiry)?;
-    segment(cube.tenors(), tenor)?;
-    if cube.interpolation_mode() == VolInterpolationMode::TotalVariance {
-        return cube_total_variance(cube, expiry, tenor, strike, true);
-    }
-    cube_vol(cube, expiry, tenor, strike, true)
-}
-
-/// Evaluate clamped normal SABR cube volatility.
-///
-/// # Arguments
-///
-/// * `cube` - Structurally validated SABR parameter and forward grid.
-/// * `expiry` - Option expiry in years; finite values are clamped to the grid.
-/// * `tenor` - Underlying tenor in years; finite values are clamped to the grid.
-/// * `strike` - Strike in the same decimal-rate units as the cube forwards.
-///
-/// Non-finite inputs or an invalid SABR expansion return `NaN`.
-pub fn get_cube_normal_vol_clamped(cube: &VolCube, expiry: f64, tenor: f64, strike: f64) -> f64 {
-    if !expiry.is_finite() || !tenor.is_finite() || !strike.is_finite() {
-        return f64::NAN;
-    }
-    let expiry = expiry.clamp(
-        cube.expiries()[0],
-        cube.expiries()[cube.expiries().len() - 1],
-    );
-    let tenor = tenor.clamp(cube.tenors()[0], cube.tenors()[cube.tenors().len() - 1]);
-    let (params, forward, _) = cube_params(cube, expiry, tenor);
-    let shift = params.shift.unwrap_or(0.0);
-    if params.quote_convention() != VolatilityConvention::Normal
-        && (forward + shift <= 0.0 || strike + shift <= 0.0)
-    {
-        return f64::NAN;
-    }
-    let result = if cube.interpolation_mode() == VolInterpolationMode::TotalVariance {
-        cube_total_variance(cube, expiry, tenor, strike, true)
-    } else {
-        params.implied_vol_normal(forward, strike, expiry)
-    };
-    result.unwrap_or(f64::NAN)
-}
-
-/// Materialize a lognormal cube tenor slice as a core surface artifact.
+/// Materialize a cube tenor slice as a core surface artifact.
 ///
 /// # Arguments
 ///
 /// * `cube` - Source SABR cube.
 /// * `tenor` - Underlying tenor in years; evaluation clamps it to the cube axis.
 /// * `strikes` - Non-empty finite strike grid in the cube forward's units.
+/// * `convention` - Output quote: [`VolatilityConvention::Lognormal`] (a Black
+///   or shifted-Black surface, by the cube's shifts) or
+///   [`VolatilityConvention::Normal`] (a normal surface).
 ///
 /// # Errors
 ///
-/// Returns an input or structural-validation error when the requested grid
-/// cannot form a valid surface artifact.
+/// Returns a validation error for a shifted-lognormal `convention`, and an
+/// input or structural-validation error when the requested grid cannot form a
+/// valid surface artifact.
 pub fn materialize_cube_tenor_slice(
     cube: &VolCube,
     tenor: f64,
     strikes: &[f64],
+    convention: VolatilityConvention,
 ) -> Result<VolSurface> {
-    materialize_cube_tenor_slice_with_convention(cube, tenor, strikes, false)
-}
-
-/// Materialize a normal cube tenor slice as a core surface artifact.
-///
-/// # Arguments
-///
-/// * `cube` - Source SABR cube.
-/// * `tenor` - Underlying tenor in years; evaluation clamps it to the cube axis.
-/// * `strikes` - Non-empty finite strike grid in the cube forward's units.
-///
-/// # Errors
-///
-/// Returns an input or structural-validation error when the requested grid
-/// cannot form a valid normal-volatility surface artifact.
-pub fn materialize_cube_tenor_slice_normal(
-    cube: &VolCube,
-    tenor: f64,
-    strikes: &[f64],
-) -> Result<VolSurface> {
-    materialize_cube_tenor_slice_with_convention(cube, tenor, strikes, true)
+    materialize_cube_tenor_slice_with_convention(cube, tenor, strikes, normal_output(convention)?)
 }
 
 fn materialize_cube_tenor_slice_with_convention(
@@ -667,11 +652,17 @@ fn materialize_cube_tenor_slice_with_convention(
     let mut values = Vec::with_capacity(cube.expiries().len() * strikes.len());
     for &expiry in cube.expiries() {
         for &strike in strikes {
-            values.push(if normal {
-                get_cube_normal_vol_clamped(cube, expiry, tenor, strike)
-            } else {
-                get_cube_vol_clamped(cube, expiry, tenor, strike)
-            });
+            values.push(get_cube_vol_clamped(
+                cube,
+                expiry,
+                tenor,
+                strike,
+                if normal {
+                    VolatilityConvention::Normal
+                } else {
+                    VolatilityConvention::Lognormal
+                },
+            ));
         }
     }
     let interpolation_mode = cube.interpolation_mode();
@@ -719,44 +710,28 @@ fn materialize_cube_tenor_slice_with_convention(
     )
 }
 
-/// Materialize lognormal quotes on tenor and strike axes at one fixed expiry.
+/// Materialize quotes on tenor and strike axes at one fixed expiry.
 ///
 /// # Arguments
 ///
 /// * `cube` - Source SABR cube.
 /// * `expiry` - Option expiry in years; evaluation clamps it to the cube axis.
 /// * `strikes` - Non-empty finite strike grid in the cube forward's units.
+/// * `convention` - Output quote: [`VolatilityConvention::Lognormal`] or
+///   [`VolatilityConvention::Normal`].
 ///
 /// # Errors
 ///
-/// Returns an input or structural-validation error when the requested grid
-/// cannot form a valid tenor-axis surface artifact.
+/// Returns a validation error for a shifted-lognormal `convention`, and an
+/// input or structural-validation error when the requested grid cannot form a
+/// valid tenor-axis surface artifact.
 pub fn materialize_cube_expiry_slice(
     cube: &VolCube,
     expiry: f64,
     strikes: &[f64],
+    convention: VolatilityConvention,
 ) -> Result<VolCubeExpirySlice> {
-    materialize_cube_expiry_slice_with_convention(cube, expiry, strikes, false)
-}
-
-/// Materialize normal quotes on tenor and strike axes at one fixed expiry.
-///
-/// # Arguments
-///
-/// * `cube` - Source SABR cube.
-/// * `expiry` - Option expiry in years; evaluation clamps it to the cube axis.
-/// * `strikes` - Non-empty finite strike grid in the cube forward's units.
-///
-/// # Errors
-///
-/// Returns an input or structural-validation error when the requested grid
-/// cannot form a valid normal-volatility tenor-axis surface artifact.
-pub fn materialize_cube_expiry_slice_normal(
-    cube: &VolCube,
-    expiry: f64,
-    strikes: &[f64],
-) -> Result<VolCubeExpirySlice> {
-    materialize_cube_expiry_slice_with_convention(cube, expiry, strikes, true)
+    materialize_cube_expiry_slice_with_convention(cube, expiry, strikes, normal_output(convention)?)
 }
 
 fn materialize_cube_expiry_slice_with_convention(
@@ -777,11 +752,17 @@ fn materialize_cube_expiry_slice_with_convention(
     let mut values = Vec::with_capacity(cube.tenors().len() * strikes.len());
     for &tenor in cube.tenors() {
         for &strike in strikes {
-            values.push(if normal {
-                get_cube_normal_vol_clamped(cube, expiry, tenor, strike)
-            } else {
-                get_cube_vol_clamped(cube, expiry, tenor, strike)
-            });
+            values.push(get_cube_vol_clamped(
+                cube,
+                expiry,
+                tenor,
+                strike,
+                if normal {
+                    VolatilityConvention::Normal
+                } else {
+                    VolatilityConvention::Lognormal
+                },
+            ));
         }
     }
     let shifts: Vec<Option<f64>> = cube

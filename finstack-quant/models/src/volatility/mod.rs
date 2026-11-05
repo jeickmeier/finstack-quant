@@ -83,10 +83,9 @@ pub mod variance_replication;
 pub use convert::{VolatilityConvention, convert_atm_volatility};
 pub use implied::{implied_vol_bachelier, implied_vol_black};
 pub use source::{
-    VolSource, get_cube_expiry_slice_vol, get_cube_expiry_slice_vol_clamped, get_cube_normal_vol,
-    get_cube_normal_vol_clamped, get_cube_vol, get_cube_vol_clamped, get_surface_vol,
-    get_surface_vol_clamped, materialize_cube_expiry_slice, materialize_cube_expiry_slice_normal,
-    materialize_cube_tenor_slice, materialize_cube_tenor_slice_normal, measure_vol_surface_shift,
+    VolSource, get_cube_expiry_slice_vol, get_cube_expiry_slice_vol_clamped, get_cube_vol,
+    get_cube_vol_clamped, get_surface_vol, get_surface_vol_clamped, materialize_cube_expiry_slice,
+    materialize_cube_tenor_slice, measure_vol_surface_shift,
 };
 
 pub use fx::{

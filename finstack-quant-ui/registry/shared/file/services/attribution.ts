@@ -1,4 +1,5 @@
 import type { attribution } from "finstack-quant-wasm";
+import { serializeHost } from "@/lib/finstack/codec.mjs";
 import type { AttributionApi } from "../finstack-contract";
 import type { ServiceContext } from "./context";
 /** attribution facade members this slice reads. */
@@ -21,9 +22,10 @@ export function createAttributionService(
   return {
     attributePnlMany(request) {
       return context.result(() => {
-        // Canonical market texts are spliced into AttributionInputs, never parsed;
-        // every option beyond the method stays unset so Rust applies its defaults.
-        const inputs = `{"as_of_t0":${JSON.stringify(request.asOfT0)},"as_of_t1":${JSON.stringify(request.asOfT1)},"market_t0":${context.market(request.marketT0Json).json},"market_t1":${context.market(request.marketT1Json).json},"method":${JSON.stringify(request.method)}}`;
+        // Canonical market texts are spliced into the Rust AttributionInputs,
+        // never parsed; every other field passes through unchanged.
+        const fields = serializeHost(request.inputs).slice(1);
+        const inputs = `{"market_t0":${context.market(request.marketT0Json).json},"market_t1":${context.market(request.marketT1Json).json}${fields === "}" ? "" : ","}${fields}`;
         // finstack-compose: Rust's own text, check and shares per returned attribution
         return api
           .attributePnlMany(inputs, [...request.instrumentJsons])

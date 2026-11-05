@@ -707,6 +707,43 @@ export type IdiosyncraticVolModel =
       };
     };
 /**
+ * Zone classification across all scoring models.
+ *
+ * Represents the risk category derived from a model's score:
+ * - `Safe`: low bankruptcy probability.
+ * - `Grey`: ambiguous / requires further analysis.
+ * - `Distress`: high bankruptcy probability.
+ */
+export type ScoringZone = "safe" | "grey" | "distress";
+/**
+ * One scoring model and its input ratios.
+ */
+export type CreditScoreRequest =
+  | {
+      input: AltmanZScoreInput;
+      model: "altman_z_score";
+    }
+  | {
+      input: AltmanZPrimeInput;
+      model: "altman_z_prime";
+    }
+  | {
+      input: AltmanZDoublePrimeInput;
+      model: "altman_z_double_prime";
+    }
+  | {
+      input: AltmanZDoublePrimeInput;
+      model: "altman_em_score";
+    }
+  | {
+      input: OhlsonOScoreInput;
+      model: "ohlson_o_score";
+    }
+  | {
+      input: ZmijewskiInput;
+      model: "zmijewski_score";
+    };
+/**
  * Which credit metric drives the toggle decision.
  */
 export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "leverage";
@@ -985,8 +1022,8 @@ export type LiquidityTier = "tier1" | "tier2" | "tier3" | "tier4" | "tier5";
 /**
  * Structure of a liability management exercise.
  *
- * Each variant reinterprets the `repurchase_price_pct` argument of
- * [`analyze_lme`]; see that function's documentation for the per-variant
+ * Each variant reinterprets the `repurchase_price_pct` field of
+ * [`LmeTerms`]; see that function's documentation for the per-variant
  * meaning and admissible range.
  */
 export type LmeType = "open_market_repurchase" | "tender_offer" | "amend_and_extend" | "dropdown";
@@ -1145,6 +1182,151 @@ export type NonFiniteF64Wire = number | NonFiniteSentinel;
  * Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.
  */
 export type NonFiniteSentinel = "inf" | "-inf" | "nan";
+/**
+ * A closed-form model and the option terms it reads.
+ */
+export type OptionModel =
+  | {
+      /**
+       * Continuously compounded dividend yield or foreign rate as a decimal.
+       */
+      div_yield: number;
+      /**
+       * Time to expiry in years.
+       */
+      expiry: number;
+      /**
+       * `true` for a call, `false` for a put.
+       */
+      is_call: boolean;
+      kind: "black_scholes";
+      /**
+       * Continuously compounded domestic risk-free rate as a decimal.
+       */
+      rate: number;
+      /**
+       * Underlying spot price, positive.
+       */
+      spot: number;
+      /**
+       * Exercise price in the same units as `spot`, positive.
+       */
+      strike: number;
+      /**
+       * Theta denominator in days per year; omitted uses
+       * [`DEFAULT_THETA_DAYS_PER_YEAR`].
+       */
+      theta_days_per_year?: number | null;
+    }
+  | {
+      /**
+       * Discount factor from valuation to payment, positive.
+       */
+      df: number;
+      /**
+       * Time to expiry in years.
+       */
+      expiry: number;
+      /**
+       * Forward price or rate at expiry, positive.
+       */
+      forward: number;
+      /**
+       * `true` for a call, `false` for a put.
+       */
+      is_call: boolean;
+      kind: "black76";
+      /**
+       * Exercise price in the forward's units, positive.
+       */
+      strike: number;
+    }
+  | {
+      /**
+       * Time to expiry in years.
+       */
+      expiry: number;
+      /**
+       * Forward price or rate at expiry; any sign.
+       */
+      forward: number;
+      /**
+       * `true` for a call, `false` for a put.
+       */
+      is_call: boolean;
+      kind: "bachelier";
+      /**
+       * Exercise price in the forward's units; any sign.
+       */
+      strike: number;
+    };
+/**
+ * What the calculation solves for.
+ */
+export type OptionSolve =
+  | {
+      kind: "price";
+      /**
+       * Annualized volatility: a decimal Black vol for Black-Scholes and
+       * Black-76, an absolute normal vol in the forward's units for
+       * Bachelier.
+       */
+      vol: number;
+    }
+  | {
+      kind: "implied_vol";
+      /**
+       * Option price per unit in the model's convention: discounted for
+       * Black-Scholes and Black-76, undiscounted for Bachelier.
+       */
+      price: number;
+    };
+/**
+ * Greeks of the calculated option, by model family.
+ */
+export type OptionGreeks =
+  | {
+      /**
+       * Delta sensitivity per unit.
+       */
+      delta: number;
+      /**
+       * Gamma sensitivity per unit.
+       */
+      gamma: number;
+      kind: "black_scholes";
+      /**
+       * Rho to the foreign/dividend yield per 1%.
+       */
+      rho_q: number;
+      /**
+       * Rho to the domestic/risk-free rate per 1%.
+       */
+      rho_r: number;
+      /**
+       * Theta per day (scaled by provided day-count basis).
+       */
+      theta: number;
+      /**
+       * Vega per 1% volatility move.
+       */
+      vega: number;
+    }
+  | {
+      /**
+       * Sensitivity of the undiscounted premium to the forward (`dV/dF`).
+       */
+      delta: number;
+      /**
+       * Second derivative of the undiscounted premium to the forward (`d2V/dF2`).
+       */
+      gamma: number;
+      kind: "forward";
+      /**
+       * Sensitivity of the undiscounted premium to a unit (1.0) change in vol.
+       */
+      vega: number;
+    };
 /**
  * Option payoff direction used by analytical and numerical model engines.
  */
@@ -1518,6 +1700,36 @@ export type ResidualContributionSource =
       [k: string]: unknown;
     };
 /**
+ * Where a position VaR/ES decomposition comes from.
+ */
+export type PositionRiskSource =
+  | {
+      /**
+       * Also compute leave-one-out incremental VaR (one repricing per
+       * position); omitted is `false`.
+       */
+      compute_incremental?: boolean;
+      /**
+       * Position-return covariance: `n x n` rows in position order,
+       * symmetric positive semidefinite.
+       */
+      covariance: number[][];
+      kind: "parametric";
+      /**
+       * Position weights or exposures in portfolio currency, one per
+       * position id.
+       */
+      weights: number[];
+    }
+  | {
+      kind: "historical";
+      /**
+       * Position-major scenario P&L: one row per position, one column per
+       * scenario, losses negative.
+       */
+      pnls: number[][];
+    };
+/**
  * Finite JSON number that is strictly greater than zero.
  *
  * This type is used by serde field adapters so runtime deserialization and
@@ -1591,15 +1803,6 @@ export type RecoverySpec =
       recovery_volatility: number;
       type: "market_correlated";
     };
-/**
- * Zone classification across all scoring models.
- *
- * Represents the risk category derived from a model's score:
- * - `Safe`: low bankruptcy probability.
- * - `Grey`: ambiguous / requires further analysis.
- * - `Distress`: high bankruptcy probability.
- */
-export type ScoringZone = "safe" | "grey" | "distress";
 /**
  * Debt seniority classification for recovery rate modeling.
  *
@@ -1924,7 +2127,6 @@ export interface AltmanZDoublePrimeInput {
    * X1: Working Capital / Total Assets.
    */
   working_capital_to_total_assets: number;
-  [k: string]: unknown;
 }
 /**
  * Input ratios for the Altman Z'-Score (private firms).
@@ -1950,7 +2152,6 @@ export interface AltmanZPrimeInput {
    * X1: Working Capital / Total Assets.
    */
   working_capital_to_total_assets: number;
-  [k: string]: unknown;
 }
 /**
  * Input ratios for the original Altman Z-Score (1968).
@@ -1976,7 +2177,6 @@ export interface AltmanZScoreInput {
    * X1: Working Capital / Total Assets.
    */
   working_capital_to_total_assets: number;
-  [k: string]: unknown;
 }
 /**
  * Configuration for the arbitrage detection suite.
@@ -3260,6 +3460,173 @@ export interface VolState {
   [k: string]: unknown;
 }
 /**
+ * A scoring model's result and the default master-scale grade of its implied PD.
+ */
+export interface CreditScoreReport {
+  /**
+   * Default-calibration master-scale grade of `result.implied_pd`; `None`
+   * when the model has no native implied PD (the Altman family).
+   */
+  grade?: MasterScaleResult | null;
+  /**
+   * The scoring model's result.
+   */
+  result: ScoringResult;
+}
+/**
+ * Result of mapping a PD to a master scale grade.
+ */
+export interface MasterScaleResult {
+  /**
+   * The central PD for the assigned grade.
+   */
+  central_pd: number;
+  /**
+   * The assigned rating grade label.
+   */
+  grade: string;
+  /**
+   * Index of the grade in the scale (0 = best).
+   */
+  grade_index: number;
+  /**
+   * The input PD that was mapped.
+   */
+  input_pd: number;
+  [k: string]: unknown;
+}
+/**
+ * Result from any academic scoring model.
+ *
+ * Provides a uniform interface across Altman Z-Score, Ohlson O-Score,
+ * and Zmijewski probit models. The `score` field contains the raw
+ * discriminant or regression output, `zone` classifies credit risk,
+ * and `implied_pd` contains a probability only when the model has a native
+ * probability transform or an explicit calibration was requested.
+ */
+export interface ScoringResult {
+  /**
+   * Optional implied probability of default.
+   *
+   * Altman score results leave this as `None` unless an explicit,
+   * versioned heuristic calibration is requested. Ohlson and Zmijewski
+   * retain their native logistic and probit probabilities.
+   */
+  implied_pd?: number | null;
+  /**
+   * Name of the model that produced this result.
+   */
+  model: string;
+  /**
+   * The raw score value (Z, Z', Z'', O, or Zmijewski Y).
+   */
+  score: number;
+  /**
+   * Risk zone classification (Safe/Grey/Distress).
+   */
+  zone: ScoringZone;
+  [k: string]: unknown;
+}
+/**
+ * Input for the Ohlson O-Score logistic model (1980).
+ *
+ * Nine predictors capturing size, leverage, performance, and liquidity.
+ *
+ * # References
+ *
+ * Ohlson, J. A. (1980). "Financial Ratios and the Probabilistic Prediction
+ * of Bankruptcy." *Journal of Accounting Research*, 18(1), 109-131. `docs/REFERENCES.md#ohlson-1980`
+ */
+export interface OhlsonOScoreInput {
+  /**
+   * Current Liabilities / Current Assets.
+   */
+  current_liabilities_to_current_assets: number;
+  /**
+   * Funds from Operations / Total Liabilities.
+   */
+  funds_from_operations_to_total_liabilities: number;
+  /**
+   * 1 if Total Liabilities > Total Assets, else 0.
+   */
+  liabilities_exceed_assets: number;
+  /**
+   * Ohlson's SIZE variable: `ln(Total Assets / GNP price-level index)`.
+   *
+   * The published coefficient `-0.407` is calibrated to this specific
+   * scale using the US GNP deflator with Ohlson's 1970s base period
+   * (Ohlson 1980, Table 4). The deflator normalises for inflation so
+   * firms are compared on a constant-dollar basis.
+   *
+   * # Unit sensitivity (IMPORTANT)
+   *
+   * Because the coefficient is calibrated to Ohlson's specific scale,
+   * substituting a different unit shifts the score by a constant and
+   * therefore shifts every implied PD and every zone boundary. For
+   * example, `ln(total_assets_millions)` differs from Ohlson's SIZE
+   * by `+ ln(10^6 / GNP_deflator_1970s)`, which multiplied by
+   * `-0.407` shifts the O-score by roughly `-2.8` - i.e. every firm
+   * looks ~60%+ "safer" than it should.
+   *
+   * Recommended inputs, in order of fidelity:
+   * 1. `ln(total_assets_nominal_USD / GNP_deflator)` using a deflator
+   *    with an explicit base period close to 1968-70. This reproduces
+   *    Ohlson's original scale.
+   * 2. `ln(total_assets_deflated_to_Ohlson_base_USD)` if you have
+   *    pre-deflated real dollars.
+   * 3. Any other rescaling, together with a re-estimated intercept and
+   *    re-calibrated zone thresholds on your own sample.
+   *
+   * Do **not** feed raw `ln(total_assets_millions)` or
+   * `ln(total_assets_billions)` unless you have re-estimated the model
+   * - the out-of-the-box thresholds will mis-rank.
+   */
+  log_total_assets_adjusted: number;
+  /**
+   * 1 if net income was negative for the last two years, else 0.
+   */
+  negative_net_income_two_years: number;
+  /**
+   * (NI_t - NI_{t-1}) / (|NI_t| + |NI_{t-1}|) -- change in net income.
+   */
+  net_income_change: number;
+  /**
+   * Net Income / Total Assets (ROA).
+   */
+  net_income_to_total_assets: number;
+  /**
+   * Total Liabilities / Total Assets.
+   */
+  total_liabilities_to_total_assets: number;
+  /**
+   * Working Capital / Total Assets.
+   */
+  working_capital_to_total_assets: number;
+}
+/**
+ * Input for the Zmijewski (1984) probit bankruptcy prediction model.
+ *
+ * # References
+ *
+ * Zmijewski, M. E. (1984). "Methodological Issues Related to the Estimation
+ * of Financial Distress Prediction Models." *Journal of Accounting Research*,
+ * 22, 59-82. `docs/REFERENCES.md#zmijewski-1984`
+ */
+export interface ZmijewskiInput {
+  /**
+   * Current Assets / Current Liabilities (current ratio / liquidity).
+   */
+  current_assets_to_current_liabilities: number;
+  /**
+   * Net Income / Total Assets (ROA).
+   */
+  net_income_to_total_assets: number;
+  /**
+   * Total Liabilities / Total Assets (leverage / financial leverage ratio).
+   */
+  total_liabilities_to_total_assets: number;
+}
+/**
  * Observable credit state at a point in time.
  */
 export interface CreditState {
@@ -3475,6 +3842,35 @@ export interface Estimate {
    * Standard error of the discounted mean.
    */
   stderr: number;
+}
+/**
+ * Terms of a distressed exchange offer, from the creditor's side.
+ */
+export interface ExchangeOffer {
+  /**
+   * Cash consent or early-tender fee paid to participating holders;
+   * non-negative.
+   */
+  consent_fee: number;
+  /**
+   * Estimated value of equity or warrants attached to the new instrument;
+   * non-negative.
+   */
+  equity_sweetener_value: number;
+  /**
+   * Structure of the offer, echoed onto the result.
+   */
+  exchange_type: ExchangeType;
+  /**
+   * Present value of the new instrument received on tendering;
+   * non-negative.
+   */
+  new_pv: number;
+  /**
+   * Present value of the existing claim if it is not tendered;
+   * non-negative.
+   */
+  old_pv: number;
 }
 /**
  * Hold-versus-tender economics of a distressed exchange offer.
@@ -3996,6 +4392,33 @@ export interface LmeAnalysis {
   [k: string]: unknown;
 }
 /**
+ * Terms of a liability management exercise, from the issuer's side.
+ */
+export interface LmeTerms {
+  /**
+   * Optional EBITDA in the same unit as `notional`; a positive value
+   * produces the leverage-impact block.
+   */
+  ebitda?: number | null;
+  /**
+   * Structure of the exercise, which selects how `repurchase_price_pct` is
+   * interpreted (see [`analyze_lme`]).
+   */
+  lme_type: LmeType;
+  /**
+   * Outstanding face amount of the target instrument; strictly positive.
+   */
+  notional: number;
+  /**
+   * Fraction of holders participating, in `[0, 1]`.
+   */
+  opt_acceptance_pct: number;
+  /**
+   * Price, extension fee, or transferred-asset fraction, by `lme_type`.
+   */
+  repurchase_price_pct: number;
+}
+/**
  * Parameters for the LMM/BGM model.
  */
 export interface LmmParams {
@@ -4240,28 +4663,6 @@ export interface MasterScaleGrade {
    * exactly on the boundary maps to the better grade.
    */
   upper_pd: number;
-  [k: string]: unknown;
-}
-/**
- * Result of mapping a PD to a master scale grade.
- */
-export interface MasterScaleResult {
-  /**
-   * The central PD for the assigned grade.
-   */
-  central_pd: number;
-  /**
-   * The assigned rating grade label.
-   */
-  grade: string;
-  /**
-   * Index of the grade in the scale (0 = best).
-   */
-  grade_index: number;
-  /**
-   * The input PD that was mapped.
-   */
-  input_pd: number;
   [k: string]: unknown;
 }
 /**
@@ -4637,76 +5038,6 @@ export interface MultiOuParams {
   thetas: number[];
 }
 /**
- * Input for the Ohlson O-Score logistic model (1980).
- */
-export interface OhlsonOScoreInput {
-  /**
-   * Current Liabilities / Current Assets.
-   */
-  current_liabilities_to_current_assets: number;
-  /**
-   * Funds from Operations / Total Liabilities.
-   */
-  funds_from_operations_to_total_liabilities: number;
-  /**
-   * 1 if Total Liabilities > Total Assets, else 0.
-   */
-  liabilities_exceed_assets: number;
-  /**
-   * Ohlson's SIZE variable: `ln(Total Assets / GNP price-level index)`.
-   *
-   * The published coefficient `-0.407` is calibrated to this specific
-   * scale using the US GNP deflator with Ohlson's 1970s base period
-   * (Ohlson 1980, Table 4). The deflator normalises for inflation so
-   * firms are compared on a constant-dollar basis.
-   *
-   * # Unit sensitivity (IMPORTANT)
-   *
-   * Because the coefficient is calibrated to Ohlson's specific scale,
-   * substituting a different unit shifts the score by a constant and
-   * therefore shifts every implied PD and every zone boundary. For
-   * example, `ln(total_assets_millions)` differs from Ohlson's SIZE
-   * by `+ ln(10^6 / GNP_deflator_1970s)`, which multiplied by
-   * `-0.407` shifts the O-score by roughly `-2.8` - i.e. every firm
-   * looks ~60%+ "safer" than it should.
-   *
-   * Recommended inputs, in order of fidelity:
-   * 1. `ln(total_assets_nominal_USD / GNP_deflator)` using a deflator
-   *    with an explicit base period close to 1968-70. This reproduces
-   *    Ohlson's original scale.
-   * 2. `ln(total_assets_deflated_to_Ohlson_base_USD)` if you have
-   *    pre-deflated real dollars.
-   * 3. Any other rescaling, together with a re-estimated intercept and
-   *    re-calibrated zone thresholds on your own sample.
-   *
-   * Do **not** feed raw `ln(total_assets_millions)` or
-   * `ln(total_assets_billions)` unless you have re-estimated the model
-   * - the out-of-the-box thresholds will mis-rank.
-   */
-  log_total_assets_adjusted: number;
-  /**
-   * 1 if net income was negative for the last two years, else 0.
-   */
-  negative_net_income_two_years: number;
-  /**
-   * (NI_t - NI_{t-1}) / (|NI_t| + |NI_{t-1}|) -- change in net income.
-   */
-  net_income_change: number;
-  /**
-   * Net Income / Total Assets (ROA).
-   */
-  net_income_to_total_assets: number;
-  /**
-   * Total Liabilities / Total Assets.
-   */
-  total_liabilities_to_total_assets: number;
-  /**
-   * Working Capital / Total Assets.
-   */
-  working_capital_to_total_assets: number;
-  [k: string]: unknown;
-}
-/**
  * Optimal toggle configuration using nested Monte Carlo simulation.
  *
  * At each coupon date the toggle runs a small nested MC to estimate the
@@ -4740,6 +5071,38 @@ export interface OptimalToggle {
    * Risk-free rate (continuous) used as drift in the nested simulation.
    */
   risk_free_rate: number;
+}
+/**
+ * One closed-form option calculation: a model with its terms and a price or implied-volatility solve.
+ */
+export interface OptionCalculation {
+  /**
+   * Closed-form model and option terms.
+   */
+  model: OptionModel;
+  /**
+   * Price at a volatility, or implied volatility of a price.
+   */
+  solve: OptionSolve;
+}
+/**
+ * Price, volatility and Greeks of one closed-form option calculation.
+ */
+export interface OptionCalculationResult {
+  /**
+   * Greeks at `implied_vol`.
+   */
+  greeks: OptionGreeks;
+  /**
+   * Volatility the price and Greeks are at: the supplied vol for a price
+   * solve, the solved implied volatility otherwise.
+   */
+  implied_vol: number;
+  /**
+   * Option price per unit: computed for a price solve, the supplied price
+   * for an implied-volatility solve.
+   */
+  price: number;
 }
 /**
  * Complete, serializable description of one path simulation.
@@ -5034,6 +5397,21 @@ export interface PositionResidualContribution {
   [k: string]: unknown;
 }
 /**
+ * Target shares of portfolio VaR checked against the decomposition.
+ */
+export interface PositionRiskBudget {
+  /**
+   * Target fraction of portfolio VaR per position, in `[0, 1]` and summing
+   * to ~1.0, in position order.
+   */
+  targets: number[];
+  /**
+   * Actual-to-target ratio above which a breach is flagged; omitted uses
+   * [`super::DEFAULT_UTILIZATION_THRESHOLD`].
+   */
+  utilization_threshold?: number | null;
+}
+/**
  * Complete position-level risk decomposition of a portfolio.
  */
 export interface PositionRiskDecomposition {
@@ -5145,6 +5523,155 @@ export interface PositionVarContribution {
    */
   relative_var: number;
   [k: string]: unknown;
+}
+/**
+ * Position VaR/ES decomposition with its optional risk budget and tail stress attribution.
+ */
+export interface PositionRiskReport {
+  /**
+   * Budget evaluation of the decomposition; `None` without a budget.
+   */
+  budget?: RiskBudgetResult | null;
+  /**
+   * Portfolio and per-position VaR/ES (losses negative).
+   */
+  decomposition: PositionRiskDecomposition;
+  /**
+   * Tail stress attribution of a historical source's P&L; `None` for a
+   * parametric source.
+   */
+  stress?: StressAttribution | null;
+  [k: string]: unknown;
+}
+/**
+ * Result of comparing actual risk decomposition against a risk budget.
+ *
+ * Utilization is measured on the *consuming* side: a position's component
+ * VaR is positive utilization when it carries the same sign as the portfolio
+ * VaR (it consumes risk) and negative utilization when it offsets portfolio
+ * risk (a diversifier / hedge). Diversifiers can never breach the budget and
+ * never contribute to [`Self::total_overbudget`].
+ */
+export interface RiskBudgetResult {
+  /**
+   * Whether any position exceeds its utilization threshold.
+   */
+  has_breach: boolean;
+  /**
+   * Per-position budget comparison.
+   */
+  positions: PositionBudgetEntry[];
+  /**
+   * Total over-budget amount: sum of positive consuming-side exceedances.
+   */
+  total_overbudget: number;
+  [k: string]: unknown;
+}
+/**
+ * Per-position attribution of portfolio losses in tail scenarios.
+ *
+ * For each scenario that breaches the VaR threshold, reports which
+ * positions contributed the most to the portfolio loss.
+ */
+export interface StressAttribution {
+  /**
+   * Number of tail scenarios analyzed.
+   */
+  n_tail_scenarios: number;
+  /**
+   * Per-position average contribution to tail losses.
+   *
+   * Sorted by absolute contribution (largest risk driver first).
+   */
+  position_contributions: StressPositionEntry[];
+  /**
+   * Canonical position ordering shared by every [`tail_scenarios`] entry.
+   *
+   * `tail_scenarios[k].position_pnls[i]` is the P&L for `position_ids[i]`.
+   * Storing the id list once here (rather than re-attaching it to every tail
+   * scenario) avoids duplicating it `n_tail_scenarios` times.
+   *
+   * [`tail_scenarios`]: Self::tail_scenarios
+   */
+  position_ids: string[];
+  /**
+   * Individual tail scenario breakdowns.
+   *
+   * Contains `n_tail_scenarios` entries, each with per-position P&L
+   * index-aligned to [`position_ids`](Self::position_ids).
+   * Sorted by portfolio loss (worst first).
+   */
+  tail_scenarios: TailScenarioBreakdown[];
+  /**
+   * Portfolio VaR threshold (scenarios with P&L at or below this are
+   * "tail events"). Loss convention: reported as a negative number.
+   */
+  var_threshold: number;
+  [k: string]: unknown;
+}
+/**
+ * Single position's contribution to tail stress.
+ */
+export interface StressPositionEntry {
+  /**
+   * Average P&L contribution in tail scenarios.
+   */
+  avg_tail_pnl: number;
+  /**
+   * Fraction of total portfolio tail loss attributable to this position.
+   */
+  pct_of_tail_loss: number;
+  /**
+   * Position identifier.
+   */
+  position_id: string;
+  /**
+   * Worst single-scenario P&L for this position.
+   */
+  worst_scenario_pnl: number;
+  [k: string]: unknown;
+}
+/**
+ * Breakdown of a single tail scenario.
+ */
+export interface TailScenarioBreakdown {
+  /**
+   * Total portfolio P&L for this scenario.
+   */
+  portfolio_pnl: number;
+  /**
+   * Per-position P&L contributions, index-aligned to
+   * [`StressAttribution::position_ids`]. Entry `i` is the P&L for
+   * `StressAttribution::position_ids[i]`.
+   */
+  position_pnls: number[];
+  /**
+   * Scenario index in the original history.
+   */
+  scenario_index: number;
+  [k: string]: unknown;
+}
+/**
+ * One position risk report request: position ids, confidence, a parametric or historical source and an optional budget.
+ */
+export interface PositionRiskRequest {
+  /**
+   * Risk budget to evaluate against the decomposition; omitted skips it.
+   */
+  budget?: PositionRiskBudget | null;
+  /**
+   * Tail confidence as a decimal strictly inside `(0.5, 1)`; omitted is
+   * `0.95`.
+   */
+  confidence?: number | null;
+  /**
+   * Position identifiers, in the order of the source's rows.
+   */
+  position_ids: string[];
+  /**
+   * Parametric covariance or historical scenario P&L.
+   */
+  source: PositionRiskSource;
 }
 /**
  * Rating factor table for a specific rating-agency methodology.
@@ -5279,24 +5806,6 @@ export interface RecoveryWaterfallResult {
    * Estate value remaining after all allowed claims are satisfied.
    */
   undistributed_estate: number;
-  [k: string]: unknown;
-}
-/**
- * Result of comparing actual risk decomposition against a risk budget.
- */
-export interface RiskBudgetResult {
-  /**
-   * Whether any position exceeds its utilization threshold.
-   */
-  has_breach: boolean;
-  /**
-   * Per-position budget comparison.
-   */
-  positions: PositionBudgetEntry[];
-  /**
-   * Total over-budget amount: sum of positive consuming-side exceedances.
-   */
-  total_overbudget: number;
   [k: string]: unknown;
 }
 /**
@@ -5529,32 +6038,6 @@ export interface SchwartzSmithParams {
   sigma_y: number;
 }
 /**
- * Result from any academic scoring model.
- */
-export interface ScoringResult {
-  /**
-   * Optional implied probability of default.
-   *
-   * Altman score results leave this as `None` unless an explicit,
-   * versioned heuristic calibration is requested. Ohlson and Zmijewski
-   * retain their native logistic and probit probabilities.
-   */
-  implied_pd?: number | null;
-  /**
-   * Name of the model that produced this result.
-   */
-  model: string;
-  /**
-   * The raw score value (Z, Z', Z'', O, or Zmijewski Y).
-   */
-  score: number;
-  /**
-   * Risk zone classification (Safe/Grey/Distress).
-   */
-  zone: ScoringZone;
-  [k: string]: unknown;
-}
-/**
  * Historical recovery calibration by seniority class.
  */
 export interface SeniorityCalibration {
@@ -5593,87 +6076,6 @@ export interface StochasticToggle {
    * Credit metric to observe.
    */
   state_variable: CreditStateVariable;
-  [k: string]: unknown;
-}
-/**
- * Per-position attribution of portfolio losses in tail scenarios.
- */
-export interface StressAttribution {
-  /**
-   * Number of tail scenarios analyzed.
-   */
-  n_tail_scenarios: number;
-  /**
-   * Per-position average contribution to tail losses.
-   *
-   * Sorted by absolute contribution (largest risk driver first).
-   */
-  position_contributions: StressPositionEntry[];
-  /**
-   * Canonical position ordering shared by every [`tail_scenarios`] entry.
-   *
-   * `tail_scenarios[k].position_pnls[i]` is the P&L for `position_ids[i]`.
-   * Storing the id list once here (rather than re-attaching it to every tail
-   * scenario) avoids duplicating it `n_tail_scenarios` times.
-   *
-   * [`tail_scenarios`]: Self::tail_scenarios
-   */
-  position_ids: string[];
-  /**
-   * Individual tail scenario breakdowns.
-   *
-   * Contains `n_tail_scenarios` entries, each with per-position P&L
-   * index-aligned to [`position_ids`](Self::position_ids).
-   * Sorted by portfolio loss (worst first).
-   */
-  tail_scenarios: TailScenarioBreakdown[];
-  /**
-   * Portfolio VaR threshold (scenarios with P&L at or below this are
-   * "tail events"). Loss convention: reported as a negative number.
-   */
-  var_threshold: number;
-  [k: string]: unknown;
-}
-/**
- * Single position's contribution to tail stress.
- */
-export interface StressPositionEntry {
-  /**
-   * Average P&L contribution in tail scenarios.
-   */
-  avg_tail_pnl: number;
-  /**
-   * Fraction of total portfolio tail loss attributable to this position.
-   */
-  pct_of_tail_loss: number;
-  /**
-   * Position identifier.
-   */
-  position_id: string;
-  /**
-   * Worst single-scenario P&L for this position.
-   */
-  worst_scenario_pnl: number;
-  [k: string]: unknown;
-}
-/**
- * Breakdown of a single tail scenario.
- */
-export interface TailScenarioBreakdown {
-  /**
-   * Total portfolio P&L for this scenario.
-   */
-  portfolio_pnl: number;
-  /**
-   * Per-position P&L contributions, index-aligned to
-   * [`StressAttribution::position_ids`]. Entry `i` is the P&L for
-   * `StressAttribution::position_ids[i]`.
-   */
-  position_pnls: number[];
-  /**
-   * Scenario index in the original history.
-   */
-  scenario_index: number;
   [k: string]: unknown;
 }
 /**
@@ -6031,23 +6433,5 @@ export interface YieldPcaView {
    * Tenor grid in years, in loading-row order.
    */
   tenors: number[];
-  [k: string]: unknown;
-}
-/**
- * Input for the Zmijewski (1984) probit bankruptcy prediction model.
- */
-export interface ZmijewskiInput {
-  /**
-   * Current Assets / Current Liabilities (current ratio / liquidity).
-   */
-  current_assets_to_current_liabilities: number;
-  /**
-   * Net Income / Total Assets (ROA).
-   */
-  net_income_to_total_assets: number;
-  /**
-   * Total Liabilities / Total Assets (leverage / financial leverage ratio).
-   */
-  total_liabilities_to_total_assets: number;
   [k: string]: unknown;
 }

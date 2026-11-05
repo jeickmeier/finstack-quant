@@ -73,6 +73,15 @@
       "type_name": "Performance"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/performance_panel.schema.json",
+      "bytes": 4217,
+      "kind": "input",
+      "path": "schemas/analytics/1/performance_panel.schema.json",
+      "summary": "Dated price or return panel, one series per ticker, that a Performance is built from.",
+      "title": "PerformancePanel",
+      "type_name": "PerformancePanel"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/period_stats.schema.json",
       "bytes": 3996,
       "kind": "output",

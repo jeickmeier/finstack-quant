@@ -5,6 +5,7 @@ export const scoring = {
   altmanZPrime: wasm.altmanZPrime,
   altmanZDoublePrime: wasm.altmanZDoublePrime,
   altmanEmScore: wasm.altmanEmScore,
+  creditScoreReport: wasm.creditScoreReport,
   ohlsonOScore: wasm.ohlsonOScore,
   zmijewskiScore: wasm.zmijewskiScore,
 };

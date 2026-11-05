@@ -173,6 +173,49 @@ CLAIMS = [
     ("unsecured", "senior_unsecured", 2, 80.0, 0.0, 0.0, 0.0, None),
     ("junior", "subordinated", 3, 50.0, 0.0, 1.0, 0.0, None),
 ]
+# The same workout model and scoring inputs are in `models_parity.test.mjs`.
+WORKOUT = {
+    "collateral": [{"collateral_type": "real_estate", "book_value": 800_000.0, "haircut": 0.3}],
+    "costs": {"direct_cost_rate": 0.05, "indirect_cost_rate": 0.03},
+    "workout_years": 2.0,
+    "discount_rate": 0.05,
+}
+ALTMAN_Z = {
+    "working_capital_to_total_assets": 0.1,
+    "retained_earnings_to_total_assets": 0.2,
+    "ebit_to_total_assets": 0.15,
+    "market_equity_to_total_liabilities": 1.5,
+    "sales_to_total_assets": 1.1,
+}
+ALTMAN_Z_PRIME = {
+    "working_capital_to_total_assets": 0.1,
+    "retained_earnings_to_total_assets": 0.2,
+    "ebit_to_total_assets": 0.15,
+    "book_equity_to_total_liabilities": 0.9,
+    "sales_to_total_assets": 1.1,
+}
+ALTMAN_Z_DOUBLE_PRIME = {
+    "working_capital_to_total_assets": 0.1,
+    "retained_earnings_to_total_assets": 0.2,
+    "ebit_to_total_assets": 0.15,
+    "book_equity_to_total_liabilities": 0.9,
+}
+OHLSON = {
+    "log_total_assets_adjusted": 5.0,
+    "total_liabilities_to_total_assets": 0.6,
+    "working_capital_to_total_assets": 0.1,
+    "current_liabilities_to_current_assets": 0.8,
+    "liabilities_exceed_assets": 0.0,
+    "net_income_to_total_assets": 0.05,
+    "funds_from_operations_to_total_liabilities": 0.2,
+    "negative_net_income_two_years": 0.0,
+    "net_income_change": 0.1,
+}
+ZMIJEWSKI = {
+    "net_income_to_total_assets": 0.05,
+    "total_liabilities_to_total_assets": 0.6,
+    "current_assets_to_current_liabilities": 1.5,
+}
 EXPOSURES = [
     ("A", 100.0, 0.02, 0.6, [0.4]),
     ("B", 150.0, 0.05, 0.5, [0.5]),
@@ -416,7 +459,7 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
         "lgd.workout": lambda: [
             _json(workout().evaluate(1_000_000.0)),
             workout().net_recovery(1_000_000.0),
-            _json(lgd.workout_lgd(1_000_000.0, [("real_estate", 800_000.0, 0.3)], 0.05, 0.03, 2.0, 0.05)),
+            _json(lgd.WorkoutLgd.from_json(json.dumps(WORKOUT)).evaluate(1_000_000.0)),
             lgd.WorkoutCosts.standard().total_rate,
         ],
         "lgd.downturn": lambda: [
@@ -447,17 +490,19 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
         "pd.master_scale": lambda: [
             _json(_master_scale().map_pd(0.02)),
             list(_master_scale().map_pds([0.5, 0.001, 0.05])["grade"]),
-            _master_scale().map_score(scoring.zmijewski_score(0.05, 0.6, 1.5)).grade,
+            _master_scale().map_score(scoring.zmijewski_score(scoring.ZmijewskiInput(**ZMIJEWSKI))).grade,
             pd_models.MasterScale.default_calibration().n_grades,
             pd_models.MasterScale.from_registry_id("moodys_assumptions").n_grades,
         ],
         "scoring": lambda: [
-            _json(scoring.altman_z_score(0.1, 0.2, 0.15, 1.5, 1.1)),
-            _json(scoring.altman_z_prime(0.1, 0.2, 0.15, 0.9, 1.1)),
-            _json(scoring.altman_z_double_prime(0.1, 0.2, 0.15, 0.9)),
-            _json(scoring.altman_em_score(0.1, 0.2, 0.15, 0.9)),
-            _json(scoring.ohlson_o_score(5.0, 0.6, 0.1, 0.8, 0.0, 0.05, 0.2, 0.0, 0.1)),
-            _json(scoring.zmijewski_score(0.05, 0.6, 1.5)),
+            _json(scoring.altman_z_score(scoring.AltmanZScoreInput(**ALTMAN_Z))),
+            _json(scoring.altman_z_prime(scoring.AltmanZPrimeInput(**ALTMAN_Z_PRIME))),
+            _json(scoring.altman_z_double_prime(scoring.AltmanZDoublePrimeInput(**ALTMAN_Z_DOUBLE_PRIME))),
+            _json(scoring.altman_em_score(scoring.AltmanZDoublePrimeInput(**ALTMAN_Z_DOUBLE_PRIME))),
+            _json(scoring.ohlson_o_score(scoring.OhlsonOScoreInput(**OHLSON))),
+            _json(scoring.zmijewski_score(scoring.ZmijewskiInput(**ZMIJEWSKI))),
+            _json(scoring.credit_score_report({"model": "zmijewski_score", "input": ZMIJEWSKI})),
+            _json(scoring.credit_score_report({"model": "altman_z_score", "input": ALTMAN_Z})),
         ],
         "recovery_waterfall": lambda: _json(
             recovery_waterfall.allocate_recovery(120.0, [recovery_waterfall.RecoveryClaim(*claim) for claim in CLAIMS])
@@ -557,8 +602,9 @@ def _correlation_cases() -> dict[str, Callable[[], Any]]:
 def _factor_cases() -> dict[str, Callable[[], Any]]:
     matrix = lambda: factor_model.FactorCovarianceMatrix(["rates", "credit"], [0.04, 0.01, 0.01, 0.09])  # noqa: E731
     model = lambda: factor_credit.CreditFactorModel.from_json(CANONICAL_MODEL.read_text())  # noqa: E731
-    decomposition = lambda: factor_risk.parametric_var_decomposition(  # noqa: E731
-        ["A", "B"], [1.0, 2.0], [[0.04, 0.01], [0.01, 0.09]]
+    parametric = {"kind": "parametric", "weights": [1.0, 2.0], "covariance": [[0.04, 0.01], [0.01, 0.09]]}
+    decomposition = lambda: (  # noqa: E731
+        factor_risk.position_risk_report({"position_ids": ["A", "B"], "source": parametric}).decomposition
     )
     return {
         "factor.vol_horizon": lambda: [
@@ -718,8 +764,8 @@ def _rates_cases() -> dict[str, Callable[[], Any]]:
 
 def _volatility_cases() -> dict[str, Callable[[], Any]]:
     svi = lambda: volatility.SviParams(*SVI)  # noqa: E731
-    tenor_slice = lambda: volatility.materialize_cube_tenor_slice(_cube(), 5.0, [0.02, 0.03, 0.04])  # noqa: E731
-    expiry_slice = lambda: volatility.materialize_cube_expiry_slice(_cube(), 1.0, [0.02, 0.03, 0.04])  # noqa: E731
+    tenor_slice = lambda: volatility.materialize_cube_tenor_slice(_cube(), 5.0, [0.02, 0.03, 0.04], "lognormal")  # noqa: E731
+    expiry_slice = lambda: volatility.materialize_cube_expiry_slice(_cube(), 1.0, [0.02, 0.03, 0.04], "lognormal")  # noqa: E731
     grid_slice = lambda: VolCubeExpirySlice(  # noqa: E731
         "GRID", 1.0, [2.0, 5.0], [0.02, 0.03, 0.04], [0.3, 0.25, 0.27, 0.28, 0.24, 0.26]
     )
@@ -748,9 +794,9 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
         ],
         "volatility.cube_slices": lambda: [
             _surface_vols(tenor_slice()),
-            _surface_vols(volatility.materialize_cube_tenor_slice_normal(_cube(), 5.0, [0.02, 0.03, 0.04])),
-            _surface_vols(volatility.materialize_cube_expiry_slice(_cube(), 1.0, [0.02, 0.03, 0.04])),
-            _surface_vols(volatility.materialize_cube_expiry_slice_normal(_cube(), 1.0, [0.02, 0.03, 0.04])),
+            _surface_vols(volatility.materialize_cube_tenor_slice(_cube(), 5.0, [0.02, 0.03, 0.04], "normal")),
+            _surface_vols(volatility.materialize_cube_expiry_slice(_cube(), 1.0, [0.02, 0.03, 0.04], "lognormal")),
+            _surface_vols(volatility.materialize_cube_expiry_slice(_cube(), 1.0, [0.02, 0.03, 0.04], "normal")),
             volatility.get_surface_vol(tenor_slice(), 1.5, 0.025),
             volatility.get_surface_vol_clamped(tenor_slice(), 9.0, 0.5),
         ],

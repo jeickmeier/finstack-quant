@@ -16,7 +16,7 @@ const bumped = {
   ),
 };
 /** The example's AAPL spot price, supplied by the host as one forward broadcast to every expiry. */
-const forwards = [175];
+const config = { forward_prices: [175] };
 export function Example({ density = "compact" }: ExampleProps) {
   return (
     <ul className="grid gap-3">
@@ -26,7 +26,7 @@ export function Example({ density = "compact" }: ExampleProps) {
         </span>
         <SurfaceArbitrageBadge
           surface={surface}
-          forwards={forwards}
+          config={config}
           density={density}
         />
       </li>
@@ -36,7 +36,7 @@ export function Example({ density = "compact" }: ExampleProps) {
         </span>
         <SurfaceArbitrageBadge
           surface={bumped}
-          forwards={forwards}
+          config={config}
           density={density}
         />
       </li>
@@ -46,7 +46,7 @@ export function Example({ density = "compact" }: ExampleProps) {
         </span>
         <SurfaceArbitrageBadge
           surface={{ ...surface, quote_type: "normal" }}
-          forwards={forwards}
+          config={config}
           density={density}
         />
       </li>

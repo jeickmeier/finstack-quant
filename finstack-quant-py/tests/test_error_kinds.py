@@ -58,7 +58,9 @@ def _credit_model() -> object:
 def _performance() -> analytics.Performance:
     dates = [f"2024-01-{day:02d}" for day in range(1, 11)]
     returns = [0.01, -0.01, 0.02, 0.0, 0.01, -0.02, 0.01, 0.0, 0.01, 0.01]
-    return analytics.Performance.from_returns_arrays(dates, [returns], ["A"])
+    return analytics.Performance.from_panel(
+        analytics.PerformancePanel(dates=dates, series=[returns], kind="returns", ticker_names=["A"])
+    )
 
 
 class TestStatements:
@@ -157,8 +159,14 @@ class TestCoreAndAnalytics:
         dates = [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)]
         returns = [[0.01, 0.02, 0.0], [0.0, 0.01, 0.02]]
         with pytest.raises(KeyError, match="NOPE"):
-            analytics.Performance.from_returns_arrays(dates, returns, ["A", "B"], "NOPE")
-        perf = analytics.Performance.from_returns_arrays(dates, returns, ["A", "B"])
+            analytics.Performance.from_panel(
+                analytics.PerformancePanel(
+                    dates=dates, series=returns, kind="returns", ticker_names=["A", "B"], benchmark_ticker="NOPE"
+                )
+            )
+        perf = analytics.Performance.from_panel(
+            analytics.PerformancePanel(dates=dates, series=returns, kind="returns", ticker_names=["A", "B"])
+        )
         with pytest.raises(KeyError, match="NOPE"):
             perf.reset_bench_ticker("NOPE")
         assert perf.get_benchmark_idx() == 0

@@ -90,13 +90,13 @@ notional.amountDecimal; // '1000000'
 core.Rate.fromBp(250).asDecimal; // 0.025
 
 // Panel analytics. Per-ticker results come back as Float64Array.
-const perf = analytics.Performance.fromReturns(
-  ['2024-01-31', '2024-02-29', '2024-03-31'],
-  [[0.01, -0.02, 0.03]],
-  ['FUND'],
-  null,
-  'monthly'
-);
+const perf = new analytics.Performance({
+  dates: ['2024-01-31', '2024-02-29', '2024-03-31'],
+  series: [[0.01, -0.02, 0.03]],
+  kind: 'returns',
+  ticker_names: ['FUND'],
+  frequency: 'monthly',
+});
 perf.sharpe(0.0); // Float64Array [ 0.917662935482247 ]
 perf.free();
 

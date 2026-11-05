@@ -37,7 +37,7 @@ import subprocess  # nosec B404 # fixed Cargo benchmark command, no shell
 import numpy as np
 import pytest
 
-from finstack_quant.analytics import Performance
+from finstack_quant.analytics import Performance, PerformancePanel
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, FxMatrix, MarketContext
@@ -61,6 +61,7 @@ from finstack_quant.models.correlation import (
     correlation_bounds,
     validate_correlation_matrix,
 )
+from finstack_quant.models.factor.risk import build_stress_attribution, position_risk_report
 from finstack_quant.models.monte_carlo import (
     EuropeanPricer,
     LsmcPricer,
@@ -72,9 +73,6 @@ from finstack_quant.portfolio import (
     aggregate_full_cashflows,
     aggregate_metrics,
     attribute_portfolio_pnl,
-    build_stress_attribution,
-    historical_var_decomposition,
-    parametric_var_decomposition,
     parse_portfolio_spec_json,
     replay_portfolio,
     scenario_pnl,
@@ -123,10 +121,13 @@ PRICES_10K_ALT: list[float] = list(accumulate(RETURNS_10K_ALT, lambda p, r: p * 
 DATES_252 = [date(2024, 1, 1) + timedelta(days=i) for i in range(252)]
 DATES_10K = [date(2000, 1, 1) + timedelta(days=i) for i in range(10_000)]
 
-_PERFORMANCE_10K = Performance.from_arrays(
-    DATES_10K,
-    [PRICES_10K[:10_000], PRICES_10K_ALT[:10_000]],
-    ["ASSET", "BENCH"],
+_PERFORMANCE_10K = Performance.from_panel(
+    PerformancePanel(
+        dates=DATES_10K,
+        series=[PRICES_10K[:10_000], PRICES_10K_ALT[:10_000]],
+        kind="prices",
+        ticker_names=["ASSET", "BENCH"],
+    )
 )
 
 DATA_10K: list[float] = [float(i) * 0.01 for i in range(10_000)]
@@ -370,7 +371,6 @@ _RISK_WEIGHTS = [1.0 / _RISK_MATRIX_SIZE] * _RISK_MATRIX_SIZE
 _RISK_COVARIANCE_LIST = [
     [0.04 if row == col else 0.002 for col in range(_RISK_MATRIX_SIZE)] for row in range(_RISK_MATRIX_SIZE)
 ]
-_RISK_COVARIANCE_NUMPY = np.asarray(_RISK_COVARIANCE_LIST, dtype=np.float64)
 
 _HISTORICAL_POSITION_COUNT = 200
 _HISTORICAL_SCENARIO_COUNT = 1_000
@@ -534,7 +534,8 @@ class TestAnalyticsBenchmarks:
         n = 252
         dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(n)]
         prices = [100.0 + i * 0.1 for i in range(n)]
-        benchmark(Performance.from_arrays, dates, [prices], ["BENCH"])
+        panel = PerformancePanel(dates=dates, series=[prices], kind="prices", ticker_names=["BENCH"])
+        benchmark(Performance.from_panel, panel)
 
     def test_sharpe(self, benchmark) -> None:
         benchmark(_PERFORMANCE_10K.sharpe)
@@ -1094,35 +1095,19 @@ class TestPortfolioReleaseControls:
 class TestPortfolioRiskInputBenchmarks:
     """Portfolio risk bindings across list and contiguous NumPy inputs."""
 
-    def test_parametric_list_256x256(self, benchmark) -> None:
-        benchmark(
-            parametric_var_decomposition,
-            _RISK_POSITION_IDS,
-            _RISK_WEIGHTS,
-            _RISK_COVARIANCE_LIST,
-        )
+    def test_parametric_report_256x256(self, benchmark) -> None:
+        request = {
+            "position_ids": _RISK_POSITION_IDS,
+            "source": {"kind": "parametric", "weights": _RISK_WEIGHTS, "covariance": _RISK_COVARIANCE_LIST},
+        }
+        benchmark(position_risk_report, request)
 
-    def test_parametric_numpy_256x256(self, benchmark) -> None:
-        benchmark(
-            parametric_var_decomposition,
-            _RISK_POSITION_IDS,
-            _RISK_WEIGHTS,
-            _RISK_COVARIANCE_NUMPY,
-        )
-
-    def test_historical_list_200x1000(self, benchmark) -> None:
-        benchmark(
-            historical_var_decomposition,
-            _HISTORICAL_POSITION_IDS,
-            _HISTORICAL_PNLS_LIST,
-        )
-
-    def test_historical_numpy_200x1000(self, benchmark) -> None:
-        benchmark(
-            historical_var_decomposition,
-            _HISTORICAL_POSITION_IDS,
-            _HISTORICAL_PNLS_NUMPY,
-        )
+    def test_historical_report_200x1000(self, benchmark) -> None:
+        request = {
+            "position_ids": _HISTORICAL_POSITION_IDS,
+            "source": {"kind": "historical", "pnls": _HISTORICAL_PNLS_LIST},
+        }
+        benchmark(position_risk_report, request)
 
     def test_stress_attribution_list_200x1000(self, benchmark) -> None:
         benchmark(

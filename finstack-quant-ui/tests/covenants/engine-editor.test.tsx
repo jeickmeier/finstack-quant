@@ -19,10 +19,7 @@ import {
   evaluateCovenantsOptions,
   useEvaluateCovenants,
 } from "@/hooks/covenants/use-evaluate-covenants/use-evaluate-covenants";
-import {
-  CovenantEngineEditor,
-  type CovenantTemplate,
-} from "@/components/finstack/covenants/components/covenant-engine-editor/covenant-engine-editor";
+import { CovenantEngineEditor } from "@/components/finstack/covenants/components/covenant-engine-editor/covenant-engine-editor";
 import { CovenantCompliance } from "@/components/finstack/covenants/components/covenant-compliance/covenant-compliance";
 import {
   unwrap,
@@ -79,50 +76,43 @@ afterEach(() => {
 });
 
 it("returns each Rust package template as the facade does", async () => {
-  const requests: [CovenantTemplateRequest, unknown][] = [
-    [
-      { kind: "covLite", maxLeverage: 5, maxSeniorLeverage: 3 },
-      native.covLite(5, 3),
-    ],
-    [
-      {
-        kind: "lboStandard",
-        initialLeverage: 6,
-        interestCoverage: 2,
-        fixedChargeCoverage: 1.5,
-        maxCapex: 50_000_000,
-      },
-      native.lboStandard(6, 2, 1.5, 50_000_000),
-    ],
-    [
-      { kind: "realEstate", minDscr: 1.25, minDebtYield: 0.08, maxLtv: 0.65 },
-      native.realEstate(1.25, 0.08, 0.65),
-    ],
-    [
-      {
-        kind: "projectFinance",
-        minDscr: 1.2,
-        distributionLockupDscr: 1.1,
-        minLiquidity: 1_000_000,
-        maxNetLeverage: 4,
-      },
-      native.projectFinance(1.2, 1.1, 1_000_000, 4),
-    ],
+  const requests: CovenantTemplateRequest[] = [
+    { kind: "cov_lite", max_leverage: 5, max_senior_leverage: 3 },
+    {
+      kind: "lbo_standard",
+      initial_leverage: 6,
+      interest_coverage: 2,
+      fixed_charge_coverage: 1.5,
+      max_capex: 50_000_000,
+    },
+    {
+      kind: "real_estate",
+      min_dscr: 1.25,
+      min_debt_yield: 0.08,
+      max_ltv: 0.65,
+    },
+    {
+      kind: "project_finance",
+      min_dscr: 1.2,
+      distribution_lockup_dscr: 1.1,
+      min_liquidity: 1_000_000,
+      max_net_leverage: 4,
+    },
   ];
-  for (const [request, direct] of requests)
+  for (const request of requests)
     expect(unwrap(await harness.proxy.covenantTemplate(request))).toEqual(
-      direct,
+      native.covenantTemplate(request),
     );
   // A cleared threshold crosses as NaN, which Rust rejects.
   const cleared = await harness.proxy.covenantTemplate({
-    kind: "covLite",
-    maxLeverage: Number.NaN,
-    maxSeniorLeverage: 3,
+    kind: "cov_lite",
+    max_leverage: Number.NaN,
+    max_senior_leverage: 3,
   });
   expect(cleared.ok).toBe(false);
   if (!cleared.ok) {
-    expect(cleared.error.kind).toBe("validation");
-    expect(cleared.error.message).toContain("max_leverage");
+    expect(cleared.error.kind).toBe("invalid_type");
+    expect(cleared.error.message).toContain("template");
   }
 });
 
@@ -152,12 +142,12 @@ it("evaluates the analyst engine over every result period and frees the engine",
 it("returns Rust's not_found for a template metric the model lacks, freeing the engine", async () => {
   const specs = unwrap(
     await harness.proxy.covenantTemplate({
-      kind: "covLite",
-      maxLeverage: 5,
-      maxSeniorLeverage: 3,
+      kind: "cov_lite",
+      max_leverage: 5,
+      max_senior_leverage: 3,
     }),
   );
-  // covLite reads total_leverage, senior_leverage and negative_debt.
+  // cov_lite reads total_leverage, senior_leverage and negative_debt.
   expect(specs.map((spec) => spec.metric_id)).toEqual([
     "total_leverage",
     "senior_leverage",
@@ -251,12 +241,19 @@ it("lists each covenant's metric id and whether the model has that node", async 
   ]);
   // Templates are hidden without a loader.
   expect(
-    screen.queryByRole("form", { name: "Covenant package templates" }),
+    screen.queryByRole("region", { name: "Covenant package templates" }),
   ).toBeNull();
 });
 
-it("sends a blank template threshold as NaN and shows the native error", async () => {
-  const loadTemplate = vi.fn(async (template: CovenantTemplate) => {
+/** Click Load template once the form's debounced validation has settled. */
+async function loadTemplateIn(templates: ReturnType<typeof within>) {
+  const button = templates.getByRole("button", { name: "Load template" });
+  await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
+  await userEvent.click(button);
+}
+it("picks a package in the generated template form, blocks a blank threshold and shows the native rejection", async () => {
+  const user = userEvent.setup();
+  const loadTemplate = vi.fn(async (template: CovenantTemplateRequest) => {
     throw new Error(`rejected ${template.kind}`);
   });
   render(
@@ -268,22 +265,34 @@ it("sends a blank template threshold as NaN and shows the native error", async (
     />,
   );
   const templates = within(
-    screen.getByRole("form", { name: "Covenant package templates" }),
+    screen.getByRole("region", { name: "Covenant package templates" }),
   );
+  // No package is chosen until the user picks one.
+  expect(templates.queryByLabelText("Max leverage")).toBeNull();
+  await user.click(templates.getByRole("radio", { name: /^Cov lite/ }));
   for (const label of ["Max leverage", "Max senior leverage"])
     expect(templates.getByLabelText(label)).toHaveProperty("value", "");
-  await userEvent.type(templates.getByLabelText("Max leverage"), "5");
-  await userEvent.click(
-    templates.getByRole("button", { name: "Load template" }),
+  await user.type(templates.getByLabelText("Max leverage"), "5");
+  await loadTemplateIn(templates);
+  // A blank required threshold fails the generated schema and never reaches Rust.
+  await waitFor(() =>
+    expect(
+      templates
+        .getByLabelText("Max senior leverage")
+        .getAttribute("aria-invalid"),
+    ).toBe("true"),
   );
-  expect(loadTemplate).toHaveBeenCalledWith({
-    kind: "covLite",
-    maxLeverage: 5,
-    maxSeniorLeverage: Number.NaN,
-  });
-  expect((await templates.findByRole("alert")).textContent).toBe(
-    "rejected covLite",
+  expect(loadTemplate).not.toHaveBeenCalled();
+  await user.type(templates.getByLabelText("Max senior leverage"), "3");
+  await loadTemplateIn(templates);
+  await waitFor(() =>
+    expect(loadTemplate).toHaveBeenCalledWith({
+      kind: "cov_lite",
+      max_leverage: 5,
+      max_senior_leverage: 3,
+    }),
   );
+  expect(await templates.findByText("rejected cov_lite")).toBeTruthy();
 });
 
 function Connected({ defaultJson }: { defaultJson?: string }) {
@@ -332,13 +341,12 @@ it(
       </FinstackQueryProvider>,
     );
     const templates = within(
-      await screen.findByRole("form", { name: "Covenant package templates" }),
+      await screen.findByRole("region", { name: "Covenant package templates" }),
     );
+    await userEvent.click(templates.getByRole("radio", { name: /^Cov lite/ }));
     await userEvent.type(templates.getByLabelText("Max leverage"), "5");
     await userEvent.type(templates.getByLabelText("Max senior leverage"), "3");
-    await userEvent.click(
-      templates.getByRole("button", { name: "Load template" }),
-    );
+    await loadTemplateIn(templates);
     const metrics = within(
       screen.getByRole("region", { name: "Covenant metrics" }),
     );

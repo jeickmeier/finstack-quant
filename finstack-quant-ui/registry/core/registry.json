@@ -344,7 +344,7 @@
       "type": "registry:component",
       "title": "Market context form",
       "description": "Complete market editor for curves, FX, prices, surfaces and cubes, with native validation on submit.",
-      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit.",
+      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import market JSON (Import market JSON) or the final_market of a calibration result envelope (Import calibration result), each through the generated MarketContextState contract. Supply useMarketValidator and receive complete canonical JSON on submit.",
       "files": [
         {
           "path": "components/market-context-form/market-context-form.tsx",

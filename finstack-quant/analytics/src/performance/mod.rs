@@ -11,11 +11,48 @@ use finstack_quant_core::dates::{Date, PeriodKind};
 use super::drawdown::to_drawdown_series;
 use super::returns::pairwise_returns;
 
+pub use panel::{PanelSeriesKind, PerformancePanel};
+
 mod aggregation;
 mod benchmark;
+mod panel;
 mod rolling;
 mod scalar;
 mod serialization;
+
+/// A price panel from the five values a test supplies.
+#[cfg(test)]
+pub(crate) fn prices_panel(
+    dates: Vec<Date>,
+    series: Vec<Vec<f64>>,
+    ticker_names: Vec<String>,
+    benchmark_ticker: Option<&str>,
+    frequency: PeriodKind,
+) -> PerformancePanel {
+    PerformancePanel {
+        dates,
+        series,
+        kind: PanelSeriesKind::Prices,
+        ticker_names,
+        benchmark_ticker: benchmark_ticker.map(str::to_owned),
+        frequency: Some(frequency),
+    }
+}
+
+/// A simple-return panel from the five values a test supplies.
+#[cfg(test)]
+pub(crate) fn returns_panel(
+    dates: Vec<Date>,
+    series: Vec<Vec<f64>>,
+    ticker_names: Vec<String>,
+    benchmark_ticker: Option<&str>,
+    frequency: PeriodKind,
+) -> PerformancePanel {
+    PerformancePanel {
+        kind: PanelSeriesKind::Returns,
+        ..prices_panel(dates, series, ticker_names, benchmark_ticker, frequency)
+    }
+}
 
 /// Central performance analytics engine.
 ///
@@ -29,7 +66,7 @@ mod serialization;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_analytics::Performance;
+/// use finstack_quant_analytics::{PanelSeriesKind, Performance, PerformancePanel};
 /// use finstack_quant_core::dates::{Date, PeriodKind};
 /// use time::Month;
 ///
@@ -39,13 +76,14 @@ mod serialization;
 /// let benchmark = vec![100.0, 101.0, 99.0, 102.0, 101.0, 103.0];
 /// let portfolio = vec![100.0, 103.0, 100.0, 104.0, 102.0, 106.0];
 ///
-/// let mut perf = Performance::new(
+/// let mut perf = Performance::new(&PerformancePanel {
 ///     dates,
-///     vec![benchmark, portfolio],
-///     vec!["SPY".to_string(), "ALPHA".to_string()],
-///     Some("SPY"),
-///     PeriodKind::Daily,
-/// )?;
+///     series: vec![benchmark, portfolio],
+///     kind: PanelSeriesKind::Prices,
+///     ticker_names: vec!["SPY".to_string(), "ALPHA".to_string()],
+///     benchmark_ticker: Some("SPY".to_string()),
+///     frequency: Some(PeriodKind::Daily),
+/// })?;
 ///
 /// let sharpe = perf.sharpe(0.02);
 /// let beta = perf.beta();
@@ -169,7 +207,7 @@ fn validate_strictly_ascending_dates(dates: &[Date]) -> finstack_quant_core::Res
     Ok(())
 }
 
-/// Shape checks shared by [`Performance::new`] and [`Performance::from_returns`]:
+/// Shape checks shared by both panel kinds of [`Performance::new`]:
 /// non-empty columns and dates, strictly ascending dates, and one ticker name
 /// per column. `what` names the value columns (`"prices"` / `"returns"`) in
 /// the error text.
@@ -450,162 +488,108 @@ impl Performance {
 }
 
 impl Performance {
-    /// Construct from a price matrix (columns = tickers).
+    /// Construct from a dated price or return panel.
     ///
-    /// Computes simple returns for each ticker, builds the drawdown
-    /// series, and designates one ticker as the benchmark. The `dates`
-    /// vector should have one entry per price row; internally the date and
-    /// return series are trimmed by one element to align with the return
-    /// computation (returns have length `n_prices - 1`).
-    ///
-    /// # Arguments
-    ///
-    /// * `dates` - Chronologically sorted date vector, one entry per price
-    ///   observation.
-    /// * `prices` - Price matrix: `prices[i]` is the full price series for
-    ///   ticker `i`. Each ticker may have leading/trailing `NaN` values, but
-    ///   the finite price span must be contiguous and strictly positive.
-    /// * `ticker_names` - Unique names corresponding to each column of `prices`.
-    /// * `benchmark_ticker` - Name of the benchmark ticker. Uses column 0 if
-    ///   `None`; returns an error if a non-`None` ticker name is not found.
-    /// * `frequency` - Observation frequency, used to derive the annualization factor.
-    /// # Returns
-    ///
-    /// A fully initialized [`Performance`] instance, or an error if
-    /// validation fails.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when:
-    ///
-    /// * `prices` or `dates` is empty.
-    /// * `ticker_names.len() != prices.len()` or ticker names are duplicated.
-    /// * any price column length differs from `dates.len()`.
-    /// * any ticker has no contiguous finite positive price span.
-    /// * derived returns are non-finite or at or below `-1.0`.
-    ///
-    /// Returns [`finstack_quant_core::InputError::NotFound`] when
-    /// `benchmark_ticker` is supplied but not found in `ticker_names`.
-    ///
-    /// # Tracing
-    ///
-    /// Emits a `debug`-level `tracing` span named `Performance::new` with
-    /// `n_tickers`, `n_dates`, and `frequency` fields.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_analytics::Performance;
-    /// use finstack_quant_core::dates::{Date, PeriodKind};
-    /// use time::Month;
-    ///
-    /// let dates: Vec<Date> = (1..=10)
-    ///     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
-    ///     .collect();
-    /// let prices = vec![(0..10).map(|i| 100.0 + i as f64).collect::<Vec<_>>()];
-    /// let perf = Performance::new(
-    ///     dates,
-    ///     prices,
-    ///     vec!["SPY".into()],
-    ///     None,
-    ///     PeriodKind::Daily,
-    /// ).unwrap();
-    /// assert_eq!(perf.get_ticker_names(), &["SPY"]);
-    /// ```
-    #[tracing::instrument(level = "debug", skip(dates, prices, ticker_names, benchmark_ticker), fields(n_tickers = prices.len(), n_dates = dates.len(), frequency = ?frequency))]
-    pub fn new(
-        dates: Vec<Date>,
-        prices: Vec<Vec<f64>>,
-        ticker_names: Vec<String>,
-        benchmark_ticker: Option<&str>,
-        frequency: PeriodKind,
-    ) -> finstack_quant_core::Result<Self> {
-        check_panel_inputs(&dates, prices.len(), ticker_names.len(), "prices")?;
-
-        let mut returns_matrix: Vec<Vec<f64>> = Vec::with_capacity(prices.len());
-        let mut return_spans: Vec<TickerSpan> = Vec::with_capacity(prices.len());
-        for (ticker, price_col) in ticker_names.iter().zip(prices.iter()) {
-            let (returns, span) = price_column_to_returns(price_col, ticker, dates.len())?;
-            returns_matrix.push(returns);
-            return_spans.push(span);
-        }
-        Self::assemble(
-            dates,
-            returns_matrix,
-            return_spans,
-            ticker_names,
-            benchmark_ticker,
-            frequency,
-        )
-    }
-
-    /// Construct from a pre-computed return matrix (columns = tickers).
-    ///
-    /// Use this when you already have a return panel and want to skip the
-    /// price → return conversion handled by [`Self::new`]. The supplied
-    /// `dates` are the return-aligned observation dates (one entry per
-    /// return row).
-    ///
-    /// A synthetic prior date is prepended to the internal price-date grid
-    /// so that CAGR and other date-aware metrics see a holding period of
-    /// `dates.len()` periods. The prior date is
-    /// [`PeriodKind::prior_observation_date`] of the first return date
-    /// (one frequency step back), not the first observed calendar gap.
+    /// A price panel ([`PanelSeriesKind::Prices`]) is converted to simple
+    /// returns pairwise, so the series have one entry per date and the
+    /// returns one fewer. A return panel ([`PanelSeriesKind::Returns`]) is
+    /// used as given; a synthetic prior date
+    /// ([`PeriodKind::prior_observation_date`] of the first date, one
+    /// frequency step back) anchors the internal price-date grid so CAGR and
+    /// other date-aware metrics see a holding period of `dates.len()`
+    /// periods. Drawdowns are built per ticker and one ticker is designated
+    /// the benchmark.
     ///
     /// # Arguments
     ///
-    /// * `dates` - Chronologically sorted return-aligned dates.
-    /// * `returns` - Return matrix: `returns[i]` is the simple-return series
-    ///   for ticker `i`, with one entry per `dates` row. Each ticker may have
-    ///   leading/trailing `NaN` values, but the finite return span must be
-    ///   contiguous.
-    /// * `ticker_names` - Unique names corresponding to each column of `returns`.
-    /// * `benchmark_ticker` - Name of the benchmark ticker. Uses column 0 if
-    ///   `None`; returns an error if a non-`None` ticker name is not found.
-    /// * `frequency` - Observation frequency, used to derive the annualization factor.
+    /// * `panel` - Strictly ascending dates, ticker-major series of the
+    ///   panel's kind (each ticker's finite span contiguous; prices strictly
+    ///   positive), unique ticker names, an optional benchmark ticker (the
+    ///   first ticker when omitted) and an optional observation frequency
+    ///   ([`crate::DEFAULT_FREQUENCY`] when omitted) used for annualization.
     ///
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
-    /// inputs are empty, the column count does not match `ticker_names`, any
-    /// return column has the wrong length, any ticker lacks a contiguous
-    /// finite return span, ticker names are duplicated, or any active return
-    /// value is `<= -1.0`. Propagates a date-range validation error if the
-    /// synthetic prior price date underflows the calendar.
+    /// the series or dates are empty, the series count does not match
+    /// `ticker_names` or a name is duplicated, a series length differs from
+    /// `dates.len()`, a ticker has no contiguous finite span (positive for
+    /// prices), or a return is non-finite or at or below `-1.0`. Returns
+    /// [`finstack_quant_core::InputError::NotFound`] when `benchmark_ticker`
+    /// is not one of `ticker_names`, and propagates a date-range error if the
+    /// synthetic prior date of a return panel underflows the calendar.
     ///
-    /// Returns [`finstack_quant_core::InputError::NotFound`] when
-    /// `benchmark_ticker` is supplied but not found in `ticker_names`.
-    pub fn from_returns(
-        dates: Vec<Date>,
-        returns: Vec<Vec<f64>>,
-        ticker_names: Vec<String>,
-        benchmark_ticker: Option<&str>,
-        frequency: PeriodKind,
-    ) -> finstack_quant_core::Result<Self> {
-        check_panel_inputs(&dates, returns.len(), ticker_names.len(), "returns")?;
+    /// # Tracing
+    ///
+    /// Emits a `debug`-level `tracing` span named `Performance::new` with
+    /// `n_tickers`, `n_dates`, `kind` and `frequency` fields.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_analytics::{PanelSeriesKind, Performance, PerformancePanel};
+    /// use finstack_quant_core::dates::{Date, PeriodKind};
+    /// use time::Month;
+    ///
+    /// let dates: Vec<Date> = (1..=10)
+    ///     .map(|d| Date::from_calendar_date(2025, Month::January, d))
+    ///     .collect::<Result<_, _>>()?;
+    /// let perf = Performance::new(&PerformancePanel {
+    ///     dates,
+    ///     series: vec![(0..10).map(|i| 100.0 + i as f64).collect()],
+    ///     kind: PanelSeriesKind::Prices,
+    ///     ticker_names: vec!["SPY".into()],
+    ///     benchmark_ticker: None,
+    ///     frequency: Some(PeriodKind::Daily),
+    /// })?;
+    /// assert_eq!(perf.get_ticker_names(), &["SPY"]);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[tracing::instrument(level = "debug", skip(panel), fields(n_tickers = panel.series.len(), n_dates = panel.dates.len(), kind = ?panel.kind, frequency = ?panel.frequency))]
+    pub fn new(panel: &PerformancePanel) -> finstack_quant_core::Result<Self> {
+        let frequency = panel.frequency.unwrap_or(crate::DEFAULT_FREQUENCY);
+        let what = match panel.kind {
+            PanelSeriesKind::Prices => "prices",
+            PanelSeriesKind::Returns => "returns",
+        };
+        check_panel_inputs(
+            &panel.dates,
+            panel.series.len(),
+            panel.ticker_names.len(),
+            what,
+        )?;
 
-        let mut all_returns: Vec<Vec<f64>> = Vec::with_capacity(returns.len());
-        let mut return_spans: Vec<TickerSpan> = Vec::with_capacity(returns.len());
-        for (ticker, col) in ticker_names.iter().zip(returns) {
-            let (clean, span) = return_column_to_span(col, ticker, dates.len())?;
-            all_returns.push(clean);
+        let mut returns: Vec<Vec<f64>> = Vec::with_capacity(panel.series.len());
+        let mut return_spans: Vec<TickerSpan> = Vec::with_capacity(panel.series.len());
+        for (ticker, col) in panel.ticker_names.iter().zip(&panel.series) {
+            let (column, span) = match panel.kind {
+                PanelSeriesKind::Prices => price_column_to_returns(col, ticker, panel.dates.len())?,
+                PanelSeriesKind::Returns => {
+                    return_column_to_span(col.clone(), ticker, panel.dates.len())?
+                }
+            };
+            returns.push(column);
             return_spans.push(span);
         }
+        let price_dates = match panel.kind {
+            PanelSeriesKind::Prices => panel.dates.clone(),
+            PanelSeriesKind::Returns => build_synthetic_price_dates(&panel.dates, frequency)?,
+        };
 
         Self::assemble(
-            build_synthetic_price_dates(&dates, frequency)?,
-            all_returns,
+            price_dates,
+            returns,
             return_spans,
-            ticker_names,
-            benchmark_ticker,
+            panel.ticker_names.clone(),
+            panel.benchmark_ticker.as_deref(),
             frequency,
         )
     }
 
     /// Validate return columns, build per-ticker drawdown caches, and finalize state.
     ///
-    /// Shared by [`Self::new`] (which pre-computes simple returns from prices)
-    /// and [`Self::from_returns`] (which receives a return matrix directly).
+    /// Shared by both [`PanelSeriesKind`]s of [`Self::new`]: a price panel
+    /// arrives here with its pre-computed simple returns.
     fn assemble(
         price_dates: Vec<Date>,
         returns: Vec<Vec<f64>>,

@@ -288,16 +288,17 @@ test('namespace results match their published result types', () => {
     '2024-01-05',
     '2024-01-08',
   ];
-  const perf = analytics.Performance.fromReturns(
+  const perf = new analytics.Performance({
     dates,
-    [
+    series: [
       [0.01, -0.02, 0.015, 0.003, -0.004, 0.02],
       [0.005, -0.01, 0.01, 0.001, -0.002, 0.01],
     ],
-    ['A', 'B'],
-    'B',
-    'daily'
-  );
+    kind: 'returns',
+    ticker_names: ['A', 'B'],
+    benchmark_ticker: 'B',
+    frequency: 'daily',
+  });
   try {
     declarations.push(['beta', 'fq.BetaResult[]', perf.beta()]);
     declarations.push(['greeks', 'fq.GreeksResult[]', perf.greeks()]);
@@ -332,7 +333,13 @@ test('namespace results match their published result types', () => {
   declarations.push(['pnl_attribution', 'fq.PnlAttribution', attribution.attributePnl(params)]);
 
   // covenants
-  const specs = JSON.parse(covenants.lboStandardJson(5.0, 1.5, 1.2, 10_000_000.0));
+  const specs = covenants.covenantTemplate({
+    kind: 'lbo_standard',
+    initial_leverage: 5.0,
+    interest_coverage: 1.5,
+    fixed_charge_coverage: 1.2,
+    max_capex: 10_000_000.0,
+  });
   const engine = covenants.validateCovenantEngineJson(
     JSON.stringify({ specs: [specs[0]], breach_history: [], windows: [], waivers: [] })
   );

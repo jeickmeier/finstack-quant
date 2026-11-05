@@ -5,26 +5,25 @@ import { serializeHost } from "../../../src/codec.mjs";
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
 const bondInput = await readRepoSource(bondPath);
 const base = bondInput.value.request;
-// Builder drafts as the workbench edits them; blank options are omitted so Rust applies its defaults.
+// ScenarioSpecs as the workbench builder writes them; omitted options are left to Rust's defaults.
+const usdOis50 = {
+  kind: "curve_parallel_bp",
+  curve_kind: "discount",
+  curve_id: "USD-OIS",
+  bp: 50,
+};
 const roll3m = {
   id: "roll-3m-50bp",
-  shifts: [{ curveKind: "discount", curveId: "USD-OIS", bp: "50" }],
-  roll: { period: "3M", rollMode: "" },
-  hazardBumpMode: "",
+  operations: [{ kind: "time_roll_forward", period: "3M" }, usdOis50],
 };
-const shift = {
-  id: "usd-ois-50bp",
-  shifts: [{ curveKind: "discount", curveId: "USD-OIS", bp: "50" }],
-  roll: null,
-  hazardBumpMode: "",
-};
+const shift = { id: "usd-ois-50bp", operations: [usdOis50] };
 // Requests: method and calendarId are the worker request fields; null stays unset.
 const requests = [
-  { name: "roll-3m-50bp", draft: roll3m, method: null, calendarId: null },
-  { name: "usd-ois-50bp", draft: shift, method: null, calendarId: null },
+  { name: "roll-3m-50bp", spec: roll3m, method: null, calendarId: null },
+  { name: "usd-ois-50bp", spec: shift, method: null, calendarId: null },
   {
     name: "roll-3m-50bp-taylor",
-    draft: roll3m,
+    spec: roll3m,
     method: { taylor: {} },
     calendarId: "nyse",
   },
@@ -32,34 +31,17 @@ const requests = [
   // metrics-based method drops its quote-space credit metrics with a note.
   {
     name: "roll-3m-50bp-metrics-based",
-    draft: roll3m,
+    spec: roll3m,
     method: "metrics_based",
     calendarId: null,
   },
 ];
-// The worker's ScenariosApi.buildMarketScenario.
-function build(draft) {
-  const operations = [
-    ...(draft.roll
-      ? [
-          native.operationSpecTimeRollForward(
-            draft.roll.period,
-            undefined,
-            draft.roll.rollMode || undefined,
-          ),
-        ]
-      : []),
-    ...draft.shifts.flatMap((entry) =>
-      native.parallelBpMany(entry.curveKind, [entry.curveId], Number(entry.bp)),
-    ),
-  ];
-  return JSON.stringify(
-    native.parseScenarioSpec(JSON.stringify({ id: draft.id, operations })),
-  );
-}
+// The worker's ScenariosApi.validateScenarioSpec.
+const canonical = (spec) =>
+  JSON.stringify(native.parseScenarioSpec(JSON.stringify(spec)));
 // The worker's ScenariosApi.horizonReturn.
-const cases = requests.map(({ name, draft, method, calendarId }) => {
-  const scenarioJson = build(draft);
+const cases = requests.map(({ name, spec, method, calendarId }) => {
+  const scenarioJson = canonical(spec);
   try {
     const report = native.computeHorizonReturn(
       base.instrumentJson,
@@ -72,7 +54,7 @@ const cases = requests.map(({ name, draft, method, calendarId }) => {
     );
     return {
       name,
-      draft,
+      spec,
       scenarioJson,
       method,
       calendarId,
@@ -85,7 +67,7 @@ const cases = requests.map(({ name, draft, method, calendarId }) => {
   } catch (error) {
     return {
       name,
-      draft,
+      spec,
       scenarioJson,
       method,
       calendarId,

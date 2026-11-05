@@ -42,6 +42,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "LookbackReturns",
             "MultiFactorResult",
             "Performance",
+            "PerformancePanel",
             "PeriodStats",
             "RollingGreeks",
             "constrained_least_squares",

@@ -74,21 +74,18 @@ const smile = (
   ...extra,
 });
 const materializer = {
-  tenor: {
-    normal: "materializeCubeTenorSliceNormal",
-    black_lognormal: "materializeCubeTenorSlice",
-  },
-  expiry: {
-    normal: "materializeCubeExpirySliceNormal",
-    black_lognormal: "materializeCubeExpirySlice",
-  },
+  tenor: "materializeCubeTenorSlice",
+  expiry: "materializeCubeExpirySlice",
 } as const;
 function directSlice(r: CubeSliceRequest) {
   const cube = native.VolCube.fromJson(serializeHost(r.cube));
   try {
-    const handle = native[materializer[r.axis][r.convention]](cube, r.at, [
-      ...r.strikes,
-    ]);
+    const handle = native[materializer[r.axis]](
+      cube,
+      r.at,
+      [...r.strikes],
+      r.convention,
+    );
     try {
       return JSON.parse(handle.toJson());
     } finally {
@@ -136,11 +133,11 @@ it("returns every native slice for both cubes, axes and conventions and frees bo
   const variants: CubeSliceRequest[] = [];
   for (const cube of cubes)
     for (const axis of ["tenor", "expiry"] as const)
-      for (const convention of ["normal", "black_lognormal"] as const)
+      for (const convention of ["normal", "lognormal"] as const)
         variants.push(slice(cube, axis, convention));
   // Off-node fixed values are interpolated by Rust.
   variants.push(slice(normal, "tenor", "normal", 3));
-  variants.push(slice(normal, "expiry", "black_lognormal", 1.5));
+  variants.push(slice(normal, "expiry", "lognormal", 1.5));
   const strikes = slice(normal, "tenor", "normal");
   variants.push({ ...strikes, strikes: [0.035, 0.05, 0.065] });
   const keys = variants.map((r) =>
@@ -173,12 +170,12 @@ it("returns every native slice for both cubes, axes and conventions and frees bo
   });
 });
 it("retains native slice failures and frees the cube handle", async () => {
-  const good = slice(normal, "tenor", "black_lognormal");
+  const good = slice(normal, "tenor", "lognormal");
   const invalid: CubeSliceRequest[] = [
     { ...good, strikes: [0.05, 0.04] },
     { ...good, axis: "expiry", strikes: [0.04, 0.04] },
     // Below the 0.03 displacement the shifted SABR domain ends.
-    { ...slice(shifted, "tenor", "black_lognormal"), strikes: [-0.05, 0] },
+    { ...slice(shifted, "tenor", "lognormal"), strikes: [-0.05, 0] },
   ];
   const before = await resources();
   for (const r of invalid) {

@@ -457,7 +457,11 @@ export function PricingWorkbench({
                                 <SurfaceArbitrageBadge
                                   key={surface.id}
                                   surface={surface}
-                                  forwards={forwards}
+                                  config={
+                                    forwards != null && forwards.length > 0
+                                      ? { forward_prices: [...forwards] }
+                                      : null
+                                  }
                                   density={currentDensity}
                                 />
                                 <VolSurfaceChart surface={surface} {...chart} />

@@ -15,11 +15,7 @@ import {
   type OptionCalculatorRequest,
   type OptionCalculatorResult,
 } from "@/hooks/models/use-option-calculator/use-option-calculator";
-import {
-  OptionCalculator,
-  type OptionCalculation,
-  type OptionCalculationResult,
-} from "@/components/finstack/models/components/option-calculator/option-calculator";
+import { OptionCalculator } from "@/components/finstack/models/components/option-calculator/option-calculator";
 import { unwrap, type Envelope } from "@/workers/finstack-contract";
 import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
@@ -41,7 +37,7 @@ const cases = fixture as unknown as Record<string, Case>;
 const value = (name: string) => {
   const { envelope } = cases[name]!;
   if (!envelope.ok) throw new Error(`${name} is a native rejection`);
-  return envelope.value as OptionCalculatorResult & OptionCalculationResult;
+  return envelope.value;
 };
 // Results are regenerated and compared by `mise run ui-fixtures --check`
 // (tests/models/options/generate.mjs).
@@ -56,12 +52,14 @@ it.each(Object.keys(callable))(
 );
 it("rejects an empty field in Rust, which sees NaN", async () => {
   const { request, envelope } = emptyField!;
-  const typed = { ...request, df: Number.NaN } as OptionCalculatorRequest;
+  const typed = {
+    ...request,
+    model: { ...request.model, df: Number.NaN },
+  } as OptionCalculatorRequest;
   expect(await harness.proxy.optionCalculator(typed)).toEqual(envelope);
 });
-// The facade takes every term positionally and every term is a number, so
-// TypeScript cannot catch a swapped pair. Each solve recovers the volatility
-// that priced it, which pins the price call against the implied-vol call.
+// Each solve recovers the volatility that priced it, which pins Rust's
+// price dispatch against its implied-vol dispatch.
 it.each([
   ["black_scholes", 0.2],
   ["black76", 0.25],
@@ -69,9 +67,7 @@ it.each([
 ])(
   "inverts the %s price back to the volatility that produced it",
   (model, vol) => {
-    expect(value(`${model}_implied_vol`).mode).toBe("implied_vol");
-    const solved = value(`${model}_implied_vol`) as { impliedVol: number };
-    expect(solved.impliedVol).toBeCloseTo(vol, 10);
+    expect(value(`${model}_implied_vol`).implied_vol).toBeCloseTo(vol, 10);
   },
 );
 // A central difference of the returned price pins each Greeks call against the
@@ -85,18 +81,16 @@ it.each([
   "agrees the %s Greeks with central differences of its price",
   async (model, underlying, discount, vegaUnit) => {
     const { request } = cases[`${model}_price`]!;
-    const priced = async (change: Record<string, number>) =>
-      (
-        unwrap(
-          await harness.proxy.optionCalculator({
-            ...request,
-            ...change,
-          } as OptionCalculatorRequest),
-        ) as { price: number }
+    const base = request.model as unknown as Record<string, number>;
+    const vol = (request.solve as { vol: number }).vol;
+    const priced = async (change: Record<string, number>, at = vol) =>
+      unwrap(
+        await harness.proxy.optionCalculator({
+          model: { ...request.model, ...change },
+          solve: { kind: "price", vol: at },
+        } as OptionCalculatorRequest),
       ).price;
-    const base = request as unknown as Record<string, number>;
     const { greeks } = value(`${model}_price`);
-    if (!greeks.ok) throw new Error("Greeks rejected");
     const spot = base[underlying]!;
     const bump = spot / 10000;
     const delta =
@@ -104,25 +98,23 @@ it.each([
         (await priced({ [underlying]: spot - bump }))) /
       (2 * bump) /
       discount;
-    expect(greeks.value.delta).toBeCloseTo(delta, 5);
-    const vol = base.vol!;
+    expect(greeks.delta).toBeCloseTo(delta, 5);
     const volBump = vol / 10000;
     const vega =
-      (((await priced({ vol: vol + volBump })) -
-        (await priced({ vol: vol - volBump }))) /
+      (((await priced({}, vol + volBump)) - (await priced({}, vol - volBump))) /
         (2 * volBump) /
         discount) *
       vegaUnit;
-    expect(greeks.value.vega / vega).toBeCloseTo(1, 4);
+    expect(greeks.vega / vega).toBeCloseTo(1, 4);
   },
   budget(15000),
 );
 it("passes a theta denominator to Rust and leaves an omitted one unset", () => {
   const theta = (name: string) => {
     const { greeks } = value(name);
-    if (!greeks.ok || !("theta" in greeks.value))
+    if (greeks.kind !== "black_scholes")
       throw new Error("Black-Scholes Greeks expected");
-    return greeks.value.theta;
+    return greeks.theta;
   };
   expect(theta("theta_trading_days")).not.toBe(theta("black_scholes_price"));
 });
@@ -140,7 +132,7 @@ it("keys the query on the complete request and waits for one", () => {
 const sixPlaces = (number: number) => number.toFixed(6);
 const input = (label: RegExp | string) =>
   screen.getByRole("textbox", { name: label });
-function Wired({ start }: { start: OptionCalculation }) {
+function Wired({ start }: { start: OptionCalculatorRequest }) {
   const query = useOptionCalculator(start);
   return (
     <OptionCalculator
@@ -157,7 +149,7 @@ it("shows the worker's price and Greeks through the hook", async () => {
   const { request } = cases.bachelier_price!;
   render(
     <FinstackQueryProvider>
-      <Wired start={request as OptionCalculation} />
+      <Wired start={request} />
     </FinstackQueryProvider>,
   );
   const result = value("bachelier_price");
@@ -166,9 +158,7 @@ it("shows the worker's price and Greeks through the hook", async () => {
     { name: "Price" },
     { timeout: budget(15000) },
   );
-  expect(tile.textContent).toContain(
-    sixPlaces((result as { price: number }).price),
-  );
+  expect(tile.textContent).toContain(sixPlaces(result.price));
   expect(tile.textContent).toContain("Undiscounted");
   await waitFor(() =>
     expect(
@@ -181,7 +171,7 @@ it("submits the named terms of the selected model and mode, untouched", async ()
   const { request } = cases.black_scholes_price!;
   render(
     <OptionCalculator
-      defaultRequest={request as OptionCalculation}
+      defaultRequest={request}
       onSubmit={onSubmit}
       result={null}
     />,
@@ -198,14 +188,15 @@ it("submits the named terms of the selected model and mode, untouched", async ()
   await userEvent.type(input(/^Option price/), "4.5");
   await userEvent.click(screen.getByRole("button", { name: "Calculate" }));
   expect(onSubmit).toHaveBeenLastCalledWith({
-    model: "black76",
-    mode: "implied_vol",
-    isCall: false,
-    forward: 100,
-    strike: 100,
-    df: 0.97,
-    expiry: 1,
-    price: 4.5,
+    model: {
+      kind: "black76",
+      is_call: false,
+      forward: 100,
+      strike: 100,
+      df: 0.97,
+      expiry: 1,
+    },
+    solve: { kind: "implied_vol", price: 4.5 },
   });
 });
 it("sends an empty field as NaN and a theta denominator only when entered", async () => {
@@ -213,7 +204,7 @@ it("sends an empty field as NaN and a theta denominator only when entered", asyn
   const { request } = cases.black_scholes_price!;
   render(
     <OptionCalculator
-      defaultRequest={request as OptionCalculation}
+      defaultRequest={request}
       onSubmit={onSubmit}
       result={null}
     />,
@@ -221,16 +212,16 @@ it("sends an empty field as NaN and a theta denominator only when entered", asyn
   await userEvent.clear(input(/^Spot/));
   await userEvent.click(screen.getByRole("button", { name: "Calculate" }));
   const first = onSubmit.mock.lastCall![0];
-  expect(first.spot).toBeNaN();
-  expect(first).not.toHaveProperty("thetaDaysPerYear");
+  expect(first.model.spot).toBeNaN();
+  expect(first.model).not.toHaveProperty("theta_days_per_year");
   await userEvent.type(input(/^Theta days per year/), "252");
   await userEvent.click(screen.getByRole("button", { name: "Calculate" }));
-  expect(onSubmit.mock.lastCall![0].thetaDaysPerYear).toBe(252);
+  expect(onSubmit.mock.lastCall![0].model.theta_days_per_year).toBe(252);
 });
-it("states the returned model's conventions, not the current selection", async () => {
+it("states the answered request's conventions, not the current selection", async () => {
   render(
     <OptionCalculator
-      defaultRequest={cases.black_scholes_price!.request as OptionCalculation}
+      defaultRequest={cases.black76_price!.request}
       onSubmit={() => undefined}
       result={value("black76_price")}
       formatValue={sixPlaces}
@@ -248,7 +239,7 @@ it("lists Black-Scholes Greeks in Rust's order with their units", () => {
   const result = value("black_scholes_price");
   render(
     <OptionCalculator
-      defaultRequest={cases.black_scholes_price!.request as OptionCalculation}
+      defaultRequest={cases.black_scholes_price!.request}
       onSubmit={() => undefined}
       result={result}
     />,
@@ -256,14 +247,13 @@ it("lists Black-Scholes Greeks in Rust's order with their units", () => {
   const greeks = screen.getByRole("region", { name: "Greeks" });
   const rows = within(greeks).getAllByRole("row");
   expect(rows).toHaveLength(7);
-  if (!result.greeks.ok) throw new Error("Greeks rejected");
-  expect(rows[1]!.textContent).toContain(String(result.greeks.value.delta));
+  expect(rows[1]!.textContent).toContain(String(result.greeks.delta));
   expect(greeks.textContent).toContain("per 1% move");
 });
 it("shows an implied volatility under the model's own name", () => {
   render(
     <OptionCalculator
-      defaultRequest={cases.bachelier_implied_vol!.request as OptionCalculation}
+      defaultRequest={cases.bachelier_implied_vol!.request}
       onSubmit={() => undefined}
       result={value("bachelier_implied_vol")}
       formatValue={sixPlaces}
@@ -273,37 +263,28 @@ it("shows an implied volatility under the model's own name", () => {
     name: "Implied normal volatility",
   });
   expect(tile.textContent).toContain(
-    sixPlaces(
-      (value("bachelier_implied_vol") as { impliedVol: number }).impliedVol,
-    ),
+    sixPlaces(value("bachelier_implied_vol").implied_vol),
   );
 });
-it("shows Greeks Rust rejects beside the price it returned", () => {
-  const result = value("zero_vol_rejects_greeks");
+it("fails the whole calculation when Rust rejects the Greeks at zero volatility", () => {
+  const { envelope } = cases.zero_vol_rejects_greeks!;
+  if (envelope.ok) throw new Error("Rust should reject these Greeks");
   render(
     <OptionCalculator
-      defaultRequest={
-        cases.zero_vol_rejects_greeks!.request as OptionCalculation
-      }
+      defaultRequest={cases.zero_vol_rejects_greeks!.request}
       onSubmit={() => undefined}
-      result={result}
-      formatValue={sixPlaces}
+      result={null}
+      error={envelope.error.message}
     />,
   );
-  expect(screen.getByRole("region", { name: "Price" }).textContent).toContain(
-    sixPlaces((result as { price: number }).price),
-  );
-  if (result.greeks.ok) throw new Error("Rust should reject these Greeks");
-  expect(screen.getByRole("alert").textContent).toBe(
-    result.greeks.error.message,
-  );
+  expect(screen.getByRole("alert").textContent).toBe(envelope.error.message);
 });
 it("surfaces the native error of a price below intrinsic value, untouched", () => {
   const { envelope } = cases.below_intrinsic!;
   if (envelope.ok) throw new Error("Rust should reject this price");
   render(
     <OptionCalculator
-      defaultRequest={cases.below_intrinsic!.request as OptionCalculation}
+      defaultRequest={cases.below_intrinsic!.request}
       onSubmit={() => undefined}
       result={null}
       error={envelope.error.message}
@@ -316,7 +297,7 @@ it("waits and reports loading before any result", () => {
   const { request } = cases.black76_price!;
   const { rerender } = render(
     <OptionCalculator
-      defaultRequest={request as OptionCalculation}
+      defaultRequest={request}
       onSubmit={() => undefined}
       result={null}
     />,
@@ -324,7 +305,7 @@ it("waits and reports loading before any result", () => {
   expect(screen.getByRole("status").textContent).toBe("No option result");
   rerender(
     <OptionCalculator
-      defaultRequest={request as OptionCalculation}
+      defaultRequest={request}
       onSubmit={() => undefined}
       result={null}
       loading

@@ -173,7 +173,7 @@ it("the worker lists Rust's calibration ids, each one accepted", async () => {
       ).ok,
     ).toBe(true);
 });
-it("calls workoutLgd with its arguments in the binding's positions", async () => {
+it("evaluates the request's WorkoutLgd at the request's EAD", async () => {
   // Doubling the EAD with the same collateral leaves less recovered per unit.
   const larger = unwrap(
     await harness.proxy.workoutLgd({ ...workoutTerms, ead: 2_000_000 }),
@@ -184,7 +184,7 @@ it("calls workoutLgd with its arguments in the binding's positions", async () =>
   const slower = unwrap(
     await harness.proxy.workoutLgd({
       ...workoutTerms,
-      timeToResolutionYears: 5,
+      model: { ...workoutTerms.model, workout_years: 5 },
     }),
   );
   expect(slower.net_recovery).toBeLessThan(base.net_recovery);
@@ -310,8 +310,8 @@ it("adds and removes claims and collateral pieces", () => {
     ),
   );
   fireEvent.click(screen.getByRole("button", { name: "Calculate LGD" }));
-  expect(onWorkoutSubmit.mock.lastCall![0].collateral).toEqual([
-    workoutTerms.collateral[1],
+  expect(onWorkoutSubmit.mock.lastCall![0].model.collateral).toEqual([
+    workoutTerms.model.collateral[1],
   ]);
 });
 it("labels each field by its wire name and describes it from the generated contracts", async () => {

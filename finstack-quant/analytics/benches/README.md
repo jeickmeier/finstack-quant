@@ -42,8 +42,8 @@ Both benchmark targets share deterministic inputs from
   `(-0.02, 0.02)`.
 - `synthetic_dates(n)` — consecutive calendar days from 2020-01-01 via
   `Date::next_day`.
-- `perf_from_returns(n, seed)` — single-ticker `Performance::from_returns` at
-  `PeriodKind::Daily`.
+- `perf_from_returns(n, seed)` — single-ticker return panel through
+  `Performance::new` at `PeriodKind::Daily`.
 - `perf_panel(n_obs, n_tickers, seed)` — multi-ticker panel where column 0 (`T0`) is the
   benchmark ticker; used by the rolling-greeks, multi-factor, and correlation cases.
 - `near_correlation_needs_repair(n)` — an indefinite correlation-shaped matrix used by

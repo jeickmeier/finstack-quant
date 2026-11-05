@@ -97,8 +97,8 @@ import pandas as pd
 from _shared.analyst_book import calibration_envelope, instruments
 from _shared.analyst_history import history_market
 from finstack_quant.calibration import calibrate
-from finstack_quant.attribution import default_waterfall_order
 from finstack_quant.portfolio import Portfolio, replay_portfolio
+from finstack_quant.attribution import default_waterfall_order
 from finstack_quant.scenarios import build_from_template, list_builtin_templates, compute_horizon_return
 # Quote-space stress rebuilds discount and hazard curves together. It is not an exact parallel zero shift.
 quoted=calibration_envelope("base")

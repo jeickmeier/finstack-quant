@@ -24,8 +24,9 @@ use super::types::{CreditScoringError, ScoringResult, ScoringZone, check_finite}
 /// Zmijewski, M. E. (1984). "Methodological Issues Related to the Estimation
 /// of Financial Distress Prediction Models." *Journal of Accounting Research*,
 /// 22, 59-82. `docs/REFERENCES.md#zmijewski-1984`
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct ZmijewskiInput {
     /// Net Income / Total Assets (ROA).
     pub net_income_to_total_assets: f64,

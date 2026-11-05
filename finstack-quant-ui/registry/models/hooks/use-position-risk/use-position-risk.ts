@@ -8,8 +8,6 @@ import type { PositionRiskRequest } from "@/workers/finstack-contract";
 export type {
   PositionRisk,
   PositionRiskRequest,
-  PositionRiskSource,
-  StressAttribution,
 } from "@/workers/finstack-contract";
 /** Key the report on the complete snapshotted positions, source, confidence and budget (a non-finite value stays distinct); nothing is defaulted. */
 export function positionRiskOptions(
@@ -25,7 +23,7 @@ export function positionRiskOptions(
     "No positions supplied",
   );
 }
-/** Native models.factor.risk VaR/ES decomposition with its risk budget and tail stress attribution, or the actual native error; supply a Finstack/Query provider. */
+/** Native models.factor.risk.positionRiskReport: the VaR/ES decomposition with its risk budget and tail stress attribution, or the actual native error; supply a Finstack/Query provider. */
 export function usePositionRisk(request: PositionRiskRequest | null) {
   return useWorkerQuery((worker) =>
     positionRiskOptions(worker.client, worker.session, request),

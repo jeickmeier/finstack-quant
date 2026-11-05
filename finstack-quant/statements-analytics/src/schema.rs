@@ -72,7 +72,7 @@ use crate::{
     analysis::RelativeValueReport, analysis::RelativeValueReportConfig,
     analysis::RelativeValueResult, analysis::ScenarioDiff, analysis::ScenarioResults,
     analysis::ScenarioSet, analysis::ScoringDimension, analysis::SensitivityResult,
-    analysis::StageResult, analysis::TrendCheck, analysis::VarianceConfig,
+    analysis::StageResult, analysis::TrendCheck, analysis::VarianceConfig, analysis::WaccInputs,
     analysis::WeightedEclResult, analysis::WorkingCapitalConsistency, extensions::CorkscrewConfig,
     extensions::CorkscrewReport, extensions::ScorecardConfig, extensions::ScorecardReport,
     templates::real_estate::LeaseSpec, templates::real_estate::ManagementFeeSpec,
@@ -487,6 +487,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "variance_config",
         Input,
         "Configuration for variance analysis between two `StatementResult`."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        WaccInputs,
+        "statements_analytics",
+        "wacc_inputs",
+        Input,
+        "Capital-structure inputs of a weighted-average cost of capital calculation."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

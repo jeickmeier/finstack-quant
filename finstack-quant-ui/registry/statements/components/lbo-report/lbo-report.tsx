@@ -18,10 +18,11 @@ import {
   ReportSection,
   yesNo,
 } from "@/components/finstack/shared/primitives/native-display/native-display";
+import type { LboConfigWire } from "@/lib/finstack/generated/types/lbo_config";
 
 export interface LboReportProps {
   /** Initial LboConfig; remount to load another. Omitted starts empty. */
-  defaultConfig?: Record<string, unknown>;
+  defaultConfig?: LboConfigWire;
   /** Model node ids offered for every `*_node` field of the config. */
   nodeIds: readonly string[];
   /** Receives the structurally valid LboConfig JSON on Evaluate; Rust validates it. */

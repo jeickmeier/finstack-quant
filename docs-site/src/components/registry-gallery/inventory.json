@@ -135,7 +135,7 @@
     {
       "name": "market-context-form",
       "type": "registry:component",
-      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit.",
+      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import market JSON (Import market JSON) or the final_market of a calibration result envelope (Import calibration result), each through the generated MarketContextState contract. Supply useMarketValidator and receive complete canonical JSON on submit.",
       "worker": "none"
     },
     {
@@ -351,7 +351,7 @@
     {
       "name": "covenant-engine-editor",
       "type": "registry:component",
-      "docs": "Composes schema-form over the generated covenant_engine contract (started from defaultJson; Rust publishes no example, so it otherwise starts empty). When loadTemplate is supplied, a template bar loads the specs of a Rust package (covenants.covLite, lboStandard, realEstate or projectFinance) for thresholds typed into decimal inputs that start empty; a blank threshold is sent as NaN and a rejected template shows the native error. Every metric_id and denominator_metric_id (top-level and windowed specs) is an id-combobox: free text with metricIds as suggestions. A Covenant metrics table lists each spec's metric id and whether metricIds contains it, before any evaluation; an unset metric id is listed as read by Rust's conventional metric for the covenant type and is not checked. Validation, templates and every term are native: connect validate to useCovenantEngineValidator, loadTemplate to useCovenantTemplate and onSubmit to the useEvaluateCovenants request. Accepts defaultJson, validate, onSubmit, loadTemplate, metricIds, disabled and density props.",
+      "docs": "Composes schema-form over the generated covenant_engine contract (started from defaultJson; Rust publishes no example, so it otherwise starts empty). When loadTemplate is supplied, a second schema form over the generated covenant_template contract picks a Rust package (cov_lite, lbo_standard, real_estate or project_finance) and its thresholds, which start empty; Load template passes the structurally checked CovenantTemplate to covenants.covenantTemplate and replaces the engine with the returned specs, and a rejected template shows the native error in that form. Every metric_id and denominator_metric_id (top-level and windowed specs) is an id-combobox: free text with metricIds as suggestions. A Covenant metrics table lists each spec's metric id and whether metricIds contains it, before any evaluation; an unset metric id is listed as read by Rust's conventional metric for the covenant type and is not checked. Validation, templates and every term are native: connect validate to useCovenantEngineValidator, loadTemplate to useCovenantTemplate and onSubmit to the useEvaluateCovenants request. Accepts defaultJson, validate, onSubmit, loadTemplate, metricIds, disabled and density props.",
       "worker": "none"
     },
     {
@@ -375,7 +375,7 @@
     {
       "name": "market-scenario-builder",
       "type": "registry:component",
-      "docs": "Composes schema-form over the generated scenario_spec contract (started from defaultJson, else the Rust schema example), with IdCombobox on the operation curve_id, discount_curve_id, vol_surface_id, surface_id and ids fields: free text with the supplied market ids as suggestions, never filtered by kind. When templates is supplied, a picker lists scenarios.listBuiltinTemplateMetadata (useListBuiltinTemplateMetadata) with the selected template's returned description, severity, event date, asset classes and tags; Load template replaces the document with scenarios.buildFromTemplate or, for a chosen component, buildTemplateComponent, and Compose with scenario merges the current scenario and the template through scenarios.composeScenarios (Rust's priority order, id and hazard-bump-mode rule). Template ids are placeholders the user maps to market ids. When buildMarketScenario is supplied (useBuildMarketScenario), Add parallel shift and Add roll append the operations Rust builds (scenarios.parallelBpMany, operationSpecTimeRollForward); a blank size is NaN and a blank roll mode is omitted, so Rust rejects or defaults them. Validation is native (connect validate to useScenarioSpecValidator); onSpecChange receives the canonical spec, or null while an edit is pending or rejected, and the canonical spec is shown as JSON. Every failure is the native error. Accepts defaultJson, validate, onSpecChange, curveIds, templates, templatesError, buildFromTemplate, buildTemplateComponent, composeScenarios, buildMarketScenario, disabled and density props.",
+      "docs": "Composes schema-form over the generated scenario_spec contract (started from defaultJson, else the Rust schema example), with IdCombobox on the operation curve_id, discount_curve_id, vol_surface_id, surface_id and ids fields: free text with the supplied market ids as suggestions, never filtered by kind. When templates is supplied, a picker lists scenarios.listBuiltinTemplateMetadata (useListBuiltinTemplateMetadata) with the selected template's returned description, severity, event date, asset classes and tags; Load template replaces the document with scenarios.buildFromTemplate or, for a chosen component, buildTemplateComponent, and Compose with scenario merges the current scenario and the template through scenarios.composeScenarios (Rust's priority order, id and hazard-bump-mode rule). Template ids are placeholders the user maps to market ids. Add parallel shift and Add roll append a curve_parallel_bp or time_roll_forward OperationSpec to the working spec as entered; a blank size is NaN and a blank roll mode is omitted, so Rust rejects or defaults them when it validates the spec. Validation is native (connect validate to useScenarioSpecValidator); onSpecChange receives the canonical spec, or null while an edit is pending or rejected, and the canonical spec is shown as JSON. Every failure is the native error. Accepts defaultJson, validate, onSpecChange, curveIds, templates, templatesError, buildFromTemplate, buildTemplateComponent, composeScenarios, disabled and density props.",
       "worker": "none"
     },
     {
@@ -519,7 +519,7 @@
     {
       "name": "option-calculator",
       "type": "registry:component",
-      "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. A price Rust cannot invert is the whole error; Greeks Rust rejects (at zero volatility under Black-Scholes) show their native error beside the price. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
+      "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. The request and result are Rust's OptionCalculation and OptionCalculationResult wire values; the labels follow the last submitted request. A price Rust cannot invert or Greeks it rejects (at zero volatility under Black-Scholes) is the whole error. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
       "worker": "none"
     },
     {
@@ -537,13 +537,13 @@
     {
       "name": "vol-cube-slice",
       "type": "registry:component",
-      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice[Normal], rendered by the shared surface view with an explicit color extent per convention. The node smile comes from SabrSmile at the selected expiry/tenor node: normal volatility when beta < 1e-4, Black otherwise, as the facade documents; the arbitrage check needs an explicit continuously compounded decimal rate (initialRate, never defaulted) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
+      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice in the selected convention (\"normal\" or \"lognormal\"), rendered by the shared surface view with an explicit color extent per convention. The node smile comes from SabrSmile at the selected expiry/tenor node: normal volatility when beta < 1e-4, Black otherwise, as the facade documents; the arbitrage check needs an explicit continuously compounded decimal rate (initialRate, never defaulted) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
       "worker": "host"
     },
     {
       "name": "surface-arbitrage-badge",
       "type": "registry:component",
-      "docs": "Runs models.volatility.checkSurface (through useCheckSurface) on a canonical stored surface with host-supplied forwards (one to broadcast or one per expiry, in the surface strike units; never inferred) and an optional tolerance. The badge shows Passed, the violation count, Not checked (the native error, such as a normal-quoted, shifted-Black or tenor-axis surface Rust does not check) or Forwards not supplied (no request is made). The popover lists the returned counts by type and severity and every violation (type, severity, expiry, adjacent expiry, strike, magnitude in total variance, suggested fix, description) in the order Rust returned them. Requires FinstackQueryProvider.",
+      "docs": "Runs models.volatility.checkSurface (through useCheckSurface) on a canonical stored surface with a host-supplied Rust ArbitrageCheckConfig (forward_prices one to broadcast or one per expiry, in the surface strike units, never inferred; optional tolerance and check switches). The badge shows Passed, the violation count, Not checked (the native error, such as a normal-quoted, shifted-Black or tenor-axis surface Rust does not check) or Forwards not supplied (no config, so no request is made). The popover lists the returned counts by type and severity and every violation (type, severity, expiry, adjacent expiry, strike, magnitude in total variance, suggested fix, description) in the order Rust returned them. Requires FinstackQueryProvider.",
       "worker": "host"
     },
     {
@@ -567,13 +567,13 @@
     {
       "name": "credit-scorecard",
       "type": "registry:component",
-      "docs": "Edits the input ratios of one accounting-based credit model (Altman Z-Score, Z'-Score, Z''-Score or EM-Score, Ohlson O-Score, Zmijewski probit). The fields, their order and their help text come from the generated input contract of the selected model (altman_z_score_input, altman_z_prime_input, altman_z_double_prime_input for both Z'' and EM, ohlson_o_score_input, zmijewski_input); each model keeps its own entries when another is selected. Score passes the model and the ratios to the caller (usually the useCreditScore request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned score, zone and implied PD are shown as Rust returned them, with the default PD master scale's grade and central PD of the implied PD, or Rust's error when the model returns no implied PD (the Altman models). Nothing is computed or classified here. Accepts defaultModel, defaultInputs, onSubmit, score, loading, error, formatValue and density props.",
+      "docs": "Edits the input ratios of one accounting-based credit model (Altman Z-Score, Z'-Score, Z''-Score or EM-Score, Ohlson O-Score, Zmijewski probit). The fields, their order and their help text come from the generated input contract of the selected model (altman_z_score_input, altman_z_prime_input, altman_z_double_prime_input for both Z'' and EM, ohlson_o_score_input, zmijewski_input); each model keeps its own entries when another is selected. Score passes the Rust CreditScoreRequest (the model tag and its ratios) to the caller (usually the useCreditScore request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned score, zone and implied PD are shown as Rust returned them, with the grade and central PD Rust assigns the implied PD on the default PD master scale, or no grade when the model returns no implied PD (the Altman models). Nothing is computed or classified here. Accepts defaultModel, defaultInputs, onSubmit, score, loading, error, formatValue and density props.",
       "worker": "none"
     },
     {
       "name": "portfolio-risk-report",
       "type": "registry:component",
-      "docs": "Presents the report the worker positionRisk returns (usually through usePositionRisk): portfolio VaR, ES, confidence, method, position count and the Euler residual stamp (none for a historical decomposition); bars of each returned component VaR; the VaR contributions (component, relative, marginal and incremental VaR) and ES contributions tables; the risk budget (has_breach, total_overbudget and per-position actual and target component VaR, utilization and excess) when one was requested; and, for a historical source, the tail stress attribution (VaR threshold, tail scenario count, per-position tail contributions in Rust's largest-driver-first order and the tail scenarios worst first). A budget or stress attribution Rust rejects shows its native error beside the rest. Values are as returned: losses negative, in the units of the supplied weights or P&L, shares as fractions; nothing is summed, flagged or re-sorted. With factors (usually from useFactorRisk) it adds a Factor contributions section: total and residual risk under the returned measure, risk by factor (absolute, relative and marginal), risk by position and factor, any residual risk by position, and the portfolio.computeFactorSensitivities matrix it decomposed in the book's base currency; the factor chain's native error shows in that section. Either part renders without the other. Accepts report, factors, factorsError, loading, error, formatValue and density props.",
+      "docs": "Presents the Rust PositionRiskReport the worker positionRisk returns (usually through usePositionRisk): portfolio VaR, ES, confidence, method, position count and the Euler residual stamp (none for a historical decomposition); bars of each returned component VaR; the VaR contributions (component, relative, marginal and incremental VaR) and ES contributions tables; the risk budget (has_breach, total_overbudget and per-position actual and target component VaR, utilization and excess) when one was requested; and, for a historical source, the tail stress attribution (VaR threshold, tail scenario count, per-position tail contributions in Rust's largest-driver-first order and the tail scenarios worst first). Values are as returned: losses negative, in the units of the supplied weights or P&L, shares as fractions; nothing is summed, flagged or re-sorted. With factors (usually from useFactorRisk) it adds a Factor contributions section: total and residual risk under the returned measure, risk by factor (absolute, relative and marginal), risk by position and factor, any residual risk by position, and the portfolio.computeFactorSensitivities matrix it decomposed in the book's base currency; the factor chain's native error shows in that section. Either part renders without the other. Accepts report, factors, factorsError, loading, error, formatValue and density props.",
       "worker": "none"
     },
     {
@@ -651,7 +651,7 @@
     {
       "name": "statement-sensitivity",
       "type": "registry:component",
-      "docs": "Edit a sensitivity run: the SensitivityMode (the wire values read from the generated sensitivity_result contract), the target metric as an id-combobox, the tornado period, and each varied node and period with comma-separated percentage moves. Each parameter's base value is read from the supplied evaluated result (a missing or non-finite cell is sent as NaN, never defaulted) and passed with the moves to statements_analytics.parameterSpecWithPercentages; an empty move is NaN, so Rust rejects it. Run sensitivity passes the run to the caller (usually the useRunSensitivity request). The native tornado is shown through tornado-chart, parameter keys (node@period) labelled by node and period, and the target metric at the tornado period in the baseline and every returned scenario in Rust's order. A full-grid run has no tornado; the scenarios are still shown. Nothing is calculated. Accepts result, nodeIds, periods, defaultValues, onSubmit, data, loading, error, disabled and density props.",
+      "docs": "Edit a sensitivity run: the SensitivityMode (the wire values read from the generated sensitivity_result contract), the target metric as an id-combobox, the tornado period, and each varied node and period with comma-separated percentage moves. Each parameter's base value is read from the supplied evaluated result (a missing or non-finite cell is sent as NaN, never defaulted) and sent with the moves as the Rust ParameterSpec pct_range of the submitted SensitivityConfig; an empty move is NaN, so Rust rejects it. Run sensitivity passes the run to the caller (usually the useRunSensitivity request). The native tornado is shown through tornado-chart, parameter keys (node@period) labelled by node and period, and the target metric at the tornado period in the baseline and every returned scenario in Rust's order. A full-grid run has no tornado; the scenarios are still shown. Nothing is calculated. Accepts result, nodeIds, periods, defaultValues, onSubmit, data, loading, error, disabled and density props.",
       "worker": "none"
     },
     {
@@ -806,10 +806,6 @@
     },
     {
       "name": "use-forecast-breaches",
-      "type": "registry:hook"
-    },
-    {
-      "name": "use-market-scenario",
       "type": "registry:hook"
     },
     {
@@ -1162,6 +1158,10 @@
     },
     {
       "name": "contract-covenant-report",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-covenant-template",
       "type": "registry:lib"
     },
     {
@@ -1760,11 +1760,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
-      "sha256": "0965801897de2d912a19e63fe99d6c5762228de10c586fa51ef5ea3b2e524c22"
+      "sha256": "c16e96d42ea3b6948ac8f1da5ab220788f0cd0dc9cafcf392ad6168400ce17c0"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/horizon/cases.json",
-      "sha256": "1c4eecde03629a38df14762995edfa501df5f5affc5cc47c162696b461b2e67a"
+      "sha256": "dc7c6b5b981f232e9dd0dc68936b29ee61f960dd0f50ef08cdad0903ba24a87e"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/templates/cases.json",
@@ -1772,19 +1772,19 @@
     },
     {
       "path": "finstack-quant-ui/tests/attribution/cases.json",
-      "sha256": "01956388a89957668bd02f4819f397b210762e5c01bbd65c985b8c39d8b13950"
+      "sha256": "4b2b46be098e6a6601960b82724367c028eaa27401607d5febe39c6b8729b660"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",
-      "sha256": "321ffcfe293db4e1d0e560bb9e8f8fb730c44c9412ce6695b1d2625d69930ce8"
+      "sha256": "9b1db83e086727e9f5b311353291b24df7e0cb3570892c95615ec836ddce227a"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/benchmark.json",
-      "sha256": "f8faac19b3e614cd3b307280fb4e09b1e6cfc2750a00448d4ba1c53ff7756e8d"
+      "sha256": "62e6502b190c0b291a85466eee50fe0bdb58dd34c526e49e95bec7ea45ae5922"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/correlation/cases.json",
-      "sha256": "59dfbb75408aa27495e95e764a32584ef18034539bc71d831f5d2ed5cffd479c"
+      "sha256": "e9817100ee6cf2dca6c102bbb49581fbaa52e0b3ecaa86697df583f43f541c65"
     },
     {
       "path": "finstack-quant-ui/tests/models/credit/migration.json",
@@ -1796,23 +1796,23 @@
     },
     {
       "path": "finstack-quant-ui/tests/models/credit/scorecard.json",
-      "sha256": "687c7b5a8716926a445b1fbe9faf1094c4cdd7a6615ae891ef0258b1a53495d8"
+      "sha256": "d73f7ac4c2343c994bd48ea33a5355ef902654114823a7073a63e08ee05a507b"
     },
     {
       "path": "finstack-quant-ui/tests/models/risk/cases.json",
-      "sha256": "87628356e80638606a1e4e17876b0d4058d6277d555d1b4e5faf9517ce060a4e"
+      "sha256": "e25c752bbf2af2d251b6f05ddad67e7d59f3ee7dd6c696ad52242fdafe87a6ca"
     },
     {
       "path": "finstack-quant-ui/tests/models/options/cases.json",
-      "sha256": "9fb6c54c8b7050e0ff8d768ead41b3d375a19f766dd3b60fa1e1229cabb44e09"
+      "sha256": "cfa7d8042c7ecf9c37ce1ee16cc484f928bad0fa62cf6a31876ba6d13e060d5c"
     },
     {
       "path": "finstack-quant-ui/tests/models/liability-management/cases.json",
-      "sha256": "6f51a7c35d8889becbb50185a69a67e4a744c692a82d85d261b9594cc9a872bf"
+      "sha256": "df3eb94bb57ac8e9041beb3f0b96f38e98a2a0da740e21ed1d99eedb58d5ac69"
     },
     {
       "path": "finstack-quant-ui/tests/models/recovery/cases.json",
-      "sha256": "eb71abd4d2a7034f9fc9559312fccc4c68a2f775a066e38eeb364924ba7bfda5"
+      "sha256": "051a38c43bce582f4ed62efce2e3a5afb81abd10f300e24f76b22f4c3d2e4fb9"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/margin/simm.json",
@@ -1844,7 +1844,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/attribution/cases.json",
-      "sha256": "ba2e1619d959df22fa4f12776a96861f05117c1f415799fb3d43772566910747"
+      "sha256": "cee3bf16d5ea2022b1f67e1e83f8924d5b818c1492cb91c618e0154ca8c201c4"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",
@@ -1968,7 +1968,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/wacc/cases.json",
-      "sha256": "5782f5a911c69da0fa101f500d75752084ebcb7faa46521b00b96e6cb7b5faf3"
+      "sha256": "bbafcdd8be7910fbfa1677cfe92bf5cabdcb33b36abe11c105706ee9b45d1986"
     },
     {
       "path": "finstack-quant-ui/tests/statements/normalization/cases.json",

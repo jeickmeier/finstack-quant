@@ -977,7 +977,7 @@
     {
       "id": "covenant-engine-editor",
       "route": "schema",
-      "convention": "Generated covenant_engine form (the caller's engine; Rust publishes no example), optionally replaced by the specs of a Rust package template (covenants.covLite, lboStandard, realEstate or projectFinance over typed thresholds that start empty, a blank one sent as NaN); metric ids are free text with the model's node ids as suggestions, and each spec's metric id is listed with whether the model has that node, without inferring an unset one; validated natively by validateCovenantEngineJson.",
+      "convention": "Generated covenant_engine form (the caller's engine; Rust publishes no example), optionally replaced by the specs of a Rust package template (covenants.covenantTemplate over the generated covenant_template form, whose thresholds start empty); metric ids are free text with the model's node ids as suggestions, and each spec's metric id is listed with whether the model has that node, without inferring an unset one; validated natively by validateCovenantEngineJson.",
       "schemas": [
         {
           "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
@@ -1104,9 +1104,9 @@
       ]
     },
     {
-      "id": "vol-cube-explorer-black",
+      "id": "vol-cube-explorer",
       "route": "typed",
-      "convention": "Annualized Black volatility as decimal; supply stored cube and explicit expiry, tenor, strike. Fixed-tenor and fixed-expiry slices are Rust-materialized (vol-cube-tenor-slice, vol-cube-expiry-slice).",
+      "convention": "Annualized volatility in the request's wire VolatilityConvention: decimal Black for \"lognormal\", absolute rate units for \"normal\"; shifted lognormal is rejected natively. Supply stored cube and explicit expiry, tenor, strike. Fixed-tenor and fixed-expiry slices are Rust-materialized (vol-cube-tenor-slice, vol-cube-expiry-slice).",
       "api": {
         "name": "models.volatility.getCubeVol",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -1132,11 +1132,16 @@
             "name": "strike",
             "type": "number",
             "optional": false
+          },
+          {
+            "name": "convention",
+            "type": "VolatilityConvention",
+            "optional": false
           }
         ],
         "returns": "number",
-        "declaration": "/**\n   * Evaluate checked Black/lognormal volatility from a data-only SABR cube.\n   * @returns Annualized Black volatility as a decimal.\n   * @param cube - Structurally validated data-only volatility cube.\n   * @param expiry - Positive option expiry in years within the cube grid.\n   * @param tenor - Positive underlying tenor in years within the cube grid.\n   * @param strike - Finite strike in the same rate units as the stored forwards.\n   * @throws Error - Throws a JavaScript exception for out-of-grid coordinates or invalid SABR model inputs.\n   */\n  getCubeVol(cube: VolCube, expiry: number, tenor: number, strike: number): number;",
-        "sha256": "df3fb6db845c7ac86bf901733fab4e24ad23bbc3b6e93a8444acfad4c77314fa"
+        "declaration": "/**\n   * Evaluate a data-only SABR cube in the requested quote convention.\n   * @returns Annualized volatility: decimal Black for `\"lognormal\"`, absolute rate units for `\"normal\"`.\n   * @param cube - Structurally validated data-only volatility cube.\n   * @param expiry - Positive option expiry in years within the cube grid.\n   * @param tenor - Positive underlying tenor in years within the cube grid.\n   * @param strike - Finite strike in the same rate units as the stored forwards.\n   * @param convention - Output quote convention: `\"lognormal\"` (decimal Black, shifted by the cube's own SABR shifts where it stores them) or `\"normal\"` (absolute Bachelier vol in the forward's rate units). The serde form `{\"shifted_lognormal\": {\"shift\": s}}` is rejected because the cube already carries its own shifts.\n   * @throws Error - Throws a JavaScript exception for out-of-grid coordinates, invalid SABR model inputs, or a shifted-lognormal or undecodable `convention`.\n   */\n  getCubeVol(\n    cube: VolCube,\n    expiry: number,\n    tenor: number,\n    strike: number,\n    convention: VolatilityConvention\n  ): number;",
+        "sha256": "d020360312526a0d94341ede460f1debb84e7d4cd558b3a12342e5df1509c103"
       },
       "schemas": [
         {
@@ -1149,45 +1154,9 @@
       ]
     },
     {
-      "id": "vol-cube-explorer-normal",
-      "route": "typed",
-      "convention": "Annualized normal volatility in absolute rate units. Normal slices are Rust-materialized (vol-cube-tenor-slice-normal, vol-cube-expiry-slice-normal).",
-      "api": {
-        "name": "models.volatility.getCubeNormalVol",
-        "source": "finstack-quant-wasm/index.d.ts",
-        "owner": "VolatilityNamespace",
-        "member": "getCubeNormalVol",
-        "inputs": [
-          {
-            "name": "cube",
-            "type": "VolCube",
-            "optional": false
-          },
-          {
-            "name": "expiry",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "tenor",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "strike",
-            "type": "number",
-            "optional": false
-          }
-        ],
-        "returns": "number",
-        "declaration": "/**\n   * Evaluate checked normal/Bachelier volatility from a data-only SABR cube.\n   * @returns Annualized normal volatility in absolute rate units.\n   * @param cube - Structurally validated data-only volatility cube.\n   * @param expiry - Positive option expiry in years within the cube grid.\n   * @param tenor - Positive underlying tenor in years within the cube grid.\n   * @param strike - Finite strike in the same rate units as the stored forwards.\n   * @throws Error - Throws a JavaScript exception for out-of-grid coordinates, an invalid shifted-SABR domain, or a failed normal-volatility expansion.\n   */\n  getCubeNormalVol(cube: VolCube, expiry: number, tenor: number, strike: number): number;",
-        "sha256": "b157b0227119159271e00b8af73f8f2eb3484b89c718f6c8f9ad33b564565e43"
-      }
-    },
-    {
       "id": "vol-cube-tenor-slice",
       "route": "returned-surface",
-      "convention": "Returned VolSurface JSON (expiry by strike, Black or shifted-Black quote type with displacements as Rust returns them); fixed tenor in years and absolute strikes in forward-rate units are explicit caller input. Off-node tenors are Rust-interpolated.",
+      "convention": "Returned VolSurface JSON (expiry by strike) in the request's VolatilityConvention: normal, or Black/shifted-Black with displacements as Rust returns them; fixed tenor in years and absolute strikes in forward-rate units are explicit caller input. Off-node tenors are Rust-interpolated.",
       "api": {
         "name": "models.volatility.materializeCubeTenorSlice",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -1208,48 +1177,22 @@
             "name": "strikes",
             "type": "NumericArray",
             "optional": false
-          }
-        ],
-        "returns": "VolSurface",
-        "declaration": "/**\n   * Materialize the Black volatility slice of a SABR cube at one underlying tenor.\n   * @param cube - `core.VolCube` handle.\n   * @param tenor - Underlying tenor in years, within the cube grid.\n   * @param strikes - Strictly increasing strikes of the output surface.\n   * @returns The expiry by strike `core.VolSurface` handle.\n   * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.\n   */\n  materializeCubeTenorSlice(cube: VolCube, tenor: number, strikes: NumericArray): VolSurface;",
-        "sha256": "6231f7ed2990885c24a6762e7e57b1983c18b32a225895f805d45a8d0cb25b4c"
-      }
-    },
-    {
-      "id": "vol-cube-tenor-slice-normal",
-      "route": "returned-surface",
-      "convention": "Returned VolSurface JSON of normal volatilities (expiry by strike); fixed tenor and absolute strikes are explicit caller input. Off-node tenors are Rust-interpolated.",
-      "api": {
-        "name": "models.volatility.materializeCubeTenorSliceNormal",
-        "source": "finstack-quant-wasm/index.d.ts",
-        "owner": "VolatilityNamespace",
-        "member": "materializeCubeTenorSliceNormal",
-        "inputs": [
-          {
-            "name": "cube",
-            "type": "VolCube",
-            "optional": false
           },
           {
-            "name": "tenor",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "strikes",
-            "type": "NumericArray",
+            "name": "convention",
+            "type": "VolatilityConvention",
             "optional": false
           }
         ],
         "returns": "VolSurface",
-        "declaration": "/**\n   * Materialize the normal (Bachelier) volatility slice of a SABR cube at one underlying tenor.\n   * @param cube - `core.VolCube` handle.\n   * @param tenor - Underlying tenor in years, within the cube grid.\n   * @param strikes - Strictly increasing strikes of the output surface.\n   * @returns The expiry by strike `core.VolSurface` handle of normal volatilities.\n   * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.\n   */\n  materializeCubeTenorSliceNormal(cube: VolCube, tenor: number, strikes: NumericArray): VolSurface;",
-        "sha256": "a4479575295da1212f944da76a416ce67bea85fda503a1025b2c11a57d562a37"
+        "declaration": "/**\n   * Materialize the volatility slice of a SABR cube at one underlying tenor.\n   * @param cube - `core.VolCube` handle.\n   * @param tenor - Underlying tenor in years, within the cube grid.\n   * @param strikes - Strictly increasing strikes of the output surface.\n   * @param convention - `\"lognormal\"` for Black volatilities or `\"normal\"` for absolute Bachelier volatilities; shifted-lognormal is rejected.\n   * @returns The expiry by strike `core.VolSurface` handle in `convention`.\n   * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, a SABR evaluation fails, or `convention` is shifted-lognormal.\n   */\n  materializeCubeTenorSlice(\n    cube: VolCube,\n    tenor: number,\n    strikes: NumericArray,\n    convention: VolatilityConvention\n  ): VolSurface;",
+        "sha256": "37aa597216a981e48661c5021848cba5b5bcddc97eeaa2dcf30ebcbdcd54d087"
       }
     },
     {
       "id": "vol-cube-expiry-slice",
       "route": "returned-slice",
-      "convention": "Returned VolCubeExpirySlice JSON (tenor by strike, tenor-major, Black or shifted-Black quote type with displacements as Rust returns them); fixed expiry in years and absolute strikes are explicit caller input. Off-node expiries are Rust-interpolated.",
+      "convention": "Returned VolCubeExpirySlice JSON (tenor by strike, tenor-major) in the request's VolatilityConvention: normal, or Black/shifted-Black with displacements as Rust returns them; fixed expiry in years and absolute strikes are explicit caller input. Off-node expiries are Rust-interpolated.",
       "api": {
         "name": "models.volatility.materializeCubeExpirySlice",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -1270,42 +1213,16 @@
             "name": "strikes",
             "type": "NumericArray",
             "optional": false
-          }
-        ],
-        "returns": "VolCubeExpirySlice",
-        "declaration": "/**\n   * Materialize the Black volatility slice of a SABR cube at one option expiry.\n   * @param cube - `core.VolCube` handle.\n   * @param expiry - Option expiry in years, within the cube grid.\n   * @param strikes - Strictly increasing strikes of the output surface.\n   * @returns The tenor by strike `core.VolCubeExpirySlice` handle.\n   * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.\n   */\n  materializeCubeExpirySlice(\n    cube: VolCube,\n    expiry: number,\n    strikes: NumericArray\n  ): VolCubeExpirySlice;",
-        "sha256": "73bb5e514fdaf5c5ed222e37b4ab15de42a5b36677da2778131369281da3bde8"
-      }
-    },
-    {
-      "id": "vol-cube-expiry-slice-normal",
-      "route": "returned-slice",
-      "convention": "Returned VolCubeExpirySlice JSON of normal volatilities (tenor by strike); fixed expiry and absolute strikes are explicit caller input. Off-node expiries are Rust-interpolated.",
-      "api": {
-        "name": "models.volatility.materializeCubeExpirySliceNormal",
-        "source": "finstack-quant-wasm/index.d.ts",
-        "owner": "VolatilityNamespace",
-        "member": "materializeCubeExpirySliceNormal",
-        "inputs": [
-          {
-            "name": "cube",
-            "type": "VolCube",
-            "optional": false
           },
           {
-            "name": "expiry",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "strikes",
-            "type": "NumericArray",
+            "name": "convention",
+            "type": "VolatilityConvention",
             "optional": false
           }
         ],
         "returns": "VolCubeExpirySlice",
-        "declaration": "/**\n   * Materialize the normal (Bachelier) volatility slice of a SABR cube at one option expiry.\n   * @param cube - `core.VolCube` handle.\n   * @param expiry - Option expiry in years, within the cube grid.\n   * @param strikes - Strictly increasing strikes of the output surface.\n   * @returns The tenor by strike `core.VolCubeExpirySlice` handle of normal volatilities.\n   * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.\n   */\n  materializeCubeExpirySliceNormal(\n    cube: VolCube,\n    expiry: number,\n    strikes: NumericArray\n  ): VolCubeExpirySlice;",
-        "sha256": "99713d01e08f74dea55bb03fc5ce28a31bcfdbe8216df13eb6d680739d4909a3"
+        "declaration": "/**\n   * Materialize the volatility slice of a SABR cube at one option expiry.\n   * @param cube - `core.VolCube` handle.\n   * @param expiry - Option expiry in years, within the cube grid.\n   * @param strikes - Strictly increasing strikes of the output surface.\n   * @param convention - `\"lognormal\"` for Black volatilities or `\"normal\"` for absolute Bachelier volatilities; shifted-lognormal is rejected.\n   * @returns The tenor by strike `core.VolCubeExpirySlice` handle in `convention`.\n   * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, a SABR evaluation fails, or `convention` is shifted-lognormal.\n   */\n  materializeCubeExpirySlice(\n    cube: VolCube,\n    expiry: number,\n    strikes: NumericArray,\n    convention: VolatilityConvention\n  ): VolCubeExpirySlice;",
+        "sha256": "e992703bcfad4e9094a7384f60de655de55d35a92a455649a795220b1d42f51c"
       }
     },
     {
@@ -2483,34 +2400,14 @@
         "member": "wacc",
         "inputs": [
           {
-            "name": "equityWeight",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "costOfEquity",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "debtWeight",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "costOfDebt",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "taxRate",
-            "type": "number",
+            "name": "inputs",
+            "type": "generated.statements_analytics.WaccInputs | string",
             "optional": false
           }
         ],
         "returns": "number",
-        "declaration": "/**\n   * Weighted-average cost of capital (WACC).\n   *\n   * Blends the required return on equity with the after-tax cost of debt:\n   * `WACC = w_E * r_E + w_D * r_D * (1 - T)`.\n   * @returns Returns the blended discount rate as a decimal fraction.\n   * @param equityWeight - Equity share of total capital as a decimal fraction (0.6 = 60% equity-funded).\n   * @param costOfEquity - Required return on equity in decimal form, typically from CAPM (0.115 = 11.5%).\n   * @param debtWeight - Debt share of total capital as a decimal fraction; must sum with the equity weight to 1.0.\n   * @param costOfDebt - Pre-tax marginal borrowing yield in decimal form, before the interest tax shield (0.06 = 6%).\n   * @param taxRate - Marginal corporate tax rate as a decimal fraction in [0, 1] (0.25 = 25%).\n   * @throws Error - Rejects any non-finite input, negative capital weights, weights that do not sum to one within tolerance, or a `tax_rate` outside `[0, 1]`.\n   */\n  wacc(\n    equityWeight: number,\n    costOfEquity: number,\n    debtWeight: number,\n    costOfDebt: number,\n    taxRate: number\n  ): number;",
-        "sha256": "978a242a765fbbb5f68b7765919fe7a45648c492179d4a682a52ebf635fecdd3"
+        "declaration": "/**\n   * Weighted-average cost of capital (WACC).\n   *\n   * `WACC = w_E * r_E + w_D * r_D * (1 - T)`.\n   * @param inputs - `WaccInputs` object or JSON text: `equity_weight` and `debt_weight` (decimal fractions of total capital summing to 1.0), `cost_of_equity` and pre-tax `cost_of_debt` (decimals, `0.06` = 6%) and `tax_rate` (decimal in [0, 1]).\n   * @returns The blended discount rate as a decimal fraction.\n   * @throws Error - Rejects malformed inputs, any non-finite value, negative capital weights, weights that do not sum to one within tolerance, or a `tax_rate` outside `[0, 1]`.\n   */\n  wacc(inputs: generated.statements_analytics.WaccInputs | string): number;",
+        "sha256": "33ef5f63c57078602e6441de5a04b5cb3d7b97f6763181d1407e17bfc2a55ad0"
       }
     },
     {
@@ -2708,40 +2605,20 @@
         "member": "analyzeExchangeOffer",
         "inputs": [
           {
-            "name": "oldPv",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "newPv",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "consentFee",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "equitySweetenerValue",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "exchangeType",
-            "type": "string",
+            "name": "offer",
+            "type": "generated.models.ExchangeOffer | string",
             "optional": false
           }
         ],
         "returns": "ExchangeOfferAnalysis",
-        "declaration": "/**\n   * Compare hold-versus-tender economics for a distressed exchange offer.\n   * Tendering is recommended only when total consideration exceeds the\n   * hold-out present value by more than 2%.\n   * @returns Tender total, NPV pickup, breakeven recovery, and recommendation.\n   * @param oldPv - Present value of the existing claim if it is not tendered, in the caller's monetary unit.\n   * @param newPv - Present value of the new instrument received on tendering, in the same unit as oldPv.\n   * @param consentFee - Cash consent or early-tender fee paid to participating holders, in the same unit as oldPv.\n   * @param equitySweetenerValue - Estimated value of equity or warrants attached to the new instrument, in the same unit as oldPv.\n   * @param exchangeType - Canonical offer structure: par_for_par, discount, uptier, or downtier.\n   * @throws Error - Throws a JavaScript exception if `exchangeType` is unrecognized, any monetary input is negative or non-finite, or the result cannot be converted to a JavaScript object.\n   */\n  analyzeExchangeOffer(\n    oldPv: number,\n    newPv: number,\n    consentFee: number,\n    equitySweetenerValue: number,\n    exchangeType: string\n  ): ExchangeOfferAnalysis;",
-        "sha256": "a5aa9e45ed42a262f0d47bbd03d094a53e0e4605ca3a7b5cb89c1ec64e8a543b"
+        "declaration": "/**\n   * Compare hold-versus-tender economics for a distressed exchange offer.\n   * Tendering is recommended only when total consideration exceeds the\n   * hold-out present value by more than 2%.\n   * @param offer - `ExchangeOffer` object or JSON text: `old_pv`, `new_pv`, `consent_fee` and `equity_sweetener_value` (non-negative, one monetary unit) and `exchange_type` (`par_for_par`, `discount`, `uptier` or `downtier`).\n   * @returns Tender total, NPV pickup, breakeven recovery, and recommendation.\n   * @throws Error - Throws a JavaScript exception if the offer is malformed, has an unknown field or structure, or any monetary input is negative or non-finite.\n   */\n  analyzeExchangeOffer(offer: generated.models.ExchangeOffer | string): ExchangeOfferAnalysis;",
+        "sha256": "13e68d5c6e0c4369d8c3e15def5db05308f43de360f1160db5717e506a13013d"
       }
     },
     {
       "id": "recovery-waterfall",
       "route": "returned-model",
-      "convention": "Returned models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.workoutLgd and seniorityRecoveryStats results as Rust returned them. Allocations are in Rust's priority-then-entry order; each claim's total, collateral and general recovery, recovery rate and deficiency, and the estate's distributed and undistributed totals, are Rust's fields, never summed or divided here. Amounts are in one caller-defined unit with no currency conversion; rates are fractions. Seniority classes and collateral types are the generated SeniorityClass and WorkoutCollateralType contracts; calibration ids are seniorityCalibrationIds, default first. A class a calibration lacks shows Rust's error.",
+      "convention": "Returned models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.WorkoutLgd evaluate and seniorityRecoveryStats results as Rust returned them. Allocations are in Rust's priority-then-entry order; each claim's total, collateral and general recovery, recovery rate and deficiency, and the estate's distributed and undistributed totals, are Rust's fields, never summed or divided here. Amounts are in one caller-defined unit with no currency conversion; rates are fractions. Seniority classes and collateral types are the generated SeniorityClass and WorkoutCollateralType contracts; calibration ids are seniorityCalibrationIds, default first. A class a calibration lacks shows Rust's error.",
       "api": {
         "name": "models.credit.recoveryWaterfall.allocateRecovery",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -2767,132 +2644,72 @@
     {
       "id": "option-calculator",
       "route": "returned-model",
-      "convention": "Returned closed-form results of one European option: models.bsPrice, black76Price or bachelierPrice of an entered volatility, or bsImpliedVol, black76ImpliedVol or models.volatility.impliedVolBachelier of an entered price, then bsGreeks, black76Greeks or bachelierGreeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",
+      "convention": "Returned OptionCalculationResult of one European option (models.optionCalculation): the price at an entered volatility, or the implied volatility of an entered price, and the model's Greeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",
       "api": {
-        "name": "models.bsPrice",
+        "name": "models.optionCalculation",
         "source": "finstack-quant-wasm/index.d.ts",
         "owner": "ModelsNamespace",
-        "member": "bsPrice",
+        "member": "optionCalculation",
         "inputs": [
           {
-            "name": "spot",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "strike",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "rate",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "divYield",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "vol",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "expiry",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "isCall",
-            "type": "boolean",
+            "name": "request",
+            "type": "OptionCalculation | string",
             "optional": false
           }
         ],
-        "returns": "number",
-        "declaration": "/**\n   * Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.\n   *\n   * Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.\n   * Merton (1973): see docs/REFERENCES.md#merton-1973.\n   * Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983.\n   *\n   * @example\n   * ```javascript\n   * import init, { models } from \"finstack-quant-wasm\";\n   * await init();\n   * const price = models.bsPrice(\n   *   100,    // spot\n   *   100,    // strike (ATM)\n   *   0.05,   // rate = 5%\n   *   0.0,    // divYield = 0\n   *   0.20,   // vol = 20%\n   *   1.0,    // expiry = 1 year\n   *   true,   // call\n   * );\n   * // price ≈ 10.45\n   * ```\n   *\n   * @param spot - Spot price of the underlying.\n   * @param strike - Strike of the option.\n   * @param rate - Risk-free rate, **decimal** continuously compounded (e.g. `0.05` for 5%).\n   * @param divYield - Continuous dividend yield (or foreign rate for FX), **decimal** continuously compounded.\n   * @param vol - Annualized volatility, **decimal** (e.g. `0.20` for 20%).\n   * @param expiry - Time to expiry in **years**.\n   * @param isCall - `true` for a call, `false` for a put.\n   * @returns Per-unit option price.\n   * @throws If spot or strike is non-positive, volatility or expiry is negative, any numerical input is non-finite, or discounted legs or price overflow.\n   */\n  bsPrice(\n    spot: number,\n    strike: number,\n    rate: number,\n    divYield: number,\n    vol: number,\n    expiry: number,\n    isCall: boolean\n  ): number;",
-        "sha256": "3c717b280e97c2eb385209100074925b836d8c941896e8a522532d2a92528b57"
+        "returns": "OptionCalculationResult",
+        "declaration": "/**\n   * Price a closed-form option or invert its price, with Greeks at the resulting volatility.\n   *\n   * One call replaces choosing and sequencing `bsPrice`, `black76Price`, `bachelierPrice`, their implied-volatility inverses and their Greeks.\n   *\n   * @example\n   * ```typescript\n   * import init, { models } from \"finstack-quant-wasm\";\n   * await init();\n   * const result = models.optionCalculation({\n   *   model: { kind: \"black76\", forward: 100, strike: 100, df: 0.98, expiry: 1, is_call: true },\n   *   solve: { kind: \"price\", vol: 0.2 },\n   * });\n   * console.log(result.price, result.greeks.kind); // ..., \"forward\"\n   * ```\n   *\n   * @returns The price, the volatility both are at (the supplied vol, or the solved implied vol) and the model's Greeks tagged by `kind` (`\"black_scholes\"` or `\"forward\"`).\n   * @param request - `OptionCalculation` object or JSON text: `model` tagged by `kind` (`\"black_scholes\"` with `spot`, `strike`, continuously compounded decimal `rate` and `div_yield`, `expiry` in years, `is_call` and an optional `theta_days_per_year` defaulting to 365; `\"black76\"` with `forward`, `strike`, discount factor `df`, `expiry`, `is_call`; `\"bachelier\"` with `forward`, `strike`, `expiry`, `is_call`) and `solve` (`{kind: \"price\", vol}` with a decimal Black vol or an absolute normal vol for Bachelier, or `{kind: \"implied_vol\", price}` discounted for Black-Scholes and Black-76, undiscounted for Bachelier).\n   * @throws Error - Throws a `validation` error for a malformed request, an unknown field or kind, an input outside the model's domain, or a price whose implied volatility cannot be solved; `invalid_type` for a non-finite number.\n   */\n  optionCalculation(request: OptionCalculation | string): OptionCalculationResult;",
+        "sha256": "e3008cdcde907a1c2cfbd4a35505d8ea77240271870c2145bc364bd6f25d0285"
       }
     },
     {
       "id": "credit-scorecard",
       "route": "returned-model",
-      "convention": "Returned models.credit.scoring ScoringResult of one model (Altman Z, Z', Z'' or EM, Ohlson O, Zmijewski) over ratios entered in the fields of its generated input contract and passed in the facade's positional order: score, zone and implied PD as returned (probabilities as fractions), and models.credit.pd.MasterScale.defaultCalibration().mapScore of the result, or Rust's error when the result has no implied PD (the Altman models). No zone, threshold or grade is derived here.",
+      "convention": "Returned models.credit.scoring.creditScoreReport of one model (Altman Z, Z', Z'' or EM, Ohlson O, Zmijewski) over ratios entered in the fields of its generated input contract and sent as the Rust CreditScoreRequest: score, zone and implied PD as returned (probabilities as fractions), and the default master-scale grade Rust assigns the implied PD, or no grade when the result has no implied PD (the Altman models). No zone, threshold or grade is derived here.",
       "api": {
-        "name": "models.credit.scoring.zmijewskiScore",
+        "name": "models.credit.scoring.creditScoreReport",
         "source": "finstack-quant-wasm/index.d.ts",
         "owner": "CreditScoringNamespace",
-        "member": "zmijewskiScore",
+        "member": "creditScoreReport",
         "inputs": [
           {
-            "name": "netIncomeToTotalAssets",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "totalLiabilitiesToTotalAssets",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "currentAssetsToCurrentLiabilities",
-            "type": "number",
+            "name": "request",
+            "type": "generated.models.CreditScoreRequest | string",
             "optional": false
           }
         ],
-        "returns": "generated.models.ScoringResult",
-        "declaration": "/**\n   * Zmijewski (1984) probit financial-distress model.\n   * @param netIncomeToTotalAssets - Net income divided by total assets.\n   * @param totalLiabilitiesToTotalAssets - Total liabilities divided by total assets.\n   * @param currentAssetsToCurrentLiabilities - Current assets divided by current liabilities.\n   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).\n   * @throws Error - Throws a `validation` error if any ratio is non-finite.\n   */\n  zmijewskiScore(\n    netIncomeToTotalAssets: number,\n    totalLiabilitiesToTotalAssets: number,\n    currentAssetsToCurrentLiabilities: number\n  ): generated.models.ScoringResult;",
-        "sha256": "5d342facdf2f36061814181111926e76856cc28f152ba6014eb1396deb92eea8"
+        "returns": "generated.models.CreditScoreReport",
+        "declaration": "/**\n   * Score one model and grade its implied PD on the default PD master scale.\n   *\n   * The implied PD of a model that has one (Ohlson, Zmijewski) is graded on the\n   * default PD master scale, so every host gets the same grade; the Altman\n   * family has no implied PD and no grade.\n   * @param request - `CreditScoreRequest` object or JSON text: `model` (`\"altman_z_score\"`, `\"altman_z_prime\"`, `\"altman_z_double_prime\"`, `\"altman_em_score\"`, `\"ohlson_o_score\"` or `\"zmijewski_score\"`) and `input` (that model's input ratios by Rust field name; `\"altman_em_score\"` takes the Z''-Score ratios).\n   * @returns `CreditScoreReport` plain object: `result` (the `ScoringResult`) and `grade` (the default master-scale `MasterScaleResult` of the implied PD, or `null` for the Altman family).\n   * @throws Error - Throws a `validation` error if the request is malformed or has an unknown model or field, a ratio is non-finite, or an Ohlson indicator is not exactly 0 or 1.\n   */\n  creditScoreReport(\n    request: generated.models.CreditScoreRequest | string\n  ): generated.models.CreditScoreReport;",
+        "sha256": "101366d7ee31a95df0dd2cd70344c03b9f07fee3a93cb3424797060f07e67fe7"
       }
     },
     {
       "id": "portfolio-risk-report",
       "route": "returned-report",
-      "convention": "Returned models.factor.risk PositionRiskDecomposition (parametric or historical): portfolio VaR and ES, confidence, method and the Euler residual (null for historical) as returned, component VaR charted and tabulated in returned order with relative, marginal and incremental VaR and the ES contributions; evaluateRiskBudget over positionComponentVar of each position against the supplied target shares (has_breach, total_overbudget, utilization and excess as returned, an omitted threshold left to Rust); buildStressAttribution of a historical source's P&L in Rust's largest-driver-first order with the tail scenarios worst first. Losses negative, in the units of the supplied weights or P&L; nothing summed, flagged or re-sorted. The factor section shows models.factor.risk.decomposeFactors of portfolio.computeFactorSensitivities (positions in Portfolio order, factors in definition order, base currency) as returned under the returned measure, an omitted measure and bump config left to Rust.",
+      "convention": "Returned models.factor.risk PositionRiskReport of a parametric or historical source: portfolio VaR and ES, confidence, method and the Euler residual (null for historical) as returned, component VaR charted and tabulated in returned order with relative, marginal and incremental VaR and the ES contributions; the risk budget against the supplied target shares (has_breach, total_overbudget, utilization and excess as returned, an omitted threshold left to Rust); the stress attribution of a historical source's P&L in Rust's largest-driver-first order with the tail scenarios worst first. Losses negative, in the units of the supplied weights or P&L; nothing summed, flagged or re-sorted. The factor section shows models.factor.risk.decomposeFactors of portfolio.computeFactorSensitivities (positions in Portfolio order, factors in definition order, base currency) as returned under the returned measure, an omitted measure and bump config left to Rust.",
       "api": {
-        "name": "models.factor.risk.parametricVarDecomposition",
+        "name": "models.factor.risk.positionRiskReport",
         "source": "finstack-quant-wasm/index.d.ts",
         "owner": "FactorRiskNamespace",
-        "member": "parametricVarDecomposition",
+        "member": "positionRiskReport",
         "inputs": [
           {
-            "name": "positionIds",
-            "type": "string[]",
+            "name": "request",
+            "type": "PositionRiskRequest | string",
             "optional": false
-          },
-          {
-            "name": "weights",
-            "type": "NumericArray",
-            "optional": false
-          },
-          {
-            "name": "covariance",
-            "type": "NumericArray[]",
-            "optional": false
-          },
-          {
-            "name": "confidence",
-            "type": "number | null",
-            "optional": true
-          },
-          {
-            "name": "computeIncremental",
-            "type": "boolean | null",
-            "optional": true
           }
         ],
-        "returns": "PositionRiskDecomposition",
-        "declaration": "/**\n   * Decompose portfolio VaR and ES into position contributions via\n   * parametric Euler allocation.\n   *\n   * Returns the canonical `PositionRiskDecomposition` (the object Python's\n   * `parametric_var_decomposition` returns): portfolio VaR/ES (losses\n   * negative), `method`, and per-position `var_contributions` and\n   * `es_contributions` rows.\n   * @returns The canonical `PositionRiskDecomposition` with VaR and ES contributions.\n   * @param positionIds - Position identifiers, one per weight.\n   * @param weights - Position weights or exposures in portfolio currency.\n   * @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).\n   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.\n   * @param computeIncremental - Optional; when `true`, also computes incremental VaR (one full repricing per position). Defaults to `false`.\n   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; or `confidence` is not finite and in `(0.5, 1)`.\n   */\n  parametricVarDecomposition(\n    positionIds: string[],\n    weights: NumericArray,\n    covariance: NumericArray[],\n    confidence?: number | null,\n    computeIncremental?: boolean | null\n  ): PositionRiskDecomposition;",
-        "sha256": "4e5dbe5f9673aa752082aa74ef2f38503e633fe29103e4bf1ff27f33da18faa6"
+        "returns": "PositionRiskReport",
+        "declaration": "/**\n   * Decompose position VaR/ES from a parametric or historical source, with an\n   * optional risk budget and, for scenario P&L, the tail stress attribution.\n   *\n   * Returns the canonical `PositionRiskReport` (the object Python's\n   * `position_risk_report` returns).\n   * @returns `decomposition` (portfolio and per-position VaR/ES, losses negative), `budget` (`null` without a budget) and `stress` (`null` for a parametric source).\n   * @param request - `PositionRiskRequest` object or JSON text: `position_ids`, an optional `confidence` (decimal in `(0.5, 1)`, default 0.95), a `source` tagged by `kind` (`{kind: \"parametric\", weights, covariance, compute_incremental}` with exposures in portfolio currency, an `n x n` covariance in position order and incremental VaR off by default, or `{kind: \"historical\", pnls}` with one row of scenario P&L per position, losses negative) and an optional `budget` (`{targets, utilization_threshold}`, target VaR shares in position order summing to ~1).\n   * @throws Error - Throws a `validation` error for a malformed request, an unknown field or kind, dimensions that disagree with the position ids, an invalid covariance, too few scenarios for the tail, a confidence outside `(0.5, 1)` or a malformed budget; `invalid_type` for a non-finite number.\n   */\n  positionRiskReport(request: PositionRiskRequest | string): PositionRiskReport;",
+        "sha256": "cafe5e8dff7f2b5f6d65551db6169711574b797445d04350200eebaba7522227"
       },
       "schemas": [
         {
-          "uri": "https://finstack_quant.dev/schemas/models/1/position_risk_decomposition.schema.json",
+          "uri": "https://finstack_quant.dev/schemas/models/1/position_risk_report.schema.json",
           "pointer": "#",
-          "source": "finstack-quant/models/schemas/models/1/position_risk_decomposition.schema.json",
-          "sha256": "1c415d57b487d84a504821d8ba2aebdf6d4ca4b72bc93333e86ca5092a0ceddc",
-          "description": "Complete position-level risk decomposition of a portfolio."
+          "source": "finstack-quant/models/schemas/models/1/position_risk_report.schema.json",
+          "sha256": "ca172913b5deefdc9fe30e0c143ec0cb1737f119e95390384411e311a7b828e8",
+          "description": "Position VaR/ES decomposition with its optional risk budget and tail stress attribution."
         }
       ]
     },

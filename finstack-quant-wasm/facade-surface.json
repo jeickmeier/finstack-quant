@@ -13,7 +13,7 @@
   "analytics.Performance": {
     "kind": "class",
     "constructor": true,
-    "statics": ["fromJson", "fromReturns"],
+    "statics": ["fromJson"],
     "methods": [
       "battingAverage",
       "beta",
@@ -1756,8 +1756,6 @@
     "kind": "namespace",
     "keys": [
       "CovenantEngine",
-      "covLite",
-      "covLiteJson",
       "covenantConsequenceAccelerateMaturity",
       "covenantConsequenceBlockDistributions",
       "covenantConsequenceCashSweep",
@@ -1770,6 +1768,7 @@
       "covenantSpecWithDenominatorMetric",
       "covenantSpecWithMetric",
       "covenantSpecWithThresholdSchedule",
+      "covenantTemplate",
       "covenantTypeAffirmative",
       "covenantTypeBasket",
       "covenantTypeCustom",
@@ -1791,12 +1790,6 @@
       "evaluateEngine",
       "forecastBreaches",
       "forecastCovenant",
-      "lboStandard",
-      "lboStandardJson",
-      "projectFinance",
-      "projectFinanceJson",
-      "realEstate",
-      "realEstateJson",
       "thresholdScheduleThresholdFor",
       "validateCovenantEngineJson",
       "validateCovenantReportJson",
@@ -1818,12 +1811,6 @@
       "validate"
     ],
     "getters": ["breachHistory", "specs", "waivers"]
-  },
-  "covenants.covLite": {
-    "kind": "function"
-  },
-  "covenants.covLiteJson": {
-    "kind": "function"
   },
   "covenants.covenantConsequenceAccelerateMaturity": {
     "kind": "function"
@@ -1859,6 +1846,9 @@
     "kind": "function"
   },
   "covenants.covenantSpecWithThresholdSchedule": {
+    "kind": "function"
+  },
+  "covenants.covenantTemplate": {
     "kind": "function"
   },
   "covenants.covenantTypeAffirmative": {
@@ -1922,24 +1912,6 @@
     "kind": "function"
   },
   "covenants.forecastCovenant": {
-    "kind": "function"
-  },
-  "covenants.lboStandard": {
-    "kind": "function"
-  },
-  "covenants.lboStandardJson": {
-    "kind": "function"
-  },
-  "covenants.projectFinance": {
-    "kind": "function"
-  },
-  "covenants.projectFinanceJson": {
-    "kind": "function"
-  },
-  "covenants.realEstate": {
-    "kind": "function"
-  },
-  "covenants.realEstateJson": {
     "kind": "function"
   },
   "covenants.thresholdScheduleThresholdFor": {
@@ -2424,6 +2396,7 @@
       "lookbackOptionPrice",
       "mertonJumpCosPrice",
       "monteCarlo",
+      "optionCalculation",
       "quantoOptionPrice",
       "rates",
       "vanillaExpiryPayoff",
@@ -2701,8 +2674,7 @@
       "WorkoutLgdBuilder",
       "collateralPieceLiquidationValue",
       "seniorityCalibrationIds",
-      "seniorityRecoveryStats",
-      "workoutLgd"
+      "seniorityRecoveryStats"
     ]
   },
   "models.credit.lgd.BetaRecovery": {
@@ -2759,9 +2731,6 @@
     "kind": "function"
   },
   "models.credit.lgd.seniorityRecoveryStats": {
-    "kind": "function"
-  },
-  "models.credit.lgd.workoutLgd": {
     "kind": "function"
   },
   "models.credit.lgd.collateralPieceLiquidationValue": {
@@ -2915,6 +2884,7 @@
       "altmanZDoublePrime",
       "altmanZPrime",
       "altmanZScore",
+      "creditScoreReport",
       "ohlsonOScore",
       "zmijewskiScore"
     ]
@@ -2929,6 +2899,9 @@
     "kind": "function"
   },
   "models.credit.scoring.altmanEmScore": {
+    "kind": "function"
+  },
+  "models.credit.scoring.creditScoreReport": {
     "kind": "function"
   },
   "models.credit.scoring.ohlsonOScore": {
@@ -3048,15 +3021,11 @@
       "defaultUtilizationThreshold",
       "evaluateRiskBudget",
       "evaluateRiskBudgetFromDecomposition",
-      "historicalVarDecomposition",
-      "parametricVarDecomposition",
-      "positionComponentVar"
+      "positionComponentVar",
+      "positionRiskReport"
     ]
   },
-  "models.factor.risk.parametricVarDecomposition": {
-    "kind": "function"
-  },
-  "models.factor.risk.historicalVarDecomposition": {
+  "models.factor.risk.positionRiskReport": {
     "kind": "function"
   },
   "models.factor.risk.evaluateRiskBudget": {
@@ -3320,8 +3289,6 @@
       "deltaToStrike",
       "getCubeExpirySliceVol",
       "getCubeExpirySliceVolClamped",
-      "getCubeNormalVol",
-      "getCubeNormalVolClamped",
       "getCubeVol",
       "getCubeVolClamped",
       "getFxDeltaPillarVols",
@@ -3334,9 +3301,7 @@
       "localVolFromImpliedVolSmoothed",
       "localVolValue",
       "materializeCubeExpirySlice",
-      "materializeCubeExpirySliceNormal",
       "materializeCubeTenorSlice",
-      "materializeCubeTenorSliceNormal",
       "materializeFxDeltaSurface",
       "strikeToDelta",
       "sviDurrlemanG",
@@ -3397,12 +3362,6 @@
     "kind": "function"
   },
   "models.volatility.deltaToStrike": {
-    "kind": "function"
-  },
-  "models.volatility.getCubeNormalVol": {
-    "kind": "function"
-  },
-  "models.volatility.getCubeNormalVolClamped": {
     "kind": "function"
   },
   "models.volatility.getCubeVol": {
@@ -3474,16 +3433,13 @@
   "models.volatility.materializeCubeTenorSlice": {
     "kind": "function"
   },
-  "models.volatility.materializeCubeTenorSliceNormal": {
-    "kind": "function"
-  },
   "models.volatility.materializeCubeExpirySlice": {
     "kind": "function"
   },
-  "models.volatility.materializeCubeExpirySliceNormal": {
+  "models.volatility.materializeFxDeltaSurface": {
     "kind": "function"
   },
-  "models.volatility.materializeFxDeltaSurface": {
+  "models.optionCalculation": {
     "kind": "function"
   },
   "models.bsPrice": {
@@ -4201,7 +4157,6 @@
       "forecastMetricsSummaryText",
       "generateTornadoEntries",
       "goalSeek",
-      "parameterSpecWithPercentages",
       "peerFilterAccepts",
       "peerSetFromUniverse",
       "peerStats",
@@ -4276,9 +4231,6 @@
     "kind": "function"
   },
   "statements_analytics.scenarioComparisonTable": {
-    "kind": "function"
-  },
-  "statements_analytics.parameterSpecWithPercentages": {
     "kind": "function"
   },
   "statements_analytics.backtestForecast": {

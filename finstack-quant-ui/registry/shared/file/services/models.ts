@@ -2,43 +2,24 @@ import type { core, models } from "finstack-quant-wasm";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import type {
   ArbitrageReport,
-  CreditScoreRequest,
   CubeSlice,
   FxStrikeSurface,
   MigrationMatrixRequest,
   ModelsApi,
-  OptionCalculatorRequest,
-  OptionCalculatorResult,
-  PositionRisk,
-  ScoringResult,
   SeniorityRecoveryStats,
 } from "../finstack-contract";
-import { attempt, type ServiceContext } from "./context";
-/** The closed-form option functions, models.volatility evaluators and the surface arbitrage check, the core surface handles they read, models.credit.migration, the Merton model, the credit-scoring functions, the PD master scale, the liability-management analyses, the recovery waterfall, workout LGD and seniority recovery statistics, and the models.factor.risk position decompositions. */
+import type { ServiceContext } from "./context";
+/** The closed-form option calculation, models.volatility evaluators and the surface arbitrage check, the core surface handles they read, models.credit.migration, the Merton model, the credit-score report, the liability-management analyses, the recovery waterfall, workout LGD and seniority recovery statistics, and the models.factor.risk position decompositions. */
 export type ModelsNative = {
   core: Pick<typeof core, "FxDeltaVolSurface" | "VolCube" | "VolSurface">;
-  models: Pick<
-    typeof models,
-    | "bsPrice"
-    | "bsGreeks"
-    | "bsImpliedVol"
-    | "black76Price"
-    | "black76Greeks"
-    | "black76ImpliedVol"
-    | "bachelierPrice"
-    | "bachelierGreeks"
-  > & {
+  models: Pick<typeof models, "optionCalculation"> & {
     volatility: Pick<
       typeof models.volatility,
-      | "impliedVolBachelier"
       | "getFxDeltaVol"
       | "getCubeVol"
-      | "getCubeNormalVol"
       | "materializeFxDeltaSurface"
       | "materializeCubeTenorSlice"
-      | "materializeCubeTenorSliceNormal"
       | "materializeCubeExpirySlice"
-      | "materializeCubeExpirySliceNormal"
       | "SabrParameters"
       | "SabrSmile"
       | "checkSurface"
@@ -48,37 +29,24 @@ export type ModelsNative = {
         typeof models.credit.migration,
         "TransitionMatrix" | "GeneratorMatrix" | "project"
       >;
-      pd: Pick<typeof models.credit.pd, "MasterScale">;
       liabilityManagement: Pick<
         typeof models.credit.liabilityManagement,
         "analyzeExchangeOffer" | "analyzeLme" | "tenderRecommendationHurdle"
       >;
       lgd: Pick<
         typeof models.credit.lgd,
-        "workoutLgd" | "seniorityRecoveryStats" | "seniorityCalibrationIds"
+        "WorkoutLgd" | "seniorityRecoveryStats" | "seniorityCalibrationIds"
       >;
       recoveryWaterfall: Pick<
         typeof models.credit.recoveryWaterfall,
         "allocateRecovery"
       >;
-      scoring: Pick<
-        typeof models.credit.scoring,
-        | "altmanZScore"
-        | "altmanZPrime"
-        | "altmanZDoublePrime"
-        | "altmanEmScore"
-        | "ohlsonOScore"
-        | "zmijewskiScore"
-      >;
+      scoring: Pick<typeof models.credit.scoring, "creditScoreReport">;
     };
     factor: {
       risk: Pick<
         typeof models.factor.risk,
-        | "parametricVarDecomposition"
-        | "historicalVarDecomposition"
-        | "evaluateRiskBudgetFromDecomposition"
-        | "buildStressAttribution"
-        | "decomposeFactors"
+        "positionRiskReport" | "decomposeFactors"
       >;
     };
   };
@@ -96,196 +64,6 @@ function scaleOf(matrix: TransitionMatrix) {
     };
   } finally {
     scale.free();
-  }
-}
-/**
- * One scoring function with the request's named ratios in its positional
- * argument order (conversion only: the facade takes numbers, not the Rust
- * input struct; tests/models/credit/scorecard.test.tsx pins every order).
- * Values pass through unchanged, so Rust rejects a missing or non-finite one.
- */
-function score(
-  scoring: ModelsNative["models"]["credit"]["scoring"],
-  request: CreditScoreRequest,
-): ScoringResult {
-  switch (request.model) {
-    case "altmanZScore": {
-      const r = request.input;
-      return scoring.altmanZScore(
-        r.working_capital_to_total_assets,
-        r.retained_earnings_to_total_assets,
-        r.ebit_to_total_assets,
-        r.market_equity_to_total_liabilities,
-        r.sales_to_total_assets,
-      );
-    }
-    case "altmanZPrime": {
-      const r = request.input;
-      return scoring.altmanZPrime(
-        r.working_capital_to_total_assets,
-        r.retained_earnings_to_total_assets,
-        r.ebit_to_total_assets,
-        r.book_equity_to_total_liabilities,
-        r.sales_to_total_assets,
-      );
-    }
-    case "altmanZDoublePrime":
-    case "altmanEmScore": {
-      const r = request.input;
-      return (
-        request.model === "altmanEmScore"
-          ? scoring.altmanEmScore
-          : scoring.altmanZDoublePrime
-      )(
-        r.working_capital_to_total_assets,
-        r.retained_earnings_to_total_assets,
-        r.ebit_to_total_assets,
-        r.book_equity_to_total_liabilities,
-      );
-    }
-    case "ohlsonOScore": {
-      const r = request.input;
-      return scoring.ohlsonOScore(
-        r.log_total_assets_adjusted,
-        r.total_liabilities_to_total_assets,
-        r.working_capital_to_total_assets,
-        r.current_liabilities_to_current_assets,
-        r.liabilities_exceed_assets,
-        r.net_income_to_total_assets,
-        r.funds_from_operations_to_total_liabilities,
-        r.negative_net_income_two_years,
-        r.net_income_change,
-      );
-    }
-    case "zmijewskiScore": {
-      const r = request.input;
-      return scoring.zmijewskiScore(
-        r.net_income_to_total_assets,
-        r.total_liabilities_to_total_assets,
-        r.current_assets_to_current_liabilities,
-      );
-    }
-    default: {
-      const unhandled: never = request;
-      throw new RangeError("Unsupported scoring model", { cause: unhandled });
-    }
-  }
-}
-/**
- * One closed-form function of the request's model with the named terms in the
- * facade's positional order (conversion only; tests/models/options pins every
- * order). Values pass through unchanged, so Rust rejects an invalid one.
- */
-function optionPrice(
-  native: ModelsNative["models"],
-  r: OptionCalculatorRequest,
-  vol: number,
-) {
-  switch (r.model) {
-    case "black_scholes":
-      return native.bsPrice(
-        r.spot,
-        r.strike,
-        r.rate,
-        r.divYield,
-        vol,
-        r.expiry,
-        r.isCall,
-      );
-    case "black76":
-      return native.black76Price(
-        r.forward,
-        r.strike,
-        r.df,
-        vol,
-        r.expiry,
-        r.isCall,
-      );
-    case "bachelier":
-      return native.bachelierPrice(
-        r.forward,
-        r.strike,
-        vol,
-        r.expiry,
-        r.isCall,
-      );
-    default: {
-      const unhandled: never = r;
-      throw new RangeError("Unsupported option model", { cause: unhandled });
-    }
-  }
-}
-function optionImpliedVol(
-  native: ModelsNative["models"],
-  r: OptionCalculatorRequest,
-  price: number,
-) {
-  switch (r.model) {
-    case "black_scholes":
-      return native.bsImpliedVol(
-        r.spot,
-        r.strike,
-        r.rate,
-        r.divYield,
-        r.expiry,
-        price,
-        r.isCall,
-      );
-    case "black76":
-      return native.black76ImpliedVol(
-        r.forward,
-        r.strike,
-        r.df,
-        r.expiry,
-        price,
-        r.isCall,
-      );
-    case "bachelier":
-      return native.volatility.impliedVolBachelier(
-        price,
-        r.forward,
-        r.strike,
-        r.expiry,
-        r.isCall,
-      );
-    default: {
-      const unhandled: never = r;
-      throw new RangeError("Unsupported option model", { cause: unhandled });
-    }
-  }
-}
-function optionGreeks(
-  native: ModelsNative["models"],
-  r: OptionCalculatorRequest,
-  vol: number,
-) {
-  switch (r.model) {
-    case "black_scholes":
-      // An omitted denominator stays unset so Rust applies its default.
-      return native.bsGreeks(
-        r.spot,
-        r.strike,
-        r.rate,
-        r.divYield,
-        vol,
-        r.expiry,
-        r.isCall,
-        r.thetaDaysPerYear ?? undefined,
-      );
-    case "black76":
-      return native.black76Greeks(r.forward, r.strike, vol, r.expiry, r.isCall);
-    case "bachelier":
-      return native.bachelierGreeks(
-        r.forward,
-        r.strike,
-        vol,
-        r.expiry,
-        r.isCall,
-      );
-    default: {
-      const unhandled: never = r;
-      throw new RangeError("Unsupported option model", { cause: unhandled });
-    }
   }
 }
 const orNull = (values: Float64Array | undefined) =>
@@ -306,21 +84,18 @@ export function createModelsService(
   return {
     sampleCube(request) {
       return context.result(() => {
-        const evaluate =
-          request.convention === "normal"
-            ? native.models.volatility.getCubeNormalVol
-            : request.convention === "black_lognormal"
-              ? native.models.volatility.getCubeVol
-              : null;
-        // finstack-compose: dispatch on request.convention; evaluate is a native function, not a result
-        if (!evaluate)
-          throw new RangeError("Unsupported cube output convention");
         const handle = native.core.VolCube.fromJson(
           serializeHost(request.cube),
         );
         try {
           return request.coordinates.map((point) =>
-            evaluate(handle, point.expiry, point.tenor, point.strike),
+            native.models.volatility.getCubeVol(
+              handle,
+              point.expiry,
+              point.tenor,
+              point.strike,
+              request.convention,
+            ),
           );
         } finally {
           handle.free();
@@ -370,10 +145,7 @@ export function createModelsService(
     },
     cubeSlice(request) {
       return context.result(() => {
-        const v = native.models.volatility,
-          normal = request.convention === "normal";
-        if (!normal && request.convention !== "black_lognormal")
-          throw new RangeError("Unsupported cube output convention");
+        const v = native.models.volatility;
         if (request.axis !== "tenor" && request.axis !== "expiry")
           throw new RangeError("Unsupported cube slice axis");
         const cube = native.core.VolCube.fromJson(serializeHost(request.cube));
@@ -381,12 +153,18 @@ export function createModelsService(
           const strikes = [...request.strikes];
           const slice =
             request.axis === "tenor"
-              ? (normal
-                  ? v.materializeCubeTenorSliceNormal
-                  : v.materializeCubeTenorSlice)(cube, request.at, strikes)
-              : (normal
-                  ? v.materializeCubeExpirySliceNormal
-                  : v.materializeCubeExpirySlice)(cube, request.at, strikes);
+              ? v.materializeCubeTenorSlice(
+                  cube,
+                  request.at,
+                  strikes,
+                  request.convention,
+                )
+              : v.materializeCubeExpirySlice(
+                  cube,
+                  request.at,
+                  strikes,
+                  request.convention,
+                );
           try {
             const json = JSON.parse(slice.toJson());
             return (
@@ -459,13 +237,7 @@ export function createModelsService(
           serializeHost(request.surface),
         );
         try {
-          // An omitted tolerance stays unset so Rust applies its default.
-          return native.models.volatility.checkSurface(surface, {
-            forward_prices: [...request.forwards],
-            ...(request.tolerance == null
-              ? {}
-              : { tolerance: request.tolerance }),
-          });
+          return native.models.volatility.checkSurface(surface, request.config);
         } finally {
           surface.free();
         }
@@ -539,40 +311,18 @@ export function createModelsService(
       return context.result(() => native.models.credit.mertonReport(request));
     },
     creditScore(request) {
-      return context.result(() => {
-        const result = score(native.models.credit.scoring, request);
-        const scale = native.models.credit.pd.MasterScale.defaultCalibration();
-        try {
-          return {
-            model: request.model,
-            result,
-            grade: attempt(() => scale.mapScore(result)),
-          };
-        } finally {
-          scale.free();
-        }
-      });
+      return context.result(() =>
+        native.models.credit.scoring.creditScoreReport(request),
+      );
     },
     analyzeExchangeOffer(request) {
       return context.result(() =>
-        native.models.credit.liabilityManagement.analyzeExchangeOffer(
-          request.oldPv,
-          request.newPv,
-          request.consentFee,
-          request.equitySweetenerValue,
-          request.exchangeType,
-        ),
+        native.models.credit.liabilityManagement.analyzeExchangeOffer(request),
       );
     },
     analyzeLme(request) {
       return context.result(() =>
-        native.models.credit.liabilityManagement.analyzeLme(
-          request.lmeType,
-          request.notional,
-          request.repurchasePricePct,
-          request.optAcceptancePct,
-          request.ebitda,
-        ),
+        native.models.credit.liabilityManagement.analyzeLme(request),
       );
     },
     tenderRecommendationHurdle: () =>
@@ -588,16 +338,16 @@ export function createModelsService(
       );
     },
     workoutLgd(request) {
-      return context.result(() =>
-        native.models.credit.lgd.workoutLgd(
-          request.ead,
-          request.collateral,
-          request.directCostPct,
-          request.indirectCostPct,
-          request.timeToResolutionYears,
-          request.discountRate,
-        ),
-      );
+      return context.result(() => {
+        const model = native.models.credit.lgd.WorkoutLgd.fromJson(
+          serializeHost(request.model),
+        );
+        try {
+          return model.evaluate(request.ead);
+        } finally {
+          model.free();
+        }
+      });
     },
     seniorityRecoveryStats(request) {
       return context.result((): SeniorityRecoveryStats => {
@@ -623,84 +373,12 @@ export function createModelsService(
     seniorityCalibrationIds: () =>
       context.result(() => native.models.credit.lgd.seniorityCalibrationIds()),
     optionCalculator(request) {
-      return context.result((): OptionCalculatorResult => {
-        const { model } = request;
-        if (request.mode === "price")
-          return {
-            model,
-            mode: "price",
-            price: optionPrice(native.models, request, request.vol),
-            greeks: attempt(() =>
-              optionGreeks(native.models, request, request.vol),
-            ),
-          };
-        // The solved volatility only passes along to the Greeks call.
-        const impliedVol = optionImpliedVol(
-          native.models,
-          request,
-          request.price,
-        );
-        return {
-          model,
-          mode: "implied_vol",
-          impliedVol,
-          greeks: attempt(() =>
-            optionGreeks(native.models, request, impliedVol),
-          ),
-        };
-      });
+      return context.result(() => native.models.optionCalculation(request));
     },
     positionRisk(request) {
-      return context.result((): PositionRisk => {
-        const risk = native.models.factor.risk;
-        const { source } = request;
-        const ids = [...request.positionIds];
-        // Omitted options stay unset so Rust applies its own defaults.
-        const confidence = request.confidence ?? undefined;
-        const rows = (matrix: readonly (readonly number[])[]) =>
-          matrix.map((row) => [...row]);
-        let decomposition;
-        if (source.kind === "parametric")
-          decomposition = risk.parametricVarDecomposition(
-            ids,
-            [...source.weights],
-            rows(source.covariance),
-            confidence,
-            source.computeIncremental ?? undefined,
-          );
-        else if (source.kind === "historical")
-          decomposition = risk.historicalVarDecomposition(
-            ids,
-            rows(source.pnls),
-            confidence,
-          );
-        else throw new RangeError("Unsupported position risk source");
-        const { budget } = request;
-        return {
-          decomposition,
-          budget:
-            budget == null
-              ? null
-              : attempt(() =>
-                  risk.evaluateRiskBudgetFromDecomposition(
-                    decomposition,
-                    [...budget.targets],
-                    budget.utilizationThreshold ?? undefined,
-                  ),
-                ),
-          // Tail attribution needs scenario P&L, which only a historical source has.
-          stress:
-            source.kind === "historical"
-              ? attempt(() =>
-                  risk.buildStressAttribution(
-                    ids,
-                    rows(source.pnls),
-                    confidence,
-                  ),
-                )
-              : null,
-        };
-      });
+      return context.result(() =>
+        native.models.factor.risk.positionRiskReport(request),
+      );
     },
     decomposeFactors(request) {
       return context.result(() =>

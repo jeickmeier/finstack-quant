@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from finstack_quant.analytics import Performance
+from finstack_quant.analytics import Performance, PerformancePanel
 
 GOLDEN: dict[str, Any] = json.loads((Path(__file__).parent / "data" / "analytics_wasm_parity.json").read_text())
 NAMES: list[str] = GOLDEN["ticker_names"]
@@ -24,20 +24,37 @@ NAMES: list[str] = GOLDEN["ticker_names"]
 def price_panel() -> Performance:
     """Price panel of the shared golden."""
     prices = GOLDEN["prices"]
-    return Performance.from_arrays(
-        prices["dates"], prices["values"], NAMES, prices["benchmark_ticker"], prices["frequency"]
+    return Performance.from_panel(
+        PerformancePanel(
+            dates=prices["dates"],
+            series=prices["values"],
+            kind="prices",
+            ticker_names=NAMES,
+            benchmark_ticker=prices["benchmark_ticker"],
+            frequency=prices["frequency"],
+        )
     )
 
 
-def test_from_arrays_matches_the_shared_golden() -> None:
+def test_price_panel_matches_the_shared_golden() -> None:
     assert list(price_panel().sharpe()) == pytest.approx(GOLDEN["prices"]["sharpe"], rel=1e-12)
     with pytest.raises(KeyError, match="missing"):
-        Performance.from_arrays(GOLDEN["prices"]["dates"], GOLDEN["prices"]["values"], NAMES, "missing")
+        Performance.from_panel(
+            PerformancePanel(
+                dates=GOLDEN["prices"]["dates"],
+                series=GOLDEN["prices"]["values"],
+                kind="prices",
+                ticker_names=NAMES,
+                benchmark_ticker="missing",
+            )
+        )
 
 
-def test_from_returns_arrays_matches_the_shared_golden() -> None:
+def test_return_panel_matches_the_shared_golden() -> None:
     returns = GOLDEN["returns"]
-    panel = Performance.from_returns_arrays(returns["dates"], returns["values"], NAMES)
+    panel = Performance.from_panel(
+        PerformancePanel(dates=returns["dates"], series=returns["values"], kind="returns", ticker_names=NAMES)
+    )
     assert list(panel.volatility()) == pytest.approx(returns["volatility"], rel=1e-12)
 
 

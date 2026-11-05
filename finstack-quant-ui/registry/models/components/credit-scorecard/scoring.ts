@@ -10,29 +10,29 @@ export interface ScoringContract {
   properties: Readonly<Record<string, { description?: string }>>;
 }
 /**
- * The models.credit.scoring functions the scorecard offers, each with the
- * generated input contract of its ratios; altmanEmScore takes the Z''-Score
+ * The Rust CreditScoreRequest models the scorecard offers, each with the
+ * generated input contract of its ratios; altman_em_score takes the Z''-Score
  * ratios. The labels are this editor's own control choices.
  */
 export const scoringModels = [
-  { model: "altmanZScore", label: "Altman Z (1968)", contract: altmanZScore },
+  { model: "altman_z_score", label: "Altman Z (1968)", contract: altmanZScore },
   {
-    model: "altmanZPrime",
+    model: "altman_z_prime",
     label: "Altman Z' (private)",
     contract: altmanZPrime,
   },
   {
-    model: "altmanZDoublePrime",
+    model: "altman_z_double_prime",
     label: "Altman Z'' (non-manufacturer)",
     contract: altmanZDoublePrime,
   },
   {
-    model: "altmanEmScore",
+    model: "altman_em_score",
     label: "Altman EM (1995)",
     contract: altmanZDoublePrime,
   },
-  { model: "ohlsonOScore", label: "Ohlson O (1980)", contract: ohlsonOScore },
-  { model: "zmijewskiScore", label: "Zmijewski (1984)", contract: zmijewski },
+  { model: "ohlson_o_score", label: "Ohlson O (1980)", contract: ohlsonOScore },
+  { model: "zmijewski_score", label: "Zmijewski (1984)", contract: zmijewski },
 ] as const satisfies readonly {
   model: string;
   label: string;

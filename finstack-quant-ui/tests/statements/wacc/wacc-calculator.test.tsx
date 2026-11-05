@@ -77,7 +77,7 @@ it("shows the rate Rust returns for the entered decimals", async () => {
 
 it("sends the two weights as entered, and shows Rust's rejection of their sum", async () => {
   renderLive(cases.blended.inputs);
-  enter("debt_weight", String(errors.weights.inputs.debtWeight));
+  enter("debt_weight", String(errors.weights.inputs.debt_weight));
   calculate();
   await waitFor(
     () =>
@@ -90,7 +90,7 @@ it("sends the two weights as entered, and shows Rust's rejection of their sum", 
 
 it("shows Rust's rejection of a tax rate out of range", async () => {
   renderLive(cases.blended.inputs);
-  enter("tax_rate", String(errors.tax.inputs.taxRate));
+  enter("tax_rate", String(errors.tax.inputs.tax_rate));
   calculate();
   await waitFor(
     () =>
@@ -209,10 +209,10 @@ it("hides the rate and the button while an error or a load is showing", () => {
 
 it("keys the query on the snapshot, with NaN distinct from null", () => {
   const client = { call: vi.fn() } as unknown as FinstackClient;
-  const nan = { ...cases.blended.inputs, taxRate: Number.NaN };
+  const nan = { ...cases.blended.inputs, tax_rate: Number.NaN };
   const empty = {
     ...cases.blended.inputs,
-    taxRate: null,
+    tax_rate: null,
   } as unknown as WaccRequest;
   expect(waccOptions(client, 1, nan).queryKey).not.toEqual(
     waccOptions(client, 1, empty).queryKey,

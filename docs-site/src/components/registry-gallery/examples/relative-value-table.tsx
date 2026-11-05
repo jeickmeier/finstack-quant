@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import type { ExampleProps } from "./props";
 import { RelativeValueTable } from "@/components/finstack/statements/components/relative-value-table/relative-value-table";
 import { useRelativeValueReport } from "@/hooks/statements/use-relative-value-report/use-relative-value-report";
@@ -13,7 +13,9 @@ import { WorkerPreview } from "../worker-preview";
 const fixture = data.relativeValueTable;
 const subject = fixture.subject as CompanyMetrics;
 const universe = fixture.universe as CompanyMetrics[];
-const start = fixture.cases.full.config;
+const start = fixture.cases.full.config as unknown as ComponentProps<
+  typeof RelativeValueTable
+>["defaultConfig"];
 const initial: RelativeValueReportRequest = {
   subjectJson: JSON.stringify(subject),
   universeJson: JSON.stringify(universe),

@@ -14,7 +14,7 @@ import math
 
 import pytest
 
-from finstack_quant.analytics import DatedSeries, Performance, sharpe, sortino, volatility
+from finstack_quant.analytics import DatedSeries, Performance, PerformancePanel, sharpe, sortino, volatility
 from finstack_quant.core.dates import FiscalConfig
 
 RETURNS = [0.004 * math.sin(i) + 0.0005 * (i % 7) - 0.001 for i in range(120)]
@@ -27,7 +27,15 @@ def _dates(n: int) -> list[date]:
 
 @pytest.fixture
 def perf() -> Performance:
-    return Performance.from_returns_arrays(_dates(len(RETURNS)), [RETURNS, BENCH], ["FUND", "BENCH"], "BENCH")
+    return Performance.from_panel(
+        PerformancePanel(
+            dates=_dates(len(RETURNS)),
+            series=[RETURNS, BENCH],
+            kind="returns",
+            ticker_names=["FUND", "BENCH"],
+            benchmark_ticker="BENCH",
+        )
+    )
 
 
 def test_rolling_series_carry_the_rust_metric_label(perf: Performance) -> None:
@@ -65,7 +73,12 @@ def test_omitted_arguments_equal_the_rust_defaults(perf: Performance) -> None:
         perf.multi_factor_greeks(0, [BENCH]).to_json() == perf.multi_factor_greeks(0, [BENCH], "excess", 0.0).to_json()
     )
     assert perf.cagr().equals(perf.cagr("act365_25"))
-    assert Performance.from_arrays(_dates(3), [[100.0, 101.0, 102.0]], ["A"]).get_frequency() == "daily"
+    assert (
+        Performance.from_panel(
+            PerformancePanel(dates=_dates(3), series=[[100.0, 101.0, 102.0]], kind="prices", ticker_names=["A"])
+        ).get_frequency()
+        == "daily"
+    )
 
 
 def test_omitted_fiscal_config_is_rust_none(perf: Performance) -> None:

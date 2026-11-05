@@ -77,17 +77,42 @@ function recordingClient() {
   } as unknown as FinstackClient;
   return { client, calls };
 }
+type Config = RunSensitivityRequest["config"];
+type Parameter = Config["parameters"][number];
 /** The fixture run as the worker request, base values read from the evaluated cells. */
 function fixtureRequest(): RunSensitivityRequest {
   return {
     modelJson,
-    mode: run.mode,
+    config: {
+      mode: run.mode as Config["mode"],
+      parameters: run.parameters.map((parameter) => ({
+        node_id: parameter.nodeId,
+        period_id: parameter.periodId,
+        base_value: evaluatedNumber(
+          result,
+          parameter.nodeId,
+          parameter.periodId,
+        ),
+        pct_range: parameter.pctRange,
+      })),
+      target_metrics: [run.targetMetric],
+    },
     targetMetric: run.targetMetric,
     period: run.period,
-    parameters: run.parameters.map((parameter) => ({
-      ...parameter,
-      baseValue: evaluatedNumber(result, parameter.nodeId, parameter.periodId),
-    })),
+  };
+}
+/** The request with its first parameter changed. */
+function withParameter(
+  request: RunSensitivityRequest,
+  change: Partial<Parameter>,
+): RunSensitivityRequest {
+  const [first, ...rest] = request.config.parameters;
+  return {
+    ...request,
+    config: {
+      ...request.config,
+      parameters: [{ ...first!, ...change }, ...rest],
+    },
   };
 }
 
@@ -105,18 +130,7 @@ it(
       expect(JSON.parse(serializeHost(returned))).toEqual(captured);
       const direct = native.runSensitivity(
         modelJson,
-        JSON.stringify({
-          mode: run.mode,
-          parameters: request.parameters.map((parameter) =>
-            native.parameterSpecWithPercentages(
-              parameter.nodeId,
-              parameter.periodId,
-              parameter.baseValue,
-              parameter.pctRange,
-            ),
-          ),
-          target_metrics: [run.targetMetric],
-        }),
+        JSON.stringify(request.config),
       );
       expect(serializeHost(returned.result)).toBe(serializeHost(direct));
       expect(returned.tornado).toEqual(
@@ -125,32 +139,35 @@ it(
       expect(calls).toEqual([["runSensitivity", request]]);
       // A full-grid run has scenarios but no tornado (Rust cannot rank it).
       const grid = await query.fetchQuery(
-        runSensitivityOptions(client, 1, { ...request, mode: "full_grid" }),
+        runSensitivityOptions(client, 1, {
+          ...request,
+          config: { ...request.config, mode: "full_grid" },
+        }),
       );
       expect(grid.tornado).toBeNull();
       expect(grid.result.config.mode).toBe("full_grid");
       expect(grid.result.scenarios).toHaveLength(4);
-      // A NaN base value or move reaches Rust, which rejects it.
-      const fails = (change: Partial<RunSensitivityRequest>) =>
-        query.fetchQuery(
-          runSensitivityOptions(client, 1, { ...request, ...change }),
-        );
+      // A NaN base value or move reaches the binding, which rejects it.
+      const fails = (failing: RunSensitivityRequest) =>
+        query.fetchQuery(runSensitivityOptions(client, 1, failing));
+      await expect(
+        fails(withParameter(request, { base_value: Number.NaN })),
+      ).rejects.toMatchObject({ kind: "invalid_type" });
+      await expect(
+        fails(withParameter(request, { pct_range: [Number.NaN] })),
+      ).rejects.toMatchObject({ kind: "invalid_type" });
+      // Both perturbation forms, an unknown mode and a missing node are native errors.
+      await expect(
+        fails(withParameter(request, { perturbations: [1] })),
+      ).rejects.toThrow(/exactly one of `perturbations` or `pct_range`/);
       await expect(
         fails({
-          parameters: [{ ...request.parameters[0]!, baseValue: Number.NaN }],
+          ...request,
+          config: { ...request.config, mode: "" as Config["mode"] },
         }),
-      ).rejects.toMatchObject({ kind: "validation" });
+      ).rejects.toThrow(/unknown variant/);
       await expect(
-        fails({
-          parameters: [{ ...request.parameters[0]!, pctRange: [Number.NaN] }],
-        }),
-      ).rejects.toMatchObject({ kind: "validation" });
-      // An unknown mode and a missing node are native errors.
-      await expect(fails({ mode: "" })).rejects.toThrow(/unknown variant/);
-      await expect(
-        fails({
-          parameters: [{ ...request.parameters[0]!, nodeId: "missing" }],
-        }),
+        fails(withParameter(request, { node_id: "missing" })),
       ).rejects.toMatchObject({ name: "FinstackError" });
     } finally {
       query.clear();
@@ -166,19 +183,25 @@ it("keys the run by every request field and the worker session, and keeps NaN di
   expect(hashKey(runSensitivityOptions(client, 2, request).queryKey)).not.toBe(
     key,
   );
-  for (const field of ["modelJson", "mode", "targetMetric", "period"])
+  for (const field of ["modelJson", "targetMetric", "period"])
     expect(
       hashKey(
         runSensitivityOptions(client, 1, { ...request, [field]: "changed" })
           .queryKey,
       ),
     ).not.toBe(key);
-  const withBase = (baseValue: number) =>
+  expect(
     hashKey(
       runSensitivityOptions(client, 1, {
         ...request,
-        parameters: [{ ...request.parameters[0]!, baseValue }],
+        config: { ...request.config, mode: "full_grid" },
       }).queryKey,
+    ),
+  ).not.toBe(key);
+  const withBase = (base_value: number) =>
+    hashKey(
+      runSensitivityOptions(client, 1, withParameter(request, { base_value }))
+        .queryKey,
     );
   expect(withBase(Number.NaN)).not.toBe(withBase(null as never));
   expect(runSensitivityOptions(client, 1, null).enabled).toBe(false);
@@ -211,14 +234,14 @@ it("submits the run with each base value read from the evaluated cell, and a cle
   );
   fireEvent.click(screen.getByRole("button", { name: "Add parameter" }));
   fireEvent.click(button);
-  const parameters = submit.mock.lastCall![0].parameters;
-  expect(parameters[0]!.pctRange).toEqual([-5, Number.NaN]);
+  const parameters = submit.mock.lastCall![0].config.parameters;
+  expect(parameters[0]!.pct_range).toEqual([-5, Number.NaN]);
   // A new row starts empty: no node, period or move is defaulted.
   expect(parameters[2]).toEqual({
-    nodeId: "",
-    periodId: "",
-    baseValue: Number.NaN,
-    pctRange: [Number.NaN],
+    node_id: "",
+    period_id: "",
+    base_value: Number.NaN,
+    pct_range: [Number.NaN],
   });
 });
 
@@ -236,17 +259,20 @@ it("starts empty without defaults", () => {
   expect(screen.getByText("No sensitivity run available.")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Run sensitivity" }));
   expect(submit.mock.lastCall![0]).toEqual({
-    mode: "",
+    config: {
+      mode: "",
+      parameters: [
+        {
+          node_id: "",
+          period_id: "",
+          base_value: Number.NaN,
+          pct_range: [Number.NaN],
+        },
+      ],
+      target_metrics: [""],
+    },
     targetMetric: "",
     period: "",
-    parameters: [
-      {
-        nodeId: "",
-        periodId: "",
-        baseValue: Number.NaN,
-        pctRange: [Number.NaN],
-      },
-    ],
   });
 });
 

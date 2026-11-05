@@ -161,6 +161,10 @@ export type DateWire = string;
  */
 export type RollingMetric = "volatility" | "sortino" | "sharpe" | "return";
 /**
+ * Whether a panel's series are prices or simple returns.
+ */
+export type PanelSeriesKind = "prices" | "returns";
+/**
  * Period frequency type.
  *
  * Defines the frequency of periodic schedules (cashflow rolls, return-series
@@ -396,6 +400,38 @@ export interface TickerSpan {
   end: number;
   start: number;
   [k: string]: unknown;
+}
+/**
+ * Dated price or return panel, one series per ticker, that a Performance is built from.
+ */
+export interface PerformancePanel {
+  /**
+   * Benchmark ticker; omitted uses the first ticker.
+   */
+  benchmark_ticker?: string | null;
+  /**
+   * Strictly ascending observation dates, one per value of every series.
+   */
+  dates: DateWire[];
+  /**
+   * Observation frequency used for annualization; omitted uses
+   * [`crate::DEFAULT_FREQUENCY`].
+   */
+  frequency?: PeriodKind | null;
+  /**
+   * Whether `series` holds prices or simple returns.
+   */
+  kind: PanelSeriesKind;
+  /**
+   * Ticker-major series: `series[i][t]` is ticker `i` at `dates[t]`. A
+   * ticker may have leading or trailing gaps (`NaN`, `null` on the wire)
+   * but its observed span must be contiguous.
+   */
+  series: (number | null)[][];
+  /**
+   * Unique ticker names, one per series.
+   */
+  ticker_names: string[];
 }
 /**
  * Period-level aggregate statistics.

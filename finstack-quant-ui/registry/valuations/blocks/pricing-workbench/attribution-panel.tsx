@@ -19,7 +19,7 @@ export type AttributionMethodChoice =
   "" | "parallel" | "waterfall" | "metrics_based" | "taylor";
 /** Where the T1 market and date come from. */
 export type AttributionT1Source = "priced" | "scenario";
-type Method = AttributePnlManyRequest["method"];
+type Method = AttributePnlManyRequest["inputs"]["method"];
 type WaterfallOrder = Extract<Method, { waterfall: unknown }>["waterfall"];
 
 /** The AttributionMethod wire value of a choice: waterfall in Rust's default order, Taylor with its config left for Rust to fill; null until both exist. */
@@ -71,9 +71,7 @@ export function useAttributionSession(
           instrumentJsons: [base.instrumentJson],
           marketT0Json: pinned.marketJson,
           marketT1Json: t1.marketJson,
-          asOfT0: pinned.asOf,
-          asOfT1: t1.asOf,
-          method,
+          inputs: { as_of_t0: pinned.asOf, as_of_t1: t1.asOf, method },
         }
       : null;
   const attribution = useAttributePnlMany(request);

@@ -13,7 +13,8 @@ import { createChartRuntime } from "@tanstack/charts";
 import { MarketContextForm } from "@/components/finstack/core/components/market-context-form/market-context-form";
 import {
   marketModule,
-  importMarket,
+  calibratedMarket,
+  parseMarket,
 } from "@/components/finstack/core/components/market-context-form/market";
 import {
   curvePanels,
@@ -165,12 +166,17 @@ it(
     const envelope = calibrations.find(
       (c) => c.source.endsWith("01_usd_discount.json") && !("variant" in c),
     )!.result;
-    const imported = importMarket(serializeHost(envelope));
+    const imported = calibratedMarket(serializeHost(envelope));
     expect(imported).toEqual(
       marketModule.codec.parse(
         canonical(serializeHost(envelope.result.final_market)),
       ),
     );
+    // A plain market is not a calibration result, and an envelope is not a market.
+    expect(() => calibratedMarket(bond.request.marketJson)).toThrow(
+      /final_market is missing/,
+    );
+    expect(() => parseMarket(serializeHost(envelope))).toThrow();
     const onSubmit = vi.fn();
     render(
       <MarketContextForm
@@ -193,7 +199,7 @@ it(
       screen.getByLabelText("Market or calibration result JSON"),
       { target: { value: serializeHost(envelope) } },
     );
-    fireEvent.click(screen.getByText("Import JSON"));
+    fireEvent.click(screen.getByText("Import calibration result"));
     expect(JSON.parse(await submit(onSubmit))).toEqual(
       JSON.parse(canonical(serializeHost(envelope.result.final_market))),
     );
@@ -202,7 +208,7 @@ it(
       screen.getByLabelText("Market or calibration result JSON"),
       { target: { value: bond.request.marketJson } },
     );
-    fireEvent.click(screen.getByText("Import JSON"));
+    fireEvent.click(screen.getByText("Import market JSON"));
     expect(await submit(onSubmit)).toBe(canonical(bond.request.marketJson));
   },
   budget(15000),
@@ -264,7 +270,7 @@ it("rejects malformed imports without discarding edits or exposing readonly data
   fireEvent.change(screen.getByLabelText("Market or calibration result JSON"), {
     target: { value: "{bad" },
   });
-  fireEvent.click(screen.getByText("Import JSON"));
+  fireEvent.click(screen.getByText("Import market JSON"));
   expect(screen.getAllByRole("alert").length).toBeGreaterThan(0);
   expect(
     (screen.getAllByLabelText("Stored value 1")[0] as HTMLInputElement).value,

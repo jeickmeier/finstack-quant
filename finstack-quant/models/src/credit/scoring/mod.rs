@@ -14,6 +14,9 @@
 //! - [`ohlson_o_score`]: Ohlson O-Score (1980) nine-predictor logistic model.
 //! - [`zmijewski_score`]: Zmijewski (1984) three-predictor probit model.
 //!
+//! [`credit_score_report`] scores one [`CreditScoreRequest`] and grades its
+//! implied PD on the default PD master scale.
+//!
 //! # Examples
 //!
 //! ```
@@ -33,6 +36,7 @@
 
 mod altman;
 mod ohlson;
+mod report;
 #[cfg(test)]
 mod tests;
 mod types;
@@ -44,5 +48,6 @@ pub use altman::{
 };
 pub(crate) use ohlson::logistic;
 pub use ohlson::{OhlsonOScoreInput, ohlson_o_score};
+pub use report::{CreditScoreReport, CreditScoreRequest, credit_score_report};
 pub use types::{CreditScoringError, ScoringResult, ScoringZone};
 pub use zmijewski::{ZmijewskiInput, zmijewski_score};

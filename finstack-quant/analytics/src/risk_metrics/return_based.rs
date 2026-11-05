@@ -654,13 +654,13 @@ mod tests {
                     .unwrap()
             })
             .collect();
-        let perf = crate::Performance::from_returns(
+        let perf = crate::Performance::new(&crate::performance::returns_panel(
             dates,
             vec![returns.to_vec()],
             vec!["A".into()],
             None,
             finstack_quant_core::dates::PeriodKind::Daily,
-        )
+        ))
         .unwrap();
         assert!((sharpe(&returns, 0.02, 252.0) - perf.sharpe(0.02)[0]).abs() < 1e-12);
         assert!((sortino(&returns, 0.0, 252.0) - perf.sortino(0.0)[0]).abs() < 1e-12);

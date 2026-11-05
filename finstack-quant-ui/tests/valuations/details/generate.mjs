@@ -99,7 +99,13 @@ for (const type of [
     resultJson: native.valuationResultToJson(serializeHost(result)),
   });
 }
-const specs = JSON.parse(native.lboStandardJson(5, 1.5, 1.2, 10000000));
+const specs = native.covenantTemplate({
+  kind: "lbo_standard",
+  initial_leverage: 5,
+  interest_coverage: 1.5,
+  fixed_charge_coverage: 1.2,
+  max_capex: 10000000,
+});
 const covenantRequest = {
   engineJson: JSON.stringify({
     specs: [specs[0]],

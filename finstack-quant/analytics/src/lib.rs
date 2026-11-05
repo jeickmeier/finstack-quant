@@ -56,21 +56,22 @@
 //! # Quick start
 //!
 //! ```
-//! use finstack_quant_analytics::Performance;
+//! use finstack_quant_analytics::{PanelSeriesKind, Performance, PerformancePanel};
 //! use finstack_quant_core::dates::{Date, PeriodKind};
 //! use time::Month;
 //!
 //! let dates: Vec<Date> = (1..=10)
 //!     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
 //!     .collect();
-//! let prices = vec![(0..10).map(|i| 100.0 + i as f64).collect::<Vec<_>>()];
-//! let perf = Performance::new(
+//! let perf = Performance::new(&PerformancePanel {
 //!     dates,
-//!     prices,
-//!     vec!["SPY".into()],
-//!     None,
-//!     PeriodKind::Daily,
-//! ).unwrap();
+//!     series: vec![(0..10).map(|i| 100.0 + i as f64).collect()],
+//!     kind: PanelSeriesKind::Prices,
+//!     ticker_names: vec!["SPY".into()],
+//!     benchmark_ticker: None,
+//!     frequency: Some(PeriodKind::Daily),
+//! })
+//! .unwrap();
 //! assert_eq!(perf.get_ticker_names(), &["SPY"]);
 //! ```
 //!
@@ -101,7 +102,7 @@ pub use defaults::{
 };
 pub use drawdown::DrawdownEpisode;
 pub use multi_factor::{MultiFactorResult, ReturnKind};
-pub use performance::{LookbackReturns, Performance};
+pub use performance::{LookbackReturns, PanelSeriesKind, Performance, PerformancePanel};
 pub use risk_metrics::{
     CagrDayCount, DatedSeries, RollingMetric, max_drawdown, sharpe, sortino, volatility,
 };

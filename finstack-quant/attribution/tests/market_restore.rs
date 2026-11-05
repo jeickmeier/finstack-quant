@@ -124,7 +124,14 @@ impl Instrument for RestoreTestInstrument {
             Kind::PriceCurve => 100_000.0 * market.get_price_curve("WTI")?.spot_price(),
             Kind::VolCube => {
                 let cube = market.get_vol_cube("SWPT-CUBE")?;
-                1_000_000.0 * get_cube_vol_clamped(&cube, 1.0, 1.0, 0.05)
+                1_000_000.0
+                    * get_cube_vol_clamped(
+                        &cube,
+                        1.0,
+                        1.0,
+                        0.05,
+                        finstack_quant_models::volatility::VolatilityConvention::Lognormal,
+                    )
             }
             Kind::RatesInflation => {
                 let rate = market.get_forward("USD-FWD")?.rate(1.0);

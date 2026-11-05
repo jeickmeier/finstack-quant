@@ -87,14 +87,9 @@ function materializeFxDeltaSurface(...args) {
 }
 let sliceConstructed = 0,
   sliceFreed = 0;
-// The four cube-slice materializers share one constructed/freed count.
+// The two cube-slice materializers share one constructed/freed count.
 const slices = Object.fromEntries(
-  [
-    "materializeCubeTenorSlice",
-    "materializeCubeTenorSliceNormal",
-    "materializeCubeExpirySlice",
-    "materializeCubeExpirySliceNormal",
-  ].map((name) => [
+  ["materializeCubeTenorSlice", "materializeCubeExpirySlice"].map((name) => [
     name,
     (...args) => {
       const handle = facade.models.volatility[name](...args);

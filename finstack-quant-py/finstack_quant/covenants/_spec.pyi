@@ -1225,8 +1225,8 @@ class CovenantWaiver:
 
     Examples
     --------
-    >>> from finstack_quant.covenants import CovenantEngine, CovenantWaiver, lbo_standard
-    >>> engine = CovenantEngine.from_specs(lbo_standard(4.5, 2.0, 1.1, 50.0))
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, CovenantWaiver, covenant_template
+    >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.lbo_standard(4.5, 2.0, 1.1, 50.0)))
     >>> waiver = CovenantWaiver("max_debt_ebitda", "2026-01-01", "2026-12-31", amended_threshold=6.0)
     >>> _ = engine.add_waiver(waiver)
     >>> metrics = {"debt_to_ebitda": 5.0, "interest_coverage": 3.0, "fixed_charge_coverage": 1.5, "capex": 10.0}
@@ -1475,8 +1475,8 @@ class CovenantSpec:
         Parameters
         ----------
         json : str
-            JSON matching the ``CovenantSpec`` wire schema, for example one
-            element of ``lbo_standard_json(...)``.
+            JSON matching the ``CovenantSpec`` wire schema, for example
+            ``CovenantSpec.to_json()``.
 
         Returns
         -------
@@ -1490,10 +1490,9 @@ class CovenantSpec:
 
         Examples
         --------
-        >>> import json
-        >>> from finstack_quant.covenants import CovenantSpec, lbo_standard_json
-        >>> raw = json.loads(lbo_standard_json(5.0, 1.5, 1.2, 10_000_000.0))[0]
-        >>> CovenantSpec.from_json(json.dumps(raw)).metric_id
+        >>> from finstack_quant.covenants import CovenantSpec, CovenantTemplate, covenant_template
+        >>> spec = covenant_template(CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))[0]
+        >>> CovenantSpec.from_json(spec.to_json()).metric_id
         'debt_to_ebitda'
         """
 

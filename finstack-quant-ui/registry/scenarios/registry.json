@@ -6,7 +6,7 @@
       "type": "registry:component",
       "title": "Market scenario builder",
       "description": "Full ScenarioSpec editor: built-in templates and components loaded or composed in Rust, add-parallel-shift and add-roll actions, and the generated form over every operation.",
-      "docs": "Composes schema-form over the generated scenario_spec contract (started from defaultJson, else the Rust schema example), with IdCombobox on the operation curve_id, discount_curve_id, vol_surface_id, surface_id and ids fields: free text with the supplied market ids as suggestions, never filtered by kind. When templates is supplied, a picker lists scenarios.listBuiltinTemplateMetadata (useListBuiltinTemplateMetadata) with the selected template's returned description, severity, event date, asset classes and tags; Load template replaces the document with scenarios.buildFromTemplate or, for a chosen component, buildTemplateComponent, and Compose with scenario merges the current scenario and the template through scenarios.composeScenarios (Rust's priority order, id and hazard-bump-mode rule). Template ids are placeholders the user maps to market ids. When buildMarketScenario is supplied (useBuildMarketScenario), Add parallel shift and Add roll append the operations Rust builds (scenarios.parallelBpMany, operationSpecTimeRollForward); a blank size is NaN and a blank roll mode is omitted, so Rust rejects or defaults them. Validation is native (connect validate to useScenarioSpecValidator); onSpecChange receives the canonical spec, or null while an edit is pending or rejected, and the canonical spec is shown as JSON. Every failure is the native error. Accepts defaultJson, validate, onSpecChange, curveIds, templates, templatesError, buildFromTemplate, buildTemplateComponent, composeScenarios, buildMarketScenario, disabled and density props.",
+      "docs": "Composes schema-form over the generated scenario_spec contract (started from defaultJson, else the Rust schema example), with IdCombobox on the operation curve_id, discount_curve_id, vol_surface_id, surface_id and ids fields: free text with the supplied market ids as suggestions, never filtered by kind. When templates is supplied, a picker lists scenarios.listBuiltinTemplateMetadata (useListBuiltinTemplateMetadata) with the selected template's returned description, severity, event date, asset classes and tags; Load template replaces the document with scenarios.buildFromTemplate or, for a chosen component, buildTemplateComponent, and Compose with scenario merges the current scenario and the template through scenarios.composeScenarios (Rust's priority order, id and hazard-bump-mode rule). Template ids are placeholders the user maps to market ids. Add parallel shift and Add roll append a curve_parallel_bp or time_roll_forward OperationSpec to the working spec as entered; a blank size is NaN and a blank roll mode is omitted, so Rust rejects or defaults them when it validates the spec. Validation is native (connect validate to useScenarioSpecValidator); onSpecChange receives the canonical spec, or null while an edit is pending or rejected, and the canonical spec is shown as JSON. Every failure is the native error. Accepts defaultJson, validate, onSpecChange, curveIds, templates, templatesError, buildFromTemplate, buildTemplateComponent, composeScenarios, disabled and density props.",
       "files": [
         {
           "path": "components/market-scenario-builder/market-scenario-builder.tsx",
@@ -31,6 +31,7 @@
         "@finstack/decimal-input",
         "@finstack/json-viewer",
         "@finstack/native-display",
+        "@finstack/finstack-worker",
         "button"
       ],
       "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
@@ -39,8 +40,10 @@
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
-          "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json"
+          "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -112,32 +115,6 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
-        ]
-      }
-    },
-    {
-      "name": "use-market-scenario",
-      "type": "registry:hook",
-      "title": "useMarketScenario",
-      "description": "Builds the canonical ScenarioSpec text of a market scenario from native operations through the WASM worker, as a query or on demand.",
-      "docs": "Rust-built operations (scenarios.operationSpecTimeRollForward and parallelBpMany per shift) validated and canonicalized by scenarios.parseScenarioSpec, returned as JSON text. Omitted options stay unset so Rust applies its defaults. Keyed on the complete request and worker session; native errors are returned unchanged. useBuildMarketScenario returns the same build as a callback for market-scenario-builder's add actions. Requires the shared Finstack/Query provider.",
-      "files": [
-        {
-          "path": "hooks/use-market-scenario/use-market-scenario.ts",
-          "type": "registry:hook",
-          "target": "hooks/scenarios/use-market-scenario/use-market-scenario.ts"
-        }
-      ],
-      "registryDependencies": ["@finstack/use-finstack"],
-      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
-      "categories": [],
-      "meta": {
-        "version": "0.2.0",
-        "wasmVersion": "0.11.0",
-        "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
-          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },

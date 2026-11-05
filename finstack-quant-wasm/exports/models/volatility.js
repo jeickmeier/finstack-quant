@@ -7,8 +7,6 @@ export const volatility = {
   calibrateSvi: wasm.calibrateSvi,
   convertAtmVolatility: wasm.convertAtmVolatility,
   deltaToStrike: wasm.deltaToStrike,
-  getCubeNormalVol: wasm.getCubeNormalVol,
-  getCubeNormalVolClamped: wasm.getCubeNormalVolClamped,
   getCubeVol: wasm.getCubeVol,
   getCubeVolClamped: wasm.getCubeVolClamped,
   getCubeExpirySliceVol: wasm.getCubeExpirySliceVol,
@@ -32,8 +30,6 @@ export const volatility = {
   getSurfaceVol: wasm.getSurfaceVol,
   getSurfaceVolClamped: wasm.getSurfaceVolClamped,
   materializeCubeTenorSlice: wasm.materializeCubeTenorSlice,
-  materializeCubeTenorSliceNormal: wasm.materializeCubeTenorSliceNormal,
   materializeCubeExpirySlice: wasm.materializeCubeExpirySlice,
-  materializeCubeExpirySliceNormal: wasm.materializeCubeExpirySliceNormal,
   materializeFxDeltaSurface: wasm.materializeFxDeltaSurface,
 };

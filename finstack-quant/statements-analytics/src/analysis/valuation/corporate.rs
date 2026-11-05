@@ -19,6 +19,7 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
     DiscountedCashFlow, EquityBridge, TerminalValueSpec, ValuationDiscounts,
 };
+use serde::{Deserialize, Serialize};
 
 /// Corporate valuation result containing DCF outputs.
 ///
@@ -699,6 +700,31 @@ pub fn dcf_sensitivity(
 /// genuine mis-specification (a stray 1% weight) while absorbing rounding.
 const WACC_WEIGHT_SUM_TOLERANCE: f64 = 1e-6;
 
+/// Capital-structure inputs of a [`wacc`] calculation.
+///
+/// All rates follow the crate-wide decimal convention (`0.10` means `10%`);
+/// weights are decimal fractions of total capital and must sum to one.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct WaccInputs {
+    /// Equity share of total capital as a decimal fraction (`0.6` means 60%
+    /// equity-funded); non-negative.
+    pub equity_weight: f64,
+    /// Required return on equity in decimal form, typically from CAPM
+    /// (`0.115` means `11.5%`).
+    pub cost_of_equity: f64,
+    /// Debt share of total capital as a decimal fraction (`0.4` means 40%
+    /// debt-funded); non-negative, and sums with `equity_weight` to `1.0`.
+    pub debt_weight: f64,
+    /// **Pre-tax** cost of debt in decimal form: the marginal borrowing yield
+    /// before the tax shield (`0.06` means `6%`).
+    pub cost_of_debt: f64,
+    /// Marginal corporate tax rate as a decimal fraction in `[0, 1]` (`0.25`
+    /// means `25%`).
+    pub tax_rate: f64,
+}
+
 /// Weighted-average cost of capital (WACC).
 ///
 /// Blends the required return on equity with the *after-tax* cost of debt at
@@ -711,27 +737,14 @@ const WACC_WEIGHT_SUM_TOLERANCE: f64 = 1e-6;
 /// The `(1 − T)` factor is the interest tax shield: because interest is
 /// deductible, the cash cost of debt to the firm is lower than the coupon
 /// investors receive. Equity carries no equivalent shield, so `cost_of_equity`
-/// enters untaxed.
-///
-/// All rate arguments follow the crate-wide decimal convention, so `0.10`
-/// means `10%`. Weights are decimal fractions of total capital and must sum to
-/// one — pass market-value weights, not book-value weights, for a valuation
-/// discount rate. The result is the rate to feed to
+/// enters untaxed. Pass market-value weights, not book-value weights, for a
+/// valuation discount rate. The result is the rate to feed to
 /// [`evaluate_dcf`] or [`dcf_sensitivity`].
 ///
 /// # Arguments
 ///
-/// * `equity_weight` - Equity share of total capital as a decimal fraction
-///   (`0.6` means 60% equity-funded); must be non-negative
-/// * `cost_of_equity` - Required return on equity in decimal form, typically
-///   from CAPM (`0.115` means `11.5%`)
-/// * `debt_weight` - Debt share of total capital as a decimal fraction
-///   (`0.4` means 40% debt-funded); must be non-negative and must sum with
-///   `equity_weight` to `1.0`
-/// * `cost_of_debt` - **Pre-tax** cost of debt in decimal form, i.e. the
-///   marginal borrowing yield before the tax shield (`0.06` means `6%`)
-/// * `tax_rate` - Marginal corporate tax rate as a decimal fraction in
-///   `[0, 1]` (`0.25` means `25%`)
+/// * `inputs` - Capital weights, the cost of equity, the pre-tax cost of debt
+///   and the marginal tax rate, all decimals (see [`WaccInputs`]).
 ///
 /// # Returns
 ///
@@ -739,18 +752,24 @@ const WACC_WEIGHT_SUM_TOLERANCE: f64 = 1e-6;
 ///
 /// # Errors
 ///
-/// Returns an error if any argument is not finite, if either weight is
+/// Returns an error if any input is not finite, if either weight is
 /// negative, if the weights do not sum to `1.0` within `1e-6`, or if
 /// `tax_rate` falls outside `[0, 1]`.
 ///
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_statements_analytics::analysis::wacc;
+/// use finstack_quant_statements_analytics::analysis::{wacc, WaccInputs};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// // 60% equity at 11.5%, 40% debt at 6% pre-tax, 25% tax rate.
-/// let rate = wacc(0.6, 0.115, 0.4, 0.06, 0.25)?;
+/// let rate = wacc(&WaccInputs {
+///     equity_weight: 0.6,
+///     cost_of_equity: 0.115,
+///     debt_weight: 0.4,
+///     cost_of_debt: 0.06,
+///     tax_rate: 0.25,
+/// })?;
 /// assert!((rate - 0.087).abs() < 1e-12);
 /// # Ok(())
 /// # }
@@ -766,13 +785,14 @@ const WACC_WEIGHT_SUM_TOLERANCE: f64 = 1e-6;
 ///   433-443 — the source of the `(1 − T)` debt tax shield.
 /// - Koller, T., Goedhart, M., & Wessels, D. (2020). *Valuation: Measuring and
 ///   Managing the Value of Companies* (7th ed.). Wiley. Ch. 13. `docs/REFERENCES.md#koller-valuation`
-pub fn wacc(
-    equity_weight: f64,
-    cost_of_equity: f64,
-    debt_weight: f64,
-    cost_of_debt: f64,
-    tax_rate: f64,
-) -> Result<f64> {
+pub fn wacc(inputs: &WaccInputs) -> Result<f64> {
+    let WaccInputs {
+        equity_weight,
+        cost_of_equity,
+        debt_weight,
+        cost_of_debt,
+        tax_rate,
+    } = *inputs;
     for (name, value) in [
         ("equity_weight", equity_weight),
         ("cost_of_equity", cost_of_equity),
@@ -1659,37 +1679,53 @@ mod tests {
         assert!(exit.downside < 0.0 && exit.upside > 0.0, "{exit:?}");
     }
 
+    fn inputs(
+        equity_weight: f64,
+        cost_of_equity: f64,
+        debt_weight: f64,
+        cost_of_debt: f64,
+        tax_rate: f64,
+    ) -> WaccInputs {
+        WaccInputs {
+            equity_weight,
+            cost_of_equity,
+            debt_weight,
+            cost_of_debt,
+            tax_rate,
+        }
+    }
+
     #[test]
     fn wacc_blends_equity_and_after_tax_debt() {
         // 0.6 * 0.115 + 0.4 * 0.06 * 0.75 = 0.069 + 0.018 = 0.087
-        let rate = wacc(0.6, 0.115, 0.4, 0.06, 0.25).expect("valid inputs");
+        let rate = wacc(&inputs(0.6, 0.115, 0.4, 0.06, 0.25)).expect("valid inputs");
         assert!((rate - 0.087).abs() < 1e-12, "{rate}");
 
         // An all-equity firm prices at the cost of equity.
-        let unlevered = wacc(1.0, 0.115, 0.0, 0.06, 0.25).expect("valid inputs");
+        let unlevered = wacc(&inputs(1.0, 0.115, 0.0, 0.06, 0.25)).expect("valid inputs");
         assert!((unlevered - 0.115).abs() < 1e-12, "{unlevered}");
 
         // A zero tax rate removes the shield.
-        let untaxed = wacc(0.6, 0.115, 0.4, 0.06, 0.0).expect("valid inputs");
+        let untaxed = wacc(&inputs(0.6, 0.115, 0.4, 0.06, 0.0)).expect("valid inputs");
         assert!((untaxed - 0.093).abs() < 1e-12, "{untaxed}");
     }
 
     #[test]
     fn wacc_rejects_invalid_weights_and_rates() {
         assert!(
-            wacc(0.6, 0.115, 0.3, 0.06, 0.25).is_err(),
+            wacc(&inputs(0.6, 0.115, 0.3, 0.06, 0.25)).is_err(),
             "weights must sum to 1"
         );
         assert!(
-            wacc(1.2, 0.115, -0.2, 0.06, 0.25).is_err(),
+            wacc(&inputs(1.2, 0.115, -0.2, 0.06, 0.25)).is_err(),
             "weights must be non-negative"
         );
         assert!(
-            wacc(0.6, 0.115, 0.4, 0.06, 1.5).is_err(),
+            wacc(&inputs(0.6, 0.115, 0.4, 0.06, 1.5)).is_err(),
             "tax rate must be in [0, 1]"
         );
         assert!(
-            wacc(f64::NAN, 0.115, 0.4, 0.06, 0.25).is_err(),
+            wacc(&inputs(f64::NAN, 0.115, 0.4, 0.06, 0.25)).is_err(),
             "inputs must be finite"
         );
     }

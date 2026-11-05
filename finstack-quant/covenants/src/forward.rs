@@ -1130,10 +1130,15 @@ mod tests {
     #[test]
     fn forecast_breaches_generic_skips_non_numeric_covenants() {
         use crate::engine::CovenantEngine;
-        use crate::templates;
+        use crate::templates::{CovenantTemplate, covenant_template};
 
         let mut engine = CovenantEngine::new();
-        for spec in templates::cov_lite(6.0, 4.0).unwrap() {
+        for spec in covenant_template(&CovenantTemplate::CovLite {
+            max_leverage: 6.0,
+            max_senior_leverage: 4.0,
+        })
+        .unwrap()
+        {
             engine.add_spec(spec);
         }
 

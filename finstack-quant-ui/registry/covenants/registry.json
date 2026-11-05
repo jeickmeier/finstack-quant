@@ -6,7 +6,7 @@
       "type": "registry:component",
       "title": "Covenant engine editor",
       "description": "Edits a covenant engine with the generated form, optionally starting from a Rust covenant package template, and lists each covenant's metric id against the model's nodes.",
-      "docs": "Composes schema-form over the generated covenant_engine contract (started from defaultJson; Rust publishes no example, so it otherwise starts empty). When loadTemplate is supplied, a template bar loads the specs of a Rust package (covenants.covLite, lboStandard, realEstate or projectFinance) for thresholds typed into decimal inputs that start empty; a blank threshold is sent as NaN and a rejected template shows the native error. Every metric_id and denominator_metric_id (top-level and windowed specs) is an id-combobox: free text with metricIds as suggestions. A Covenant metrics table lists each spec's metric id and whether metricIds contains it, before any evaluation; an unset metric id is listed as read by Rust's conventional metric for the covenant type and is not checked. Validation, templates and every term are native: connect validate to useCovenantEngineValidator, loadTemplate to useCovenantTemplate and onSubmit to the useEvaluateCovenants request. Accepts defaultJson, validate, onSubmit, loadTemplate, metricIds, disabled and density props.",
+      "docs": "Composes schema-form over the generated covenant_engine contract (started from defaultJson; Rust publishes no example, so it otherwise starts empty). When loadTemplate is supplied, a second schema form over the generated covenant_template contract picks a Rust package (cov_lite, lbo_standard, real_estate or project_finance) and its thresholds, which start empty; Load template passes the structurally checked CovenantTemplate to covenants.covenantTemplate and replaces the engine with the returned specs, and a rejected template shows the native error in that form. Every metric_id and denominator_metric_id (top-level and windowed specs) is an id-combobox: free text with metricIds as suggestions. A Covenant metrics table lists each spec's metric id and whether metricIds contains it, before any evaluation; an unset metric id is listed as read by Rust's conventional metric for the covenant type and is not checked. Validation, templates and every term are native: connect validate to useCovenantEngineValidator, loadTemplate to useCovenantTemplate and onSubmit to the useEvaluateCovenants request. Accepts defaultJson, validate, onSubmit, loadTemplate, metricIds, disabled and density props.",
       "files": [
         {
           "path": "components/covenant-engine-editor/covenant-engine-editor.tsx",
@@ -17,21 +17,23 @@
           "path": "components/covenant-engine-editor/covenant-engine.ts",
           "type": "registry:component",
           "target": "components/finstack/covenants/components/covenant-engine-editor/covenant-engine.ts"
+        },
+        {
+          "path": "components/covenant-engine-editor/covenant-template.ts",
+          "type": "registry:component",
+          "target": "components/finstack/covenants/components/covenant-engine-editor/covenant-template.ts"
         }
       ],
       "registryDependencies": [
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
-        "@finstack/finstack-format",
         "@finstack/schema-form",
         "@finstack/finstack-form",
-        "@finstack/decimal-input",
-        "@finstack/enum-field",
         "@finstack/id-combobox",
         "@finstack/finstack-table",
         "@finstack/contract-covenant-engine",
-        "@finstack/finstack-codec",
-        "button"
+        "@finstack/contract-covenant-template",
+        "@finstack/finstack-codec"
       ],
       "dependencies": [
         "@tanstack/react-table@9.2.4",
@@ -44,6 +46,7 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_template.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
@@ -185,7 +188,7 @@
       "type": "registry:hook",
       "title": "useCovenantTemplate",
       "description": "Loads a Rust covenant package template through the WASM worker.",
-      "docs": "Returns a loader: {kind: \"covLite\", maxLeverage, maxSeniorLeverage} calls covenants.covLite, {kind: \"lboStandard\", initialLeverage, interestCoverage, fixedChargeCoverage, maxCapex} lboStandard, {kind: \"realEstate\", minDscr, minDebtYield, maxLtv} realEstate and {kind: \"projectFinance\", minDscr, distributionLockupDscr, minLiquidity, maxNetLeverage} projectFinance; it resolves to the returned CovenantSpec objects or rejects with the native error (a NaN, infinite or negative threshold). Pass it as covenant-engine-editor's loadTemplate. Requires the shared Finstack provider.",
+      "docs": "Returns a loader of a Rust CovenantTemplate wire value ({kind: \"cov_lite\" | \"lbo_standard\" | \"real_estate\" | \"project_finance\"} with that variant's snake_case thresholds), passed unchanged to covenants.covenantTemplate; it resolves to the returned CovenantSpec objects or rejects with the native error (a NaN, infinite or negative threshold). Pass it as covenant-engine-editor's loadTemplate. Requires the shared Finstack provider.",
       "files": [
         {
           "path": "hooks/use-covenant-template/use-covenant-template.ts",

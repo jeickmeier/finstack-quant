@@ -112,7 +112,7 @@ const displays = [
     pointer: "#",
     route: "schema",
     convention:
-      "Generated covenant_engine form (the caller's engine; Rust publishes no example), optionally replaced by the specs of a Rust package template (covenants.covLite, lboStandard, realEstate or projectFinance over typed thresholds that start empty, a blank one sent as NaN); metric ids are free text with the model's node ids as suggestions, and each spec's metric id is listed with whether the model has that node, without inferring an unset one; validated natively by validateCovenantEngineJson.",
+      "Generated covenant_engine form (the caller's engine; Rust publishes no example), optionally replaced by the specs of a Rust package template (covenants.covenantTemplate over the generated covenant_template form, whose thresholds start empty); metric ids are free text with the model's node ids as suggestions, and each spec's metric id is listed with whether the model has that node, without inferring an unset one; validated natively by validateCovenantEngineJson.",
   },
   {
     id: "covenant-breach-forecast",
@@ -159,24 +159,13 @@ const displays = [
     deferred: "off-grid-surface-evaluation",
   },
   {
-    id: "vol-cube-explorer-black",
+    id: "vol-cube-explorer",
     schema: market,
     pointer: "#/properties/vol_cubes",
     api: ["models.volatility.getCubeVol", "VolatilityNamespace", "getCubeVol"],
     route: "typed",
     convention:
-      "Annualized Black volatility as decimal; supply stored cube and explicit expiry, tenor, strike. Fixed-tenor and fixed-expiry slices are Rust-materialized (vol-cube-tenor-slice, vol-cube-expiry-slice).",
-  },
-  {
-    id: "vol-cube-explorer-normal",
-    api: [
-      "models.volatility.getCubeNormalVol",
-      "VolatilityNamespace",
-      "getCubeNormalVol",
-    ],
-    route: "typed",
-    convention:
-      "Annualized normal volatility in absolute rate units. Normal slices are Rust-materialized (vol-cube-tenor-slice-normal, vol-cube-expiry-slice-normal).",
+      'Annualized volatility in the request\'s wire VolatilityConvention: decimal Black for "lognormal", absolute rate units for "normal"; shifted lognormal is rejected natively. Supply stored cube and explicit expiry, tenor, strike. Fixed-tenor and fixed-expiry slices are Rust-materialized (vol-cube-tenor-slice, vol-cube-expiry-slice).',
   },
   {
     id: "vol-cube-tenor-slice",
@@ -187,18 +176,7 @@ const displays = [
     ],
     route: "returned-surface",
     convention:
-      "Returned VolSurface JSON (expiry by strike, Black or shifted-Black quote type with displacements as Rust returns them); fixed tenor in years and absolute strikes in forward-rate units are explicit caller input. Off-node tenors are Rust-interpolated.",
-  },
-  {
-    id: "vol-cube-tenor-slice-normal",
-    api: [
-      "models.volatility.materializeCubeTenorSliceNormal",
-      "VolatilityNamespace",
-      "materializeCubeTenorSliceNormal",
-    ],
-    route: "returned-surface",
-    convention:
-      "Returned VolSurface JSON of normal volatilities (expiry by strike); fixed tenor and absolute strikes are explicit caller input. Off-node tenors are Rust-interpolated.",
+      "Returned VolSurface JSON (expiry by strike) in the request's VolatilityConvention: normal, or Black/shifted-Black with displacements as Rust returns them; fixed tenor in years and absolute strikes in forward-rate units are explicit caller input. Off-node tenors are Rust-interpolated.",
   },
   {
     id: "vol-cube-expiry-slice",
@@ -209,18 +187,7 @@ const displays = [
     ],
     route: "returned-slice",
     convention:
-      "Returned VolCubeExpirySlice JSON (tenor by strike, tenor-major, Black or shifted-Black quote type with displacements as Rust returns them); fixed expiry in years and absolute strikes are explicit caller input. Off-node expiries are Rust-interpolated.",
-  },
-  {
-    id: "vol-cube-expiry-slice-normal",
-    api: [
-      "models.volatility.materializeCubeExpirySliceNormal",
-      "VolatilityNamespace",
-      "materializeCubeExpirySliceNormal",
-    ],
-    route: "returned-slice",
-    convention:
-      "Returned VolCubeExpirySlice JSON of normal volatilities (tenor by strike); fixed expiry and absolute strikes are explicit caller input. Off-node expiries are Rust-interpolated.",
+      "Returned VolCubeExpirySlice JSON (tenor by strike, tenor-major) in the request's VolatilityConvention: normal, or Black/shifted-Black with displacements as Rust returns them; fixed expiry in years and absolute strikes are explicit caller input. Off-node expiries are Rust-interpolated.",
   },
   {
     id: "vol-cube-node-smile",
@@ -676,38 +643,38 @@ const displays = [
     ],
     route: "returned-model",
     convention:
-      "Returned models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.workoutLgd and seniorityRecoveryStats results as Rust returned them. Allocations are in Rust's priority-then-entry order; each claim's total, collateral and general recovery, recovery rate and deficiency, and the estate's distributed and undistributed totals, are Rust's fields, never summed or divided here. Amounts are in one caller-defined unit with no currency conversion; rates are fractions. Seniority classes and collateral types are the generated SeniorityClass and WorkoutCollateralType contracts; calibration ids are seniorityCalibrationIds, default first. A class a calibration lacks shows Rust's error.",
+      "Returned models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.WorkoutLgd evaluate and seniorityRecoveryStats results as Rust returned them. Allocations are in Rust's priority-then-entry order; each claim's total, collateral and general recovery, recovery rate and deficiency, and the estate's distributed and undistributed totals, are Rust's fields, never summed or divided here. Amounts are in one caller-defined unit with no currency conversion; rates are fractions. Seniority classes and collateral types are the generated SeniorityClass and WorkoutCollateralType contracts; calibration ids are seniorityCalibrationIds, default first. A class a calibration lacks shows Rust's error.",
   },
   {
     id: "option-calculator",
-    api: ["models.bsPrice", "ModelsNamespace", "bsPrice"],
+    api: ["models.optionCalculation", "ModelsNamespace", "optionCalculation"],
     route: "returned-model",
     convention:
-      "Returned closed-form results of one European option: models.bsPrice, black76Price or bachelierPrice of an entered volatility, or bsImpliedVol, black76ImpliedVol or models.volatility.impliedVolBachelier of an entered price, then bsGreeks, black76Greeks or bachelierGreeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",
+      "Returned OptionCalculationResult of one European option (models.optionCalculation): the price at an entered volatility, or the implied volatility of an entered price, and the model's Greeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",
   },
   {
     id: "credit-scorecard",
     api: [
-      "models.credit.scoring.zmijewskiScore",
+      "models.credit.scoring.creditScoreReport",
       "CreditScoringNamespace",
-      "zmijewskiScore",
+      "creditScoreReport",
     ],
     route: "returned-model",
     convention:
-      "Returned models.credit.scoring ScoringResult of one model (Altman Z, Z', Z'' or EM, Ohlson O, Zmijewski) over ratios entered in the fields of its generated input contract and passed in the facade's positional order: score, zone and implied PD as returned (probabilities as fractions), and models.credit.pd.MasterScale.defaultCalibration().mapScore of the result, or Rust's error when the result has no implied PD (the Altman models). No zone, threshold or grade is derived here.",
+      "Returned models.credit.scoring.creditScoreReport of one model (Altman Z, Z', Z'' or EM, Ohlson O, Zmijewski) over ratios entered in the fields of its generated input contract and sent as the Rust CreditScoreRequest: score, zone and implied PD as returned (probabilities as fractions), and the default master-scale grade Rust assigns the implied PD, or no grade when the result has no implied PD (the Altman models). No zone, threshold or grade is derived here.",
   },
   {
     id: "portfolio-risk-report",
-    schema: `${base}models/1/position_risk_decomposition.schema.json`,
+    schema: `${base}models/1/position_risk_report.schema.json`,
     pointer: "#",
     api: [
-      "models.factor.risk.parametricVarDecomposition",
+      "models.factor.risk.positionRiskReport",
       "FactorRiskNamespace",
-      "parametricVarDecomposition",
+      "positionRiskReport",
     ],
     route: "returned-report",
     convention:
-      "Returned models.factor.risk PositionRiskDecomposition (parametric or historical): portfolio VaR and ES, confidence, method and the Euler residual (null for historical) as returned, component VaR charted and tabulated in returned order with relative, marginal and incremental VaR and the ES contributions; evaluateRiskBudget over positionComponentVar of each position against the supplied target shares (has_breach, total_overbudget, utilization and excess as returned, an omitted threshold left to Rust); buildStressAttribution of a historical source's P&L in Rust's largest-driver-first order with the tail scenarios worst first. Losses negative, in the units of the supplied weights or P&L; nothing summed, flagged or re-sorted. The factor section shows models.factor.risk.decomposeFactors of portfolio.computeFactorSensitivities (positions in Portfolio order, factors in definition order, base currency) as returned under the returned measure, an omitted measure and bump config left to Rust.",
+      "Returned models.factor.risk PositionRiskReport of a parametric or historical source: portfolio VaR and ES, confidence, method and the Euler residual (null for historical) as returned, component VaR charted and tabulated in returned order with relative, marginal and incremental VaR and the ES contributions; the risk budget against the supplied target shares (has_breach, total_overbudget, utilization and excess as returned, an omitted threshold left to Rust); the stress attribution of a historical source's P&L in Rust's largest-driver-first order with the tail scenarios worst first. Losses negative, in the units of the supplied weights or P&L; nothing summed, flagged or re-sorted. The factor section shows models.factor.risk.decomposeFactors of portfolio.computeFactorSensitivities (positions in Portfolio order, factors in definition order, base currency) as returned under the returned measure, an omitted measure and bump config left to Rust.",
   },
   {
     id: "transition-matrix-heatmap",

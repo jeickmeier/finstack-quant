@@ -35,10 +35,7 @@ const normal = { ...surface, quote_type: "normal" as const };
 function direct(r: CheckSurfaceRequest) {
   const handle = native.VolSurface.fromJson(serializeHost(r.surface));
   try {
-    return native.checkSurface(handle, {
-      forward_prices: [...r.forwards],
-      ...(r.tolerance == null ? {} : { tolerance: r.tolerance }),
-    });
+    return native.checkSurface(handle, r.config);
   } finally {
     handle.free();
   }
@@ -53,7 +50,7 @@ async function delta(run: () => Promise<void>) {
   };
 }
 it("passes the calibrated surface with a broadcast forward and frees the handle", async () => {
-  const request = { surface, forwards: [175] };
+  const request = { surface, config: { forward_prices: [175] } };
   let report;
   expect(
     await delta(async () => {
@@ -71,12 +68,18 @@ it("passes the calibrated surface with a broadcast forward and frees the handle"
   // One forward per expiry is the same check.
   expect(
     unwrap(
-      await worker.proxy.checkSurface({ surface, forwards: [175, 175, 175] }),
+      await worker.proxy.checkSurface({
+        surface,
+        config: { forward_prices: [175, 175, 175] },
+      }),
     ),
   ).toEqual(report);
 });
 it("reports an injected butterfly violation as Rust returns it, with an explicit tolerance", async () => {
-  const request = { surface: butterfly, forwards: [175], tolerance: 1e-8 };
+  const request = {
+    surface: butterfly,
+    config: { forward_prices: [175], tolerance: 1e-8 },
+  };
   const report = unwrap(await worker.proxy.checkSurface(request));
   expect(report).toEqual(direct(request));
   expect(report.passed).toBe(false);
@@ -92,7 +95,7 @@ it("reports an injected butterfly violation as Rust returns it, with an explicit
   );
 });
 it("returns the native convention error for a normal-quoted surface and frees the handle", async () => {
-  const request = { surface: normal, forwards: [175] };
+  const request = { surface: normal, config: { forward_prices: [175] } };
   let error: ReturnType<typeof errorValue> | undefined;
   try {
     direct(request);
@@ -111,14 +114,14 @@ it("returns the native convention error for a normal-quoted surface and frees th
   ).toEqual({ constructed: 1, freed: 1 });
 });
 it("leaves forward validation to Rust and keys every request distinctly", async () => {
-  const wrongLength = { surface, forwards: [175, 176] };
+  const wrongLength = { surface, config: { forward_prices: [175, 176] } };
   const result = await worker.proxy.checkSurface(wrongLength);
   expect(result).toMatchObject({ ok: false, error: { kind: "validation" } });
   const keys = [
-    { surface, forwards: [175] },
-    { surface, forwards: [176] },
-    { surface, forwards: [175], tolerance: 1e-8 },
-    { surface: butterfly, forwards: [175] },
+    { surface, config: { forward_prices: [175] } },
+    { surface, config: { forward_prices: [176] } },
+    { surface, config: { forward_prices: [175], tolerance: 1e-8 } },
+    { surface: butterfly, config: { forward_prices: [175] } },
   ].map((r) => JSON.stringify(checkSurfaceOptions(null, 1, r).queryKey));
   expect(new Set(keys).size).toBe(keys.length);
 });

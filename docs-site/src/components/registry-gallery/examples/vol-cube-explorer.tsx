@@ -22,8 +22,8 @@ export function Example({
           : cube.id !== "SHIFTED-BLACK",
       )!}
       initialStrike={variant === "shifted" ? -0.005 : 0.05}
-      initialConvention={variant === "shifted" ? "black_lognormal" : "normal"}
-      colorDomains={{ normal: [0.003, 0.012], black_lognormal: [0.1, 0.7] }}
+      initialConvention={variant === "shifted" ? "lognormal" : "normal"}
+      colorDomains={{ normal: [0.003, 0.012], lognormal: [0.1, 0.7] }}
       slice={{
         initialStrikes:
           variant === "shifted"

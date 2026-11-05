@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import type { ExampleProps } from "./props";
 import { NormalizationEditor } from "@/components/finstack/statements/components/normalization-editor/normalization-editor";
 import { useNormalizationConfigValidator } from "@/hooks/statements/use-normalization-config-validator/use-normalization-config-validator";
@@ -8,7 +8,9 @@ import data from "../data.json";
 import { WorkerPreview } from "../worker-preview";
 const resultJson = JSON.stringify(data.statementResult);
 const nodeIds = Object.keys(data.statementResult.nodes);
-const start = data.normalizationEditor.config;
+const start = data.normalizationEditor.config as unknown as ComponentProps<
+  typeof NormalizationEditor
+>["defaultConfig"];
 function Live({ density }: ExampleProps) {
   const validate = useNormalizationConfigValidator();
   const [configJson, setConfigJson] = useState(() => JSON.stringify(start));

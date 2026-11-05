@@ -6,7 +6,6 @@ import { useListBuiltinTemplateMetadata } from "@/hooks/scenarios/use-list-built
 import { useBuildFromTemplate } from "@/hooks/scenarios/use-build-from-template/use-build-from-template";
 import { useBuildTemplateComponent } from "@/hooks/scenarios/use-build-template-component/use-build-template-component";
 import { useComposeScenarios } from "@/hooks/scenarios/use-compose-scenarios/use-compose-scenarios";
-import { useBuildMarketScenario } from "@/hooks/scenarios/use-market-scenario/use-market-scenario";
 import { WorkerPreview } from "../worker-preview";
 import data from "../data.json";
 // The rate_shock_2022 rates component remapped to USD-OIS and composed with its
@@ -36,7 +35,6 @@ function Builder({ density }: ExampleProps) {
       buildFromTemplate={useBuildFromTemplate()}
       buildTemplateComponent={useBuildTemplateComponent()}
       composeScenarios={useComposeScenarios()}
-      buildMarketScenario={useBuildMarketScenario()}
       density={density}
     />
   );

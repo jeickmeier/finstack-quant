@@ -124,7 +124,7 @@ def portfolio_risk_tearsheet(
     Parameters
     ----------
     decomposition : PositionRiskDecomposition | dict | str
-        A ``parametric_/historical_var_decomposition`` result (typed, dict or
+        A ``position_risk_report(...).decomposition`` result (typed, dict or
         JSON); its ``var_contributions`` feed the VaR-contributions section.
     es : dict | str, optional
         A ``PositionRiskDecomposition`` (typed, dict or JSON) whose

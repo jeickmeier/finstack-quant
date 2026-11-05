@@ -1,10 +1,10 @@
 """
 Performance analytics: returns, drawdowns, risk metrics, and benchmarks.
 
-The panel entry point is :class:`Performance`. Construct from a price panel
-(``Performance(prices_df)`` / ``Performance.from_arrays(...)``) or from a
-return panel (``Performance.from_returns(returns_df)`` /
-``Performance.from_returns_arrays(...)``); every analytic — return / risk
+The panel entry point is :class:`Performance`. Construct from a pandas price
+panel (``Performance(prices_df)``), a pandas return panel
+(``Performance.from_returns(returns_df)``), or a :class:`PerformancePanel` of
+raw lists (``Performance.from_panel(panel)``); every analytic — return / risk
 scalars, drawdown statistics, rolling windows, periodic returns
 (MTD / QTD / YTD / FYTD), benchmark alpha/beta, basic factor models — is a
 method on the resulting instance.
@@ -20,8 +20,11 @@ attribution.
 Examples
 --------
 >>> from datetime import date
->>> from finstack_quant.analytics import Performance
->>> perf = Performance.from_returns_arrays([date(2024, 1, 1), date(2024, 1, 2)], [[0.01, 0.02]], ["FUND"])
+>>> from finstack_quant.analytics import Performance, PerformancePanel
+>>> panel = PerformancePanel(
+...     dates=[date(2024, 1, 1), date(2024, 1, 2)], series=[[0.01, 0.02]], kind="returns", ticker_names=["FUND"]
+... )
+>>> perf = Performance.from_panel(panel)
 >>> perf.get_ticker_names()
 ['FUND']
 """
@@ -41,6 +44,7 @@ from finstack_quant.analytics._types import (
 )
 from finstack_quant.analytics._performance import (
     Performance as Performance,
+    PerformancePanel as PerformancePanel,
     max_drawdown as max_drawdown,
     sharpe as sharpe,
     sortino as sortino,
@@ -57,6 +61,7 @@ __all__ = [
     "LookbackReturns",
     "MultiFactorResult",
     "Performance",
+    "PerformancePanel",
     "PeriodStats",
     "RollingGreeks",
     "constrained_least_squares",

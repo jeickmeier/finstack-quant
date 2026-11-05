@@ -8,7 +8,7 @@ import {
 
 import data from "./data.json";
 // The score is the supplied native fixture: the item installs without a worker.
-const entry = data.scorecard.zmijewskiScore;
+const entry = data.scorecard.zmijewski_score;
 export function InstalledItem() {
   const [count, setCount] = useState(0);
   return (
@@ -19,7 +19,7 @@ export function InstalledItem() {
       </p>
       <CreditScorecard
         defaultModel={(entry.request as CreditScorecardRequest).model}
-        defaultInputs={{ zmijewskiScore: entry.request.input }}
+        defaultInputs={{ zmijewski_score: entry.request.input }}
         onSubmit={() => setCount((n) => n + 1)}
         score={entry.score as unknown as CreditScoreData}
       />

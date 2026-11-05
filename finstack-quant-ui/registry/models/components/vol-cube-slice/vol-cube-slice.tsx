@@ -28,6 +28,8 @@ import { FinstackTable } from "@/components/finstack/shared/table/finstack-table
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
+/** The unit wire conventions a cube evaluates in; shifted lognormal is not offered. */
+type OutputConvention = Extract<CubeSliceRequest["convention"], string>;
 export interface VolCubeSliceProps extends Pick<
   SurfaceViewProps<SurfacePoint>,
   "width" | "height"
@@ -35,7 +37,7 @@ export interface VolCubeSliceProps extends Pick<
   cube: CubeSliceRequest["cube"];
   /** Absolute strikes in the stored forwards' rate units, in the order given; Rust requires them strictly increasing and inside the SABR domain. */
   initialStrikes: readonly number[];
-  initialConvention: CubeSliceRequest["convention"];
+  initialConvention: OutputConvention;
   /** Fixed axis shown first; omitted fixes the underlying tenor. */
   initialAxis?: CubeSliceRequest["axis"];
   /** Continuously compounded decimal rate for the smile's arbitrage check. Omitted leaves the field empty. */
@@ -43,10 +45,7 @@ export interface VolCubeSliceProps extends Pick<
   /** Repair passes for SabrSmile#repairArbitrage. Omitted runs no repair. */
   repairIterations?: number;
   /** Explicit extents in each evaluator's output units. */
-  colorDomains: Record<
-    CubeSliceRequest["convention"],
-    readonly [number, number]
-  >;
+  colorDomains: Record<OutputConvention, readonly [number, number]>;
 }
 const decimal = new RegExp(contracts.decimal.schema.pattern);
 /** Exact typed text as a number; null while the text is empty, incomplete or non-finite. */
@@ -216,12 +215,10 @@ export function VolCubeSlice(props: VolCubeSliceProps) {
         <EnumField
           label="Slice convention"
           value={convention}
-          onValueChange={(value) =>
-            setConvention(value as CubeSliceRequest["convention"])
-          }
+          onValueChange={(value) => setConvention(value as OutputConvention)}
           options={[
             { value: "normal", label: "Normal/Bachelier" },
-            { value: "black_lognormal", label: "Black/lognormal" },
+            { value: "lognormal", label: "Black/lognormal" },
           ]}
         />
         <EnumField
@@ -276,7 +273,7 @@ export function VolCubeSlice(props: VolCubeSliceProps) {
             value: "",
           }
         }
-        description={`Native models.volatility.materializeCube${axis === "tenor" ? "Tenor" : "Expiry"}Slice${convention === "normal" ? "Normal" : ""} output at fixed ${fixed} ${axis === "tenor" ? node.tenor : node.expiry} years: the returned grid at the supplied strikes. Values off the cube's nodes are Rust-interpolated; no local interpolation or conversion.${view?.displacements ? ` Shifted-Black displacements (rate units): ${view.displacements.join(", ")}.` : ""}`}
+        description={`Native models.volatility.materializeCube${axis === "tenor" ? "Tenor" : "Expiry"}Slice (${convention}) output at fixed ${fixed} ${axis === "tenor" ? node.tenor : node.expiry} years: the returned grid at the supplied strikes. Values off the cube's nodes are Rust-interpolated; no local interpolation or conversion.${view?.displacements ? ` Shifted-Black displacements (rate units): ${view.displacements.join(", ")}.` : ""}`}
         colorDomain={props.colorDomains[convention]}
         width={props.width}
         height={props.height}

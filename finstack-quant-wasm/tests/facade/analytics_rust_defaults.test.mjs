@@ -28,12 +28,13 @@ const RETURNS = Array.from(
 const BENCH = Array.from({ length: 120 }, (_, i) => 0.003 * Math.cos(i) + 0.0002);
 
 function perf() {
-  return analytics.Performance.fromReturns(
-    dates(RETURNS.length),
-    [RETURNS, BENCH],
-    ['FUND', 'BENCH'],
-    'BENCH'
-  );
+  return new analytics.Performance({
+    dates: dates(RETURNS.length),
+    series: [RETURNS, BENCH],
+    kind: 'returns',
+    ticker_names: ['FUND', 'BENCH'],
+    benchmark_ticker: 'BENCH',
+  });
 }
 
 function sameArray(actual, expected) {
@@ -79,7 +80,12 @@ test('omitted arguments equal the Rust defaults', () => {
   assert.deepEqual(p.periodStats(0), p.periodStats(0, 'monthly'));
   assert.deepEqual(p.multiFactorGreeks(0, [BENCH]), p.multiFactorGreeks(0, [BENCH], 'excess', 0));
   sameArray(p.cagr(), p.cagr('act365_25'));
-  const fromPrices = new analytics.Performance(dates(3), [[100, 101, 102]], ['A']);
+  const fromPrices = new analytics.Performance({
+    dates: dates(3),
+    series: [[100, 101, 102]],
+    kind: 'prices',
+    ticker_names: ['A'],
+  });
   assert.equal(fromPrices.getFrequency(), 'daily');
 });
 
@@ -96,24 +102,35 @@ test('an omitted fiscalConfig is Rust None for FYTD', () => {
 });
 
 test('non-finite result fields named by Rust NonFiniteFields stay numeric', () => {
-  const allUp = analytics.Performance.fromReturns(dates(90), [Array(90).fill(0.01)], ['UP']);
+  const allUp = new analytics.Performance({
+    dates: dates(90),
+    series: [Array(90).fill(0.01)],
+    kind: 'returns',
+    ticker_names: ['UP'],
+  });
   const stats = allUp.periodStats(0);
   assert.equal(stats.profit_factor, Infinity);
   assert.equal(stats.payoff_ratio, Infinity);
 
-  const flat = analytics.Performance.fromReturns(dates(10), [Array(10).fill(0.01)], ['FLAT']);
+  const flat = new analytics.Performance({
+    dates: dates(10),
+    series: [Array(10).fill(0.01)],
+    kind: 'returns',
+    ticker_names: ['FLAT'],
+  });
   const mf = flat.multiFactorGreeks(0, [
     [0.01, -0.02, 0.03, 0.0, 0.01, -0.01, 0.02, 0.0, 0.01, -0.02],
   ]);
   assert.ok(Number.isNaN(mf.r_squared));
   assert.equal(typeof mf.adjusted_r_squared, 'number');
 
-  const constantBench = analytics.Performance.fromReturns(
-    dates(10),
-    [RETURNS.slice(0, 10), Array(10).fill(0.001)],
-    ['FUND', 'BENCH'],
-    'BENCH'
-  );
+  const constantBench = new analytics.Performance({
+    dates: dates(10),
+    series: [RETURNS.slice(0, 10), Array(10).fill(0.001)],
+    kind: 'returns',
+    ticker_names: ['FUND', 'BENCH'],
+    benchmark_ticker: 'BENCH',
+  });
   for (const row of constantBench.beta()) {
     assert.deepEqual(Object.keys(row).sort(), [
       'beta',

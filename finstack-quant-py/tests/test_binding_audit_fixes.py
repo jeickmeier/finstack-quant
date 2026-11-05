@@ -339,14 +339,10 @@ def test_days_to_liquidate_uses_rust_share_space_keywords() -> None:
 
 def test_square_matrix_column_mismatch_message_has_no_fake_row_index() -> None:
     np = pytest.importorskip("numpy")
-    from finstack_quant.models.factor.risk import parametric_var_decomposition
+    from finstack_quant.models.correlation import validate_correlation_matrix
 
     with pytest.raises(ValueError, match="columns") as excinfo:
-        parametric_var_decomposition(
-            ["A", "B"],
-            [1.0, 2.0],
-            np.zeros((2, 3), dtype=np.float64),
-        )
+        validate_correlation_matrix(np.zeros((2, 3), dtype=np.float64), 2)
     message = str(excinfo.value)
     assert "row 0" not in message
     assert "columns" in message

@@ -55,7 +55,7 @@ def evaluate_covenants(
 
     Examples
     --------
-    >>> from finstack_quant.covenants import CovenantEngine, cov_lite
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template
     >>> from finstack_quant.statements import Evaluator, ModelBuilder
     >>> from finstack_quant.statements_analytics import evaluate_covenants
     >>> builder = ModelBuilder("borrower")
@@ -63,7 +63,7 @@ def evaluate_covenants(
     >>> _ = builder.value("total_leverage", [("2025Q1", 6.0), ("2025Q2", 7.5)])
     >>> _ = builder.value("senior_leverage", [("2025Q1", 3.0), ("2025Q2", 3.5)])
     >>> model = builder.build()
-    >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
+    >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
     >>> frame = evaluate_covenants(Evaluator().evaluate(model), engine)
     >>> frame.loc[frame["covenant"] == "max_total_leverage", ["as_of", "passed"]].values.tolist()
     [['2025-03-31', True], ['2025-06-30', False]]
@@ -114,7 +114,7 @@ def forecast_breaches(
 
     Examples
     --------
-    >>> from finstack_quant.covenants import CovenantEngine, CovenantForecastConfig, cov_lite
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantForecastConfig, CovenantTemplate, covenant_template
     >>> from finstack_quant.statements import Evaluator, ModelBuilder
     >>> from finstack_quant.statements_analytics import forecast_breaches
     >>> builder = ModelBuilder("borrower")
@@ -122,7 +122,7 @@ def forecast_breaches(
     >>> _ = builder.value("total_leverage", [("2025Q1", 6.0), ("2025Q2", 7.5)])
     >>> _ = builder.value("senior_leverage", [("2025Q1", 3.0), ("2025Q2", 3.5)])
     >>> model = builder.build()
-    >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
+    >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
     >>> config = CovenantForecastConfig().with_scope("incurrence")  # cov-lite tests are incurrence tests
     >>> breaches = forecast_breaches(Evaluator().evaluate(model), engine, config)
     >>> [(b.covenant_id, b.breach_date.isoformat()) for b in breaches]
