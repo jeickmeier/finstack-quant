@@ -9,6 +9,7 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::monte_carlo::engine::McPricingInputs;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
@@ -112,15 +113,15 @@ impl BarrierOptionHestonMcPricer {
         // Initial state: [spot, v0]
         let initial_state = [spot, v0];
 
-        let result = engine.price(
-            &rng,
-            &process,
-            &discretization,
-            &initial_state,
-            &payoff,
-            inst.currency,
+        let result = engine.price(McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &discretization,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: inst.currency,
             discount_factor,
-        )?;
+        })?;
 
         Ok((result.mean, result.stderr))
     }

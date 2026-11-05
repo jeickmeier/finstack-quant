@@ -52,7 +52,15 @@ fn scaling_european_paths(c: &mut Criterion) {
                 .with_parallel(false);
             b.iter(|| {
                 pricer
-                    .price(&process, SPOT, 1.0, 52, &payoff, Currency::USD, df)
+                    .price(
+                        &process,
+                        SPOT,
+                        finstack_quant_core::math::time_grid::TimeGrid::uniform(1.0, 52)
+                            .expect("valid time grid"),
+                        &payoff,
+                        Currency::USD,
+                        df,
+                    )
                     .expect("pricing should succeed")
             });
         });
@@ -75,7 +83,15 @@ fn scaling_european_steps(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(steps), &steps, |b, &steps| {
             b.iter(|| {
                 pricer
-                    .price(&process, SPOT, 1.0, steps, &payoff, Currency::USD, df)
+                    .price(
+                        &process,
+                        SPOT,
+                        finstack_quant_core::math::time_grid::TimeGrid::uniform(1.0, steps)
+                            .expect("valid time grid"),
+                        &payoff,
+                        Currency::USD,
+                        df,
+                    )
                     .expect("pricing should succeed")
             });
         });
@@ -98,13 +114,15 @@ fn scaling_heston_paths(c: &mut Criterion) {
             b.iter(|| {
                 engine
                     .price(
-                        &rng,
-                        &process,
-                        &disc,
-                        &[SPOT, 0.04],
-                        &payoff,
-                        Currency::USD,
-                        df,
+                        finstack_quant_models::monte_carlo::engine::McPricingInputs {
+                            rng: &rng,
+                            process: &process,
+                            disc: &disc,
+                            initial_state: &[SPOT, 0.04],
+                            payoff: &payoff,
+                            currency: Currency::USD,
+                            discount_factor: df,
+                        },
                     )
                     .expect("pricing should succeed")
             });
@@ -131,14 +149,16 @@ fn scaling_lsmc_paths(c: &mut Criterion) {
             b.iter(|| {
                 pricer
                     .price(
-                        &process,
-                        SPOT,
-                        1.0,
-                        num_steps,
-                        &exercise,
-                        &basis,
+                        &finstack_quant_models::monte_carlo::pricer::lsmc::LsmcInputs {
+                            process: &process,
+                            initial_spot: SPOT,
+                            time_to_maturity: 1.0,
+                            num_steps,
+                            exercise: &exercise,
+                            basis: &basis,
+                            discount_rate: RATE,
+                        },
                         Currency::USD,
-                        RATE,
                     )
                     .expect("pricing should succeed")
             });
@@ -264,7 +284,17 @@ fn scaling_multi_gbm_assets(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
             b.iter(|| {
                 engine
-                    .price(&rng, &process, &disc, &spots, &payoff, Currency::USD, df)
+                    .price(
+                        finstack_quant_models::monte_carlo::engine::McPricingInputs {
+                            rng: &rng,
+                            process: &process,
+                            disc: &disc,
+                            initial_state: &spots,
+                            payoff: &payoff,
+                            currency: Currency::USD,
+                            discount_factor: df,
+                        },
+                    )
                     .expect("pricing should succeed")
             });
         });

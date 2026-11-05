@@ -119,8 +119,9 @@ what dropping discrete dividends or jumps would do).
 3. Pick a `StochasticProcess` and a compatible `Discretization`.
 4. Supply the initial state as a raw `&[f64]` of length `process.dim()`.
 5. Pick or implement a `Payoff`.
-6. Call `price()` for the aggregate estimate, or `price_with_capture()` for the
-   estimate plus a captured path dataset.
+6. Bundle them in `McPricingInputs` with the currency and scalar discount
+   factor, then call `price()` for the aggregate estimate, or
+   `price_with_capture()` for the estimate plus a captured path dataset.
 
 The engine owns the path loop, Welford online statistics, deterministic chunked
 reduction, optional serial early stopping, and optional path capture.
@@ -130,7 +131,7 @@ reduction, optional serial early stopping, and optional path capture.
 ```rust
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
-use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
+use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig, McPricingInputs};
 use finstack_quant_models::monte_carlo::payoff::vanilla::European;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
@@ -149,15 +150,15 @@ let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 let discount_factor = (-0.03_f64).exp();
 
 let result = engine
-    .price(
-        &rng,
-        &process,
-        &disc,
-        &[100.0],
-        &payoff,
-        Currency::USD,
+    .price(McPricingInputs {
+        rng: &rng,
+        process: &process,
+        disc: &disc,
+        initial_state: &[100.0],
+        payoff: &payoff,
+        currency: Currency::USD,
         discount_factor,
-    )
+    })
     .expect("pricing should succeed");
 
 println!("{} +/- {}", result.mean, result.stderr);
@@ -171,15 +172,15 @@ year fraction should build it with
 ### Pricing with captured paths
 
 `price_with_capture()` returns the aggregate estimate plus a subset of paths for
-plotting, debugging, or cashflow inspection. It takes one extra argument,
-`ProcessParams`, which names the raw state-vector positions so downstream
+plotting, debugging, or cashflow inspection. Beside the `McPricingInputs` it
+takes `ProcessParams`, which names the raw state-vector positions so downstream
 consumers can interpret them.
 
 ```rust
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 use finstack_quant_models::monte_carlo::engine::{
-    McEngine, McEngineConfig, PathCaptureConfig,
+    McEngine, McEngineConfig, McPricingInputs, PathCaptureConfig,
 };
 use finstack_quant_models::monte_carlo::paths::ProcessParams;
 use finstack_quant_models::monte_carlo::payoff::vanilla::European;
@@ -202,13 +203,15 @@ let process_params = ProcessParams::new("GBM").with_factors(vec!["spot".to_strin
 
 let result = engine
     .price_with_capture(
-        &rng,
-        &process,
-        &disc,
-        &[100.0],
-        &payoff,
-        Currency::USD,
-        (-0.03_f64).exp(),
+        McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &disc,
+            initial_state: &[100.0],
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: (-0.03_f64).exp(),
+        },
         process_params,
     )
     .expect("pricing with capture should succeed");
@@ -236,7 +239,7 @@ one path set and replays it on a second, independent set. It rejects a
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::pricer::lsmc::{
-    AmericanExercise, LsmcConfig, LsmcEngine,
+    AmericanExercise, LsmcConfig, LsmcEngine, LsmcInputs,
 };
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::types::OptionType;
@@ -249,18 +252,17 @@ let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0
 let put = AmericanExercise::new(OptionType::Put, 100.0).expect("valid strike");
 let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
+let inputs = LsmcInputs {
+    process: &process,
+    initial_spot: 100.0,
+    time_to_maturity: 1.0,
+    num_steps: 100,
+    exercise: &put,
+    basis: &basis,
+    discount_rate: 0.05,
+};
 let unbiased = pricer
-    .price_unbiased(
-        &process,
-        100.0,
-        1.0,
-        100,
-        &put,
-        &basis,
-        Currency::USD,
-        0.05,
-        /* pricing_seed = */ 4243,
-    )
+    .price_unbiased(&inputs, Currency::USD, /* pricing_seed = */ 4243)
     .expect("two-pass pricing should succeed");
 
 assert!(unbiased.mean.amount() > 0.0);
@@ -330,6 +332,7 @@ For GBM European contracts specifically, host bindings must go through
 
 ```rust
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_models::monte_carlo::payoff::vanilla::European;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
@@ -342,8 +345,9 @@ let pricer = EuropeanPricer::new(25_000)
 let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).expect("valid GBM parameters");
 let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 
+let grid = TimeGrid::uniform(1.0, 252).expect("valid time grid");
 let result = pricer
-    .price(&process, 100.0, 1.0, 252, &payoff, Currency::USD, (-0.03_f64).exp())
+    .price(&process, 100.0, grid, &payoff, Currency::USD, (-0.03_f64).exp())
     .expect("pricing should succeed");
 ```
 

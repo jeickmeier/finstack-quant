@@ -7,6 +7,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::stats::OnlineCovariance;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::monte_carlo::payoff::asian::AsianFixingHistory;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
@@ -346,9 +347,11 @@ impl AsianOptionMcPricer {
                 inst.quantity,
                 finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic,
                 fixing_steps.clone(),
-                hist_sum,
-                hist_prod_log,
-                hist_count,
+                AsianFixingHistory {
+                    sum: hist_sum,
+                    log_sum: hist_prod_log,
+                    count: hist_count,
+                },
             )?
             .with_fixing_multipliers(&fixing_multipliers)?;
             let arith_full = pricer_cap.price_with_paths_and_grid(
@@ -367,9 +370,11 @@ impl AsianOptionMcPricer {
                 inst.quantity,
                 finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric,
                 fixing_steps,
-                hist_sum,
-                hist_prod_log,
-                hist_count,
+                AsianFixingHistory {
+                    sum: hist_sum,
+                    log_sum: hist_prod_log,
+                    count: hist_count,
+                },
             )?
             .with_fixing_multipliers(&fixing_multipliers)?;
             let geom_full = pricer_cap.price_with_paths_and_grid(
@@ -462,13 +467,15 @@ impl AsianOptionMcPricer {
                 inst.quantity,
                 averaging,
                 fixing_steps,
-                hist_sum,
-                hist_prod_log,
-                hist_count,
+                AsianFixingHistory {
+                    sum: hist_sum,
+                    log_sum: hist_prod_log,
+                    count: hist_count,
+                },
             )?
             .with_fixing_multipliers(&fixing_multipliers)?;
             pricer
-                .price_with_grid(
+                .price(
                     &process,
                     spot,
                     time_grid,
@@ -2014,9 +2021,11 @@ mod tests {
             1.0,
             AveragingMethod::Geometric,
             grid.fixing_steps,
-            90.0,
-            90.0_f64.ln(),
-            1,
+            finstack_quant_models::monte_carlo::payoff::asian::AsianFixingHistory {
+                sum: 90.0,
+                log_sum: 90.0_f64.ln(),
+                count: 1,
+            },
         )
         .expect("payoff")
         .with_fixing_multipliers(&multipliers)
@@ -2030,7 +2039,7 @@ mod tests {
             ..Default::default()
         };
         let result = PathDependentPricer::new(config)
-            .price_with_grid(&process, 100.0, grid.time_grid, &payoff, Currency::USD, df)
+            .price(&process, 100.0, grid.time_grid, &payoff, Currency::USD, df)
             .expect("MC");
         assert!(
             (result.mean.amount() - expected).abs() < 5.0 * result.stderr,

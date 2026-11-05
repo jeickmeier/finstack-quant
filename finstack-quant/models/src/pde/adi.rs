@@ -256,21 +256,18 @@ impl McsStepper {
     ///
     /// * `problem` - PDE problem supplying coefficients, payoff data, and boundary conditions.
     /// * `grid` - Numerical grid defining the state-space discretization.
-    /// * `u_full` - Full PDE solution buffer including boundary nodes.
-    /// * `u_int` - Interior PDE solution buffer excluding boundary nodes.
-    /// * `t_from` - Start time of the backward PDE step in model-year units.
-    /// * `t_to` - End time of the backward PDE step in model-year units.
+    /// * `(u_full, u_int)` - Full PDE solution buffer including boundary
+    ///   nodes, and interior PDE solution buffer excluding boundary nodes.
+    /// * `(t_from, t_to)` - Start and end time of the backward PDE step in
+    ///   model-year units.
     /// * `step_index` - Zero-based index of the current numerical time step.
     /// * `buffers` - Reusable work buffers sized for the supplied numerical grid.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn step(
         &self,
         problem: &dyn PdeProblem2D,
         grid: &Grid2D,
-        u_full: &mut [f64],
-        u_int: &mut [f64],
-        t_from: f64,
-        t_to: f64,
+        (u_full, u_int): (&mut [f64], &mut [f64]),
+        (t_from, t_to): (f64, f64),
         step_index: usize,
         buffers: &mut AdiWorkBuffers,
     ) -> Result<(), StepperError> {
@@ -424,13 +421,13 @@ impl McsStepper {
         implicit_x_sweep(
             ops_impl,
             alpha,
-            y0,
-            ax_u,
-            nx_int,
-            ny_int,
-            rhs_buf,
-            thomas_scratch,
-            line_out,
+            (y0, ax_u),
+            (nx_int, ny_int),
+            &mut LineScratch {
+                rhs: rhs_buf,
+                thomas: thomas_scratch,
+                out: line_out,
+            },
             y1,
         )?;
 
@@ -439,13 +436,13 @@ impl McsStepper {
         implicit_y_sweep(
             ops_impl,
             alpha,
-            y1,
-            ay_u,
-            nx_int,
-            ny_int,
-            rhs_buf,
-            thomas_scratch,
-            line_out,
+            (y1, ay_u),
+            (nx_int, ny_int),
+            &mut LineScratch {
+                rhs: rhs_buf,
+                thomas: thomas_scratch,
+                out: line_out,
+            },
             y2,
         )?;
 
@@ -486,13 +483,13 @@ impl McsStepper {
         implicit_x_sweep(
             ops_impl,
             alpha,
-            ytld,
-            ax_u,
-            nx_int,
-            ny_int,
-            rhs_buf,
-            thomas_scratch,
-            line_out,
+            (ytld, ax_u),
+            (nx_int, ny_int),
+            &mut LineScratch {
+                rhs: rhs_buf,
+                thomas: thomas_scratch,
+                out: line_out,
+            },
             y1,
         )?;
 
@@ -501,13 +498,13 @@ impl McsStepper {
         implicit_y_sweep(
             ops_impl,
             alpha,
-            y1,
-            ay_u,
-            nx_int,
-            ny_int,
-            rhs_buf,
-            thomas_scratch,
-            line_out,
+            (y1, ay_u),
+            (nx_int, ny_int),
+            &mut LineScratch {
+                rhs: rhs_buf,
+                thomas: thomas_scratch,
+                out: line_out,
+            },
             ytld,
         )?;
 
@@ -565,27 +562,39 @@ fn apply_y_operator(
     }
 }
 
+/// Per-line scratch of one implicit sweep, each at least as long as the
+/// swept line.
+struct LineScratch<'a> {
+    /// Right-hand side of the line's tridiagonal system.
+    rhs: &'a mut [f64],
+    /// Modified-diagonal scratch of the Thomas solve.
+    thomas: &'a mut [f64],
+    /// Solved line before it is scattered into the interior vector.
+    out: &'a mut [f64],
+}
+
 /// One implicit x-sweep `(I - alpha*A_x) out = rhs - alpha*ax_u (+ corr.)`.
 ///
 /// `rhs` is the previous iterate (`Y_0` or `Ytld_0`), `ax_u` is `A_x` applied
-/// to the explicit-side solution `u^n`. Both are row-major interior vectors;
-/// `rhs_buf`/`scratch`/`line_out` (length `>= nx_int`) are scratch. Result into `out`.
+/// to the explicit-side solution `u^n`. Both are row-major interior vectors of
+/// the `(nx_int, ny_int)` interior; `line` (each buffer of length `>= nx_int`)
+/// is scratch. Result into `out`.
 ///
 /// Returns [`StepperError::ThomasFailure`] if any per-line tridiagonal solve
 /// hits a degenerate pivot.
-#[allow(clippy::too_many_arguments)]
 fn implicit_x_sweep(
     ops: &Operators2D,
     alpha: f64,
-    rhs: &[f64],
-    ax_u: &[f64],
-    nx_int: usize,
-    ny_int: usize,
-    rhs_buf: &mut [f64],
-    scratch: &mut [f64],
-    line_out: &mut [f64],
+    (rhs, ax_u): (&[f64], &[f64]),
+    (nx_int, ny_int): (usize, usize),
+    line: &mut LineScratch<'_>,
     out: &mut [f64],
 ) -> Result<(), StepperError> {
+    let LineScratch {
+        rhs: rhs_buf,
+        thomas: scratch,
+        out: line_out,
+    } = line;
     for jj in 0..ny_int {
         for ii in 0..nx_int {
             rhs_buf[ii] = rhs[ii * ny_int + jj] - alpha * ax_u[ii * ny_int + jj];
@@ -607,19 +616,19 @@ fn implicit_x_sweep(
 /// One implicit y-sweep `(I - alpha*A_y) out = rhs - alpha*ay_u (+ corr.)`.
 ///
 /// Mirror of [`implicit_x_sweep`] along the y-direction.
-#[allow(clippy::too_many_arguments)]
 fn implicit_y_sweep(
     ops: &Operators2D,
     alpha: f64,
-    rhs: &[f64],
-    ay_u: &[f64],
-    nx_int: usize,
-    ny_int: usize,
-    rhs_buf: &mut [f64],
-    scratch: &mut [f64],
-    line_out: &mut [f64],
+    (rhs, ay_u): (&[f64], &[f64]),
+    (nx_int, ny_int): (usize, usize),
+    line: &mut LineScratch<'_>,
     out: &mut [f64],
 ) -> Result<(), StepperError> {
+    let LineScratch {
+        rhs: rhs_buf,
+        thomas: scratch,
+        out: line_out,
+    } = line;
     for ii in 0..nx_int {
         for jj in 0..ny_int {
             rhs_buf[jj] = rhs[ii * ny_int + jj] - alpha * ay_u[ii * ny_int + jj];
@@ -795,10 +804,8 @@ mod tests {
                 .step(
                     &problem,
                     &grid,
-                    &mut u_full,
-                    &mut u_int,
-                    levels[step],
-                    levels[step + 1],
+                    (&mut u_full, &mut u_int),
+                    (levels[step], levels[step + 1]),
                     step,
                     &mut buffers,
                 )
@@ -942,10 +949,8 @@ mod tests {
                 .step(
                     &problem,
                     &grid,
-                    &mut u_full,
-                    &mut u_int,
-                    t_from,
-                    t_to,
+                    (&mut u_full, &mut u_int),
+                    (t_from, t_to),
                     step,
                     &mut buffers,
                 )
@@ -987,10 +992,8 @@ mod tests {
         let zero = stepper.step(
             &Heat2D,
             &grid,
-            &mut u_full,
-            &mut u_int,
-            0.3,
-            0.3,
+            (&mut u_full, &mut u_int),
+            (0.3, 0.3),
             0,
             &mut buffers,
         );
@@ -1001,10 +1004,8 @@ mod tests {
         let neg = stepper.step(
             &Heat2D,
             &grid,
-            &mut u_full,
-            &mut u_int,
-            0.1,
-            0.4,
+            (&mut u_full, &mut u_int),
+            (0.1, 0.4),
             0,
             &mut buffers,
         );

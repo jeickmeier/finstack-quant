@@ -90,7 +90,7 @@
 //! ```
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
-//! use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
+//! use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig, McPricingInputs};
 //! use finstack_quant_models::monte_carlo::payoff::vanilla::European;
 //! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
@@ -111,15 +111,15 @@
 //! let disc = ExactGbm::new();
 //! let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 //! let result = engine
-//!     .price(
-//!         &rng,
-//!         &gbm,
-//!         &disc,
-//!         &[100.0],
-//!         &payoff,
-//!         Currency::USD,
-//!         (-0.05_f64).exp(),
-//!     )
+//!     .price(McPricingInputs {
+//!         rng: &rng,
+//!         process: &gbm,
+//!         disc: &disc,
+//!         initial_state: &[100.0],
+//!         payoff: &payoff,
+//!         currency: Currency::USD,
+//!         discount_factor: (-0.05_f64).exp(),
+//!     })
 //!     .unwrap();
 //!
 //! assert!(result.mean.amount().is_finite());

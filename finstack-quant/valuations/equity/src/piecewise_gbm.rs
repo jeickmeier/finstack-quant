@@ -16,6 +16,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_models::monte_carlo::engine::McEngine;
+use finstack_quant_models::monte_carlo::engine::McPricingInputs;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_models::monte_carlo::process::piecewise_gbm::{
     GbmCheckpoint, PiecewiseExactGbm, PiecewiseGbmProcess,
@@ -116,14 +117,14 @@ impl PiecewiseGbmMc<'_> {
         engine_config.target_ci_half_width = self.overrides.model_config.mc_target_ci_half_width;
         let engine = McEngine::new(engine_config);
         let rng = PhiloxRng::new(self.overrides.model_config.mc_seed(self.instrument_id));
-        engine.price(
-            &rng,
-            self.process,
-            &PiecewiseExactGbm::new(),
-            &[self.initial_spot],
+        engine.price(McPricingInputs {
+            rng: &rng,
+            process: self.process,
+            disc: &PiecewiseExactGbm::new(),
+            initial_state: &[self.initial_spot],
             payoff,
-            self.currency,
-            self.discount_factor,
-        )
+            currency: self.currency,
+            discount_factor: self.discount_factor,
+        })
     }
 }

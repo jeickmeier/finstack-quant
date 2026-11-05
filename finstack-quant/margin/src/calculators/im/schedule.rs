@@ -24,7 +24,13 @@ use finstack_quant_core::money::Money;
 use std::borrow::Cow;
 
 /// Asset class for schedule-based IM calculation.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+///
+/// On the wire it is a built-in class name (`"interest_rate"`, `"credit"`,
+/// `"equity"`, `"commodity"`, `"fx"`, `"other"`) or `"custom_<name>"`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "ScheduleAssetClassWire", into = "ScheduleAssetClassWire")]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(with = "ScheduleAssetClassWire"))]
 pub enum ScheduleAssetClass {
     /// Interest rate derivatives
     InterestRate,
@@ -57,47 +63,87 @@ impl ScheduleAssetClass {
     }
 }
 
-impl serde::Serialize for ScheduleAssetClass {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(self.as_str().as_ref())
+/// Wire form of [`ScheduleAssetClass`]: a built-in class name, or any other
+/// string, which must be `custom_` followed by lowercase ASCII letters, digits
+/// or underscores (checked by the `TryFrom` conversion).
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(rename = "ScheduleAssetClass"))]
+enum ScheduleAssetClassWire {
+    /// One of the built-in asset classes.
+    BuiltIn(BuiltInScheduleAssetClass),
+    /// A user-defined class, `custom_` followed by lowercase ASCII letters,
+    /// digits or underscores.
+    Custom(
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(regex(pattern = r"^custom_[a-z0-9_]+$"))
+        )]
+        String,
+    ),
+}
+
+/// Built-in [`ScheduleAssetClass`] spellings.
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+enum BuiltInScheduleAssetClass {
+    /// `interest_rate`.
+    InterestRate,
+    /// `credit`.
+    Credit,
+    /// `equity`.
+    Equity,
+    /// `commodity`.
+    Commodity,
+    /// `fx`.
+    Fx,
+    /// `other`.
+    Other,
+}
+
+impl From<ScheduleAssetClass> for ScheduleAssetClassWire {
+    fn from(class: ScheduleAssetClass) -> Self {
+        let built_in = match class {
+            ScheduleAssetClass::InterestRate => BuiltInScheduleAssetClass::InterestRate,
+            ScheduleAssetClass::Credit => BuiltInScheduleAssetClass::Credit,
+            ScheduleAssetClass::Equity => BuiltInScheduleAssetClass::Equity,
+            ScheduleAssetClass::Commodity => BuiltInScheduleAssetClass::Commodity,
+            ScheduleAssetClass::Fx => BuiltInScheduleAssetClass::Fx,
+            ScheduleAssetClass::Other => BuiltInScheduleAssetClass::Other,
+            ScheduleAssetClass::Custom(name) => {
+                return ScheduleAssetClassWire::Custom(format!("custom_{name}"));
+            }
+        };
+        ScheduleAssetClassWire::BuiltIn(built_in)
     }
 }
 
-impl<'de> serde::Deserialize<'de> for ScheduleAssetClass {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = <String as serde::Deserialize>::deserialize(deserializer)?;
-        s.parse().map_err(serde::de::Error::custom)
-    }
-}
+impl TryFrom<ScheduleAssetClassWire> for ScheduleAssetClass {
+    type Error = String;
 
-/// The wire string the hand-written serde impls read and write: a built-in
-/// class name or `custom_<name>`.
-#[cfg(feature = "json-schema")]
-impl schemars::JsonSchema for ScheduleAssetClass {
-    fn schema_name() -> Cow<'static, str> {
-        Cow::Borrowed("ScheduleAssetClass")
-    }
-
-    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        schemars::json_schema!({
-            "description": "A built-in schedule asset class, or a user-defined `custom_<name>` class.",
-            "anyOf": [
-                {
-                    "type": "string",
-                    "enum": ["interest_rate", "credit", "equity", "commodity", "fx", "other"]
-                },
-                {
-                    "description": "A user-defined class: `custom_` followed by lowercase ASCII letters, digits or underscores.",
-                    "type": "string",
-                    "pattern": "^custom_[a-z0-9_]+$"
-                }
-            ]
+    fn try_from(wire: ScheduleAssetClassWire) -> std::result::Result<Self, Self::Error> {
+        Ok(match wire {
+            ScheduleAssetClassWire::BuiltIn(BuiltInScheduleAssetClass::InterestRate) => {
+                ScheduleAssetClass::InterestRate
+            }
+            ScheduleAssetClassWire::BuiltIn(BuiltInScheduleAssetClass::Credit) => {
+                ScheduleAssetClass::Credit
+            }
+            ScheduleAssetClassWire::BuiltIn(BuiltInScheduleAssetClass::Equity) => {
+                ScheduleAssetClass::Equity
+            }
+            ScheduleAssetClassWire::BuiltIn(BuiltInScheduleAssetClass::Commodity) => {
+                ScheduleAssetClass::Commodity
+            }
+            ScheduleAssetClassWire::BuiltIn(BuiltInScheduleAssetClass::Fx) => {
+                ScheduleAssetClass::Fx
+            }
+            ScheduleAssetClassWire::BuiltIn(BuiltInScheduleAssetClass::Other) => {
+                ScheduleAssetClass::Other
+            }
+            ScheduleAssetClassWire::Custom(text) => return text.parse(),
         })
     }
 }

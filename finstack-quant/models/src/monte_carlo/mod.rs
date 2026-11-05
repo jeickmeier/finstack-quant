@@ -59,6 +59,7 @@
 //!
 //! ```
 //! use finstack_quant_core::currency::Currency;
+//! use finstack_quant_core::math::time_grid::TimeGrid;
 //! use finstack_quant_models::monte_carlo::payoff::vanilla::European;
 //! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
@@ -70,8 +71,9 @@
 //!     .with_parallel(false);
 //! let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).unwrap();
 //! let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
+//! let grid = TimeGrid::uniform(1.0, 252).expect("valid time grid");
 //! let result = pricer
-//!     .price(&process, 100.0, 1.0, 252, &payoff, Currency::USD, (-0.03_f64).exp())
+//!     .price(&process, 100.0, grid, &payoff, Currency::USD, (-0.03_f64).exp())
 //!     .expect("pricing should succeed");
 //! assert!(result.mean.amount().is_finite());
 //! ```

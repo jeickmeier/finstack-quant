@@ -14,6 +14,7 @@ use crate::utils::input::{
 };
 
 use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_models::closed_form::HestonPricingParams;
 use finstack_quant_models::monte_carlo::convenience;
 use finstack_quant_models::monte_carlo::greeks::gbm_european::{self, GbmEuropeanFdSpec};
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
@@ -96,24 +97,16 @@ pub fn price_heston(
     // seed, step count, currency, and (wasm-gated) parallelism; the binding
     // only marshals explicitly supplied values.
     let currency = js_opt_currency(currency.as_ref(), "currency")?;
-    let est = canonical::price_heston(
-        option_type,
-        spot,
-        strike,
-        rate,
-        div_yield,
-        kappa,
-        theta,
-        vol_of_vol,
-        rho,
-        v0,
-        expiry,
+    let params = HestonPricingParams::new(rate, div_yield, kappa, theta, vol_of_vol, rho, v0)
+        .map_err(to_js_err)?;
+    let settings = canonical::HestonMcSettings {
         num_paths,
         seed,
         num_steps,
         currency,
-    )
-    .map_err(to_js_err)?;
+    };
+    let est = canonical::price_heston(spot, strike, expiry, &params, option_type, &settings)
+        .map_err(to_js_err)?;
     crate::utils::to_js_value(&est)
 }
 
@@ -479,13 +472,15 @@ impl JsEuropeanPricer {
         let estimate = self
             .inner
             .price_gbm(
-                option_type,
-                gbm.spot,
-                gbm.strike,
-                gbm.rate,
-                gbm.div_yield,
-                gbm.vol,
-                gbm.expiry,
+                &OptionMarketParams {
+                    option_type,
+                    spot: gbm.spot,
+                    strike: gbm.strike,
+                    rate: gbm.rate,
+                    dividend_yield: gbm.div_yield,
+                    volatility: gbm.vol,
+                    time_to_expiry: gbm.expiry,
+                },
                 num_steps,
                 currency,
             )
@@ -640,13 +635,15 @@ impl JsPathDependentPricer {
         let estimate = self
             .inner
             .price_asian(
-                option_type,
-                gbm.spot,
-                gbm.strike,
-                gbm.rate,
-                gbm.div_yield,
-                gbm.vol,
-                gbm.expiry,
+                &OptionMarketParams {
+                    option_type,
+                    spot: gbm.spot,
+                    strike: gbm.strike,
+                    rate: gbm.rate,
+                    dividend_yield: gbm.div_yield,
+                    volatility: gbm.vol,
+                    time_to_expiry: gbm.expiry,
+                },
                 num_steps,
                 currency,
             )
@@ -711,13 +708,15 @@ impl JsPathDependentPricer {
         let greeks = self
             .inner
             .price_with_lrm_greeks(
-                option_type,
-                gbm.spot,
-                gbm.strike,
-                gbm.rate,
-                gbm.div_yield,
-                gbm.vol,
-                gbm.expiry,
+                &OptionMarketParams {
+                    option_type,
+                    spot: gbm.spot,
+                    strike: gbm.strike,
+                    rate: gbm.rate,
+                    dividend_yield: gbm.div_yield,
+                    volatility: gbm.vol,
+                    time_to_expiry: gbm.expiry,
+                },
                 num_steps,
                 currency,
             )

@@ -441,13 +441,15 @@ where
     );
     let dataset = engine
         .price_with_capture(
-            &PhiloxRng::new(20_261_004),
-            process,
-            scheme,
-            x0,
-            &European::new(OptionType::Call, 0.0, 1.0, 6),
-            Currency::USD,
-            1.0,
+            crate::monte_carlo::engine::McPricingInputs {
+                rng: &PhiloxRng::new(20_261_004),
+                process,
+                disc: scheme,
+                initial_state: x0,
+                payoff: &European::new(OptionType::Call, 0.0, 1.0, 6),
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            },
             process.metadata(),
         )
         .unwrap()

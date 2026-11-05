@@ -12,7 +12,7 @@ Per-item detail is in the rustdoc (`cargo doc -p finstack-quant-models --open`).
 | Path | Role | Public modules |
 |------|------|----------------|
 | `discretization/` | Time-stepping and exact transitions | all except `qe_common` (`pub(crate)`); no flat re-exports |
-| `engine/` | Generic simulation loop, config, path capture, fractional-noise path loop | files are private `mod`s; `McEngine`, `McEngineConfig`, `PathCaptureConfig`, `PathCaptureMode`, `MAX_NUM_PATHS`, `MAX_CAPTURED_PATHS`, `simulate_path_fractional` are re-exported from `engine/mod.rs` |
+| `engine/` | Generic simulation loop, config, path capture, fractional-noise path loop | files are private `mod`s; `McEngine`, `McPricingInputs`, `McEngineConfig`, `PathCaptureConfig`, `PathCaptureMode`, `MAX_NUM_PATHS`, `MAX_CAPTURED_PATHS`, `FractionalPath`, `simulate_path_fractional` are re-exported from `engine/mod.rs` |
 | `greeks/` | Sensitivity estimators | `lrm`, `finite_diff`, `gbm_european` |
 | `payoff/` | Contract definitions evaluated on `PathState`; `barrier` also owns the Brownian-bridge crossing test and `GOBET_MIRI_BETA` | `vanilla`, `asian`, `barrier`, `lookback`, `autocallable`, `cliquet`, `range_accrual` |
 | `pricer/` | Higher-level workflows over `McEngine` | `european`, `path_dependent`, `lsmc`, `heston`, `basis`, `lsq`, `polynomial` |
@@ -42,7 +42,7 @@ Per-item detail is in the rustdoc (`cargo doc -p finstack-quant-models --open`).
 | `mod.rs` | Engine-module docs plus the `pub use` list that forms the crate's `engine` surface |
 | `config.rs` | `McEngineConfig`, `MAX_NUM_PATHS`, `MAX_CAPTURED_PATHS` |
 | `path_capture.rs` | `PathCaptureConfig`, `PathCaptureMode`, the deterministic hash-based sampling rule |
-| `pricing.rs` | `McEngine`, `price`, `price_with_capture`, all runtime validation, `adaptive_chunk_size`, result finalization |
+| `pricing.rs` | `McEngine`, `McPricingInputs`, `price`, `price_with_capture`, all runtime validation, `adaptive_chunk_size`, result finalization |
 | `fractional.rs` | `simulate_path_fractional` — per-path loop that injects pre-generated fractional noise, for rough-volatility processes the generic engine rejects |
 | `simulation.rs` | Engine-internal per-path loops, none re-exported publicly: `run_path_loop`, `NoiseHook`, and `fill_shocks` (`pub(crate)`, shared with `fractional.rs`), plus private uniform-draw handling |
 | `tests.rs` | Engine unit tests, including the bit-identical serial/parallel and thread-pool-invariance pins |

@@ -77,13 +77,15 @@ impl PyEuropeanPricer {
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_gbm(
-                OptionType::from(is_call),
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
+                &OptionMarketParams {
+                    option_type: OptionType::from(is_call),
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
                 num_steps,
                 ccy,
             )
@@ -160,13 +162,15 @@ impl PyPathDependentPricer {
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_asian(
-                OptionType::from(is_call),
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
+                &OptionMarketParams {
+                    option_type: OptionType::from(is_call),
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
                 num_steps,
                 ccy,
             )
@@ -195,13 +199,15 @@ impl PyPathDependentPricer {
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_with_lrm_greeks(
-                OptionType::from(is_call),
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
+                &OptionMarketParams {
+                    option_type: OptionType::from(is_call),
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
                 num_steps,
                 ccy,
             )

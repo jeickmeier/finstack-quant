@@ -21,6 +21,31 @@ pub enum CliquetPayoffType {
     Multiplicative,
 }
 
+/// Contract terms of a [`CliquetCallPayoff`], consumed by
+/// [`CliquetCallPayoff::new`].
+#[derive(Debug, Clone)]
+pub struct CliquetCallParams {
+    /// Period-end observation times in years, strictly increasing and
+    /// strictly positive. Period 1 runs from the contract start to
+    /// `reset_dates[0]` and is anchored to `initial_spot`; a t=0 strike-set
+    /// reset is NOT a period observation and must be excluded.
+    pub reset_dates: Vec<f64>,
+    /// Maximum return per period as a decimal (e.g. `0.05`); at least `local_floor`.
+    pub local_cap: f64,
+    /// Minimum return per period as a decimal (e.g. `0.0`).
+    pub local_floor: f64,
+    /// Maximum total return as a decimal (e.g. `0.20`); at least `global_floor`.
+    pub global_cap: f64,
+    /// Minimum total return as a decimal (e.g. `0.0`).
+    pub global_floor: f64,
+    /// Notional amount in payoff currency units.
+    pub notional: f64,
+    /// Initial spot price `S_0`.
+    pub initial_spot: f64,
+    /// Additive or multiplicative aggregation of the period returns.
+    pub payoff_type: CliquetPayoffType,
+}
+
 /// Cliquet call option payoff.
 ///
 /// A cliquet option accumulates returns over multiple periods with periodic resets.
@@ -79,28 +104,25 @@ impl CliquetCallPayoff {
     ///
     /// # Arguments
     ///
-    /// * `reset_dates` - Period-end observation times in years (must be strictly
-    ///   increasing and strictly positive). Period 1 runs from the contract
-    ///   start to `reset_dates[0]` and is anchored to `initial_spot`; a t=0
-    ///   strike-set reset is NOT a period observation and must be excluded.
-    /// * `local_cap` - Maximum return per period (e.g., 0.05)
-    /// * `local_floor` - Minimum return per period (e.g., 0.0)
-    /// * `global_cap` - Maximum total return (e.g., 0.20)
-    /// * `global_floor` - Minimum total return (e.g., 0.0)
-    /// * `notional` - Notional amount
-    /// * `initial_spot` - Initial spot price S_0
-    /// * `payoff_type` - Additive or Multiplicative aggregation
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        reset_dates: Vec<f64>,
-        local_cap: f64,
-        local_floor: f64,
-        global_cap: f64,
-        global_floor: f64,
-        notional: f64,
-        initial_spot: f64,
-        payoff_type: CliquetPayoffType,
-    ) -> finstack_quant_core::Result<Self> {
+    /// * `params` - Reset schedule, local and global caps and floors,
+    ///   notional, initial spot and aggregation type; see
+    ///   [`CliquetCallParams`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] when the reset dates are not strictly
+    /// increasing or a cap is below its floor.
+    pub fn new(params: CliquetCallParams) -> finstack_quant_core::Result<Self> {
+        let CliquetCallParams {
+            reset_dates,
+            local_cap,
+            local_floor,
+            global_cap,
+            global_floor,
+            notional,
+            initial_spot,
+            payoff_type,
+        } = params;
         for i in 1..reset_dates.len() {
             if reset_dates[i - 1] >= reset_dates[i] {
                 return Err(Error::Validation(format!(
@@ -251,14 +273,11 @@ mod tests {
     fn test_cliquet_creation() {
         let reset_dates = vec![0.0, 0.25, 0.5, 0.75, 1.0];
         let cliquet = CliquetCallPayoff::new(
-            reset_dates,
-            0.10, // 10% local cap
-            0.0,  // 0% local floor
-            0.30, // 30% global cap
-            0.0,  // 0% global floor
-            100_000.0,
-            100.0,
-            CliquetPayoffType::Additive,
+            CliquetCallParams { reset_dates, local_cap: 0.10, local_floor: // 10% local cap
+            0.0, global_cap: // 0% local floor
+            0.30, global_floor: // 30% global cap
+            0.0, notional: // 0% global floor
+            100_000.0, initial_spot: 100.0, payoff_type: CliquetPayoffType::Additive },
         )
         .expect("test fixture is well-formed");
 
@@ -273,14 +292,11 @@ mod tests {
     fn test_cliquet_compute_return() {
         let reset_dates = vec![0.0, 0.25, 0.5];
         let mut cliquet = CliquetCallPayoff::new(
-            reset_dates,
-            0.10, // 10% local cap
-            0.0,  // 0% local floor
-            0.30, // 30% global cap
-            0.0,  // 0% global floor
-            1.0,
-            100.0,
-            CliquetPayoffType::Additive,
+            CliquetCallParams { reset_dates, local_cap: 0.10, local_floor: // 10% local cap
+            0.0, global_cap: // 0% local floor
+            0.30, global_floor: // 30% global cap
+            0.0, notional: // 0% global floor
+            1.0, initial_spot: 100.0, payoff_type: CliquetPayoffType::Additive },
         )
         .expect("test fixture is well-formed");
 
@@ -298,14 +314,11 @@ mod tests {
     fn test_cliquet_local_cap_floor() {
         let reset_dates = vec![0.0, 0.25, 0.5];
         let mut cliquet = CliquetCallPayoff::new(
-            reset_dates,
-            0.10,  // 10% local cap
-            -0.05, // -5% local floor
-            0.30,  // 30% global cap
-            -0.20, // -20% global floor
-            1.0,
-            100.0,
-            CliquetPayoffType::Additive,
+            CliquetCallParams { reset_dates, local_cap: 0.10, local_floor: // 10% local cap
+            -0.05, global_cap: // -5% local floor
+            0.30, global_floor: // 30% global cap
+            -0.20, notional: // -20% global floor
+            1.0, initial_spot: 100.0, payoff_type: CliquetPayoffType::Additive },
         )
         .expect("test fixture is well-formed");
 
@@ -323,14 +336,11 @@ mod tests {
     fn test_cliquet_global_cap() {
         let reset_dates = vec![0.0, 0.25, 0.5, 0.75];
         let mut cliquet = CliquetCallPayoff::new(
-            reset_dates,
-            0.10, // 10% local cap
-            0.0,  // 0% local floor
-            0.30, // 30% global cap
-            0.0,  // 0% global floor
-            1.0,
-            100.0,
-            CliquetPayoffType::Additive,
+            CliquetCallParams { reset_dates, local_cap: 0.10, local_floor: // 10% local cap
+            0.0, global_cap: // 0% local floor
+            0.30, global_floor: // 30% global cap
+            0.0, notional: // 0% global floor
+            1.0, initial_spot: 100.0, payoff_type: CliquetPayoffType::Additive },
         )
         .expect("test fixture is well-formed");
 
@@ -350,16 +360,16 @@ mod tests {
         // A coarse MC grid has steps that each span several reset dates. Every
         // due reset must record a spot so reset_spots has one entry per reset.
         let reset_dates = vec![0.25, 0.5, 0.75, 1.0];
-        let mut cliquet = CliquetCallPayoff::new(
-            reset_dates.clone(),
-            0.10,
-            0.0,
-            0.30,
-            0.0,
-            100_000.0,
-            100.0,
-            CliquetPayoffType::Additive,
-        )
+        let mut cliquet = CliquetCallPayoff::new(CliquetCallParams {
+            reset_dates: reset_dates.clone(),
+            local_cap: 0.10,
+            local_floor: 0.0,
+            global_cap: 0.30,
+            global_floor: 0.0,
+            notional: 100_000.0,
+            initial_spot: 100.0,
+            payoff_type: CliquetPayoffType::Additive,
+        })
         .expect("test fixture is well-formed");
 
         // First coarse step at t = 0.5 spans reset dates 0 (0.25) and 1 (0.5).
@@ -398,14 +408,11 @@ mod tests {
     fn negative_global_floor_long_call_payoff_floored_at_zero() {
         let reset_dates = vec![0.25, 0.5];
         let mut cliquet = CliquetCallPayoff::new(
-            reset_dates,
-            0.10,  // local cap
-            -0.30, // local floor (allows large negative period returns)
-            0.30,  // global cap
-            -0.20, // NEGATIVE global floor
-            100_000.0,
-            100.0,
-            CliquetPayoffType::Additive,
+            CliquetCallParams { reset_dates, local_cap: 0.10, local_floor: // local cap
+            -0.30, global_cap: // local floor (allows large negative period returns)
+            0.30, global_floor: // global cap
+            -0.20, notional: // NEGATIVE global floor
+            100_000.0, initial_spot: 100.0, payoff_type: CliquetPayoffType::Additive },
         )
         .expect("test fixture is well-formed");
 
@@ -436,16 +443,16 @@ mod tests {
     #[test]
     fn test_cliquet_reset() {
         let reset_dates = vec![0.0, 0.25];
-        let mut cliquet = CliquetCallPayoff::new(
+        let mut cliquet = CliquetCallPayoff::new(CliquetCallParams {
             reset_dates,
-            0.10,
-            0.0,
-            0.30,
-            0.0,
-            1.0,
-            100.0,
-            CliquetPayoffType::Additive,
-        )
+            local_cap: 0.10,
+            local_floor: 0.0,
+            global_cap: 0.30,
+            global_floor: 0.0,
+            notional: 1.0,
+            initial_spot: 100.0,
+            payoff_type: CliquetPayoffType::Additive,
+        })
         .expect("test fixture is well-formed");
 
         cliquet.reset_spots = vec![110.0];

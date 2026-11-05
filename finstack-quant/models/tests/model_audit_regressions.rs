@@ -77,18 +77,31 @@ fn lsmc_only_applies_immediate_exercise_when_scheduled_in_both_pricing_modes() {
             .with_seed(7);
         let pricer = LsmcEngine::new(config);
         let estimate = pricer
-            .price(&process, 50.0, 1.0, 1, &payoff, &basis, Currency::USD, 0.2)
+            .price(
+                &finstack_quant_models::monte_carlo::pricer::lsmc::LsmcInputs {
+                    process: &process,
+                    initial_spot: 50.0,
+                    time_to_maturity: 1.0,
+                    num_steps: 1,
+                    exercise: &payoff,
+                    basis: &basis,
+                    discount_rate: 0.2,
+                },
+                Currency::USD,
+            )
             .unwrap();
         let independent = pricer
             .price_unbiased(
-                &process,
-                50.0,
-                1.0,
-                1,
-                &payoff,
-                &basis,
+                &finstack_quant_models::monte_carlo::pricer::lsmc::LsmcInputs {
+                    process: &process,
+                    initial_spot: 50.0,
+                    time_to_maturity: 1.0,
+                    num_steps: 1,
+                    exercise: &payoff,
+                    basis: &basis,
+                    discount_rate: 0.2,
+                },
                 Currency::USD,
-                0.2,
                 8,
             )
             .unwrap();

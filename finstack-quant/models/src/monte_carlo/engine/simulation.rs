@@ -5,7 +5,7 @@
 //! (serial / parallel, with or without capture) live in
 //! [`super::pricing`] and call these primitives.
 
-use super::pricing::McEngine;
+use super::pricing::{McEngine, PathInputs, PathScratch};
 use crate::monte_carlo::paths::{PathPoint, SimulatedPath};
 use crate::monte_carlo::traits::{
     Discretization, PathState, Payoff, RandomStream, StochasticProcess,
@@ -13,6 +13,7 @@ use crate::monte_carlo::traits::{
 use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::linalg::CorrelationFactor;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use smallvec::SmallVec;
 
 /// Strategy for filling the per-step shock vector `z`.
@@ -37,6 +38,35 @@ pub(crate) enum NoiseHook<'a> {
         /// alongside the Riemann-Liouville Volterra increment.
         aux: Option<(usize, &'a [f64])>,
     },
+}
+
+/// Mutable per-path buffers reused across the paths of one run.
+pub(crate) struct PathBuffers<'a> {
+    /// Process state, length `process.dim()`.
+    pub(crate) state: &'a mut [f64],
+    /// Per-step shocks handed to the discretization, length `process.num_factors()`.
+    pub(crate) z: &'a mut [f64],
+    /// Independent shocks before engine-side correlation; zero-length when
+    /// the engine applies no correlation.
+    pub(crate) z_raw: &'a mut [f64],
+    /// Discretization work buffer, length `disc.work_size(process)`.
+    pub(crate) work: &'a mut [f64],
+}
+
+/// Path-invariant description of one plain (uncaptured, unpaired) path loop.
+pub(crate) struct PathLoop<'a, P, D> {
+    /// Simulation grid the path is stepped over.
+    pub(crate) time_grid: &'a TimeGrid,
+    /// Process driving the simulated state.
+    pub(crate) process: &'a P,
+    /// Discretization compatible with `process`.
+    pub(crate) disc: &'a D,
+    /// State at time zero; its length equals `process.dim()`.
+    pub(crate) initial_state: &'a [f64],
+    /// How each step's shocks are generated.
+    pub(crate) hook: NoiseHook<'a>,
+    /// Currency of the returned payoff amount.
+    pub(crate) currency: Currency,
 }
 
 /// Fill `z` with the shocks chosen by `hook` for time step `step`.
@@ -122,20 +152,11 @@ fn draw_uniform_if_needed<R: RandomStream, F: Payoff>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_path_loop<R, P, D, F>(
     rng: &mut R,
-    time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
-    process: &P,
-    disc: &D,
-    initial_state: &[f64],
+    path: &PathLoop<'_, P, D>,
     payoff: &mut F,
-    state: &mut [f64],
-    z: &mut [f64],
-    z_raw: &mut [f64],
-    work: &mut [f64],
-    hook: NoiseHook<'_>,
-    currency: Currency,
+    buffers: PathBuffers<'_>,
 ) -> Result<f64>
 where
     R: RandomStream,
@@ -143,6 +164,20 @@ where
     D: Discretization<P>,
     F: Payoff,
 {
+    let PathLoop {
+        time_grid,
+        process,
+        disc,
+        initial_state,
+        hook,
+        currency,
+    } = path;
+    let PathBuffers {
+        state,
+        z,
+        z_raw,
+        work,
+    } = buffers;
     state.copy_from_slice(initial_state);
 
     // Always zero the work buffer at path start so discretizations that
@@ -160,8 +195,8 @@ where
         let t = time_grid.time(step);
         let dt = time_grid.dt(step);
 
-        fill_shocks(rng, z, z_raw, step, &hook);
-        disc.step(process, t, dt, state, z, work);
+        fill_shocks(rng, z, z_raw, step, hook);
+        disc.step(*process, t, dt, state, z, work);
 
         path_state.set_step_time(step + 1, t + dt);
         process.populate_path_state(state, &mut path_state);
@@ -169,7 +204,7 @@ where
         payoff.on_event(&mut path_state)?;
     }
 
-    Ok(payoff.value(currency)?.amount())
+    Ok(payoff.value(*currency)?.amount())
 }
 
 impl McEngine {
@@ -179,22 +214,13 @@ impl McEngine {
     /// `pub(crate)` so specialised
     /// pricer loops (e.g. Sobol path-dependent pricing) drive per-path RNGs
     /// themselves while reusing the engine's capture bookkeeping.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn simulate_path_with_capture<R, P, D, F>(
         &self,
         rng: &mut R,
-        process: &P,
-        disc: &D,
-        initial_state: &[f64],
+        inputs: PathInputs<'_, P, D>,
         payoff: &mut F,
-        state: &mut [f64],
-        z: &mut [f64],
-        z_raw: &mut [f64],
-        work: &mut [f64],
-        correlation: Option<&CorrelationFactor>,
+        buffers: PathBuffers<'_>,
         path_id: usize,
-        discount_factor: f64,
-        currency: Currency,
     ) -> Result<(f64, SimulatedPath)>
     where
         R: RandomStream,
@@ -202,6 +228,20 @@ impl McEngine {
         D: Discretization<P>,
         F: Payoff,
     {
+        let PathInputs {
+            process,
+            disc,
+            initial_state,
+            correlation,
+            currency,
+            discount_factor,
+        } = inputs;
+        let PathBuffers {
+            state,
+            z,
+            z_raw,
+            work,
+        } = buffers;
         state.copy_from_slice(initial_state);
         // Captured paths reuse the same scratch buffers as streaming paths.
         // Clear history and step counters before each path, including when
@@ -279,28 +319,20 @@ impl McEngine {
     /// state corruption in discretizations with stateful work buffers (e.g.,
     /// rough Heston, rBergomi, Cheyette rough-vol).
     ///
-    /// `payoff_p` and `payoff_a` are caller-owned per-pair scratch payoffs
-    /// that this method `reset()`s in place — the caller hoists the two
-    /// clones outside the per-path loop so we don't allocate-and-discard a
-    /// fresh payoff on every pair.
-    #[allow(clippy::too_many_arguments)]
+    /// The two payoffs are the caller-owned per-pair scratch payoffs of
+    /// `scratch` (hoisted outside the per-path loop so a fresh payoff is not
+    /// allocated and discarded on every pair). The caller resets the primary
+    /// payoff; this method resets the antithetic one.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `scratch` holds no antithetic payoff,
+    /// and propagates payoff event and valuation errors.
     pub(crate) fn simulate_antithetic_pair<R, P, D, F>(
         &self,
         rng: &mut R,
-        process: &P,
-        disc: &D,
-        initial_state: &[f64],
-        payoff_p: &mut F,
-        payoff_a: &mut F,
-        state_p: &mut [f64],
-        state_a: &mut [f64],
-        z: &mut [f64],
-        z_anti: &mut [f64],
-        z_raw: &mut [f64],
-        work: &mut [f64],
-        work_anti: &mut [f64],
-        correlation: Option<&CorrelationFactor>,
-        currency: Currency,
+        inputs: PathInputs<'_, P, D>,
+        scratch: &mut PathScratch<F>,
     ) -> Result<f64>
     where
         R: RandomStream,
@@ -308,7 +340,31 @@ impl McEngine {
         D: Discretization<P>,
         F: Payoff,
     {
-        // Both payoffs are reset by the caller.
+        let PathInputs {
+            process,
+            disc,
+            initial_state,
+            correlation,
+            currency,
+            ..
+        } = inputs;
+        let PathScratch {
+            state: state_p,
+            z,
+            z_raw,
+            work,
+            state_anti: state_a,
+            z_anti,
+            work_anti,
+            payoff: payoff_p,
+            payoff_anti,
+        } = scratch;
+        let payoff_a = payoff_anti.as_mut().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "antithetic pair requested without an antithetic payoff".to_string(),
+            )
+        })?;
+        payoff_a.reset();
         work.fill(0.0);
         work_anti.fill(0.0);
         // Primary path

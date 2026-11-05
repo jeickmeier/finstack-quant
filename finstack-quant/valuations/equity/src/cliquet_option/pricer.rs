@@ -7,6 +7,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::monte_carlo::payoff::cliquet::CliquetCallParams;
 use finstack_quant_models::monte_carlo::payoff::cliquet::CliquetCallPayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -217,16 +218,16 @@ impl CliquetOptionMcPricer {
         // Build payoff (consumes reset_times via move). The first simulated
         // period anchors to the last observed level (`sim_anchor`), and the
         // locked-in past returns seed the global cap/floor aggregation.
-        let payoff = CliquetCallPayoff::new(
-            reset_times,
-            inst.local_cap,
-            inst.local_floor,
-            inst.global_cap,
-            inst.global_floor,
-            inst.notional.amount(),
-            sim_anchor,
-            inst.payoff_type,
-        )?
+        let payoff = CliquetCallPayoff::new(CliquetCallParams {
+            reset_dates: reset_times,
+            local_cap: inst.local_cap,
+            local_floor: inst.local_floor,
+            global_cap: inst.global_cap,
+            global_floor: inst.global_floor,
+            notional: inst.notional.amount(),
+            initial_spot: sim_anchor,
+            payoff_type: inst.payoff_type,
+        })?
         .with_prior_locked_returns(locked_sum, locked_growth);
 
         // The payoff is FIXED on the last reset date but PAID at the contract

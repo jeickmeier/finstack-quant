@@ -2,6 +2,24 @@
 
 ## Itemized changes
 
+### Models: Monte Carlo, payoff and Hull-White caplet entry points take one inputs struct
+
+Rust functions with more than seven inputs now take a struct. `McEngine::price`
+and `price_with_capture` take `engine::McPricingInputs`;
+`engine::simulate_path_fractional` takes `engine::FractionalPath`;
+`LsmcEngine::{price, fit_exercise_policy, price_with_policy, price_unbiased}`
+take `pricer::lsmc::LsmcInputs`; `pricer::heston::price_heston` takes
+`HestonPricingParams` and `HestonMcSettings`; `EuropeanPricer::price_gbm` and
+`PathDependentPricer::{price_asian, price_with_lrm_greeks}` take
+`OptionMarketParams`; `EuropeanPricer::price`, `PathDependentPricer::price` and
+`price_with_lrm_greeks_from_payoff` take a `TimeGrid` (the latter reads its
+score parameters from the process). `PathDependentPricer::price_with_grid` is
+gone (use `price`). `AutocallablePayoff::new`, `BarrierOptionPayoff::new` and
+`CliquetCallPayoff::new` take `AutocallableParams`, `BarrierOptionParams` and
+`CliquetCallParams`; `Asian::with_history` takes `AsianFixingHistory`;
+`hw1f_term_caplet_price_from_dfs_with_model` takes `TermCapletPeriod`. Prices
+are unchanged and Python and WASM signatures do not change.
+
 ### Valuations: field-unit tables move to `results`; the registry catalog to its own file
 
 `valuations/src/pricer/json.rs` (2,800 lines) is split by concern. The result

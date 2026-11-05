@@ -34,7 +34,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::rates::hull_white::{
-    HullWhiteCalibrationParams, HullWhiteParams, capfloor_hw1f_scalar_keys,
+    HullWhiteCalibrationParams, HullWhiteParams, TermCapletPeriod, capfloor_hw1f_scalar_keys,
     capfloor_hw1f_sigma_schedule_key, hw_b, hw1f_term_caplet_price_from_dfs_with_model,
 };
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -350,14 +350,16 @@ impl CapFloorHullWhitePricer {
                 notional
                     * hw1f_term_caplet_price_from_dfs_with_model(
                         &hw_model,
-                        pf_start,
-                        pf_end,
-                        df,
-                        t_fix,
-                        t_start,
-                        t_end,
-                        t_pay,
-                        tau,
+                        &TermCapletPeriod {
+                            pf_start,
+                            pf_end,
+                            pd_pay: df,
+                            t_fix,
+                            t_start,
+                            t_end,
+                            t_pay,
+                            accrual: tau,
+                        },
                         term_strike,
                         is_cap,
                     )?
@@ -991,14 +993,16 @@ mod tests {
         let expected = caplet.notional.amount()
             * hw1f_term_caplet_price_from_dfs_with_model(
                 &model,
-                pf_start,
-                pf_end,
-                pd_pay,
-                t_fix,
-                t_start,
-                t_end,
-                t_pay,
-                period.accrual_year_fraction,
+                &TermCapletPeriod {
+                    pf_start,
+                    pf_end,
+                    pd_pay,
+                    t_fix,
+                    t_start,
+                    t_end,
+                    t_pay,
+                    accrual: period.accrual_year_fraction,
+                },
                 0.04,
                 true,
             )

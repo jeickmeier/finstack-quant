@@ -12,6 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
+use finstack_quant_models::monte_carlo::engine::McPricingInputs;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::vanilla::European;
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
@@ -105,15 +106,15 @@ impl EquityOptionHestonMcPricer {
         let initial_state = [spot, params.model.v0];
 
         let payoff = European::new(inst.option_type, inst.strike, inst.quantity, maturity_step);
-        let result = engine.price(
-            &rng,
-            &process,
-            &discretization,
-            &initial_state,
-            &payoff,
-            ccy,
+        let result = engine.price(McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &discretization,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: ccy,
             discount_factor,
-        )?;
+        })?;
 
         Ok((result.mean, result.stderr))
     }

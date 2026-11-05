@@ -9,6 +9,8 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::monte_carlo::engine::McPricingInputs;
+use finstack_quant_models::monte_carlo::payoff::asian::AsianFixingHistory;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
@@ -155,9 +157,11 @@ impl AsianOptionHestonMcPricer {
                 inst.quantity,
                 averaging,
                 fixing_steps,
-                hist_sum,
-                hist_prod_log,
-                hist_count,
+                AsianFixingHistory {
+                    sum: hist_sum,
+                    log_sum: hist_prod_log,
+                    count: hist_count,
+                },
             )
         } else {
             Asian::new(
@@ -169,15 +173,15 @@ impl AsianOptionHestonMcPricer {
             )
         }?
         .with_fixing_multipliers(&fixing_multipliers)?;
-        let result = engine.price(
-            &rng,
-            &process,
-            &discretization,
-            &initial_state,
-            &payoff,
-            ccy,
+        let result = engine.price(McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &discretization,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: ccy,
             discount_factor,
-        )?;
+        })?;
         let (pv, mc_stderr) = (result.mean, result.stderr);
 
         Ok((pv, mc_stderr))

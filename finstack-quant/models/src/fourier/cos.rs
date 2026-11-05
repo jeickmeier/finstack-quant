@@ -402,10 +402,20 @@ impl<'a> CosPricer<'a> {
             0.0
         };
 
+        let strip = CosStrip {
+            r,
+            t,
+            spot,
+            a,
+            b,
+            bma,
+            df,
+            aks: &aks,
+        };
         strikes
             .iter()
             .map(|&strike| {
-                let put = self.put_price(strike, r, t, spot, a, b, bma, df, &aks)?;
+                let put = self.put_price(strike, &strip)?;
                 if !is_call {
                     return Ok(put);
                 }
@@ -421,19 +431,17 @@ impl<'a> CosPricer<'a> {
     /// coefficient `chi_k` stays bounded for arbitrarily wide truncation
     /// windows — this is the numerically stable building block from which the
     /// call is recovered by put-call parity.
-    #[allow(clippy::too_many_arguments)]
-    fn put_price(
-        &self,
-        strike: f64,
-        r: f64,
-        t: f64,
-        spot: f64,
-        a: f64,
-        b: f64,
-        bma: f64,
-        df: f64,
-        aks: &[f64],
-    ) -> Result<f64> {
+    fn put_price(&self, strike: f64, strip: &CosStrip<'_>) -> Result<f64> {
+        let &CosStrip {
+            r,
+            t,
+            spot,
+            a,
+            b,
+            bma,
+            df,
+            aks,
+        } = strip;
         // x0 = ln(S/K): shift from Y to X = Y + x0.
         // Integration window in X-space, following the moneyness shift.
         let x0 = spot.ln() - strike.ln();
@@ -483,6 +491,26 @@ impl<'a> CosPricer<'a> {
         }
         cos_finite_price(raw, "put")
     }
+}
+
+/// Strike-independent inputs shared by every strike of one COS price strip.
+struct CosStrip<'a> {
+    /// Continuously compounded risk-free rate (decimal); reported in warnings.
+    r: f64,
+    /// Time to expiry in years; reported in warnings.
+    t: f64,
+    /// Spot level `S_0`.
+    spot: f64,
+    /// Lower end of the `Y`-centred truncation window.
+    a: f64,
+    /// Upper end of the `Y`-centred truncation window.
+    b: f64,
+    /// Window width `b - a`.
+    bma: f64,
+    /// Discount factor `exp(-r t)`.
+    df: f64,
+    /// Strike-independent COS coefficients `Re[phi_Y(u_k) exp(-i u_k a)]`.
+    aks: &'a [f64],
 }
 
 /// Validate a raw COS price and clamp small negative noise to zero.

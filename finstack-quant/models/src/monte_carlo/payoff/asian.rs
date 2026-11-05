@@ -113,6 +113,22 @@ fn fixing_weights(steps: &[usize], multipliers: &[f64]) -> Result<HashMap<usize,
     Ok(weights)
 }
 
+/// Historical fixings of a seasoned Asian option, restored before every path.
+///
+/// `Default` is a fresh trade with no past observations.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct AsianFixingHistory {
+    /// Sum of historical spot levels in spot-price units, used for
+    /// arithmetic averaging.
+    pub sum: f64,
+    /// Sum of the natural logarithms of the positive historical spot levels,
+    /// used for geometric averaging.
+    pub log_sum: f64,
+    /// Number of historical fixings represented by `sum` and `log_sum`; zero
+    /// is permitted when future fixings exist.
+    pub count: usize,
+}
+
 /// Asian call or put option.
 ///
 /// Payoff: max(Avg - K, 0) × N for a call and max(K - Avg, 0) × N for a put,
@@ -182,17 +198,15 @@ impl Asian {
             notional,
             averaging,
             fixing_steps,
-            0.0,
-            0.0,
-            0,
+            AsianFixingHistory::default(),
         )
     }
 
     /// Resume an Asian option after historical fixings have already occurred.
     ///
-    /// `initial_sum` is the sum of historical fixing levels and
-    /// `initial_product_log` is the sum of their natural logarithms. The latter
-    /// is used only for geometric averaging. `initial_count` is the number of
+    /// `history.sum` is the sum of historical fixing levels and
+    /// `history.log_sum` is the sum of their natural logarithms. The latter
+    /// is used only for geometric averaging. `history.count` is the number of
     /// historical observations included in those aggregates; future simulated
     /// fixing steps are appended to this state.
     ///
@@ -209,35 +223,33 @@ impl Asian {
     /// * `notional` - Scalar multiplier applied to the positive difference
     ///   between the fixing average and `strike`; [`Payoff::value`] supplies
     ///   the payoff currency separately.
-    /// * `averaging` - Arithmetic mean using `initial_sum`, or geometric mean
-    ///   using `initial_product_log`, combined with future simulated fixings.
+    /// * `averaging` - Arithmetic mean using `history.sum`, or geometric mean
+    ///   using `history.log_sum`, combined with future simulated fixings.
     /// * `fixing_steps` - Owned indices of future path events to observe. Step
     ///   `0` includes the initial spot; indices may be unsorted or repeated,
     ///   and every entry contributes once, including repeated indices. An empty
-    ///   vector is valid only when `initial_count` is positive, for a fully observed contract.
-    /// * `initial_sum` - Sum of historical spot levels in spot-price units,
-    ///   used for arithmetic averaging and restored before every new path.
-    /// * `initial_product_log` - Sum of the natural logarithms of positive
-    ///   historical spot levels, used for geometric averaging and restored
-    ///   before every new path.
-    /// * `initial_count` - Number of historical fixings represented by the
-    ///   supplied aggregates; zero is permitted when future fixings exist.
+    ///   vector is valid only when `history.count` is positive, for a fully observed contract.
+    /// * `history` - Aggregates of the historical fixings (spot-level sum,
+    ///   log-spot sum and count), restored before every new path; see
+    ///   [`AsianFixingHistory`].
     ///
     /// # Errors
     ///
     /// Returns [`Error::Validation`] when `fixing_steps` is empty and
-    /// `initial_count` is zero, leaving no observations for the average.
-    #[allow(clippy::too_many_arguments)]
+    /// `history.count` is zero, leaving no observations for the average.
     pub fn with_history(
         option_type: OptionType,
         strike: f64,
         notional: f64,
         averaging: AveragingMethod,
         fixing_steps: Vec<usize>,
-        initial_sum: f64,
-        initial_product_log: f64,
-        initial_count: usize,
+        history: AsianFixingHistory,
     ) -> Result<Self> {
+        let AsianFixingHistory {
+            sum: initial_sum,
+            log_sum: initial_product_log,
+            count: initial_count,
+        } = history;
         validate_fixing_schedule(&fixing_steps, initial_count)?;
         let fixing_weights = fixing_weights(&fixing_steps, &vec![1.0; fixing_steps.len()])?;
         Ok(Self {
@@ -386,9 +398,11 @@ mod tests {
                     1.0,
                     averaging,
                     Vec::new(),
-                    0.0,
-                    0.0,
-                    0,
+                    AsianFixingHistory {
+                        sum: 0.0,
+                        log_sum: 0.0,
+                        count: 0,
+                    },
                 )
                 .expect_err("empty history does not supply a fixing");
                 assert!(matches!(error, Error::Validation(_)));
@@ -405,9 +419,11 @@ mod tests {
             1.0,
             AveragingMethod::Arithmetic,
             fixing_steps.clone(),
-            90.0,
-            90.0_f64.ln(),
-            1,
+            AsianFixingHistory {
+                sum: 90.0,
+                log_sum: 90.0_f64.ln(),
+                count: 1,
+            },
         )
         .expect("historical and future fixings");
         let mut put = Asian::with_history(
@@ -416,9 +432,11 @@ mod tests {
             1.0,
             AveragingMethod::Arithmetic,
             fixing_steps.clone(),
-            90.0,
-            90.0_f64.ln(),
-            1,
+            AsianFixingHistory {
+                sum: 90.0,
+                log_sum: 90.0_f64.ln(),
+                count: 1,
+            },
         )
         .expect("historical and future fixings");
 
@@ -595,9 +613,11 @@ mod tests {
                 1.0,
                 averaging,
                 vec![2, 2],
-                90.0,
-                90.0_f64.ln(),
-                1,
+                AsianFixingHistory {
+                    sum: 90.0,
+                    log_sum: 90.0_f64.ln(),
+                    count: 1,
+                },
             )
             .expect("call")
             .with_fixing_multipliers(&[1.0, 1.1])

@@ -52,14 +52,16 @@ fn contractual_act360_cap_reprices_in_production_term_kernel() {
         .map(|period| {
             finstack_quant_models::rates::hull_white::hw1f_term_caplet_price_from_dfs_with_model(
                 &model,
-                df(period.start_time),
-                df(period.end_time),
-                df(period.payment_time),
-                period.fixing_time,
-                period.start_time,
-                period.end_time,
-                period.payment_time,
-                period.accrual,
+                &finstack_quant_models::rates::hull_white::TermCapletPeriod {
+                    pf_start: df(period.start_time),
+                    pf_end: df(period.end_time),
+                    pd_pay: df(period.payment_time),
+                    t_fix: period.fixing_time,
+                    t_start: period.start_time,
+                    t_end: period.end_time,
+                    t_pay: period.payment_time,
+                    accrual: period.accrual,
+                },
                 quote.strike,
                 true,
             )

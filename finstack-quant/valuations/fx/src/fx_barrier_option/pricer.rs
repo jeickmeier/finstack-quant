@@ -6,6 +6,7 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PayoutTiming;
+use finstack_quant_models::monte_carlo::payoff::barrier::BarrierOptionParams;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::Monitoring;
 use finstack_quant_valuations_core::pricer::{
@@ -120,18 +121,18 @@ impl FxBarrierOptionMcPricer {
             t,
             &config,
         )?;
-        let mut payoff = BarrierOptionPayoff::new(
-            inst.strike,
-            inst.barrier,
-            inst.barrier_type,
-            inst.option_type,
-            inst.rebate_per_unit(),
-            inst.notional.amount(),
-            time_grid.num_steps(),
+        let mut payoff = BarrierOptionPayoff::new(BarrierOptionParams {
+            strike: inst.strike,
+            barrier: inst.barrier,
+            barrier_type: inst.barrier_type,
+            option_type: inst.option_type,
+            rebate: inst.rebate_per_unit(),
+            notional: inst.notional.amount(),
+            maturity_step: time_grid.num_steps(),
             sigma,
-            &time_grid,
+            time_grid: &time_grid,
             monitoring,
-        );
+        });
         // Exact at-hit rebate timing: compound the rebate forward from the
         // hit time at the domestic rate so DF(T) nets to DF(τ).
         if inst.rebate.is_some() && inst.rebate_timing == PayoutTiming::AtHit {
@@ -143,7 +144,7 @@ impl FxBarrierOptionMcPricer {
         let sobol = config.use_sobol;
         let brownian_bridge = config.use_brownian_bridge;
         let pricer = PathDependentPricer::new(config);
-        let result = pricer.price_with_grid(
+        let result = pricer.price(
             &process,
             fx_spot,
             time_grid,
