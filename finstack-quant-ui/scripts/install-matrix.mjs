@@ -228,6 +228,9 @@ async function buildTemplate(needsWasm) {
       allowJs: true,
       skipLibCheck: true,
       strict: true,
+      // Gallery fixtures typed by items outside the closure arrive as `any`, as do
+      // wasm-bindgen inputs; strict registry source is checked by ui-check.
+      noImplicitAny: false,
       noEmit: true,
       esModuleInterop: true,
       module: "esnext",
