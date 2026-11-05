@@ -207,7 +207,7 @@ interoperable `float` view.
 from decimal import Decimal
 from finstack_quant.core.money import Money
 
-m = Money(Decimal("123.4500000000000000001"), "USD")
+m = Money.from_decimal(Decimal("123.4500000000000000001"), "USD")
 m.amount_decimal  # Decimal('123.4500000000000000001')
 m.amount          # 123.45000000000002
 ```

@@ -30,10 +30,11 @@ globs:
   `scripts/check_single_path.py` (rustdoc JSON) measures this; run it with
   `--compare <base JSON>` after making a module private, because a public item
   left unnameable produces no compiler warning.
-- **File size: 1000 lines desired, 2000 lines maximum** (measured on source
-  lines, excluding colocated `#[cfg(test)]` blocks). Split a submodule out once
-  it passes ~1000; treat 2000 as a hard ceiling that needs a deliberate
-  justification, not a default. Rationale: this is a numerics library where a
+- **File size: 1000 lines desired, 2000 lines maximum** (measured on Rust
+  source lines under `src/`, excluding `#[cfg(test)]` items, `tests.rs` and
+  generated files). Split a submodule out once it passes ~1000; 2000 is a hard
+  limit (enforced by `scripts/check_loc.py`, the pre-commit `rust-loc` hook,
+  which also reports the files over 1000). Rationale: this is a numerics library where a
   single pricing model or waterfall is genuinely cohesive at that size, and
   splitting purely to hit a smaller number fragments logic that reads better
   together.
@@ -56,7 +57,11 @@ globs:
 pub struct MyType;
 ```
 
-- Do not add #[allow(missing_docs)], add missing docs instead
+- Do not add `#[allow(missing_docs)]`; add the missing docs. `#[allow]`/`#[expect]` of
+  `dead_code`, `unused_imports`, `clippy::expect_used`, `clippy::unwrap_used`,
+  `clippy::too_many_arguments` or `missing_docs` is not permitted outside `#[cfg(test)]`:
+  delete the item, `cfg`-gate a platform-specific one, propagate the error, or take a
+  params struct (enforced by `scripts/check_lint_suppressions.py`).
 
 ### Mathematical Utilities Organization
 

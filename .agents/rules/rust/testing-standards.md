@@ -5,7 +5,7 @@ globs:
 ---
 ### Rust Testing Standards (Finstack)
 
-These standards apply to all Rust crates in the Finstack Quant workspace (`finstack-quant/core` through `portfolio`; see the crate map in `project-description.md`) and should be read alongside our code standards. They reinforce our core invariants: determinism, currency‑safety, stable serde schemas, and parity across bindings.
+These standards apply to all Rust crates in the Finstack Quant workspace (`finstack-quant/core` through `portfolio`; see the crate map in `ARCHITECTURE.md`) and should be read alongside our code standards. They reinforce our core invariants: determinism, currency‑safety, stable serde schemas, and parity across bindings.
 
 ### Guiding principles
 
@@ -61,7 +61,7 @@ These standards apply to all Rust crates in the Finstack Quant workspace (`finst
 
 ### Structure, naming, and style
 
-- **Unit tests**: colocate with code under `mod tests { … }`; name tests descriptively (behavior‑oriented, not ticket IDs).
+- **Unit tests**: a `#[cfg(test)] mod tests`, inline or as the sibling file `tests.rs`; no other sibling name (enforced by `scripts/check_lint_suppressions.py`). Name tests descriptively (behavior‑oriented, not ticket IDs). Integration tests live under the crate's `tests/`.
 - **Integration tests**: under `crate/tests/`; one file per scenario or cohesive feature area; mirror user workflows.
 - **Golden tests**: suffix files or directories with the source (e.g., `*_bloomberg.rs`, `*_quantlib.rs`) and include data provenance notes.
 - **Helpers**: Common test helpers live in `tests/common.rs` or a dedicated `tests/common/` module; avoid coupling helpers to private internals.

@@ -174,11 +174,8 @@ mise run gen-check            # schemas, fixtures, and bindings are idempotent
 
 ## Adding tests
 
-**New instrument** — create `instruments/<name>/`, add the `#[path = ...] mod`
-entry to [`instruments.rs`](instruments.rs), register the tag in
-`instruments/coverage_manifest.toml`, and regenerate its canonical fixture with
-`mise run gen-write`. See
-[`instruments/README.md`](instruments/README.md).
+**New instrument** — follow [`ADDING_AN_INSTRUMENT.md`](../ADDING_AN_INSTRUMENT.md)
+(steps 7–9 are the tests, the persistence manifest and the regenerated fixture).
 
 **New calibration / metrics / market / cashflows test** — add the file to the
 directory and the `mod` line to that directory's `mod.rs`. The entry-point `.rs`

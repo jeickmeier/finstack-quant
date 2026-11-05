@@ -77,7 +77,7 @@ implementor must write:
 
 | Method | Notes |
 |--------|-------|
-| `id()`, `key()`, `as_any()`, `as_any_mut()`, `attributes()`, `attributes_mut()`, `clone_box()` | All seven come from `impl_instrument_base!(InstrumentType::X)` |
+| `id()`, `key()`, `as_any()`, `as_any_mut()`, `attributes()`, `attributes_mut()`, `clone_box()` | All seven, plus `family()`, come from `impl_instrument_base!(InstrumentType::X, FAMILY)` |
 | `base_value(market, as_of) -> Result<Money>` | The unshocked model kernel. Do **not** apply scenario overrides here and do not re-validate — the wrapper lifecycle owns both |
 | `market_dependencies() -> Result<MarketDependencies>` | Must declare every curve, surface and FX pair the pricer actually reads; the `*_dependency_completeness.rs` tests enforce this |
 
@@ -145,24 +145,7 @@ methods.
 
 ## Adding an instrument
 
-The end-to-end checklist lives in [`../README.md`](../README.md#adding-an-instrument).
-The parts this directory owns:
-
-1. `impl Instrument for X { impl_instrument_base!(InstrumentType::X); … }` —
-   requires fields `id: InstrumentId` and `attributes: Attributes`, and `Clone`.
-2. Store the three override bags and add `impl_focused_pricing_overrides!()` if
-   the instrument accepts pricing/metric/scenario overrides.
-3. Implement `finstack_quant_cashflows::CashflowScheduleSource`.
-   `CashflowProvider` — the `Instrument` supertrait that owns
-   `cashflow_schedule` and `dated_cashflows` — is blanket-implemented for it, so
-   normalization and dated-flow meaning cannot be overridden per instrument.
-   Products whose waterfall is intentionally empty use
-   `impl_empty_cashflow_provider!(X, representation)`; contingent or exhausted
-   products still return an explicit empty schedule tagged so `Placeholder` and
-   `NoResidual` stay distinguishable.
-4. Reuse `parameters/` types instead of inventing a parallel leg or underlying
-   struct, and reuse `instruments::pricing::swap_legs` instead of open-coding
-   discounting.
+Follow [`ADDING_AN_INSTRUMENT.md`](../../../../ADDING_AN_INSTRUMENT.md), the one checklist for a new instrument type.
 
 ## Tests
 

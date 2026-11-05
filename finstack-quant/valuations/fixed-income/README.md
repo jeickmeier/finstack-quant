@@ -104,8 +104,8 @@ Inside a leaf, `metrics/`, `pricer.rs`/`pricing/` and `types.rs`/`types/` are
 
 ## Registration
 
-New leaves follow the six-step checklist in
-[`../README.md`](../README.md#adding-an-instrument). Family-specific landing
+New leaves follow [`../ADDING_AN_INSTRUMENT.md`](../ADDING_AN_INSTRUMENT.md).
+Family-specific landing
 sites, which are *not* all named after the directory:
 
 | Step | Where, for this family |

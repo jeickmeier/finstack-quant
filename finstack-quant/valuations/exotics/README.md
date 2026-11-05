@@ -110,7 +110,7 @@ Inside a leaf, `metrics/`, `pricer.rs`, `traits.rs` and `types.rs` are
 
 ### Registration
 
-The general checklist is in [`../README.md`](../README.md#adding-an-instrument).
+The general checklist is [`../ADDING_AN_INSTRUMENT.md`](../ADDING_AN_INSTRUMENT.md).
 Unlike the other asset classes, this family's landing sites are all named after
 it:
 

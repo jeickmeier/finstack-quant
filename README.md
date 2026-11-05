@@ -72,7 +72,7 @@ finstack-quant/
 │   ├── test-utils/               # golden-test helpers (dev-dependency only)
 │   └── tests/                    # umbrella-level integration tests
 ├── finstack-quant-py/            # PyO3 bindings; builds the `finstack_quant` package
-├── finstack-quant-wasm/          # wasm-bindgen bindings + hand-written JS facade
+├── finstack-quant-wasm/          # wasm-bindgen bindings + hand-written JS facade (macros/: plain_docs)
 ├── finstack-quant-ui/            # shadcn registry; crate-first React components
 ├── docs-site/                    # documentation site and registry gallery
 ├── benchmarks/                   # materialization benchmark fixtures and notes
@@ -83,66 +83,14 @@ finstack-quant/
 └── mise.toml                     # toolchain pins and dev tasks
 ```
 
-## Crate map
+## Architecture
 
-`finstack-quant` is the umbrella crate. It re-exports all fourteen domain
-crates, so one dependency reaches the whole API. Default features enable
-JSON Schema generation and validation; they do not change pricing behavior.
-
-| Crate | Umbrella path | Provides |
-|---|---|---|
-| [`finstack-quant-core`](finstack-quant/core/README.md) | `finstack_quant::core` | `Money`/`Currency`/`Rate`, FX providers, dates and calendars, term structures, math, expression engine, config, `table` envelope |
-| [`finstack-quant-analytics`](finstack-quant/analytics/README.md) | `finstack_quant::analytics` | `Performance` entry point: return/risk scalars, drawdowns, rolling windows, alpha/beta, basic factor models |
-| [`finstack-quant-attribution`](finstack-quant/attribution/README.md) | `finstack_quant::attribution` | Multi-period P&L attribution: simple bridge, metrics-based, parallel, waterfall, Taylor |
-| [`finstack-quant-calibration`](finstack-quant/calibration/README.md) | `finstack_quant::calibration` | Quote ingestion, market construction, calibration engines, explicit model fitting, and cached quote replay |
-| [`finstack-quant-cashflows`](finstack-quant/cashflows/README.md) | `finstack_quant::cashflows` | Schedule construction, accrual, currency-preserving aggregation |
-| [`finstack-quant-covenants`](finstack-quant/covenants/README.md) | `finstack_quant::covenants` | Covenant specs, evaluation engine, threshold schedules, forecasting, standard packages |
-| [`finstack-quant-features`](finstack-quant/features/README.md) | `finstack_quant::features` | Time-series, cross-sectional, and panel feature transforms over `Option<f64>` columns |
-| [`finstack-quant-margin`](finstack-quant/margin/README.md) | `finstack_quant::margin` | CSA/repo terms, VM and IM engines (SIMM, schedule, haircut, CCP), collateral metrics, XVA config, regulatory capital |
-| [`finstack-quant-models`](finstack-quant/models/README.md) | `finstack_quant::models` | Closed-form/Fourier formulas, volatility, rates/DTSM, credit and structured-credit pool models, liquidity, PDE/tree engines, and Monte Carlo |
-| [`finstack-quant-factor`](finstack-quant/factor/README.md) | `finstack_quant::models::factor` | Factor definitions and matching, covariance, sensitivity matrices, risk decomposition, and hierarchical credit-factor calibration |
-| [`finstack-quant-valuations`](finstack-quant/valuations/README.md) | `finstack_quant::valuations` | Instruments, market resolution, pricing registries, recalibration provider contract, metrics, and result envelopes |
-| [`finstack-quant-statements`](finstack-quant/statements/README.md) | `finstack_quant::statements` | Statement model graph, DSL formulas, forecasting, corkscrews, deterministic period evaluation |
-| [`finstack-quant-statements-analytics`](finstack-quant/statements-analytics/README.md) | `finstack_quant::statements_analytics` | Sensitivity, scenario sets, variance, DCF, goal seek, covenant forecasting, backtesting, templates |
-| [`finstack-quant-portfolio`](finstack-quant/portfolio/README.md) | `finstack_quant::portfolio` | Entities and positions, valuation and metric aggregation, grouping, optimization, risk decomposition, materialization |
-| [`finstack-quant-scenarios`](finstack-quant/scenarios/README.md) | `finstack_quant::scenarios` | Deterministic market/instrument/statement shocks and time rolls as serde-stable specs, template registry, composition, phase-ordered apply, horizon P&L |
-
-### Crates that are not re-exported
-
-Depend on these directly when you need them:
-
-| Crate | Path | Purpose |
-|---|---|---|
-| [`finstack-quant-arrow`](finstack-quant/arrow-interchange/README.md) | `finstack-quant/arrow-interchange/` | Export a `core::table::TableEnvelope` as an Arrow `RecordBatch` |
-| [`finstack-quant-test-utils`](finstack-quant/test-utils/README.md) | `finstack-quant/test-utils/` | Golden-test framework shared across crates; dev-dependency only |
-| `finstack-quant-valuations-macros` | `finstack-quant/valuations/macros/` | `FinancialBuilder` derive used inside `valuations` |
-
-### Dependency direction
-
-Every domain crate depends on `core`, as does `arrow-interchange`; `test-utils`
-and `valuations-macros` have no in-workspace dependencies. The rest of the
-edges, read off the manifests:
-
-| Crate | Also depends on |
-|---|---|
-| `analytics`, `cashflows`, `covenants`, `features`, `margin` | nothing else in-workspace |
-| `models` | `cashflows` |
-| `factor` | `analytics` |
-| `valuations` | `cashflows`, `covenants`, `margin`, `models`, `valuations-core`, `valuations-{rates,fixed-income,structured-credit,credit,equity,fx,exotics}`, `valuations-macros` |
-| `calibration` | `cashflows`, `models`, `valuations-{core,credit,rates}` |
-| `attribution` | `calibration`, `cashflows`, `factor`, `models`, `valuations` |
-| `statements` | `cashflows`, `valuations` |
-| `statements-analytics` | `covenants`, `models`, `statements`, `valuations` |
-| `scenarios` | `attribution`, `calibration`, `cashflows`, `models`, `statements`, `valuations` |
-| `portfolio` | `attribution`, `calibration`, `cashflows`, `factor`, `margin`, `scenarios`, `valuations` |
-
-`valuations` is the mid-stack hub and `portfolio` is the top. No Rust crate
-depends on a binding crate, and `core` never depends on `models`.
-
-No cargo feature selects financial behavior. Workspace features are
-`json-schema` and `jsonschema-validate` (default on most crates, including
-the umbrella) and `extension-module` (PyO3 linking). The WASM package's TypeScript contract types are generated
-from the checked-in JSON Schemas, not from a cargo feature.
+`finstack-quant` is the umbrella crate: it re-exports all fourteen domain
+crates, so one dependency reaches the whole API. Default features enable JSON
+Schema generation and validation; no cargo feature selects financial behavior.
+The crate map (what each crate owns, with a link to its README), the
+dependency direction and the cross-cutting invariants are in
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Quick start
 
@@ -197,7 +145,7 @@ settle = adjust(
     HolidayCalendar("usny"),
 )
 
-print(amount.format())  # 'USD 1000000.00'
+print(str(amount))      # 'USD 1000000.00'
 print(settle)           # 2025-01-06
 ```
 

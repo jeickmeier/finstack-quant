@@ -73,22 +73,7 @@ schema-index summary, and the schema-parity check are all generated from it.
 
 ## Adding an instrument
 
-1. Add the type under the appropriate asset-class directory, following an
-   existing neighbour (for example `fixed_income/bond/` or `rates/irs/`).
-2. Implement `Instrument` (`impl_instrument_base!` supplies `id`, `key`,
-   `attributes` and `family`).
-3. Add an `InstrumentType` variant in `core/src/pricer/keys.rs`.
-4. Add one row to `with_instrument_json_registry!` in `json_loader.rs`: kind
-   (`plain`, or `boxed` for a large payload), variant, type, tag, category,
-   example and a distinct one-sentence schema-index summary. No per-site hand
-   edits are needed — everything else is generated.
-5. Add a `metrics/` module with a `register_<name>_metrics(&mut MetricRegistry)`
-   function and call it from `register_metrics` in the family's `family.rs`;
-   register the pricer in that file's `register_pricers` and name the family
-   as the second argument of `impl_instrument_base!`.
-6. Add tests under `../../tests/instruments/<name>/`, then regenerate schemas
-   when the public JSON shape changes: `mise run gen-write`
-   (verify with `mise run gen-check`).
+Follow [`ADDING_AN_INSTRUMENT.md`](../../ADDING_AN_INSTRUMENT.md), the one checklist for a new instrument type.
 
 ## Related
 

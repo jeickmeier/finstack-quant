@@ -134,7 +134,7 @@ items surface through each leaf's `pub use`. Genuinely public submodules are
 
 ## Registration
 
-The general checklist is in [`../src/instruments/README.md`](../src/instruments/README.md#adding-an-instrument).
+The general checklist is [`../ADDING_AN_INSTRUMENT.md`](../ADDING_AN_INSTRUMENT.md).
 Every leaf registers in [`src/family.rs`](src/family.rs) (`RATES`), including
 `xccy_swap`, the CMS products, the Bermudan swaption and the inflation
 instruments:
@@ -149,12 +149,8 @@ Other steps:
 
 - `InstrumentType` variant in `../core/src/pricer/keys.rs`.
 - One line in `with_instrument_json_registry!` in `../src/instruments/json_loader.rs` (umbrella), category
-  `"rates"`. Current tags: `interest_rate_swap`, `basis_swap`, `xccy_swap`,
-  `inflation_swap`, `yoy_inflation_swap`, `inflation_cap_floor`,
-  `forward_rate_agreement`, `swaption`, `bermudan_swaption`,
-  `interest_rate_future`, `cap_floor`, `cms_swap`, `cms_option`,
-  `cms_spread_option`, `deposit`, `repo`. Note `swaption/`
-  and `inflation_swap/` each own two tags.
+  `"rates"`; the rows there are the list of rates tags. `swaption/` and
+  `inflation_swap/` each own two tags.
 - `register_<name>_metrics` in the leaf's `metrics/`, called from
   `register_metrics` in `family.rs`. Bermudan swaption greeks are
   registered there with the documented default Hull-White parameters

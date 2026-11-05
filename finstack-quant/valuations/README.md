@@ -8,17 +8,10 @@ that produce DV01, CS01, Greeks, spreads, and VaR.
 
 ## Where it sits
 
-Depends on (see [`Cargo.toml`](Cargo.toml)):
-
-| Crate | Used for |
-|-------|----------|
-| [`finstack-quant-core`](../core/README.md) | `Money`, `Currency`, dates/day-count, `MarketContext`, curves/surfaces, math, config |
-| [`finstack-quant-cashflows`](../cashflows/README.md) | schedule generation, accrual, the `CashflowProvider` supertrait of `Instrument` |
-| [`finstack-quant-covenants`](../covenants/README.md) | `CovenantReport` attached to `ValuationResult::covenants` |
-| [`finstack-quant-margin`](../margin/README.md) | `Marginable` bridge (`Instrument::as_marginable`) for VM/IM and XVA |
-| [`finstack-quant-models`](../models/README.md) | closed-form/Fourier formulas, SABR, PDE/tree engines, structural credit, correlation, and Monte Carlo |
-| [`finstack-quant-valuations-core`](core/README.md) and the seven family crates | pricing framework (`Instrument`, registries, metrics, results, conventions) and instrument implementations (`rates`, `fixed-income`, `structured-credit`, `credit`, `equity`, `fx`, `exotics`) |
-| `finstack-quant-valuations-macros` | `FinancialBuilder` derive, which generates `Type::builder()` (`macros/`) |
+Depends on `core`, `cashflows`, `covenants`, `margin`, `models`, the pricing
+framework [`core/`](core/README.md) and the seven family crates; the reasons and
+the workspace-wide dependency direction are in
+[`ARCHITECTURE.md`](../../ARCHITECTURE.md).
 
 Consumed by [`attribution`](../attribution/README.md),
 [`statements`](../statements/README.md), `statements-analytics`,
@@ -90,9 +83,9 @@ families build on are defined in [`core/src/instruments/`](core/src/instruments/
 are at `instruments::*` and `instruments::pricing`, the same paths as before the
 split.
 
-`pricer::InstrumentType` has 71 variants; the JSON registry in
-`instruments/json_loader.rs` covers 70 loadable instrument types. Several
-instruments carry their own README — for example
+`pricer::InstrumentType` lists every instrument type, and the JSON registry in
+`instruments/json_loader.rs` makes each one loadable; the registry tests keep
+the two equal. Several instruments carry their own README — for example
 [`fixed_income/bond`](fixed-income/src/bond/README.md),
 [`structured_credit`](structured-credit/src/structured_credit/README.md),
 and [`rates/irs`](rates/src/irs/README.md).

@@ -103,7 +103,7 @@ reached through the standard metric registry.
 
 ## Registration
 
-The general checklist is in [`../src/instruments/README.md`](../src/instruments/README.md#adding-an-instrument).
+The general checklist is [`../ADDING_AN_INSTRUMENT.md`](../ADDING_AN_INSTRUMENT.md).
 Landing sites for this family:
 
 | Step | Where |

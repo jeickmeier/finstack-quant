@@ -47,13 +47,18 @@ in a different crate, reached by the MC instrument pricers.
 
 | Path | Contents | Visibility |
 |------|----------|------------|
-| [`mod.rs`](mod.rs) | `FAMILIES`, the `STANDARD` umbrella family, `STANDARD.pricers()`, the `register_generic!` macro, all re-exports | mixed |
+| [`mod.rs`](mod.rs) | The `register_generic!` macro and all re-exports | mixed |
+| [`defaults.rs`](defaults.rs) | Embedded product-specific Monte Carlo defaults | `pub mod` |
 | [`keys.rs`](keys.rs) | `InstrumentType`, `ModelKey`, `PricerKey` — enums, `as_str`, `Display`, `FromStr`, serde | private mod, types re-exported |
 | [`registry.rs`](registry.rs) | `Pricer` trait, `PricerRegistry`, the pricing pipeline, `expect_inst`, FX-policy collection | private mod, items re-exported |
 | [`errors.rs`](errors.rs) | `PricingError`, `PricingErrorContext`, the two lossy conversions to/from `finstack_quant_core::Error` | private mod, types re-exported |
 | [`enrichment.rs`](enrichment.rs) | Metric enrichment applied after the base PV | `pub(super)`, fully internal |
-| [`json.rs`](json.rs) | Envelope parse/validate, model + metric discovery, the JSON pricing entry points | `pub mod` |
 | [`family.rs`](family.rs) | `Family`: the registration unit, its per-family pricer and metric registries built on first use, `Family::unregistered` | private mod, type re-exported |
+
+The umbrella crate's `src/pricer/` adds what needs every family:
+`FAMILIES`, the `STANDARD` family and `STANDARD.pricers()` (`mod.rs`), and the
+JSON entry points below (`json.rs`, a private module whose items are lifted
+flat into `finstack_quant_valuations::pricer`).
 
 Registration tables live with the instruments. Each family crate declares a
 `static Family` with its pricer and metric tables: `rates/src/family.rs`
@@ -240,43 +245,7 @@ then rejects any metric no primitive supported. `measures` may still contain
 
 ## Adding an instrument
 
-The steps that touch this directory, in order:
-
-1. **Add the `InstrumentType` variant** in [`keys.rs`](keys.rs). Give it the next
-   free discriminant (do not renumber anything). Add the matching arm to
-   `InstrumentType::as_str`, and add a `#[serde(rename = ...)]` only if the wire
-   name must differ from the snake_case variant name — in which case `as_str`
-   must return that same string.
-2. **Register the pricer** in the matching asset-class shard, inside that shard's
-   `register_*_pricers` function. If the instrument prices by discounting its own
-   cashflows, one line suffices:
-
-   ```rust
-   register_generic!(registry, InstrumentType::Foo, crate::instruments::Foo);
-   ```
-
-   That expands to a `GenericInstrumentPricer::<Foo>::discounting(...)`
-   registration under `ModelKey::Discounting`, which forwards to the
-   instrument's `base_value` / `base_value_raw`. For a non-discounting model, use
-   the four-argument form (`register_generic!(registry, inst, ty, ModelKey::Bar)`)
-   or write a `Pricer` impl and call `registry.register(...)` directly.
-3. **Add a new `ModelKey`** only if no existing variant describes the model;
-   same discriminant and `as_str` rules apply.
-4. If the instrument's native model is not `Discounting`, override
-   `Instrument::default_model` on the type so `price_with_metrics` and the
-   JSON `"default"` selector reach the right pricer.
-5. In a hand-written `Pricer`, downcast with
-   `expect_inst::<Foo>(instrument, InstrumentType::Foo)?` — it checks the
-   `InstrumentType` tag *and* the concrete type, and returns `TypeMismatch`.
-   Return the unshocked base PV; do not apply scenario overrides or re-resolve
-   `as_of`.
-
-The remaining steps live outside this directory:
-`with_instrument_json_registry!` in `../instruments/json_loader.rs`, the
-`register_<name>_metrics` hook called from the family's `family.rs`, tests
-under `../../tests/instruments/<name>/`, and
-`mise run gen-write` when the public JSON shape changes. See
-[`../instruments/README.md`](../instruments/README.md).
+Follow [`ADDING_AN_INSTRUMENT.md`](../../../ADDING_AN_INSTRUMENT.md), the one checklist for a new instrument type.
 
 ## Errors
 
@@ -300,7 +269,7 @@ mapping table in [`errors.rs`](errors.rs):
 
 ## JSON entry points
 
-`json.rs` is the shared pipeline behind both host bindings: parse a canonical
+The umbrella's `src/pricer/json.rs` is the shared pipeline behind both host bindings: parse a canonical
 `InstrumentEnvelope`, optionally merge metric pricing overrides, parse the
 as-of date and model key, dispatch through the standard registry.
 
