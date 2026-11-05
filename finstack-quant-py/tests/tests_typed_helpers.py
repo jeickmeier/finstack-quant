@@ -218,7 +218,7 @@ def build_fx_option() -> FxOption:
         .quote_currency(Currency("USD"))
         .strike(1.12)
         .option_type("call")
-        .delta_convention("forward", Currency("USD"), "generic_interbank")
+        .delta_convention({"kind": "forward", "premium_currency": "USD", "venue": "generic_interbank"})
         .expiry(datetime.date(2025, 12, 15))
         .notional(Money(1_000_000.0, Currency("EUR")))
         .domestic_discount_curve_id("USD-OIS")

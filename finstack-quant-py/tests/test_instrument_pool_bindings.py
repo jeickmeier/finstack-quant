@@ -113,11 +113,10 @@ def test_pool_accessors_report_the_collateral_and_reserve() -> None:
             overrides=[{"id": "US912828XG33", "call": {"policy": "first_call"}}],
         )
         .with_reserve(
-            5_000_000.0,
+            Money(5_000_000.0, "USD"),
             reserve_account_rate=0.02,
-            reserve_target=6_000_000.0,
+            reserve_target=Money(6_000_000.0, "USD"),
             reserve_interest_destination={"kind": "tranche", "tranche_id": "EQ"},
-            currency="USD",
         )
     )
     collateral = pool.instruments

@@ -65,7 +65,7 @@ impl PyCdsTrancheParams {
             series,
             attach_pct,
             detach_pct,
-            money_from_py(notional, None, "notional")?,
+            money_from_py(notional, "notional")?,
             py_to_date(maturity)?,
             extract_basis_points(coupon_bp, "coupon_bp")?,
         )
@@ -88,7 +88,7 @@ impl PyCdsTrancheParams {
             inner: CdsTrancheParams::equity_tranche(
                 index_name,
                 series,
-                money_from_py(notional, None, "notional")?,
+                money_from_py(notional, "notional")?,
                 py_to_date(maturity)?,
                 extract_basis_points(coupon_bp, "coupon_bp")?,
             ),
@@ -109,7 +109,7 @@ impl PyCdsTrancheParams {
             inner: CdsTrancheParams::mezzanine_tranche(
                 index_name,
                 series,
-                money_from_py(notional, None, "notional")?,
+                money_from_py(notional, "notional")?,
                 py_to_date(maturity)?,
                 extract_basis_points(coupon_bp, "coupon_bp")?,
             ),
@@ -572,7 +572,7 @@ impl PyCdsTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let (date, money) = dated_money_from_py(value, None, "upfront")?;
+        let (date, money) = dated_money_from_py(value, "upfront")?;
         let shown = format!("({}, {})", date_repr(date), money_repr(money));
         builder_set!(slf, upfront, shown, |b: CdsTrancheBuilder| b
             .upfront((date, money)))

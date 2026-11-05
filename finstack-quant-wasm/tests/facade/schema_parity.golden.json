@@ -2737,7 +2737,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/fx_forward_trade_date_params.schema.json",
             "type_name": "FxForwardTradeDateParams",
             "kind": "input",
-            "bytes": 3792
+            "bytes": 3818
           },
           {
             "path": "schemas/common/1/fx_option_params.schema.json",
@@ -4993,7 +4993,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/fx_forward_trade_date_params.schema.json",
             "type_name": "FxForwardTradeDateParams",
             "kind": "input",
-            "bytes": 3792
+            "bytes": 3818
           },
           {
             "domain": "valuations",

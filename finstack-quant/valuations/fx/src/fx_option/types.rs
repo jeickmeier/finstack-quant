@@ -116,22 +116,40 @@ impl FxDeltaConvention {
     /// * `kind` - Spot, forward, or premium-adjusted quoting convention.
     /// * `premium_currency` - Currency in which premium is paid.
     /// * `venue` - Non-empty venue or quoting-source identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `venue` is blank (see [`Self::validate`]).
     pub fn new(
         kind: FxDeltaConventionKind,
         premium_currency: Currency,
         venue: impl Into<String>,
     ) -> finstack_quant_core::Result<Self> {
-        let venue = venue.into();
-        if venue.trim().is_empty() {
+        let convention = Self {
+            kind,
+            premium_currency,
+            venue: venue.into(),
+        };
+        convention.validate()?;
+        Ok(convention)
+    }
+
+    /// Check the convention's own invariant: the venue is not blank.
+    ///
+    /// [`Self::new`] runs this; call it on a value deserialized from its
+    /// serde form, which does not. Whether the premium currency belongs to an
+    /// option's pair is checked by [`FxOption::validate`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `venue` is empty or only whitespace.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if self.venue.trim().is_empty() {
             return Err(finstack_quant_core::Error::Validation(
                 "FX delta convention venue must not be blank".to_string(),
             ));
         }
-        Ok(Self {
-            kind,
-            premium_currency,
-            venue,
-        })
+        Ok(())
     }
 }
 
@@ -266,11 +284,7 @@ impl FxOption {
                 self.delta_convention.premium_currency, self.base_currency, self.quote_currency
             )));
         }
-        if self.delta_convention.venue.trim().is_empty() {
-            return Err(finstack_quant_core::Error::Validation(
-                "FxOption delta convention venue must not be blank".to_string(),
-            ));
-        }
+        self.delta_convention.validate()?;
         if !self.strike.is_finite() || self.strike < 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "FxOption strike must be finite and non-negative, got {}",

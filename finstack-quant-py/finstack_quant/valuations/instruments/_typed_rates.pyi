@@ -570,6 +570,7 @@ class InterestRateSwapBuilder:
     Examples
     --------
     >>> from finstack_quant.core.dates import DayCount, Tenor
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import FixedLegSpec, FloatLegSpec, InterestRateSwap
     >>> fixed = FixedLegSpec(
     ...     "USD-OIS",
@@ -592,7 +593,7 @@ class InterestRateSwapBuilder:
     ...     InterestRateSwap
     ...     .builder()
     ...     .id("IRS-1")
-    ...     .notional(10_000_000.0, currency="USD")
+    ...     .notional(Money(10_000_000.0, "USD"))
     ...     .side("pay")
     ...     .fixed_leg(fixed)
     ...     .float_leg(floating)
@@ -622,16 +623,14 @@ class InterestRateSwapBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def notional(self, value: Money | float, currency: str | None = None) -> InterestRateSwapBuilder:
+    def notional(self, value: Money) -> InterestRateSwapBuilder:
         """
         Set the notional shared by both legs.
 
         Parameters
         ----------
-        value : Money | float
-            Notional shared by both legs; a bare number is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Notional shared by both legs.
 
         Returns
         -------
@@ -641,7 +640,9 @@ class InterestRateSwapBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a bare number is given without ``currency``.
+            If the builder was already consumed by ``build()``.
+        TypeError
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def side(self, value: Literal["pay", "receive"]) -> InterestRateSwapBuilder:
@@ -1479,6 +1480,7 @@ class SwaptionBuilder:
     Examples
     --------
     >>> from finstack_quant.core.dates import DayCount, Tenor
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import FixedLegSpec, FloatLegSpec, Swaption
     >>> fixed = FixedLegSpec(
     ...     "USD-OIS",
@@ -1502,7 +1504,7 @@ class SwaptionBuilder:
     ...     .builder()
     ...     .id("SWPT-1")
     ...     .option_type("call")
-    ...     .notional(10_000_000.0, currency="USD")
+    ...     .notional(Money(10_000_000.0, "USD"))
     ...     .expiry("2025-01-13")
     ...     .settlement("cash")
     ...     .cash_settlement_method("collateralized_cash_price")
@@ -1556,16 +1558,14 @@ class SwaptionBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized name.
         """
         ...
-    def notional(self, value: Money | float, currency: str | None = None) -> SwaptionBuilder:
+    def notional(self, value: Money) -> SwaptionBuilder:
         """
         Set the notional of the underlying swap.
 
         Parameters
         ----------
-        value : Money | float
-            Notional of the underlying swap; a bare number is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Notional of the underlying swap.
 
         Returns
         -------
@@ -1575,7 +1575,9 @@ class SwaptionBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a bare number is given without ``currency``.
+            If the builder was already consumed by ``build()``.
+        TypeError
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def expiry(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> SwaptionBuilder:
@@ -2545,13 +2547,14 @@ class CapFloorBuilder:
     Examples
     --------
     >>> from finstack_quant.core.dates import DayCount, Tenor
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import CapFloor
     >>> cap = (
     ...     CapFloor
     ...     .builder()
     ...     .id("CAP-1")
     ...     .rate_option_type("cap")
-    ...     .notional(5_000_000.0, currency="USD")
+    ...     .notional(Money(5_000_000.0, "USD"))
     ...     .strike(0.05)
     ...     .start_date("2024-01-15")
     ...     .maturity("2027-01-15")
@@ -2606,16 +2609,14 @@ class CapFloorBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized name.
         """
         ...
-    def notional(self, value: Money | float, currency: str | None = None) -> CapFloorBuilder:
+    def notional(self, value: Money) -> CapFloorBuilder:
         """
         Set the notional amount.
 
         Parameters
         ----------
-        value : Money | float
-            Notional amount; a bare number is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Notional amount.
 
         Returns
         -------
@@ -2625,7 +2626,9 @@ class CapFloorBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a bare number is given without ``currency``.
+            If the builder was already consumed by ``build()``.
+        TypeError
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def strike(self, value: float | Rate) -> CapFloorBuilder:
@@ -2671,8 +2674,7 @@ class CapFloorBuilder:
     def premium(
         self,
         payment_date: datetime.date | datetime.datetime | pd.Timestamp | str,
-        amount: Money | float,
-        currency: str | None = None,
+        amount: Money,
     ) -> CapFloorBuilder:
         """
         Set the dated premium paid by the cap/floor holder.
@@ -2682,11 +2684,8 @@ class CapFloorBuilder:
         payment_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Contractual premium payment date. Payments on or before the valuation
             date are treated as settled and excluded from NPV.
-        amount : Money | float
-            Non-negative premium outflow in the notional currency; a bare number is
-            tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``amount`` is a bare number.
+        amount : Money
+            Non-negative premium outflow in the notional currency.
 
         Returns
         -------
@@ -2696,9 +2695,10 @@ class CapFloorBuilder:
         Raises
         ------
         ValueError
-            If ``payment_date`` cannot be interpreted, a bare amount has no
-            ``currency``, or the builder was already consumed. Premium amount and
-            currency validation occurs in ``build``.
+            If ``payment_date`` cannot be interpreted or the builder was already
+            consumed. Premium amount and currency validation occurs in ``build``.
+        TypeError
+            If ``amount`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def start_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> CapFloorBuilder:

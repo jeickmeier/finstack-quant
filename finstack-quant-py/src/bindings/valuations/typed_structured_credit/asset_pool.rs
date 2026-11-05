@@ -133,9 +133,9 @@ impl PyAssetPool {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.with_reserve")]
-    #[pyo3(signature = (reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None, currency=None))]
+    #[pyo3(signature = (reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None))]
     #[pyo3(
-        text_signature = "($self, reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None, currency=None)"
+        text_signature = "($self, reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None)"
     )]
     fn with_reserve(
         &self,
@@ -144,13 +144,12 @@ impl PyAssetPool {
         reserve_account_rate: f64,
         reserve_target: Option<&Bound<'_, PyAny>>,
         reserve_interest_destination: Option<&Bound<'_, PyAny>>,
-        currency: Option<&str>,
     ) -> PyResult<Self> {
         let inner = self.inner.clone().with_reserve(
-            money_from_py(reserve_account, currency, "reserve_account")?,
+            money_from_py(reserve_account, "reserve_account")?,
             reserve_account_rate,
             reserve_target
-                .map(|value| money_from_py(value, currency, "reserve_target"))
+                .map(|value| money_from_py(value, "reserve_target"))
                 .transpose()?,
             reserve_interest_destination
                 .map(|value| tagged_enum_from_py(py, value, "kind", "reserve_interest_destination"))

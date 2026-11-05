@@ -372,12 +372,10 @@ class Bond:
     @staticmethod
     def zero_coupon(
         id: str,
-        notional: Money | float,
+        notional: Money,
         issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         discount_curve_id: str,
-        *,
-        currency: str | None = None,
     ) -> Bond:
         """
         Create a zero-coupon bond (single principal redemption at maturity).
@@ -388,16 +386,14 @@ class Bond:
         ----------
         id : str
             Unique instrument identifier.
-        notional : Money | float
-            Redemption amount; a bare number is tagged with ``currency``.
+        notional : Money
+            Redemption amount; its currency is the bond currency.
         issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Maturity (redemption) date.
         discount_curve_id : str
             Discount curve identifier used for pricing.
-        currency : str, optional
-            ISO-4217 code applied when ``notional`` is a bare number.
 
         Returns
         -------
@@ -407,16 +403,15 @@ class Bond:
         Raises
         ------
         ValueError
-            If a bare ``notional`` has no ``currency`` or ``maturity`` is not after
-            ``issue_date``.
+            If ``maturity`` is not after ``issue_date``.
         TypeError
-            If ``notional`` has an unsupported type or a date cannot be
-            interpreted.
+            If ``notional`` is not a ``Money`` or a date cannot be interpreted.
 
         Examples
         --------
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import Bond
-        >>> zc = Bond.zero_coupon("ZC", 1_000_000.0, "2024-01-01", "2029-01-01", "USD-OIS", currency="USD")
+        >>> zc = Bond.zero_coupon("ZC", Money(1_000_000.0, "USD"), "2024-01-01", "2029-01-01", "USD-OIS")
         >>> zc.has_floating_coupons
         False
         """
@@ -1157,13 +1152,14 @@ class BondBuilder:
 
     Examples
     --------
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import Bond
     >>> base = Bond.example().to_dict()
     >>> callable_bond = (
     ...     Bond
     ...     .builder()
     ...     .id("CALLABLE")
-    ...     .notional(1_000_000.0, currency="USD")
+    ...     .notional(Money(1_000_000.0, "USD"))
     ...     .issue_date("2024-01-15")
     ...     .maturity("2034-01-15")
     ...     .cashflow_spec(base["cashflow_spec"])
@@ -1199,16 +1195,14 @@ class BondBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def notional(self, value: Money | float, currency: str | None = None) -> BondBuilder:
+    def notional(self, value: Money) -> BondBuilder:
         """
         Set the principal amount.
 
         Parameters
         ----------
-        value : Money | float
-            Principal amount; a bare number is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Principal amount; its currency is the bond currency.
 
         Returns
         -------
@@ -1218,7 +1212,9 @@ class BondBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a bare number is given without ``currency``.
+            If the builder was already consumed by ``build()``.
+        TypeError
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def issue_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> BondBuilder:
@@ -2290,13 +2286,14 @@ class TermLoanBuilder:
     Examples
     --------
     >>> from finstack_quant.core.dates import DayCount, Tenor
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import TermLoan
     >>> loan = (
     ...     TermLoan
     ...     .builder()
     ...     .id("TL-1")
     ...     .currency("USD")
-    ...     .notional_limit(10_000_000.0, currency="USD")
+    ...     .notional_limit(Money(10_000_000.0, "USD"))
     ...     .issue_date("2024-01-01")
     ...     .maturity("2029-01-01")
     ...     .rate(0.06)
@@ -2350,16 +2347,14 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized currency code.
         """
         ...
-    def notional_limit(self, value: Money | float, currency: str | None = None) -> TermLoanBuilder:
+    def notional_limit(self, value: Money) -> TermLoanBuilder:
         """
         Set the committed notional (facility limit).
 
         Parameters
         ----------
-        value : Money | float
-            Committed notional (facility limit); a bare number is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Committed notional (facility limit), in the loan currency.
 
         Returns
         -------
@@ -2369,7 +2364,9 @@ class TermLoanBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a bare number is given without ``currency``.
+            If the builder was already consumed by ``build()``.
+        TypeError
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def issue_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> TermLoanBuilder:
@@ -2620,21 +2617,19 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized name.
         """
         ...
-    def upfront_fee(
-        self, value: Money | float | dict[str, object] | str, currency: str | None = None
-    ) -> TermLoanBuilder:
+    def upfront_fee(self, value: dict[str, object] | str) -> TermLoanBuilder:
         """
         Set the upfront (arrangement or OID) fee paid on the issue date.
 
         Parameters
         ----------
-        value : Money | float | dict[str, object] | str
-            A ``Money`` or bare number (tagged with ``currency``) is an absolute
-            amount; a ``dict`` or JSON string is the ``UpfrontFee`` serde form
-            (``{"amount": Money-dict}`` or ``{"fraction_of_commitment": 0.02}``,
-            a decimal fraction of the DDTL commitment, else ``notional_limit``).
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : dict[str, object] | str
+            The ``UpfrontFee`` serde form, as a ``dict`` or JSON string:
+            ``{"amount": Money}`` for an absolute fee (a ``Money`` or its
+            ``{"amount": "20000", "currency": "USD"}`` dict) or
+            ``{"fraction_of_commitment": 0.02}`` for a decimal fraction of the
+            DDTL commitment, else ``notional_limit``. The ``upfront_fee``
+            getter returns this shape.
 
         Returns
         -------
@@ -2644,7 +2639,7 @@ class TermLoanBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()``, a bare number is given without ``currency``, or a ``dict``/string does not match the ``UpfrontFee`` shape.
+            If the builder was already consumed by ``build()`` or ``value`` does not match the ``UpfrontFee`` shape.
         """
         ...
     def ddtl(self, value: dict[str, object] | str) -> TermLoanBuilder:

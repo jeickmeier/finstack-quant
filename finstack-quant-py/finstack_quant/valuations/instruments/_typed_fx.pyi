@@ -1759,7 +1759,7 @@ class FxOptionBuilder:
     ...     .quote_currency("USD")
     ...     .strike(1.12)
     ...     .option_type("call")
-    ...     .delta_convention("spot", "USD", "desk")
+    ...     .delta_convention({"kind": "spot", "premium_currency": "USD", "venue": "desk"})
     ...     .expiry("2025-06-15")
     ...     .notional(Money(1_000_000.0, Currency("EUR")))
     ...     .domestic_discount_curve_id("USD-OIS")
@@ -1871,23 +1871,20 @@ class FxOptionBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized option type.
         """
         ...
-    def delta_convention(
-        self,
-        kind: Literal["spot", "forward", "premium_adjusted_spot", "premium_adjusted_forward"],
-        premium_currency: Currency | str,
-        venue: str,
-    ) -> FxOptionBuilder:
+    def delta_convention(self, value: dict[str, Any] | str) -> FxOptionBuilder:
         """
         Set the pair/venue delta convention and premium currency.
 
         Parameters
         ----------
-        kind : {"spot", "forward", "premium_adjusted_spot", "premium_adjusted_forward"}
-            Delta convention quoted by the venue.
-        premium_currency : Currency | str
-            Currency in which the FX option premium is paid.
-        venue : str
-            Non-empty market venue or quoting-source identifier.
+        value : dict[str, Any] | str
+            ``FxDeltaConvention`` serde form, as a ``dict`` or JSON string,
+            every key required: ``kind`` (``"spot"``, ``"forward"``,
+            ``"premium_adjusted_spot"`` or ``"premium_adjusted_forward"``),
+            ``premium_currency`` (ISO-4217 code or ``Currency``; must be the
+            base or quote currency, checked by ``build()``) and ``venue``
+            (non-blank market venue or quoting-source identifier). The
+            ``FxOption.delta_convention`` getter returns this shape.
 
         Returns
         -------
@@ -1897,7 +1894,7 @@ class FxOptionBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()``, ``kind`` is unknown or ``venue`` is blank.
+            If the builder was already consumed by ``build()``, ``value`` does not match the ``FxDeltaConvention`` shape (an unknown ``kind`` or key, a missing key) or ``venue`` is blank.
         """
         ...
     def expiry(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> FxOptionBuilder:

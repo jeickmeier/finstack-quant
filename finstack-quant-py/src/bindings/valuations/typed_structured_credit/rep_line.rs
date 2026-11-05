@@ -53,7 +53,7 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
         io_months: Option<u32>,
     ) -> PyResult<Self> {
         let maturity = py_to_date(maturity)?;
-        let balance = money_from_py(balance, None, "balance")?;
+        let balance = money_from_py(balance, "balance")?;
         let rate = extract_rate_decimal(rate, "rate")?;
         let spread_bp = spread_bp
             .map(|value| extract_basis_points(value, "spread_bp"))

@@ -165,14 +165,12 @@ impl PyInterestRateSwapBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder.notional")]
-    #[pyo3(signature = (value, currency = None))]
-    #[pyo3(text_signature = "($self, value, currency=None)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "notional")?;
+        let money = money_from_py(value, "notional")?;
         builder_set!(
             slf,
             notional,
@@ -446,14 +444,12 @@ impl PySwaptionBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.notional")]
-    #[pyo3(signature = (value, currency = None))]
-    #[pyo3(text_signature = "($self, value, currency=None)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "notional")?;
+        let money = money_from_py(value, "notional")?;
         builder_set!(slf, notional, money_repr(money), |b: SwaptionBuilder| b
             .notional(money))
     }
@@ -758,14 +754,12 @@ impl PyCapFloorBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.notional")]
-    #[pyo3(signature = (value, currency = None))]
-    #[pyo3(text_signature = "($self, value, currency=None)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "notional")?;
+        let money = money_from_py(value, "notional")?;
         builder_set!(slf, notional, money_repr(money), |b: CapFloorBuilder| b
             .notional(money))
     }
@@ -799,16 +793,14 @@ impl PyCapFloorBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.premium")]
-    #[pyo3(signature = (payment_date, amount, currency = None))]
-    #[pyo3(text_signature = "($self, payment_date, amount, currency=None)")]
+    #[pyo3(text_signature = "($self, payment_date, amount)")]
     fn premium<'py>(
         mut slf: PyRefMut<'py, Self>,
         payment_date: &Bound<'_, PyAny>,
         amount: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let payment_date = py_to_date(payment_date)?;
-        let amount = money_from_py(amount, currency, "amount")?;
+        let amount = money_from_py(amount, "amount")?;
         builder_set!(
             slf,
             premium,

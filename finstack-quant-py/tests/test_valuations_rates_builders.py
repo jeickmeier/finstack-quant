@@ -98,7 +98,7 @@ def test_swap_from_legs_prices_on_start_date_without_fixings() -> None:
         InterestRateSwap
         .builder()
         .id("IRS-SPOT")
-        .notional(10_000_000.0, currency="USD")
+        .notional(Money(10_000_000.0, "USD"))
         .side("pay")
         .fixed_leg(_fixed_leg())
         .float_leg(_float_leg())
@@ -206,7 +206,7 @@ def test_builder_build_does_not_run_pricing_validation() -> None:
         InterestRateSwap
         .builder()
         .id("IRS-NO-PRICING-CHECK")
-        .notional(1_000_000.0, currency="USD")
+        .notional(Money(1_000_000.0, "USD"))
         .side("pay")
         .fixed_leg(_fixed_leg())
         .float_leg(_float_leg())
@@ -221,13 +221,20 @@ def test_builder_names_missing_field() -> None:
             InterestRateSwap
             .builder()
             .id("IRS-MISSING")
-            .notional(1_000_000.0, currency="USD")
+            .notional(Money(1_000_000.0, "USD"))
             .side("pay")
             .fixed_leg(_fixed_leg())
             .build()
         )
     with pytest.raises(ValueError, match="missing required field 'id'"):
-        InterestRateSwap.builder().notional(1_000_000.0, currency="USD").build()
+        InterestRateSwap.builder().notional(Money(1_000_000.0, "USD")).build()
+
+
+def test_money_inputs_take_only_money() -> None:
+    with pytest.raises(TypeError, match=r"notional: expected finstack_quant\.core\.money\.Money, got float"):
+        InterestRateSwap.builder().notional(1_000_000.0)
+    with pytest.raises(TypeError, match=r"notional: expected finstack_quant\.core\.money\.Money"):
+        Bond.zero_coupon("ZC", 1_000_000.0, "2024-01-01", "2029-01-01", "USD-OIS")
 
 
 def test_builder_repr_renders_fields_set_so_far() -> None:
@@ -334,7 +341,7 @@ def test_bond_fixed_accepts_floats_strings_and_with_convention_takes_a_stub() ->
 
 def test_bond_constructors_and_examples() -> None:
     assert (
-        Bond.zero_coupon("ZC", 1_000_000.0, "2024-01-01", "2029-01-01", "USD-OIS", currency="USD").has_floating_coupons
+        Bond.zero_coupon("ZC", Money(1_000_000.0, "USD"), "2024-01-01", "2029-01-01", "USD-OIS").has_floating_coupons
         is False
     )
     gilt = Bond.with_convention(
@@ -385,7 +392,7 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
             Bond
             .builder()
             .id(bond_id)
-            .notional(1_000_000.0, currency="USD")
+            .notional(Money(1_000_000.0, "USD"))
             .issue_date("2024-01-15")
             .maturity("2034-01-15")
             .cashflow_spec(base["cashflow_spec"])
@@ -508,7 +515,7 @@ def test_bond_builder_requires_contractual_issue_date() -> None:
         Bond
         .builder()
         .id("MISSING-ISSUE")
-        .notional(1_000_000.0, currency="USD")
+        .notional(Money(1_000_000.0, "USD"))
         .maturity("2034-01-15")
         .cashflow_spec(base["cashflow_spec"])
         .discount_curve_id("USD-OIS")
@@ -526,7 +533,7 @@ def test_term_loan_builder_and_getters() -> None:
         .builder()
         .id("TL-1")
         .currency("USD")
-        .notional_limit(10_000_000.0, currency="USD")
+        .notional_limit(Money(10_000_000.0, "USD"))
         .issue_date("2024-01-01")
         .maturity("2029-01-01")
         .rate(0.06)
@@ -586,7 +593,7 @@ def test_swaption_examples_getters_and_accessors() -> None:
         .builder()
         .id("SWPT-ATTR")
         .option_type("put")
-        .notional(1_000_000.0, currency="USD")
+        .notional(Money(1_000_000.0, "USD"))
         .expiry("2025-01-13")
         .settlement("physical")
         .cash_settlement_method("par_yield")
@@ -615,10 +622,10 @@ def test_cap_floor_example_getters_and_new_setters() -> None:
         .builder()
         .id("CAP-KW")
         .rate_option_type("floor")
-        .notional(5_000_000.0, currency="USD")
+        .notional(Money(5_000_000.0, "USD"))
         .strike(Rate(0.02))
         .spread_bp(0.0)
-        .premium("2025-01-20", 10_000.0, currency="USD")
+        .premium("2025-01-20", Money(10_000.0, "USD"))
         .start_date("2025-01-15")
         .maturity("2028-01-15")
         .frequency(Tenor.quarterly())
@@ -659,7 +666,7 @@ def test_metric_keys_are_human_readable_not_escaped() -> None:
         InterestRateSwap
         .builder()
         .id("IRS-KEYS")
-        .notional(10_000_000.0, currency="USD")
+        .notional(Money(10_000_000.0, "USD"))
         .side("pay")
         .fixed_leg(_fixed_leg())
         .float_leg(_float_leg())
@@ -752,7 +759,7 @@ def test_bond_builder_quoted_price_drives_ytm_like_the_wire_field() -> None:
             Bond
             .builder()
             .id(spec["id"])
-            .notional(float(spec["notional"]["amount"]), currency=spec["notional"]["currency"])
+            .notional(Money(float(spec["notional"]["amount"]), spec["notional"]["currency"]))
             .issue_date(spec["issue_date"])
             .maturity(spec["maturity"])
             .cashflow_spec(spec["cashflow_spec"])

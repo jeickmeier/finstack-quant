@@ -575,7 +575,7 @@ impl PyCdsIndexBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let (date, money) = dated_money_from_py(value, None, "upfront")?;
+        let (date, money) = dated_money_from_py(value, "upfront")?;
         let shown = format!("({}, {})", date_repr(date), money_repr(money));
         builder_set!(slf, upfront, shown, |b: CdsIndexBuilder| b
             .upfront((date, money)))

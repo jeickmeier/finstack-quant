@@ -422,7 +422,7 @@ rf=-math.log(market.get_discount('EUR-OIS').df_between_dates(AS_OF,expiry))/t
 spot=1.08;strike=1.12;forward=spot*math.exp((rd-rf)*t)
 vol=get_fx_delta_vol(market.get_fx_delta_vol_surface('EURUSD-VOL'),t,strike,forward)
 option=(FxOption.builder().id('EURUSD-GK').base_currency(Currency('EUR')).quote_currency(Currency('USD'))
- .strike(strike).option_type('call').delta_convention('forward',Currency('USD'),'generic_interbank')
+ .strike(strike).option_type('call').delta_convention({'kind':'forward','premium_currency':'USD','venue':'generic_interbank'})
  .expiry(expiry).notional(Money(1_000_000,'EUR')).domestic_discount_curve_id('USD-OIS')
  .foreign_discount_curve_id('EUR-OIS').vol_surface_id('EURUSD-VOL').build())
 import json

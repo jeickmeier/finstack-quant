@@ -154,7 +154,7 @@ macro_rules! fx_option {
 }
 
 use crate::api::valuations::pricing::parse_market;
-use crate::utils::wire::{js_date, js_wire};
+use crate::utils::wire::js_date;
 use finstack_quant_valuations::instruments;
 
 fx_class!(
@@ -846,28 +846,23 @@ handle_setters!(JsFxOptionBuilder, "FxOptionBuilder", {
 impl JsFxOptionBuilder {
     /// Set the delta convention used to read the volatility surface.
     ///
-    /// Mirrors Rust `FxDeltaConvention::new`; the convention decides which
-    /// delta (spot or forward, premium-adjusted or not) a surface pillar means.
-    /// @param kind - Delta convention kind: `spot`, `forward`, `spot_premium_adjusted`, or `forward_premium_adjusted`.
-    /// @param premiumCurrency - Currency the option premium is paid in.
-    /// @param venue - Market or broker whose quoting convention this is (for example `"interbank"`); must not be blank.
+    /// Mirrors Rust `FxOptionBuilder::delta_convention`; the convention decides
+    /// which delta (spot or forward, premium-adjusted or not) a surface pillar
+    /// means. The value runs `FxDeltaConvention::validate`.
+    /// @param value - `FxDeltaConvention` plain object or JSON text `{ kind, premium_currency, venue }`: `kind` one of `"spot"`, `"forward"`, `"premium_adjusted_spot"`, `"premium_adjusted_forward"`; `premium_currency` the ISO-4217 code the premium is paid in (the base or quote currency, checked by `build()`); `venue` the market or broker whose quoting convention this is (for example `"generic_interbank"`), not blank. The `deltaConvention` getter returns this shape.
     /// @returns The builder, for chaining.
-    /// @throws Error - Throws with kind `invalid_type` if `kind` or `venue` is not a string, and kind `validation` if `kind` is unknown, `venue` is blank, or the builder was already consumed by `build()`.
+    /// @throws Error - Throws with kind `validation` if `value` does not match the `FxDeltaConvention` schema, `venue` is blank, or the builder was already consumed by `build()`.
     #[wasm_bindgen(js_name = deltaConvention)]
     pub fn delta_convention(
         &self,
-        #[wasm_bindgen(unchecked_param_type = "generated.valuations.FxDeltaConvention['kind']")]
-        kind: JsValue,
-        #[wasm_bindgen(js_name = "premiumCurrency")] premium_currency: &JsCurrency,
-        #[wasm_bindgen(unchecked_param_type = "string")] venue: JsValue,
+        #[wasm_bindgen(
+            unchecked_param_type = "generated.valuations.FxDeltaConvention | JsonInput"
+        )]
+        value: JsValue,
     ) -> Result<JsFxOptionBuilder, JsValue> {
-        let convention =
-            finstack_quant_valuations::instruments::fx::fx_option::FxDeltaConvention::new(
-                js_wire(&kind, "kind")?,
-                premium_currency.inner,
-                crate::utils::input::js_string(&venue, "venue")?,
-            )
-            .map_err(to_js_err)?;
+        let convention: finstack_quant_valuations::instruments::fx::fx_option::FxDeltaConvention =
+            crate::utils::input::from_js_json(&value, "value")?;
+        convention.validate().map_err(to_js_err)?;
         let inner = self.inner.apply(|b| b.delta_convention(convention))?;
         Ok(Self { inner })
     }

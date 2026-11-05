@@ -192,11 +192,10 @@ class AssetPool:
         ...
     def with_reserve(
         self,
-        reserve_account: Money | float,
+        reserve_account: Money,
         reserve_account_rate: float = 0.0,
-        reserve_target: Money | float | None = None,
+        reserve_target: Money | None = None,
         reserve_interest_destination: str | dict[str, Any] | None = None,
-        currency: str | None = None,
     ) -> AssetPool:
         """
         Configure the reserve account, returning a new pool.
@@ -208,12 +207,12 @@ class AssetPool:
 
         Parameters
         ----------
-        reserve_account : Money | float
-            Opening reserve balance; a bare number needs ``currency``.
+        reserve_account : Money
+            Opening reserve balance.
         reserve_account_rate : float, default 0.0
             Annual interest rate earned by the reserve, as a decimal (simple
             ACT/360 on the opening balance each period).
-        reserve_target : Money | float, optional
+        reserve_target : Money, optional
             Balance revolver repayments replenish toward; ``None`` disables
             replenishment.
         reserve_interest_destination : str | dict[str, Any], optional
@@ -221,8 +220,6 @@ class AssetPool:
             (capitalized into the reserve) or
             ``{"kind": "tranche", "tranche_id": "EQ"}`` (paid directly to that
             tranche).
-        currency : str, optional
-            ISO-4217 code applied when a bare number is passed.
 
         Returns
         -------
@@ -232,10 +229,10 @@ class AssetPool:
         Raises
         ------
         ValueError
-            If an amount is not finite, a bare number has no currency, or the
-            destination does not match its serde shape.
+            If the destination does not match its serde shape.
         TypeError
-            If an amount is neither ``Money`` nor a number.
+            If ``reserve_account`` or ``reserve_target`` is not a
+            ``finstack_quant.core.money.Money``.
 
         Examples
         --------

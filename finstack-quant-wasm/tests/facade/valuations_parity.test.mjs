@@ -150,8 +150,6 @@ test('every field getter agrees with the instrument spec', () => {
 const SPECIAL_SETTERS = {
   premium: (builder, value) => builder.premium(value[0], value[1]),
   upfront: (builder, value) => builder.upfront(value[0], value[1]),
-  deltaConvention: (builder, value) =>
-    builder.deltaConvention(value.kind, new core.Currency(value.premium_currency), value.venue),
   exercise: (builder, value) =>
     builder.exercise(value.date, value.spot, value.settlement_date, value.exercised),
 };

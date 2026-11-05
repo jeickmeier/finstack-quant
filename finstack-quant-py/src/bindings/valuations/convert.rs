@@ -6,7 +6,7 @@
 //!
 //! - rates: `float | int | Rate | Bps` (decimal, `0.05` = 5%), through the
 //!   crate-wide `extract::extract_rate_decimal`
-//! - money: `Money | float | int` (a bare number needs a currency from the caller)
+//! - money: a `finstack_quant.core.money.Money`, the one form every money input takes
 //! - enums: serde string names, resolved through `enum_from_str`
 //! - attributes: `Attributes | dict | None`, a `dict` being the serde form of
 //!   `Attributes` (`{"tags": [...], "meta": {...}}`, as `to_dict()` returns it)
@@ -27,35 +27,23 @@ use crate::errors::{core_to_py, serde_json_to_py, value_error};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 
-/// Coerce `Money | float | int` to [`Money`](finstack_quant_core::money::Money).
+/// Extract a `finstack_quant.core.money.Money` as Rust
+/// [`Money`](finstack_quant_core::money::Money).
 ///
 /// # Arguments
 ///
-/// * `obj` - A `finstack_quant.core.money.Money`, or a bare amount that is
-///   tagged with `currency`.
-/// * `currency` - ISO-4217 code applied when `obj` is a bare number; ignored
-///   for a `Money` object (its own currency wins).
+/// * `obj` - A `finstack_quant.core.money.Money`; any other type (a bare
+///   number included) raises `TypeError`.
 /// * `what` - Parameter name used in error messages.
 pub(crate) fn money_from_py(
     obj: &Bound<'_, PyAny>,
-    currency: Option<&str>,
     what: &str,
 ) -> PyResult<finstack_quant_core::money::Money> {
     if let Ok(money) = obj.cast::<PyMoney>() {
         return Ok(money.borrow().inner);
     }
-    if let Ok(amount) = obj.extract::<f64>() {
-        let Some(code) = currency else {
-            return Err(value_error(format!(
-                "{what}: a bare number needs a currency; pass Money(amount, \"USD\") or supply currency="
-            )));
-        };
-        let ccy = crate::bindings::module_utils::parse_currency(code)?;
-        return finstack_quant_core::money::Money::new(amount, ccy)
-            .map_err(crate::errors::core_to_py);
-    }
     Err(pyo3::exceptions::PyTypeError::new_err(format!(
-        "{what}: expected finstack_quant.core.money.Money or a float amount, got {}",
+        "{what}: expected finstack_quant.core.money.Money, got {}",
         obj.get_type().name()?
     )))
 }
@@ -207,14 +195,11 @@ pub(crate) fn day_count_from_py(
 ///
 /// # Arguments
 ///
-/// * `obj` - A two-element tuple/list `(payment_date, amount)` where the
-///   date is any value accepted by `py_to_date` and the amount is a
-///   `Money` (or a bare number when `currency` is given).
-/// * `currency` - ISO-4217 code applied when the amount is a bare number.
+/// * `obj` - A two-element tuple `(payment_date, amount)` where the date is
+///   any value accepted by `py_to_date` and the amount is a `Money`.
 /// * `what` - Parameter name used in error messages.
 pub(crate) fn dated_money_from_py(
     obj: &Bound<'_, PyAny>,
-    currency: Option<&str>,
     what: &str,
 ) -> PyResult<(
     finstack_quant_core::dates::Date,
@@ -228,7 +213,7 @@ pub(crate) fn dated_money_from_py(
             ))
         })?;
     let date = crate::bindings::date_utils::py_to_date(&date_obj)?;
-    let money = money_from_py(&money_obj, currency, what)?;
+    let money = money_from_py(&money_obj, what)?;
     Ok((date, money))
 }
 

@@ -163,21 +163,17 @@ impl PyBond {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.zero_coupon")]
     #[staticmethod]
-    #[pyo3(signature = (id, notional, issue_date, maturity, discount_curve_id, *, currency = None))]
-    #[pyo3(
-        text_signature = "(id, notional, issue_date, maturity, discount_curve_id, *, currency=None)"
-    )]
+    #[pyo3(text_signature = "(id, notional, issue_date, maturity, discount_curve_id)")]
     fn zero_coupon(
         id: &str,
         notional: &Bound<'_, PyAny>,
         issue_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         discount_curve_id: &str,
-        currency: Option<&str>,
     ) -> PyResult<Self> {
         let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::zero_coupon(
             id,
-            money_from_py(notional, currency, "notional")?,
+            money_from_py(notional, "notional")?,
             py_to_date(issue_date)?,
             py_to_date(maturity)?,
             discount_curve_id,
@@ -371,14 +367,12 @@ impl PyBondBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "BondBuilder.notional")]
-    #[pyo3(signature = (value, currency = None))]
-    #[pyo3(text_signature = "($self, value, currency=None)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "notional")?;
+        let money = money_from_py(value, "notional")?;
         builder_set!(
             slf,
             notional,
@@ -752,14 +746,12 @@ impl PyTermLoanBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoanBuilder.notional_limit")]
-    #[pyo3(signature = (value, currency = None))]
-    #[pyo3(text_signature = "($self, value, currency=None)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn notional_limit<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "notional_limit")?;
+        let money = money_from_py(value, "notional_limit")?;
         builder_set!(
             slf,
             notional_limit,
@@ -950,27 +942,19 @@ impl PyTermLoanBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoanBuilder.upfront_fee")]
-    #[pyo3(signature = (value, currency = None))]
-    #[pyo3(text_signature = "($self, value, currency=None)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn upfront_fee<'py>(
         mut slf: PyRefMut<'py, Self>,
-        py: Python<'py>,
         value: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         use finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee;
-        let (fee, shown) = if value.extract::<&str>().is_ok() || value.cast::<PyDict>().is_ok() {
-            let fee: UpfrontFee = spec_from_py(py, value, "upfront_fee")?;
-            (fee, "{...}".to_string())
-        } else {
-            let money = money_from_py(value, currency, "upfront_fee")?;
-            (
-                UpfrontFee::Amount(money),
-                crate::bindings::valuations::convert::money_repr(money),
-            )
-        };
-        builder_set!(slf, upfront_fee, shown, |b: TermLoanBuilder| b
-            .upfront_fee(fee))
+        let fee: UpfrontFee = spec_from_py(value.py(), value, "upfront_fee")?;
+        builder_set!(
+            slf,
+            upfront_fee,
+            "{...}".to_string(),
+            |b: TermLoanBuilder| b.upfront_fee(fee)
+        )
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoanBuilder.ddtl")]

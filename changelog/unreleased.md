@@ -2,6 +2,25 @@
 
 ## Itemized changes
 
+### Valuations: every Money input takes a `Money`; `FxOptionBuilder.delta_convention` takes the convention
+
+One route per value. In Python a money input is a `finstack_quant.core.money.Money`
+and nothing else: the bare-float-plus-`currency=` route is removed, and a float
+raises `TypeError` naming the expected type. `FxOptionBuilder.delta_convention`
+takes the Rust `FxDeltaConvention` in its serde form (the shape the
+`FxOption.delta_convention` getter returns and `FxOption.european` takes) in
+both hosts, and runs the new Rust `FxDeltaConvention::validate` (non-blank
+venue), which `FxDeltaConvention::new` and `FxOption::validate` now share.
+WASM money setters already took `Money` handles. Old → new:
+
+- Python `Bond.zero_coupon(id, 1e6, issue_date, maturity, discount_curve_id, currency="USD")` → `Bond.zero_coupon(id, Money(1e6, "USD"), issue_date, maturity, discount_curve_id)`
+- Python `BondBuilder.notional(1e6, currency="USD")`, `TermLoanBuilder.notional_limit(..)`, `InterestRateSwapBuilder.notional(..)`, `SwaptionBuilder.notional(..)`, `CapFloorBuilder.notional(..)`, `RevolvingCreditBuilder.commitment(..)` / `.drawn(..)`, `AssetBackedFacilityBuilder.commitment(..)` / `.drawn(..)` → `.notional(Money(1e6, "USD"))` (and likewise for each)
+- Python `CapFloorBuilder.premium(date, 10_000.0, currency="USD")` → `CapFloorBuilder.premium(date, Money(10_000.0, "USD"))`
+- Python `AssetPool.with_reserve(5e6, reserve_target=6e6, currency="USD")` → `AssetPool.with_reserve(Money(5e6, "USD"), reserve_target=Money(6e6, "USD"))`
+- Python `TermLoanBuilder.upfront_fee(Money(..))` / `.upfront_fee(20_000.0, currency="USD")` → `TermLoanBuilder.upfront_fee({"amount": Money(20_000.0, "USD")})` (the `UpfrontFee` serde form only, as in WASM `upfrontFee`)
+- Python `FxOptionBuilder.delta_convention("forward", Currency("USD"), "generic_interbank")` → `FxOptionBuilder.delta_convention({"kind": "forward", "premium_currency": "USD", "venue": "generic_interbank"})`; WASM `FxOptionBuilder.deltaConvention(kind, premiumCurrency, venue)` → `FxOptionBuilder.deltaConvention({ kind, premium_currency, venue })`
+- Rust: new `FxDeltaConvention::validate(&self)`
+
 ### Valuations: instrument convenience constructors take one params object
 
 Every instrument convenience constructor with more than seven inputs takes one

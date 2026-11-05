@@ -899,7 +899,7 @@ class AssetBackedFacilityBuilder:
     ...     .collateral(pool)
     ...     .borrowing_base_rules({"advance_rates": [{"asset_class": "*", "rate": 0.75}]})
     ...     .commitment(Money(80_000_000.0, Currency("USD")))
-    ...     .drawn(60_000_000.0, currency="USD")
+    ...     .drawn(Money(60_000_000.0, Currency("USD")))
     ...     .rate(0.055)
     ...     .commitment_fee_bp(50.0)
     ...     .closing_date(datetime.date(2024, 1, 15))
@@ -980,16 +980,14 @@ class AssetBackedFacilityBuilder:
             the builder was already consumed.
         """
         ...
-    def commitment(self, value: Money | float, currency: str | None = None) -> AssetBackedFacilityBuilder:
+    def commitment(self, value: Money) -> AssetBackedFacilityBuilder:
         """
         Set the total commitment.
 
         Parameters
         ----------
-        value : Money | float
-            Commitment; a bare amount is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code for a bare amount (ignored for ``Money``).
+        value : Money
+            Total commitment, in the facility currency.
 
         Returns
         -------
@@ -999,23 +997,19 @@ class AssetBackedFacilityBuilder:
         Raises
         ------
         ValueError
-            If a bare amount has no currency or the builder was already
-            consumed.
+            If the builder was already consumed.
         TypeError
-            If ``value`` is neither ``Money`` nor a number.
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
-    def drawn(self, value: Money | float, currency: str | None = None) -> AssetBackedFacilityBuilder:
+    def drawn(self, value: Money) -> AssetBackedFacilityBuilder:
         """
         Set the amount drawn at closing.
 
         Parameters
         ----------
-        value : Money | float
-            Drawn balance (at most the commitment and below the collateral);
-            a bare amount is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code for a bare amount (ignored for ``Money``).
+        value : Money
+            Drawn balance (at most the commitment and below the collateral).
 
         Returns
         -------
@@ -1025,10 +1019,9 @@ class AssetBackedFacilityBuilder:
         Raises
         ------
         ValueError
-            If a bare amount has no currency or the builder was already
-            consumed.
+            If the builder was already consumed.
         TypeError
-            If ``value`` is neither ``Money`` nor a number.
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def rate(self, value: float | Rate | Bps | dict[str, Any] | str) -> AssetBackedFacilityBuilder:

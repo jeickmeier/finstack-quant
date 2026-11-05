@@ -870,16 +870,14 @@ class RevolvingCreditBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def commitment(self, value: Money | float, currency: str | None = None) -> RevolvingCreditBuilder:
+    def commitment(self, value: Money) -> RevolvingCreditBuilder:
         """
         Set the total commitment.
 
         Parameters
         ----------
-        value : Money | float
-            Commitment; a bare number needs ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Total commitment, in the facility currency.
 
         Returns
         -------
@@ -889,22 +887,19 @@ class RevolvingCreditBuilder:
         Raises
         ------
         ValueError
-            If the amount is not finite, a bare number has no currency, or the
-            builder was already consumed.
+            If the builder was already consumed.
         TypeError
-            If ``value`` is neither ``Money`` nor a number.
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
-    def drawn(self, value: Money | float, currency: str | None = None) -> RevolvingCreditBuilder:
+    def drawn(self, value: Money) -> RevolvingCreditBuilder:
         """
         Set the drawn balance at the simulation anchor, the later of the commitment date and the valuation date, in both modes. Deterministic draw/repay events must be dated after that anchor.
 
         Parameters
         ----------
-        value : Money | float
-            Drawn balance; a bare number needs ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Drawn balance, in the facility currency.
 
         Returns
         -------
@@ -914,10 +909,9 @@ class RevolvingCreditBuilder:
         Raises
         ------
         ValueError
-            If the amount is not finite, a bare number has no currency, or the
-            builder was already consumed.
+            If the builder was already consumed.
         TypeError
-            If ``value`` is neither ``Money`` nor a number.
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def issue_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> RevolvingCreditBuilder:

@@ -15,9 +15,7 @@ use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fx::fx_option::{
-    FxDeltaConvention, FxDeltaConventionKind,
-};
+use finstack_quant_valuations::instruments::fx::fx_option::FxDeltaConvention;
 
 use super::convert::enum_from_str;
 use super::convert::{
@@ -368,21 +366,6 @@ instrument_pricing_methods!(
     module = "finstack_quant.valuations.instruments._typed_fx"
 );
 
-/// Build an `FxDeltaConvention` from the loose Python inputs.
-fn delta_convention_from_parts(
-    kind: &str,
-    premium_currency: &Bound<'_, PyAny>,
-    venue: &str,
-) -> PyResult<FxDeltaConvention> {
-    let kind: FxDeltaConventionKind = enum_from_str(kind, "delta convention kind")?;
-    FxDeltaConvention::new(
-        kind,
-        crate::bindings::core::currency::extract_currency(premium_currency)?,
-        venue,
-    )
-    .map_err(core_to_py)
-}
-
 #[pymethods]
 impl PyFxOption {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.example")]
@@ -571,17 +554,17 @@ impl PyFxOptionBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.delta_convention")]
-    #[pyo3(text_signature = "($self, kind, premium_currency, venue)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn delta_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
-        kind: &str,
-        premium_currency: &Bound<'_, PyAny>,
-        venue: &str,
+        value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let convention = delta_convention_from_parts(kind, premium_currency, venue)?;
+        let convention: FxDeltaConvention =
+            crate::bindings::module_utils::spec_from_py(value.py(), value, "FxDeltaConvention")?;
+        convention.validate().map_err(core_to_py)?;
         let shown = format!(
-            "({kind:?}, Currency('{}'), {venue:?})",
-            convention.premium_currency
+            "{{'kind': '{}', 'premium_currency': '{}', 'venue': '{}'}}",
+            convention.kind, convention.premium_currency, convention.venue
         );
         builder_set!(slf, delta_convention, shown, |b: FxOptionBuilder| b
             .delta_convention(convention))
