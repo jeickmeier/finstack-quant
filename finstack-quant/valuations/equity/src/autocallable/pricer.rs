@@ -2,7 +2,7 @@
 
 use crate::autocallable::types::Autocallable;
 use crate::past_fixings::fixing_on;
-use crate::piecewise_gbm::{PiecewiseGbmMc, bootstrap_forward_gbm};
+use crate::piecewise_gbm::{GbmVolSource, PiecewiseGbmMc, bootstrap_forward_gbm};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -197,9 +197,11 @@ impl AutocallableMcPricer {
         check_points.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-10);
         let process = bootstrap_forward_gbm(
             disc_curve.as_ref(),
-            curves,
-            &inst.instrument_pricing_overrides.market_quotes,
-            inst.vol_surface_id.as_str(),
+            GbmVolSource {
+                curves,
+                market_quotes: &inst.instrument_pricing_overrides.market_quotes,
+                vol_surface_id: inst.vol_surface_id.as_str(),
+            },
             as_of,
             initial_spot,
             q,

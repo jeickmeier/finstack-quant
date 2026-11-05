@@ -33,7 +33,6 @@ pub struct CdsTrancheParams {
 
 impl CdsTrancheParams {
     /// Create new CDS tranche parameters
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         index_name: impl Into<String>,
         series: u16,

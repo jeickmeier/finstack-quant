@@ -533,7 +533,6 @@ pub struct DcfSensitivityResult {
 ///   value) on the sensitivity of `1/(WACC − g)` to the assumed spread. `docs/REFERENCES.md#koller-valuation`
 /// - Damodaran, A. (2012). *Investment Valuation* (3rd ed.). Wiley. Ch. 12 on
 ///   stable-growth constraints (`g < WACC`).
-#[allow(clippy::too_many_arguments)]
 pub fn dcf_sensitivity(
     model: &FinancialModelSpec,
     wacc: f64,

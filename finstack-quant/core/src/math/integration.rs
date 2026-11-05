@@ -455,22 +455,36 @@ where
             "adaptive Simpson endpoints and tolerance must be finite with tol >= 0".to_string(),
         ));
     }
-    #[allow(clippy::too_many_arguments)]
-    fn adaptive_simpson_inner<F2>(
-        f: F2,
+    /// One Simpson panel `[a, b]`: the integrand at `a`, `b` and the midpoint
+    /// (`fc`) plus the panel's whole-interval Simpson estimate.
+    #[derive(Clone, Copy)]
+    struct Panel {
         a: f64,
         b: f64,
-        tol: f64,
         fa: f64,
         fb: f64,
         fc: f64,
         whole: f64,
+    }
+
+    fn adaptive_simpson_inner<F2>(
+        f: F2,
+        panel: Panel,
+        tol: f64,
         depth: usize,
         max_depth: usize,
     ) -> (f64, f64)
     where
         F2: Fn(f64) -> f64 + Copy,
     {
+        let Panel {
+            a,
+            b,
+            fa,
+            fb,
+            fc,
+            whole,
+        } = panel;
         let c = (a + b) / 2.0;
 
         let fd = f((a + c) / 2.0);
@@ -490,10 +504,26 @@ where
         }
 
         let mid_tol = tol / 2.0;
+        let left_panel = Panel {
+            a,
+            b: c,
+            fa,
+            fb: fc,
+            fc: fd,
+            whole: left,
+        };
+        let right_panel = Panel {
+            a: c,
+            b,
+            fa: fc,
+            fb,
+            fc: fe,
+            whole: right,
+        };
         let (left_result, left_error) =
-            adaptive_simpson_inner(f, a, c, mid_tol, fa, fc, fd, left, depth + 1, max_depth);
+            adaptive_simpson_inner(f, left_panel, mid_tol, depth + 1, max_depth);
         let (right_result, right_error) =
-            adaptive_simpson_inner(f, c, b, mid_tol, fc, fb, fe, right, depth + 1, max_depth);
+            adaptive_simpson_inner(f, right_panel, mid_tol, depth + 1, max_depth);
         (left_result + right_result, left_error + right_error)
     }
 
@@ -505,8 +535,15 @@ where
 
     let whole = h * (fa + 4.0 * fc + fb);
 
-    let (value, error_estimate) =
-        adaptive_simpson_inner(f, a, b, tol, fa, fb, fc, whole, 0, max_depth);
+    let panel = Panel {
+        a,
+        b,
+        fa,
+        fb,
+        fc,
+        whole,
+    };
+    let (value, error_estimate) = adaptive_simpson_inner(f, panel, tol, 0, max_depth);
     if value.is_finite() && error_estimate <= tol {
         Ok(value)
     } else {

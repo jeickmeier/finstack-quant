@@ -46,7 +46,7 @@ use finstack_quant_models::monte_carlo::process::ou::{HullWhite1FParams, HullWhi
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
 
-use super::lmm_bermudan::{build_exercise_aligned_grid, price_bermudan_lmm};
+use super::lmm_bermudan::{LmmBermudanSwap, build_exercise_aligned_grid, price_bermudan_lmm};
 use super::monte_carlo_lsmc::SwaptionLsmcPricer;
 use super::swap_rate_utils::hw_bond_price;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
@@ -225,14 +225,17 @@ fn lmm_single_exercise_matches_numeraire_correct_reference() {
     };
 
     for &ex_t in &[1.0, 2.0, 3.0] {
+        // A single exercise date makes the Bermudan a European.
         let engine = price_bermudan_lmm(
             &params,
-            &[ex_t], // single exercise date ⇒ European
-            strike,
-            true, // payer
-            notional,
-            df0_terminal,
-            Currency::USD,
+            &[ex_t],
+            &LmmBermudanSwap {
+                strike,
+                payer: true,
+                notional,
+                discount_factor_terminal: df0_terminal,
+                currency: Currency::USD,
+            },
             &config,
         )
         .expect("LMM single-exercise pricing");
@@ -288,11 +291,13 @@ fn lmm_bermudan_respects_coterminal_lower_bound() {
     let bermudan = price_bermudan_lmm(
         &params,
         &exercise_times,
-        strike,
-        true, // payer
-        notional,
-        df0_terminal,
-        Currency::USD,
+        &LmmBermudanSwap {
+            strike,
+            payer: true,
+            notional,
+            discount_factor_terminal: df0_terminal,
+            currency: Currency::USD,
+        },
         &config,
     )
     .expect("bermudan pricing");

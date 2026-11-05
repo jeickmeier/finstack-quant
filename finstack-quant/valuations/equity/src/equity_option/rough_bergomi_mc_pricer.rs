@@ -173,19 +173,24 @@ fn build_xi0_from_surface(
     ForwardVarianceCurve::from_intervals(&intervals)
 }
 
+/// The simulated rough Bergomi model: grid, process, scheme, start state,
+/// payoff currency and the Volterra noise generator over `num_steps` steps.
+struct RBergomiModel<'a> {
+    time_grid: &'a finstack_quant_core::math::time_grid::TimeGrid,
+    process: &'a finstack_quant_models::monte_carlo::process::rough_bergomi::RoughBergomiProcess,
+    disc: &'a finstack_quant_models::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler,
+    initial_state: &'a [f64],
+    ccy: finstack_quant_core::currency::Currency,
+    fbm_gen: &'a finstack_quant_models::monte_carlo::rng::volterra::RiemannLiouvilleVolterra,
+    num_steps: usize,
+}
+
 /// Run the fractional MC simulation loop for a concrete payoff type.
-#[allow(clippy::too_many_arguments)]
 fn simulate_rbergomi<F: finstack_quant_models::monte_carlo::traits::Payoff>(
+    model: &RBergomiModel<'_>,
     num_paths: usize,
     rng: &mut finstack_quant_models::monte_carlo::rng::philox::PhiloxRng,
-    time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
-    process: &finstack_quant_models::monte_carlo::process::rough_bergomi::RoughBergomiProcess,
-    disc: &finstack_quant_models::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler,
-    initial_state: &[f64],
     payoff_template: &F,
-    ccy: finstack_quant_core::currency::Currency,
-    fbm_gen: &finstack_quant_models::monte_carlo::rng::volterra::RiemannLiouvilleVolterra,
-    num_steps: usize,
     err_ctx: finstack_quant_valuations_core::pricer::PricingErrorContext,
 ) -> std::result::Result<(f64, f64), PricingError> {
     use finstack_quant_core::math::stats::OnlineStats;
@@ -194,6 +199,15 @@ fn simulate_rbergomi<F: finstack_quant_models::monte_carlo::traits::Payoff>(
         Discretization, RandomStream, StochasticProcess,
     };
 
+    let &RBergomiModel {
+        time_grid,
+        process,
+        disc,
+        initial_state,
+        ccy,
+        fbm_gen,
+        num_steps,
+    } = model;
     let num_factors = process.num_factors();
     let work_size = disc.work_size(process);
     let mut state = vec![0.0; process.dim()];
@@ -384,19 +398,17 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughBergomi
             equity_option.quantity,
             self.num_steps,
         );
-        let (mean_pv, stderr_undisc) = simulate_rbergomi(
-            num_paths,
-            &mut rng,
-            &time_grid,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
+        let model = RBergomiModel {
+            time_grid: &time_grid,
+            process: &process,
+            disc: &disc,
+            initial_state: &initial_state,
             ccy,
-            &fbm_gen,
-            self.num_steps,
-            err_ctx,
-        )?;
+            fbm_gen: &fbm_gen,
+            num_steps: self.num_steps,
+        };
+        let (mean_pv, stderr_undisc) =
+            simulate_rbergomi(&model, num_paths, &mut rng, &payoff, err_ctx)?;
 
         // Vanilla payoffs from `simulate_path_fractional` are undiscounted
         // terminal payoffs; discount the path mean (and stderr) to present

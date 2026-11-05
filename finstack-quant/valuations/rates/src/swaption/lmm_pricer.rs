@@ -7,7 +7,7 @@
 use crate::swaption::BermudanSwaption;
 use crate::swaption::BermudanType;
 use crate::swaption::bermudan::{apply_exercise_today, require_discount_curve, settled_result};
-use crate::swaption::pricing::lmm_bermudan::price_bermudan_lmm;
+use crate::swaption::pricing::lmm_bermudan::{LmmBermudanSwap, price_bermudan_lmm};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -361,11 +361,13 @@ impl Pricer for BermudanSwaptionLmmPricer {
         let estimate = price_bermudan_lmm(
             &lmm_params,
             &exercise_times,
-            strike,
-            is_payer,
-            notional,
-            df_terminal,
-            currency,
+            &LmmBermudanSwap {
+                strike,
+                payer: is_payer,
+                notional,
+                discount_factor_terminal: df_terminal,
+                currency,
+            },
             &self.config,
         )?;
 

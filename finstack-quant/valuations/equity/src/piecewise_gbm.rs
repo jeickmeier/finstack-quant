@@ -29,6 +29,18 @@ use finstack_quant_valuations_core::instruments::pricing_overrides::{
     InstrumentPricingOverrides, MarketQuoteOverrides,
 };
 
+/// Volatility inputs of [`bootstrap_forward_gbm`].
+#[derive(Clone, Copy)]
+pub(crate) struct GbmVolSource<'a> {
+    /// Market holding the volatility surface.
+    pub(crate) curves: &'a MarketContext,
+    /// Instrument quote overrides; a flat implied volatility override wins
+    /// over the surface.
+    pub(crate) market_quotes: &'a MarketQuoteOverrides,
+    /// Surface identifier used when no override is set.
+    pub(crate) vol_surface_id: &'a str,
+}
+
 /// Bootstrap the forward-vol / forward-rate GBM for dated schedule points.
 ///
 /// Discount factors are the exact date-based factors from `as_of`, so the
@@ -39,9 +51,8 @@ use finstack_quant_valuations_core::instruments::pricing_overrides::{
 /// # Arguments
 ///
 /// * `disc_curve` - Discount curve for the pricing currency.
-/// * `curves` - Market holding the volatility surface.
-/// * `market_quotes` - Instrument quote overrides; a flat implied volatility override wins over the surface.
-/// * `vol_surface_id` - Surface identifier used when no override is set.
+/// * `vol_source` - Where each point's volatility comes from: the quote
+///   override, else the named surface in the market.
 /// * `as_of` - Valuation date the discount factors start from.
 /// * `initial_spot` - Spot at `as_of`.
 /// * `div_yield` - Continuous dividend yield as a decimal.
@@ -51,12 +62,9 @@ use finstack_quant_valuations_core::instruments::pricing_overrides::{
 /// # Errors
 ///
 /// Propagates discount-factor, volatility-resolution and bootstrap errors.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn bootstrap_forward_gbm(
     disc_curve: &DiscountCurve,
-    curves: &MarketContext,
-    market_quotes: &MarketQuoteOverrides,
-    vol_surface_id: &str,
+    vol_source: GbmVolSource<'_>,
     as_of: Date,
     initial_spot: f64,
     div_yield: f64,
@@ -74,7 +82,15 @@ pub(crate) fn bootstrap_forward_gbm(
         &points,
         initial_spot,
         div_yield,
-        |t, forward| resolve_sigma_at(market_quotes, curves, vol_surface_id, t, forward),
+        |t, forward| {
+            resolve_sigma_at(
+                vol_source.market_quotes,
+                vol_source.curves,
+                vol_source.vol_surface_id,
+                t,
+                forward,
+            )
+        },
         context_label,
     )
 }

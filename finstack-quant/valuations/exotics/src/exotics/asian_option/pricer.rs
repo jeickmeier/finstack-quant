@@ -23,6 +23,7 @@ use finstack_quant_models::monte_carlo::pricer::path_dependent::{
 };
 use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
 
 /// Exact simulation grid and one event index for every future fixing.
 /// Repeated indices retain contractual observations sharing a model time.
@@ -163,21 +164,29 @@ fn asian_drift_and_fixing_multipliers(
 /// so `E[ln S_{tᵢ}]` has to use the schedule's cumulative drift, not the
 /// maturity-averaged constant `r − q`. Returns `df · max(forward_intrinsic,
 /// 0)` in the degenerate zero-variance case.
-#[allow(clippy::too_many_arguments)]
+///
+/// `market` carries spot, strike, `rate` (`r`), `dividend_yield` (`q`),
+/// `volatility` (`σ`) and the call/put direction; `market.time_to_expiry` is
+/// not read, because discounting uses `df` and the fixings use `future_times`.
 fn seasoned_geometric_asian_control(
-    spot: f64,
-    strike: f64,
-    r: f64,
-    q: f64,
-    sigma: f64,
+    market: &OptionMarketParams,
     df: f64,
     hist_prod_log: f64,
     hist_count: usize,
     future_times: &[f64],
-    is_call: bool,
     drift_schedule: Option<&finstack_quant_models::monte_carlo::process::gbm::DriftSchedule>,
     fixing_multipliers: Option<&[f64]>,
 ) -> f64 {
+    let &OptionMarketParams {
+        spot,
+        strike,
+        rate: r,
+        volatility: sigma,
+        dividend_yield: q,
+        option_type,
+        ..
+    } = market;
+    let is_call = matches!(option_type, OptionType::Call);
     let k = future_times.len();
     let n_total = hist_count + k;
     if n_total == 0 {
@@ -440,19 +449,19 @@ impl AsianOptionMcPricer {
             // be scaled to the same units before the CV adjustment.
             let control_analytical = inst.quantity
                 * seasoned_geometric_asian_control(
-                    spot,
-                    inst.strike,
-                    r,
-                    q,
-                    sigma,
+                    &OptionMarketParams {
+                        spot,
+                        strike: inst.strike,
+                        rate: r,
+                        volatility: sigma,
+                        time_to_expiry: t,
+                        dividend_yield: q,
+                        option_type: inst.option_type,
+                    },
                     discount_factor,
                     hist_prod_log,
                     hist_count,
                     &future_fixing_times,
-                    matches!(
-                        inst.option_type,
-                        finstack_quant_models::types::OptionType::Call
-                    ),
                     Some(drift_schedule.as_ref()),
                     Some(&fixing_multipliers),
                 );
@@ -640,25 +649,24 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
         // concentrated near expiry).
         let fixing_times = fixing_year_fractions(asian, as_of)?;
         let df = inputs.df;
-        let is_call = matches!(
-            asian.option_type,
-            finstack_quant_models::types::OptionType::Call
-        );
         let (drift, multipliers) = asian_drift_and_fixing_multipliers(asian, market, as_of, q)
             .map_err(|error| {
                 PricingError::from_core(error, PricingErrorContext::from_instrument(asian))
             })?;
         let price = seasoned_geometric_asian_control(
-            spot,
-            asian.strike,
-            r,
-            q,
-            sigma,
+            &OptionMarketParams {
+                spot,
+                strike: asian.strike,
+                rate: r,
+                volatility: sigma,
+                time_to_expiry: t,
+                dividend_yield: q,
+                option_type: asian.option_type,
+            },
             df,
             log_prod,
             count,
             &fixing_times,
-            is_call,
             Some(&drift),
             Some(&multipliers),
         );
@@ -1632,16 +1640,19 @@ mod tests {
         let future_times: Vec<f64> = (1..=n).map(|i| i as f64 * t / n as f64).collect();
 
         let seasoned_call = seasoned_geometric_asian_control(
-            spot,
-            strike,
-            r,
-            q,
-            sigma,
+            &OptionMarketParams {
+                spot,
+                strike,
+                rate: r,
+                volatility: sigma,
+                time_to_expiry: t,
+                dividend_yield: q,
+                option_type: OptionType::Call,
+            },
             df,
             0.0,
             0,
             &future_times,
-            true,
             None,
             None,
         );
@@ -1653,16 +1664,19 @@ mod tests {
         );
 
         let seasoned_put = seasoned_geometric_asian_control(
-            spot,
-            strike,
-            r,
-            q,
-            sigma,
+            &OptionMarketParams {
+                spot,
+                strike,
+                rate: r,
+                volatility: sigma,
+                time_to_expiry: t,
+                dividend_yield: q,
+                option_type: OptionType::Put,
+            },
             df,
             0.0,
             0,
             &future_times,
-            false,
             None,
             None,
         );
@@ -1693,30 +1707,36 @@ mod tests {
         let high_hist = 2.0 * 130.0_f64.ln();
 
         let call_low = seasoned_geometric_asian_control(
-            spot,
-            strike,
-            r,
-            q,
-            sigma,
+            &OptionMarketParams {
+                spot,
+                strike,
+                rate: r,
+                volatility: sigma,
+                time_to_expiry: 1.0,
+                dividend_yield: q,
+                option_type: OptionType::Call,
+            },
             df,
             low_hist,
             2,
             &future_times,
-            true,
             None,
             None,
         );
         let call_high = seasoned_geometric_asian_control(
-            spot,
-            strike,
-            r,
-            q,
-            sigma,
+            &OptionMarketParams {
+                spot,
+                strike,
+                rate: r,
+                volatility: sigma,
+                time_to_expiry: 1.0,
+                dividend_yield: q,
+                option_type: OptionType::Call,
+            },
             df,
             high_hist,
             2,
             &future_times,
-            true,
             None,
             None,
         );
@@ -1996,16 +2016,19 @@ mod tests {
         let (drift, multipliers) =
             asian_drift_and_fixing_multipliers(&option, &curves, as_of, 0.0).expect("carry");
         let control = seasoned_geometric_asian_control(
-            100.0,
-            option.strike,
-            -df.ln() / t,
-            0.0,
-            sigma,
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: option.strike,
+                rate: -df.ln() / t,
+                volatility: sigma,
+                time_to_expiry: t,
+                dividend_yield: 0.0,
+                option_type: OptionType::Call,
+            },
             df,
             90.0_f64.ln(),
             1,
             &times,
-            true,
             Some(&drift),
             Some(&multipliers),
         );

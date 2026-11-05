@@ -7,7 +7,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::d1_d2;
-use finstack_quant_models::types::OptionType;
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
 
 pub(crate) fn compute_pv(
     inst: &FxDigitalOption,
@@ -45,13 +45,7 @@ pub(crate) fn compute_pv(
     }
 
     let price = price_digital(
-        spot,
-        inst.strike,
-        r_d,
-        r_f,
-        sigma,
-        t,
-        inst.option_type,
+        &fx_market(spot, inst.strike, r_d, r_f, sigma, t, inst.option_type),
         inst.payout_type,
         inst.payout_amount.amount(),
         inst.notional.amount(),
@@ -82,18 +76,36 @@ pub(crate) fn compute_greeks(
     }
 
     greeks_digital(
-        spot,
-        inst.strike,
-        r_d,
-        r_f,
-        sigma,
-        t,
-        inst.option_type,
+        &fx_market(spot, inst.strike, r_d, r_f, sigma, t, inst.option_type),
         inst.payout_type,
         inst.payout_amount.amount(),
         inst.notional.amount(),
         inst.metric_pricing_overrides.theta_days_per_year(),
     )
+}
+
+/// Garman-Kohlhagen market inputs as [`OptionMarketParams`]: the domestic
+/// rate `r_d` is the discount `rate` and the foreign rate `r_f` the carry
+/// `dividend_yield` (both continuously compounded decimals); `t` is the time
+/// to expiry in years.
+fn fx_market(
+    spot: f64,
+    strike: f64,
+    r_d: f64,
+    r_f: f64,
+    sigma: f64,
+    t: f64,
+    option_type: OptionType,
+) -> OptionMarketParams {
+    OptionMarketParams {
+        spot,
+        strike,
+        rate: r_d,
+        volatility: sigma,
+        time_to_expiry: t,
+        dividend_yield: r_f,
+        option_type,
+    }
 }
 
 fn input_request<'a>(
@@ -135,19 +147,24 @@ pub(crate) struct FxDigitalOptionGreeks {
     pub(crate) rho_foreign: f64,
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Garman-Kohlhagen digital value in quote currency: `payout_amount` for
+/// cash-or-nothing, `notional` units of the base currency for
+/// asset-or-nothing (see [`fx_market`] for the rate mapping).
 fn price_digital(
-    spot: f64,
-    strike: f64,
-    r_d: f64,
-    r_f: f64,
-    sigma: f64,
-    t: f64,
-    option_type: OptionType,
+    market: &OptionMarketParams,
     payout_type: DigitalPayoutType,
     payout_amount: f64,
     notional: f64,
 ) -> f64 {
+    let &OptionMarketParams {
+        spot,
+        strike,
+        rate: r_d,
+        volatility: sigma,
+        time_to_expiry: t,
+        dividend_yield: r_f,
+        option_type,
+    } = market;
     let (d1, d2) = d1_d2(spot, strike, r_d, sigma, t, r_f);
     let exp_rd_t = (-r_d * t).exp();
     let exp_rf_t = (-r_f * t).exp();
@@ -180,6 +197,16 @@ fn price_digital(
     }
 }
 
+/// Garman-Kohlhagen intermediates shared by the cash-or-nothing price and its
+/// theta: `d₂`, `√τ`, `exp(−r_d τ)` and the standard normal density `n(d₂)`.
+#[derive(Clone, Copy)]
+struct D2Terms {
+    d2: f64,
+    sqrt_t: f64,
+    exp_rd_t: f64,
+    pdf_d2: f64,
+}
+
 /// Analytic theta (per calendar day) for a cash-or-nothing digital option.
 ///
 /// Returns `∂V/∂τ × (−1/365)` where `τ` is time-to-expiry in years — the
@@ -196,21 +223,30 @@ fn price_digital(
 /// ∂V/∂τ = −r_d V − exp(−r_d τ) n(d₂) (∂d₂/∂τ) Q
 /// ```
 /// Theta per day = `−∂V/∂τ / theta_days_per_year` (negative = daily decay).
-#[allow(clippy::too_many_arguments)]
+///
+/// `market` supplies `r_d`, `r_f`, `σ`, `τ` and the call/put direction;
+/// `terms` the intermediates already computed for the price.
 fn analytic_theta_cash_or_nothing(
-    d2: f64,
-    r_d: f64,
-    r_f: f64,
-    sigma: f64,
-    t: f64,
-    sqrt_t: f64,
-    exp_rd_t: f64,
-    pdf_d2: f64,
+    market: &OptionMarketParams,
+    terms: D2Terms,
     base_pv: f64,
     payout_amount: f64,
-    option_type: OptionType,
     theta_days_per_year: f64,
 ) -> f64 {
+    let &OptionMarketParams {
+        rate: r_d,
+        volatility: sigma,
+        time_to_expiry: t,
+        dividend_yield: r_f,
+        option_type,
+        ..
+    } = market;
+    let D2Terms {
+        d2,
+        sqrt_t,
+        exp_rd_t,
+        pdf_d2,
+    } = terms;
     // ∂d₂/∂τ = (r_d - r_f - σ²/2)/(σ√τ) - d₂/(2τ)
     let dd2_dt = (r_d - r_f - 0.5 * sigma * sigma) / (sigma * sqrt_t) - d2 / (2.0 * t);
     // ∂V/∂τ differs by sign of the n(d₂)·∂d₂/∂τ term for put vs call.
@@ -222,20 +258,24 @@ fn analytic_theta_cash_or_nothing(
     -dv_dt / theta_days_per_year
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Garman-Kohlhagen digital Greeks (see [`FxDigitalOptionGreeks`] for units),
+/// with theta on a `theta_days_per_year` day basis.
 fn greeks_digital(
-    spot: f64,
-    strike: f64,
-    r_d: f64,
-    r_f: f64,
-    sigma: f64,
-    t: f64,
-    option_type: OptionType,
+    market: &OptionMarketParams,
     payout_type: DigitalPayoutType,
     payout_amount: f64,
     notional: f64,
     theta_days_per_year: f64,
 ) -> Result<FxDigitalOptionGreeks> {
+    let &OptionMarketParams {
+        spot,
+        strike,
+        rate: r_d,
+        volatility: sigma,
+        time_to_expiry: t,
+        dividend_yield: r_f,
+        option_type,
+    } = market;
     let (d1, d2) = d1_d2(spot, strike, r_d, sigma, t, r_f);
     let exp_rd_t = (-r_d * t).exp();
     let exp_rf_t = (-r_f * t).exp();
@@ -250,13 +290,10 @@ fn greeks_digital(
         let t_minus = (t - 1.0 / theta_days_per_year).max(0.0);
         let pv_t_minus = if t_minus > 0.0 {
             price_digital(
-                spot,
-                strike,
-                r_d,
-                r_f,
-                sigma,
-                t_minus,
-                option_type,
+                &OptionMarketParams {
+                    time_to_expiry: t_minus,
+                    ..market.clone()
+                },
                 payout_type,
                 payout_amount,
                 notional,
@@ -323,17 +360,15 @@ fn greeks_digital(
             // Analytic theta: exact −∂V/∂τ / theta_days_per_year from the
             // closed-form Garman–Kohlhagen formula.
             let theta = analytic_theta_cash_or_nothing(
-                d2,
-                r_d,
-                r_f,
-                sigma,
-                t,
-                sqrt_t,
-                exp_rd_t,
-                pdf_d2,
+                market,
+                D2Terms {
+                    d2,
+                    sqrt_t,
+                    exp_rd_t,
+                    pdf_d2,
+                },
                 base_pv,
                 payout_amount,
-                option_type,
                 theta_days_per_year,
             );
 
@@ -500,26 +535,14 @@ mod tests {
                 for (option_type, payout_type) in cases {
                     let price = |s, r, vol, time| {
                         price_digital(
-                            s,
-                            strike,
-                            r,
-                            0.01,
-                            vol,
-                            time,
-                            option_type,
+                            &fx_market(s, strike, r, 0.01, vol, time, option_type),
                             payout_type,
                             100_000.0,
                             1_000_000.0,
                         )
                     };
                     let greeks = greeks_digital(
-                        spot,
-                        strike,
-                        r_d,
-                        0.01,
-                        0.0,
-                        t,
-                        option_type,
+                        &fx_market(spot, strike, r_d, 0.01, 0.0, t, option_type),
                         payout_type,
                         100_000.0,
                         1_000_000.0,
@@ -562,13 +585,7 @@ mod tests {
         let strike = spot * (0.02_f64 * (t - 0.5 / 365.0)).exp();
         for option_type in [OptionType::Call, OptionType::Put] {
             let greeks = greeks_digital(
-                spot,
-                strike,
-                0.03,
-                0.01,
-                0.0,
-                t,
-                option_type,
+                &fx_market(spot, strike, 0.03, 0.01, 0.0, t, option_type),
                 DigitalPayoutType::AssetOrNothing,
                 100_000.0,
                 1_000_000.0,
@@ -688,18 +705,19 @@ mod tests {
         let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2);
         let base_pv_call = exp_rd_t * cdf_d2 * payout_amount;
 
-        let analytic_theta_call = analytic_theta_cash_or_nothing(
+        let terms = D2Terms {
             d2,
-            r_d,
-            r_f,
-            sigma,
-            t,
             sqrt_t,
             exp_rd_t,
             pdf_d2,
+        };
+        let call_market = fx_market(spot, strike, r_d, r_f, sigma, t, OptionType::Call);
+        let put_market = fx_market(spot, strike, r_d, r_f, sigma, t, OptionType::Put);
+        let analytic_theta_call = analytic_theta_cash_or_nothing(
+            &call_market,
+            terms,
             base_pv_call,
             payout_amount,
-            OptionType::Call,
             theta_days_per_year,
         );
 
@@ -727,13 +745,7 @@ mod tests {
         // Run the full greeks path and verify theta comes from analytic formula.
         // The greeks output theta is ∂V/∂τ×(−1/365) = analytic_theta_call.
         let greeks = greeks_digital(
-            spot,
-            strike,
-            r_d,
-            r_f,
-            sigma,
-            t,
-            OptionType::Call,
+            &call_market,
             DigitalPayoutType::CashOrNothing,
             payout_amount,
             notional,
@@ -752,27 +764,14 @@ mod tests {
         let cdf_neg_d2 = finstack_quant_core::math::special_functions::norm_cdf(-d2);
         let base_pv_put = exp_rd_t * cdf_neg_d2 * payout_amount;
         let analytic_theta_put = analytic_theta_cash_or_nothing(
-            d2,
-            r_d,
-            r_f,
-            sigma,
-            t,
-            sqrt_t,
-            exp_rd_t,
-            pdf_d2,
+            &put_market,
+            terms,
             base_pv_put,
             payout_amount,
-            OptionType::Put,
             theta_days_per_year,
         );
         let greeks_put = greeks_digital(
-            spot,
-            strike,
-            r_d,
-            r_f,
-            sigma,
-            t,
-            OptionType::Put,
+            &put_market,
             DigitalPayoutType::CashOrNothing,
             payout_amount,
             notional,

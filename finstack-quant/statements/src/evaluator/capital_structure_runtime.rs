@@ -4,6 +4,7 @@
 //! capitalization remain visible; public valuation schedules filter past cash
 //! and normalize PIK into non-cash principal rows.
 
+use super::engine::PeriodEval;
 use super::{EvaluationContext, Evaluator, PeriodHistory};
 use crate::error::Result;
 use crate::evaluator::{DependencyGraph, EvalWarning};
@@ -22,6 +23,20 @@ type DynamicPeriodEvaluation = (
     crate::capital_structure::CapitalStructureCashflows,
     IndexMap<String, crate::evaluator::CellSource>,
 );
+
+/// Capital-structure inputs of [`Evaluator::evaluate_period_dynamic`].
+pub(crate) struct CapitalStructureRun<'a> {
+    /// Market the debt instruments' contractual flows are projected on.
+    pub(crate) market_ctx: &'a finstack_quant_core::market_data::context::MarketContext,
+    /// Valuation date of the contractual flows.
+    pub(crate) as_of: Date,
+    /// Debt instruments keyed by id.
+    pub(crate) instruments: &'a Instruments,
+    /// Balances carried across periods, updated by this period.
+    pub(crate) state: &'a mut crate::capital_structure::CapitalStructureState,
+    /// Nodes re-evaluated after a waterfall replaces the contractual flows.
+    pub(crate) affected_nodes: &'a HashSet<NodeId>,
+}
 
 impl Evaluator {
     /// Build instruments from model specifications.
@@ -53,24 +68,24 @@ impl Evaluator {
     }
 
     /// Evaluate a period with dynamic capital structure support.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn evaluate_period_dynamic(
         &mut self,
-        model: &FinancialModelSpec,
-        period: &Period,
-        is_actual: bool,
-        eval_order: &[crate::types::NodeId],
+        eval: PeriodEval<'_>,
         historical: &Arc<PeriodHistory>,
         historical_cs: &Arc<
             IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
         >,
-        market_ctx: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: Date,
-        instruments: &Instruments,
-        cs_state: &mut crate::capital_structure::CapitalStructureState,
-        cs_affected_nodes: &HashSet<NodeId>,
+        cs: CapitalStructureRun<'_>,
         mut mc: Option<(u64, &mut super::engine::McZCache)>,
     ) -> Result<DynamicPeriodEvaluation> {
+        let PeriodEval { model, period, .. } = eval;
+        let CapitalStructureRun {
+            market_ctx,
+            as_of,
+            instruments,
+            state: cs_state,
+            affected_nodes: cs_affected_nodes,
+        } = cs;
         let period_id = period.id;
 
         let (contractual_flows, mut contractual_warnings) =
@@ -89,10 +104,7 @@ impl Evaluator {
         context.set_capital_structure_cashflows(cs_cashflows.clone());
 
         self.evaluate_nodes_in_order(
-            model,
-            &period_id,
-            is_actual,
-            eval_order,
+            eval,
             &mut context,
             mc.as_ref().map(|(seed, _)| *seed),
             None,
@@ -133,10 +145,7 @@ impl Evaluator {
 
         if waterfall_replaced_flows && !cs_affected_nodes.is_empty() {
             self.evaluate_nodes_in_order(
-                model,
-                &period_id,
-                is_actual,
-                eval_order,
+                eval,
                 &mut context,
                 mc.as_ref().map(|(seed, _)| *seed),
                 Some(cs_affected_nodes),

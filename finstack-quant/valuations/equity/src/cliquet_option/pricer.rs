@@ -172,9 +172,11 @@ impl CliquetOptionMcPricer {
 
         let process = crate::piecewise_gbm::bootstrap_forward_gbm(
             disc_curve.as_ref(),
-            curves,
-            &inst.instrument_pricing_overrides.market_quotes,
-            inst.vol_surface_id.as_str(),
+            crate::piecewise_gbm::GbmVolSource {
+                curves,
+                market_quotes: &inst.instrument_pricing_overrides.market_quotes,
+                vol_surface_id: inst.vol_surface_id.as_str(),
+            },
             as_of,
             initial_spot,
             div_yield,
