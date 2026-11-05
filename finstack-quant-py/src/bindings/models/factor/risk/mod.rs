@@ -2,6 +2,7 @@
 mod budget;
 pub(crate) mod contributions;
 mod functions;
+mod report;
 mod stress;
 use budget::{
     PyPositionBudgetEntry, PyRiskBudgetResult, evaluate_risk_budget,
@@ -12,11 +13,9 @@ use contributions::{
     PyFactorContribution, PyPositionEsContribution, PyPositionFactorContribution,
     PyPositionResidualContribution, PyPositionRiskDecomposition, PyPositionVarContribution,
 };
-use functions::{
-    decompose_factors, historical_var_decomposition, parametric_var_decomposition,
-    position_component_var,
-};
+use functions::{decompose_factors, position_component_var};
 use pyo3::prelude::*;
+use report::{PyPositionRiskReport, position_risk_report};
 use stress::{
     PyStressAttribution, PyStressPositionEntry, PyTailScenarioBreakdown, build_stress_attribution,
 };
@@ -34,13 +33,13 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyStressPositionEntry>()?;
     m.add_class::<PyTailScenarioBreakdown>()?;
     m.add_class::<PyStressAttribution>()?;
+    m.add_class::<PyPositionRiskReport>()?;
     m.add(
         "DEFAULT_UTILIZATION_THRESHOLD",
         finstack_quant_factor::risk::DEFAULT_UTILIZATION_THRESHOLD,
     )?;
 
-    m.add_function(wrap_pyfunction!(parametric_var_decomposition, m)?)?;
-    m.add_function(wrap_pyfunction!(historical_var_decomposition, m)?)?;
+    m.add_function(wrap_pyfunction!(position_risk_report, m)?)?;
     m.add_function(wrap_pyfunction!(evaluate_risk_budget, m)?)?;
     m.add_function(wrap_pyfunction!(build_stress_attribution, m)?)?;
     m.add_function(wrap_pyfunction!(position_component_var, m)?)?;

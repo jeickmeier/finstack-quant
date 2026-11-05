@@ -21,7 +21,7 @@ beforeAll(async () => {
 });
 afterAll(async () => harness?.close());
 const base = bond.request;
-type Method = AttributePnlManyRequest["method"];
+type Method = AttributePnlManyRequest["inputs"]["method"];
 const workbench = (scenario: string, name: string) =>
   fixture.workbench.find(
     (entry) => entry.scenario === scenario && entry.name === name,
@@ -49,9 +49,11 @@ async function request(
     instrumentJsons: [base.instrumentJson],
     marketT0Json: base.marketJson,
     marketT1Json: shocked.marketJson,
-    asOfT0: base.asOf,
-    asOfT1: shocked.asOf,
-    method: workbench(scenario, name).method as Method,
+    inputs: {
+      as_of_t0: base.asOf,
+      as_of_t1: shocked.asOf,
+      method: workbench(scenario, name).method as Method,
+    },
   };
 }
 it.each(
@@ -63,7 +65,7 @@ it.each(
   async (scenario, name) => {
     const expected = workbench(scenario!, name!);
     const supplied = await request(scenario!, name!);
-    expect(supplied.asOfT1).toBe(expected.asOfT1);
+    expect(supplied.inputs.as_of_t1).toBe(expected.asOfT1);
     const [result, ...rest] = unwrap(
       await harness.proxy.attributePnlMany(supplied),
     );
@@ -164,7 +166,7 @@ it("splices canonical market texts into AttributionInputs and sets nothing beyon
     market.free();
   }
   expect(inputs).toBe(
-    `{"as_of_t0":"${base.asOf}","as_of_t1":"${supplied.asOfT1}","market_t0":${canonical},"market_t1":${supplied.marketT1Json},"method":"parallel"}`,
+    `{"market_t0":${canonical},"market_t1":${supplied.marketT1Json},"as_of_t0":"${base.asOf}","as_of_t1":"${supplied.inputs.as_of_t1}","method":"parallel"}`,
   );
   // Rust's own tolerances and its default zero-factor hiding.
   expect(residual.mock.calls[0]!.slice(1)).toEqual([]);

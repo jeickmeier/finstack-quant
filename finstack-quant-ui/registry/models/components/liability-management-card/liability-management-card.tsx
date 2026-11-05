@@ -62,7 +62,7 @@ export function LiabilityManagementCard({
   formatValue = String,
   density = "compact",
 }: LiabilityManagementCardProps) {
-  const [lmeType, setLmeType] = useState(defaultTerms.lmeType);
+  const [lmeType, setLmeType] = useState(defaultTerms.lme_type);
   const exercise = useFields(defaultTerms);
   const [priceLabel, priceHelp] = priceInput[lmeType];
   return (
@@ -80,10 +80,12 @@ export function LiabilityManagementCard({
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit({
-            lmeType,
+            lme_type: lmeType,
             notional: typedNumber(exercise.values.notional),
-            repurchasePricePct: typedNumber(exercise.values.repurchasePricePct),
-            optAcceptancePct: typedNumber(exercise.values.optAcceptancePct),
+            repurchase_price_pct: typedNumber(
+              exercise.values.repurchase_price_pct,
+            ),
+            opt_acceptance_pct: typedNumber(exercise.values.opt_acceptance_pct),
             // An empty EBITDA stays unset, so Rust leaves the leverage block out.
             ebitda: exercise.values.ebitda?.trim()
               ? typedNumber(exercise.values.ebitda)
@@ -107,9 +109,9 @@ export function LiabilityManagementCard({
             "Notional",
             "Outstanding face of the target instrument, positive, in one monetary unit you choose.",
           )}
-          {exercise.field("repurchasePricePct", priceLabel, priceHelp)}
+          {exercise.field("repurchase_price_pct", priceLabel, priceHelp)}
           {exercise.field(
-            "optAcceptancePct",
+            "opt_acceptance_pct",
             "Participation",
             "Fraction of holders participating, from 0 to 1.",
           )}

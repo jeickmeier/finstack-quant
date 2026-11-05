@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/altman_z_double_prime_input.schema.json",
-      "bytes": 1128,
+      "bytes": 1161,
       "kind": "input",
       "path": "schemas/models/1/altman_z_double_prime_input.schema.json",
       "summary": "Input ratios for the Altman Z''-Score (non-manufacturing firms).",
@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/altman_z_prime_input.schema.json",
-      "bytes": 1270,
+      "bytes": 1303,
       "kind": "input",
       "path": "schemas/models/1/altman_z_prime_input.schema.json",
       "summary": "Input ratios for the Altman Z'-Score (private firms).",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/altman_z_score_input.schema.json",
-      "bytes": 1275,
+      "bytes": 1308,
       "kind": "input",
       "path": "schemas/models/1/altman_z_score_input.schema.json",
       "summary": "Input ratios for the original Altman Z-Score (1968).",
@@ -190,6 +190,24 @@
       "type_name": "CreditExposure"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/credit_score_report.schema.json",
+      "bytes": 3863,
+      "kind": "output",
+      "path": "schemas/models/1/credit_score_report.schema.json",
+      "summary": "A scoring model's result and the default master-scale grade of its implied PD.",
+      "title": "CreditScoreReport",
+      "type_name": "CreditScoreReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/credit_score_request.schema.json",
+      "bytes": 12483,
+      "kind": "input",
+      "path": "schemas/models/1/credit_score_request.schema.json",
+      "summary": "One scoring model and its input ratios.",
+      "title": "CreditScoreRequest",
+      "type_name": "CreditScoreRequest"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/credit_state.schema.json",
       "bytes": 1377,
       "kind": "component",
@@ -251,6 +269,15 @@
       "summary": "Numeric Monte Carlo estimate for discounted path values.",
       "title": "Estimate",
       "type_name": "Estimate"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/exchange_offer.schema.json",
+      "bytes": 2326,
+      "kind": "input",
+      "path": "schemas/models/1/exchange_offer.schema.json",
+      "summary": "Terms of a distressed exchange offer, from the creditor's side.",
+      "title": "ExchangeOffer",
+      "type_name": "ExchangeOffer"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/exchange_offer_analysis.schema.json",
@@ -398,12 +425,21 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/lme_analysis.schema.json",
-      "bytes": 4229,
+      "bytes": 4223,
       "kind": "output",
       "path": "schemas/models/1/lme_analysis.schema.json",
       "summary": "Issuer-side economics of a liability management exercise.",
       "title": "LmeAnalysis",
       "type_name": "LmeAnalysis"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/lme_terms.schema.json",
+      "bytes": 2410,
+      "kind": "input",
+      "path": "schemas/models/1/lme_terms.schema.json",
+      "summary": "Terms of a liability management exercise, from the issuer's side.",
+      "title": "LmeTerms",
+      "type_name": "LmeTerms"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/lmm_params.schema.json",
@@ -542,12 +578,30 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/ohlson_o_score_input.schema.json",
-      "bytes": 3457,
+      "bytes": 3490,
       "kind": "input",
       "path": "schemas/models/1/ohlson_o_score_input.schema.json",
       "summary": "Input for the Ohlson O-Score logistic model (1980).",
       "title": "OhlsonOScoreInput",
       "type_name": "OhlsonOScoreInput"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/option_calculation.schema.json",
+      "bytes": 6517,
+      "kind": "input",
+      "path": "schemas/models/1/option_calculation.schema.json",
+      "summary": "One closed-form option calculation: a model with its terms and a price or implied-volatility solve.",
+      "title": "OptionCalculation",
+      "type_name": "OptionCalculation"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/option_calculation_result.schema.json",
+      "bytes": 3621,
+      "kind": "output",
+      "path": "schemas/models/1/option_calculation_result.schema.json",
+      "summary": "Price, volatility and Greeks of one closed-form option calculation.",
+      "title": "OptionCalculationResult",
+      "type_name": "OptionCalculationResult"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/option_type.schema.json",
@@ -629,6 +683,24 @@
       "summary": "Complete position-level risk decomposition of a portfolio.",
       "title": "PositionRiskDecomposition",
       "type_name": "PositionRiskDecomposition"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/position_risk_report.schema.json",
+      "bytes": 16966,
+      "kind": "output",
+      "path": "schemas/models/1/position_risk_report.schema.json",
+      "summary": "Position VaR/ES decomposition with its optional risk budget and tail stress attribution.",
+      "title": "PositionRiskReport",
+      "type_name": "PositionRiskReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/position_risk_request.schema.json",
+      "bytes": 4356,
+      "kind": "input",
+      "path": "schemas/models/1/position_risk_request.schema.json",
+      "summary": "One position risk report request: position ids, confidence, a parametric or historical source and an optional budget.",
+      "title": "PositionRiskRequest",
+      "type_name": "PositionRiskRequest"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
@@ -938,7 +1010,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/zmijewski_input.schema.json",
-      "bytes": 983,
+      "bytes": 1016,
       "kind": "input",
       "path": "schemas/models/1/zmijewski_input.schema.json",
       "summary": "Input for the Zmijewski (1984) probit bankruptcy prediction model.",

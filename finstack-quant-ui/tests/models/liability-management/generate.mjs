@@ -2,22 +2,8 @@ import { emit } from "../../../scripts/fixture-output.mjs";
 import { native } from "../../../scripts/fixture-inputs.mjs";
 // The worker's ModelsApi over the raw package (the facade's
 // models.credit.liabilityManagement namespace re-exports these unchanged).
-const exchange = (request) =>
-  native.analyzeExchangeOffer(
-    request.oldPv,
-    request.newPv,
-    request.consentFee,
-    request.equitySweetenerValue,
-    request.exchangeType,
-  );
-const lme = (request) =>
-  native.analyzeLme(
-    request.lmeType,
-    request.notional,
-    request.repurchasePricePct,
-    request.optAcceptancePct,
-    request.ebitda,
-  );
+const exchange = (request) => native.analyzeExchangeOffer(request);
+const lme = (request) => native.analyzeLme(request);
 const attempt = (call) => {
   try {
     return { ok: true, value: call() };
@@ -37,55 +23,55 @@ const cases = {
   exchange: {
     // A discounted exchange worth clearly more than holding out.
     recommended: entry(exchange, {
-      oldPv: 45,
-      newPv: 80,
-      consentFee: 2,
-      equitySweetenerValue: 3,
-      exchangeType: "discount",
+      old_pv: 45,
+      new_pv: 80,
+      consent_fee: 2,
+      equity_sweetener_value: 3,
+      exchange_type: "discount",
     }),
     // Consideration above the hold-out value, but not by more than the hurdle.
     insideHurdle: entry(exchange, {
-      oldPv: 100,
-      newPv: 100.5,
-      consentFee: 0.5,
-      equitySweetenerValue: 0.25,
-      exchangeType: "par_for_par",
+      old_pv: 100,
+      new_pv: 100.5,
+      consent_fee: 0.5,
+      equity_sweetener_value: 0.25,
+      exchange_type: "par_for_par",
     }),
     negativeFee: entry(exchange, {
-      oldPv: 45,
-      newPv: 80,
-      consentFee: -1,
-      equitySweetenerValue: 0,
-      exchangeType: "uptier",
+      old_pv: 45,
+      new_pv: 80,
+      consent_fee: -1,
+      equity_sweetener_value: 0,
+      exchange_type: "uptier",
     }),
   },
   lme: {
     tender: entry(lme, {
-      lmeType: "tender_offer",
+      lme_type: "tender_offer",
       notional: 1000,
-      repurchasePricePct: 0.6,
-      optAcceptancePct: 0.8,
+      repurchase_price_pct: 0.6,
+      opt_acceptance_pct: 0.8,
       ebitda: 125,
     }),
     amendAndExtend: entry(lme, {
-      lmeType: "amend_and_extend",
+      lme_type: "amend_and_extend",
       notional: 1000,
-      repurchasePricePct: 0.01,
-      optAcceptancePct: 0.9,
+      repurchase_price_pct: 0.01,
+      opt_acceptance_pct: 0.9,
       ebitda: null,
     }),
     dropdown: entry(lme, {
-      lmeType: "dropdown",
+      lme_type: "dropdown",
       notional: 1000,
-      repurchasePricePct: 0.3,
-      optAcceptancePct: 0.7,
+      repurchase_price_pct: 0.3,
+      opt_acceptance_pct: 0.7,
       ebitda: 125,
     }),
     pricePoints: entry(lme, {
-      lmeType: "open_market_repurchase",
+      lme_type: "open_market_repurchase",
       notional: 1000,
-      repurchasePricePct: 60,
-      optAcceptancePct: 0.8,
+      repurchase_price_pct: 60,
+      opt_acceptance_pct: 0.8,
       ebitda: null,
     }),
   },

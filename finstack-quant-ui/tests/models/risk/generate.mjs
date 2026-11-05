@@ -1,58 +1,9 @@
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
 import { native, readRepoJson } from "../../../scripts/fixture-inputs.mjs";
 // The worker's ModelsApi.positionRisk over the raw package
-// (models.factor.risk re-exports these raw functions unchanged).
-function envelope(call) {
-  try {
-    return { ok: true, value: call() };
-  } catch (error) {
-    // The worker's errorValue shape for a facade FinstackError.
-    return {
-      ok: false,
-      error: { name: error.name, message: error.message, kind: error.kind },
-    };
-  }
-}
+// (models.factor.risk re-exports positionRiskReport unchanged).
+const positionRisk = (request) => native.positionRiskReport(request);
 const optional = (value) => value ?? undefined;
-function positionRisk({ positionIds, confidence, source, budget }) {
-  const decomposition =
-    source.kind === "parametric"
-      ? native.parametricVarDecomposition(
-          positionIds,
-          source.weights,
-          source.covariance,
-          optional(confidence),
-          optional(source.computeIncremental),
-        )
-      : native.historicalVarDecomposition(
-          positionIds,
-          source.pnls,
-          optional(confidence),
-        );
-  return {
-    decomposition,
-    budget:
-      budget == null
-        ? null
-        : envelope(() =>
-            native.evaluateRiskBudgetFromDecomposition(
-              decomposition,
-              budget.targets,
-              optional(budget.utilizationThreshold),
-            ),
-          ),
-    stress:
-      source.kind === "historical"
-        ? envelope(() =>
-            native.buildStressAttribution(
-              positionIds,
-              source.pnls,
-              optional(confidence),
-            ),
-          )
-        : null,
-  };
-}
 // fixture-output writes null for NaN and ±Infinity, so the pinned values must be finite.
 function assertFinite(value, path) {
   if (typeof value === "number") {
@@ -82,7 +33,7 @@ function scenarioPnls(n = 250) {
 }
 const cases = {
   parametric: {
-    positionIds,
+    position_ids: positionIds,
     confidence: 0.99,
     source: {
       kind: "parametric",
@@ -92,12 +43,12 @@ const cases = {
         [0.012, 0.02, 0.001],
         [-0.002, 0.001, 0.0064],
       ],
-      computeIncremental: true,
+      compute_incremental: true,
     },
-    budget: { targets, utilizationThreshold: 1.1 },
+    budget: { targets, utilization_threshold: 1.1 },
   },
   historical: {
-    positionIds,
+    position_ids: positionIds,
     confidence: 0.95,
     source: { kind: "historical", pnls: scenarioPnls() },
     budget: { targets },

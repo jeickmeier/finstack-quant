@@ -73,27 +73,22 @@ await write(
   ),
 );
 // Native sensitivity of the analyst model under analyst-sensitivity-run.json
-// (the statement-sensitivity shape): each parameter's base value is the
-// evaluated cell, passed with its percentage moves to
-// parameterSpecWithPercentages, then runSensitivity and the tornado at the
-// target metric and period, as the worker's runSensitivity does.
+// (the statement-sensitivity defaults): each parameter's base value is the
+// evaluated cell with its percentage moves as the Rust ParameterSpec
+// pct_range, then runSensitivity and the tornado at the target metric and
+// period, as the worker's runSensitivity does.
 const evaluated = JSON.parse(resultJson);
 const sensitivity = JSON.parse(await read("analyst-sensitivity-run.json"));
-const sensitivityResult = native.runSensitivity(
-  modelJson,
-  JSON.stringify({
-    mode: sensitivity.mode,
-    parameters: sensitivity.parameters.map((parameter) =>
-      native.parameterSpecWithPercentages(
-        parameter.nodeId,
-        parameter.periodId,
-        evaluated.nodes[parameter.nodeId][parameter.periodId],
-        parameter.pctRange,
-      ),
-    ),
-    target_metrics: [sensitivity.targetMetric],
-  }),
-);
+const sensitivityResult = native.runSensitivity(modelJson, {
+  mode: sensitivity.mode,
+  parameters: sensitivity.parameters.map((parameter) => ({
+    node_id: parameter.nodeId,
+    period_id: parameter.periodId,
+    base_value: evaluated.nodes[parameter.nodeId][parameter.periodId],
+    pct_range: parameter.pctRange,
+  })),
+  target_metrics: [sensitivity.targetMetric],
+});
 await write(
   "analyst-sensitivity.json",
   serializeHost({

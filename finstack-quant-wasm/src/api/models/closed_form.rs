@@ -15,13 +15,13 @@
 //! `docs/REFERENCES.md#black-1976`.
 
 use crate::utils::input::{
-    js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_string, js_uint,
+    from_js_json, js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_string, js_uint,
 };
 use crate::utils::to_js_err;
 use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::closed_form::{
     DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
-    HestonPricingParams, asian_option_price as asian_option_price_core,
+    HestonPricingParams, OptionCalculation, asian_option_price as asian_option_price_core,
     bachelier_greeks as bachelier_greeks_core, bachelier_price as bachelier_price_core,
     barrier_option_price as barrier_option_price_core,
     black_shifted_price as black_shifted_price_core, black_shifted_vega as black_shifted_vega_core,
@@ -29,12 +29,42 @@ use finstack_quant_models::closed_form::{
     black76_price as black76_price_core, bs_greeks as bs_greeks_core,
     bs_implied_vol as bs_implied_vol_core, bs_price as bs_price_core,
     heston_price as heston_price_core, lookback_option_price as lookback_option_price_core,
-    quanto_option_price as quanto_option_price_core,
+    option_calculation as option_calculation_core, quanto_option_price as quanto_option_price_core,
     vanilla_expiry_payoff as vanilla_expiry_payoff_core,
 };
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::OptionType;
 use wasm_bindgen::prelude::*;
+
+/// Price a closed-form option or invert its price, with Greeks at the
+/// resulting volatility.
+///
+/// One call replaces choosing and sequencing `bsPrice`, `black76Price`,
+/// `bachelierPrice`, their implied-volatility inverses and their Greeks.
+///
+/// # Arguments
+///
+/// * `request` - `OptionCalculation` object or JSON text: `model` tagged by
+///   `kind` (`"black_scholes"` with `spot`, `strike`, continuously compounded
+///   decimal `rate` and `div_yield`, `expiry` in years, `is_call` and an
+///   optional `theta_days_per_year` defaulting to 365; `"black76"` with
+///   `forward`, `strike`, discount factor `df`, `expiry`, `is_call`;
+///   `"bachelier"` with `forward`, `strike`, `expiry`, `is_call`) and `solve`
+///   (`{kind: "price", vol}` with a decimal Black vol or an absolute normal vol
+///   for Bachelier, or `{kind: "implied_vol", price}` discounted for
+///   Black-Scholes and Black-76, undiscounted for Bachelier).
+///
+/// # Errors
+///
+/// Throws a `validation` error for a malformed request, an unknown field or
+/// kind, an input outside the model's domain, or a price whose implied
+/// volatility cannot be solved; `invalid_type` for a non-finite number.
+#[wasm_bindgen(js_name = optionCalculation)]
+pub fn option_calculation(request: JsValue) -> Result<JsValue, JsValue> {
+    let request: OptionCalculation = from_js_json(&request, "request")?;
+    let result = option_calculation_core(&request).map_err(to_js_err)?;
+    crate::utils::to_js_value(&result)
+}
 
 /// Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
 ///

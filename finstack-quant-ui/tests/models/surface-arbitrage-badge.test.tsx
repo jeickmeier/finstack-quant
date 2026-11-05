@@ -53,20 +53,22 @@ function mount(props: Parameters<typeof SurfaceArbitrageBadge>[0]) {
 const trigger = () => screen.getByRole("button", { name: "Arbitrage details" });
 /** The badge row: label, status badge and the popover trigger. */
 const summary = () => trigger().parentElement!;
-it("shows a passed check of the supplied forwards and sends the tolerance only when given", async () => {
-  mount({ surface, forwards: [175] });
+it("shows a passed check of the supplied config and sends it unchanged", async () => {
+  mount({ surface, config: { forward_prices: [175] } });
   await waitFor(() => expect(summary().textContent).toContain("Passed"), {
     timeout: budget(5000),
   });
-  expect(requests()).toEqual([{ surface, forwards: [175] }]);
+  expect(requests()).toEqual([{ surface, config: { forward_prices: [175] } }]);
   await userEvent.click(trigger());
   const dialog = await screen.findByRole("dialog");
   expect(within(dialog).getByText("No violations returned")).toBeTruthy();
   cleanup();
   transport.call.mockClear();
-  mount({ surface, forwards: [175], tolerance: 1e-8 });
+  mount({ surface, config: { forward_prices: [175], tolerance: 1e-8 } });
   await waitFor(() => expect(summary().textContent).toContain("Passed"));
-  expect(requests()).toEqual([{ surface, forwards: [175], tolerance: 1e-8 }]);
+  expect(requests()).toEqual([
+    { surface, config: { forward_prices: [175], tolerance: 1e-8 } },
+  ]);
 });
 it("counts an injected butterfly violation by type and severity and lists each violation", async () => {
   const bumped = {
@@ -74,9 +76,12 @@ it("counts an injected butterfly violation by type and severity and lists each v
     vols_row_major: surface.vols_row_major.map((v, i) => (i === 4 ? 0.4 : v)),
   };
   const report = unwrap(
-    await worker.proxy.checkSurface({ surface: bumped, forwards: [175] }),
+    await worker.proxy.checkSurface({
+      surface: bumped,
+      config: { forward_prices: [175] },
+    }),
   );
-  mount({ surface: bumped, forwards: [175] });
+  mount({ surface: bumped, config: { forward_prices: [175] } });
   await waitFor(() => expect(summary().textContent).toContain("6 violations"), {
     timeout: budget(5000),
   });
@@ -101,7 +106,10 @@ it("counts an injected butterfly violation by type and severity and lists each v
   expect(rows[0]!.textContent).toContain(report.violations[0]!.description);
 });
 it("shows the native convention error of a normal-quoted surface as not checked", async () => {
-  mount({ surface: { ...surface, quote_type: "normal" }, forwards: [175] });
+  mount({
+    surface: { ...surface, quote_type: "normal" },
+    config: { forward_prices: [175] },
+  });
   await waitFor(() => expect(summary().textContent).toContain("Not checked"), {
     timeout: budget(5000),
   });
@@ -111,10 +119,10 @@ it("shows the native convention error of a normal-quoted surface as not checked"
     "stores 'normal' quotes",
   );
 });
-it("requests nothing when the host supplies no forwards", () => {
+it("requests nothing when the host supplies no check config", () => {
   mount({ surface });
   expect(summary().textContent).toContain("Forwards not supplied");
-  mount({ surface, forwards: [] });
+  mount({ surface, config: null });
   expect(screen.getAllByText("Forwards not supplied")).toHaveLength(2);
   expect(requests()).toEqual([]);
 });

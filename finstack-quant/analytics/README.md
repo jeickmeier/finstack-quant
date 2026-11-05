@@ -23,27 +23,27 @@ regression and the constrained least-squares solver. Consumed by:
 
 ## Entry point
 
-[`Performance`](src/performance/mod.rs) is the entry point. Construct it from a
-price panel (`Performance::new`) or a return panel
-(`Performance::from_returns`); every analytic is then a method on that
-instance.
+[`Performance`](src/performance/mod.rs) is the entry point. Construct it with
+`Performance::new(&PerformancePanel)` from a dated panel whose
+[`PanelSeriesKind`](src/performance/panel.rs) is `Prices` or `Returns`; every
+analytic is then a method on that instance.
 
 ```rust
-use finstack_quant_analytics::Performance;
+use finstack_quant_analytics::{PanelSeriesKind, Performance, PerformancePanel};
 use finstack_quant_core::dates::{Date, PeriodKind};
 use time::Month;
 
 let dates: Vec<Date> = (1..=10)
     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
     .collect();
-let prices = vec![(0..10).map(|i| 100.0 + i as f64).collect::<Vec<_>>()];
-let perf = Performance::new(
+let perf = Performance::new(&PerformancePanel {
     dates,
-    prices,
-    vec!["SPY".into()],
-    None,                 // benchmark ticker; None selects column 0
-    PeriodKind::Daily,
-)
+    series: vec![(0..10).map(|i| 100.0 + i as f64).collect()],
+    kind: PanelSeriesKind::Prices,
+    ticker_names: vec!["SPY".into()],
+    benchmark_ticker: None, // None selects the first ticker
+    frequency: Some(PeriodKind::Daily),
+})
 .unwrap();
 
 assert_eq!(perf.get_ticker_names(), &["SPY"]);
@@ -151,7 +151,7 @@ link against this crate.
 
 ### Input validation
 
-`Performance::new` and `Performance::from_returns` reject empty inputs, ragged
+`Performance::new` rejects, for either panel kind, empty inputs, ragged
 matrices, column counts that disagree with `ticker_names`, an unknown
 `benchmark_ticker`, and non-ascending dates. Per ticker, leading and trailing
 `NaN` padding is allowed but the finite span must be contiguous; an interior
@@ -183,11 +183,12 @@ are required. The `PeriodStats` fields that can legitimately be
   `GreeksResult`, `LookbackReturns`, `MultiFactorResult`, `PeriodStats`,
   `RollingGreeks`), the single-series functions `sharpe`, `sortino`,
   `volatility` and `max_drawdown`, `constrained_least_squares`, and the
-  `AnalyticsError` exception. `Performance` gains DataFrame-first constructors
-  (`Performance(prices_df, ...)`, `Performance.from_returns(df, ...)`) with the
-  Rust-shaped array constructors available as `Performance.from_arrays` and
-  `Performance.from_returns_arrays`, plus result `to_dataframe` methods.
-- **WASM** — `analytics.Performance`, `analytics.constrainedLeastSquares`,
+  `AnalyticsError` exception. `Performance` keeps DataFrame-first constructors
+  (`Performance(prices_df, ...)`, `Performance.from_returns(df, ...)`, row
+  index = dates, column headings = ticker names) that build a
+  `PerformancePanel`; `Performance.from_panel(PerformancePanel(...))` is the
+  Rust-shaped path. Results carry `to_dataframe` methods.
+- **WASM** — `analytics.Performance` (`new Performance(panel)`), `analytics.constrainedLeastSquares`,
   `analytics.maxDrawdown`, `analytics.sharpe`, `analytics.sortino`, and
   `analytics.volatility` (see [`exports/analytics.js`](../../finstack-quant-wasm/exports/analytics.js)).
   WASM `Performance` methods return plain JS values instead of typed wrappers.

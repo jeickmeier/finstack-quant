@@ -10,14 +10,15 @@ import datetime as dt
 
 import pandas as pd
 
-from finstack_quant.analytics import Performance
 from finstack_quant import reporting
+from finstack_quant.analytics import Performance
 
 
 def main() -> None:
-    # 1) Your data: a DataFrame of returns (or build from prices via from_arrays).
+    # 1) Your data: a DataFrame of returns (or raw lists via Performance.from_panel(PerformancePanel(...))).
     idx = pd.bdate_range("2021-01-04", "2024-12-31")
     import math
+
     rets = [0.0005 + 0.003 * math.sin(i / 7.0) for i in range(len(idx))]
     returns = pd.DataFrame({"Global Macro Composite": rets}, index=idx)
 

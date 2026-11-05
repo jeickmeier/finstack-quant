@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from finstack_quant.analytics import Performance
+from finstack_quant.analytics import Performance, PerformancePanel
 
 
 def _fixture() -> dict[str, Any]:
@@ -44,12 +44,15 @@ def _build_performance(fixture: dict[str, Any]) -> Performance:
     dates = _dates(fixture["dates"])
     target = fixture["returns"]
     benchmark = fixture["benchmark"]
-    return Performance.from_returns_arrays(
-        dates,
-        [target, benchmark],
-        ["TARGET", "BENCH"],
-        benchmark_ticker="BENCH",
-        frequency="daily",
+    return Performance.from_panel(
+        PerformancePanel(
+            dates=dates,
+            series=[target, benchmark],
+            kind="returns",
+            ticker_names=["TARGET", "BENCH"],
+            benchmark_ticker="BENCH",
+            frequency="daily",
+        )
     )
 
 

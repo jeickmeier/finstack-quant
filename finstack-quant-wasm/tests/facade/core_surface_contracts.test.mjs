@@ -29,7 +29,7 @@ test('zero vol-of-vol SABR nodes retain the exact Black cube limit', () => {
   try {
     for (const strike of [0.02, 0.03, 0.04]) {
       for (const source of [cube, restored]) {
-        const vol = facade.models.volatility.getCubeVol(source, 3, 6, strike);
+        const vol = facade.models.volatility.getCubeVol(source, 3, 6, strike, 'lognormal');
         assert.ok(Math.abs(vol - 0.2) < 1e-14, `K=${strike}: ${vol}`);
       }
     }

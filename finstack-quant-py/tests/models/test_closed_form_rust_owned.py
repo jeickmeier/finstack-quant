@@ -12,7 +12,9 @@ import pickle
 import pytest
 
 from finstack_quant.models import (
+    BsGreeks,
     ForwardGreeks,
+    OptionCalculationResult,
     bachelier_greeks,
     bachelier_price,
     black76_greeks,
@@ -20,7 +22,10 @@ from finstack_quant.models import (
     black76_price,
     black_shifted_price,
     black_shifted_vega,
+    bs_greeks,
+    bs_price,
     heston_price,
+    option_calculation,
 )
 from finstack_quant.models.volatility import SabrCalibrator, SabrParameters, SabrSmile
 
@@ -81,3 +86,52 @@ def test_sabr_with_shift_keyword_is_parsed_by_rust_and_bool_is_rejected() -> Non
         SabrCalibrator().with_shift(True)
     with pytest.raises(ValueError, match='SABR shift must be null/None, a number, or "auto"'):
         SabrCalibrator().with_shift("AUTO")
+
+
+BLACK_SCHOLES = {
+    "kind": "black_scholes",
+    "spot": 100.0,
+    "strike": 105.0,
+    "rate": 0.03,
+    "div_yield": 0.01,
+    "expiry": 0.75,
+    "is_call": False,
+}
+
+
+def test_option_calculation_price_solve_matches_the_kernels() -> None:
+    result = option_calculation({"model": BLACK_SCHOLES, "solve": {"kind": "price", "vol": 0.25}})
+    assert result.price == bs_price(100.0, 105.0, 0.03, 0.01, 0.25, 0.75, False)
+    assert result.implied_vol == 0.25
+    assert isinstance(result.greeks, BsGreeks)
+    assert result.greeks == bs_greeks(100.0, 105.0, 0.03, 0.01, 0.25, 0.75, False)
+
+
+@pytest.mark.parametrize(
+    ("model", "vol"),
+    [
+        (BLACK_SCHOLES, 0.25),
+        ({"kind": "black76", "forward": 0.04, "strike": 0.035, "df": 0.97, "expiry": 2.0, "is_call": True}, 0.3),
+        ({"kind": "bachelier", "forward": -0.002, "strike": 0.001, "expiry": 1.5, "is_call": True}, 0.006),
+    ],
+)
+def test_option_calculation_implied_vol_inverts_each_model(model: dict[str, object], vol: float) -> None:
+    priced = option_calculation({"model": model, "solve": {"kind": "price", "vol": vol}})
+    solved = option_calculation({"model": model, "solve": {"kind": "implied_vol", "price": priced.price}})
+    assert solved.implied_vol == pytest.approx(vol, abs=1e-7)
+    assert solved.price == priced.price
+    if model["kind"] != "black_scholes":
+        assert isinstance(solved.greeks, ForwardGreeks)
+
+
+def test_option_calculation_result_round_trips_and_rejects_bad_requests() -> None:
+    result = option_calculation({"model": BLACK_SCHOLES, "solve": {"kind": "price", "vol": 0.25}})
+    assert OptionCalculationResult.from_json(result.to_json()) == result
+    assert pickle.loads(pickle.dumps(result)) == result  # noqa: S301 - trusted in-process round trip
+    with pytest.raises(ValueError, match="unknown field"):
+        option_calculation({"model": {**BLACK_SCHOLES, "forward": 1.0}, "solve": {"kind": "price", "vol": 0.25}})
+    with pytest.raises(ValueError, match="intrinsic"):
+        option_calculation({
+            "model": {**BLACK_SCHOLES, "spot": 120.0, "is_call": True},
+            "solve": {"kind": "implied_vol", "price": 1.0},
+        })

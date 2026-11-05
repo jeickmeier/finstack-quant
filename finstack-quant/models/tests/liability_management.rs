@@ -2,8 +2,65 @@
 
 use finstack_quant_core::wire::{serde_label, serde_parse};
 use finstack_quant_models::credit::liability_management::{
-    ExchangeType, LmeType, TENDER_RECOMMENDATION_HURDLE, analyze_exchange_offer, analyze_lme,
+    ExchangeOffer, ExchangeType, LmeAnalysis, LmeTerms, LmeType, TENDER_RECOMMENDATION_HURDLE,
 };
+
+fn analyze_exchange_offer(
+    old_pv: f64,
+    new_pv: f64,
+    consent_fee: f64,
+    equity_sweetener_value: f64,
+    exchange_type: ExchangeType,
+) -> finstack_quant_core::Result<
+    finstack_quant_models::credit::liability_management::ExchangeOfferAnalysis,
+> {
+    finstack_quant_models::credit::liability_management::analyze_exchange_offer(&ExchangeOffer {
+        old_pv,
+        new_pv,
+        consent_fee,
+        equity_sweetener_value,
+        exchange_type,
+    })
+}
+
+fn analyze_lme(
+    lme_type: LmeType,
+    notional: f64,
+    repurchase_price_pct: f64,
+    opt_acceptance_pct: f64,
+    ebitda: Option<f64>,
+) -> finstack_quant_core::Result<LmeAnalysis> {
+    finstack_quant_models::credit::liability_management::analyze_lme(&LmeTerms {
+        lme_type,
+        notional,
+        repurchase_price_pct,
+        opt_acceptance_pct,
+        ebitda,
+    })
+}
+
+#[test]
+fn wire_terms_are_strict() {
+    let offer: ExchangeOffer = serde_json::from_value(serde_json::json!({
+        "old_pv": 45.0, "new_pv": 80.0, "consent_fee": 2.0,
+        "equity_sweetener_value": 0.0, "exchange_type": "discount",
+    }))
+    .expect("offer");
+    assert_eq!(offer.exchange_type, ExchangeType::Discount);
+    let terms: LmeTerms = serde_json::from_value(serde_json::json!({
+        "lme_type": "tender_offer", "notional": 100.0,
+        "repurchase_price_pct": 0.9, "opt_acceptance_pct": 1.0,
+    }))
+    .expect("terms without ebitda");
+    assert_eq!(terms.ebitda, None);
+    assert!(
+        serde_json::from_value::<LmeTerms>(serde_json::json!({
+            "lme_type": "tender_offer", "notional": 100.0,
+            "repurchase_price_pct": 0.9, "opt_acceptance_pct": 1.0, "extra": 1,
+        }))
+        .is_err()
+    );
+}
 
 #[test]
 fn discount_exchange_matches_reference_economics() {

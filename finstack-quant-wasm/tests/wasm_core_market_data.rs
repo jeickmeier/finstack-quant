@@ -9,7 +9,7 @@ use finstack_quant_wasm::api::core::market_fx::*;
 use finstack_quant_wasm::api::core::market_fx::{JsFxConversionPolicy, JsFxMatrix};
 use finstack_quant_wasm::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube};
 use finstack_quant_wasm::api::models::volatility::{
-    get_cube_normal_vol, get_cube_normal_vol_clamped, get_fx_delta_pillar_vols, get_fx_delta_vol,
+    get_cube_vol, get_cube_vol_clamped, get_fx_delta_pillar_vols, get_fx_delta_vol,
 };
 use js_sys::Float64Array;
 use wasm_bindgen::JsValue;
@@ -255,20 +255,22 @@ fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
     )
     .unwrap();
     assert!(
-        get_cube_normal_vol(
+        get_cube_vol(
             &cev,
             JsValue::from(1.0),
             JsValue::from(2.0),
-            JsValue::from(-0.01)
+            JsValue::from(-0.01),
+            JsValue::from("normal"),
         )
         .is_err()
     );
     assert!(
-        get_cube_normal_vol_clamped(
+        get_cube_vol_clamped(
             &cev,
             JsValue::from(1.0),
             JsValue::from(2.0),
-            JsValue::from(-0.01)
+            JsValue::from(-0.01),
+            JsValue::from("normal"),
         )
         .unwrap()
         .is_nan()
@@ -284,11 +286,12 @@ fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
     )
     .unwrap();
     assert!(
-        get_cube_normal_vol(
+        get_cube_vol(
             &normal,
             JsValue::from(1.0),
             JsValue::from(2.0),
-            JsValue::from(-0.02)
+            JsValue::from(-0.02),
+            JsValue::from("normal"),
         )
         .unwrap()
         .is_finite()

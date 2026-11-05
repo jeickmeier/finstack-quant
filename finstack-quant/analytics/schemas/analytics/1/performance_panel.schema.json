@@ -1,0 +1,123 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "PanelSeriesKind": {
+      "description": "Whether a panel's series are prices or simple returns.",
+      "oneOf": [
+        {
+          "const": "prices",
+          "description": "Strictly positive prices, one per date; returns are derived pairwise,\nso the first date anchors the first return.",
+          "type": "string"
+        },
+        {
+          "const": "returns",
+          "description": "Simple decimal returns, one per return-aligned date; a synthetic prior\ndate one frequency step before the first anchors the holding period.",
+          "type": "string"
+        }
+      ]
+    },
+    "PeriodKind": {
+      "description": "Period frequency type.\n\nDefines the frequency of periodic schedules (cashflow rolls, return-series\nresampling, statement reporting). Each variant carries an implied\n\"periods-per-year\" used by [`PeriodKind::periods_per_year`] and by\ndownstream annualization helpers in `finstack-quant-analytics`.\n\n`Daily` follows the trading-day convention (252 per year), not the\ncalendar-day convention (365 per year). Use `Weekly` if you need\ncalendar-week granularity.\n\nParses only the canonical snake_case wire values via [`std::str::FromStr`]:\n`daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.\nAliases, whitespace padding and case variants are rejected.",
+      "oneOf": [
+        {
+          "const": "daily",
+          "description": "Daily periods (252 trading days per year by convention)",
+          "type": "string"
+        },
+        {
+          "const": "quarterly",
+          "description": "Quarterly periods (4 per year)",
+          "type": "string"
+        },
+        {
+          "const": "monthly",
+          "description": "Monthly periods (12 per year)",
+          "type": "string"
+        },
+        {
+          "const": "weekly",
+          "description": "Weekly periods (ISO 8601 week-year, typically 52 or 53 per year)",
+          "type": "string"
+        },
+        {
+          "const": "semi_annual",
+          "description": "Semi-annual periods (2 per year)",
+          "type": "string"
+        },
+        {
+          "const": "annual",
+          "description": "Annual periods (1 per year)",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/performance_panel.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Dated price or return panel, one series per ticker, that a Performance is built from.",
+  "properties": {
+    "benchmark_ticker": {
+      "description": "Benchmark ticker; omitted uses the first ticker.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "dates": {
+      "description": "Strictly ascending observation dates, one per value of every series.",
+      "items": {
+        "$ref": "#/$defs/DateWire"
+      },
+      "type": "array"
+    },
+    "frequency": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PeriodKind"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Observation frequency used for annualization; omitted uses\n[`crate::DEFAULT_FREQUENCY`]."
+    },
+    "kind": {
+      "$ref": "#/$defs/PanelSeriesKind",
+      "description": "Whether `series` holds prices or simple returns."
+    },
+    "series": {
+      "description": "Ticker-major series: `series[i][t]` is ticker `i` at `dates[t]`. A\nticker may have leading or trailing gaps (`NaN`, `null` on the wire)\nbut its observed span must be contiguous.",
+      "items": {
+        "items": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "ticker_names": {
+      "description": "Unique ticker names, one per series.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "dates",
+    "series",
+    "kind",
+    "ticker_names"
+  ],
+  "title": "PerformancePanel",
+  "type": "object"
+}

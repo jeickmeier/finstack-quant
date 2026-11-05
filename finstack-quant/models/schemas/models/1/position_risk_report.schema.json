@@ -1,0 +1,394 @@
+{
+  "$defs": {
+    "DecompositionMethod": {
+      "description": "Method used for position-level VaR/ES decomposition.",
+      "oneOf": [
+        {
+          "const": "parametric",
+          "description": "Covariance-based using normal distribution assumption.\n\nO(n^2) Euler allocation in positions, after an O(n^3) pivoted-Cholesky\nPSD check of the covariance. Exact Euler property.\nRequires a position-level return covariance matrix.",
+          "type": "string"
+        },
+        {
+          "const": "historical",
+          "description": "Full historical simulation with per-position P&L attribution.\n\nSlow (O(n * scenarios)). Approximate Euler property.\nHandles non-normality and non-linear positions.",
+          "type": "string"
+        }
+      ]
+    },
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    },
+    "PositionBudgetEntry": {
+      "description": "Budget comparison for a single position.",
+      "properties": {
+        "actual_component_var": {
+          "description": "Actual component VaR from the decomposition, signed as reported by\nthe engine (loss convention: negative for risk consumers when the\nportfolio VaR is negative).",
+          "format": "double",
+          "type": "number"
+        },
+        "excess": {
+          "description": "Over/under-budget amount on the consuming side: consuming component\nVaR minus the target level. Negative when under budget, and always\nnegative for diversifiers.",
+          "format": "double",
+          "type": "number"
+        },
+        "position_id": {
+          "description": "Position identifier.",
+          "type": "string"
+        },
+        "target_component_var": {
+          "description": "Target component VaR level: target fraction times |portfolio VaR|.",
+          "format": "double",
+          "type": "number"
+        },
+        "utilization": {
+          "$ref": "#/$defs/NonFiniteF64Wire",
+          "description": "Utilization ratio: consuming-side component VaR over the target level.\n\nThe component is measured on the consuming side (positive when it has\nthe same sign as portfolio VaR). Values > 1.0 indicate the position\nuses more risk than budgeted; values in (0, 1) indicate unused\nbudget; **negative values indicate a diversifier** whose component\nVaR offsets portfolio risk — a diversifier can never breach.\n`±inf` marks a non-zero component against a zero target."
+        }
+      },
+      "required": [
+        "position_id",
+        "actual_component_var",
+        "target_component_var",
+        "utilization",
+        "excess"
+      ],
+      "type": "object"
+    },
+    "PositionEsContribution": {
+      "description": "Expected Shortfall decomposition result for a single portfolio position.",
+      "properties": {
+        "component_es": {
+          "description": "Component ES: position's contribution to portfolio Expected Shortfall.\n\nParametric: analytical formula using truncated normal moments.\n```text\nCES_i = w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)\n```\n\nHistorical: probability-weighted position P&L over the exact loss-tail\nmass. Boundary ties share their tail weight equally.\n```text\nCES_i = E[L_i | L_portfolio > VaR_portfolio]\n```",
+          "format": "double",
+          "type": "number"
+        },
+        "marginal_es": {
+          "description": "Marginal ES: per-unit sensitivity of portfolio ES to this position.\n\n`None` when the engine cannot produce a true gradient (e.g.\nhistorical mode without finite-difference repricing).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "position_id": {
+          "description": "Position identifier.",
+          "type": "string"
+        },
+        "relative_es": {
+          "description": "Component ES as a fraction of total portfolio ES.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "position_id",
+        "component_es",
+        "relative_es"
+      ],
+      "type": "object"
+    },
+    "PositionRiskDecomposition": {
+      "description": "Complete position-level risk decomposition of a portfolio.\n\nContains VaR and ES decompositions for every position, along with\nportfolio-level totals. All values are in the portfolio's base currency.\n\n# Euler Decomposition Property\n\nUnder the parametric (normal) assumption:\n```text\nsum(component_var_i) == portfolio_var  (exact)\nsum(component_es_i)  == portfolio_es   (exact)\n```\n\nUnder historical simulation, the Euler property holds approximately.\n\n# References\n\n- Tasche (2008): Capital allocation with Euler's method. `docs/REFERENCES.md#tasche-2008-capital-allocation`\n- Meucci (2005): Risk and Asset Allocation. `docs/REFERENCES.md#meucci-risk-and-asset-allocation`\n- Litterman (1996): Hot Spots and Hedges. `docs/REFERENCES.md#litterman-1996-hotspots`",
+      "properties": {
+        "confidence": {
+          "description": "Confidence level used for both VaR and ES.",
+          "format": "double",
+          "type": "number"
+        },
+        "es_contributions": {
+          "description": "Per-position ES decomposition.",
+          "items": {
+            "$ref": "#/$defs/PositionEsContribution"
+          },
+          "type": "array"
+        },
+        "euler_residual": {
+          "description": "Residual from Euler decomposition (should be near zero).\n\n`residual = portfolio_var - sum(component_var_i)`.\nOnly meaningful for the parametric engine, where a non-zero residual\nsignals a numerical issue (ill-conditioned covariance, floating-point\naccumulation error).\n\n`None` in historical mode: the Tasche scaling used there makes the\nresidual algebraically zero by construction, so it carries no\ndiagnostic information.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "method": {
+          "$ref": "#/$defs/DecompositionMethod",
+          "description": "Method used for decomposition."
+        },
+        "n_positions": {
+          "description": "Number of positions in the portfolio.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "portfolio_es": {
+          "description": "Total portfolio Expected Shortfall.\n\nSame loss convention as [`Self::portfolio_var`]; ES lies at or\nbeyond VaR in the loss tail (`portfolio_es <= portfolio_var`).",
+          "format": "double",
+          "type": "number"
+        },
+        "portfolio_var": {
+          "description": "Total portfolio VaR.\n\nLoss convention (workspace-wide): VaR follows the P&L sign, so\nlosses are reported as **negative** numbers, matching the\nfactor-level engines and `analytics::value_at_risk`.",
+          "format": "double",
+          "type": "number"
+        },
+        "var_contributions": {
+          "description": "Per-position VaR decomposition.",
+          "items": {
+            "$ref": "#/$defs/PositionVarContribution"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "portfolio_var",
+        "portfolio_es",
+        "confidence",
+        "method",
+        "var_contributions",
+        "es_contributions",
+        "n_positions"
+      ],
+      "type": "object"
+    },
+    "PositionVarContribution": {
+      "description": "Risk decomposition result for a single portfolio position.\n\nAll monetary fields are in the same units as the portfolio VaR\n(typically the portfolio's base currency).",
+      "properties": {
+        "component_var": {
+          "description": "Component VaR: position's Euler-allocated share of portfolio VaR.\n\nSum of all component VaRs equals total portfolio VaR (exact under\nthe parametric normal assumption; approximate for historical).\n\nFormula (parametric, loss-signed):\n```text\nCVaR_i = -w_i * (Sigma * w)_i / sigma_p * z_alpha\n```",
+          "format": "double",
+          "type": "number"
+        },
+        "incremental_var": {
+          "description": "Incremental VaR: change in portfolio VaR from removing this position.\n\n```text\nIVaR_i = VaR(portfolio) - VaR(portfolio \\ {i})\n```\n\nRequires full repricing for each position removal. `None` if\nincremental VaR was not requested (it is expensive).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "marginal_var": {
+          "description": "Marginal VaR: per-unit sensitivity of portfolio VaR to this position.\n\nFormula (parametric, loss-signed):\n```text\nMVaR_i = -(Sigma * w)_i / sigma_p * z_alpha\n```\n\nUsed as gradient input for mean-variance optimization and\nrisk-budgeting rebalancing.\n\n`None` when the engine cannot produce a true gradient (e.g.\nhistorical mode without finite-difference repricing); callers that\nneed a marginal must choose a fallback or skip rebalancing.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "position_id": {
+          "description": "Position identifier.",
+          "type": "string"
+        },
+        "relative_var": {
+          "description": "Component VaR as a fraction of total portfolio VaR.\n\n`relative_var = component_var / portfolio_var`. Sums to 1.0.\nA negative value indicates the position is a diversifier.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "position_id",
+        "component_var",
+        "relative_var"
+      ],
+      "type": "object"
+    },
+    "RiskBudgetResult": {
+      "description": "Result of comparing actual risk decomposition against a risk budget.\n\nUtilization is measured on the *consuming* side: a position's component\nVaR is positive utilization when it carries the same sign as the portfolio\nVaR (it consumes risk) and negative utilization when it offsets portfolio\nrisk (a diversifier / hedge). Diversifiers can never breach the budget and\nnever contribute to [`Self::total_overbudget`].",
+      "properties": {
+        "has_breach": {
+          "description": "Whether any position exceeds its utilization threshold.",
+          "type": "boolean"
+        },
+        "positions": {
+          "description": "Per-position budget comparison.",
+          "items": {
+            "$ref": "#/$defs/PositionBudgetEntry"
+          },
+          "type": "array"
+        },
+        "total_overbudget": {
+          "description": "Total over-budget amount: sum of positive consuming-side exceedances.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "positions",
+        "total_overbudget",
+        "has_breach"
+      ],
+      "type": "object"
+    },
+    "StressAttribution": {
+      "description": "Per-position attribution of portfolio losses in tail scenarios.\n\nFor each scenario that breaches the VaR threshold, reports which\npositions contributed the most to the portfolio loss.",
+      "properties": {
+        "n_tail_scenarios": {
+          "description": "Number of tail scenarios analyzed.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "position_contributions": {
+          "description": "Per-position average contribution to tail losses.\n\nSorted by absolute contribution (largest risk driver first).",
+          "items": {
+            "$ref": "#/$defs/StressPositionEntry"
+          },
+          "type": "array"
+        },
+        "position_ids": {
+          "description": "Canonical position ordering shared by every [`tail_scenarios`] entry.\n\n`tail_scenarios[k].position_pnls[i]` is the P&L for `position_ids[i]`.\nStoring the id list once here (rather than re-attaching it to every tail\nscenario) avoids duplicating it `n_tail_scenarios` times.\n\n[`tail_scenarios`]: Self::tail_scenarios",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tail_scenarios": {
+          "description": "Individual tail scenario breakdowns.\n\nContains `n_tail_scenarios` entries, each with per-position P&L\nindex-aligned to [`position_ids`](Self::position_ids).\nSorted by portfolio loss (worst first).",
+          "items": {
+            "$ref": "#/$defs/TailScenarioBreakdown"
+          },
+          "type": "array"
+        },
+        "var_threshold": {
+          "description": "Portfolio VaR threshold (scenarios with P&L at or below this are\n\"tail events\"). Loss convention: reported as a negative number.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "var_threshold",
+        "n_tail_scenarios",
+        "position_ids",
+        "position_contributions",
+        "tail_scenarios"
+      ],
+      "type": "object"
+    },
+    "StressPositionEntry": {
+      "description": "Single position's contribution to tail stress.",
+      "properties": {
+        "avg_tail_pnl": {
+          "description": "Average P&L contribution in tail scenarios.",
+          "format": "double",
+          "type": "number"
+        },
+        "pct_of_tail_loss": {
+          "description": "Fraction of total portfolio tail loss attributable to this position.",
+          "format": "double",
+          "type": "number"
+        },
+        "position_id": {
+          "description": "Position identifier.",
+          "type": "string"
+        },
+        "worst_scenario_pnl": {
+          "description": "Worst single-scenario P&L for this position.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "position_id",
+        "avg_tail_pnl",
+        "pct_of_tail_loss",
+        "worst_scenario_pnl"
+      ],
+      "type": "object"
+    },
+    "TailScenarioBreakdown": {
+      "description": "Breakdown of a single tail scenario.",
+      "properties": {
+        "portfolio_pnl": {
+          "description": "Total portfolio P&L for this scenario.",
+          "format": "double",
+          "type": "number"
+        },
+        "position_pnls": {
+          "description": "Per-position P&L contributions, index-aligned to\n[`StressAttribution::position_ids`]. Entry `i` is the P&L for\n`StressAttribution::position_ids[i]`.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "scenario_index": {
+          "description": "Scenario index in the original history.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "scenario_index",
+        "portfolio_pnl",
+        "position_pnls"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/position_risk_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Position VaR/ES decomposition with its optional risk budget and tail stress attribution.",
+  "properties": {
+    "budget": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RiskBudgetResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Budget evaluation of the decomposition; `None` without a budget."
+    },
+    "decomposition": {
+      "$ref": "#/$defs/PositionRiskDecomposition",
+      "description": "Portfolio and per-position VaR/ES (losses negative)."
+    },
+    "stress": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StressAttribution"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Tail stress attribution of a historical source's P&L; `None` for a\nparametric source."
+    }
+  },
+  "required": [
+    "decomposition"
+  ],
+  "title": "PositionRiskReport",
+  "type": "object"
+}

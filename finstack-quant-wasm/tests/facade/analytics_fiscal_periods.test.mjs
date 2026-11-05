@@ -17,7 +17,12 @@ const close = (actual, expected) =>
 
 for (const example of cases) {
   test(`fiscal aggregation matches boundary groups: ${example.name}`, () => {
-    const perf = analytics.Performance.fromReturns(example.dates, [example.returns], ['FUND']);
+    const perf = new analytics.Performance({
+      dates: example.dates,
+      series: [example.returns],
+      kind: 'returns',
+      ticker_names: ['FUND'],
+    });
     const fiscal = new core.FiscalConfig(example.start_month, example.start_day);
     for (const [frequency, groups] of Object.entries(example.groups)) {
       const expected = groups.map(
@@ -34,11 +39,12 @@ for (const example of cases) {
 }
 
 test('aggregation rejects unrepresentable calendar and fiscal boundaries', () => {
-  const perf = analytics.Performance.fromReturns(
-    ['9999-12-30', '9999-12-31'],
-    [[0.01, 0.02]],
-    ['FUND']
-  );
+  const perf = new analytics.Performance({
+    dates: ['9999-12-30', '9999-12-31'],
+    series: [[0.01, 0.02]],
+    kind: 'returns',
+    ticker_names: ['FUND'],
+  });
   const fiscal = new core.FiscalConfig(10, 1);
   const isValidation = (error) => error.kind === 'validation';
   for (const frequency of ['daily', 'weekly', 'monthly', 'quarterly', 'semi_annual', 'annual']) {
@@ -52,12 +58,14 @@ test('aggregation rejects unrepresentable calendar and fiscal boundaries', () =>
 
 test('fiscal aggregation preserves ragged active-window alignment', () => {
   const example = cases[0];
-  const ragged = [NaN, ...example.returns.slice(1, -1), NaN];
-  const perf = analytics.Performance.fromReturns(
-    example.dates,
-    [example.returns, ragged],
-    ['BENCH', 'FUND']
-  );
+  // A gap is null on the wire.
+  const ragged = [null, ...example.returns.slice(1, -1), null];
+  const perf = new analytics.Performance({
+    dates: example.dates,
+    series: [example.returns, ragged],
+    kind: 'returns',
+    ticker_names: ['BENCH', 'FUND'],
+  });
   perf.resetDateRange(example.dates[1], example.dates.at(-2));
   assert.deepEqual(perf.getActiveDatesForTicker(1), example.dates.slice(1, -1));
   const expected =
@@ -81,7 +89,12 @@ test('an omitted fiscalConfig buckets weekly periods with ISO weeks', () => {
     '2025-01-07',
   ];
   const returns = [0.01, -0.02, 0.03, 0.01, -0.01, 0.02, 0.01, -0.03, 0.02];
-  const perf = analytics.Performance.fromReturns(dates, [returns], ['FUND']);
+  const perf = new analytics.Performance({
+    dates,
+    series: [returns],
+    kind: 'returns',
+    ticker_names: ['FUND'],
+  });
   const calendar = core.FiscalConfig.calendarYear();
   const omitted = perf.periodStats(0, 'weekly');
   assert.deepEqual(perf.periodStats(0, 'weekly', null), omitted);

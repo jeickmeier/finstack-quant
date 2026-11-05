@@ -233,6 +233,74 @@ export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor
  * generated schemas enforce the same positive-number contract.
  */
 export type PositiveF64Wire = number;
+/**
+ * One standard covenant package and its thresholds.
+ */
+export type CovenantTemplate =
+  | {
+      /**
+       * Minimum fixed-charge-coverage threshold in turns.
+       */
+      fixed_charge_coverage: number;
+      /**
+       * Maximum debt-to-EBITDA threshold in turns.
+       */
+      initial_leverage: number;
+      /**
+       * Minimum interest-coverage threshold in turns.
+       */
+      interest_coverage: number;
+      kind: "lbo_standard";
+      /**
+       * Maximum annual capital expenditure in the reporting currency.
+       */
+      max_capex: number;
+    }
+  | {
+      kind: "cov_lite";
+      /**
+       * Maximum total debt-to-EBITDA incurrence threshold in turns.
+       */
+      max_leverage: number;
+      /**
+       * Maximum senior-debt-to-EBITDA incurrence threshold in turns.
+       */
+      max_senior_leverage: number;
+    }
+  | {
+      kind: "real_estate";
+      /**
+       * Maximum loan-to-value ratio as a decimal fraction.
+       */
+      max_ltv: number;
+      /**
+       * Minimum debt yield as a decimal fraction.
+       */
+      min_debt_yield: number;
+      /**
+       * Minimum debt-service-coverage ratio in turns.
+       */
+      min_dscr: number;
+    }
+  | {
+      /**
+       * Higher DSCR threshold in turns that blocks distributions.
+       */
+      distribution_lockup_dscr: number;
+      kind: "project_finance";
+      /**
+       * Maximum net-debt-to-EBITDA threshold in turns.
+       */
+      max_net_leverage: number;
+      /**
+       * Minimum default DSCR in turns.
+       */
+      min_dscr: number;
+      /**
+       * Minimum debt-service-reserve amount in the reporting currency.
+       */
+      min_liquidity: number;
+    };
 
 /**
  * Result of applying a covenant consequence.

@@ -9,6 +9,5 @@ export const lgd = {
   EadCalculator: wasm.EadCalculator,
   seniorityCalibrationIds: wasm.seniorityCalibrationIds,
   seniorityRecoveryStats: wasm.seniorityRecoveryStats,
-  workoutLgd: wasm.workoutLgd,
   collateralPieceLiquidationValue: wasm.collateralPieceLiquidationValue,
 };

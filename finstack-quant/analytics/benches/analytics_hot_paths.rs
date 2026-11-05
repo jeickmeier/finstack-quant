@@ -70,25 +70,25 @@ fn bench_performance(c: &mut Criterion) {
     c.bench_function("Performance::new 750x2 daily", |b| {
         b.iter(|| {
             black_box(
-                Performance::new(
+                Performance::new(&fixtures::prices_panel(
                     dates.clone(),
                     vec![prices_a.clone(), prices_b.clone()],
                     vec!["A".to_string(), "B".to_string()],
                     Some("B"),
                     PeriodKind::Daily,
-                )
+                ))
                 .expect("perf"),
             )
         });
     });
 
-    let perf = Performance::new(
+    let perf = Performance::new(&fixtures::prices_panel(
         dates,
         vec![prices_a, prices_b],
         vec!["A".to_string(), "B".to_string()],
         Some("B"),
         PeriodKind::Daily,
-    )
+    ))
     .expect("perf");
     c.bench_function("Performance::sharpe 750x2", |b| {
         b.iter(|| black_box(perf.sharpe(0.02)));

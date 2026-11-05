@@ -3,6 +3,9 @@ import { useMemo, useState } from "react";
 import type { StatementResult } from "finstack-quant-wasm";
 import { Button } from "@/components/ui/button";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
+import { createWireCodec } from "@/lib/finstack/codec.mjs";
+import varianceConfigSchema from "@/lib/finstack/generated/schemas/variance_config.json";
+import type { VarianceConfigWire } from "@/lib/finstack/generated/types/variance_config";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { VarianceTable } from "@/components/finstack/statements/components/variance-table/variance-table";
@@ -19,6 +22,10 @@ export interface EvaluatedModel {
 }
 const baselineLabel = "Before roll forward";
 const comparisonLabel = "After roll forward";
+/** The generated VarianceConfig contract: the run's config is checked against it and written by it. */
+const varianceConfig = createWireCodec(varianceConfigSchema);
+const varianceConfigJson = (config: VarianceConfigWire) =>
+  varianceConfig.stringify(config);
 /** A returned cell as a number; a missing cell or non-finite sentinel is NaN, which Rust rejects. */
 function cell(result: StatementResult, nodeId: string, period: string) {
   const value = result.nodes[nodeId]?.[period];
@@ -118,7 +125,7 @@ export function RollForwardReview({
       ? {
           baseJson: base,
           comparisonJson: comparison,
-          configJson: JSON.stringify({
+          configJson: varianceConfigJson({
             baseline_label: baselineLabel,
             comparison_label: comparisonLabel,
             metrics,

@@ -97,13 +97,13 @@ fn performance_state_validates_against_its_schema() {
         vec![100.0, 101.0, 100.5, 102.0, 103.0, 102.5, 104.0],
         vec![50.0, 50.5, 50.2, 51.0, 51.5, 51.2, 52.0],
     ];
-    let perf = Performance::new(
+    let perf = Performance::new(&crate::support::prices_panel(
         dates,
         prices,
         vec!["SPY".into(), "QQQ".into()],
         Some("SPY"),
         PeriodKind::Daily,
-    )
+    ))
     .expect("valid panel");
     assert_wire_matches_schema("Performance", &perf);
 }

@@ -31,14 +31,17 @@ test('covenants namespace exposes JSON bridge functions', () => {
   assert.equal(typeof covenants.validateCovenantReportJson, 'function');
   assert.equal(typeof covenants.validateCovenantEngineJson, 'function');
   assert.equal(typeof covenants.evaluateEngine, 'function');
-  assert.equal(typeof covenants.lboStandardJson, 'function');
-  assert.equal(typeof covenants.covLiteJson, 'function');
-  assert.equal(typeof covenants.realEstateJson, 'function');
-  assert.equal(typeof covenants.projectFinanceJson, 'function');
+  assert.equal(typeof covenants.covenantTemplate, 'function');
 });
 
-test('covenants facade generates and evaluates template JSON', () => {
-  const specs = JSON.parse(covenants.lboStandardJson(5.0, 1.5, 1.2, 10_000_000.0));
+test('covenants facade generates and evaluates template specs', () => {
+  const specs = covenants.covenantTemplate({
+    kind: 'lbo_standard',
+    initial_leverage: 5.0,
+    interest_coverage: 1.5,
+    fixed_charge_coverage: 1.2,
+    max_capex: 10_000_000.0,
+  });
   const engine = JSON.stringify({
     specs: [specs[0]],
     breach_history: [],
@@ -81,7 +84,13 @@ test('covenants facade rejects unknown validation fields', () => {
 });
 
 test('net cash requires a positive earnings denominator across the JSON bridge', () => {
-  const spec = JSON.parse(covenants.lboStandardJson(5, 1.5, 1.2, 1000))[0];
+  const spec = covenants.covenantTemplate({
+    kind: 'lbo_standard',
+    initial_leverage: 5,
+    interest_coverage: 1.5,
+    fixed_charge_coverage: 1.2,
+    max_capex: 1000,
+  })[0];
   spec.covenant.covenant_type = { max_net_debt_to_ebitda: { threshold: 4.5 } };
   spec.metric_id = 'net_debt_to_ebitda';
   spec.denominator_metric_id = 'ebitda';
@@ -102,7 +111,13 @@ test('net cash requires a positive earnings denominator across the JSON bridge',
 });
 
 test('engine validation rejects overlapping amendments and invalid sweep fractions', () => {
-  const spec = JSON.parse(covenants.lboStandardJson(5, 1.5, 1.2, 1000))[0];
+  const spec = covenants.covenantTemplate({
+    kind: 'lbo_standard',
+    initial_leverage: 5,
+    interest_coverage: 1.5,
+    fixed_charge_coverage: 1.2,
+    max_capex: 1000,
+  })[0];
   const waiver = {
     covenant_id: spec.covenant.label,
     effective_date: '2026-01-01',
@@ -125,7 +140,13 @@ test('engine validation rejects overlapping amendments and invalid sweep fractio
 });
 
 test('JSON metric-map errors come from the Rust parser (same text as Python)', () => {
-  const spec = JSON.parse(covenants.lboStandardJson(5.0, 1.5, 1.2, 10_000_000.0))[0];
+  const spec = covenants.covenantTemplate({
+    kind: 'lbo_standard',
+    initial_leverage: 5.0,
+    interest_coverage: 1.5,
+    fixed_charge_coverage: 1.2,
+    max_capex: 10_000_000.0,
+  })[0];
   const engine = JSON.stringify({ specs: [spec] });
   for (const [metrics, message] of [
     [

@@ -26,8 +26,13 @@ impl TornadoEntry {
 }
 
 /// Parameter to vary in sensitivity analysis.
+///
+/// The wire form carries exactly one of `perturbations` (absolute values) or
+/// `pct_range` (percentage moves of `base_value`, converted on deserialization
+/// as by [`Self::with_percentages`]); it always serializes the absolute values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "ParameterSpecWire")]
 pub struct ParameterSpec {
     /// Node identifier
     pub node_id: String,
@@ -41,6 +46,49 @@ pub struct ParameterSpec {
     /// Absolute values to substitute for this node/period; use
     /// [`Self::with_percentages`] to construct shocks from percentage inputs.
     pub perturbations: Vec<f64>,
+}
+
+#[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct ParameterSpecWire {
+    /// Node identifier
+    node_id: String,
+    /// Period to vary
+    period_id: PeriodId,
+    /// Base value in the node's units; `pct_range` moves are applied to it.
+    base_value: f64,
+    /// Absolute values to substitute for this node/period; give exactly one of
+    /// `perturbations` and `pct_range`.
+    #[serde(default)]
+    perturbations: Option<Vec<f64>>,
+    /// Percentage moves of `base_value` (`10.0` is a 10% increase), each
+    /// substituted as `base_value * (1 + pct / 100)`; give exactly one of
+    /// `perturbations` and `pct_range`.
+    #[serde(default)]
+    pct_range: Option<Vec<f64>>,
+}
+
+impl TryFrom<ParameterSpecWire> for ParameterSpec {
+    type Error = finstack_quant_statements::Error;
+
+    fn try_from(wire: ParameterSpecWire) -> finstack_quant_statements::Result<Self> {
+        match (wire.perturbations, wire.pct_range) {
+            (Some(perturbations), None) => Ok(Self::new(
+                wire.node_id,
+                wire.period_id,
+                wire.base_value,
+                perturbations,
+            )),
+            (None, Some(pct_range)) => {
+                Self::with_percentages(wire.node_id, wire.period_id, wire.base_value, pct_range)
+            }
+            _ => Err(finstack_quant_statements::Error::invalid_input(format!(
+                "Sensitivity parameter '{}@{}' takes exactly one of `perturbations` or `pct_range`",
+                wire.node_id, wire.period_id
+            ))),
+        }
+    }
 }
 
 impl ParameterSpec {
@@ -356,5 +404,53 @@ mod tests {
             .expect_err("out of range");
         assert!(error.to_string().contains("scenario index 1 out of range"));
         assert!(result.get_value(3, "profit", &period).is_err());
+    }
+
+    #[test]
+    fn parameter_spec_wire_takes_absolute_or_percentage_perturbations() {
+        let absolute: ParameterSpec = serde_json::from_value(serde_json::json!({
+            "node_id": "revenue", "period_id": "2025Q2", "base_value": 100.0,
+            "perturbations": [90.0, 110.0],
+        }))
+        .expect("absolute");
+        assert_eq!(absolute.perturbations, vec![90.0, 110.0]);
+        let percent: ParameterSpec = serde_json::from_value(serde_json::json!({
+            "node_id": "revenue", "period_id": "2025Q2", "base_value": 100.0,
+            "pct_range": [-10.0, 10.0],
+        }))
+        .expect("percent");
+        let direct = ParameterSpec::with_percentages(
+            "revenue",
+            PeriodId::quarter(2025, 2).expect("valid period"),
+            100.0,
+            vec![-10.0, 10.0],
+        )
+        .expect("direct");
+        assert_eq!(percent.perturbations, direct.perturbations);
+        let written = serde_json::to_value(&percent).expect("serialize");
+        assert_eq!(
+            written["perturbations"],
+            serde_json::json!(direct.perturbations)
+        );
+        assert!(written.get("pct_range").is_none());
+    }
+
+    #[test]
+    fn parameter_spec_wire_rejects_both_neither_and_unknown_fields() {
+        let base = serde_json::json!({
+            "node_id": "revenue", "period_id": "2025Q2", "base_value": 100.0,
+        });
+        let with = |extra: serde_json::Value| {
+            let mut value = base.clone();
+            value
+                .as_object_mut()
+                .expect("object")
+                .extend(extra.as_object().expect("object").clone());
+            serde_json::from_value::<ParameterSpec>(value)
+        };
+        assert!(with(serde_json::json!({})).is_err());
+        assert!(with(serde_json::json!({"perturbations": [1.0], "pct_range": [1.0]})).is_err());
+        assert!(with(serde_json::json!({"perturbations": [1.0], "extra": 1})).is_err());
+        assert!(with(serde_json::json!({"pct_range": [-10.0]})).is_ok());
     }
 }

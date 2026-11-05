@@ -20,6 +20,8 @@ import {
   VolCubeSlice,
   type VolCubeSliceProps,
 } from "@/components/finstack/models/components/vol-cube-slice/vol-cube-slice";
+/** The unit wire conventions a cube evaluates in; shifted lognormal is not offered. */
+type OutputConvention = Extract<CubeSampleRequest["convention"], string>;
 export interface CubePoint extends SurfacePoint {
   coordinate: CubeSampleRequest["coordinates"][number];
 }
@@ -36,12 +38,9 @@ export interface VolCubeExplorerProps extends Omit<
   cube: CubeSampleRequest["cube"];
   /** Absolute strike in the same rate units as stored forwards; never an offset. */
   initialStrike: number;
-  initialConvention: CubeSampleRequest["convention"];
+  initialConvention: OutputConvention;
   /** Explicit extents in each evaluator's output units. */
-  colorDomains: Record<
-    CubeSampleRequest["convention"],
-    readonly [number, number]
-  >;
+  colorDomains: Record<OutputConvention, readonly [number, number]>;
   /** Supplied sampling coordinates. Omit to sample the canonical expiry/tenor nodes. */
   coordinates?: readonly { expiry: number; tenor: number }[];
   /** Explicit strikes (and optional rate and repair passes) for the Rust-materialized slice and node smile. Omit to show no slice. */
@@ -121,12 +120,10 @@ export function VolCubeExplorer(props: VolCubeExplorerProps) {
       <EnumField
         label="Output convention"
         value={convention}
-        onValueChange={(value) =>
-          setConvention(value as CubeSampleRequest["convention"])
-        }
+        onValueChange={(value) => setConvention(value as OutputConvention)}
         options={[
           { value: "normal", label: "Normal/Bachelier" },
-          { value: "black_lognormal", label: "Black/lognormal" },
+          { value: "lognormal", label: "Black/lognormal" },
         ]}
       />
       <p>

@@ -52,7 +52,7 @@ const cube = fixtures.market.vol_cubes.find(
 const strikes = [0.03, 0.04, 0.05, 0.06, 0.07];
 const colorDomains = {
   normal: [0, 0.02],
-  black_lognormal: [0, 1],
+  lognormal: [0, 1],
 } as const;
 const calls = (method: string) =>
   transport.call.mock.calls
@@ -102,7 +102,7 @@ it("slices the cube natively at the seeded strikes, fixed axis and node", async 
   fireEvent.click(screen.getByRole("radio", { name: "Black/lognormal" }));
   await waitFor(() =>
     expect(calls("cubeSlice").at(-1)).toMatchObject({
-      convention: "black_lognormal",
+      convention: "lognormal",
     }),
   );
   const count = transport.call.mock.calls.length;

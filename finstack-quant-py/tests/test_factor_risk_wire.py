@@ -18,8 +18,7 @@ from finstack_quant.models.correlation import PortfolioLossResult
 from finstack_quant.models.factor.risk import (
     build_stress_attribution,
     evaluate_risk_budget,
-    historical_var_decomposition,
-    parametric_var_decomposition,
+    position_risk_report,
 )
 
 VAR_IDS = ["A", "B"]
@@ -46,7 +45,10 @@ def _scenario_pnls(n_scenarios: int = 20) -> list[list[float]]:
 
 
 def test_parametric_var_decomposition_wire_shape_matches_wasm() -> None:
-    result = parametric_var_decomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE)
+    result = position_risk_report({
+        "position_ids": VAR_IDS,
+        "source": {"kind": "parametric", "weights": VAR_WEIGHTS, "covariance": VAR_COVARIANCE},
+    }).decomposition
     doc = json.loads(result.to_json())
     assert sorted(doc) == DECOMPOSITION_KEYS
     assert sorted(doc["var_contributions"][0]) == [
@@ -63,21 +65,33 @@ def test_parametric_var_decomposition_wire_shape_matches_wasm() -> None:
     assert doc["portfolio_var"] == pytest.approx(PARAMETRIC_VAR_95, abs=1e-12)
     assert doc["var_contributions"][0]["incremental_var"] is None
 
-    explicit = parametric_var_decomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE, 0.99, True)
+    explicit = position_risk_report({
+        "position_ids": VAR_IDS,
+        "confidence": 0.99,
+        "source": {
+            "kind": "parametric",
+            "weights": VAR_WEIGHTS,
+            "covariance": VAR_COVARIANCE,
+            "compute_incremental": True,
+        },
+    }).decomposition
     assert explicit.confidence == 0.99
     assert explicit.var_contributions[0].incremental_var is not None
 
 
-def test_decompositions_no_longer_take_a_config_keyword() -> None:
-    with pytest.raises(TypeError):
-        parametric_var_decomposition(  # type: ignore[call-arg]
-            VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE, config={"confidence": 0.95}
-        )
+def test_position_risk_request_rejects_unknown_fields() -> None:
+    source = {"kind": "parametric", "weights": VAR_WEIGHTS, "covariance": VAR_COVARIANCE}
+    with pytest.raises(ValueError, match="unknown field"):
+        position_risk_report({"position_ids": VAR_IDS, "source": source, "config": {"confidence": 0.95}})
 
 
 def test_historical_decomposition_has_es_rows_and_rust_default_confidence() -> None:
     pnls = _scenario_pnls()
-    result = historical_var_decomposition(VAR_IDS, pnls, 0.9)
+    result = position_risk_report({
+        "position_ids": VAR_IDS,
+        "confidence": 0.9,
+        "source": {"kind": "historical", "pnls": pnls},
+    }).decomposition
     doc = json.loads(result.to_json())
     assert sorted(doc) == DECOMPOSITION_KEYS
     assert doc["method"] == "historical"
@@ -85,7 +99,13 @@ def test_historical_decomposition_has_es_rows_and_rust_default_confidence() -> N
     assert doc["euler_residual"] is None
     # Two tail scenarios at 95% need at least 40 scenarios.
     longer = _scenario_pnls(40)
-    assert historical_var_decomposition(VAR_IDS, longer).confidence == 0.95
+    assert (
+        position_risk_report({
+            "position_ids": VAR_IDS,
+            "source": {"kind": "historical", "pnls": longer},
+        }).decomposition.confidence
+        == 0.95
+    )
 
 
 def test_scenario_major_pnls_are_rejected_like_wasm() -> None:
@@ -93,7 +113,11 @@ def test_scenario_major_pnls_are_rejected_like_wasm() -> None:
     pnls = _scenario_pnls()
     scenario_major = [[a, b] for a, b in zip(pnls[0], pnls[1], strict=True)]
     with pytest.raises(ValueError, match="must have 2 rows, got 20"):
-        historical_var_decomposition(VAR_IDS, scenario_major, 0.9)
+        position_risk_report({
+            "position_ids": VAR_IDS,
+            "confidence": 0.9,
+            "source": {"kind": "historical", "pnls": scenario_major},
+        })
     with pytest.raises(ValueError, match="must have 2 rows, got 20"):
         build_stress_attribution(VAR_IDS, scenario_major, 0.9)
 

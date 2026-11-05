@@ -206,12 +206,16 @@ export function RenderField({
             label: labelFor(branch.label),
             description: branch.schema.description,
           }))}
-          onValueChange={(index) =>
+          onValueChange={(index) => {
             // Choosing a branch reveals its fields; it does not edit them.
-            form.setFieldValue(path, union.switchTo(Number(index), value), {
-              dontUpdateMeta: true,
-            })
-          }
+            const next = union.switchTo(Number(index), value);
+            // The document root has no field name: its branch replaces every value.
+            if (path === "")
+              form.reset(next as Record<string, unknown>, {
+                keepDefaultValues: true,
+              });
+            else form.setFieldValue(path, next, { dontUpdateMeta: true });
+          }}
         />
         {selected >= 0 && (
           <RenderField

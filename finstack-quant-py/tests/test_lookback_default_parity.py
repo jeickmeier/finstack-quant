@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from finstack_quant.analytics import Performance
+from finstack_quant.analytics import Performance, PerformancePanel
 
 FIXTURE = Path(__file__).parent / "fixtures" / "lookback_default.json"
 DATES = ["2025-01-30", "2025-01-31", "2025-02-03", "2025-02-04", "2025-02-05"]
@@ -23,7 +23,9 @@ RETURNS = [[0.01, -0.02, 0.03, 0.005, 0.0]]
 
 
 def _panel() -> Performance:
-    return Performance.from_returns_arrays(DATES, RETURNS, ["asset"], None, "daily")
+    return Performance.from_panel(
+        PerformancePanel(dates=DATES, series=RETURNS, kind="returns", ticker_names=["asset"], frequency="daily")
+    )
 
 
 def test_default_matches_the_result_pinned_for_both_hosts() -> None:

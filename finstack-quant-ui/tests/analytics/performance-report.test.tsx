@@ -62,7 +62,7 @@ const entry = (name: keyof typeof cases) => ({
   request: cases[name].request as PerformanceReportRequest,
   report: cases[name].report as unknown as Report,
 });
-const panel = entry("defaults").request;
+const { panel } = entry("defaults").request;
 // Reports are regenerated and compared by `mise run ui-fixtures --check`
 // (tests/analytics/generate.mjs).
 it.each(["defaults", "explicit"] as const)(
@@ -111,13 +111,15 @@ it("builds a price panel with the native constructor and reports no benchmark wh
   const dates = panel.dates.slice(0, 260);
   const prices = [dates.map((_, i) => 100 + 10 * Math.sin(i / 20) + i / 20)];
   const request: PerformanceReportRequest = {
-    dates,
-    values: prices,
-    kind: "prices",
-    tickerNames: ["Prices"],
+    panel: {
+      dates,
+      series: prices,
+      kind: "prices",
+      ticker_names: ["Prices"],
+    },
   };
   const report = unwrap(await harness.proxy.performanceReport(request));
-  const direct = new native.Performance(dates, prices, ["Prices"]);
+  const direct = new native.Performance(request.panel);
   try {
     expect(report.summary).toEqual(direct.summary());
     expect(report.tickers[0]!.cumulativeReturns).toEqual(
@@ -147,7 +149,7 @@ it("returns the native error and still frees the panel when a later call fails",
   );
   const unknown = await harness.proxy.performanceReport({
     ...request,
-    benchmarkTicker: "Missing",
+    panel: { ...request.panel, benchmark_ticker: "Missing" },
   });
   expect(unknown.ok).toBe(false);
   if (!unknown.ok) expect(unknown.error.kind).toBe("not_found");
@@ -191,16 +193,19 @@ it("sends the original numeric snapshot after the caller mutates its request", a
   const input = {
     ...request,
     riskFreeRate: Number.NaN,
-    values: request.values.map((row) => [...row]),
+    panel: {
+      ...request.panel,
+      series: request.panel.series.map((row) => [...row]),
+    },
   };
-  input.values[0]![0] = Infinity;
+  input.panel.series[0]![0] = Infinity;
   const expected = structuredClone(input);
   const call = vi.fn(async () => report);
   const client = { call } as unknown as FinstackClient;
   const options = performanceReportOptions(client, 2, input);
   const key = options.queryKey[3];
   input.riskFreeRate = 0;
-  input.values[0]![0] = 0;
+  input.panel.series[0]![0] = 0;
   const queries = new QueryClient();
   try {
     await queries.query(options);
@@ -329,7 +334,13 @@ it("renders the worker report through the hook, then the native error", async ()
   unmount();
   render(
     <FinstackQueryProvider>
-      <Connected request={{ ...request, frequency: "fortnightly" }} />
+      <Connected
+        request={{
+          ...request,
+          // Not a Rust PeriodKind: the native error surfaces.
+          panel: { ...request.panel, frequency: "fortnightly" as never },
+        }}
+      />
     </FinstackQueryProvider>,
   );
   await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy(), {

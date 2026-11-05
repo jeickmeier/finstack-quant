@@ -14,7 +14,13 @@ function dates(n) {
 }
 
 function panel(values, frequency = 'daily') {
-  return analytics.Performance.fromReturns(dates(values.length), [values], ['A'], null, frequency);
+  return new analytics.Performance({
+    dates: dates(values.length),
+    series: [values],
+    kind: 'returns',
+    ticker_names: ['A'],
+    frequency,
+  });
 }
 
 function close(actual, expected) {
@@ -65,11 +71,12 @@ test('drawdown ratios preserve non-finite cash rates', () => {
 
 test('Treynor preserves non-finite cash rates with zero beta', () => {
   for (const portfolioReturn of [0.01, 0]) {
-    const perf = analytics.Performance.fromReturns(
-      dates(3),
-      [[-0.01, 0.01, 0.02], Array(3).fill(portfolioReturn)],
-      ['BENCH', 'PORT']
-    );
+    const perf = new analytics.Performance({
+      dates: dates(3),
+      series: [[-0.01, 0.01, 0.02], Array(3).fill(portfolioReturn)],
+      kind: 'returns',
+      ticker_names: ['BENCH', 'PORT'],
+    });
     for (const invalid of [NaN, Infinity, -Infinity])
       assert.ok(Number.isNaN(perf.treynor(invalid)[1]));
     assert.equal(perf.treynor(0)[1], portfolioReturn > 0 ? Infinity : 0);
@@ -85,17 +92,24 @@ test('extreme wealth preserves annualized growth and relative drawdowns', () => 
     ],
     [['2021-01-01', '2022-01-01'], [1e200, 1e200], Math.pow(1e200, 2 / (731 / 365.25))],
   ]) {
-    const perf = analytics.Performance.fromReturns(grid, [values], ['A'], null, 'annual');
+    const perf = new analytics.Performance({
+      dates: grid,
+      series: [values],
+      kind: 'returns',
+      ticker_names: ['A'],
+      frequency: 'annual',
+    });
     const result = perf.cagr()[0];
     assert.ok(Number.isFinite(result));
     close(result / expected, 1);
   }
   for (const values of [Array(20).fill(-0.9), Array(4).fill(1e300)]) {
-    const perf = analytics.Performance.fromReturns(
-      dates(values.length),
-      [values, values],
-      ['BENCH', 'A']
-    );
+    const perf = new analytics.Performance({
+      dates: dates(values.length),
+      series: [values, values],
+      kind: 'returns',
+      ticker_names: ['BENCH', 'A'],
+    });
     for (const series of perf.cumulativeReturnsOutperformance()) {
       assert.ok(Array.from(series).every((value) => value === 0));
     }
@@ -114,7 +128,12 @@ test('extreme wealth preserves annualized growth and relative drawdowns', () => 
 });
 
 test('lookback returns accept the maximum calendar date', () => {
-  const perf = new analytics.Performance(['9999-12-30', '9999-12-31'], [[100, 110]], ['A']);
+  const perf = new analytics.Performance({
+    dates: ['9999-12-30', '9999-12-31'],
+    series: [[100, 110]],
+    kind: 'prices',
+    ticker_names: ['A'],
+  });
   const lookback = perf.lookbackReturns('9999-12-31');
   for (const values of [lookback.mtd, lookback.qtd, lookback.ytd, lookback.fytd])
     close(values[0], 0.1);
@@ -204,21 +223,36 @@ test('integer arguments reject truncation, wrapping and non-finite values', () =
 test('duplicate ticker labels and unrepresentable price returns are rejected', () => {
   assert.throws(
     () =>
-      analytics.Performance.fromReturns(
-        dates(2),
-        [
+      new analytics.Performance({
+        dates: dates(2),
+        series: [
           [0.01, 0.02],
           [0.03, 0.04],
         ],
-        ['A', 'A']
-      ),
+        kind: 'returns',
+        ticker_names: ['A', 'A'],
+      }),
     /duplicate ticker/
   );
-  assert.throws(() => new analytics.Performance(dates(2), [[1e-300, 1e300]], ['A']), /finite/);
+  assert.throws(
+    () =>
+      new analytics.Performance({
+        dates: dates(2),
+        series: [[1e-300, 1e300]],
+        kind: 'prices',
+        ticker_names: ['A'],
+      }),
+    /finite/
+  );
 });
 
 test('drawdown dates, cash basis, Kelly and undefined factor statistics agree with Rust', () => {
-  const perf = new analytics.Performance(dates(3), [[100, 90, 100]], ['A']);
+  const perf = new analytics.Performance({
+    dates: dates(3),
+    series: [[100, 90, 100]],
+    kind: 'prices',
+    ticker_names: ['A'],
+  });
   const episode = perf.drawdownDetails(0)[0];
   assert.equal(episode.duration_days, 2);
   assert.equal(episode.truncated_at_start, false);
@@ -236,12 +270,13 @@ test('drawdown dates, cash basis, Kelly and undefined factor statistics agree wi
 test('beta confidence intervals use the actual sample degrees of freedom', () => {
   const benchmark = Array.from({ length: 42 }, (_, i) => -0.02 + i * 0.001);
   const fund = benchmark.map((value, i) => 1.4 * value + (i % 2 === 0 ? 0.002 : -0.0015));
-  const perf = analytics.Performance.fromReturns(
-    dates(42),
-    [fund, benchmark],
-    ['FUND', 'BENCH'],
-    'BENCH'
-  );
+  const perf = new analytics.Performance({
+    dates: dates(42),
+    series: [fund, benchmark],
+    kind: 'returns',
+    ticker_names: ['FUND', 'BENCH'],
+    benchmark_ticker: 'BENCH',
+  });
   const result = perf.beta()[0];
   const critical = (result.ci_upper - result.beta) / result.std_err;
   assert.ok(Math.abs(critical - 2.0210753903062733) < 1e-9, `df=40: critical value ${critical}`);

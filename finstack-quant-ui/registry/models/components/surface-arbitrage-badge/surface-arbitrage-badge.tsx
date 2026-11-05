@@ -24,10 +24,8 @@ import {
 export interface SurfaceArbitrageBadgeProps {
   /** Canonical stored surface; Rust checks only unshifted Black lognormal quotes on a strike axis and reports any other convention. */
   surface: CheckSurfaceRequest["surface"];
-  /** Host-supplied forward prices in the surface's strike units, one to broadcast or one per expiry. Omitted or empty means no check is requested. */
-  forwards?: readonly number[] | null;
-  /** Non-negative tolerance in total-variance units; omitted leaves the Rust default. */
-  tolerance?: number | null;
+  /** The Rust ArbitrageCheckConfig: host-supplied `forward_prices` in the surface's strike units (one to broadcast or one per expiry) and any optional tolerance or check switches. Omitted or null means no check is requested. */
+  config?: CheckSurfaceRequest["config"] | null;
   density?: "compact" | "comfortable";
 }
 
@@ -146,26 +144,18 @@ function ReportDetails({
 /**
  * Static-arbitrage status of a stored volatility surface from the native
  * models.volatility.checkSurface report: passed, violations, not checked (the
- * native error, such as a quote convention Rust rejects) or forwards not
- * supplied. The popover shows the returned counts and violations unchanged.
+ * native error, such as a quote convention Rust rejects) or no check
+ * configuration supplied. The popover shows the returned counts and violations unchanged.
  */
 export function SurfaceArbitrageBadge({
   surface,
-  forwards,
-  tolerance,
+  config,
   density = "compact",
 }: SurfaceArbitrageBadgeProps) {
-  const supplied = forwards != null && forwards.length > 0;
+  const supplied = config != null;
   const request = useMemo<CheckSurfaceRequest | null>(
-    () =>
-      supplied
-        ? {
-            surface,
-            forwards: [...forwards],
-            ...(tolerance == null ? {} : { tolerance }),
-          }
-        : null,
-    [surface, forwards, tolerance, supplied],
+    () => (config == null ? null : { surface, config }),
+    [surface, config],
   );
   const query = useCheckSurface(request);
   const attributes = useSurfaceAttributes();

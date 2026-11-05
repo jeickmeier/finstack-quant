@@ -6,7 +6,8 @@ use crate::credit::calibration::{CreditCalibrationConfig, CreditCalibrationInput
 use crate::credit::decomposition::{LevelsAtDate, PeriodDecomposition};
 use crate::credit::hierarchy::CreditFactorModel;
 use crate::risk::{
-    PositionRiskDecomposition, RiskBudgetResult, RiskDecomposition, StressAttribution,
+    PositionRiskDecomposition, PositionRiskReport, PositionRiskRequest, RiskBudgetResult,
+    RiskDecomposition, StressAttribution,
 };
 
 /// The three-issuer, six-date panel behind both credit examples.
@@ -278,6 +279,20 @@ pub const MODELS_ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "position_risk_decomposition",
         Output,
         "Complete position-level risk decomposition of a portfolio."
+    ),
+    finstack_quant_core::schema_artifact!(
+        PositionRiskReport,
+        "models",
+        "position_risk_report",
+        Output,
+        "Position VaR/ES decomposition with its optional risk budget and tail stress attribution."
+    ),
+    finstack_quant_core::schema_artifact!(
+        PositionRiskRequest,
+        "models",
+        "position_risk_request",
+        Input,
+        "One position risk report request: position ids, confidence, a parametric or historical source and an optional budget."
     ),
     finstack_quant_core::schema_artifact!(
         RiskBudgetResult,

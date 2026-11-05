@@ -166,13 +166,6 @@ export const importHarnesses = {
       name: "use-forecast-breaches",
       modules: modules.length,
     })),
-  "use-market-scenario": () =>
-    Promise.all([
-      import("@/hooks/scenarios/use-market-scenario/use-market-scenario"),
-    ]).then((modules) => ({
-      name: "use-market-scenario",
-      modules: modules.length,
-    })),
   "use-apply-market-scenario": () =>
     Promise.all([
       import("@/hooks/scenarios/use-apply-market-scenario/use-apply-market-scenario"),
@@ -777,6 +770,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/covenant_report"),
     ]).then((modules) => ({
       name: "contract-covenant-report",
+      modules: modules.length,
+    })),
+  "contract-covenant-template": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/covenant_template.json"),
+      import("@/lib/finstack/generated/types/covenant_template"),
+      import("@/lib/finstack/generated/meta/covenant_template"),
+    ]).then((modules) => ({
+      name: "contract-covenant-template",
       modules: modules.length,
     })),
   "contract-dated-covenant-reports": () =>

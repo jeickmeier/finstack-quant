@@ -58,20 +58,11 @@ it.each(
 )(
   "computes the %s horizon return through the real worker exactly as the native fixture",
   async (name) => {
+    // The spec as the builder writes it, canonicalized natively.
     const built = unwrap(
-      await harness.proxy.buildMarketScenario({
-        id: entry(name).draft.id,
-        shifts: entry(name).draft.shifts.map((shift) => ({
-          curveKind: shift.curveKind as "discount",
-          curveIds: [shift.curveId],
-          bp: Number(shift.bp),
-        })),
-        roll: entry(name).draft.roll && {
-          period: entry(name).draft.roll!.period,
-          rollMode: null,
-        },
-        hazardBumpMode: null,
-      }),
+      await harness.proxy.validateScenarioSpec(
+        JSON.stringify(entry(name).spec),
+      ),
     );
     expect(built).toBe(entry(name).scenarioJson);
     const result = unwrap(await harness.proxy.horizonReturn(request(name)));

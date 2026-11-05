@@ -425,7 +425,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json",
-      "bytes": 4102,
+      "bytes": 4879,
       "kind": "output",
       "path": "schemas/statements_analytics/1/sensitivity_result.schema.json",
       "summary": "Results of sensitivity analysis.",
@@ -458,6 +458,15 @@
       "summary": "Configuration for variance analysis between two `StatementResult`.",
       "title": "VarianceConfig",
       "type_name": "VarianceConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/wacc_inputs.schema.json",
+      "bytes": 1505,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/wacc_inputs.schema.json",
+      "summary": "Capital-structure inputs of a weighted-average cost of capital calculation.",
+      "title": "WaccInputs",
+      "type_name": "WaccInputs"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/weighted_ecl_result.schema.json",

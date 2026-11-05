@@ -1,0 +1,118 @@
+{
+  "$defs": {
+    "OptionGreeks": {
+      "description": "Greeks of the calculated option, by model family.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Black-Scholes Greeks.",
+          "properties": {
+            "delta": {
+              "description": "Delta sensitivity per unit.",
+              "format": "double",
+              "type": "number"
+            },
+            "gamma": {
+              "description": "Gamma sensitivity per unit.",
+              "format": "double",
+              "type": "number"
+            },
+            "kind": {
+              "const": "black_scholes",
+              "type": "string"
+            },
+            "rho_q": {
+              "description": "Rho to the foreign/dividend yield per 1%.",
+              "format": "double",
+              "type": "number"
+            },
+            "rho_r": {
+              "description": "Rho to the domestic/risk-free rate per 1%.",
+              "format": "double",
+              "type": "number"
+            },
+            "theta": {
+              "description": "Theta per day (scaled by provided day-count basis).",
+              "format": "double",
+              "type": "number"
+            },
+            "vega": {
+              "description": "Vega per 1% volatility move.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "delta",
+            "gamma",
+            "vega",
+            "theta",
+            "rho_r",
+            "rho_q"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Black-76 or Bachelier forward Greeks.",
+          "properties": {
+            "delta": {
+              "description": "Sensitivity of the undiscounted premium to the forward (`dV/dF`).",
+              "format": "double",
+              "type": "number"
+            },
+            "gamma": {
+              "description": "Second derivative of the undiscounted premium to the forward (`d2V/dF2`).",
+              "format": "double",
+              "type": "number"
+            },
+            "kind": {
+              "const": "forward",
+              "type": "string"
+            },
+            "vega": {
+              "description": "Sensitivity of the undiscounted premium to a unit (1.0) change in vol.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "delta",
+            "gamma",
+            "vega"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/option_calculation_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Price, volatility and Greeks of one closed-form option calculation.",
+  "properties": {
+    "greeks": {
+      "$ref": "#/$defs/OptionGreeks",
+      "description": "Greeks at `implied_vol`."
+    },
+    "implied_vol": {
+      "description": "Volatility the price and Greeks are at: the supplied vol for a price\nsolve, the solved implied volatility otherwise.",
+      "format": "double",
+      "type": "number"
+    },
+    "price": {
+      "description": "Option price per unit: computed for a price solve, the supplied price\nfor an implied-volatility solve.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "price",
+    "implied_vol",
+    "greeks"
+  ],
+  "title": "OptionCalculationResult",
+  "type": "object"
+}

@@ -1,6 +1,8 @@
 """Credit APIs reject non-finite inputs without panicking."""
 
+import json
 import math
+import pickle
 
 import pytest
 
@@ -20,8 +22,6 @@ def test_credit_non_finite_inputs_raise_value_error(invalid: float) -> None:
 
 
 def test_lgd_typed_surface() -> None:
-    import pickle
-
     stats = credit.lgd.seniority_recovery_stats("senior_secured", "moodys_recovery_1982_2023")
     assert isinstance(stats, credit.lgd.BetaRecovery)
     assert stats.mean == pytest.approx(0.52)
@@ -31,7 +31,13 @@ def test_lgd_typed_surface() -> None:
     assert stats.sample_seeded(3, 42) == credit.lgd.BetaRecovery(stats.mean, stats.std_dev).sample_seeded(3, 42)
     assert stats.quantile(0.5) == pytest.approx(credit.lgd.BetaRecovery(stats.mean, stats.std_dev).quantile(0.5))
 
-    result = credit.lgd.workout_lgd(100.0, [("real_estate", 80.0, 0.30)], 0.05, 0.03, 2.0, 0.05)
+    wire = {
+        "collateral": [{"collateral_type": "real_estate", "book_value": 80.0, "haircut": 0.30}],
+        "costs": {"direct_cost_rate": 0.05, "indirect_cost_rate": 0.03},
+        "workout_years": 2.0,
+        "discount_rate": 0.05,
+    }
+    result = credit.lgd.WorkoutLgd.from_json(json.dumps(wire)).evaluate(100.0)
     assert isinstance(result, credit.lgd.WorkoutLgdResult)
     expected_net = 48.0 / (1.05 * 1.05)
     assert result.net_recovery == pytest.approx(expected_net)

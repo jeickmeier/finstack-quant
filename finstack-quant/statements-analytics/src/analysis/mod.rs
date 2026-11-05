@@ -75,8 +75,8 @@ pub use scenarios::{
 pub use valuation::{
     CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions,
     CorporateValuationResult, DEFAULT_UFCF_NODE, DcfOptions, DcfPeriodRow, DcfSensitivityResult,
-    ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche, dcf_sensitivity,
-    evaluate_dcf, evaluate_lbo, run_corporate_analysis, wacc,
+    ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche, WaccInputs,
+    dcf_sensitivity, evaluate_dcf, evaluate_lbo, run_corporate_analysis, wacc,
 };
 
 pub use checks::{

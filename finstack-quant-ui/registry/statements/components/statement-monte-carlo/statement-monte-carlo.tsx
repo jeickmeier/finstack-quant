@@ -16,6 +16,7 @@ import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { monteCarloConfigModule } from "./monte-carlo-config";
 import { passThrough } from "@/components/finstack/shared/primitives/native-display/native-display";
+import type { MonteCarloConfigWire } from "@/lib/finstack/generated/types/monte_carlo_config";
 
 /** Rust documents MonteCarloConfig percentiles and breach probabilities as fractions in [0, 1]; shown as percents. */
 const percent = (value: number) => `${formatPercent(value)}%`;
@@ -54,7 +55,7 @@ export interface BreachRequest {
 }
 export interface StatementMonteCarloProps {
   /** Initial MonteCarloConfig; remount to load another. Omitted starts empty. */
-  defaultConfig?: Record<string, unknown>;
+  defaultConfig?: MonteCarloConfigWire;
   /** Receives the structurally valid MonteCarloConfig JSON on Simulate; Rust validates it. */
   onSubmit(configJson: string): void;
   /** Native MonteCarloResults; null while none is available. */

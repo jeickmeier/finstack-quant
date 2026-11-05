@@ -1,0 +1,143 @@
+{
+  "$defs": {
+    "PositionRiskBudget": {
+      "additionalProperties": false,
+      "description": "Target shares of portfolio VaR checked against the decomposition.",
+      "properties": {
+        "targets": {
+          "description": "Target fraction of portfolio VaR per position, in `[0, 1]` and summing\nto ~1.0, in position order.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "utilization_threshold": {
+          "description": "Actual-to-target ratio above which a breach is flagged; omitted uses\n[`super::DEFAULT_UTILIZATION_THRESHOLD`].",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "targets"
+      ],
+      "type": "object"
+    },
+    "PositionRiskSource": {
+      "description": "Where a position VaR/ES decomposition comes from.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Euler allocation under normal returns.",
+          "properties": {
+            "compute_incremental": {
+              "default": false,
+              "description": "Also compute leave-one-out incremental VaR (one repricing per\nposition); omitted is `false`.",
+              "type": "boolean"
+            },
+            "covariance": {
+              "description": "Position-return covariance: `n x n` rows in position order,\nsymmetric positive semidefinite.",
+              "items": {
+                "items": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "parametric",
+              "type": "string"
+            },
+            "weights": {
+              "description": "Position weights or exposures in portfolio currency, one per\nposition id.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "weights",
+            "covariance"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Historical simulation over scenario P&L; also yields the tail stress\nattribution.",
+          "properties": {
+            "kind": {
+              "const": "historical",
+              "type": "string"
+            },
+            "pnls": {
+              "description": "Position-major scenario P&L: one row per position, one column per\nscenario, losses negative.",
+              "items": {
+                "items": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "pnls"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/position_risk_request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One position risk report request: position ids, confidence, a parametric or historical source and an optional budget.",
+  "properties": {
+    "budget": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PositionRiskBudget"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Risk budget to evaluate against the decomposition; omitted skips it."
+    },
+    "confidence": {
+      "description": "Tail confidence as a decimal strictly inside `(0.5, 1)`; omitted is\n`0.95`.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "position_ids": {
+      "description": "Position identifiers, in the order of the source's rows.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "source": {
+      "$ref": "#/$defs/PositionRiskSource",
+      "description": "Parametric covariance or historical scenario P&L."
+    }
+  },
+  "required": [
+    "position_ids",
+    "source"
+  ],
+  "title": "PositionRiskRequest",
+  "type": "object"
+}

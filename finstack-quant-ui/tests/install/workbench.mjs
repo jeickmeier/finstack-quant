@@ -313,7 +313,7 @@ try {
     .getByLabel("Market or calibration result JSON", { exact: true })
     .fill(JSON.stringify(supplemental));
   await editor
-    .getByRole("button", { name: "Import JSON", exact: true })
+    .getByRole("button", { name: "Import market JSON", exact: true })
     .click();
   await page.getByRole("tab", { name: "View market", exact: true }).click();
   await page.getByLabel("Search market data").fill("/fx_delta_vol_surfaces/0");

@@ -149,6 +149,7 @@ mod asian;
 mod bachelier;
 mod barrier;
 mod black;
+mod calculation;
 mod dispatch;
 mod forward;
 mod heston;
@@ -171,6 +172,10 @@ pub use barrier::{
 pub use black::{
     black_call, black_delta_call, black_delta_put, black_gamma, black_put, black_vega, d1_d2,
     d1_d2_black76,
+};
+pub use calculation::{
+    OptionCalculation, OptionCalculationResult, OptionGreeks, OptionModel, OptionSolve,
+    option_calculation,
 };
 pub use dispatch::{
     DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, asian_option_price,

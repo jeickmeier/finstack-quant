@@ -6,8 +6,7 @@ import json
 import pytest
 
 from finstack_quant.models.factor.risk import (
-    historical_var_decomposition,
-    parametric_var_decomposition,
+    position_risk_report,
 )
 from finstack_quant.reporting import portfolio_risk_tearsheet
 from finstack_quant.reporting.document import TearSheet
@@ -16,9 +15,13 @@ _IDS = ["Equity", "Credit", "Rates"]
 _WEIGHTS = [0.5, 0.3, 0.2]
 _COV = [[0.04, 0.006, 0.001], [0.006, 0.0225, 0.0015], [0.001, 0.0015, 0.0025]]
 
-# Real Rust output: ``parametric_var_decomposition`` returns the typed
+# Real Rust output: ``position_risk_report`` returns the typed
 # ``PositionRiskDecomposition`` (``var_contributions`` / ``relative_var``).
-_DECOMP_TYPED = parametric_var_decomposition(_IDS, _WEIGHTS, _COV, confidence=0.95)
+_DECOMP_TYPED = position_risk_report({
+    "position_ids": _IDS,
+    "confidence": 0.95,
+    "source": {"kind": "parametric", "weights": _WEIGHTS, "covariance": _COV},
+}).decomposition
 _DECOMP = json.loads(_DECOMP_TYPED.to_json())
 _ES = _DECOMP
 _BUDGET = {
@@ -115,5 +118,9 @@ def test_portfolio_risk_tearsheet_renders_var_contributions_from_typed_rust_resu
         # The share column is the Rust ``relative_var`` scaled to percent.
         assert f"{row['relative_var'] * 100:.1f}%" in body
     pnls = [[float((s * (i + 3)) % 7 - 3) * (i + 1) for s in range(60)] for i in range(3)]
-    historical = historical_var_decomposition(_IDS, pnls, confidence=0.95)
+    historical = position_risk_report({
+        "position_ids": _IDS,
+        "confidence": 0.95,
+        "source": {"kind": "historical", "pnls": pnls},
+    }).decomposition
     assert [s.title for s in portfolio_risk_tearsheet(historical).sections] == ["VaR Contributions"]

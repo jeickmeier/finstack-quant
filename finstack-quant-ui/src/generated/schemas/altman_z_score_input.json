@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Input ratios for the original Altman Z-Score (1968).",
   "properties": {
     "ebit_to_total_assets": {

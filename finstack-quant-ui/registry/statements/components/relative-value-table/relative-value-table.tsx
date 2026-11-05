@@ -21,6 +21,7 @@ import {
   passThrough,
   UndefinedValue,
 } from "@/components/finstack/shared/primitives/native-display/native-display";
+import type { RelativeValueReportConfigWire } from "@/lib/finstack/generated/types/relative_value_report_config";
 
 type Company = RelativeValueReport["companies"][number];
 type MultipleRow = RelativeValueReport["multiples"][number];
@@ -119,7 +120,7 @@ export interface RelativeValueTableProps {
   /** The universe's CompanyMetrics, in the order the report returns peers. */
   universe: readonly CompanyMetrics[];
   /** Initial RelativeValueReportConfig; remount to load another. Omitted starts empty. */
-  defaultConfig?: Record<string, unknown>;
+  defaultConfig?: RelativeValueReportConfigWire;
   /** Receives the subject, universe and structurally valid config JSON on Compare; Rust validates them. */
   onSubmit(request: RelativeValueReportRequest): void;
   /** Native statements_analytics.relativeValueReport result; null while none is available. */

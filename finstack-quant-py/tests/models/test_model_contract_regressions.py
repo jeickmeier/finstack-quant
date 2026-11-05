@@ -12,10 +12,8 @@ from finstack_quant.models.factor.risk import evaluate_risk_budget
 from finstack_quant.models.volatility import (
     get_cube_expiry_slice_vol,
     get_cube_expiry_slice_vol_clamped,
-    get_cube_normal_vol,
     get_cube_vol,
     materialize_cube_expiry_slice,
-    materialize_cube_expiry_slice_normal,
     materialize_cube_tenor_slice,
 )
 
@@ -24,7 +22,7 @@ def test_cube_materialization_retains_expiry_tenor_and_displacement() -> None:
     node = {"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4, "shift": 0.03}
     cube = VolCube("SHIFT", [1.0, 2.0], [5.0, 10.0], [node] * 4, [0.01] * 4)
     strikes = [-0.01, 0.0, 0.01]
-    grid = materialize_cube_expiry_slice(cube, 1.0, strikes)
+    grid = materialize_cube_expiry_slice(cube, 1.0, strikes, "lognormal")
     assert isinstance(grid, VolCubeExpirySlice)
     assert grid.expiry == 1.0
     assert grid.tenors == [5.0, 10.0]
@@ -32,8 +30,12 @@ def test_cube_materialization_retains_expiry_tenor_and_displacement() -> None:
     assert grid.quote_type == "shifted_black_lognormal"
     assert grid.displacements == [0.03, 0.03]
     for tenor in grid.tenors:
-        assert get_cube_expiry_slice_vol(grid, tenor, -0.01) == pytest.approx(get_cube_vol(cube, 1.0, tenor, -0.01))
-    assert get_cube_expiry_slice_vol_clamped(grid, 20.0, -0.01) == pytest.approx(get_cube_vol(cube, 1.0, 10.0, -0.01))
+        assert get_cube_expiry_slice_vol(grid, tenor, -0.01) == pytest.approx(
+            get_cube_vol(cube, 1.0, tenor, -0.01, "lognormal")
+        )
+    assert get_cube_expiry_slice_vol_clamped(grid, 20.0, -0.01) == pytest.approx(
+        get_cube_vol(cube, 1.0, 10.0, -0.01, "lognormal")
+    )
     with pytest.raises(ValueError, match="out of bounds"):
         get_cube_expiry_slice_vol(grid, 20.0, -0.01)
     restored = VolCubeExpirySlice.from_json(grid.to_json())
@@ -43,11 +45,11 @@ def test_cube_materialization_retains_expiry_tenor_and_displacement() -> None:
     assert frame.columns.tolist() == ["expiry", "tenor", "strike", "vol"]
     assert frame["expiry"].tolist() == [1.0] * 6
 
-    normal = materialize_cube_expiry_slice_normal(cube, 1.0, strikes)
+    normal = materialize_cube_expiry_slice(cube, 1.0, strikes, "normal")
     assert normal.quote_type == "normal"
     assert normal.displacements is None
-    assert get_cube_expiry_slice_vol(normal, 5.0, -0.01) == pytest.approx(get_cube_normal_vol(cube, 1.0, 5.0, -0.01))
-    surface = materialize_cube_tenor_slice(cube, 5.0, strikes)
+    assert get_cube_expiry_slice_vol(normal, 5.0, -0.01) == pytest.approx(get_cube_vol(cube, 1.0, 5.0, -0.01, "normal"))
+    surface = materialize_cube_tenor_slice(cube, 5.0, strikes, "lognormal")
     assert surface.quote_type == "shifted_black_lognormal"
     assert surface.displacements == [0.03, 0.03]
     assert VolSurface.from_json(surface.to_json()).displacements == [0.03, 0.03]

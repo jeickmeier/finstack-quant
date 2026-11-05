@@ -17,6 +17,7 @@ import { IdCombobox } from "@/components/finstack/shared/primitives/id-combobox/
 import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { normalizationConfigModule } from "./normalization-config";
+import type { NormalizationConfigWire } from "@/lib/finstack/generated/types/normalization_config";
 
 /** Config fields that name a statement node, offered as the model's node ids. */
 const nodeFieldPath = /(^|\.)(target_node|node_id|base_node)$/;
@@ -78,7 +79,7 @@ type Row =
   | { id: string; label: string; kind: "adjustment"; index: number };
 export interface NormalizationEditorProps {
   /** Initial NormalizationConfig; remount to load another. Omitted starts empty. */
-  defaultConfig?: Record<string, unknown>;
+  defaultConfig?: NormalizationConfigWire;
   /** Statement node ids offered for the target, percentage and cap-base nodes. */
   nodeIds: readonly string[];
   /** Native validation returning canonical NormalizationConfig JSON; connect useNormalizationConfigValidator. */

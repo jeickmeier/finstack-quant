@@ -203,11 +203,10 @@ it("routes formula, explanation and check semantics to WASM", async () => {
   expect(negative.ok).toBe(false);
   if (!negative.ok) expect(negative.error.message).toMatch(/default_tolerance/);
   const report = unwrap(
-    await harness.proxy.runStatementChecks({
+    await harness.proxy.runChecks({
       modelJson,
       resultsJson,
-      configJson,
-      kind: "suite",
+      suiteSpecJson: configJson,
     }),
   );
   expect(report).toEqual(
@@ -232,11 +231,10 @@ it("evaluates the complete analyst example, returned ratios, checks and supplied
   expect(result.meta?.num_periods).toBe(8);
   expect(result.nodes.leverage?.["2025Q4"]).toBeDefined();
   const report = unwrap(
-    await harness.proxy.runStatementChecks({
+    await harness.proxy.runChecks({
       modelJson: canonical,
       resultsJson: JSON.stringify(result),
-      configJson: analystChecks,
-      kind: "suite",
+      suiteSpecJson: analystChecks,
     }),
   );
   expect(report).toEqual(
@@ -359,11 +357,10 @@ it("routes scenario sets, rollups and data-gap checks to WASM", async () => {
   ).toEqual(native.rollupSpecDeclaredMethods(canonical, "annual"));
 
   const report = unwrap(
-    await harness.proxy.runStatementChecks({
+    await harness.proxy.runChecks({
       modelJson: canonical,
       resultsJson,
-      kind: "suite",
-      configJson: JSON.stringify({
+      suiteSpecJson: JSON.stringify({
         name: "growth",
         builtin_checks: [],
         formula_checks: [

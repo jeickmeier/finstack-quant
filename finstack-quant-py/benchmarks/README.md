@@ -47,7 +47,7 @@ Every class is marked `perf`. Selection within the suite is by class or by the
 | Class | Covers |
 |-------|--------|
 | `TestCoreBenchmarks` | `Currency`, `Money` arithmetic, `DayCount.year_fraction`, `DiscountCurve.df`, `ForwardCurve.rate`, `FxMatrix.rate`, `Tenor.parse`, `Rate` conversions, `linalg.cholesky_decomposition`, `stats.mean`/`variance` |
-| `TestAnalyticsBenchmarks` | `Performance` over a 10,000-point two-series panel: `sharpe`, `sortino`, `calmar`, `volatility`, `returns`, `cumulative_returns`, drawdown series and details, VaR/ES, moments, `beta`, `tracking_error`, `rolling_sharpe`, `period_stats`. Construction (`Performance.from_arrays`) is benched separately on a 252-point single-series panel |
+| `TestAnalyticsBenchmarks` | `Performance` over a 10,000-point two-series panel: `sharpe`, `sortino`, `calmar`, `volatility`, `returns`, `cumulative_returns`, drawdown series and details, VaR/ES, moments, `beta`, `tracking_error`, `rolling_sharpe`, `period_stats`. Construction (`Performance.from_panel`) is benched separately on a 252-point single-series panel |
 | `TestCorrelationBenchmarks` | `models.correlation`: `CopulaSpec`, `CorrelatedBernoulli`, `RecoverySpec`, `LatentFactorSpec`/`LatentSingleFactor`, `correlation_bounds`, `validate_correlation_matrix` |
 | `TestMonteCarloBenchmarks` | Closed-form `models.bs_price`, plus `EuropeanPricer`, `LsmcPricer`, and `PathDependentPricer` at 5,000–10,000 paths |
 | `TestMarginBenchmarks` | `CsaSpec.usd_regulatory`, `VmCalculator.calculate`, `NettingSetId`, `XvaConfig`, `FundingConfig`, `MarginUtilization` |
@@ -56,7 +56,7 @@ Every class is marked `perf`. Selection within the suite is by class or by the
 | `TestPortfolioBenchmarks` | `Portfolio.from_materialization` (cold-unique, cold-dedup, warm-dedup) and `parse_portfolio_spec_json` / `Portfolio.from_spec` |
 | `TestPortfolioCompoundWorkflow` | The realistic calling pattern (value + metrics + cashflows) over 500 positions, JSON path vs. typed `Portfolio`/`MarketContext` path |
 | `TestPortfolioReleaseControls` | Release-scale controls: metrics attribution (40/120 positions), `scenario_pnl_batch` vs. repeated `scenario_pnl` (10/100 scenarios), 20-snapshot `replay_portfolio`, standard-risk valuation at 3,000 positions, PV-only valuation at 3,000 and 25,000 positions |
-| `TestPortfolioRiskInputBenchmarks` | `parametric_var_decomposition` (256×256), `historical_var_decomposition` and `build_stress_attribution` (200×1,000), each with `list` and contiguous NumPy inputs — this pair exists to measure the zero-copy path, so keep both |
+| `TestPortfolioRiskInputBenchmarks` | `position_risk_report` over a parametric (256×256) and a historical (200×1,000) source, and `build_stress_attribution` (200×1,000) with `list` and contiguous NumPy inputs — that pair exists to measure the zero-copy path, so keep both |
 | `TestValuationsBenchmarks` | `validate_instrument_json`, `list_standard_metrics` |
 | `TestScenariosBenchmarks` | Template registry, `parse_scenario_spec`, `validate_scenario_spec`, `build_scenario_spec`, `compose_scenarios` |
 

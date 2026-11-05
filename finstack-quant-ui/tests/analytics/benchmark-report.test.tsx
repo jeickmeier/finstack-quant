@@ -110,17 +110,21 @@ it("aligns relative series with each ticker's own active dates on a ragged panel
   const ragged: BenchmarkReportRequest = {
     ...request,
     factors: null,
-    values: [
-      request.values[0]!.map((value, i) => (i < 3 ? Number.NaN : value)),
-      request.values[1]!,
-    ],
+    panel: {
+      ...request.panel,
+      // A leading gap is null on the wire.
+      series: [
+        request.panel.series[0]!.map((value, i) => (i < 3 ? null : value)),
+        request.panel.series[1]!,
+      ],
+    },
   };
   const report = unwrap(await harness.proxy.benchmarkReport(ragged));
   const [fund, bench] = report.tickers;
-  expect(fund!.activeDates).toHaveLength(request.dates.length - 3);
+  expect(fund!.activeDates).toHaveLength(request.panel.dates.length - 3);
   expect(fund!.outperformance).toHaveLength(fund!.activeDates.length);
   expect(fund!.drawdownDifference).toHaveLength(fund!.activeDates.length);
-  expect(bench!.outperformance).toHaveLength(request.dates.length);
+  expect(bench!.outperformance).toHaveLength(request.panel.dates.length);
   expect(fund!.multiFactor).toBeNull();
 });
 it("returns a ticker's rejected regression as its native error and keeps the rest of the report", async () => {
@@ -150,35 +154,28 @@ it("returns the native error and still frees the panel when a later call fails",
   expect(after.performanceFreed - before.performanceFreed).toBe(1);
   const unknown = await harness.proxy.benchmarkReport({
     ...request,
-    benchmarkTicker: "Missing",
+    panel: { ...request.panel, benchmark_ticker: "Missing" },
   });
   expect(unknown.ok).toBe(false);
   if (!unknown.ok) expect(unknown.error.kind).toBe("not_found");
 });
 it("builds a price panel with the native constructor", async () => {
   const { request } = entry("invariants");
-  const prices = request.values.map((row) =>
+  const prices = request.panel.series.map((row) =>
     row.reduce<number[]>(
-      (levels, r) => [...levels, levels.at(-1)! * (1 + r)],
+      (levels, r) => [...levels, levels.at(-1)! * (1 + r!)],
       [100],
     ),
   );
-  const dates = ["2024-12-31", ...request.dates];
-  const report = unwrap(
-    await harness.proxy.benchmarkReport({
-      dates,
-      values: prices,
-      kind: "prices",
-      tickerNames: ["TARGET", "BENCH"],
-      benchmarkTicker: "BENCH",
-    }),
-  );
-  const direct = new native.Performance(
-    dates,
-    prices,
-    ["TARGET", "BENCH"],
-    "BENCH",
-  );
+  const panel = {
+    dates: ["2024-12-31", ...request.panel.dates],
+    series: prices,
+    kind: "prices" as const,
+    ticker_names: ["TARGET", "BENCH"],
+    benchmark_ticker: "BENCH",
+  };
+  const report = unwrap(await harness.proxy.benchmarkReport({ panel }));
+  const direct = new native.Performance(panel);
   try {
     expect(report.greeks).toEqual(direct.greeks());
     expect(report.trackingError).toEqual(Array.from(direct.trackingError()));
@@ -225,16 +222,19 @@ it("sends the original numeric snapshot after the caller mutates its request", a
   const input = {
     ...request,
     riskFreeRate: Number.NaN,
-    values: request.values.map((row) => [...row]),
+    panel: {
+      ...request.panel,
+      series: request.panel.series.map((row) => [...row]),
+    },
   };
-  input.values[0]![0] = Infinity;
+  input.panel.series[0]![0] = Infinity;
   const expected = structuredClone(input);
   const call = vi.fn(async () => report);
   const client = { call } as unknown as FinstackClient;
   const options = benchmarkReportOptions(client, 2, input);
   const key = options.queryKey[3];
   input.riskFreeRate = 0;
-  input.values[0]![0] = 0;
+  input.panel.series[0]![0] = 0;
   const queries = new QueryClient();
   try {
     await queries.query(options);
@@ -376,7 +376,13 @@ it("renders the worker report through the hook, then the native error", async ()
   unmount();
   render(
     <FinstackQueryProvider>
-      <Connected request={{ ...request, frequency: "fortnightly" }} />
+      <Connected
+        request={{
+          ...request,
+          // Not a Rust PeriodKind: the native error surfaces.
+          panel: { ...request.panel, frequency: "fortnightly" as never },
+        }}
+      />
     </FinstackQueryProvider>,
   );
   await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy(), {

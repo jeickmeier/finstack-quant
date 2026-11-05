@@ -111,7 +111,7 @@ describe("discovered canonical fixtures", () => {
         expect(validator.parse(example)).toEqual(example);
     }
     // Rust publishes no example for CovenantEngine, CovenantForecastConfig,
-    // CovenantReport, DatedCovenantReports, FutureBreach,
+    // CovenantReport, CovenantTemplate, DatedCovenantReports, FutureBreach,
     // the five credit-scoring inputs, ArbitrageReport, MertonModel, RecoveryClaim,
     // WorkoutLgd, SeniorityCalibration, CreditAssessment,
     // DcfOptions, DcfSensitivityResult, LboConfig, LboResult, ScenarioSet,
@@ -122,6 +122,7 @@ describe("discovered canonical fixtures", () => {
       "schemas/covenant_engine.json",
       "schemas/covenant_forecast_config.json",
       "schemas/covenant_report.json",
+      "schemas/covenant_template.json",
       "schemas/dated_covenant_reports.json",
       "schemas/future_breach.json",
       "schemas/altman_z_double_prime_input.json",

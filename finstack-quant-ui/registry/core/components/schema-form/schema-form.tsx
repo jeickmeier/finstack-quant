@@ -37,8 +37,8 @@ export type PromotedField = { path: string; node: ReactNode };
 export interface SchemaFormProps {
   /** Lazily import a generated contract module; the shared renderer follows its reachable schema. */
   module: InstrumentModule;
-  /** Initial working host values; changing this prop does not reset an active edit. Remount for another document. */
-  defaultValues?: Record<string, unknown>;
+  /** Initial working host values, usually a generated wire type; changing this prop does not reset an active edit. Remount for another document. */
+  defaultValues?: object;
   layout?: "basic" | "full";
   /** Canonical dotted field paths from the document root. Hidden fields retain their values. */
   fields?: FieldFilter;

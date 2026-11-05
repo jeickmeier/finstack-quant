@@ -22,9 +22,22 @@ const names = isDocs
     ];
 const cssPath = path.join(consumer, JSON.parse(original).tailwind.css);
 const originalCss = isDocs ? await readFile(cssPath, "utf8") : null;
+// The registry-owned copies in docs-site (all gitignored there). Cleared before
+// every install so an item that was removed or moved does not linger and break
+// the docs type-check.
+const docsOwned = [
+  "src/components/finstack",
+  "src/hooks",
+  "src/lib/finstack",
+  "src/styles/finstack",
+  "src/workers",
+];
 const npmCache = await mkdtemp(path.join(tmpdir(), "finstack-npm-cache-"));
 const server = await serveLocalRegistry(root);
 try {
+  if (isDocs)
+    for (const dir of docsOwned)
+      await rm(path.join(consumer, dir), { recursive: true, force: true });
   const config = JSON.parse(original);
   config.registries["@finstack"] = `${server.url}/{name}.json`;
   await writeFile(configPath, JSON.stringify(config, null, 2) + "\n");

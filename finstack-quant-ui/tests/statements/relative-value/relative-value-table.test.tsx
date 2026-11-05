@@ -34,6 +34,7 @@ import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import fixture from "./cases.json";
+import type { RelativeValueReportConfigWire } from "../../../src/generated/types/relative_value_report_config";
 
 // Figures are drawn by the shared chart in the browser gates; here each one
 // is a labelled placeholder.
@@ -358,7 +359,9 @@ function Live() {
   return (
     <RelativeValueTable
       {...props}
-      defaultConfig={fixture.cases.full.config}
+      defaultConfig={
+        fixture.cases.full.config as unknown as RelativeValueReportConfigWire
+      }
       onSubmit={(next) => {
         submitted.push(next);
         setRequest(next);

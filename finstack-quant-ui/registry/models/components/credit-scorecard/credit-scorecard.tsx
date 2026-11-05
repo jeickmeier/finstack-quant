@@ -11,34 +11,18 @@ import {
   typedNumber,
 } from "@/components/finstack/shared/primitives/native-display/native-display";
 
-/** A native result or the native error of that one call. */
-type Outcome<T> =
-  { ok: true; value: T } | { ok: false; error: { message: string } };
-/** A models.credit.scoring function name. */
+/** A Rust CreditScoreRequest model tag. */
 export type CreditScorecardModel = (typeof scoringModels)[number]["model"];
-/** The request the scorecard submits; the worker's CreditScoreRequest. */
-export type CreditScorecardRequest =
-  | { model: "altmanZScore"; input: modelsWire.AltmanZScoreInput }
-  | { model: "altmanZPrime"; input: modelsWire.AltmanZPrimeInput }
-  | {
-      model: "altmanZDoublePrime" | "altmanEmScore";
-      input: modelsWire.AltmanZDoublePrimeInput;
-    }
-  | { model: "ohlsonOScore"; input: modelsWire.OhlsonOScoreInput }
-  | { model: "zmijewskiScore"; input: modelsWire.ZmijewskiInput };
-/** The native score the worker's creditScore returns. */
-export interface CreditScoreData {
-  model: CreditScorecardModel;
-  result: modelsWire.ScoringResult;
-  /** The default PD master-scale grade, or Rust's error (a result without an implied PD has no grade). */
-  grade: Outcome<modelsWire.MasterScaleResult>;
-}
+/** The request the scorecard submits: the Rust CreditScoreRequest. */
+export type CreditScorecardRequest = modelsWire.CreditScoreRequest;
+/** The native models.credit.scoring.creditScoreReport result. */
+export type CreditScoreData = modelsWire.CreditScoreReport;
 export interface CreditScorecardProps {
   /** The model selected first; remount to load another. */
   defaultModel: CreditScorecardModel;
   /** Starting ratios per model, keyed by Rust field name; a model without them starts empty. */
   defaultInputs?: Partial<
-    Record<CreditScorecardModel, Readonly<Record<string, unknown>>>
+    Record<CreditScorecardModel, Readonly<CreditScorecardRequest["input"]>>
   >;
   /** Receives the request on Score; connect it to the useCreditScore request. */
   onSubmit(request: CreditScorecardRequest): void;
@@ -53,6 +37,9 @@ export interface CreditScorecardProps {
 }
 /** The first paragraph of a Rust field description. */
 const summary = (text: string | undefined) => text?.split("\n\n")[0];
+/** One named ratio of a model's input; the field comes from its generated contract. */
+const ratioOf = (input: object | undefined, field: string) =>
+  (input as Readonly<Record<string, unknown>> | undefined)?.[field];
 const contractOf = (model: CreditScorecardModel): ScoringContract =>
   scoringModels.find((entry) => entry.model === model)!.contract;
 /**
@@ -84,7 +71,7 @@ export function CreditScorecard({
           model,
           Object.fromEntries(
             contract.required.map((field) => {
-              const value = defaultInputs[model]?.[field];
+              const value = ratioOf(defaultInputs[model], field);
               return [field, value === undefined ? "" : String(value)];
             }),
           ),
@@ -103,15 +90,14 @@ export function CreditScorecard({
         className="space-y-4"
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit({
-            model,
-            input: Object.fromEntries(
-              contract.required.map((field) => [
-                field,
-                typedNumber(entries[model][field] ?? ""),
-              ]),
-            ),
-          } as CreditScorecardRequest);
+          // The fields are the selected model's generated input contract.
+          const input: object = Object.fromEntries(
+            contract.required.map((field) => [
+              field,
+              typedNumber(entries[model][field] ?? ""),
+            ]),
+          );
+          onSubmit({ model, input } as CreditScorecardRequest);
         }}
       >
         <EnumField
@@ -210,22 +196,20 @@ function ScoreView({
           {value(shownValue(result.implied_pd, format))}
         </Tile>
         <Tile label={labelFor("grade")}>
-          {grade.ok ? (
-            <p className="text-base">{grade.value.grade}</p>
+          {grade ? (
+            <p className="text-base">{grade.grade}</p>
           ) : (
-            <p className="text-xs text-muted-foreground">
-              {grade.error.message}
-            </p>
+            <p className="text-xs text-muted-foreground">No implied PD</p>
           )}
         </Tile>
         <Tile label={labelFor("central_pd")}>
-          {value(grade.ok ? shownValue(grade.value.central_pd, format) : "—")}
+          {value(grade ? shownValue(grade.central_pd, format) : "—")}
         </Tile>
       </div>
       <p className="text-xs text-muted-foreground">
         Score, zone and implied PD as Rust returned them (probabilities as
-        fractions); the grade is the default PD master scale&apos;s grade of the
-        implied PD.
+        fractions); the grade is Rust&apos;s default PD master-scale grade of
+        the implied PD.
       </p>
     </section>
   );

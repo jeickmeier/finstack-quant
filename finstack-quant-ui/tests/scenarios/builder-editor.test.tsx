@@ -22,7 +22,6 @@ import {
 import { useBuildFromTemplate } from "@/hooks/scenarios/use-build-from-template/use-build-from-template";
 import { useBuildTemplateComponent } from "@/hooks/scenarios/use-build-template-component/use-build-template-component";
 import { useComposeScenarios } from "@/hooks/scenarios/use-compose-scenarios/use-compose-scenarios";
-import { useBuildMarketScenario } from "@/hooks/scenarios/use-market-scenario/use-market-scenario";
 import { unwrap } from "@/workers/finstack-contract";
 import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
@@ -153,7 +152,6 @@ function Connected({
       buildFromTemplate={useBuildFromTemplate()}
       buildTemplateComponent={useBuildTemplateComponent()}
       composeScenarios={useComposeScenarios()}
-      buildMarketScenario={useBuildMarketScenario()}
     />
   );
 }
@@ -227,7 +225,7 @@ it(
   budget(30000),
 );
 it(
-  "appends the operations Rust builds for a parallel shift and a roll, and shows a native rejection",
+  "appends a parallel shift and a roll as entered once Rust validates them, and shows a rejection",
   async () => {
     const onSpecChange = vi.fn();
     render(
@@ -292,11 +290,21 @@ it(
         ],
       }),
     );
-    // The builder sent the document's id and no roll mode, leaving Rust's default.
-    expect(calls("buildMarketScenario").at(-1)).toEqual([
-      "buildMarketScenario",
-      { id: "s", shifts: [], roll: { period: "3M", rollMode: null } },
-    ]);
+    // The builder appended the operations as entered (no roll mode, leaving
+    // Rust's default); only native validation reached the worker.
+    const appended = calls("validateScenarioSpec")
+      .map(([, json]) => JSON.parse(json as string).operations)
+      .filter(
+        (operations) =>
+          operations.length === 2 &&
+          operations[1].kind === "time_roll_forward" &&
+          !("roll_mode" in operations[1]),
+      );
+    expect(appended.length).toBeGreaterThan(0);
+    expect(appended[0]![1]).toEqual({
+      kind: "time_roll_forward",
+      period: "3M",
+    });
   },
   budget(30000),
 );

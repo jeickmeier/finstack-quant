@@ -20,6 +20,223 @@ from finstack_quant.analytics._types import (
     RollingGreeks,
 )
 
+# Performance panel
+
+class PerformancePanel:
+    """
+    Dated panel of price or return series, one per ticker: the Rust
+    ``PerformancePanel`` a :class:`Performance` is built from.
+
+    Immutable, compares by value, picklable. ``Performance(df)`` and
+    ``Performance.from_returns(df)`` build one from a pandas frame; construct
+    it directly for raw lists and pass it to :meth:`Performance.from_panel`.
+
+    Parameters
+    ----------
+    dates : Sequence[object]
+        Strictly ascending observation dates (``datetime.date``,
+        ``pd.Timestamp`` or ISO strings), one per value of every series.
+    series : list[list[float]]
+        Ticker-major series: ``series[i][t]`` is ticker ``i`` at ``dates[t]``.
+        Leading or trailing ``nan`` gaps are allowed; each ticker's observed
+        span must be contiguous.
+    kind : str
+        ``"prices"`` (strictly positive prices; returns are derived pairwise)
+        or ``"returns"`` (simple decimal returns, ``0.01`` = +1%).
+    ticker_names : list[str]
+        Unique ticker names, one per series.
+    benchmark_ticker : str, optional
+        Benchmark ticker; ``None`` uses the first ticker.
+    frequency : str, optional
+        ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
+        ``"semi_annual"`` or ``"annual"``; ``None`` uses the Rust default
+        ``DEFAULT_FREQUENCY`` (daily).
+
+    Raises
+    ------
+    ValueError
+        If ``kind`` is not ``"prices"`` or ``"returns"``.
+    AnalyticsError
+        If ``frequency`` is not a recognized frequency.
+
+    Examples
+    --------
+    >>> from datetime import date
+    >>> from finstack_quant.analytics import PerformancePanel
+    >>> panel = PerformancePanel(
+    ...     dates=[date(2024, 1, 1), date(2024, 1, 2)], series=[[0.01, 0.02]], kind="returns", ticker_names=["FUND"]
+    ... )
+    >>> panel.kind, panel.frequency
+    ('returns', None)
+    """
+
+    def __init__(
+        self,
+        *,
+        dates: Sequence[object],
+        series: list[list[float]],
+        kind: str,
+        ticker_names: list[str],
+        benchmark_ticker: str | None = None,
+        frequency: str | None = None,
+    ) -> None: ...
+    @property
+    def dates(self) -> list[datetime.date]:
+        """
+        Observation dates, one per value of every series.
+
+        Returns
+        -------
+        list[datetime.date]
+            Strictly ascending dates.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def series(self) -> list[list[float]]:
+        """
+        Ticker-major series, ``nan`` for a gap.
+
+        Returns
+        -------
+        list[list[float]]
+            ``series[i][t]`` is ticker ``i`` at ``dates[t]``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def kind(self) -> str:
+        """
+        Whether the series are prices or simple returns.
+
+        Returns
+        -------
+        str
+            ``"prices"`` or ``"returns"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def ticker_names(self) -> list[str]:
+        """
+        Ticker names, one per series.
+
+        Returns
+        -------
+        list[str]
+            Unique names in series order.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def benchmark_ticker(self) -> str | None:
+        """
+        Benchmark ticker.
+
+        Returns
+        -------
+        str | None
+            The benchmark name, or ``None`` for the first ticker.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def frequency(self) -> str | None:
+        """
+        Observation frequency used for annualization.
+
+        Returns
+        -------
+        str | None
+            The frequency label, or ``None`` for the Rust default (daily).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON with the canonical field names.
+
+        Returns
+        -------
+        str
+            JSON object with ``dates``, ``series`` (gaps as ``null``),
+            ``kind``, ``ticker_names`` and any ``benchmark_ticker`` and
+            ``frequency``. Does not raise.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> PerformancePanel:
+        """
+        Deserialize from the JSON produced by :meth:`to_json`.
+
+        Parameters
+        ----------
+        json : str
+            JSON object with ``dates``, ``series``, ``kind``, ``ticker_names``
+            and optional ``benchmark_ticker`` and ``frequency``.
+
+        Returns
+        -------
+        PerformancePanel
+            Reconstructed panel.
+
+        Raises
+        ------
+        ValueError
+            If a field is missing, unknown or malformed.
+
+        Examples
+        --------
+        >>> from datetime import date
+        >>> from finstack_quant.analytics import PerformancePanel
+        >>> panel = PerformancePanel(dates=[date(2024, 1, 1)], series=[[100.0]], kind="prices", ticker_names=["A"])
+        >>> PerformancePanel.from_json(panel.to_json()) == panel
+        True
+        """
+        ...
+
+    def __eq__(self, other: object) -> bool: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
 # Performance engine
 
 class Performance:
@@ -28,8 +245,9 @@ class Performance:
 
     Construct from a pandas DataFrame or Series of prices
     (``Performance(df)``), a DataFrame or Series of returns
-    (``Performance.from_returns(df)``), or from raw arrays via
-    :meth:`from_arrays` / :meth:`from_returns_arrays`.
+    (``Performance.from_returns(df)``), or a :class:`PerformancePanel` of raw
+    lists (``Performance.from_panel(panel)``). The pandas constructors read
+    the row index as the dates and the column headings as the ticker names.
 
     Scalar-per-ticker metrics return a ``pandas.Series`` indexed by ticker name
     and named after the metric, so results are selected by label rather than by
@@ -39,7 +257,7 @@ class Performance:
     Examples
     --------
     >>> import pandas as pd
-    >>> from finstack_quant.analytics import Performance
+    >>> from finstack_quant.analytics import Performance, PerformancePanel
     >>> prices = pd.DataFrame(
     ...     {"FUND": [100.0, 101.0, 103.0]},
     ...     index=pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]),
@@ -81,63 +299,9 @@ class Performance:
             If ``benchmark_ticker`` is given but is not one of the column labels.
         TypeError
             If ``prices`` is not a pandas ``DataFrame`` or ``Series`` (use
-            :meth:`from_arrays` for raw lists), or its column labels are not
+            :meth:`from_panel` for raw lists), or its column labels are not
             all ``str`` (rename with ``df.columns = df.columns.astype(str)``).
 
-        """
-
-    @staticmethod
-    def from_arrays(
-        dates: Sequence[object],
-        prices: list[list[float]],
-        ticker_names: list[str],
-        benchmark_ticker: str | None = None,
-        frequency: str | None = None,
-    ) -> Performance:
-        """
-        Construct from raw arrays (dates, prices matrix, ticker names).
-
-        Parameters
-        ----------
-        dates : sequence
-            Observation dates as ``datetime.date``, ``pd.Timestamp``, or ISO
-            strings parseable by the binding layer.
-        prices : list[list[float]]
-            Column-major price matrix; ``prices[i]`` is the series for ticker
-            ``ticker_names[i]``.
-        ticker_names : list[str]
-            Column labels, one per price series.
-        benchmark_ticker : str, optional
-            Benchmark ticker name. Defaults to the first column when ``None``.
-        frequency : str, optional
-            One of ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
-            ``"semi_annual"``, or ``"annual"``.
-            Default ``"daily"``.
-
-        Returns
-        -------
-        Performance
-            Analytics engine over the supplied panel.
-
-        Raises
-        ------
-        AnalyticsError
-            If dimensions are inconsistent, dates are invalid, or ``frequency`` is
-            unrecognized.
-        KeyError
-            If ``benchmark_ticker`` is given but is not in ``ticker_names``.
-
-        Examples
-        --------
-        >>> from datetime import date
-        >>> from finstack_quant.analytics import Performance
-        >>> perf = Performance.from_arrays(
-        ...     [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)],
-        ...     [[100.0, 101.0, 103.0]],
-        ...     ["FUND"],
-        ... )
-        >>> perf.get_ticker_names()
-        ['FUND']
         """
 
     @staticmethod
@@ -169,7 +333,7 @@ class Performance:
             If ``returns`` is invalid or empty.
         TypeError
             If ``returns`` is not a pandas ``DataFrame`` or ``Series`` (use
-            :meth:`from_returns_arrays` for raw lists).
+            :meth:`from_panel` for raw lists).
         KeyError
             If ``benchmark_ticker`` is given but is not one of the column labels.
 
@@ -181,7 +345,7 @@ class Performance:
         Examples
         --------
         >>> import pandas as pd
-        >>> from finstack_quant.analytics import Performance
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
         >>> returns = pd.DataFrame(
         ...     {"FUND": [0.01, 0.02]},
         ...     index=pd.to_datetime(["2024-01-01", "2024-01-02"]),
@@ -191,50 +355,42 @@ class Performance:
         """
 
     @staticmethod
-    def from_returns_arrays(
-        dates: Sequence[object],
-        returns: list[list[float]],
-        ticker_names: list[str],
-        benchmark_ticker: str | None = None,
-        frequency: str | None = None,
-    ) -> Performance:
+    def from_panel(panel: PerformancePanel) -> Performance:
         """
-        Construct from raw return arrays (dates, returns matrix, ticker names).
+        Construct from a :class:`PerformancePanel`, the Rust-shaped panel.
 
         Parameters
         ----------
-        dates : sequence
-            Return observation dates.
-        returns : list[list[float]]
-            Column-major simple-return matrix; ``returns[i]`` is the series for
-            ``ticker_names[i]``.
-        ticker_names : list[str]
-            Column labels.
-        benchmark_ticker : str, optional
-            Benchmark ticker name.
-        frequency : str, optional
-            One of ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
-            ``"semi_annual"``, or ``"annual"``.
-            Default ``"daily"``.
+        panel : PerformancePanel
+            Dated price or return series, one per ticker, with an optional
+            benchmark ticker and frequency.
 
         Returns
         -------
         Performance
-            Analytics engine over the supplied return panel.
+            Analytics engine over the panel.
 
         Raises
         ------
         AnalyticsError
-            If dimensions are inconsistent or ``frequency`` is unrecognized.
+            If the series are empty or ragged, a ticker name is duplicated,
+            dates are not strictly ascending, a ticker has no contiguous
+            finite span (positive for prices), or a return is at or below
+            ``-1``.
         KeyError
-            If ``benchmark_ticker`` is given but is not in ``ticker_names``.
+            If the panel's ``benchmark_ticker`` is not one of its ticker names.
 
         Examples
         --------
         >>> from datetime import date
-        >>> from finstack_quant.analytics import Performance
-        >>> perf = Performance.from_returns_arrays([date(2024, 1, 1), date(2024, 1, 2)], [[0.01, 0.02]], ["FUND"])
-        >>> perf.get_ticker_names()
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
+        >>> panel = PerformancePanel(
+        ...     dates=[date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)],
+        ...     series=[[100.0, 101.0, 103.0]],
+        ...     kind="prices",
+        ...     ticker_names=["FUND"],
+        ... )
+        >>> Performance.from_panel(panel).get_ticker_names()
         ['FUND']
         """
 
@@ -494,8 +650,14 @@ class Performance:
         Examples
         --------
         >>> from datetime import date
-        >>> from finstack_quant.analytics import Performance
-        >>> perf = Performance.from_returns_arrays([date(2024, 1, 1), date(2024, 1, 2)], [[0.01, 0.02]], ["FUND"])
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
+        >>> panel = PerformancePanel(
+        ...     dates=[date(2024, 1, 1), date(2024, 1, 2)],
+        ...     series=[[0.01, 0.02]],
+        ...     kind="returns",
+        ...     ticker_names=["FUND"],
+        ... )
+        >>> perf = Performance.from_panel(panel)
         >>> sharpe = perf.sharpe()
         >>> (sharpe.name, list(sharpe.index))
         ('sharpe', ['FUND'])
@@ -1332,12 +1494,14 @@ class Performance:
         Examples
         --------
         >>> from datetime import date
-        >>> from finstack_quant.analytics import Performance
-        >>> perf = Performance.from_returns_arrays(
-        ...     [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)],
-        ...     [[0.01, 0.02, -0.01], [0.02, -0.01, 0.01]],
-        ...     ["A", "B"],
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
+        >>> panel = PerformancePanel(
+        ...     dates=[date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)],
+        ...     series=[[0.01, 0.02, -0.01], [0.02, -0.01, 0.01]],
+        ...     kind="returns",
+        ...     ticker_names=["A", "B"],
         ... )
+        >>> perf = Performance.from_panel(panel)
         >>> matrix, repaired = perf.correlation_matrix()
         >>> matrix[0][0], repaired
         (1.0, False)
@@ -1774,11 +1938,13 @@ class Performance:
         Examples
         --------
         >>> from datetime import date
-        >>> perf = Performance.from_returns_arrays(
-        ...     [date(2024, 1, 1), date(2024, 1, 2)],
-        ...     [[0.01, 0.02]],
-        ...     ["FUND"],
+        >>> panel = PerformancePanel(
+        ...     dates=[date(2024, 1, 1), date(2024, 1, 2)],
+        ...     series=[[0.01, 0.02]],
+        ...     kind="returns",
+        ...     ticker_names=["FUND"],
         ... )
+        >>> perf = Performance.from_panel(panel)
         >>> panel = perf.periodic_returns()
         >>> (len(panel), panel[0][0][0], round(panel[0][0][1], 4))
         (1, datetime.date(2024, 1, 2), 0.0302)
@@ -1873,8 +2039,14 @@ class Performance:
         Examples
         --------
         >>> from datetime import date
-        >>> from finstack_quant.analytics import Performance
-        >>> perf = Performance.from_returns_arrays([date(2024, 1, 1), date(2024, 1, 2)], [[0.01, 0.02]], ["FUND"])
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
+        >>> panel = PerformancePanel(
+        ...     dates=[date(2024, 1, 1), date(2024, 1, 2)],
+        ...     series=[[0.01, 0.02]],
+        ...     kind="returns",
+        ...     ticker_names=["FUND"],
+        ... )
+        >>> perf = Performance.from_panel(panel)
         >>> Performance.from_json(perf.to_json()).get_ticker_names()
         ['FUND']
         """

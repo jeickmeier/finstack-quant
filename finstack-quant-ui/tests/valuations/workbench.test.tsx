@@ -207,8 +207,6 @@ beforeEach(() => {
           deal.free();
         }
       }
-      case "buildMarketScenario":
-        return unwrap(await scenarioService.buildMarketScenario(request));
       case "applyMarketScenario":
         return unwrap(await scenarioService.applyMarketScenario(request));
       case "horizonReturn":
@@ -578,7 +576,7 @@ it(
       call.mock.calls
         .filter(([method]) => method === "checkSurface")
         .map(([, request]) => request),
-    ).toEqual([{ surface, forwards: [175] }]);
+    ).toEqual([{ surface, config: { forward_prices: [175] } }]);
     // The stored chart stays beside the badge.
     expect(
       screen.getAllByRole("img", { name: /AAPL-EQUITY-VOL/ }).length,
@@ -1399,9 +1397,11 @@ it(
           instrumentJsons: [t1!.instrumentJson],
           marketT0Json: t0!.marketJson,
           marketT1Json: t1!.marketJson,
-          asOfT0: t0!.asOf,
-          asOfT1: t1!.asOf,
-          method: "parallel",
+          inputs: {
+            as_of_t0: t0!.asOf,
+            as_of_t1: t1!.asOf,
+            method: "parallel",
+          },
         },
       ],
     ]);

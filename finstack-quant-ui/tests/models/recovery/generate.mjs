@@ -2,18 +2,28 @@ import { emit } from "../../../scripts/fixture-output.mjs";
 import { native } from "../../../scripts/fixture-inputs.mjs";
 // The worker's ModelsApi over the raw package (the facade's
 // models.credit.recoveryWaterfall and models.credit.lgd namespaces re-export
-// these unchanged). The BetaRecovery handle is read the way the worker reads it.
+// these unchanged). The WorkoutLgd and BetaRecovery handles are read the way
+// the worker reads them.
 const allocate = (request) =>
   native.allocateRecovery(request.estateValue, request.claims);
-const workout = (request) =>
-  native.workoutLgd(
-    request.ead,
-    request.collateral,
-    request.directCostPct,
-    request.indirectCostPct,
-    request.timeToResolutionYears,
-    request.discountRate,
-  );
+const workout = (request) => {
+  const model = native.WorkoutLgd.fromJson(request.model);
+  try {
+    return model.evaluate(request.ead);
+  } finally {
+    model.free();
+  }
+};
+const piece = (collateral_type, book_value, haircut) => ({
+  collateral_type,
+  book_value,
+  haircut,
+});
+const terms = {
+  costs: { direct_cost_rate: 0.05, indirect_cost_rate: 0.03 },
+  workout_years: 2,
+  discount_rate: 0.06,
+};
 const stats = (request) => {
   const recovery = native.seniorityRecoveryStats(
     request.seniority,
@@ -84,22 +94,17 @@ const cases = {
   workout: {
     secured: entry(workout, {
       ead: 1_000_000,
-      collateral: [
-        ["real_estate", 600_000, 0.3],
-        ["receivables", 200_000, 0.35],
-      ],
-      directCostPct: 0.05,
-      indirectCostPct: 0.03,
-      timeToResolutionYears: 2,
-      discountRate: 0.06,
+      model: {
+        collateral: [
+          piece("real_estate", 600_000, 0.3),
+          piece("receivables", 200_000, 0.35),
+        ],
+        ...terms,
+      },
     }),
     unknownCollateral: entry(workout, {
       ead: 1_000_000,
-      collateral: [["real-estate", 600_000, 0.3]],
-      directCostPct: 0.05,
-      indirectCostPct: 0.03,
-      timeToResolutionYears: 2,
-      discountRate: 0.06,
+      model: { collateral: [piece("real-estate", 600_000, 0.3)], ...terms },
     }),
   },
   stats: {
@@ -121,7 +126,7 @@ await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({
     description:
-      "Native models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.workoutLgd, seniorityRecoveryStats (read from the BetaRecovery handle) and seniorityCalibrationIds results: a four-claim stack with a pari passu shortfall and with a surplus, net collateral above the estate, a repeated claim id, a two-piece workout and a non-canonical collateral type, and statistics for a calibrated class, a class the S&P calibration lacks and an unknown calibration id.",
+      "Native models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.WorkoutLgd.fromJson(model).evaluate(ead), seniorityRecoveryStats (read from the BetaRecovery handle) and seniorityCalibrationIds results: a four-claim stack with a pari passu shortfall and with a surplus, net collateral above the estate, a repeated claim id, a two-piece workout and a non-canonical collateral type, and statistics for a calibrated class, a class the S&P calibration lacks and an unknown calibration id.",
     ...cases,
   }),
 );

@@ -195,6 +195,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "scenario_diff",
             "score_relative_value",
             "variance_bridge",
+            "WaccInputs",
             "wacc",
             "z_score",
         ],

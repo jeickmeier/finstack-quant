@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Input for the Ohlson O-Score logistic model (1980).",
   "properties": {
     "current_liabilities_to_current_assets": {

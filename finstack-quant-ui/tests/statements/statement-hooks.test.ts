@@ -15,7 +15,10 @@ import {
   rollupStatementOptions,
 } from "@/hooks/statements/use-rollup-statement/use-rollup-statement";
 import { evaluateStatementScenariosOptions } from "@/hooks/statements/use-evaluate-statement-scenarios/use-evaluate-statement-scenarios";
-import { runStatementChecksOptions } from "@/hooks/statements/use-run-statement-checks/use-run-statement-checks";
+import {
+  runStatementChecksOptions,
+  type StatementSuiteChecksRequest,
+} from "@/hooks/statements/use-run-statement-checks/use-run-statement-checks";
 import { explainStatementOptions } from "@/hooks/statements/use-explain-statement/use-explain-statement";
 import { traceStatementOptions } from "@/hooks/statements/use-trace-statement/use-trace-statement";
 import { diffStatementScenariosOptions } from "@/hooks/statements/use-diff-statement-scenarios/use-diff-statement-scenarios";
@@ -254,11 +257,13 @@ it(
     const request = {
       modelJson: analystModel,
       resultsJson: analystResults,
-      kind: "suite" as const,
-      configJson,
+      suiteSpecJson: configJson,
     };
-    const options = runStatementChecksOptions(client, 1, request);
-    request.configJson = "changed after snapshot";
+    const options = runStatementChecksOptions(client, 1, {
+      method: "runChecks",
+      request,
+    });
+    request.suiteSpecJson = "changed after snapshot";
     const query = new QueryClient();
     try {
       expect(await query.fetchQuery(options)).toEqual(
@@ -269,10 +274,13 @@ it(
         ),
       );
       await query.fetchQuery(
-        runStatementChecksOptions(client, 1, { ...request, configJson }),
+        runStatementChecksOptions(client, 1, {
+          method: "runChecks",
+          request: { ...request, suiteSpecJson: configJson },
+        }),
       );
       expect(calls).toEqual([
-        ["runStatementChecks", { ...request, configJson }],
+        ["runChecks", { ...request, suiteSpecJson: configJson }],
       ]);
     } finally {
       query.clear();
@@ -297,12 +305,24 @@ it("keys rollup, scenario and check queries by every request field and the worke
     marketJson: market,
     asOf: "2025-07-01",
   });
-  expectKeyed(runStatementChecksOptions, {
+  const suite: StatementSuiteChecksRequest = {
     modelJson: analystModel,
     resultsJson: analystResults,
-    kind: "suite",
-    configJson,
+    suiteSpecJson: configJson,
+  };
+  expectKeyed(runStatementChecksOptions, {
+    method: "runChecks",
+    request: suite,
   });
+  expectKeyed(
+    (client, session, request: StatementSuiteChecksRequest | null) =>
+      runStatementChecksOptions(
+        client,
+        session,
+        request && { method: "runChecks", request },
+      ),
+    suite,
+  );
 });
 
 it(

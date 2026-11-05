@@ -1,6 +1,7 @@
 {
   "$id": "https://finstack_quant.dev/schemas/models/1/altman_z_score_input.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Input ratios for the original Altman Z-Score (1968).",
   "properties": {
     "ebit_to_total_assets": {

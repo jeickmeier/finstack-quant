@@ -61,13 +61,13 @@ fn scaling_from_returns(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
             b.iter(|| {
                 black_box(
-                    Performance::from_returns(
+                    Performance::new(&fixtures::returns_panel(
                         dates.clone(),
                         vec![rets.clone()],
                         vec!["X".to_string()],
                         None,
                         PeriodKind::Daily,
-                    )
+                    ))
                     .expect("from_returns"),
                 )
             });

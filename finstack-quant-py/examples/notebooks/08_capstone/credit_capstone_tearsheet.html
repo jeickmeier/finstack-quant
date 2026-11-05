@@ -26,8 +26,8 @@
 .fq-ts .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:26px; }
 .fq-ts .statgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:0 30px; margin-top:6px; }
 .fq-ts table.kv { width:100%; border-collapse:collapse; font-size:12.5px; }
-.fq-ts table.kv td { padding:6px 0; border-bottom:1px solid #e4e1d8; }
-.fq-ts table.kv td.k { color:#7a8190; }
+.fq-ts table.kv th, .fq-ts table.kv td { padding:6px 0; border-bottom:1px solid #e4e1d8; }
+.fq-ts table.kv th.k { color:#7a8190; text-align:left; font-weight:inherit; }
 .fq-ts table.kv td.v { text-align:right; font-family:"Iowan Old Style",Georgia,serif; font-weight:600; color:#10243f; }
 .fq-ts table.kv td.v.pos { color:#1b6b4f; } .fq-ts table.kv td.v.neg { color:#9b2335; }
 .fq-ts table.hm { width:100%; border-collapse:collapse; font-family:"Iowan Old Style",Georgia,serif; font-size:11.5px; }
@@ -58,7 +58,7 @@
 .fq-ts svg .fq-mk { fill:#7c2230; stroke:#fff; stroke-width:1; pointer-events:none; }
 .fq-ts .fq-scroll { max-height:240px; overflow:auto; border:1px solid #e4e1d8; border-radius:4px; }
 .fq-ts .fq-scroll table.dd th { position:sticky; top:0; background:#f3f1ea; }
-</style></head><body style="margin:0;padding:24px;background:#e8e9ec;"><div class="fq-ts"><div class="head"><div><div class="eyebrow"></div><div class="title">Analyst credit capstone — reference submission</div><div class="subtitle">Synthetic inputs; actual native repricing. BBB is a separate analytical sleeve.</div></div><div class="meta">Generated 15 Jan 2025</div></div><div class="kpis"><div class="kpi"><div class="lbl">Combined value</div><div class="val ">USD 28,763,707.68</div></div><div class="kpi"><div class="lbl">Stress P&amp;L</div><div class="val ">USD -10,599,830.82</div></div><div class="kpi"><div class="lbl">IRS SIMM v2.6</div><div class="val ">USD 35,028.43</div></div><div class="kpi"><div class="lbl">Linked active return</div><div class="val ">0.2388%</div></div></div><div class="secttl">PM recommendation</div>Reduce the USD 15m-face BBB holding by 25% (USD 3,750,000 face), subject to an executable quote. At model value this releases USD 4,015,774.38; holding those proceeds as USD cash preserves initial wealth and reduces this composed stress loss by USD 2,475,412.08. This is a model-sized risk reduction, not an expected return forecast or an assumption that the model price is executable. The retained 75% still bears default, recovery, liquidity and index/tranche basis risk. Reassess the trim when observed collateral deterioration approaches the displayed first-writedown CDR; do not equate that model threshold with a physical default forecast. Add USD 0 to the held borrower loan until all four forecast DSCR tests clear 1.10x or a documented remediation changes the underwriting conclusion. Existing revolver commitments remain obligations and the conditional-draw stress remains relevant.<div class="secttl">Position values</div><table border="1" class="dataframe">
+</style></head><body style="margin:0;padding:24px;background:#e8e9ec;"><div class="fq-ts"><div class="head"><div><div class="eyebrow"></div><div class="title">Analyst credit capstone — reference submission</div><div class="subtitle">Synthetic inputs; actual native repricing. BBB is a separate analytical sleeve.</div></div><div class="meta">Generated 15 Jan 2025</div></div><div class="kpis"><div class="kpi"><div class="lbl">Combined value</div><div class="val ">USD 28,767,223.94</div></div><div class="kpi"><div class="lbl">Stress P&amp;L</div><div class="val ">USD -10,586,851.63</div></div><div class="kpi"><div class="lbl">IRS SIMM v2.6</div><div class="val ">USD 35,028.43</div></div><div class="kpi"><div class="lbl">Linked active return</div><div class="val ">0.2385%</div></div></div><div class="secttl">PM recommendation</div>Reduce the USD 15m-face BBB holding by 25% (USD 3,750,000 face), subject to an executable quote. At model value this releases USD 4,015,774.38; holding those proceeds as USD cash preserves initial wealth and reduces this composed stress loss by USD 2,475,412.08. This is a model-sized risk reduction, not an expected return forecast or an assumption that the model price is executable. The retained 75% still bears default, recovery, liquidity and index/tranche basis risk. Reassess the trim when observed collateral deterioration approaches the displayed first-writedown CDR; do not equate that model threshold with a physical default forecast. Add USD 0 to the held borrower loan until all four forecast DSCR tests clear 1.10x or a documented remediation changes the underwriting conclusion. Existing revolver commitments remain obligations and the conditional-draw stress remains relevant.<div class="secttl">Position values</div><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th>position</th>
@@ -137,8 +137,8 @@
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>USD</td>
-      <td>1.153335e+06</td>
-      <td>1.153335e+06</td>
+      <td>1.156851e+06</td>
+      <td>1.156851e+06</td>
     </tr>
     <tr>
       <td>CLO-BBB</td>
@@ -730,6 +730,11 @@
       <td>SPX-CALL</td>
       <td>bucketed_dv01::USD-OIS::7y</td>
       <td>0.000000</td>
+    </tr>
+    <tr>
+      <td>SPX-CALL</td>
+      <td>theta_period_days</td>
+      <td>1.000000</td>
     </tr>
     <tr>
       <td>ACME-CDS</td>
@@ -1469,102 +1474,52 @@
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>bucketed_cs01</td>
-      <td>-181.742742</td>
+      <td>-151.668370</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>bucketed_dv01</td>
-      <td>-148.387178</td>
+      <td>-150.405727</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>cs01</td>
-      <td>-181.742742</td>
+      <td>-151.668370</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>delta</td>
-      <td>8171.519974</td>
+      <td>8166.895496</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>dv01</td>
-      <td>-148.387179</td>
+      <td>-150.405727</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>gamma</td>
-      <td>441.414750</td>
+      <td>374.496167</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>rho</td>
-      <td>-148.387179</td>
+      <td>-150.405727</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>theta</td>
-      <td>-999976.707851</td>
+      <td>32.576946</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>vega</td>
-      <td>6075.787261</td>
-    </tr>
-    <tr>
-      <td>ANALYST-CONVERT</td>
-      <td>bucketed_cs01::CONVERT-RISKY::10y</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <td>ANALYST-CONVERT</td>
-      <td>bucketed_cs01::CONVERT-RISKY::15y</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <td>ANALYST-CONVERT</td>
-      <td>bucketed_cs01::CONVERT-RISKY::1y</td>
-      <td>-181.742742</td>
-    </tr>
-    <tr>
-      <td>ANALYST-CONVERT</td>
-      <td>bucketed_cs01::CONVERT-RISKY::20y</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <td>ANALYST-CONVERT</td>
-      <td>bucketed_cs01::CONVERT-RISKY::2y</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <td>ANALYST-CONVERT</td>
-      <td>bucketed_cs01::CONVERT-RISKY::30y</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <td>ANALYST-CONVERT</td>
-      <td>bucketed_cs01::CONVERT-RISKY::3m</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <td>ANALYST-CONVERT</td>
-      <td>bucketed_cs01::CONVERT-RISKY::3y</td>
-      <td>0.000000</td>
+      <td>5921.103075</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>bucketed_cs01::CONVERT-RISKY::5y</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <td>ANALYST-CONVERT</td>
-      <td>bucketed_cs01::CONVERT-RISKY::6m</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <td>ANALYST-CONVERT</td>
-      <td>bucketed_cs01::CONVERT-RISKY::7y</td>
-      <td>0.000000</td>
+      <td>-151.668370</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
@@ -1579,7 +1534,7 @@
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>bucketed_dv01::USD-OIS::1y</td>
-      <td>-1.602499</td>
+      <td>-1.605529</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
@@ -1589,7 +1544,7 @@
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>bucketed_dv01::USD-OIS::2y</td>
-      <td>-3.452647</td>
+      <td>-3.449694</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
@@ -1599,27 +1554,32 @@
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>bucketed_dv01::USD-OIS::3m</td>
-      <td>-0.000594</td>
+      <td>-0.008327</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>bucketed_dv01::USD-OIS::3y</td>
-      <td>-7.845477</td>
+      <td>-7.818966</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>bucketed_dv01::USD-OIS::5y</td>
-      <td>-134.825789</td>
+      <td>-136.871754</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>bucketed_dv01::USD-OIS::6m</td>
-      <td>-0.481642</td>
+      <td>-0.470123</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
       <td>bucketed_dv01::USD-OIS::7y</td>
-      <td>-0.178530</td>
+      <td>-0.181332</td>
+    </tr>
+    <tr>
+      <td>ANALYST-CONVERT</td>
+      <td>cs01::CONVERT-RISKY</td>
+      <td>-151.668370</td>
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
@@ -1657,14 +1617,14 @@
     <tr>
       <td>0.95</td>
       <td>504</td>
-      <td>66450.06178</td>
-      <td>85844.535482</td>
+      <td>66856.337764</td>
+      <td>85906.157794</td>
       <td>26</td>
-      <td>59645.836505</td>
-      <td>73385.152112</td>
-      <td>75356.491964</td>
-      <td>94276.783945</td>
-      <td>2042.454274</td>
+      <td>59710.293496</td>
+      <td>73411.356729</td>
+      <td>75428.160029</td>
+      <td>94281.197317</td>
+      <td>2015.719401</td>
       <td>13</td>
     </tr>
   </tbody>
@@ -1680,57 +1640,57 @@
   <tbody>
     <tr>
       <td>USD_zero_and_forward_decimal</td>
-      <td>-2.860532</td>
-      <td>-8.227951e+07</td>
-      <td>1.936633e-06</td>
+      <td>-2.861027</td>
+      <td>-8.230382e+07</td>
+      <td>1.937472e-06</td>
     </tr>
     <tr>
       <td>EUR_zero_decimal</td>
-      <td>-0.266126</td>
-      <td>-7.654784e+06</td>
-      <td>5.404353e-08</td>
+      <td>-0.265887</td>
+      <td>-7.648826e+06</td>
+      <td>5.394292e-08</td>
     </tr>
     <tr>
       <td>hazard_log_change</td>
-      <td>0.001912</td>
-      <td>5.499607e+04</td>
-      <td>3.473384e-09</td>
+      <td>0.002165</td>
+      <td>6.229496e+04</td>
+      <td>5.894508e-09</td>
     </tr>
     <tr>
       <td>equity_log_return</td>
-      <td>0.039209</td>
-      <td>1.127792e+06</td>
-      <td>1.162026e-07</td>
+      <td>0.039198</td>
+      <td>1.127624e+06</td>
+      <td>1.153222e-07</td>
     </tr>
     <tr>
       <td>absolute_volatility_change</td>
-      <td>0.027997</td>
-      <td>8.052992e+05</td>
-      <td>3.506446e-08</td>
+      <td>0.027458</td>
+      <td>7.899036e+05</td>
+      <td>3.356062e-08</td>
     </tr>
     <tr>
       <td>EURUSD_log_return</td>
       <td>0.065644</td>
-      <td>1.888155e+06</td>
-      <td>1.679296e-07</td>
+      <td>1.888396e+06</td>
+      <td>1.674777e-07</td>
     </tr>
     <tr>
       <td>energy_log_return</td>
-      <td>0.000008</td>
-      <td>2.413297e+02</td>
-      <td>5.955146e-12</td>
+      <td>0.000005</td>
+      <td>1.418141e+02</td>
+      <td>3.480361e-12</td>
     </tr>
     <tr>
       <td>WTI_basis_log_return</td>
-      <td>-0.000119</td>
-      <td>-3.433136e+03</td>
-      <td>5.659300e-11</td>
+      <td>-0.000110</td>
+      <td>-3.151988e+03</td>
+      <td>5.198725e-11</td>
     </tr>
     <tr>
       <td>nonlinear_residual</td>
       <td>0.000000</td>
       <td>0.000000e+00</td>
-      <td>2.348069e-10</td>
+      <td>2.368267e-10</td>
     </tr>
   </tbody>
 </table><div class="secttl">Historical-pattern fixed-date stress</div><table border="1" class="dataframe">
@@ -1811,9 +1771,9 @@
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
-      <td>1.153335e+06</td>
-      <td>1.091913e+06</td>
-      <td>-61421.846491</td>
+      <td>1.156851e+06</td>
+      <td>1.096513e+06</td>
+      <td>-60338.611872</td>
     </tr>
     <tr>
       <td>CLO-BBB</td>
@@ -1900,9 +1860,9 @@
     </tr>
     <tr>
       <td>ANALYST-CONVERT</td>
-      <td>1.153335e+06</td>
-      <td>9.173148e+05</td>
-      <td>-2.360201e+05</td>
+      <td>1.156851e+06</td>
+      <td>9.338102e+05</td>
+      <td>-2.230409e+05</td>
     </tr>
     <tr>
       <td>CLO-BBB</td>
@@ -2151,33 +2111,33 @@
   <tbody>
     <tr>
       <td>2025-01-15</td>
-      <td>1.270061e+07</td>
+      <td>1.270413e+07</td>
       <td>1.606310e+07</td>
-      <td>2.876371e+07</td>
+      <td>2.876722e+07</td>
       <td>1.080000</td>
       <td>0.0</td>
     </tr>
     <tr>
       <td>2025-01-22</td>
-      <td>1.271946e+07</td>
+      <td>1.272293e+07</td>
       <td>1.608911e+07</td>
-      <td>2.880857e+07</td>
+      <td>2.881204e+07</td>
       <td>1.079222</td>
       <td>0.0</td>
     </tr>
     <tr>
       <td>2025-01-29</td>
-      <td>1.273811e+07</td>
+      <td>1.274159e+07</td>
       <td>1.611478e+07</td>
-      <td>2.885289e+07</td>
+      <td>2.885637e+07</td>
       <td>1.078444</td>
       <td>0.0</td>
     </tr>
     <tr>
       <td>2025-02-05</td>
-      <td>1.275725e+07</td>
+      <td>1.276070e+07</td>
       <td>1.614139e+07</td>
-      <td>2.889864e+07</td>
+      <td>2.890210e+07</td>
       <td>1.077667</td>
       <td>0.0</td>
     </tr>
@@ -2250,7 +2210,7 @@
       <td>5.006649e+06</td>
     </tr>
   </tbody>
-</table><p>Post-as-of collateral cash: USD 101,031,649.41; total tranche distributions: USD 101,031,649.41; reconciliation error: USD 0.00000000.</p><p>This controlled 90-day trace uses 5% annual CDR, 25% recovery and immediate recovery. It excludes defaulted-notional loss records and zero-PV as-of records from remaining investor cash; it is distinct from the full-life joint stress above.</p><div class="secttl">Expected revolver draws</div><table border="1" class="dataframe">
+</table><p>Post-as-of collateral cash: USD 101,031,649.41; total tranche distributions: USD 101,031,649.41; reconciliation error: USD -0.00000004.</p><p>This controlled 90-day trace uses 5% annual CDR, 25% recovery and immediate recovery. It excludes defaulted-notional loss records and zero-PV as-of records from remaining investor cash; it is distinct from the full-life joint stress above.</p><div class="secttl">Expected revolver draws</div><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th>correlation</th>
@@ -2287,27 +2247,27 @@
   <tbody>
     <tr>
       <td>50.0</td>
-      <td>8.400919e+05</td>
-      <td>789240.244571</td>
+      <td>8.412941e+05</td>
+      <td>787946.66137</td>
       <td>500000.0</td>
       <td>0.5</td>
-      <td>3688.425621</td>
+      <td>3827.832492</td>
     </tr>
     <tr>
       <td>100.0</td>
-      <td>1.153335e+06</td>
-      <td>789240.244571</td>
+      <td>1.156851e+06</td>
+      <td>787946.66137</td>
       <td>1000000.0</td>
       <td>1.0</td>
-      <td>8171.519974</td>
+      <td>8166.895496</td>
     </tr>
     <tr>
       <td>150.0</td>
-      <td>1.602939e+06</td>
-      <td>789240.244571</td>
+      <td>1.605446e+06</td>
+      <td>787946.66137</td>
       <td>1500000.0</td>
       <td>1.5</td>
-      <td>9590.947300</td>
+      <td>9537.938462</td>
     </tr>
   </tbody>
 </table><div class="secttl">Three-period linked attribution</div><table border="1" class="dataframe">
@@ -2327,16 +2287,16 @@
       <td>common</td>
       <td>0.0</td>
       <td>0.000379</td>
-      <td>-0.000155</td>
+      <td>-0.000156</td>
       <td>0.000223</td>
     </tr>
     <tr>
       <th>1</th>
       <td>track_extension</td>
       <td>0.0</td>
-      <td>0.000992</td>
-      <td>-0.000263</td>
-      <td>0.000729</td>
+      <td>0.000988</td>
+      <td>-0.000261</td>
+      <td>0.000727</td>
     </tr>
     <tr>
       <th>2</th>

@@ -2430,10 +2430,14 @@ export interface DFeab1608Ae875B3Fa417 {
 }
 /**
  * Parameter to vary in sensitivity analysis.
+ *
+ * The wire form carries exactly one of `perturbations` (absolute values) or
+ * `pct_range` (percentage moves of `base_value`, converted on deserialization
+ * as by [`Self::with_percentages`]); it always serializes the absolute values.
  */
 export interface D_6Df778C161860D725Fb3 {
   /**
-   * Base value
+   * Base value in the node's units; `pct_range` moves are applied to it.
    */
   base_value: number;
   /**
@@ -2441,15 +2445,20 @@ export interface D_6Df778C161860D725Fb3 {
    */
   node_id: string;
   /**
+   * Percentage moves of `base_value` (`10.0` is a 10% increase), each
+   * substituted as `base_value * (1 + pct / 100)`; give exactly one of
+   * `perturbations` and `pct_range`.
+   */
+  pct_range?: number[] | null;
+  /**
    * Period to vary
    */
   period_id: string;
   /**
-   * Absolute values to substitute for this node/period; use
-   * [`Self::with_percentages`] to construct shocks from percentage inputs.
+   * Absolute values to substitute for this node/period; give exactly one of
+   * `perturbations` and `pct_range`.
    */
-  perturbations: number[];
-  [k: string]: unknown;
+  perturbations?: number[] | null;
 }
 /**
  * Result of a single sensitivity scenario.

@@ -222,10 +222,12 @@ it("preserves the scoped published Float64Array return through structured clone"
     expect(copy).toBeInstanceOf(Float64Array);
     expect(Buffer.from(copy.buffer)).toEqual(Buffer.from(values.buffer));
     expect(
-      Number.isFinite(models.volatility.getCubeVol(cube, 1, 5, 0.03)),
+      Number.isFinite(
+        models.volatility.getCubeVol(cube, 1, 5, 0.03, "lognormal"),
+      ),
     ).toBe(true);
     expect(
-      Number.isFinite(models.volatility.getCubeNormalVol(cube, 1, 5, 0.03)),
+      Number.isFinite(models.volatility.getCubeVol(cube, 1, 5, 0.03, "normal")),
     ).toBe(true);
     expect(
       Number.isFinite(models.volatility.getFxDeltaVol(surface, 1, 1.1, 1.1)),

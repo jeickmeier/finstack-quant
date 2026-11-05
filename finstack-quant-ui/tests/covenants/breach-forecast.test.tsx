@@ -155,9 +155,15 @@ it("keeps a uint64 seed exact and returns native config and metric errors, freei
   expect(over.value.ok).toBe(false);
   if (!over.value.ok) expect(over.value.error.kind).toBe("validation");
   expect(over.engine).toEqual([1, 1]);
-  // covLite is an incurrence package: the maintenance default forecasts
+  // cov_lite is an incurrence package: the maintenance default forecasts
   // nothing, an incurrence scope reads total_leverage, which the model lacks.
-  const covLite = JSON.stringify({ specs: native.covLite(5, 3) });
+  const covLite = JSON.stringify({
+    specs: native.covenantTemplate({
+      kind: "cov_lite",
+      max_leverage: 5,
+      max_senior_leverage: 3,
+    }),
+  });
   expect(
     unwrap(
       await harness.proxy.forecastBreaches({

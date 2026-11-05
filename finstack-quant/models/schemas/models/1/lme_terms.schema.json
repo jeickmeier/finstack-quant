@@ -1,0 +1,71 @@
+{
+  "$defs": {
+    "LmeType": {
+      "description": "Structure of a liability management exercise.\n\nEach variant reinterprets the `repurchase_price_pct` field of\n[`LmeTerms`]; see that function's documentation for the per-variant\nmeaning and admissible range.",
+      "oneOf": [
+        {
+          "const": "open_market_repurchase",
+          "description": "Open-market repurchase of debt below par.",
+          "type": "string"
+        },
+        {
+          "const": "tender_offer",
+          "description": "Public tender offer for debt at a stated price.",
+          "type": "string"
+        },
+        {
+          "const": "amend_and_extend",
+          "description": "Maturity extension in exchange for a consent fee; no par is retired.",
+          "type": "string"
+        },
+        {
+          "const": "dropdown",
+          "description": "Transfer of collateral to an unrestricted subsidiary; no par is\nretired and remaining holders are structurally diluted.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/lme_terms.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Terms of a liability management exercise, from the issuer's side.",
+  "properties": {
+    "ebitda": {
+      "default": null,
+      "description": "Optional EBITDA in the same unit as `notional`; a positive value\nproduces the leverage-impact block.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "lme_type": {
+      "$ref": "#/$defs/LmeType",
+      "description": "Structure of the exercise, which selects how `repurchase_price_pct` is\ninterpreted (see [`analyze_lme`])."
+    },
+    "notional": {
+      "description": "Outstanding face amount of the target instrument; strictly positive.",
+      "format": "double",
+      "type": "number"
+    },
+    "opt_acceptance_pct": {
+      "description": "Fraction of holders participating, in `[0, 1]`.",
+      "format": "double",
+      "type": "number"
+    },
+    "repurchase_price_pct": {
+      "description": "Price, extension fee, or transferred-asset fraction, by `lme_type`.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "lme_type",
+    "notional",
+    "repurchase_price_pct",
+    "opt_acceptance_pct"
+  ],
+  "title": "LmeTerms",
+  "type": "object"
+}

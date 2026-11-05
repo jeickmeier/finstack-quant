@@ -441,14 +441,22 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
             let tenor = contractual_swap_tenor_years(start, end)?;
             let fitted = match params.vol_convention {
                 SwaptionVolConvention::Normal => {
-                    finstack_quant_models::volatility::get_cube_normal_vol_clamped(
-                        &cube, expiry, tenor, *strike,
+                    finstack_quant_models::volatility::get_cube_vol_clamped(
+                        &cube,
+                        expiry,
+                        tenor,
+                        *strike,
+                        finstack_quant_models::volatility::VolatilityConvention::Normal,
                     )
                 }
                 SwaptionVolConvention::Lognormal
                 | SwaptionVolConvention::ShiftedLognormal { .. } => {
                     finstack_quant_models::volatility::get_cube_vol_clamped(
-                        &cube, expiry, tenor, *strike,
+                        &cube,
+                        expiry,
+                        tenor,
+                        *strike,
+                        finstack_quant_models::volatility::VolatilityConvention::Lognormal,
                     )
                 }
             };
@@ -1068,8 +1076,14 @@ mod tests {
         }
         let (cube, report) = solve(&p, &quotes, &context, &CalibrationConfig::default())
             .expect("fit returns published cube diagnostics");
-        let fitted = finstack_quant_models::volatility::get_cube_normal_vol(&cube, 1.0, 3.0, 0.03)
-            .expect("interior quote is inside the output axes");
+        let fitted = finstack_quant_models::volatility::get_cube_vol(
+            &cube,
+            1.0,
+            3.0,
+            0.03,
+            finstack_quant_models::volatility::VolatilityConvention::Normal,
+        )
+        .expect("interior quote is inside the output axes");
         assert!((fitted - 0.0125).abs() < 1e-7);
         assert!(!report.success);
         assert!((report.max_residual - 0.0275).abs() < 1e-7);
@@ -1379,8 +1393,14 @@ mod tests {
         };
         let (cube, _report) = solve(&p, &quotes, &ctx, &config).expect("solve");
 
-        let fitted_atm = finstack_quant_models::volatility::get_cube_vol(&cube, t_exp, t_ten, fwd)
-            .expect("cube vol");
+        let fitted_atm = finstack_quant_models::volatility::get_cube_vol(
+            &cube,
+            t_exp,
+            t_ten,
+            fwd,
+            finstack_quant_models::volatility::VolatilityConvention::Lognormal,
+        )
+        .expect("cube vol");
         let true_atm = sabr_true.implied_vol(fwd, fwd, t_exp).expect("true atm");
 
         assert!(
@@ -1389,9 +1409,13 @@ mod tests {
             fitted_atm,
             true_atm
         );
-        let surface =
-            finstack_quant_models::volatility::materialize_cube_tenor_slice(&cube, t_ten, &strikes)
-                .expect("materialized cube");
+        let surface = finstack_quant_models::volatility::materialize_cube_tenor_slice(
+            &cube,
+            t_ten,
+            &strikes,
+            finstack_quant_models::volatility::VolatilityConvention::Lognormal,
+        )
+        .expect("materialized cube");
         match shift {
             Some(expected) => {
                 assert_eq!(surface.quote_type(), VolQuoteType::ShiftedBlackLognormal);

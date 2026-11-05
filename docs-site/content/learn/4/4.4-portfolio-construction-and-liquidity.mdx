@@ -116,14 +116,14 @@ The cash-bond LVaR table retains native model loss, spread cost and adjusted los
 
 {/* notebook-block notebook="05_portfolio/liquidity_risk.ipynb" cell="risk-budget-and-liquidity" role="build" */}
 ```python exec id=risk-budget-and-liquidity role=build
-from finstack_quant.models.factor.risk import parametric_var_decomposition,evaluate_risk_budget
+from finstack_quant.models.factor.risk import position_risk_report, evaluate_risk_budget
 from finstack_quant.models.liquidity import lvar_bangia,roll_effective_spread,amihud_illiquidity,almgren_chriss_impact,kyle_lambda
 from finstack_quant.portfolio import value_portfolio
 from finstack_quant.analytics import Performance
 covariance=panel[position_ids].cov().to_numpy()
 # Currency exposure is position quantity times the disclosed100k proxy-risk-capital denominator.
 exposure=[100_000*initial_quantity*constrained.optimal_weights[pid] for pid in position_ids]
-decomp=parametric_var_decomposition(position_ids,exposure,covariance,confidence=.99,compute_incremental=True)
+decomp=position_risk_report({"position_ids": position_ids, "confidence": .99, "source": {"kind": "parametric", "weights": exposure, "covariance": covariance, "compute_incremental": True}}).decomposition
 components=[x.component_var for x in decomp.var_contributions]
 budget=evaluate_risk_budget(position_ids,components,[1/8]*8,decomp.portfolio_var)
 print(pd.DataFrame([{"position":x.position_id,"component_VaR_USD":x.component_var,"share":x.relative_var} for x in decomp.var_contributions]).to_string(index=False))

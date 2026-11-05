@@ -1130,11 +1130,19 @@ const ES_ROW_KEYS = ['component_es', 'marginal_es', 'position_id', 'relative_es'
 // Parametric 95% VaR of the book above (losses negative), pinned in both hosts.
 const PARAMETRIC_VAR_95 = -0.30150665010511113;
 
-test('models.factor.risk.parametricVarDecomposition returns the canonical PositionRiskDecomposition', () => {
-  const decomposition = assertStructured(
-    models.factor.risk.parametricVarDecomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE),
-    'parametricVarDecomposition result'
-  );
+const parametric = (extra = {}, source = {}) =>
+  models.factor.risk.positionRiskReport({
+    position_ids: VAR_IDS,
+    source: { kind: 'parametric', weights: VAR_WEIGHTS, covariance: VAR_COVARIANCE, ...source },
+    ...extra,
+  });
+
+test('models.factor.risk.positionRiskReport returns the canonical parametric PositionRiskDecomposition', () => {
+  const report = assertStructured(parametric(), 'positionRiskReport result');
+  assert.deepEqual(Object.keys(report).sort(), ['budget', 'decomposition', 'stress']);
+  assert.equal(report.budget, null);
+  assert.equal(report.stress, null);
+  const { decomposition } = report;
   assert.deepEqual(Object.keys(decomposition).sort(), DECOMPOSITION_KEYS);
   assert.deepEqual(Object.keys(decomposition.var_contributions[0]).sort(), VAR_ROW_KEYS);
   assert.deepEqual(Object.keys(decomposition.es_contributions[0]).sort(), ES_ROW_KEYS);
@@ -1148,18 +1156,16 @@ test('models.factor.risk.parametricVarDecomposition returns the canonical Positi
   const shares = decomposition.var_contributions.map((row) => row.relative_var);
   assert.ok(Math.abs(shares[0] + shares[1] - 1) < 1e-12);
 
-  const explicit = models.factor.risk.parametricVarDecomposition(
-    VAR_IDS,
-    new Float64Array(VAR_WEIGHTS),
-    VAR_COVARIANCE,
-    0.99,
-    true
+  const explicit = parametric(
+    { confidence: 0.99, budget: { targets: [0.5, 0.5] } },
+    { compute_incremental: true }
   );
-  assert.equal(explicit.confidence, 0.99);
-  assert.equal(typeof explicit.var_contributions[0].incremental_var, 'number');
+  assert.equal(explicit.decomposition.confidence, 0.99);
+  assert.equal(typeof explicit.decomposition.var_contributions[0].incremental_var, 'number');
+  assert.equal(explicit.budget.positions.length, 2);
 });
 
-test('models.factor.risk.historicalVarDecomposition returns ES rows and takes position-major P&L only', () => {
+test('models.factor.risk.positionRiskReport returns historical ES rows and stress and takes position-major P&L only', () => {
   // (1 - confidence) * n_scenarios must be at least 1 to resolve the tail, so
   // 0.9 confidence needs >= 10 scenarios per position.
   const scenarios = 20;
@@ -1167,25 +1173,30 @@ test('models.factor.risk.historicalVarDecomposition returns ES rows and takes po
     Array.from({ length: scenarios }, (_, i) => i - scenarios / 2),
     Array.from({ length: scenarios }, (_, i) => (i - scenarios / 2) / 2),
   ];
-  const decomposition = assertStructured(
-    models.factor.risk.historicalVarDecomposition(VAR_IDS, pnls, 0.9),
-    'historicalVarDecomposition result'
-  );
+  const historical = (rows, confidence) =>
+    models.factor.risk.positionRiskReport({
+      position_ids: VAR_IDS,
+      confidence,
+      source: { kind: 'historical', pnls: rows },
+    });
+  const report = assertStructured(historical(pnls, 0.9), 'positionRiskReport result');
+  const { decomposition } = report;
   assert.deepEqual(Object.keys(decomposition).sort(), DECOMPOSITION_KEYS);
   assert.equal(decomposition.method, 'historical');
   assert.equal(decomposition.es_contributions.length, 2);
   assert.equal(decomposition.euler_residual, null);
+  assert.deepEqual(report.stress, models.factor.risk.buildStressAttribution(VAR_IDS, pnls, 0.9));
   // Omitted confidence resolves to the Rust `historical_95()` preset (two
   // tail scenarios need at least 40 at 95%).
   const longer = [
     Array.from({ length: 40 }, (_, i) => i - 20),
     Array.from({ length: 40 }, (_, i) => (i - 20) / 2),
   ];
-  assert.equal(models.factor.risk.historicalVarDecomposition(VAR_IDS, longer).confidence, 0.95);
+  assert.equal(historical(longer).decomposition.confidence, 0.95);
   // A scenario-major (20 x 2) matrix is rejected in both hosts.
   const scenarioMajor = pnls[0].map((value, i) => [value, pnls[1][i]]);
   assert.throws(
-    () => models.factor.risk.historicalVarDecomposition(VAR_IDS, scenarioMajor, 0.9),
+    () => historical(scenarioMajor, 0.9),
     (error) => error.kind === 'validation' && /must have 2 rows, got 20/.test(error.message)
   );
 });
@@ -1208,21 +1219,19 @@ test('models.factor.risk.evaluateRiskBudget returns the canonical RiskBudgetResu
   assert.ok(Math.abs(budget.total_overbudget - 10.0) < 1e-12);
 });
 
-test('factor-risk inputs are arrays, not JSON strings', () => {
+test('a position risk request rejects an unknown source kind and field', () => {
   assert.throws(
-    () =>
-      models.factor.risk.parametricVarDecomposition(
-        JSON.stringify(VAR_IDS),
-        VAR_WEIGHTS,
-        VAR_COVARIANCE
-      ),
-    (error) => error instanceof TypeError && error.kind === 'invalid_type'
+    () => parametric({}, { kind: 'monte_carlo' }),
+    (error) => error.kind === 'validation' && /unknown variant/.test(error.message)
+  );
+  assert.throws(
+    () => parametric({ horizon: 10 }),
+    (error) => error.kind === 'validation' && /unknown field/.test(error.message)
   );
 });
 
 test('factor-risk kernels are absent from the portfolio namespace', () => {
-  assert.equal('parametricVarDecomposition' in portfolio, false);
-  assert.equal('historicalVarDecomposition' in portfolio, false);
+  assert.equal('positionRiskReport' in portfolio, false);
   assert.equal('evaluateRiskBudget' in portfolio, false);
 });
 

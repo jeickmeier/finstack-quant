@@ -12,56 +12,15 @@ import {
   typedNumber,
 } from "@/components/finstack/shared/primitives/native-display/native-display";
 
-/** A native result or the native error of that one call. */
-type Outcome<T> =
-  { ok: true; value: T } | { ok: false; error: { message: string } };
 /** The pricing model; each takes its own terms. */
-export type OptionModel = "black_scholes" | "black76" | "bachelier";
-type OptionTerms =
-  | {
-      model: "black_scholes";
-      spot: number;
-      strike: number;
-      rate: number;
-      divYield: number;
-      expiry: number;
-      isCall: boolean;
-      /** Omitted leaves the theta denominator to Rust. */
-      thetaDaysPerYear?: number | null;
-    }
-  | {
-      model: "black76";
-      forward: number;
-      strike: number;
-      df: number;
-      expiry: number;
-      isCall: boolean;
-    }
-  | {
-      model: "bachelier";
-      forward: number;
-      strike: number;
-      expiry: number;
-      isCall: boolean;
-    };
-/** The request the calculator submits; the worker's OptionCalculatorRequest. */
-export type OptionCalculation = OptionTerms &
-  ({ mode: "price"; vol: number } | { mode: "implied_vol"; price: number });
-/** What the worker's optionCalculator returns. */
-export type OptionCalculationResult = {
-  model: OptionModel;
-  /** The returned Greeks, or Rust's error of that one call. */
-  greeks: Outcome<modelsWire.BsGreeks | modelsWire.ForwardGreeks>;
-} & (
-  { mode: "price"; price: number } | { mode: "implied_vol"; impliedVol: number }
-);
+type Kind = modelsWire.OptionModel["kind"];
 export interface OptionCalculatorProps {
-  /** The initial inputs; remount to load another request. */
-  defaultRequest: OptionCalculation;
+  /** The initial inputs, and the request a result answers until Calculate; remount to load another request. */
+  defaultRequest: modelsWire.OptionCalculation;
   /** Receives the request on Calculate; connect it to the useOptionCalculator request. */
-  onSubmit(request: OptionCalculation): void;
-  /** The returned result; null while none is available. */
-  result: OptionCalculationResult | null;
+  onSubmit(request: modelsWire.OptionCalculation): void;
+  /** The returned result of the last request; null while none is available. */
+  result: modelsWire.OptionCalculationResult | null;
   loading?: boolean;
   /** The native error of the whole calculation, shown as returned. */
   error?: string;
@@ -84,7 +43,7 @@ const optionModels = {
       strikeField,
       ["rate", "Rate", "Risk-free rate, decimal, continuously compounded."],
       [
-        "divYield",
+        "div_yield",
         "Dividend yield",
         "Dividend yield or foreign rate, decimal, continuously compounded.",
       ],
@@ -133,7 +92,7 @@ const optionModels = {
       "Undiscounted forward Greeks: vega per unit (1.0) change in normal volatility.",
   },
 } as const satisfies Record<
-  OptionModel,
+  Kind,
   {
     label: string;
     fields: readonly (readonly [string, string, string])[];
@@ -143,11 +102,12 @@ const optionModels = {
     greeksNote: string;
   }
 >;
-/** The supplied numbers as field text; a model the request does not use starts empty. */
-function fieldText(request: OptionCalculation) {
+/** The supplied numbers as field text by wire name; a model the request does not use starts empty. */
+function fieldText(request: modelsWire.OptionCalculation) {
   return Object.fromEntries(
-    Object.entries(request).flatMap(([key, value]) =>
-      typeof value === "number" ? [[key, String(value)]] : [],
+    Object.entries({ ...request.model, ...request.solve }).flatMap(
+      ([key, value]) =>
+        typeof value === "number" ? [[key, String(value)]] : [],
     ),
   );
 }
@@ -165,9 +125,13 @@ export function OptionCalculator({
   formatValue = String,
   density = "compact",
 }: OptionCalculatorProps) {
-  const [model, setModel] = useState<OptionModel>(defaultRequest.model);
-  const [mode, setMode] = useState(defaultRequest.mode);
-  const [side, setSide] = useState(defaultRequest.isCall ? "call" : "put");
+  const [model, setModel] = useState<Kind>(defaultRequest.model.kind);
+  const [mode, setMode] = useState(defaultRequest.solve.kind);
+  const [side, setSide] = useState(
+    defaultRequest.model.is_call ? "call" : "put",
+  );
+  // The request the shown result answers: the last one submitted.
+  const [answered, setAnswered] = useState(defaultRequest);
   const [values, setValues] = useState<Record<string, string>>(() =>
     fieldText(defaultRequest),
   );
@@ -188,19 +152,23 @@ export function OptionCalculator({
       definition.fields.map(([key]) => [key, typedNumber(values[key])]),
     );
     // An empty theta denominator stays unset so Rust applies its own.
-    const theta = values.thetaDaysPerYear?.trim()
-      ? { thetaDaysPerYear: typedNumber(values.thetaDaysPerYear) }
+    const theta = values.theta_days_per_year?.trim()
+      ? { theta_days_per_year: typedNumber(values.theta_days_per_year) }
       : {};
-    onSubmit({
-      model,
-      mode,
-      isCall: side === "call",
-      ...terms,
-      ...(model === "black_scholes" ? theta : {}),
-      ...(mode === "price"
-        ? { vol: typedNumber(values.vol) }
-        : { price: typedNumber(values.price) }),
-    } as OptionCalculation);
+    const request = {
+      model: {
+        kind: model,
+        is_call: side === "call",
+        ...terms,
+        ...(model === "black_scholes" ? theta : {}),
+      },
+      solve:
+        mode === "price"
+          ? { kind: "price", vol: typedNumber(values.vol) }
+          : { kind: "implied_vol", price: typedNumber(values.price) },
+    } as modelsWire.OptionCalculation;
+    setAnswered(request);
+    onSubmit(request);
   };
   return (
     <section
@@ -220,7 +188,7 @@ export function OptionCalculator({
           <EnumField
             label="Model"
             value={model}
-            onValueChange={(value) => setModel(value as OptionModel)}
+            onValueChange={(value) => setModel(value as Kind)}
             options={Object.entries(optionModels).map(([value, { label }]) => ({
               value,
               label,
@@ -257,7 +225,7 @@ export function OptionCalculator({
             : field("price", "Option price", definition.priceHelp)}
           {model === "black_scholes" &&
             field(
-              "thetaDaysPerYear",
+              "theta_days_per_year",
               "Theta days per year",
               "Day-count denominator for theta; empty uses the Rust default of 365.",
             )}
@@ -265,6 +233,7 @@ export function OptionCalculator({
         <Button type="submit">Calculate</Button>
       </form>
       <OptionResultView
+        request={answered}
         result={result}
         loading={loading}
         error={error}
@@ -279,13 +248,15 @@ interface GreekRow {
   value: unknown;
 }
 function OptionResultView({
+  request,
   result,
   loading,
   error,
   format,
   density,
 }: {
-  result: OptionCalculationResult | null;
+  request: modelsWire.OptionCalculation;
+  result: modelsWire.OptionCalculationResult | null;
   loading?: boolean;
   error?: string;
   format: (value: number) => string;
@@ -327,16 +298,17 @@ function OptionResultView({
         No option result
       </p>
     );
-  // The notes follow the returned model, not the current selection.
-  const definition = optionModels[result.model];
+  // The notes follow the answered request's model, not the current selection.
+  const definition = optionModels[request.model.kind];
   const [title, value, note] =
-    result.mode === "price"
+    request.solve.kind === "price"
       ? ["Price", result.price, definition.priceNote]
       : [
           `Implied ${definition.vol[0].toLowerCase()}`,
-          result.impliedVol,
+          result.implied_vol,
           definition.vol[1],
         ];
+  const { kind: _family, ...greeks } = result.greeks;
   return (
     <div className="space-y-4">
       <section
@@ -351,28 +323,19 @@ function OptionResultView({
       </section>
       <section aria-label="Greeks" className="min-w-0 space-y-2">
         <h3 className="text-sm font-medium">Greeks</h3>
-        {result.greeks.ok ? (
-          <>
-            <FinstackTable
-              data={Object.entries(result.greeks.value).map(
-                ([name, greek]) => ({ name: labelFor(name), value: greek }),
-              )}
-              columns={columns}
-              getRowId={(row) => row.name}
-              caption="Option Greeks"
-              captionVisibility="sr-only"
-              density={density}
-              emptyState="No Greeks returned"
-            />
-            <p className="text-xs text-muted-foreground">
-              {definition.greeksNote}
-            </p>
-          </>
-        ) : (
-          <p role="alert" className="text-xs text-error">
-            {result.greeks.error.message}
-          </p>
-        )}
+        <FinstackTable
+          data={Object.entries(greeks).map(([name, greek]) => ({
+            name: labelFor(name),
+            value: greek,
+          }))}
+          columns={columns}
+          getRowId={(row) => row.name}
+          caption="Option Greeks"
+          captionVisibility="sr-only"
+          density={density}
+          emptyState="No Greeks returned"
+        />
+        <p className="text-xs text-muted-foreground">{definition.greeksNote}</p>
       </section>
     </div>
   );

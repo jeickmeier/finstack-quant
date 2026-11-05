@@ -35,6 +35,11 @@
     "schema": "schemas/covenant_report.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_template.schema.json",
+    "source": "finstack-quant/covenants/schemas/covenants/1/covenant_template.schema.json",
+    "schema": "schemas/covenant_template.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
     "source": "finstack-quant/covenants/schemas/covenants/1/dated_covenant_reports.schema.json",
     "schema": "schemas/dated_covenant_reports.json"

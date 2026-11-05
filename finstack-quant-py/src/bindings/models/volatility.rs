@@ -542,48 +542,49 @@ fn get_surface_vol_clamped(surface: &PyVolSurface, expiry: f64, strike: f64) -> 
 
 #[doc = pydoc!("finstack_quant.models.volatility", "get_cube_vol")]
 #[pyfunction]
-fn get_cube_vol(cube: &PyVolCube, expiry: f64, tenor: f64, strike: f64) -> PyResult<f64> {
-    vol::get_cube_vol(&cube.inner, expiry, tenor, strike).map_err(core_to_py)
+fn get_cube_vol(
+    py: Python<'_>,
+    cube: &PyVolCube,
+    expiry: f64,
+    tenor: f64,
+    strike: f64,
+    convention: &Bound<'_, PyAny>,
+) -> PyResult<f64> {
+    let convention: VolatilityConvention = py_to_serde(py, convention, "convention")?;
+    vol::get_cube_vol(&cube.inner, expiry, tenor, strike, convention).map_err(core_to_py)
 }
 
 #[doc = pydoc!("finstack_quant.models.volatility", "get_cube_vol_clamped")]
 #[pyfunction]
-fn get_cube_vol_clamped(cube: &PyVolCube, expiry: f64, tenor: f64, strike: f64) -> f64 {
-    vol::get_cube_vol_clamped(&cube.inner, expiry, tenor, strike)
-}
-
-#[doc = pydoc!("finstack_quant.models.volatility", "get_cube_normal_vol")]
-#[pyfunction]
-fn get_cube_normal_vol(cube: &PyVolCube, expiry: f64, tenor: f64, strike: f64) -> PyResult<f64> {
-    vol::get_cube_normal_vol(&cube.inner, expiry, tenor, strike).map_err(core_to_py)
-}
-
-#[doc = pydoc!("finstack_quant.models.volatility", "get_cube_normal_vol_clamped")]
-#[pyfunction]
-fn get_cube_normal_vol_clamped(cube: &PyVolCube, expiry: f64, tenor: f64, strike: f64) -> f64 {
-    vol::get_cube_normal_vol_clamped(&cube.inner, expiry, tenor, strike)
+fn get_cube_vol_clamped(
+    py: Python<'_>,
+    cube: &PyVolCube,
+    expiry: f64,
+    tenor: f64,
+    strike: f64,
+    convention: &Bound<'_, PyAny>,
+) -> PyResult<f64> {
+    let convention: VolatilityConvention = py_to_serde(py, convention, "convention")?;
+    Ok(vol::get_cube_vol_clamped(
+        &cube.inner,
+        expiry,
+        tenor,
+        strike,
+        convention,
+    ))
 }
 
 #[doc = pydoc!("finstack_quant.models.volatility", "materialize_cube_tenor_slice")]
 #[pyfunction]
 fn materialize_cube_tenor_slice(
+    py: Python<'_>,
     cube: &PyVolCube,
     tenor: f64,
     strikes: Vec<f64>,
+    convention: &Bound<'_, PyAny>,
 ) -> PyResult<PyVolSurface> {
-    vol::materialize_cube_tenor_slice(&cube.inner, tenor, &strikes)
-        .map(|surface| PyVolSurface::from_inner(Arc::new(surface)))
-        .map_err(core_to_py)
-}
-
-#[doc = pydoc!("finstack_quant.models.volatility", "materialize_cube_tenor_slice_normal")]
-#[pyfunction]
-fn materialize_cube_tenor_slice_normal(
-    cube: &PyVolCube,
-    tenor: f64,
-    strikes: Vec<f64>,
-) -> PyResult<PyVolSurface> {
-    vol::materialize_cube_tenor_slice_normal(&cube.inner, tenor, &strikes)
+    let convention: VolatilityConvention = py_to_serde(py, convention, "convention")?;
+    vol::materialize_cube_tenor_slice(&cube.inner, tenor, &strikes, convention)
         .map(|surface| PyVolSurface::from_inner(Arc::new(surface)))
         .map_err(core_to_py)
 }
@@ -591,23 +592,14 @@ fn materialize_cube_tenor_slice_normal(
 #[doc = pydoc!("finstack_quant.models.volatility", "materialize_cube_expiry_slice")]
 #[pyfunction]
 fn materialize_cube_expiry_slice(
+    py: Python<'_>,
     cube: &PyVolCube,
     expiry: f64,
     strikes: Vec<f64>,
+    convention: &Bound<'_, PyAny>,
 ) -> PyResult<PyVolCubeExpirySlice> {
-    vol::materialize_cube_expiry_slice(&cube.inner, expiry, &strikes)
-        .map(|surface| PyVolCubeExpirySlice::from_inner(Arc::new(surface)))
-        .map_err(core_to_py)
-}
-
-#[doc = pydoc!("finstack_quant.models.volatility", "materialize_cube_expiry_slice_normal")]
-#[pyfunction]
-fn materialize_cube_expiry_slice_normal(
-    cube: &PyVolCube,
-    expiry: f64,
-    strikes: Vec<f64>,
-) -> PyResult<PyVolCubeExpirySlice> {
-    vol::materialize_cube_expiry_slice_normal(&cube.inner, expiry, &strikes)
+    let convention: VolatilityConvention = py_to_serde(py, convention, "convention")?;
+    vol::materialize_cube_expiry_slice(&cube.inner, expiry, &strikes, convention)
         .map(|surface| PyVolCubeExpirySlice::from_inner(Arc::new(surface)))
         .map_err(core_to_py)
 }
@@ -934,12 +926,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_cube_expiry_slice_vol_clamped, &m)?)?;
     m.add_function(wrap_pyfunction!(get_cube_vol, &m)?)?;
     m.add_function(wrap_pyfunction!(get_cube_vol_clamped, &m)?)?;
-    m.add_function(wrap_pyfunction!(get_cube_normal_vol, &m)?)?;
-    m.add_function(wrap_pyfunction!(get_cube_normal_vol_clamped, &m)?)?;
     m.add_function(wrap_pyfunction!(materialize_cube_tenor_slice, &m)?)?;
-    m.add_function(wrap_pyfunction!(materialize_cube_tenor_slice_normal, &m)?)?;
     m.add_function(wrap_pyfunction!(materialize_cube_expiry_slice, &m)?)?;
-    m.add_function(wrap_pyfunction!(materialize_cube_expiry_slice_normal, &m)?)?;
     m.add_function(wrap_pyfunction!(get_fx_delta_pillar_vols, &m)?)?;
     m.add_function(wrap_pyfunction!(get_fx_delta_vol, &m)?)?;
     m.add_function(wrap_pyfunction!(materialize_fx_delta_surface, &m)?)?;
@@ -970,8 +958,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "delta_to_strike",
                 "get_cube_expiry_slice_vol",
                 "get_cube_expiry_slice_vol_clamped",
-                "get_cube_normal_vol",
-                "get_cube_normal_vol_clamped",
                 "get_cube_vol",
                 "get_cube_vol_clamped",
                 "get_fx_delta_pillar_vols",
@@ -981,9 +967,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "implied_vol_bachelier",
                 "implied_vol_black",
                 "materialize_cube_expiry_slice",
-                "materialize_cube_expiry_slice_normal",
                 "materialize_cube_tenor_slice",
-                "materialize_cube_tenor_slice_normal",
                 "materialize_fx_delta_surface",
                 "strike_to_delta",
             ],

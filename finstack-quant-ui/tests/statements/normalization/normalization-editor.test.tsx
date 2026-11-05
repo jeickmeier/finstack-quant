@@ -30,6 +30,7 @@ import { useWorkerHarness } from "../../shared/worker/use-worker-harness";
 import { budget } from "../../shared/budget";
 import analystResult from "../../../src/fixtures/statements/analyst-result.json";
 import fixture from "./cases.json";
+import type { NormalizationConfigWire } from "../../../src/generated/types/normalization_config";
 
 // Figures are drawn by the shared chart in the browser gates; here each one
 // is a labelled placeholder.
@@ -62,7 +63,7 @@ afterEach(() => {
 const resultJson = JSON.stringify(analystResult);
 const nodeIds = Object.keys(analystResult.nodes);
 const results = fixture.results as unknown as NormalizationResult[];
-const config = fixture.config as unknown as Record<string, unknown>;
+const config = fixture.config as unknown as NormalizationConfigWire;
 const exact = (value: number) => groupDecimal(String(value));
 
 it("returns the fixture's results and canonical config through the worker", async () => {

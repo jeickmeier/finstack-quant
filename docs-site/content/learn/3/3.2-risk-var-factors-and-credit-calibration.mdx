@@ -4,7 +4,7 @@ title: "Risk: VaR, Factors, and Credit Calibration"
 description: "Audit tail estimators and horizon scaling, fit aligned return factors, and turn a calibrated credit covariance into explicitly dimensioned risk."
 desk_question: "How much can this book lose, over which horizon, and which exposures explain that estimate?"
 references: ["#jpmorgan1996RiskMetrics", "#artzner1999CoherentRisk", "#cornishFisher1937", "#mcneil-frey-embrechts-qrm", "#fama-french-1993", "#ben-dor-2007-dts", "#ledoitwolf2004", "#joanesGill1998"]
-api: ["finstack_quant.analytics.Performance", "finstack_quant.core.math.linalg.ledoit_wolf_shrinkage", "finstack_quant.features.neutralize_and_zscore", "finstack_quant.models.factor.risk.parametric_var_decomposition"]
+api: ["finstack_quant.analytics.Performance", "finstack_quant.core.math.linalg.ledoit_wolf_shrinkage", "finstack_quant.features.neutralize_and_zscore", "finstack_quant.models.factor.risk.position_risk_report"]
 status: "published"
 ---
 
@@ -78,6 +78,7 @@ import math
 import numpy as np
 from _shared.analyst_history import risk_panel
 from finstack_quant.analytics import Performance
+from finstack_quant.core.dates import FiscalConfig
 panel = risk_panel()
 performance = Performance.from_returns(panel[["portfolio", "benchmark"]], frequency="daily", benchmark_ticker="benchmark")
 confidence = 0.95
@@ -417,10 +418,10 @@ for issuer_id in model.issuer_ids():
     vol = fcf.idiosyncratic_vol(issuer_id, "one_step")
     print(f"  {issuer_id}: {vol:.6f}")
 # Explicit illustrative dollar exposures per native factor unit, aligned by ID.
-from finstack_quant.models.factor.risk import parametric_var_decomposition
+from finstack_quant.models.factor.risk import position_risk_report
 exposure = np.full(len(factor_ids), 1000.0)
 dollar_sigma = float(np.sqrt(exposure @ data @ exposure))
-allocated = parametric_var_decomposition(factor_ids, exposure.tolist(), data, 0.95)
+allocated = position_risk_report({"position_ids": factor_ids, "confidence": 0.95, "source": {"kind": "parametric", "weights": exposure.tolist(), "covariance": data}}).decomposition
 print(f"Illustrative annual dollar volatility: {dollar_sigma:,.6f}; 95% Gaussian VaR: {allocated.portfolio_var:,.6f}")
 ```
 {/* /notebook-block */}
@@ -503,14 +504,14 @@ With $z_c=\Phi^{-1}(c)$ and standard-normal density $\phi$, return ES is $-\sigm
 
 {/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="normal-es-reference" role="exercise" */}
 ```python exec id=normal-es-reference role=exercise
-from finstack_quant.models.factor.risk import parametric_var_decomposition
+from finstack_quant.models.factor.risk import position_risk_report
 from statistics import NormalDist
 
 alpha, daily_sigma = 0.95, 0.01
 z = NormalDist().inv_cdf(alpha)
 phi = math.exp(-0.5*z*z)/math.sqrt(2*math.pi)
 expected_normal_es = -daily_sigma * phi/(1-alpha)
-es_reference = parametric_var_decomposition(["unit_exposure"],[1.0],[[daily_sigma**2]],alpha)
+es_reference = position_risk_report({"position_ids": ["unit_exposure"], "confidence": alpha, "source": {"kind": "parametric", "weights": [1.0], "covariance": [[daily_sigma**2]]}}).decomposition
 print(f"Zero-mean normal VaR={es_reference.portfolio_var:.6%}; ES={es_reference.portfolio_es:.6%}")
 print(f"ES/VaR magnitude ratio={phi/((1-alpha)*z):.6f}; this ratio depends on confidence and distribution.")
 ```

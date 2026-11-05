@@ -7,6 +7,7 @@
 mod budget;
 mod parametric;
 mod position;
+mod report;
 mod residual;
 mod types;
 
@@ -20,6 +21,10 @@ pub use position::{
     PositionVarContribution, StressAttribution, StressPositionEntry, TailScenarioBreakdown,
     build_stress_attribution, flatten_position_pnls, historical_var_decomposition,
     parametric_var_decomposition,
+};
+pub use report::{
+    PositionRiskBudget, PositionRiskReport, PositionRiskRequest, PositionRiskSource,
+    position_risk_report,
 };
 pub use residual::apply_residual_contributions;
 pub use types::{

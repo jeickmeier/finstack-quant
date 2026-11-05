@@ -1,251 +1,258 @@
 {
   "black_scholes_price": {
     "request": {
-      "model": "black_scholes",
-      "spot": 100,
-      "strike": 100,
-      "rate": 0.05,
-      "divYield": 0.01,
-      "expiry": 1,
-      "isCall": true,
-      "mode": "price",
-      "vol": 0.2
+      "model": {
+        "kind": "black_scholes",
+        "spot": 100,
+        "strike": 100,
+        "rate": 0.05,
+        "div_yield": 0.01,
+        "expiry": 1,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0.2
+      }
     },
     "envelope": {
       "ok": true,
       "value": {
-        "model": "black_scholes",
-        "mode": "price",
         "price": 9.826297782739111,
+        "implied_vol": 0.2,
         "greeks": {
-          "ok": true,
-          "value": {
-            "delta": 0.6117631008098845,
-            "gamma": 0.01887964716453252,
-            "vega": 0.3775929432906503,
-            "theta": -0.015703197115093385,
-            "rho_r": 0.5135001229824934,
-            "rho_q": -0.6117631008098845
-          }
+          "kind": "black_scholes",
+          "delta": 0.6117631008098845,
+          "gamma": 0.01887964716453252,
+          "vega": 0.3775929432906503,
+          "theta": -0.015703197115093385,
+          "rho_r": 0.5135001229824934,
+          "rho_q": -0.6117631008098845
         }
       }
     }
   },
   "black_scholes_implied_vol": {
     "request": {
-      "model": "black_scholes",
-      "spot": 100,
-      "strike": 100,
-      "rate": 0.05,
-      "divYield": 0.01,
-      "expiry": 1,
-      "isCall": true,
-      "mode": "implied_vol",
-      "price": 9.826297782739111
+      "model": {
+        "kind": "black_scholes",
+        "spot": 100,
+        "strike": 100,
+        "rate": 0.05,
+        "div_yield": 0.01,
+        "expiry": 1,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "implied_vol",
+        "price": 9.826297782739111
+      }
     },
     "envelope": {
       "ok": true,
       "value": {
-        "model": "black_scholes",
-        "mode": "implied_vol",
-        "impliedVol": 0.2,
+        "price": 9.826297782739111,
+        "implied_vol": 0.2,
         "greeks": {
-          "ok": true,
-          "value": {
-            "delta": 0.6117631008098845,
-            "gamma": 0.01887964716453252,
-            "vega": 0.3775929432906503,
-            "theta": -0.015703197115093385,
-            "rho_r": 0.5135001229824934,
-            "rho_q": -0.6117631008098845
-          }
+          "kind": "black_scholes",
+          "delta": 0.6117631008098845,
+          "gamma": 0.01887964716453252,
+          "vega": 0.3775929432906503,
+          "theta": -0.015703197115093385,
+          "rho_r": 0.5135001229824934,
+          "rho_q": -0.6117631008098845
         }
       }
     }
   },
   "black76_price": {
     "request": {
-      "model": "black76",
-      "forward": 100,
-      "strike": 95,
-      "df": 0.97,
-      "expiry": 0.5,
-      "isCall": false,
-      "mode": "price",
-      "vol": 0.25
+      "model": {
+        "kind": "black76",
+        "forward": 100,
+        "strike": 95,
+        "df": 0.97,
+        "expiry": 0.5,
+        "is_call": false
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0.25
+      }
     },
     "envelope": {
       "ok": true,
       "value": {
-        "model": "black76",
-        "mode": "price",
         "price": 4.513759046893119,
+        "implied_vol": 0.25,
         "greeks": {
-          "ok": true,
-          "value": {
-            "delta": -0.35251212877862625,
-            "gamma": 0.021007207249695493,
-            "vega": 26.259009062119368
-          }
+          "kind": "forward",
+          "delta": -0.35251212877862625,
+          "gamma": 0.021007207249695493,
+          "vega": 26.259009062119368
         }
       }
     }
   },
   "black76_implied_vol": {
     "request": {
-      "model": "black76",
-      "forward": 100,
-      "strike": 95,
-      "df": 0.97,
-      "expiry": 0.5,
-      "isCall": false,
-      "mode": "implied_vol",
-      "price": 4.513759046893119
+      "model": {
+        "kind": "black76",
+        "forward": 100,
+        "strike": 95,
+        "df": 0.97,
+        "expiry": 0.5,
+        "is_call": false
+      },
+      "solve": {
+        "kind": "implied_vol",
+        "price": 4.513759046893119
+      }
     },
     "envelope": {
       "ok": true,
       "value": {
-        "model": "black76",
-        "mode": "implied_vol",
-        "impliedVol": 0.24999999999999983,
+        "price": 4.513759046893119,
+        "implied_vol": 0.24999999999999983,
         "greeks": {
-          "ok": true,
-          "value": {
-            "delta": -0.35251212877862614,
-            "gamma": 0.021007207249695504,
-            "vega": 26.259009062119365
-          }
+          "kind": "forward",
+          "delta": -0.35251212877862614,
+          "gamma": 0.021007207249695504,
+          "vega": 26.259009062119365
         }
       }
     }
   },
   "bachelier_price": {
     "request": {
-      "model": "bachelier",
-      "forward": 0.03,
-      "strike": 0.0325,
-      "expiry": 2,
-      "isCall": true,
-      "mode": "price",
-      "vol": 0.0075
+      "model": {
+        "kind": "bachelier",
+        "forward": 0.03,
+        "strike": 0.0325,
+        "expiry": 2,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0.0075
+      }
     },
     "envelope": {
       "ok": true,
       "value": {
-        "model": "bachelier",
-        "mode": "price",
         "price": 0.0030984202170486787,
+        "implied_vol": 0.0075,
         "greeks": {
-          "ok": true,
-          "value": {
-            "delta": 0.4068318578833959,
-            "gamma": 36.58222099339706,
-            "vega": 0.5487333149009559
-          }
+          "kind": "forward",
+          "delta": 0.4068318578833959,
+          "gamma": 36.58222099339706,
+          "vega": 0.5487333149009559
         }
       }
     }
   },
   "bachelier_implied_vol": {
     "request": {
-      "model": "bachelier",
-      "forward": 0.03,
-      "strike": 0.0325,
-      "expiry": 2,
-      "isCall": true,
-      "mode": "implied_vol",
-      "price": 0.0030984202170486787
+      "model": {
+        "kind": "bachelier",
+        "forward": 0.03,
+        "strike": 0.0325,
+        "expiry": 2,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "implied_vol",
+        "price": 0.0030984202170486787
+      }
     },
     "envelope": {
       "ok": true,
       "value": {
-        "model": "bachelier",
-        "mode": "implied_vol",
-        "impliedVol": 0.0075,
+        "price": 0.0030984202170486787,
+        "implied_vol": 0.0075,
         "greeks": {
-          "ok": true,
-          "value": {
-            "delta": 0.4068318578833959,
-            "gamma": 36.58222099339706,
-            "vega": 0.5487333149009559
-          }
+          "kind": "forward",
+          "delta": 0.4068318578833959,
+          "gamma": 36.58222099339706,
+          "vega": 0.5487333149009559
         }
       }
     }
   },
   "theta_trading_days": {
     "request": {
-      "model": "black_scholes",
-      "spot": 100,
-      "strike": 100,
-      "rate": 0.05,
-      "divYield": 0.01,
-      "expiry": 1,
-      "isCall": true,
-      "thetaDaysPerYear": 252,
-      "mode": "price",
-      "vol": 0.2
+      "model": {
+        "kind": "black_scholes",
+        "spot": 100,
+        "strike": 100,
+        "rate": 0.05,
+        "div_yield": 0.01,
+        "expiry": 1,
+        "is_call": true,
+        "theta_days_per_year": 252
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0.2
+      }
     },
     "envelope": {
       "ok": true,
       "value": {
-        "model": "black_scholes",
-        "mode": "price",
         "price": 9.826297782739111,
+        "implied_vol": 0.2,
         "greeks": {
-          "ok": true,
-          "value": {
-            "delta": 0.6117631008098845,
-            "gamma": 0.01887964716453252,
-            "vega": 0.3775929432906503,
-            "theta": -0.02274471010717891,
-            "rho_r": 0.5135001229824934,
-            "rho_q": -0.6117631008098845
-          }
+          "kind": "black_scholes",
+          "delta": 0.6117631008098845,
+          "gamma": 0.01887964716453252,
+          "vega": 0.3775929432906503,
+          "theta": -0.02274471010717891,
+          "rho_r": 0.5135001229824934,
+          "rho_q": -0.6117631008098845
         }
       }
     }
   },
   "zero_vol_rejects_greeks": {
     "request": {
-      "model": "black_scholes",
-      "spot": 100,
-      "strike": 100,
-      "rate": 0.05,
-      "divYield": 0.01,
-      "expiry": 1,
-      "isCall": true,
-      "mode": "price",
-      "vol": 0
+      "model": {
+        "kind": "black_scholes",
+        "spot": 100,
+        "strike": 100,
+        "rate": 0.05,
+        "div_yield": 0.01,
+        "expiry": 1,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0
+      }
     },
     "envelope": {
-      "ok": true,
-      "value": {
-        "model": "black_scholes",
-        "mode": "price",
-        "price": 3.8820409248453984,
-        "greeks": {
-          "ok": false,
-          "error": {
-            "name": "FinstackError",
-            "message": "Validation error: Black-Scholes Greeks require positive vol, expiry, and theta_days_per_year, got vol=0, expiry=1, theta_days_per_year=365",
-            "kind": "validation"
-          }
-        }
+      "ok": false,
+      "error": {
+        "name": "FinstackError",
+        "message": "Validation error: Black-Scholes Greeks require positive vol, expiry, and theta_days_per_year, got vol=0, expiry=1, theta_days_per_year=365",
+        "kind": "validation"
       }
     }
   },
   "below_intrinsic": {
     "request": {
-      "model": "black_scholes",
-      "spot": 120,
-      "strike": 100,
-      "rate": 0.05,
-      "divYield": 0.01,
-      "expiry": 1,
-      "isCall": true,
-      "mode": "implied_vol",
-      "price": 1
+      "model": {
+        "kind": "black_scholes",
+        "spot": 120,
+        "strike": 100,
+        "rate": 0.05,
+        "div_yield": 0.01,
+        "expiry": 1,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "implied_vol",
+        "price": 1
+      }
     },
     "envelope": {
       "ok": false,
@@ -258,13 +265,17 @@
   },
   "bachelier_below_intrinsic": {
     "request": {
-      "model": "bachelier",
-      "forward": 0.05,
-      "strike": 0.0325,
-      "expiry": 2,
-      "isCall": true,
-      "mode": "implied_vol",
-      "price": 0.001
+      "model": {
+        "kind": "bachelier",
+        "forward": 0.05,
+        "strike": 0.0325,
+        "expiry": 2,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "implied_vol",
+        "price": 0.001
+      }
     },
     "envelope": {
       "ok": false,
@@ -277,21 +288,25 @@
   },
   "empty_field": {
     "request": {
-      "model": "black76",
-      "forward": 100,
-      "strike": 95,
-      "df": "NaN",
-      "expiry": 0.5,
-      "isCall": false,
-      "mode": "price",
-      "vol": 0.25
+      "model": {
+        "kind": "black76",
+        "forward": 100,
+        "strike": 95,
+        "df": "NaN",
+        "expiry": 0.5,
+        "is_call": false
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0.25
+      }
     },
     "envelope": {
       "ok": false,
       "error": {
-        "name": "FinstackError",
-        "message": "Validation error: Black-76 df must be finite, got NaN",
-        "kind": "validation"
+        "name": "TypeError",
+        "message": "request: request.model.df is NaN, which JSON cannot represent",
+        "kind": "invalid_type"
       }
     }
   }

@@ -46,19 +46,20 @@ impl Performance {
     /// # Examples
     ///
     /// ```rust
-    /// # use finstack_quant_analytics::{CagrDayCount, Performance};
+    /// # use finstack_quant_analytics::{CagrDayCount, PanelSeriesKind, Performance, PerformancePanel};
     /// # use finstack_quant_core::dates::{Date, PeriodKind};
     /// # use time::Month;
     /// # let dates: Vec<Date> = (1..=4)
     /// #     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
     /// #     .collect();
-    /// # let perf = Performance::new(
+    /// # let perf = Performance::new(&PerformancePanel {
     /// #     dates,
-    /// #     vec![vec![100.0, 101.0, 102.0, 103.0]],
-    /// #     vec!["SPY".to_string()],
-    /// #     None,
-    /// #     PeriodKind::Daily,
-    /// # )?;
+    /// #     series: vec![vec![100.0, 101.0, 102.0, 103.0]],
+    /// #     kind: PanelSeriesKind::Prices,
+    /// #     ticker_names: vec!["SPY".to_string()],
+    /// #     benchmark_ticker: None,
+    /// #     frequency: Some(PeriodKind::Daily),
+    /// # })?;
     /// let cagr = perf.cagr(CagrDayCount::Act365_25, None)?;
     /// assert_eq!(cagr.len(), 1);
     /// # Ok::<(), finstack_quant_core::Error>(())
@@ -204,19 +205,20 @@ impl Performance {
     /// # Examples
     ///
     /// ```rust
-    /// # use finstack_quant_analytics::Performance;
+    /// # use finstack_quant_analytics::{PanelSeriesKind, Performance, PerformancePanel};
     /// # use finstack_quant_core::dates::{Date, PeriodKind};
     /// # use time::Month;
     /// # let dates: Vec<Date> = (1..=4)
     /// #     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
     /// #     .collect();
-    /// # let perf = Performance::new(
+    /// # let perf = Performance::new(&PerformancePanel {
     /// #     dates,
-    /// #     vec![vec![100.0, 105.0, 99.0, 106.0]],
-    /// #     vec!["SPY".to_string()],
-    /// #     None,
-    /// #     PeriodKind::Daily,
-    /// # )?;
+    /// #     series: vec![vec![100.0, 105.0, 99.0, 106.0]],
+    /// #     kind: PanelSeriesKind::Prices,
+    /// #     ticker_names: vec!["SPY".to_string()],
+    /// #     benchmark_ticker: None,
+    /// #     frequency: Some(PeriodKind::Daily),
+    /// # })?;
     /// let max_dd = perf.max_drawdown();
     /// assert!(max_dd[0] <= 0.0);
     /// # Ok::<(), finstack_quant_core::Error>(())
@@ -763,13 +765,13 @@ mod from_returns_cagr_tests {
             vec![0.01, -0.02, 0.015, 0.003, -0.01, 0.02],
             vec![-0.005, 0.01, -0.03, 0.02, 0.004, -0.012],
         ];
-        let perf = Performance::from_returns(
+        let perf = Performance::new(&crate::performance::returns_panel(
             dates,
             returns.clone(),
             vec!["A".into(), "B".into()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .expect("daily panel");
         let (var, es): (Vec<f64>, Vec<f64>) = returns
             .iter()
@@ -787,13 +789,13 @@ mod from_returns_cagr_tests {
             d(2023, Month::March, 31),
         ];
         let returns = vec![vec![0.01, 0.02, 0.03]];
-        let perf = Performance::from_returns(
+        let perf = Performance::new(&crate::performance::returns_panel(
             dates,
             returns.clone(),
             vec!["M".into()],
             None,
             PeriodKind::Monthly,
-        )
+        ))
         .expect("monthly panel");
         let actual = perf.cagr(CagrDayCount::default(), None).expect("cagr")[0];
         let expected = cagr(
@@ -820,13 +822,13 @@ mod from_returns_cagr_tests {
     fn from_returns_daily_cagr_ignores_two_day_gap() {
         let dates = vec![d(2024, Month::January, 3), d(2024, Month::January, 5)];
         let returns = vec![vec![0.01, 0.02]];
-        let perf = Performance::from_returns(
+        let perf = Performance::new(&crate::performance::returns_panel(
             dates,
             returns.clone(),
             vec!["D".into()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .expect("daily panel");
         let actual = perf.cagr(CagrDayCount::default(), None).expect("cagr")[0];
         let expected = cagr(
@@ -852,13 +854,13 @@ mod from_returns_cagr_tests {
     #[test]
     fn cagr_bus252_without_calendar_is_err() {
         let dates = vec![d(2024, Month::January, 2), d(2024, Month::January, 5)];
-        let perf = Performance::from_returns(
+        let perf = Performance::new(&crate::performance::returns_panel(
             dates,
             vec![vec![0.01, 0.02]],
             vec!["D".into()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .expect("daily panel");
         let err = perf
             .cagr(

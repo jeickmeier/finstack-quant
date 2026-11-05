@@ -8,7 +8,7 @@ import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/
 import { useCheckSuiteValidator } from "@/hooks/statements/use-check-suite-validator/use-check-suite-validator";
 import {
   useRunStatementChecks,
-  type StatementChecksRequest,
+  type StatementChecksCall,
 } from "@/hooks/statements/use-run-statement-checks/use-run-statement-checks";
 import type { LinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import { checkSuiteModule } from "./check-suite";
@@ -35,11 +35,10 @@ export function StatementChecks({
   density?: "compact" | "comfortable";
 }) {
   const validateSuite = useCheckSuiteValidator();
-  const [kind, setKind] = useState<StatementChecksRequest["kind"]>("suite");
+  const [method, setMethod] =
+    useState<StatementChecksCall["method"]>("runChecks");
   const [mappingJson, setMappingJson] = useState("");
-  const [submitted, setSubmitted] = useState<StatementChecksRequest | null>(
-    null,
-  );
+  const [submitted, setSubmitted] = useState<StatementChecksCall | null>(null);
   const initial = useMemo(() => {
     if (!defaultConfigJson.trim())
       return { value: {} as Record<string, unknown> };
@@ -53,10 +52,11 @@ export function StatementChecks({
     }
   }, [defaultConfigJson]);
   const request =
-    submitted?.modelJson === modelJson &&
-    submitted.resultsJson === resultsJson &&
-    submitted.kind === kind &&
-    (kind === "suite" || submitted.configJson === mappingJson)
+    submitted?.method === method &&
+    submitted.request.modelJson === modelJson &&
+    submitted.request.resultsJson === resultsJson &&
+    (submitted.method === "runChecks" ||
+      submitted.request.mappingJson === mappingJson)
       ? submitted
       : null;
   const query = useRunStatementChecks(request);
@@ -68,21 +68,24 @@ export function StatementChecks({
       <h3 className="font-semibold">Checks</h3>
       <EnumField
         label="Check runner"
-        value={kind}
+        value={method}
         onValueChange={(value) =>
-          setKind(value as StatementChecksRequest["kind"])
+          setMethod(value as StatementChecksCall["method"])
         }
         options={[
-          { value: "suite", label: "Check suite" },
-          { value: "three-statement", label: "Three statement mapping" },
+          { value: "runChecks", label: "Check suite" },
           {
-            value: "credit-underwriting",
+            value: "runThreeStatementChecks",
+            label: "Three statement mapping",
+          },
+          {
+            value: "runCreditUnderwritingChecks",
             label: "Credit underwriting mapping",
           },
         ]}
       />
       {/* Hidden, not unmounted: a remount would reset the suite draft to defaultConfigJson. */}
-      <div hidden={kind !== "suite"}>
+      <div hidden={method !== "runChecks"}>
         {"error" in initial ? (
           <p role="alert">{initial.error}</p>
         ) : (
@@ -93,17 +96,15 @@ export function StatementChecks({
             validate={validateSuite}
             onSubmit={(canonical) =>
               setSubmitted({
-                modelJson,
-                resultsJson,
-                kind: "suite",
-                configJson: canonical,
+                method: "runChecks",
+                request: { modelJson, resultsJson, suiteSpecJson: canonical },
               })
             }
             onValidated={(json) => {
               // A suite edit invalidates only a suite run, never a mapping run.
               if (json === null)
                 setSubmitted((current) =>
-                  current?.kind === "suite" ? null : current,
+                  current?.method === "runChecks" ? null : current,
                 );
             }}
             submitLabel="Run native checks"
@@ -111,7 +112,7 @@ export function StatementChecks({
           />
         )}
       </div>
-      {kind !== "suite" && (
+      {method !== "runChecks" && (
         <>
           <FieldFrame label="Canonical node mapping JSON">
             {(control) => (
@@ -129,10 +130,8 @@ export function StatementChecks({
             disabled={!mappingJson.trim() || query.workerStatus !== "ready"}
             onClick={() =>
               setSubmitted({
-                modelJson,
-                resultsJson,
-                configJson: mappingJson,
-                kind,
+                method,
+                request: { modelJson, resultsJson, mappingJson },
               })
             }
           >

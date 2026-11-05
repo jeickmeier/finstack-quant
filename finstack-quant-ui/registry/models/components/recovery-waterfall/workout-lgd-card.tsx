@@ -38,16 +38,16 @@ export interface WorkoutLgdCardProps {
   density?: Density;
 }
 /**
- * The workout arguments, each with the WorkoutLgd field it fills and that
- * field's contract description. `ead` is an argument of workoutLgd with no
- * contract field, so its help is the binding's own.
+ * The workout terms under their WorkoutLgd field names, each with its contract
+ * description. `ead` is the evaluate argument with no contract field, so its
+ * help is the binding's own.
  */
-const costFields = [
-  ["ead", "ead", "Exposure at default in monetary units; positive."],
-  ["directCostPct", "direct_cost_rate", costHelp("direct_cost_rate")],
-  ["indirectCostPct", "indirect_cost_rate", costHelp("indirect_cost_rate")],
-  ["timeToResolutionYears", "workout_years", workoutHelp("workout_years")],
-  ["discountRate", "discount_rate", workoutHelp("discount_rate")],
+const termFields = [
+  ["ead", "Exposure at default in monetary units; positive."],
+  ["direct_cost_rate", costHelp("direct_cost_rate")],
+  ["indirect_cost_rate", costHelp("indirect_cost_rate")],
+  ["workout_years", workoutHelp("workout_years")],
+  ["discount_rate", workoutHelp("discount_rate")],
 ] as const;
 /**
  * A workout LGD from collateral, costs and time, as Rust returned it.
@@ -60,16 +60,23 @@ export function WorkoutLgdCard({
   formatValue = defaultValue,
   density = "compact",
 }: WorkoutLgdCardProps) {
-  const [costs, setCosts] = useState<Record<string, string>>(() => ({
-    ead: String(defaultTerms.ead),
-    directCostPct: String(defaultTerms.directCostPct),
-    indirectCostPct: String(defaultTerms.indirectCostPct),
-    timeToResolutionYears: String(defaultTerms.timeToResolutionYears),
-    discountRate: String(defaultTerms.discountRate),
-  }));
+  const [terms, setTerms] = useState<Record<string, string>>(() => {
+    const { model } = defaultTerms;
+    return {
+      ead: String(defaultTerms.ead),
+      direct_cost_rate: String(model.costs.direct_cost_rate),
+      indirect_cost_rate: String(model.costs.indirect_cost_rate),
+      workout_years: String(model.workout_years),
+      discount_rate: String(model.discount_rate),
+    };
+  });
   const pieces = useRows(() =>
-    defaultTerms.collateral.map(([type, bookValue, haircut]) =>
-      row({ type, bookValue: String(bookValue), haircut: String(haircut) }),
+    defaultTerms.model.collateral.map((piece) =>
+      row({
+        type: piece.collateral_type,
+        bookValue: String(piece.book_value),
+        haircut: String(piece.haircut),
+      }),
     ),
   );
   return (
@@ -85,28 +92,32 @@ export function WorkoutLgdCard({
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit({
-            ead: typedNumber(costs.ead),
-            collateral: pieces.rows.map((piece) => [
-              piece.type as modelsWire.WorkoutCollateralType,
-              typedNumber(piece.bookValue),
-              typedNumber(piece.haircut),
-            ]),
-            directCostPct: typedNumber(costs.directCostPct),
-            indirectCostPct: typedNumber(costs.indirectCostPct),
-            timeToResolutionYears: typedNumber(costs.timeToResolutionYears),
-            discountRate: typedNumber(costs.discountRate),
+            ead: typedNumber(terms.ead),
+            model: {
+              collateral: pieces.rows.map((piece) => ({
+                collateral_type: piece.type as modelsWire.WorkoutCollateralType,
+                book_value: typedNumber(piece.bookValue),
+                haircut: typedNumber(piece.haircut),
+              })),
+              costs: {
+                direct_cost_rate: typedNumber(terms.direct_cost_rate),
+                indirect_cost_rate: typedNumber(terms.indirect_cost_rate),
+              },
+              workout_years: typedNumber(terms.workout_years),
+              discount_rate: typedNumber(terms.discount_rate),
+            },
           });
         }}
       >
         <div className="grid gap-4 @lg:grid-cols-3">
-          {costFields.map(([key, wire, help]) => (
+          {termFields.map(([key, help]) => (
             <DecimalInput
               key={key}
-              label={labelFor(wire)}
+              label={labelFor(key)}
               help={help}
-              value={costs[key] ?? ""}
+              value={terms[key] ?? ""}
               onValueChange={(value) =>
-                setCosts((prior) => ({ ...prior, [key]: value }))
+                setTerms((prior) => ({ ...prior, [key]: value }))
               }
             />
           ))}

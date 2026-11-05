@@ -52,7 +52,7 @@ function view(overrides: Partial<CorrelationHeatmapProps> = {}) {
 }
 
 it("stores the panel panels.mjs builds", () => {
-  expect(request).toEqual(panel);
+  expect(request).toEqual({ panel });
 });
 it(
   "the worker returns the native matrix and Rust's repaired flag",
@@ -66,9 +66,9 @@ it(
 it.each(Object.keys(failures) as (keyof typeof failures)[])(
   "the worker returns the native error of %s",
   async (name) => {
-    const outcome = await proxy().correlationMatrix(
-      failures[name] as CorrelationMatrixRequest,
-    );
+    const outcome = await proxy().correlationMatrix({
+      panel: failures[name],
+    });
     expect(outcome.ok).toBe(false);
     if (outcome.ok) return;
     expect(outcome.error.message).toBe(fixture.errors[name].message);

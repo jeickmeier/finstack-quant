@@ -5,12 +5,7 @@ import type { ServiceContext } from "./context";
 export type CovenantsNative = {
   covenants: Pick<
     typeof covenants,
-    | "covLite"
-    | "lboStandard"
-    | "realEstate"
-    | "projectFinance"
-    | "validateCovenantEngineJson"
-    | "CovenantEngine"
+    "covenantTemplate" | "validateCovenantEngineJson" | "CovenantEngine"
   >;
   statements_analytics: Pick<
     typeof statements_analytics,
@@ -24,39 +19,7 @@ export function createCovenantsService(
 ): CovenantsApi {
   return {
     covenantTemplate(request) {
-      return context.result(() => {
-        const api = native.covenants;
-        switch (request.kind) {
-          case "covLite":
-            return api.covLite(request.maxLeverage, request.maxSeniorLeverage);
-          case "lboStandard":
-            return api.lboStandard(
-              request.initialLeverage,
-              request.interestCoverage,
-              request.fixedChargeCoverage,
-              request.maxCapex,
-            );
-          case "realEstate":
-            return api.realEstate(
-              request.minDscr,
-              request.minDebtYield,
-              request.maxLtv,
-            );
-          case "projectFinance":
-            return api.projectFinance(
-              request.minDscr,
-              request.distributionLockupDscr,
-              request.minLiquidity,
-              request.maxNetLeverage,
-            );
-          default: {
-            const unhandled: never = request;
-            throw new RangeError("Unsupported covenant template", {
-              cause: unhandled,
-            });
-          }
-        }
-      });
+      return context.result(() => native.covenants.covenantTemplate(request));
     },
     validateCovenantEngine(json) {
       return context.result(() =>

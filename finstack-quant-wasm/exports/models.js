@@ -15,6 +15,7 @@ export const models = {
   monteCarlo,
   rates,
   volatility,
+  optionCalculation: wasm.optionCalculation,
   bsPrice: wasm.bsPrice,
   vanillaExpiryPayoff: wasm.vanillaExpiryPayoff,
   bsGreeks: wasm.bsGreeks,

@@ -22,9 +22,10 @@ export function CalibrationForm({
   onValidated?: SchemaFormProps["onValidated"];
   onInputJson?: SchemaFormProps["onInputJson"];
 }) {
+  // The validated envelope is written through the generated contract (lossless integers).
   const validateJson = useCallback(
     async (json: string, signal?: AbortSignal) =>
-      JSON.stringify(await validate(json, signal)),
+      calibrationModule.codec.stringify(await validate(json, signal)),
     [validate],
   );
   const [initial] = useState(() => {

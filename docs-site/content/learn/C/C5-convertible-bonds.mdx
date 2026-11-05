@@ -67,7 +67,7 @@ import math
 import numpy as np
 import pandas as pd
 from _shared import analyst_tracks as tracks
-from finstack_quant.valuations.instruments import price_instrument
+from finstack_quant.valuations.instruments import ConvertibleBond, convertible_spot_ladder, price_instrument
 AS_OF = date(2025, 1, 15)
 convert=tracks.credit_extension()["ANALYST-CONVERT"]
 credit_market=tracks.build_market("credit")
@@ -77,14 +77,9 @@ credit_market=tracks.build_market("credit")
 <ExecutedOutput lesson="C5" block="convertible-setup" />
 {/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="convertible-regime-proof" role="build" */}
 ```python exec id=convertible-regime-proof role=build
-regimes=[]
-for spot in [50.,100.,150.]:
-    market=tracks.build_market("credit")
-    market.insert_price("CONVERT",spot,"USD")
-    value=price_instrument(json.dumps(convert),market,AS_OF,model="tree",
-        metrics=["parity","conversion_value","conversion_premium","bond_floor","delta","vega"])
-    regimes.append({"spot":spot,"pv_usd":value.value.amount,**value.metrics})
-print(pd.DataFrame(regimes))
+ladder=convertible_spot_ladder(ConvertibleBond.from_json(json.dumps(convert)),credit_market,AS_OF,[50.,100.,150.])
+regimes=[{"spot":row.spot,"pv_usd":row.price,"bond_floor":row.bond_floor} for row in ladder.rows]
+print(ladder.to_dataframe())
 ```
 {/* /notebook-block */}
 

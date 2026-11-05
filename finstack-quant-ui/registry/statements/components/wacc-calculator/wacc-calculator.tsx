@@ -9,33 +9,16 @@ import {
 } from "@/components/finstack/shared/primitives/native-display/native-display";
 import type { WaccRequest } from "@/workers/finstack-contract";
 
-/** The arguments in Rust's order, with the wire name that labels each and what it means. */
-const fields: readonly (readonly [keyof WaccRequest, string, string])[] = [
+/** The WaccInputs fields in Rust's order, each with what it means. */
+const fields: readonly (readonly [keyof WaccRequest, string])[] = [
+  ["equity_weight", "Equity share of total capital, decimal (0.6 = 60%)."],
+  ["cost_of_equity", "Required return on equity, decimal (0.115 = 11.5%)."],
   [
-    "equityWeight",
-    "equity_weight",
-    "Equity share of total capital, decimal (0.6 = 60%).",
-  ],
-  [
-    "costOfEquity",
-    "cost_of_equity",
-    "Required return on equity, decimal (0.115 = 11.5%).",
-  ],
-  [
-    "debtWeight",
     "debt_weight",
     "Debt share of total capital, decimal; must sum with the equity weight to one.",
   ],
-  [
-    "costOfDebt",
-    "cost_of_debt",
-    "Pre-tax borrowing yield, decimal (0.06 = 6%).",
-  ],
-  [
-    "taxRate",
-    "tax_rate",
-    "Marginal tax rate, decimal from 0 to 1 (0.25 = 25%).",
-  ],
+  ["cost_of_debt", "Pre-tax borrowing yield, decimal (0.06 = 6%)."],
+  ["tax_rate", "Marginal tax rate, decimal from 0 to 1 (0.25 = 25%)."],
 ];
 export interface WaccCalculatorProps {
   /** The inputs the form starts from; omitted starts empty. */
@@ -78,11 +61,11 @@ export function WaccCalculator({
       const text = (name: keyof WaccRequest) =>
         defaultInputs ? String(defaultInputs[name]) : "";
       return {
-        equityWeight: text("equityWeight"),
-        costOfEquity: text("costOfEquity"),
-        debtWeight: text("debtWeight"),
-        costOfDebt: text("costOfDebt"),
-        taxRate: text("taxRate"),
+        equity_weight: text("equity_weight"),
+        cost_of_equity: text("cost_of_equity"),
+        debt_weight: text("debt_weight"),
+        cost_of_debt: text("cost_of_debt"),
+        tax_rate: text("tax_rate"),
       };
     },
   );
@@ -92,11 +75,11 @@ export function WaccCalculator({
     event.preventDefault();
     setEdited(false);
     onSubmit({
-      equityWeight: typedNumber(values.equityWeight),
-      costOfEquity: typedNumber(values.costOfEquity),
-      debtWeight: typedNumber(values.debtWeight),
-      costOfDebt: typedNumber(values.costOfDebt),
-      taxRate: typedNumber(values.taxRate),
+      equity_weight: typedNumber(values.equity_weight),
+      cost_of_equity: typedNumber(values.cost_of_equity),
+      debt_weight: typedNumber(values.debt_weight),
+      cost_of_debt: typedNumber(values.cost_of_debt),
+      tax_rate: typedNumber(values.tax_rate),
     });
   };
   return (
@@ -110,10 +93,10 @@ export function WaccCalculator({
           Enter every value as a decimal: 0.10 means 10%.
         </p>
         <div className="grid gap-4 @lg:grid-cols-2">
-          {fields.map(([name, wire, help]) => (
+          {fields.map(([name, help]) => (
             <DecimalInput
               key={name}
-              label={labelFor(wire)}
+              label={labelFor(name)}
               help={help}
               value={values[name]}
               onValueChange={(value) => {

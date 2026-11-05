@@ -45,8 +45,6 @@ __all__ = [
     "delta_to_strike",
     "get_cube_expiry_slice_vol",
     "get_cube_expiry_slice_vol_clamped",
-    "get_cube_normal_vol",
-    "get_cube_normal_vol_clamped",
     "get_cube_vol",
     "get_cube_vol_clamped",
     "get_fx_delta_pillar_vols",
@@ -56,9 +54,7 @@ __all__ = [
     "implied_vol_bachelier",
     "implied_vol_black",
     "materialize_cube_expiry_slice",
-    "materialize_cube_expiry_slice_normal",
     "materialize_cube_tenor_slice",
-    "materialize_cube_tenor_slice_normal",
     "materialize_fx_delta_surface",
     "strike_to_delta",
 ]
@@ -1412,8 +1408,10 @@ def get_surface_vol_clamped(surface: VolSurface, expiry: float, strike: float) -
     """
     ...
 
-def get_cube_vol(cube: VolCube, expiry: float, tenor: float, strike: float) -> float:
-    """Evaluate Black volatility from a stored SABR cube.
+_VolatilityConvention = Literal["normal", "lognormal"] | dict[str, dict[str, float]]
+
+def get_cube_vol(cube: VolCube, expiry: float, tenor: float, strike: float, convention: _VolatilityConvention) -> float:
+    """Evaluate a stored SABR cube in the requested quote convention.
 
     Parameters
     ----------
@@ -1424,30 +1422,43 @@ def get_cube_vol(cube: VolCube, expiry: float, tenor: float, strike: float) -> f
     tenor : float
         Positive underlying tenor in years inside the grid.
     strike : float
-        Finite strike in stored forward units.
+        Finite strike in the cube's forward rate units.
+    convention : str or dict
+        Output quote convention: ``"lognormal"`` returns decimal Black
+        volatility (shifted by the cube's own SABR shifts where it stores
+        them) and ``"normal"`` returns absolute Bachelier volatility in the
+        cube's rate units (``0.0075`` = 75 bp on decimal rates). A
+        ``{"shifted_lognormal": {"shift": s}}`` output is rejected because the
+        cube already carries its own shifts.
 
     Returns
     -------
     float
-        Annualized Black volatility as a decimal.
+        Annualized volatility: decimal Black for ``"lognormal"``, absolute
+        rate units for ``"normal"``.
 
     Raises
     ------
     ValueError
-        If coordinates or SABR evaluation are invalid.
+        If coordinates are outside the grid, SABR evaluation fails, or
+        *convention* is shifted-lognormal or not a recognized convention.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import VolCube
     >>> from finstack_quant.models.volatility import get_cube_vol
     >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> get_cube_vol(c, 1.0, 5.0, 0.03) > 0
+    >>> get_cube_vol(c, 1.0, 5.0, 0.03, "lognormal") > 0
+    True
+    >>> get_cube_vol(c, 1.0, 5.0, 0.03, "normal") > 0
     True
     """
     ...
 
-def get_cube_vol_clamped(cube: VolCube, expiry: float, tenor: float, strike: float) -> float:
-    """Evaluate Black cube volatility with coordinate clamping.
+def get_cube_vol_clamped(
+    cube: VolCube, expiry: float, tenor: float, strike: float, convention: _VolatilityConvention
+) -> float:
+    """Evaluate a SABR cube in the requested convention with coordinate clamping.
 
     Parameters
     ----------
@@ -1458,95 +1469,40 @@ def get_cube_vol_clamped(cube: VolCube, expiry: float, tenor: float, strike: flo
     tenor : float
         Finite tenor in years, clamped to the grid.
     strike : float
-        Finite strike in stored forward units.
+        Finite strike in the cube's forward rate units.
+    convention : str or dict
+        Output quote convention: ``"lognormal"`` returns decimal Black
+        volatility (shifted by the cube's own SABR shifts where it stores
+        them) and ``"normal"`` returns absolute Bachelier volatility in the
+        cube's rate units (``0.0075`` = 75 bp on decimal rates). A
+        ``{"shifted_lognormal": {"shift": s}}`` output is rejected because the
+        cube already carries its own shifts.
 
     Returns
     -------
     float
-        Annualized volatility, or nan when undefined.
+        Annualized volatility in *convention*, or nan when the coordinates,
+        SABR domain, or a shifted-lognormal *convention* make it undefined.
 
-    This function does not raise; invalid coordinates or model outputs return nan.
+    Raises
+    ------
+    ValueError
+        If *convention* is not a recognized convention value.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import VolCube
     >>> from finstack_quant.models.volatility import get_cube_vol_clamped
     >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> get_cube_vol_clamped(c, 2.0, 10.0, 0.03) > 0
+    >>> get_cube_vol_clamped(c, 2.0, 10.0, 0.03, "lognormal") > 0
     True
     """
     ...
 
-def get_cube_normal_vol(cube: VolCube, expiry: float, tenor: float, strike: float) -> float:
-    """Evaluate normal volatility from a stored SABR cube.
-    Returns an **absolute** normal (Bachelier) volatility in the cube's rate
-    units (e.g. ``0.0075`` for 75 bp on decimal rates), not a Black decimal vol.
-
-
-    Parameters
-    ----------
-    cube : VolCube
-        Data-only SABR parameter and forward grid.
-    expiry : float
-        Positive expiry in years inside the grid.
-    tenor : float
-        Positive tenor in years inside the grid.
-    strike : float
-        Finite strike in absolute rate units.
-
-    Returns
-    -------
-    float
-        Annualized normal volatility in absolute rate units.
-
-    Raises
-    ------
-    ValueError
-        If coordinates or the shifted-SABR domain are invalid.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import VolCube
-    >>> from finstack_quant.models.volatility import get_cube_normal_vol
-    >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> get_cube_normal_vol(c, 1.0, 5.0, 0.03) > 0
-    True
-    """
-    ...
-
-def get_cube_normal_vol_clamped(cube: VolCube, expiry: float, tenor: float, strike: float) -> float:
-    """Evaluate normal cube volatility with coordinate clamping.
-
-    Parameters
-    ----------
-    cube : VolCube
-        Data-only SABR parameter and forward grid.
-    expiry : float
-        Finite expiry in years, clamped to the grid.
-    tenor : float
-        Finite tenor in years, clamped to the grid.
-    strike : float
-        Finite strike in absolute rate units.
-
-    Returns
-    -------
-    float
-        Normal volatility, or nan when the domain is invalid.
-
-    This function does not raise; invalid coordinates or model outputs return nan.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import VolCube
-    >>> from finstack_quant.models.volatility import get_cube_normal_vol_clamped
-    >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> get_cube_normal_vol_clamped(c, 2.0, 10.0, 0.03) > 0
-    True
-    """
-    ...
-
-def materialize_cube_tenor_slice(cube: VolCube, tenor: float, strikes: list[float]) -> VolSurface:
-    """Materialize a lognormal cube tenor slice.
+def materialize_cube_tenor_slice(
+    cube: VolCube, tenor: float, strikes: list[float], convention: _VolatilityConvention
+) -> VolSurface:
+    """Materialize a cube tenor slice as an expiry-by-strike surface.
 
     Parameters
     ----------
@@ -1556,61 +1512,42 @@ def materialize_cube_tenor_slice(cube: VolCube, tenor: float, strikes: list[floa
         Finite tenor in years, clamped to the grid.
     strikes : list[float]
         Non-empty finite strike grid.
+    convention : str or dict
+        Output quote convention: ``"lognormal"`` returns decimal Black
+        volatility (shifted by the cube's own SABR shifts where it stores
+        them) and ``"normal"`` returns absolute Bachelier volatility in the
+        cube's rate units (``0.0075`` = 75 bp on decimal rates). A
+        ``{"shifted_lognormal": {"shift": s}}`` output is rejected because the
+        cube already carries its own shifts.
 
     Returns
     -------
     VolSurface
-        Data-only expiry-by-strike Black surface.
+        Data-only expiry-by-strike surface whose ``quote_type`` records the
+        convention (``"normal"`` for normal output).
 
     Raises
     ------
     ValueError
-        If inputs or evaluation are invalid.
+        If inputs or evaluation are invalid, or *convention* is
+        shifted-lognormal.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import VolCube
     >>> from finstack_quant.models.volatility import materialize_cube_tenor_slice
     >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> materialize_cube_tenor_slice(c, 5.0, [0.02, 0.03]).grid_shape
+    >>> materialize_cube_tenor_slice(c, 5.0, [0.02, 0.03], "lognormal").grid_shape
     (1, 2)
-    """
-    ...
-
-def materialize_cube_tenor_slice_normal(cube: VolCube, tenor: float, strikes: list[float]) -> VolSurface:
-    """Materialize a normal-volatility cube tenor slice.
-
-    Parameters
-    ----------
-    cube : VolCube
-        Source SABR cube.
-    tenor : float
-        Finite tenor in years, clamped to the grid.
-    strikes : list[float]
-        Non-empty finite strike grid.
-
-    Returns
-    -------
-    VolSurface
-        Data-only expiry-by-strike normal surface.
-
-    Raises
-    ------
-    ValueError
-        If inputs or evaluation are invalid.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import VolCube
-    >>> from finstack_quant.models.volatility import materialize_cube_tenor_slice_normal
-    >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> materialize_cube_tenor_slice_normal(c, 5.0, [0.02, 0.03]).quote_type
+    >>> materialize_cube_tenor_slice(c, 5.0, [0.02, 0.03], "normal").quote_type
     'normal'
     """
     ...
 
-def materialize_cube_expiry_slice(cube: VolCube, expiry: float, strikes: list[float]) -> VolCubeExpirySlice:
-    """Materialize a lognormal cube expiry slice.
+def materialize_cube_expiry_slice(
+    cube: VolCube, expiry: float, strikes: list[float], convention: _VolatilityConvention
+) -> VolCubeExpirySlice:
+    """Materialize a cube expiry slice as a tenor-by-strike grid.
 
     Parameters
     ----------
@@ -1620,57 +1557,34 @@ def materialize_cube_expiry_slice(cube: VolCube, expiry: float, strikes: list[fl
         Finite expiry in years, clamped to the grid.
     strikes : list[float]
         Non-empty finite strike grid.
+    convention : str or dict
+        Output quote convention: ``"lognormal"`` returns decimal Black
+        volatility (shifted by the cube's own SABR shifts where it stores
+        them) and ``"normal"`` returns absolute Bachelier volatility in the
+        cube's rate units (``0.0075`` = 75 bp on decimal rates). A
+        ``{"shifted_lognormal": {"shift": s}}`` output is rejected because the
+        cube already carries its own shifts.
 
     Returns
     -------
     VolCubeExpirySlice
         Data-only tenor-by-strike grid retaining the fixed option expiry and,
-        for shifted Black quotes, one displacement per tenor.
+        for shifted Black output, one displacement per tenor.
 
     Raises
     ------
     ValueError
-        If inputs or evaluation are invalid.
+        If inputs or evaluation are invalid, or *convention* is
+        shifted-lognormal.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import VolCube
     >>> from finstack_quant.models.volatility import materialize_cube_expiry_slice
     >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> materialize_cube_expiry_slice(c, 1.0, [0.02, 0.03]).grid_shape
+    >>> materialize_cube_expiry_slice(c, 1.0, [0.02, 0.03], "lognormal").grid_shape
     (1, 2)
-    """
-    ...
-
-def materialize_cube_expiry_slice_normal(cube: VolCube, expiry: float, strikes: list[float]) -> VolCubeExpirySlice:
-    """Materialize a normal-volatility cube expiry slice.
-
-    Parameters
-    ----------
-    cube : VolCube
-        Source SABR cube.
-    expiry : float
-        Finite expiry in years, clamped to the grid.
-    strikes : list[float]
-        Non-empty finite strike grid.
-
-    Returns
-    -------
-    VolCubeExpirySlice
-        Data-only tenor-by-strike normal-volatility grid retaining the fixed
-        option expiry separately from the underlying tenors.
-
-    Raises
-    ------
-    ValueError
-        If inputs or evaluation are invalid.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import VolCube
-    >>> from finstack_quant.models.volatility import materialize_cube_expiry_slice_normal
-    >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> materialize_cube_expiry_slice_normal(c, 1.0, [0.02, 0.03]).quote_type
+    >>> materialize_cube_expiry_slice(c, 1.0, [0.02, 0.03], "normal").quote_type
     'normal'
     """
     ...
@@ -1900,8 +1814,6 @@ def strike_to_delta(strike: float, forward: float, vol: float, expiry: float) ->
     0.523922
     """
     ...
-
-_VolatilityConvention = Literal["normal", "lognormal"] | dict[str, dict[str, float]]
 
 def convert_atm_volatility(
     vol: float,

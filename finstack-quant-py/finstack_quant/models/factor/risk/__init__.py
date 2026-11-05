@@ -23,9 +23,9 @@ RiskBudgetResult = _risk.RiskBudgetResult
 StressPositionEntry = _risk.StressPositionEntry
 TailScenarioBreakdown = _risk.TailScenarioBreakdown
 StressAttribution = _risk.StressAttribution
+PositionRiskReport = _risk.PositionRiskReport
 DEFAULT_UTILIZATION_THRESHOLD = _risk.DEFAULT_UTILIZATION_THRESHOLD
-parametric_var_decomposition = _risk.parametric_var_decomposition
-historical_var_decomposition = _risk.historical_var_decomposition
+position_risk_report = _risk.position_risk_report
 evaluate_risk_budget = _risk.evaluate_risk_budget
 evaluate_risk_budget_from_decomposition = _risk.evaluate_risk_budget_from_decomposition
 build_stress_attribution = _risk.build_stress_attribution
@@ -40,6 +40,7 @@ __all__: list[str] = [
     "PositionFactorContribution",
     "PositionResidualContribution",
     "PositionRiskDecomposition",
+    "PositionRiskReport",
     "PositionVarContribution",
     "RiskBudgetResult",
     "RiskDecomposition",
@@ -50,7 +51,6 @@ __all__: list[str] = [
     "decompose_factors",
     "evaluate_risk_budget",
     "evaluate_risk_budget_from_decomposition",
-    "historical_var_decomposition",
-    "parametric_var_decomposition",
     "position_component_var",
+    "position_risk_report",
 ]

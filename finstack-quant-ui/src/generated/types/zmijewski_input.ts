@@ -17,5 +17,4 @@ export interface ZmijewskiInputWire {
    * Total Liabilities / Total Assets (leverage / financial leverage ratio).
    */
   total_liabilities_to_total_assets: number;
-  [k: string]: unknown;
 }

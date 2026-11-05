@@ -6,8 +6,8 @@ use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_core::wire::{serde_label, serde_parse};
 use finstack_quant_models::credit::liability_management::{
-    self as lm, ExchangeOfferAnalysis, ExchangeType, LeverageImpact, LmeAnalysis, LmeType,
-    TENDER_RECOMMENDATION_HURDLE,
+    self as lm, ExchangeOffer, ExchangeOfferAnalysis, ExchangeType, LeverageImpact, LmeAnalysis,
+    LmeTerms, LmeType, TENDER_RECOMMENDATION_HURDLE,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
@@ -325,51 +325,180 @@ wire_methods!(
 );
 impl_repr_html_via_dataframe!(PyLmeAnalysis);
 
+#[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer")]
+#[pyclass(
+    name = "ExchangeOffer",
+    module = "finstack_quant.models.credit.liability_management",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct PyExchangeOffer {
+    inner: ExchangeOffer,
+}
+
+#[pymethods]
+impl PyExchangeOffer {
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.__init__")]
+    #[new]
+    #[pyo3(signature = (*, old_pv, new_pv, consent_fee, equity_sweetener_value, exchange_type))]
+    fn new(
+        old_pv: f64,
+        new_pv: f64,
+        consent_fee: f64,
+        equity_sweetener_value: f64,
+        exchange_type: &str,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: ExchangeOffer {
+                old_pv,
+                new_pv,
+                consent_fee,
+                equity_sweetener_value,
+                exchange_type: serde_parse::<ExchangeType>(exchange_type).map_err(core_to_py)?,
+            },
+        })
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.old_pv")]
+    #[getter]
+    fn old_pv(&self) -> f64 {
+        self.inner.old_pv
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.new_pv")]
+    #[getter]
+    fn new_pv(&self) -> f64 {
+        self.inner.new_pv
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.consent_fee")]
+    #[getter]
+    fn consent_fee(&self) -> f64 {
+        self.inner.consent_fee
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.equity_sweetener_value")]
+    #[getter]
+    fn equity_sweetener_value(&self) -> f64 {
+        self.inner.equity_sweetener_value
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.exchange_type")]
+    #[getter]
+    fn exchange_type(&self) -> PyResult<String> {
+        serde_label(&self.inner.exchange_type).map_err(core_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.__repr__")]
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("ExchangeOffer", &self.inner)
+    }
+}
+
+wire_methods!(
+    PyExchangeOffer,
+    ExchangeOffer,
+    "ExchangeOffer",
+    module = "finstack_quant.models.credit.liability_management"
+);
+
+#[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms")]
+#[pyclass(
+    name = "LmeTerms",
+    module = "finstack_quant.models.credit.liability_management",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct PyLmeTerms {
+    inner: LmeTerms,
+}
+
+#[pymethods]
+impl PyLmeTerms {
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.__init__")]
+    #[new]
+    #[pyo3(signature = (*, lme_type, notional, repurchase_price_pct, opt_acceptance_pct, ebitda=None))]
+    fn new(
+        lme_type: &str,
+        notional: f64,
+        repurchase_price_pct: f64,
+        opt_acceptance_pct: f64,
+        ebitda: Option<f64>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: LmeTerms {
+                lme_type: serde_parse::<LmeType>(lme_type).map_err(core_to_py)?,
+                notional,
+                repurchase_price_pct,
+                opt_acceptance_pct,
+                ebitda,
+            },
+        })
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.lme_type")]
+    #[getter]
+    fn lme_type(&self) -> PyResult<String> {
+        serde_label(&self.inner.lme_type).map_err(core_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.notional")]
+    #[getter]
+    fn notional(&self) -> f64 {
+        self.inner.notional
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.repurchase_price_pct")]
+    #[getter]
+    fn repurchase_price_pct(&self) -> f64 {
+        self.inner.repurchase_price_pct
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.opt_acceptance_pct")]
+    #[getter]
+    fn opt_acceptance_pct(&self) -> f64 {
+        self.inner.opt_acceptance_pct
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.ebitda")]
+    #[getter]
+    fn ebitda(&self) -> Option<f64> {
+        self.inner.ebitda
+    }
+
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.__repr__")]
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("LmeTerms", &self.inner)
+    }
+}
+
+wire_methods!(
+    PyLmeTerms,
+    LmeTerms,
+    "LmeTerms",
+    module = "finstack_quant.models.credit.liability_management"
+);
+
 #[doc = pydoc!("finstack_quant.models.credit.liability_management", "analyze_exchange_offer")]
 #[pyfunction]
-#[pyo3(text_signature = "(old_pv, new_pv, consent_fee, equity_sweetener_value, exchange_type)")]
-fn analyze_exchange_offer(
-    old_pv: f64,
-    new_pv: f64,
-    consent_fee: f64,
-    equity_sweetener_value: f64,
-    exchange_type: &str,
-) -> PyResult<PyExchangeOfferAnalysis> {
-    let exchange_type = serde_parse::<ExchangeType>(exchange_type).map_err(core_to_py)?;
-    lm::analyze_exchange_offer(
-        old_pv,
-        new_pv,
-        consent_fee,
-        equity_sweetener_value,
-        exchange_type,
-    )
-    .map(|inner| PyExchangeOfferAnalysis { inner })
-    .map_err(core_to_py)
+#[pyo3(text_signature = "(offer)")]
+fn analyze_exchange_offer(offer: PyExchangeOffer) -> PyResult<PyExchangeOfferAnalysis> {
+    lm::analyze_exchange_offer(&offer.inner)
+        .map(|inner| PyExchangeOfferAnalysis { inner })
+        .map_err(core_to_py)
 }
 
 #[doc = pydoc!("finstack_quant.models.credit.liability_management", "analyze_lme")]
 #[pyfunction]
-#[pyo3(signature = (lme_type, notional, repurchase_price_pct, opt_acceptance_pct, ebitda=None))]
-#[pyo3(
-    text_signature = "(lme_type, notional, repurchase_price_pct, opt_acceptance_pct, ebitda=None)"
-)]
-fn analyze_lme(
-    lme_type: &str,
-    notional: f64,
-    repurchase_price_pct: f64,
-    opt_acceptance_pct: f64,
-    ebitda: Option<f64>,
-) -> PyResult<PyLmeAnalysis> {
-    let lme_type = serde_parse::<LmeType>(lme_type).map_err(core_to_py)?;
-    lm::analyze_lme(
-        lme_type,
-        notional,
-        repurchase_price_pct,
-        opt_acceptance_pct,
-        ebitda,
-    )
-    .map(|inner| PyLmeAnalysis { inner })
-    .map_err(core_to_py)
+#[pyo3(text_signature = "(terms)")]
+fn analyze_lme(terms: PyLmeTerms) -> PyResult<PyLmeAnalysis> {
+    lm::analyze_lme(&terms.inner)
+        .map(|inner| PyLmeAnalysis { inner })
+        .map_err(core_to_py)
 }
 
 /// Build the `finstack_quant.models.credit.liability_management` submodule.
@@ -384,18 +513,22 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
 
     m.add("TENDER_RECOMMENDATION_HURDLE", TENDER_RECOMMENDATION_HURDLE)?;
+    m.add_class::<PyExchangeOffer>()?;
     m.add_class::<PyExchangeOfferAnalysis>()?;
     m.add_class::<PyLeverageImpact>()?;
     m.add_class::<PyLmeAnalysis>()?;
+    m.add_class::<PyLmeTerms>()?;
     m.add_function(wrap_pyfunction!(analyze_exchange_offer, &m)?)?;
     m.add_function(wrap_pyfunction!(analyze_lme, &m)?)?;
 
     let all = PyList::new(
         py,
         [
+            "ExchangeOffer",
             "ExchangeOfferAnalysis",
             "LeverageImpact",
             "LmeAnalysis",
+            "LmeTerms",
             "TENDER_RECOMMENDATION_HURDLE",
             "analyze_exchange_offer",
             "analyze_lme",

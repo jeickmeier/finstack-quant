@@ -73,12 +73,14 @@ import type {
   valuations,
 } from "finstack-quant-wasm";
 import type {
+  analytics as analyticsWire,
   attribution as attributionWire,
   core as wire,
   covenants as covenantsWire,
   models as modelsWire,
   portfolio as portfolioWire,
   scenarios as scenarioWire,
+  statements_analytics as statementsAnalyticsWire,
 } from "finstack-quant-wasm/types";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
 export interface PriceRequest {
@@ -235,11 +237,19 @@ export interface StatementTraceRequest {
   readonly modelJson: string;
   readonly nodeId: string;
 }
-export interface StatementChecksRequest {
+/** statements_analytics.runChecks arguments: a check suite run against the model and its evaluated result. */
+export interface StatementSuiteChecksRequest {
   readonly modelJson: string;
+  /** CheckSuiteSpec JSON; the worker validates it natively before the run. */
+  readonly suiteSpecJson: string;
   readonly resultsJson: string;
-  readonly kind: "suite" | "three-statement" | "credit-underwriting";
-  readonly configJson: string;
+}
+/** runThreeStatementChecks or runCreditUnderwritingChecks arguments: a node mapping run against the model and its evaluated result. */
+export interface StatementMappingChecksRequest {
+  readonly modelJson: string;
+  /** ThreeStatementMapping or CreditMapping JSON, as the chosen method takes it. */
+  readonly mappingJson: string;
+  readonly resultsJson: string;
 }
 /** Native ScenarioSet JSON evaluated against one model; market and date are supplied together. */
 export interface StatementScenarioRequest {
@@ -293,19 +303,8 @@ export type TerminalValueSpec = Exclude<
   Parameters<typeof statements_analytics.evaluateDcf>[2],
   string
 >;
-/** The statements_analytics.wacc arguments, each a decimal as Rust takes it. */
-export interface WaccRequest {
-  /** Equity share of total capital (0.6 = 60%). */
-  readonly equityWeight: number;
-  /** Required return on equity (0.115 = 11.5%). */
-  readonly costOfEquity: number;
-  /** Debt share of total capital; Rust rejects weights that do not sum to one. */
-  readonly debtWeight: number;
-  /** Pre-tax borrowing yield (0.06 = 6%). */
-  readonly costOfDebt: number;
-  /** Marginal tax rate in [0, 1] (0.25 = 25%). */
-  readonly taxRate: number;
-}
+/** Rust WaccInputs: both capital weights, both costs and the tax rate, each a decimal; Rust rejects weights that do not sum to one. */
+export type WaccRequest = statementsAnalyticsWire.WaccInputs;
 /** DCF assumptions for one statement model; an omitted optional argument stays unset so Rust applies its default. */
 export interface DcfSensitivityRequest {
   readonly modelJson: string;
@@ -365,24 +364,12 @@ export interface RelativeValueReportRequest {
   /** Rust RelativeValueReportConfig JSON; Rust rejects unknown keys. */
   readonly configJson: string;
 }
-/** One sensitivity parameter: statements_analytics.parameterSpecWithPercentages arguments. */
-export interface SensitivityParameterRequest {
-  readonly nodeId: string;
-  /** Period whose value is varied, such as `2025Q4`. */
-  readonly periodId: string;
-  /** Base value of the node at the period, in the node's own units, read from the evaluated result. */
-  readonly baseValue: number;
-  /** Percentage moves of the base value, such as `[-10, 10]` for plus or minus 10%. */
-  readonly pctRange: readonly number[];
-}
-/** A sensitivity run of one model and the target metric and period its tornado reads. */
+/** A sensitivity run of one model: the Rust SensitivityConfig, and the target metric and period its tornado reads. */
 export interface RunSensitivityRequest {
   readonly modelJson: string;
-  /** Rust SensitivityMode wire value: `diagonal`, `full_grid` or `tornado`. */
-  readonly mode: string;
-  /** Parameters in the order Rust varies them. */
-  readonly parameters: readonly SensitivityParameterRequest[];
-  /** Target metric node tracked in every scenario and read by the tornado. */
+  /** Rust SensitivityConfig, passed through unchanged: mode, parameters in the order Rust varies them (each node_id, period_id, base_value and either absolute perturbations or pct_range percentage moves of base_value) and target_metrics. */
+  readonly config: statementsAnalyticsWire.SensitivityConfig;
+  /** Target metric node the tornado reads (generateTornadoEntries). */
   readonly targetMetric: string;
   /** Period at which the tornado reads the target metric. */
   readonly period: string;
@@ -465,38 +452,8 @@ export interface MonteCarloBreachRequest {
 export type CovenantSpec = covenantsWire.CovenantSpec;
 /** Native DatedCovenantReports row: the reports of the covenants applicable on one test date. */
 export type DatedCovenantReports = covenantsWire.DatedCovenantReports;
-/**
- * A Rust covenant package template and its thresholds, named after the facade
- * function and its parameters. Ratios are in turns (`3.5` means 3.5x), yields
- * and loan-to-value as decimals, amounts in the reporting currency; a cleared
- * field is NaN, which Rust rejects.
- */
-export type CovenantTemplateRequest =
-  | {
-      readonly kind: "covLite";
-      readonly maxLeverage: number;
-      readonly maxSeniorLeverage: number;
-    }
-  | {
-      readonly kind: "lboStandard";
-      readonly initialLeverage: number;
-      readonly interestCoverage: number;
-      readonly fixedChargeCoverage: number;
-      readonly maxCapex: number;
-    }
-  | {
-      readonly kind: "realEstate";
-      readonly minDscr: number;
-      readonly minDebtYield: number;
-      readonly maxLtv: number;
-    }
-  | {
-      readonly kind: "projectFinance";
-      readonly minDscr: number;
-      readonly distributionLockupDscr: number;
-      readonly minLiquidity: number;
-      readonly maxNetLeverage: number;
-    };
+/** One standard covenant package and its thresholds: the Rust CovenantTemplate (kind-tagged; ratios in turns, debt yield and LTV as decimals, capex and liquidity in the reporting currency). */
+export type CovenantTemplateRequest = covenantsWire.CovenantTemplate;
 /** Native FutureBreach wire object: one projected breach. */
 export type FutureBreach = covenantsWire.FutureBreach;
 /** A breach forecast of an evaluated statement result under a CovenantEngine. */
@@ -529,28 +486,6 @@ export type { CurrencyLadder };
 export type CashflowEnvelope = ReturnType<
   typeof valuations.instruments.instrumentCashflowsWithMarket
 >;
-/** One parallel shift: scenarios.parallelBpMany over the listed curve ids of one curve family. */
-export interface MarketScenarioShift {
-  readonly curveKind: scenarioWire.CurveKind;
-  /** Market curve ids, in operation order; Rust resolves them when the scenario is applied. */
-  readonly curveIds: readonly string[];
-  /** Additive basis points; percent of forward for commodity curves. */
-  readonly bp: number;
-}
-/** A scenarios.operationSpecTimeRollForward operation; an omitted roll mode is left to Rust. */
-export interface MarketScenarioRoll {
-  /** Tenor text such as "1M", parsed by Rust. */
-  readonly period: string;
-  readonly rollMode?: scenarioWire.TimeRollMode | null;
-}
-/** A market-only ScenarioSpec built from native operations; omitted options keep Rust's defaults. */
-export interface MarketScenarioRequest {
-  /** Scenario id; Rust rejects a blank one. */
-  readonly id: string;
-  readonly shifts: readonly MarketScenarioShift[];
-  readonly roll?: MarketScenarioRoll | null;
-  readonly hazardBumpMode?: scenarioWire.HazardBumpMode | null;
-}
 /** One built-in scenario template, or one component of a composite template. */
 export interface TemplateComponentRequest {
   /** Built-in template id from scenarios.listBuiltinTemplateMetadata. */
@@ -604,16 +539,15 @@ export interface HorizonReturn {
 export interface AttributePnlManyRequest {
   /** Canonical instrument envelope JSON texts, attributed in this order. */
   readonly instrumentJsons: readonly string[];
-  /** MarketContext JSON at T0; canonicalized through the market cache and spliced, never parsed. */
+  /** MarketContext JSON at T0; canonicalized through the market cache and spliced into the inputs as `market_t0`, never parsed. */
   readonly marketT0Json: string;
-  /** MarketContext JSON at T1; canonicalized through the market cache and spliced, never parsed. */
+  /** MarketContext JSON at T1; canonicalized through the market cache and spliced into the inputs as `market_t1`, never parsed. */
   readonly marketT1Json: string;
-  /** ISO valuation date at T0. */
-  readonly asOfT0: string;
-  /** ISO valuation date at T1. */
-  readonly asOfT1: string;
-  /** AttributionMethod wire value (required by AttributionInputs; Rust has no default here). */
-  readonly method: attributionWire.AttributionMethod;
+  /** Every other Rust AttributionInputs field (as_of_t0, as_of_t1, method, and the optional config and credit-factor settings), passed through unchanged. */
+  readonly inputs: Omit<
+    attributionWire.AttributionInputs,
+    "market_t0" | "market_t1"
+  >;
 }
 /** One native attribution with the Rust helpers a report shows beside it. */
 export interface AttributedPnl {
@@ -626,20 +560,12 @@ export interface AttributedPnl {
   /** attribution.pnlAttributionPctOfTotalByBucket: every money bucket with its share of total, in Rust's order. */
   readonly buckets: readonly PnlBucketShare[];
 }
-/** A ticker-major panel for analytics.Performance; every omitted option is left to Rust. */
+/** Rust PerformancePanel: ISO dates, ticker-major price or return series (a gap is null), ticker names and an optional benchmark and frequency left to Rust when omitted. */
+export type PerformancePanel = analyticsWire.PerformancePanel;
+/** A panel for analytics.Performance with the report's options; every omitted option is left to Rust. */
 export interface PerformanceReportRequest {
-  /** ISO-8601 observation dates, ascending, one per value of each series. */
-  readonly dates: readonly string[];
-  /** `values[ticker][date]`: simple decimal returns ("returns") or price levels ("prices"). */
-  readonly values: readonly (readonly number[])[];
-  /** "returns" builds with Performance.fromReturns, "prices" with new Performance. */
-  readonly kind: "returns" | "prices";
-  /** Ticker labels aligned with the outer elements of `values`. */
-  readonly tickerNames: readonly string[];
-  /** Ticker used as the benchmark series; omitted leaves it to Rust. */
-  readonly benchmarkTicker?: string | null;
-  /** Observation frequency token such as "daily"; omitted is Rust's default. */
-  readonly frequency?: string | null;
+  /** The panel new analytics.Performance(panel) is built from. */
+  readonly panel: PerformancePanel;
   /** Annualized decimal risk-free rate for summary() and rollingSharpe; omitted is Rust's default. */
   readonly riskFreeRate?: number | null;
   /** Tail confidence for summary() VaR, ES and tail ratio; omitted is Rust's default. */
@@ -678,11 +604,10 @@ export interface PerformanceReport extends Omit<
   /** correlationMatrix rows in tickerNames order. */
   correlation: { matrix: number[][]; repaired: boolean };
 }
-/** A ticker-major return or price panel whose Pearson correlation matrix Rust estimates; host-supplied, never defaulted. */
-export type CorrelationMatrixRequest = Pick<
-  PerformanceReportRequest,
-  "dates" | "values" | "kind" | "tickerNames" | "frequency"
->;
+/** A return or price panel whose Pearson correlation matrix Rust estimates; host-supplied, never defaulted. */
+export interface CorrelationMatrixRequest {
+  readonly panel: PerformancePanel;
+}
 /** Performance#correlationMatrix as returned, with the panel's ticker names in matrix order. */
 export interface CorrelationMatrixReport {
   /** Performance#getTickerNames: row and column order of the matrix. */
@@ -692,20 +617,10 @@ export interface CorrelationMatrixReport {
   /** True when Rust projected the raw estimate to the nearest valid correlation matrix (Higham). */
   repaired: boolean;
 }
-/** A ticker-major panel measured against a named benchmark; every omitted option is left to Rust. */
+/** A panel measured against its named benchmark; every omitted option is left to Rust. */
 export interface BenchmarkReportRequest {
-  /** ISO-8601 observation dates, ascending, one per value of each series. */
-  readonly dates: readonly string[];
-  /** `values[ticker][date]`: simple decimal returns ("returns") or price levels ("prices"). */
-  readonly values: readonly (readonly number[])[];
-  /** "returns" builds with Performance.fromReturns, "prices" with new Performance. */
-  readonly kind: "returns" | "prices";
-  /** Ticker labels aligned with the outer elements of `values`. */
-  readonly tickerNames: readonly string[];
-  /** Ticker every relative measure is taken against; Rust rejects an unknown one. */
-  readonly benchmarkTicker: string;
-  /** Observation frequency token such as "daily"; omitted is Rust's default. */
-  readonly frequency?: string | null;
+  /** The panel; its benchmark_ticker is the ticker every relative measure is taken against, and Rust rejects an unknown one. */
+  readonly panel: PerformancePanel & { readonly benchmark_ticker: string };
   /** Annualized decimal risk-free rate for greeks, treynor, mSquared and rollingGreeks; omitted is Rust's default. */
   readonly riskFreeRate?: number | null;
   /** rollingGreeks window in observations; omitted is Rust's default. */
@@ -743,43 +658,14 @@ export interface BenchmarkReport extends Omit<BenchmarkReportData, "tickers"> {
 export type MertonReportRequest = modelsWire.MertonReportRequest;
 /** The native models.credit.mertonReport result. */
 export type MertonReport = modelsWire.MertonReport;
-/** One models.credit.scoring function and its named input ratios; altmanEmScore takes the Z''-Score ratios. */
-export type CreditScoreRequest =
-  | {
-      readonly model: "altmanZScore";
-      readonly input: Readonly<modelsWire.AltmanZScoreInput>;
-    }
-  | {
-      readonly model: "altmanZPrime";
-      readonly input: Readonly<modelsWire.AltmanZPrimeInput>;
-    }
-  | {
-      readonly model: "altmanZDoublePrime" | "altmanEmScore";
-      readonly input: Readonly<modelsWire.AltmanZDoublePrimeInput>;
-    }
-  | {
-      readonly model: "ohlsonOScore";
-      readonly input: Readonly<modelsWire.OhlsonOScoreInput>;
-    }
-  | {
-      readonly model: "zmijewskiScore";
-      readonly input: Readonly<modelsWire.ZmijewskiInput>;
-    };
-/** A models.credit.scoring function name. */
+/** One models.credit.scoring model and its input ratios (Rust CreditScoreRequest); altman_em_score takes the Z''-Score ratios. */
+export type CreditScoreRequest = modelsWire.CreditScoreRequest;
+/** A Rust CreditScoreRequest model tag. */
 export type CreditScoreModel = CreditScoreRequest["model"];
 /** The native ScoringResult of one model (score, zone, implied_pd, model). */
-export type ScoringResult = ReturnType<
-  typeof models.credit.scoring.zmijewskiScore
->;
-/** One scoring result and its master-scale grade; nothing is computed in TypeScript. */
-export interface CreditScore {
-  /** The facade function that scored the input. */
-  model: CreditScoreModel;
-  /** The returned ScoringResult. */
-  result: ScoringResult;
-  /** models.credit.pd.MasterScale.defaultCalibration().mapScore(result), or its native error (Rust rejects a result without an implied PD). */
-  grade: Envelope<modelsWire.MasterScaleResult>;
-}
+export type ScoringResult = modelsWire.ScoringResult;
+/** The native models.credit.scoring.creditScoreReport result: the ScoringResult and the default master-scale grade of its implied PD (null for the Altman family). */
+export type CreditScore = modelsWire.CreditScoreReport;
 /** Years from the curve base date, or an ISO date Rust converts with the curve day count. */
 export type CurvePoint = number | string;
 /** One stored curve or surface of a market and the points to read it at. */
@@ -832,30 +718,10 @@ export type CurveQueryResult =
       kind: "surface";
       points: { expiry: number; strike: number; vol: Envelope<number> }[];
     };
-/** One distressed exchange offer; amounts in one caller-defined unit, no currency conversion. */
-export interface ExchangeOfferRequest {
-  /** Present value of the existing claim if not tendered. */
-  readonly oldPv: number;
-  /** Present value of the new instrument received on tendering. */
-  readonly newPv: number;
-  /** Cash consent or early-tender fee. */
-  readonly consentFee: number;
-  /** Estimated value of attached equity or warrants. */
-  readonly equitySweetenerValue: number;
-  readonly exchangeType: modelsWire.ExchangeType;
-}
-/** One liability management exercise; amounts in one caller-defined unit, percentages as fractions. */
-export interface LmeRequest {
-  readonly lmeType: modelsWire.LmeType;
-  /** Outstanding face of the target instrument. */
-  readonly notional: number;
-  /** Price, extension fee or transferred-asset fraction, by structure. */
-  readonly repurchasePricePct: number;
-  /** Fraction of holders participating. */
-  readonly optAcceptancePct: number;
-  /** Unset leaves the leverage block out. */
-  readonly ebitda?: number | null;
-}
+/** Rust ExchangeOffer: one distressed exchange; amounts in one caller-defined unit, no currency conversion. */
+export type ExchangeOfferRequest = modelsWire.ExchangeOffer;
+/** Rust LmeTerms: one liability management exercise; amounts in one caller-defined unit, percentages as fractions. */
+export type LmeRequest = modelsWire.LmeTerms;
 /** One absolute-priority recovery waterfall; amounts in one caller-defined unit, no currency conversion. */
 export interface RecoveryWaterfallRequest {
   /** Distributable estate, including pledged collateral. */
@@ -867,16 +733,8 @@ export interface RecoveryWaterfallRequest {
 export interface WorkoutLgdRequest {
   /** Exposure at default, positive, in the collateral's unit. */
   readonly ead: number;
-  /** Collateral pieces, highest priority first. */
-  readonly collateral: readonly (readonly [
-    collateralType: modelsWire.WorkoutCollateralType,
-    bookValue: number,
-    haircut: number,
-  ])[];
-  readonly directCostPct: number;
-  readonly indirectCostPct: number;
-  readonly timeToResolutionYears: number;
-  readonly discountRate: number;
+  /** The canonical Rust WorkoutLgd: collateral (highest priority first), costs, workout_years and discount_rate. */
+  readonly model: modelsWire.WorkoutLgd;
 }
 /** One seniority class under one exact registry calibration id. */
 export interface SeniorityRecoveryRequest {
@@ -894,99 +752,14 @@ export interface SeniorityRecoveryStats {
   readonly mode: number | undefined;
   readonly mean_lgd: number;
 }
-/** Terms of one European option; each model takes its own, as the facade function documents them. */
-export type OptionTerms =
-  | {
-      readonly model: "black_scholes";
-      readonly spot: number;
-      readonly strike: number;
-      /** Risk-free rate, decimal, continuously compounded. */
-      readonly rate: number;
-      /** Dividend yield or foreign rate, decimal, continuously compounded. */
-      readonly divYield: number;
-      /** Years. */
-      readonly expiry: number;
-      readonly isCall: boolean;
-      /** Theta denominator; omitted is left to Rust's default. */
-      readonly thetaDaysPerYear?: number | null;
-    }
-  | {
-      readonly model: "black76";
-      readonly forward: number;
-      readonly strike: number;
-      /** Discount factor from valuation to expiry. */
-      readonly df: number;
-      /** Years. */
-      readonly expiry: number;
-      readonly isCall: boolean;
-    }
-  | {
-      readonly model: "bachelier";
-      readonly forward: number;
-      readonly strike: number;
-      /** Years. */
-      readonly expiry: number;
-      readonly isCall: boolean;
-    };
-/** An option's terms with a volatility to price, or a price to invert: per unit, discounted under Black-76, undiscounted under Bachelier. */
-export type OptionCalculatorRequest = OptionTerms &
-  (
-    | { readonly mode: "price"; readonly vol: number }
-    | { readonly mode: "implied_vol"; readonly price: number }
-  );
-/** The returned price or implied volatility and the Greeks at that volatility; nothing is computed in TypeScript. */
-export type OptionCalculatorResult = {
-  model: OptionTerms["model"];
-  /** BsGreeks under Black-Scholes, ForwardGreeks otherwise, or Rust's error of that one call. */
-  greeks: Envelope<modelsWire.BsGreeks | modelsWire.ForwardGreeks>;
-} & (
-  { mode: "price"; price: number } | { mode: "implied_vol"; impliedVol: number }
-);
-/** Where a position VaR/ES decomposition comes from. */
-export type PositionRiskSource =
-  | {
-      /** models.factor.risk.parametricVarDecomposition (Euler allocation under normal returns). */
-      readonly kind: "parametric";
-      /** Position weights or exposures in portfolio currency, one per position id. */
-      readonly weights: readonly number[];
-      /** Position-return covariance, n x n rows in position order. */
-      readonly covariance: readonly (readonly number[])[];
-      /** Also compute incremental VaR (one repricing per position); omitted is left to Rust (false). */
-      readonly computeIncremental?: boolean | null;
-    }
-  | {
-      /** models.factor.risk.historicalVarDecomposition, plus buildStressAttribution of the same P&L. */
-      readonly kind: "historical";
-      /** Position-major scenario P&L: one row per position, one column per scenario (losses negative). */
-      readonly pnls: readonly (readonly number[])[];
-    };
-/** A position risk report request; omitted options are left to Rust. */
-export interface PositionRiskRequest {
-  /** Position identifiers, in the order of the source's rows. */
-  readonly positionIds: readonly string[];
-  /** Tail confidence as a decimal in (0.5, 1); omitted is left to Rust (0.95). */
-  readonly confidence?: number | null;
-  readonly source: PositionRiskSource;
-  /** Target shares of portfolio VaR per position for models.factor.risk.evaluateRiskBudgetFromDecomposition; omitted skips the budget. */
-  readonly budget?: {
-    readonly targets: readonly number[];
-    /** Actual-to-target ratio that flags a breach; omitted is left to Rust. */
-    readonly utilizationThreshold?: number | null;
-  } | null;
-}
-/** The native StressAttribution (VaR threshold, tail scenarios, per-position tail contributions). */
-export type StressAttribution = ReturnType<
-  typeof models.factor.risk.buildStressAttribution
->;
-/** The native results of one position risk request; nothing is computed in TypeScript. */
-export interface PositionRisk {
-  /** The returned PositionRiskDecomposition (losses negative). */
-  decomposition: PositionRiskDecomposition;
-  /** evaluateRiskBudgetFromDecomposition over the decomposition, or its native error; null without a budget. */
-  budget: Envelope<RiskBudgetResult> | null;
-  /** buildStressAttribution of a historical source's P&L, or its native error; null for a parametric source. */
-  stress: Envelope<StressAttribution> | null;
-}
+/** Rust OptionCalculation: a closed-form model with its terms and a price or implied-volatility solve. */
+export type OptionCalculatorRequest = modelsWire.OptionCalculation;
+/** Rust OptionCalculationResult: the price, the volatility both are at and the model's Greeks. */
+export type OptionCalculatorResult = modelsWire.OptionCalculationResult;
+/** Rust PositionRiskRequest: position ids, an optional confidence, a parametric or historical source and an optional budget. */
+export type PositionRiskRequest = modelsWire.PositionRiskRequest;
+/** Rust PositionRiskReport: the decomposition, the budget evaluation (null without a budget) and the stress attribution (null for a parametric source). */
+export type PositionRisk = modelsWire.PositionRiskReport;
 /** A portfolio factor-sensitivity request over the cached book and market handles; an omitted bump config is left to Rust. */
 export interface FactorSensitivitiesRequest {
   /** PortfolioSpec JSON; canonicalized (Portfolio#toJson) through the shared portfolio handle cache. */
@@ -1196,7 +969,8 @@ export interface CubeSampleRequest {
     tenor: number;
     strike: number;
   }[];
-  readonly convention: "normal" | "black_lognormal";
+  /** Output quote convention; Rust rejects shifted lognormal because the cube carries its own shifts. */
+  readonly convention: modelsWire.VolatilityConvention;
 }
 /** One materialized slice of a SABR cube at explicit strikes; off-node values are Rust-interpolated. */
 export interface CubeSliceRequest {
@@ -1238,13 +1012,11 @@ export interface CubeSmile {
   /** Repaired vols aligned with the strikes; null when no repair was requested. */
   readonly repaired: number[] | null;
 }
-/** A stored Black lognormal strike-axis surface and host-supplied forwards for models.volatility.checkSurface. */
+/** A stored Black lognormal strike-axis surface and the Rust ArbitrageCheckConfig for models.volatility.checkSurface. */
 export interface CheckSurfaceRequest {
   readonly surface: StoredSurfaceWire;
-  /** Forward prices in the surface's strike units: one to broadcast or one per expiry. Host-supplied only; Rust rejects a missing, non-positive or mis-sized list. */
-  readonly forwards: readonly number[];
-  /** Non-negative tolerance in total-variance units; omitted leaves Rust's DEFAULT_ARBITRAGE_TOLERANCE. */
-  readonly tolerance?: number | null;
+  /** Host-supplied `forward_prices` in the surface's strike units (one to broadcast or one per expiry; Rust rejects a missing, non-positive or mis-sized list), plus any optional tolerance, check switches and minimum severity; an omitted option leaves Rust's default. */
+  readonly config: modelsWire.ArbitrageCheckConfig;
 }
 /** The native butterfly, calendar-spread and local-vol density report, violations most severe first. */
 export type ArbitrageReport = modelsWire.ArbitrageReport;
@@ -1465,7 +1237,7 @@ export interface CashflowsApi {
 }
 /** covenants: package templates, engine validation and statement covenant compliance. */
 export interface CovenantsApi {
-  /** covenants.covLite, lboStandard, realEstate or projectFinance, by request kind: the Rust package's CovenantSpec objects. */
+  /** covenants.covenantTemplate: the Rust package's CovenantSpec objects. */
   covenantTemplate(
     request: CovenantTemplateRequest,
   ): Promise<Envelope<CovenantSpec[]>>;
@@ -1482,10 +1254,6 @@ export interface CovenantsApi {
 }
 /** scenarios: market scenario construction, application and horizon total return. */
 export interface ScenariosApi {
-  /** scenarios.operationSpecTimeRollForward + parallelBpMany per shift + parseScenarioSpec: canonical ScenarioSpec text. */
-  buildMarketScenario(
-    request: MarketScenarioRequest,
-  ): Promise<Envelope<string>>;
   /** scenarios.scenarioSpecRequiresInstruments + applyScenario (the instrument only when required) + scenarioSpecMutatesInstruments; the shocked market is canonicalized through the market cache. */
   applyMarketScenario(
     request: MarketScenarioApplicationRequest,
@@ -1610,7 +1378,7 @@ export interface CalibrationApi {
 }
 /** models: volatility sampling over core surface handles and rating migration. */
 export interface ModelsApi {
-  /** core.VolCube.fromJson + models.volatility.getCubeNormalVol or getCubeVol, per coordinate. */
+  /** core.VolCube.fromJson + models.volatility.getCubeVol in the request convention, per coordinate. */
   sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;
   /** core.FxDeltaVolSurface.fromJson + models.volatility.getFxDeltaVol, per coordinate. */
   sampleFxDelta(request: FxDeltaSampleRequest): Promise<Envelope<number[]>>;
@@ -1618,7 +1386,7 @@ export interface ModelsApi {
   materializeFxSurface(
     request: FxStrikeSurfaceRequest,
   ): Promise<Envelope<FxStrikeSurface>>;
-  /** core.VolCube.fromJson + models.volatility.materializeCube{Tenor,Expiry}Slice[Normal], as the returned slice's JSON. */
+  /** core.VolCube.fromJson + models.volatility.materializeCube{Tenor,Expiry}Slice in the request convention, as the returned slice's JSON. */
   cubeSlice(request: CubeSliceRequest): Promise<Envelope<CubeSlice>>;
   /** core.VolCube.fromJson + paramsAt/forwardAt + models.volatility.SabrParameters.fromJson + SabrSmile generateSmile, validateNoArbitrage and (when requested) repairArbitrage. */
   cubeSmile(request: CubeSmileRequest): Promise<Envelope<CubeSmile>>;
@@ -1638,7 +1406,7 @@ export interface ModelsApi {
   validateMertonModel(json: string): Promise<Envelope<string>>;
   /** models.credit.mertonReport: the full report in one native call; a measure Rust rejects for the model is null with its message in errors. */
   mertonReport(request: MertonReportRequest): Promise<Envelope<MertonReport>>;
-  /** One models.credit.scoring function over its input ratios in the facade's positional order, then models.credit.pd.MasterScale.defaultCalibration().mapScore of the result (kept as an envelope); the scale handle is freed. */
+  /** One native models.credit.scoring.creditScoreReport: the model's score and its default master-scale grade, both from Rust. */
   creditScore(request: CreditScoreRequest): Promise<Envelope<CreditScore>>;
   /** models.credit.liabilityManagement.analyzeExchangeOffer, including Rust's tender_recommended. */
   analyzeExchangeOffer(
@@ -1652,7 +1420,7 @@ export interface ModelsApi {
   allocateRecovery(
     request: RecoveryWaterfallRequest,
   ): Promise<Envelope<modelsWire.RecoveryWaterfallResult>>;
-  /** models.credit.lgd.workoutLgd: net recovery, LGD and recovery rate. */
+  /** models.credit.lgd.WorkoutLgd.fromJson(model).evaluate(ead): net recovery, LGD and recovery rate; the handle is freed. */
   workoutLgd(
     request: WorkoutLgdRequest,
   ): Promise<Envelope<modelsWire.WorkoutLgdResult>>;
@@ -1662,11 +1430,11 @@ export interface ModelsApi {
   ): Promise<Envelope<SeniorityRecoveryStats>>;
   /** models.credit.lgd.seniorityCalibrationIds: the registry's calibration ids, default first. */
   seniorityCalibrationIds(): Promise<Envelope<string[]>>;
-  /** One closed-form price (bsPrice, black76Price, bachelierPrice) or implied-volatility solve (bsImpliedVol, black76ImpliedVol, models.volatility.impliedVolBachelier) in the facade's positional order, then the model's Greeks at that volatility, kept as an envelope. */
+  /** models.optionCalculation: one closed-form price or implied-volatility solve and the model's Greeks at that volatility. */
   optionCalculator(
     request: OptionCalculatorRequest,
   ): Promise<Envelope<OptionCalculatorResult>>;
-  /** models.factor.risk parametric or historical VaR/ES decomposition, evaluateRiskBudgetFromDecomposition, and buildStressAttribution of a historical source; the budget and stress attribution keep their own native errors. */
+  /** models.factor.risk.positionRiskReport: the parametric or historical VaR/ES decomposition, its risk budget and the stress attribution of a historical source. */
   positionRisk(request: PositionRiskRequest): Promise<Envelope<PositionRisk>>;
   /** models.factor.risk.decomposeFactors: the parametric factor and position risk decomposition of a sensitivity matrix under a factor covariance. */
   decomposeFactors(
@@ -1699,9 +1467,17 @@ export interface StatementsApi {
   traceStatement(
     request: StatementTraceRequest,
   ): Promise<Envelope<DependencyTree>>;
-  /** statements_analytics.runChecks, runThreeStatementChecks or runCreditUnderwritingChecks, by request kind. */
-  runStatementChecks(
-    request: StatementChecksRequest,
+  /** statements.validateCheckSuiteSpecJson + statements_analytics.runChecks. */
+  runChecks(
+    request: StatementSuiteChecksRequest,
+  ): Promise<Envelope<CheckReport>>;
+  /** statements_analytics.runThreeStatementChecks with a ThreeStatementMapping. */
+  runThreeStatementChecks(
+    request: StatementMappingChecksRequest,
+  ): Promise<Envelope<CheckReport>>;
+  /** statements_analytics.runCreditUnderwritingChecks with a CreditMapping. */
+  runCreditUnderwritingChecks(
+    request: StatementMappingChecksRequest,
   ): Promise<Envelope<CheckReport>>;
   /** statements_analytics.evaluateScenarioSet, or evaluateScenarioSetWithMarket to price the capital structure from the market. */
   evaluateStatementScenarios(
@@ -1759,7 +1535,7 @@ export interface StatementsApi {
   relativeValueReport(
     request: RelativeValueReportRequest,
   ): Promise<Envelope<RelativeValueReport>>;
-  /** statements_analytics.parameterSpecWithPercentages per parameter, runSensitivity, then generateTornadoEntries at the target metric and period (skipped for full_grid). */
+  /** statements_analytics.runSensitivity of the request's SensitivityConfig, then generateTornadoEntries at the target metric and period (skipped for full_grid). */
   runSensitivity(
     request: RunSensitivityRequest,
   ): Promise<Envelope<StatementSensitivity>>;

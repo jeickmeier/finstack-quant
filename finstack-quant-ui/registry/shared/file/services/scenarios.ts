@@ -5,8 +5,6 @@ import type { ServiceContext } from "./context";
 export type ScenariosNative = {
   scenarios: Pick<
     typeof scenarios,
-    | "parallelBpMany"
-    | "operationSpecTimeRollForward"
     | "parseScenarioSpec"
     | "scenarioSpecRequiresInstruments"
     | "scenarioSpecMutatesInstruments"
@@ -28,35 +26,6 @@ export function createScenariosService(
 ): ScenariosApi {
   const api = native.scenarios;
   return {
-    buildMarketScenario(request) {
-      return context.result(() => {
-        // Omitted options stay unset so Rust applies its own defaults.
-        const operations = [
-          ...(request.roll
-            ? [
-                api.operationSpecTimeRollForward(
-                  request.roll.period,
-                  undefined,
-                  request.roll.rollMode ?? undefined,
-                ),
-              ]
-            : []),
-          ...request.shifts.flatMap((shift) =>
-            api.parallelBpMany(shift.curveKind, [...shift.curveIds], shift.bp),
-          ),
-        ];
-        const spec = api.parseScenarioSpec(
-          JSON.stringify({
-            id: request.id,
-            operations,
-            ...(request.hazardBumpMode
-              ? { hazard_bump_mode: request.hazardBumpMode }
-              : {}),
-          }),
-        );
-        return JSON.stringify(spec);
-      });
-    },
     applyMarketScenario(request) {
       return context.result(() => {
         const spec = request.scenarioJson;

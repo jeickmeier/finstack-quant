@@ -21,5 +21,4 @@ export interface AltmanZDoublePrimeInputWire {
    * X1: Working Capital / Total Assets.
    */
   working_capital_to_total_assets: number;
-  [k: string]: unknown;
 }

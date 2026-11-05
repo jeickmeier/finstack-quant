@@ -39,7 +39,7 @@
       "type": "object"
     },
     "LmeType": {
-      "description": "Structure of a liability management exercise.\n\nEach variant reinterprets the `repurchase_price_pct` argument of\n[`analyze_lme`]; see that function's documentation for the per-variant\nmeaning and admissible range.",
+      "description": "Structure of a liability management exercise.\n\nEach variant reinterprets the `repurchase_price_pct` field of\n[`LmeTerms`]; see that function's documentation for the per-variant\nmeaning and admissible range.",
       "oneOf": [
         {
           "const": "open_market_repurchase",

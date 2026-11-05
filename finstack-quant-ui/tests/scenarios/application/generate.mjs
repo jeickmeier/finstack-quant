@@ -4,64 +4,44 @@ import { native, readRepoSource } from "../../../scripts/fixture-inputs.mjs";
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
 const bondInput = await readRepoSource(bondPath);
 const base = bondInput.value.request;
-// Builder drafts; blank options are omitted so Rust applies its defaults.
-const drafts = [
+// The ScenarioSpecs the builder writes: curve_parallel_bp and time_roll_forward
+// operations as entered, with every omitted option left to Rust's defaults.
+const shift = (curve_kind, curve_id, bp) => ({
+  kind: "curve_parallel_bp",
+  curve_kind,
+  curve_id,
+  bp,
+});
+const specs = [
   {
     name: "usd-ois-50bp",
-    draft: {
+    spec: {
       id: "usd-ois-50bp",
-      shifts: [{ curveKind: "discount", curveId: "USD-OIS", bp: "50" }],
-      roll: null,
-      hazardBumpMode: "",
+      operations: [shift("discount", "USD-OIS", 50)],
     },
   },
   {
     name: "roll-1m-25bp",
-    draft: {
+    spec: {
       id: "roll-1m-25bp",
-      shifts: [{ curveKind: "discount", curveId: "USD-OIS", bp: "25" }],
-      roll: { period: "1M", rollMode: "" },
-      hazardBumpMode: "",
+      operations: [
+        { kind: "time_roll_forward", period: "1M" },
+        shift("discount", "USD-OIS", 25),
+      ],
     },
   },
   {
     name: "hz-par-cds-25bp",
-    draft: {
+    spec: {
       id: "hz-par-cds-25bp",
-      shifts: [{ curveKind: "par_cds", curveId: "HZ", bp: "25" }],
-      roll: null,
-      hazardBumpMode: "first_order_shift",
+      operations: [shift("par_cds", "HZ", 25)],
+      hazard_bump_mode: "first_order_shift",
     },
   },
 ];
-// The worker's ScenariosApi: buildMarketScenario, then applyMarketScenario.
-function build(draft) {
-  const operations = [
-    ...(draft.roll
-      ? [
-          native.operationSpecTimeRollForward(
-            draft.roll.period,
-            undefined,
-            draft.roll.rollMode || undefined,
-          ),
-        ]
-      : []),
-    ...draft.shifts.flatMap((shift) =>
-      native.parallelBpMany(shift.curveKind, [shift.curveId], Number(shift.bp)),
-    ),
-  ];
-  return JSON.stringify(
-    native.parseScenarioSpec(
-      JSON.stringify({
-        id: draft.id,
-        operations,
-        ...(draft.hazardBumpMode
-          ? { hazard_bump_mode: draft.hazardBumpMode }
-          : {}),
-      }),
-    ),
-  );
-}
+// The worker's ScenariosApi: validateScenarioSpec, then applyMarketScenario.
+const canonical = (spec) =>
+  JSON.stringify(native.parseScenarioSpec(JSON.stringify(spec)));
 function apply(scenarioJson) {
   const applied = native.applyScenario(
     scenarioJson,
@@ -88,8 +68,8 @@ function apply(scenarioJson) {
       : base.instrumentJson,
   };
 }
-const cases = drafts.map(({ name, draft }) => {
-  const scenarioJson = build(draft);
+const cases = specs.map(({ name, spec }) => {
+  const scenarioJson = canonical(spec);
   const { report, marketJson, asOf, instrumentJson } = apply(scenarioJson);
   const shocked = native.priceInstrument(
     instrumentJson,
@@ -102,7 +82,7 @@ const cases = drafts.map(({ name, draft }) => {
   );
   return {
     name,
-    draft,
+    spec,
     scenarioJson,
     report,
     asOf,
@@ -114,7 +94,7 @@ await emit(
   new URL("cases.json", import.meta.url),
   JSON.stringify({
     description:
-      "Native market scenarios on the results-fixture bond: the Rust-built spec, the applyScenario report and the bond repriced with the same model and metrics on the shocked market at the returned valuation date. The shocked market itself is not stored.",
+      "Native market scenarios on the results-fixture bond: the ScenarioSpec as written and its canonical form from parseScenarioSpec, the applyScenario report and the bond repriced with the same model and metrics on the shocked market at the returned valuation date. The shocked market itself is not stored.",
     sources: [bondInput.source],
     base: { asOf: base.asOf, value: bondInput.value.result.value },
     cases,

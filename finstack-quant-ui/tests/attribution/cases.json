@@ -11,7 +11,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
-      "sha256": "0965801897de2d912a19e63fe99d6c5762228de10c586fa51ef5ea3b2e524c22"
+      "sha256": "c16e96d42ea3b6948ac8f1da5ab220788f0cd0dc9cafcf392ad6168400ce17c0"
     }
   ],
   "cases": [

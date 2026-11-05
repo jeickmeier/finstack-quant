@@ -61,7 +61,13 @@ const INFINITE_RATIOS = ['payoff_ratio', 'profit_factor', 'cpc_ratio'];
  *   plain JS object, matching Python's `PeriodStats` getters).
  */
 function periodStats(dates, returns) {
-  const perf = analytics.Performance.fromReturns(dates, [returns], ['FUND'], null, 'daily');
+  const perf = new analytics.Performance({
+    dates,
+    series: [returns],
+    kind: 'returns',
+    ticker_names: ['FUND'],
+    frequency: 'daily',
+  });
   return perf.periodStats(0, 'monthly');
 }
 

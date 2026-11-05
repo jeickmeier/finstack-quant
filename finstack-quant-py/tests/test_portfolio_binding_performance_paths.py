@@ -9,11 +9,7 @@ import numpy as np
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
-from finstack_quant.models.factor.risk import (
-    build_stress_attribution,
-    historical_var_decomposition,
-    parametric_var_decomposition,
-)
+from finstack_quant.models.factor.risk import build_stress_attribution
 from finstack_quant.portfolio import (
     Portfolio,
     PortfolioValuation,
@@ -136,24 +132,6 @@ def test_scenario_pnl_batch_matches_standalone_and_accepts_json_or_typed_inputs(
         scenario_pnl_batch(portfolio, "{}", market)
 
 
-@pytest.mark.parametrize(
-    "covariance",
-    [
-        np.asarray([[0.04, 0.01], [0.01, 0.09]], dtype=np.float64),
-        np.asfortranarray([[0.04, 0.01], [0.01, 0.09]], dtype=np.float64),
-    ],
-)
-def test_numpy_covariance_matches_nested_lists(covariance: np.ndarray) -> None:
-    position_ids = ["A", "B"]
-    weights = [0.4, 0.6]
-    nested = covariance.tolist()
-
-    numpy_result = parametric_var_decomposition(position_ids, weights, covariance)
-    list_result = parametric_var_decomposition(position_ids, weights, nested)
-
-    assert numpy_result.to_json() == list_result.to_json()
-
-
 def test_numpy_position_pnls_match_nested_lists() -> None:
     position_ids = ["A", "B"]
     position_pnls = np.asarray(
@@ -165,25 +143,15 @@ def test_numpy_position_pnls_match_nested_lists() -> None:
     )
     nested = position_pnls.tolist()
 
-    numpy_result = historical_var_decomposition(position_ids, position_pnls)
-    list_result = historical_var_decomposition(position_ids, nested)
     stress_numpy = build_stress_attribution(position_ids, position_pnls)
     stress_list = build_stress_attribution(position_ids, nested)
 
-    assert numpy_result.to_json() == list_result.to_json()
     assert stress_numpy.to_json() == stress_list.to_json()
 
 
 def test_numpy_inputs_reject_wrong_shapes() -> None:
-    with pytest.raises(ValueError, match="covariance must have 2 rows"):
-        parametric_var_decomposition(
-            ["A", "B"],
-            [0.4, 0.6],
-            np.ones((3, 3), dtype=np.float64),
-        )
-
     with pytest.raises(ValueError, match="position_pnls must have 2 rows, got 3"):
-        historical_var_decomposition(
+        build_stress_attribution(
             ["A", "B"],
             np.ones((3, 10), dtype=np.float64),
         )

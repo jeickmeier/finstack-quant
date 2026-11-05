@@ -22,6 +22,7 @@ export type StatementSensitivitySubmission = Omit<
   RunSensitivityRequest,
   "modelJson"
 >;
+type Mode = RunSensitivityRequest["config"]["mode"];
 /** One parameter row as the caller seeds it; the base value is always read from the evaluated result. */
 export interface StatementSensitivityParameter {
   nodeId: string;
@@ -89,8 +90,8 @@ export interface StatementSensitivityProps {
 /**
  * Edits a native sensitivity run of a statement model: the SensitivityMode,
  * the target metric and period, and each varied node and period with its
- * percentage moves (statements_analytics.parameterSpecWithPercentages, base
- * value read from the evaluated cell). Presents the native tornado through
+ * percentage moves (the Rust ParameterSpec pct_range, base value read from
+ * the evaluated cell). Presents the native tornado through
  * TornadoChart and the target metric in every returned scenario, in Rust's
  * order. Nothing is calculated here.
  */
@@ -133,15 +134,19 @@ export function StatementSensitivity({
   const submit = () => {
     setShown({ targetMetric, period });
     onSubmit({
-      mode,
+      config: {
+        // The mode is an EnumField value of the generated SensitivityMode; Rust rejects any other.
+        mode: mode as Mode,
+        parameters: rows.map((row) => ({
+          node_id: row.nodeId,
+          period_id: row.periodId,
+          base_value: evaluatedNumber(result, row.nodeId, row.periodId),
+          pct_range: moves(row.moves),
+        })),
+        target_metrics: [targetMetric],
+      },
       targetMetric,
       period,
-      parameters: rows.map((row) => ({
-        nodeId: row.nodeId,
-        periodId: row.periodId,
-        baseValue: evaluatedNumber(result, row.nodeId, row.periodId),
-        pctRange: moves(row.moves),
-      })),
     });
   };
   const periodOptions = periods.map((id) => ({ value: id, label: id }));

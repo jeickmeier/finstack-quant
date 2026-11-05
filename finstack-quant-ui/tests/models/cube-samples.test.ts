@@ -39,12 +39,7 @@ function direct(r: CubeSampleRequest) {
   const handle = native.VolCube.fromJson(serializeHost(r.cube));
   try {
     return r.coordinates.map((p) =>
-      (r.convention === "normal" ? native.getCubeNormalVol : native.getCubeVol)(
-        handle,
-        p.expiry,
-        p.tenor,
-        p.strike,
-      ),
+      native.getCubeVol(handle, p.expiry, p.tenor, p.strike, r.convention),
     );
   } finally {
     handle.free();
@@ -66,7 +61,7 @@ it("matches both checked evaluators for absent/present shifts and complete state
   const before = await resources();
   const variants: CubeSampleRequest[] = [];
   for (const cube of cubes)
-    for (const convention of ["normal", "black_lognormal"] as const)
+    for (const convention of ["normal", "lognormal"] as const)
       variants.push(request(cube, convention));
   const normal = cubes.find((c) => c.id !== "SHIFTED-BLACK")!;
   for (const field of ["alpha", "beta", "rho", "nu", "shift"] as const) {

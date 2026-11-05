@@ -660,7 +660,7 @@ test('statementResultToTableLong/Wide export the Rust table envelopes', () => {
   );
 });
 
-test('scenarioComparisonTable and parameterSpecWithPercentages run the Rust helpers', () => {
+test('scenarioComparisonTable and percentage sensitivity parameters run the Rust helpers', () => {
   const results = statements_analytics.evaluateScenarioSet(MODEL, {
     scenarios: {
       low: { parent: null, period_overrides: {}, overrides: { revenue: 1.0 } },
@@ -674,16 +674,34 @@ test('scenarioComparisonTable and parameterSpecWithPercentages run the Rust help
   assert.deepEqual(frac.data, { type: 'nullable_float64', values: [3] });
   assert.throws(() => statements_analytics.scenarioComparisonTable(results, []));
 
-  const spec = statements_analytics.parameterSpecWithPercentages(
-    'revenue',
-    '2025Q1',
-    100000,
-    [-10, 0, 10]
-  );
-  assert.equal(spec.node_id, 'revenue');
+  // Rust ParameterSpec deserialization turns `pct_range` into absolute shocks.
+  const sensitivity = statements_analytics.runSensitivity(MODEL, {
+    mode: 'diagonal',
+    parameters: [
+      { node_id: 'revenue', period_id: '2025Q1', base_value: 100000, pct_range: [-10, 0, 10] },
+    ],
+    target_metrics: ['revenue'],
+  });
   assert.deepEqual(
-    spec.perturbations.map((v) => Math.round(v)),
+    sensitivity.config.parameters[0].perturbations.map((v) => Math.round(v)),
     [90000, 100000, 110000]
+  );
+  assert.throws(
+    () =>
+      statements_analytics.runSensitivity(MODEL, {
+        mode: 'diagonal',
+        parameters: [
+          {
+            node_id: 'revenue',
+            period_id: '2025Q1',
+            base_value: 100000,
+            perturbations: [90000],
+            pct_range: [-10],
+          },
+        ],
+        target_metrics: ['revenue'],
+      }),
+    (e) => e.kind === 'validation'
   );
 });
 

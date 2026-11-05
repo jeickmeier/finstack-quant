@@ -654,11 +654,12 @@ fn swaption_cube_expiry_clock_is_independent_of_fixed_leg_day_count() {
         let context = calibrate_flat_normal_cube(fixed_day_count, 5);
         let cube = context.get_vol_cube("DATED-NORMAL").expect("normal cube");
         for (days, quoted) in [(180.0, 0.005), (360.0, 0.02)] {
-            let volatility = finstack_quant_models::volatility::get_cube_normal_vol(
+            let volatility = finstack_quant_models::volatility::get_cube_vol(
                 &cube,
                 days / 365.0,
                 5.0,
                 0.05,
+                finstack_quant_models::volatility::VolatilityConvention::Normal,
             )
             .expect("lookup on the swaption pricer's ACT/365F clock");
             assert!(

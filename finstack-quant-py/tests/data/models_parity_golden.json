@@ -1322,6 +1322,29 @@
       "model": "Zmijewski Probit (1984)",
       "score": -1.1482500000000002,
       "zone": "grey"
+    },
+    {
+      "result": {
+        "score": -1.1482500000000002,
+        "zone": "grey",
+        "implied_pd": 0.1254326868135372,
+        "model": "Zmijewski Probit (1984)"
+      },
+      "grade": {
+        "grade": "CCC",
+        "central_pd": 0.12,
+        "input_pd": 0.1254326868135372,
+        "grade_index": 6
+      }
+    },
+    {
+      "result": {
+        "score": 2.895,
+        "zone": "grey",
+        "implied_pd": null,
+        "model": "Altman Z-Score (1968)"
+      },
+      "grade": null
     }
   ],
   "toggle.should_pik": [

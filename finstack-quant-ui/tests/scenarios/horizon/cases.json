@@ -12,20 +12,20 @@
   "cases": [
     {
       "name": "roll-3m-50bp",
-      "draft": {
+      "spec": {
         "id": "roll-3m-50bp",
-        "shifts": [
+        "operations": [
           {
-            "curveKind": "discount",
-            "curveId": "USD-OIS",
-            "bp": "50"
+            "kind": "time_roll_forward",
+            "period": "3M"
+          },
+          {
+            "kind": "curve_parallel_bp",
+            "curve_kind": "discount",
+            "curve_id": "USD-OIS",
+            "bp": 50
           }
-        ],
-        "roll": {
-          "period": "3M",
-          "rollMode": ""
-        },
-        "hazardBumpMode": ""
+        ]
       },
       "scenarioJson": "{\"id\":\"roll-3m-50bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"time_roll_forward\",\"period\":\"3M\",\"apply_shocks\":true,\"roll_mode\":\"business_days\"},{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":50}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
       "method": null,
@@ -347,17 +347,16 @@
     },
     {
       "name": "usd-ois-50bp",
-      "draft": {
+      "spec": {
         "id": "usd-ois-50bp",
-        "shifts": [
+        "operations": [
           {
-            "curveKind": "discount",
-            "curveId": "USD-OIS",
-            "bp": "50"
+            "kind": "curve_parallel_bp",
+            "curve_kind": "discount",
+            "curve_id": "USD-OIS",
+            "bp": 50
           }
-        ],
-        "roll": null,
-        "hazardBumpMode": ""
+        ]
       },
       "scenarioJson": "{\"id\":\"usd-ois-50bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":50}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
       "method": null,
@@ -660,20 +659,20 @@
     },
     {
       "name": "roll-3m-50bp-taylor",
-      "draft": {
+      "spec": {
         "id": "roll-3m-50bp",
-        "shifts": [
+        "operations": [
           {
-            "curveKind": "discount",
-            "curveId": "USD-OIS",
-            "bp": "50"
+            "kind": "time_roll_forward",
+            "period": "3M"
+          },
+          {
+            "kind": "curve_parallel_bp",
+            "curve_kind": "discount",
+            "curve_id": "USD-OIS",
+            "bp": 50
           }
-        ],
-        "roll": {
-          "period": "3M",
-          "rollMode": ""
-        },
-        "hazardBumpMode": ""
+        ]
       },
       "scenarioJson": "{\"id\":\"roll-3m-50bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"time_roll_forward\",\"period\":\"3M\",\"apply_shocks\":true,\"roll_mode\":\"business_days\"},{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":50}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
       "method": {
@@ -1105,20 +1104,20 @@
     },
     {
       "name": "roll-3m-50bp-metrics-based",
-      "draft": {
+      "spec": {
         "id": "roll-3m-50bp",
-        "shifts": [
+        "operations": [
           {
-            "curveKind": "discount",
-            "curveId": "USD-OIS",
-            "bp": "50"
+            "kind": "time_roll_forward",
+            "period": "3M"
+          },
+          {
+            "kind": "curve_parallel_bp",
+            "curve_kind": "discount",
+            "curve_id": "USD-OIS",
+            "bp": 50
           }
-        ],
-        "roll": {
-          "period": "3M",
-          "rollMode": ""
-        },
-        "hazardBumpMode": ""
+        ]
       },
       "scenarioJson": "{\"id\":\"roll-3m-50bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"time_roll_forward\",\"period\":\"3M\",\"apply_shocks\":true,\"roll_mode\":\"business_days\"},{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":50}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
       "method": "metrics_based",

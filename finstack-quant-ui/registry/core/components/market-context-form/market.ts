@@ -9,11 +9,17 @@ export const marketModule = {
   codec: createWireCodec(schema),
   example: schema.examples[0],
 };
-/** Extract only the published final_market field, preserving all JSON number tokens. */
-export function importMarket(text: string): Record<string, unknown> {
+/** Parse MarketContextState JSON through the generated contract, preserving all JSON number tokens. */
+export function parseMarket(text: string): Record<string, unknown> {
+  return marketModule.codec.parse(text) as Record<string, unknown>;
+}
+/** Parse the `result.final_market` of a calibration result envelope, preserving all JSON number tokens. */
+export function calibratedMarket(text: string): Record<string, unknown> {
   const value = parse(text) as { result?: { final_market?: unknown } } | null;
   const market = value?.result?.final_market;
-  return marketModule.codec.parse(
-    market === undefined ? text : stringify(market)!,
-  ) as Record<string, unknown>;
+  if (market === undefined)
+    throw new TypeError(
+      "Not a calibration result: result.final_market is missing",
+    );
+  return parseMarket(stringify(market)!);
 }

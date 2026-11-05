@@ -67,13 +67,7 @@ beforeEach(() => {
       case "statementResultToTableLong":
         return native.statementResultToTableLong(arg);
       case "wacc":
-        return native.wacc(
-          arg.equityWeight,
-          arg.costOfEquity,
-          arg.debtWeight,
-          arg.costOfDebt,
-          arg.taxRate,
-        );
+        return native.wacc(arg);
       case "evaluateStatement":
         return new native.Evaluator().evaluate(arg.modelJson);
       case "validateStatementFormula":
@@ -139,21 +133,7 @@ beforeEach(() => {
           arg.configJson,
         );
       case "runSensitivity": {
-        const result = native.runSensitivity(
-          arg.modelJson,
-          JSON.stringify({
-            mode: arg.mode,
-            parameters: arg.parameters.map((parameter: any) =>
-              native.parameterSpecWithPercentages(
-                parameter.nodeId,
-                parameter.periodId,
-                parameter.baseValue,
-                parameter.pctRange,
-              ),
-            ),
-            target_metrics: [arg.targetMetric],
-          }),
-        );
+        const result = native.runSensitivity(arg.modelJson, arg.config);
         return {
           result,
           tornado: native.generateTornadoEntries(
@@ -195,7 +175,7 @@ beforeEach(() => {
           ) ?? null
         );
       case "covenantTemplate":
-        return native.covLite(arg.maxLeverage, arg.maxSeniorLeverage);
+        return native.covenantTemplate(arg);
       case "validateCovenantEngine":
         return native.validateCovenantEngineJson(arg);
       case "evaluateCovenants": {
@@ -782,11 +762,11 @@ it("sets the DCF WACC from the native calculator only on the user's click", asyn
   const calculator = screen.getByRole("region", { name: "WACC calculator" });
   const { inputs, rate } = waccCases.cases.blended;
   for (const [name, value] of [
-    ["Equity weight", inputs.equityWeight],
-    ["Cost of equity", inputs.costOfEquity],
-    ["Debt weight", inputs.debtWeight],
-    ["Cost of debt", inputs.costOfDebt],
-    ["Tax rate", inputs.taxRate],
+    ["Equity weight", inputs.equity_weight],
+    ["Cost of equity", inputs.cost_of_equity],
+    ["Debt weight", inputs.debt_weight],
+    ["Cost of debt", inputs.cost_of_debt],
+    ["Tax rate", inputs.tax_rate],
   ] as const)
     fireEvent.change(within(calculator).getByRole("textbox", { name }), {
       target: { value: String(value) },
@@ -917,17 +897,20 @@ it("runs a native sensitivity and applies a goal-seek solution only on explicit 
   const evaluated = new native.Evaluator().evaluate(modelJson);
   expect(lastCall("runSensitivity")).toEqual({
     modelJson,
-    mode: "diagonal",
+    config: {
+      mode: "diagonal",
+      parameters: [
+        {
+          node_id: "revenue",
+          period_id: "2025Q4",
+          base_value: evaluated.nodes.revenue["2025Q4"],
+          pct_range: [-10, 10],
+        },
+      ],
+      target_metrics: ["ebitda"],
+    },
     targetMetric: "ebitda",
     period: "2025Q4",
-    parameters: [
-      {
-        nodeId: "revenue",
-        periodId: "2025Q4",
-        baseValue: evaluated.nodes.revenue["2025Q4"],
-        pctRange: [-10, 10],
-      },
-    ],
   });
   expect(
     await within(sensitivity).findByRole("table", {
@@ -1177,13 +1160,15 @@ it("tests the host covenant engine on open in the Covenants tab and returns Rust
     await within(breaches).findByText("Rust forecast no breaches"),
   ).toBeTruthy();
   const templates = within(
-    screen.getByRole("form", { name: "Covenant package templates" }),
+    screen.getByRole("region", { name: "Covenant package templates" }),
   );
+  await userEvent.click(templates.getByRole("radio", { name: /^Cov lite/ }));
   await userEvent.type(templates.getByLabelText("Max leverage"), "5");
   await userEvent.type(templates.getByLabelText("Max senior leverage"), "3");
-  await userEvent.click(
-    templates.getByRole("button", { name: "Load template" }),
-  );
+  const load = templates.getByRole("button", { name: "Load template" });
+  // The template form enables Load template once its validation settles.
+  await waitFor(() => expect(load.hasAttribute("disabled")).toBe(false));
+  await userEvent.click(load);
   await waitFor(() =>
     expect(
       within(

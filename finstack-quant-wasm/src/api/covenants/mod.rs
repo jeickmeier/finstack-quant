@@ -9,7 +9,7 @@ pub mod engine;
 pub mod forecast;
 pub mod spec;
 
-use crate::utils::input::{js_f64, js_string, json_text};
+use crate::utils::input::{js_string, json_text};
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
@@ -84,111 +84,4 @@ pub fn evaluate_engine(
     let reports = finstack_quant_covenants::evaluate_engine(engine_json, metrics_json, as_of)
         .map_err(to_js_err)?;
     crate::utils::to_js_value(&reports)
-}
-
-/// Standard leveraged-buyout covenant package as JSON.
-/// @param initial_leverage - Maximum debt-to-EBITDA threshold in turns (`5.0` = 5.0x), applied at every quarterly test date.
-/// @param interest_coverage - Minimum EBIT-to-interest coverage ratio in turns.
-/// @param fixed_charge_coverage - Minimum fixed-charge-coverage threshold in turns, tested against the caller-supplied `fixed_charge_coverage` metric.
-/// @param max_capex - Maximum annual capital expenditure amount in the caller's reporting currency.
-/// @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if any threshold is `NaN`, infinite or
-/// negative, or if the generated covenant package cannot be serialized to
-/// JSON.
-#[wasm_bindgen(js_name = lboStandardJson)]
-pub fn lbo_standard_json(
-    initial_leverage: JsValue,
-    interest_coverage: JsValue,
-    fixed_charge_coverage: JsValue,
-    max_capex: JsValue,
-) -> Result<String, JsValue> {
-    let initial_leverage = js_f64(&initial_leverage, "initialLeverage")?;
-    let interest_coverage = js_f64(&interest_coverage, "interestCoverage")?;
-    let fixed_charge_coverage = js_f64(&fixed_charge_coverage, "fixedChargeCoverage")?;
-    let max_capex = js_f64(&max_capex, "maxCapex")?;
-    finstack_quant_covenants::lbo_standard_json(
-        initial_leverage,
-        interest_coverage,
-        fixed_charge_coverage,
-        max_capex,
-    )
-    .map_err(to_js_err)
-}
-
-/// Covenant-lite package as JSON.
-/// @param max_leverage - Maximum total debt-to-EBITDA leverage ratio.
-/// @param max_senior_leverage - Maximum senior-debt-to-EBITDA leverage ratio.
-/// @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if any threshold is `NaN`, infinite or
-/// negative, or if the generated covenant package cannot be serialized to
-/// JSON.
-#[wasm_bindgen(js_name = covLiteJson)]
-pub fn cov_lite_json(
-    max_leverage: JsValue,
-    max_senior_leverage: JsValue,
-) -> Result<String, JsValue> {
-    let max_leverage = js_f64(&max_leverage, "maxLeverage")?;
-    let max_senior_leverage = js_f64(&max_senior_leverage, "maxSeniorLeverage")?;
-    finstack_quant_covenants::cov_lite_json(max_leverage, max_senior_leverage).map_err(to_js_err)
-}
-
-/// Real-estate covenant package as JSON.
-/// @param min_dscr - Minimum debt-service coverage ratio.
-/// @param min_debt_yield - Minimum net-operating-income debt yield expressed as a decimal.
-/// @param max_ltv - Maximum loan-to-value ratio expressed as a decimal.
-/// @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if any threshold is `NaN`, infinite or
-/// negative, or if the generated covenant package cannot be serialized to
-/// JSON.
-#[wasm_bindgen(js_name = realEstateJson)]
-pub fn real_estate_json(
-    min_dscr: JsValue,
-    min_debt_yield: JsValue,
-    max_ltv: JsValue,
-) -> Result<String, JsValue> {
-    let min_dscr = js_f64(&min_dscr, "minDscr")?;
-    let min_debt_yield = js_f64(&min_debt_yield, "minDebtYield")?;
-    let max_ltv = js_f64(&max_ltv, "maxLtv")?;
-    finstack_quant_covenants::real_estate_json(min_dscr, min_debt_yield, max_ltv).map_err(to_js_err)
-}
-
-/// Project-finance covenant package as JSON.
-/// @param min_dscr - Minimum debt-service coverage ratio.
-/// @param distribution_lockup_dscr - DSCR threshold below which borrower distributions are locked up.
-/// @param min_liquidity - Minimum required liquidity reserve in the model's monetary units.
-/// @param max_net_leverage - Maximum net-debt-to-EBITDA leverage ratio.
-/// @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if any threshold is `NaN`, infinite or
-/// negative, or if the generated covenant package cannot be serialized to
-/// JSON.
-#[wasm_bindgen(js_name = projectFinanceJson)]
-pub fn project_finance_json(
-    min_dscr: JsValue,
-    distribution_lockup_dscr: JsValue,
-    min_liquidity: JsValue,
-    max_net_leverage: JsValue,
-) -> Result<String, JsValue> {
-    let min_dscr = js_f64(&min_dscr, "minDscr")?;
-    let distribution_lockup_dscr = js_f64(&distribution_lockup_dscr, "distributionLockupDscr")?;
-    let min_liquidity = js_f64(&min_liquidity, "minLiquidity")?;
-    let max_net_leverage = js_f64(&max_net_leverage, "maxNetLeverage")?;
-    finstack_quant_covenants::project_finance_json(
-        min_dscr,
-        distribution_lockup_dscr,
-        min_liquidity,
-        max_net_leverage,
-    )
-    .map_err(to_js_err)
 }

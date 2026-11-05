@@ -25,8 +25,8 @@ pub use comps::{
 };
 
 use crate::utils::input::{
-    js_bool, js_f64, js_f64_seq, js_opt_f64, js_opt_string, js_string, js_string_seq, json_text,
-    opt_json_text,
+    from_js_json, js_bool, js_f64, js_f64_seq, js_opt_f64, js_opt_string, js_string, js_string_seq,
+    json_text, opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::types::FinancialModelSpec;
@@ -59,7 +59,7 @@ pub(super) fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue
 /// evaluation cells, missing model nodes or periods, model-evaluation failures,
 /// or failure to serialize the sensitivity result to JavaScript.
 /// @param model_json - Financial-model specification JSON.
-/// @param config_json - Configuration JSON for this call.
+/// @param config_json - `SensitivityConfig` object or JSON text: `mode` (`diagonal`, `full_grid` or `tornado`), `parameters` (each `node_id`, `period_id`, `base_value` and exactly one of absolute `perturbations` or `pct_range` percentage moves of `base_value`, `10` meaning +10%) and `target_metrics`.
 #[wasm_bindgen(js_name = runSensitivity)]
 pub fn run_sensitivity(model_json: JsValue, config_json: JsValue) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
@@ -219,44 +219,6 @@ pub fn scenario_comparison_table(
     let metrics = js_string_seq(&metrics, "metrics")?;
     let metrics: Vec<&str> = metrics.iter().map(String::as_str).collect();
     to_js_value(&results.to_comparison_table(&metrics).map_err(to_js_err)?)
-}
-
-/// Sensitivity parameter whose perturbations are percentage moves of a base value.
-///
-/// Free-function twin of Python `ParameterSpec.with_percentages` (Rust
-/// `ParameterSpec::with_percentages`): each perturbation is
-/// `baseValue * (1 + pct / 100)`.
-/// @param node_id - Node identifier to vary.
-/// @param period_id - Period to vary, e.g. `"2025Q1"`.
-/// @param base_value - Finite base value of the node in its own units.
-/// @param pct_range - Percentage moves, e.g. `[-10, 0, 10]` for ±10%.
-/// @returns Plain `ParameterSpec` object (`node_id`, `period_id`, `base_value`, absolute `perturbations`) for a `SensitivityConfig`.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if `periodId` is not a valid period, if
-/// `baseValue` or a percentage is not finite (`NaN` or infinite), or if a
-/// converted shock overflows, and kind `invalid_type` if a number argument is
-/// not a number.
-#[wasm_bindgen(js_name = parameterSpecWithPercentages)]
-pub fn parameter_spec_with_percentages(
-    node_id: JsValue,
-    period_id: JsValue,
-    base_value: JsValue,
-    pct_range: JsValue,
-) -> Result<JsValue, JsValue> {
-    let period_id: finstack_quant_core::dates::PeriodId = js_string(&period_id, "periodId")?
-        .parse()
-        .map_err(to_js_err)?;
-    to_js_value(
-        &finstack_quant_statements_analytics::analysis::ParameterSpec::with_percentages(
-            js_string(&node_id, "nodeId")?,
-            period_id,
-            js_f64(&base_value, "baseValue")?,
-            js_f64_seq(&pct_range, "pctRange")?,
-        )
-        .map_err(to_js_err)?,
-    )
 }
 
 /// Compute forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE).
@@ -419,39 +381,20 @@ pub fn evaluate_lbo(model_json: JsValue, config_json: JsValue) -> Result<JsValue
 
 /// Weighted-average cost of capital (WACC).
 ///
-/// Blends the required return on equity with the after-tax cost of debt:
 /// `WACC = w_E * r_E + w_D * r_D * (1 - T)`.
 ///
 /// # Errors
 ///
-/// Rejects any non-finite input, negative capital weights, weights that do not
-/// sum to one within tolerance, or a `tax_rate` outside `[0, 1]`.
-/// @param equity_weight - Equity share of total capital as a decimal fraction (0.6 = 60% equity-funded).
-/// @param cost_of_equity - Required return on equity in decimal form, typically from CAPM (0.115 = 11.5%).
-/// @param debt_weight - Debt share of total capital as a decimal fraction; must sum with the equity weight to 1.0.
-/// @param cost_of_debt - Pre-tax marginal borrowing yield in decimal form, before the interest tax shield (0.06 = 6%).
-/// @param tax_rate - Marginal corporate tax rate as a decimal fraction in [0, 1] (0.25 = 25%).
+/// Rejects malformed inputs, any non-finite value, negative capital weights,
+/// weights that do not sum to one within tolerance, or a `tax_rate` outside
+/// `[0, 1]`.
+/// @param inputs - `WaccInputs` object or JSON text: `equity_weight` and `debt_weight` (decimal fractions of total capital summing to 1.0), `cost_of_equity` and pre-tax `cost_of_debt` (decimals, `0.06` = 6%) and `tax_rate` (decimal in [0, 1]).
+/// @returns The blended discount rate as a decimal fraction.
 #[wasm_bindgen(js_name = wacc)]
-pub fn wacc(
-    equity_weight: JsValue,
-    cost_of_equity: JsValue,
-    debt_weight: JsValue,
-    cost_of_debt: JsValue,
-    tax_rate: JsValue,
-) -> Result<f64, JsValue> {
-    let equity_weight = js_f64(&equity_weight, "equityWeight")?;
-    let cost_of_equity = js_f64(&cost_of_equity, "costOfEquity")?;
-    let debt_weight = js_f64(&debt_weight, "debtWeight")?;
-    let cost_of_debt = js_f64(&cost_of_debt, "costOfDebt")?;
-    let tax_rate = js_f64(&tax_rate, "taxRate")?;
-    finstack_quant_statements_analytics::analysis::wacc(
-        equity_weight,
-        cost_of_equity,
-        debt_weight,
-        cost_of_debt,
-        tax_rate,
-    )
-    .map_err(to_js_err)
+pub fn wacc(inputs: JsValue) -> Result<f64, JsValue> {
+    let inputs: finstack_quant_statements_analytics::analysis::WaccInputs =
+        from_js_json(&inputs, "inputs")?;
+    finstack_quant_statements_analytics::analysis::wacc(&inputs).map_err(to_js_err)
 }
 
 /// Find the driver value that makes a target node reach a target value.

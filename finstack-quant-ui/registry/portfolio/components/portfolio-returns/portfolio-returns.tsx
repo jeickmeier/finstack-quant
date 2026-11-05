@@ -1,6 +1,7 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import type { portfolio } from "finstack-quant-wasm/types";
+import type { TwrrLinkedRequest } from "@/workers/finstack-contract";
 import { Button } from "@/components/ui/button";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
@@ -17,17 +18,10 @@ export type LinkedReturn = portfolio.LinkedReturn;
 export type TwrrPeriod = portfolio.TwrrPeriod;
 /** A dated flow from the investor's cash account: a contribution is negative, distributions and the terminal value positive. */
 export type DatedCashflow = portfolio.DatedCashflow;
-/** Sub-period returns and the horizon they cover, as twrrLinked takes them. */
-export interface LinkedReturnInput {
-  /** Sequential sub-period returns as decimal fractions (0.02 is 2%); each must be finite and above -1. */
-  readonly returns: readonly number[];
-  /** Full elapsed horizon in 365-day calendar years, for example whole days / 365; below one Rust does not annualise. */
-  readonly horizonYears: number;
-}
 /** The host's starting data for the three forms; each form edits its own copy. Nothing is defaulted. */
 export interface PortfolioReturnsInputs {
   /** Sub-period returns to link and their horizon. */
-  readonly linked: LinkedReturnInput;
+  readonly linked: TwrrLinkedRequest;
   /** One period's beginning and ending values and its flows, each weighted by the fraction of the period remaining after it. */
   readonly dietz: TwrrPeriod;
   /** Dated investor flows, in any order; Rust sorts them and nets equal dates. */
@@ -45,7 +39,7 @@ export interface PortfolioReturnsProps {
   /** The host's returns, period and flows the forms start from. */
   defaultInputs: PortfolioReturnsInputs;
   /** Called with the entered returns and horizon, for portfolio.twrrLinked. */
-  onSubmitLinked(input: LinkedReturnInput): void;
+  onSubmitLinked(input: TwrrLinkedRequest): void;
   /** Called with the entered period, for portfolio.twrrModifiedDietz. */
   onSubmitDietz(period: TwrrPeriod): void;
   /** Called with the entered flows in the order entered, for portfolio.mwrXirr. */

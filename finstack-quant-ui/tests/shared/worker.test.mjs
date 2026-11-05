@@ -121,7 +121,6 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "evaluateCovenants",
     "forecastBreaches",
     // ScenariosApi
-    "buildMarketScenario",
     "applyMarketScenario",
     "horizonReturn",
     "validateScenarioSpec",
@@ -191,7 +190,9 @@ it("exposes exactly initialize plus every crate slice's methods", async () => {
     "evaluateStatement",
     "explainStatement",
     "traceStatement",
-    "runStatementChecks",
+    "runChecks",
+    "runThreeStatementChecks",
+    "runCreditUnderwritingChecks",
     "evaluateStatementScenarios",
     "diffStatementScenarios",
     "traceStatementScenario",

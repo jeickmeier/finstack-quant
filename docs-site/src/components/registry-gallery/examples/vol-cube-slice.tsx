@@ -11,7 +11,7 @@ export function Example({ width = 880 }: ExampleProps) {
       initialConvention="normal"
       initialRate={0.04}
       repairIterations={10}
-      colorDomains={{ normal: [0.003, 0.012], black_lognormal: [0.1, 0.7] }}
+      colorDomains={{ normal: [0.003, 0.012], lognormal: [0.1, 0.7] }}
       width={width}
       height={360}
     />

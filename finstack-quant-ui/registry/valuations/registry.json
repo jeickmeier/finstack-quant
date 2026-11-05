@@ -1176,7 +1176,6 @@
         "@finstack/finstack-codec",
         "@finstack/market-scenario-builder",
         "@finstack/market-scenario-report",
-        "@finstack/use-market-scenario",
         "@finstack/use-scenario-spec-validator",
         "@finstack/use-list-builtin-template-metadata",
         "@finstack/use-build-from-template",

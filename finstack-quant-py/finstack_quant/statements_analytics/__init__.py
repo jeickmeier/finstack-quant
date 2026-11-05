@@ -36,6 +36,7 @@ goal_seek = _sa.goal_seek
 evaluate_dcf = _sa.evaluate_dcf
 dcf_sensitivity = _sa.dcf_sensitivity
 evaluate_lbo = _sa.evaluate_lbo
+WaccInputs = _sa.WaccInputs
 wacc = _sa.wacc
 run_corporate_analysis = _sa.run_corporate_analysis
 credit_assessment_report_text = _sa.credit_assessment_report_text
@@ -223,6 +224,7 @@ __all__: list[str] = [
     "VarianceConfig",
     "VarianceReport",
     "VarianceRow",
+    "WaccInputs",
     "WeightedEclResult",
     "add_ncf_buildup",
     "add_noi_buildup",

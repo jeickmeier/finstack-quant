@@ -10,9 +10,11 @@ Examples
 from __future__ import annotations
 from finstack_quant.models.factor.risk._functions import (
     decompose_factors as decompose_factors,
-    historical_var_decomposition as historical_var_decomposition,
-    parametric_var_decomposition as parametric_var_decomposition,
     position_component_var as position_component_var,
+)
+from finstack_quant.models.factor.risk._report import (
+    PositionRiskReport as PositionRiskReport,
+    position_risk_report as position_risk_report,
 )
 from finstack_quant.models.factor.risk._budget import (
     PositionBudgetEntry as PositionBudgetEntry,
@@ -44,6 +46,7 @@ __all__ = [
     "PositionFactorContribution",
     "PositionResidualContribution",
     "PositionRiskDecomposition",
+    "PositionRiskReport",
     "PositionVarContribution",
     "RiskBudgetResult",
     "RiskDecomposition",
@@ -54,9 +57,8 @@ __all__ = [
     "decompose_factors",
     "evaluate_risk_budget",
     "evaluate_risk_budget_from_decomposition",
-    "historical_var_decomposition",
-    "parametric_var_decomposition",
     "position_component_var",
+    "position_risk_report",
 ]
 
 DEFAULT_UTILIZATION_THRESHOLD: float

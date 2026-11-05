@@ -116,22 +116,42 @@ const cases = {
     };
   },
   templates: () => [
-    covenants.lboStandard(5.0, 1.5, 1.2, 10_000_000),
-    covenants.covLite(7.0, 4.5),
-    covenants.realEstate(1.25, 0.08, 0.65),
-    covenants.projectFinance(1.3, 1.15, 5_000_000, 4.0),
+    covenants.covenantTemplate({
+      kind: 'lbo_standard',
+      initial_leverage: 5.0,
+      interest_coverage: 1.5,
+      fixed_charge_coverage: 1.2,
+      max_capex: 10_000_000,
+    }),
+    covenants.covenantTemplate({ kind: 'cov_lite', max_leverage: 7.0, max_senior_leverage: 4.5 }),
+    covenants.covenantTemplate({
+      kind: 'real_estate',
+      min_dscr: 1.25,
+      min_debt_yield: 0.08,
+      max_ltv: 0.65,
+    }),
+    covenants.covenantTemplate({
+      kind: 'project_finance',
+      min_dscr: 1.3,
+      distribution_lockup_dscr: 1.15,
+      min_liquidity: 5_000_000,
+      max_net_leverage: 4.0,
+    }),
   ],
   engine_evaluate: () =>
-    withEngine(covenants.covLite(7.0, 4.5), (engine) => ({
-      pass: engine.evaluate({ total_leverage: 5.0, senior_leverage: 3.0 }, '2026-03-31'),
-      breach: engine.evaluate(
-        JSON.stringify({ total_leverage: 7.5, senior_leverage: 3.0 }),
-        '2026-03-31'
-      ),
-      specs: engine.specs,
-      waivers: engine.waivers,
-      breach_history: engine.breachHistory,
-    })),
+    withEngine(
+      covenants.covenantTemplate({ kind: 'cov_lite', max_leverage: 7.0, max_senior_leverage: 4.5 }),
+      (engine) => ({
+        pass: engine.evaluate({ total_leverage: 5.0, senior_leverage: 3.0 }, '2026-03-31'),
+        breach: engine.evaluate(
+          JSON.stringify({ total_leverage: 7.5, senior_leverage: 3.0 }),
+          '2026-03-31'
+        ),
+        specs: engine.specs,
+        waivers: engine.waivers,
+        breach_history: engine.breachHistory,
+      })
+    ),
   engine_track_waive_and_round_trip: () => {
     const engine = new covenants.CovenantEngine();
     try {
@@ -227,34 +247,52 @@ const kind = (expected, pattern) => (error) => {
   return true;
 };
 
-test('typed templates and engine agree with the JSON bridge', () => {
-  assert.deepEqual(covenants.covLite(7.0, 4.5), JSON.parse(covenants.covLiteJson(7.0, 4.5)));
-  assert.deepEqual(
-    covenants.lboStandard(5, 1.5, 1.2, 1e7),
-    JSON.parse(covenants.lboStandardJson(5, 1.5, 1.2, 1e7))
+test('covenantTemplate expands each package and the engine agrees with the JSON bridge', () => {
+  assert.equal(
+    covenants.covenantTemplate({ kind: 'cov_lite', max_leverage: 7.0, max_senior_leverage: 4.5 })
+      .length,
+    3
   );
   assert.deepEqual(
-    covenants.realEstate(1.25, 0.08, 0.65),
-    JSON.parse(covenants.realEstateJson(1.25, 0.08, 0.65))
+    covenants.covenantTemplate(
+      JSON.stringify({ kind: 'real_estate', min_dscr: 1.25, min_debt_yield: 0.08, max_ltv: 0.65 })
+    ),
+    covenants.covenantTemplate({
+      kind: 'real_estate',
+      min_dscr: 1.25,
+      min_debt_yield: 0.08,
+      max_ltv: 0.65,
+    })
   );
-  assert.deepEqual(
-    covenants.projectFinance(1.3, 1.15, 5e6, 4),
-    JSON.parse(covenants.projectFinanceJson(1.3, 1.15, 5e6, 4))
+  withEngine(
+    covenants.covenantTemplate({ kind: 'cov_lite', max_leverage: 7.0, max_senior_leverage: 4.5 }),
+    (engine) => {
+      const metrics = { total_leverage: 5.0, senior_leverage: 3.0 };
+      assert.deepEqual(
+        engine.evaluate(metrics, '2026-03-31'),
+        covenants.evaluateEngine(engine.toJson(), metrics, '2026-03-31')
+      );
+      assert.equal(engine.addSpec(leverageSpec()), undefined);
+      assert.equal(engine.specs.length, 4);
+    }
   );
-  withEngine(covenants.covLite(7.0, 4.5), (engine) => {
-    const metrics = { total_leverage: 5.0, senior_leverage: 3.0 };
-    assert.deepEqual(
-      engine.evaluate(metrics, '2026-03-31'),
-      covenants.evaluateEngine(engine.toJson(), metrics, '2026-03-31')
-    );
-    assert.equal(engine.addSpec(leverageSpec()), undefined);
-    assert.equal(engine.specs.length, covenants.covLite(7.0, 4.5).length + 1);
-  });
 });
 
 test('covenant errors are structured and Rust-owned', () => {
-  assert.throws(() => covenants.covLite(Number.NaN, 4.5), kind('validation', /finite|negative/i));
-  assert.throws(() => covenants.covLite('7', 4.5), kind('invalid_type', /^maxLeverage: /));
+  assert.throws(
+    () =>
+      covenants.covenantTemplate({ kind: 'cov_lite', max_leverage: -1, max_senior_leverage: 4.5 }),
+    kind('validation', /finite|negative/i)
+  );
+  assert.throws(
+    () =>
+      covenants.covenantTemplate({ kind: 'cov_lite', max_leverage: '7', max_senior_leverage: 4.5 }),
+    kind('validation', /template: invalid type/)
+  );
+  assert.throws(
+    () => covenants.covenantTemplate({ kind: 'unitranche', max_leverage: 7 }),
+    kind('validation', /unknown variant/)
+  );
   assert.throws(
     () => covenants.covenantTypeCustom('m', 'between', 1),
     kind('validation', /test must be "maximum" or "minimum", got "between"/)

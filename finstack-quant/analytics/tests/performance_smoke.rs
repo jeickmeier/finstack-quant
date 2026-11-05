@@ -65,13 +65,13 @@ fn performance_facade_exercises_broad_api_surface() {
     let col_b = oscillating_prices(dates.len(), 80.0, 1.3);
     let prices = vec![col_a, col_b];
 
-    let mut perf = Performance::new(
+    let mut perf = Performance::new(&crate::support::prices_panel(
         dates.clone(),
         prices,
         vec!["AAA".to_string(), "BBB".to_string()],
         Some("BBB"),
         PeriodKind::Daily,
-    )
+    ))
     .expect("perf");
 
     assert_eq!(perf.get_benchmark_idx(), 1);
@@ -323,13 +323,13 @@ fn performance_facade_exercises_broad_api_surface() {
     assert_eq!(perf.get_benchmark_idx(), 1);
     assert_eq!(perf.tracking_error(), baseline_tracking_error);
 
-    let missing = Performance::new(
+    let missing = Performance::new(&crate::support::prices_panel(
         dates.clone(),
         vec![ramp(dates.len(), 1.0, 0.01)],
         vec!["X".to_string()],
         Some("missing"),
         PeriodKind::Daily,
-    );
+    ));
     assert_eq!(missing.err().map(|e| e.kind()), Some(ErrorKind::NotFound));
     let unknown = perf.reset_bench_ticker("missing");
     assert_eq!(unknown.err().map(|e| e.kind()), Some(ErrorKind::NotFound));
@@ -343,13 +343,13 @@ fn performance_lookback_returns_clamps_pre_start_reference_date() {
         40,
     );
     let prices = vec![ramp(dates.len(), 50.0, 0.1)];
-    let perf = Performance::new(
+    let perf = Performance::new(&crate::support::prices_panel(
         dates,
         prices,
         vec!["P".to_string()],
         None,
         PeriodKind::Daily,
-    )
+    ))
     .expect("performance");
 
     let ref_date = Date::from_calendar_date(2025, Month::May, 15).expect("ref date");
@@ -368,13 +368,13 @@ fn performance_smoke_asserts_fiscal_lookback_and_zero_variance_invariants() {
         Date::from_calendar_date(2025, Month::January, 1).expect("d0"),
         40,
     );
-    let flat_perf = Performance::new(
+    let flat_perf = Performance::new(&crate::support::prices_panel(
         dates.clone(),
         vec![vec![100.0; dates.len()]],
         vec!["FLAT".to_string()],
         None,
         PeriodKind::Daily,
-    )
+    ))
     .expect("flat performance");
 
     assert_eq!(flat_perf.sharpe(0.0), vec![0.0]);
@@ -386,13 +386,13 @@ fn performance_smoke_asserts_fiscal_lookback_and_zero_variance_invariants() {
             .is_empty()
     );
 
-    let rising_perf = Performance::new(
+    let rising_perf = Performance::new(&crate::support::prices_panel(
         dates,
         vec![ramp(40, 100.0, 1.0)],
         vec!["RISING".to_string()],
         None,
         PeriodKind::Daily,
-    )
+    ))
     .expect("rising performance");
     let config = FiscalConfig::new(1, 15).expect("valid fiscal config");
     let ref_date = *rising_perf
@@ -411,7 +411,7 @@ fn returns_accessors_reproduce_cumulative_returns_and_zero_rf_excess_returns() {
         Date::from_calendar_date(2025, Month::January, 1).expect("d0"),
         60,
     );
-    let perf = Performance::new(
+    let perf = Performance::new(&crate::support::prices_panel(
         dates.clone(),
         vec![
             ramp(dates.len(), 100.0, 0.35),
@@ -420,7 +420,7 @@ fn returns_accessors_reproduce_cumulative_returns_and_zero_rf_excess_returns() {
         vec!["AAA".to_string(), "BBB".to_string()],
         Some("BBB"),
         PeriodKind::Daily,
-    )
+    ))
     .expect("perf");
 
     let panel = perf.get_returns();
@@ -475,13 +475,13 @@ fn lookback_returns_includes_maximum_reference_date_without_overflow() {
     let last = Date::MAX;
     let mid = last.previous_day().expect("prior date");
     let first = mid.previous_day().expect("prior date");
-    let perf = Performance::new(
+    let perf = Performance::new(&crate::support::prices_panel(
         vec![first, mid, last],
         vec![vec![100.0, 110.0, 121.0]],
         vec!["A".into()],
         None,
         PeriodKind::Daily,
-    )
+    ))
     .expect("maximum-date panel");
     for fiscal_config in [FiscalConfig::calendar_year(), FiscalConfig::us_federal()] {
         let lookbacks = perf

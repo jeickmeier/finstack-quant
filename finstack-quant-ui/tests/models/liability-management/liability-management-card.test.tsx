@@ -101,11 +101,11 @@ it("calls each native function with its arguments in the binding's positions", a
   // Four distinct amounts: each comes back under its own field.
   const offered = unwrap(
     await harness.proxy.analyzeExchangeOffer({
-      oldPv: 11,
-      newPv: 22,
-      consentFee: 3,
-      equitySweetenerValue: 4,
-      exchangeType: "uptier",
+      old_pv: 11,
+      new_pv: 22,
+      consent_fee: 3,
+      equity_sweetener_value: 4,
+      exchange_type: "uptier",
     }),
   );
   expect(offered).toMatchObject({
@@ -118,10 +118,10 @@ it("calls each native function with its arguments in the binding's positions", a
   // Cost is symmetric in price and participation, par retired is not.
   const retired = unwrap(
     await harness.proxy.analyzeLme({
-      lmeType: "tender_offer",
+      lme_type: "tender_offer",
       notional: 1000,
-      repurchasePricePct: 0.5,
-      optAcceptancePct: 0.25,
+      repurchase_price_pct: 0.5,
+      opt_acceptance_pct: 0.25,
       ebitda: 200,
     }),
   );
@@ -209,7 +209,7 @@ it("submits typed numbers; an empty amount is NaN for Rust to reject and an empt
     target: { value: "" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Analyze offer" }));
-  expect(onExchangeSubmit.mock.lastCall![0].consentFee).toBeNaN();
+  expect(onExchangeSubmit.mock.lastCall![0].consent_fee).toBeNaN();
   fireEvent.click(screen.getByRole("button", { name: "Analyze LME" }));
   expect(onLmeSubmit).toHaveBeenLastCalledWith(lmeTerms);
   fireEvent.change(screen.getByLabelText("EBITDA"), { target: { value: "" } });

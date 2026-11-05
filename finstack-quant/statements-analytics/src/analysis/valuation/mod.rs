@@ -10,7 +10,7 @@ pub(crate) mod orchestrator;
 
 pub use corporate::{
     CorporateValuationResult, DEFAULT_UFCF_NODE, DcfOptions, DcfPeriodRow, DcfSensitivityResult,
-    ExitMultipleBump, dcf_sensitivity, evaluate_dcf, wacc,
+    ExitMultipleBump, WaccInputs, dcf_sensitivity, evaluate_dcf, wacc,
 };
 pub use lbo::{LboCheckMappings, LboConfig, LboResult, LboTranche, evaluate_lbo};
 pub use orchestrator::{
