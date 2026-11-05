@@ -24,6 +24,7 @@ accepting an ADR does not mark either kind of work complete.
 | [0017](project/0017-library-first-product.md) | Keep computation independently usable, with optional presentation layers. |
 | [0018](project/0018-platform-and-runtime-support.md) | Protect explicit platform/runtime commitments and distinguish build-only, smoke-tested, and fully tested coverage. |
 | [0019](project/0019-final-release-qualification.md) | Qualify the declared release scope and exact shipped artifacts before final publication. |
+| [0025](project/0025-auditable-results-and-replay.md) | Preserve audit/replay evidence with caller-owned archives and explicit limits on reproducibility. |
 
 ## Code standards
 
@@ -106,6 +107,9 @@ resolve the stated scope question explicitly.
 4. **Cross-target reproducibility claims.**
    The [models README](../../finstack-quant/models/README.md), under
    "Determinism and parallelism", claims native/WASM bit identity.
+   The [Monte Carlo run-metadata documentation](../../finstack-quant/models/src/monte_carlo/results.rs)
+   also promises host-independent bit reproduction; include it in the same
+   reconciliation.
    [INVARIANTS.md](../../INVARIANTS.md), section 2.1, limits reproducibility
    tiers per target and requires justified tolerances across hosts unless
    stronger guarantees are tested.
@@ -196,6 +200,15 @@ resolve the stated scope question explicitly.
   persisted-type errors. Native extension support does not establish custom
   persistence or host exposure; runtime plugins, host callbacks, and external
   deserialization registries require a separate architectural decision.
+- **Audit/replay evidence coverage:** inventory the saved or shared valuation
+  and risk workflows covered by
+  [ADR 0025](project/0025-auditable-results-and-replay.md). Define and verify
+  the required input/snapshot references, effective configuration, requested
+  and effective dates, producing build, and applicable stochastic settings.
+  Check archival round trips, metadata preservation, reproduction under the
+  declared guarantee, and explicit missing-input diagnostics. Existing
+  optional provenance and snapshot types do not establish complete replay
+  coverage; archival storage remains caller-owned.
 
 This collection records the agreed decisions. It does not change calculations,
 fixtures, agent guidance outside these records, or repository permissions.
