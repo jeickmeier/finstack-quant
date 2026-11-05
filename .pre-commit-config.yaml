@@ -78,7 +78,7 @@ repos:
         # MD036: emphasis as heading, MD029: ordered list prefix
         # MD032: blanks around lists, MD051: link fragments
         args: [--disable, MD013, MD033, MD041, MD024, MD040, MD036, MD029, MD032, MD051, --]
-        exclude: ^(CHANGELOG\.md|PARITY_AUDIT\.md|book/src/SUMMARY\.md|finstack-quant-wasm/pkg|node_modules|vendor|\.cursor|\.agent|\.zenflow|\.zencoder)
+        exclude: ^(PARITY_AUDIT\.md|book/src/SUMMARY\.md|finstack-quant-wasm/pkg|node_modules|vendor|\.cursor|\.agent|\.zenflow|\.zencoder)
 
   # ============================================
   # Linting and type checking (check-only `*-lint` tasks)

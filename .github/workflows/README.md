@@ -238,7 +238,7 @@ Gates. Everything except `version` starts after `version` passes, in parallel:
 
 | Job | Command | Notes |
 | --- | --- | --- |
-| Version metadata | inline check | The `Cargo.toml` workspace version and the `finstack-quant-wasm/package.json` version are on the tag's `X.Y` line; the tag itself sets the built version. For `vX.Y.Z` only: `CHANGELOG.md` has a `## [X.Y.Z]` section and `release_notes/RELEASE_NOTES_X.Y.Z.md` exists. |
+| Version metadata | inline check | The `Cargo.toml` workspace version and the `finstack-quant-wasm/package.json` version are on the tag's `X.Y` line; the tag itself sets the built version. For `vX.Y.Z` only: `changelog/X.Y.Z.md` exists with an `## Itemized changes` section. |
 | Checks | `uses: ./.github/workflows/checks.yml` | The fast tier. |
 | Full checks | `uses: ./.github/workflows/full-checks.yml` | The full tier: coverage, docs and doctests, and the slow Rust and Python suites (SonarQube skipped off `master`). |
 | Upstream check | `scripts/check_release_upstream.py check origin/master <tag commit>` | The tagged commit carries nothing `master` lacks. A tag on `master` passes trivially. |

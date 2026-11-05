@@ -196,8 +196,12 @@ both enforce this (`mise run release-check-upstream` runs the check locally).
    refreshes `Cargo.lock`) in a pull request, so nightly builds order above
    everything on this line.
 2. **Write the release notes on `master`.** In a pull request into `master`,
-   labeled `backport release/X.Y`, add the `## [X.Y.Z]` section to
-   `CHANGELOG.md` and `release_notes/RELEASE_NOTES_X.Y.Z.md`.
+   labeled `backport release/X.Y`, rename `changelog/unreleased.md` to
+   `changelog/X.Y.Z.md`, write its release notes (title, date, summary,
+   breaking changes, migration checklist) above its `## Itemized changes`
+   section, start a fresh `changelog/unreleased.md`, and add the row to
+   `changelog/README.md`. The GitHub Release body is the part above
+   `## Itemized changes`.
 
    The tag sets the version: the release workflow stamps `X.Y.Z` or
    `X.Y.Z-rc.N` into the manifests before building, so a patch release or

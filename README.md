@@ -423,7 +423,7 @@ benchmarks in all three languages; see
 | [`docs/REFERENCES.md`](docs/REFERENCES.md) | Canonical sources for formulas, conventions, and market practice |
 | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Persisted-contract matrix, strict loaders, generated schemas |
 | [`docs/SERDE_STABILITY.md`](docs/SERDE_STABILITY.md) | Wire-format and schema-version policy |
-| [`CHANGELOG.md`](CHANGELOG.md) | Release history, including breaking changes |
+| [`changelog/`](changelog/README.md) | Release history, one file per release with its notes and breaking changes; [`unreleased.md`](changelog/unreleased.md) holds pending changes |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup, principles, binding-change checklist, branching, pull requests, releases |
 | [`.github/workflows/README.md`](.github/workflows/README.md) | CI workflows, jobs, and their local `mise` equivalents |
 | [`AGENTS.md`](AGENTS.md) | Repository operating rules for automated contributors |

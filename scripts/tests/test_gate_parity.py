@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -74,3 +77,29 @@ def test_retired_gates_are_gone() -> None:
 def test_checks_workflow_skips_no_hooks() -> None:
     """CI's Lint job runs every pre-commit hook, as `mise run all` does locally."""
     assert "SKIP:" not in (WORKFLOWS / "checks.yml").read_text(encoding="utf-8")
+
+
+def test_every_generated_root_is_marked_generated() -> None:
+    """Each path `gen-check` digests carries `linguist-generated` in `.gitattributes`."""
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from generation_digest import DEFAULT_PATHS
+
+    probes = []
+    for path in DEFAULT_PATHS:
+        target = ROOT / path
+        if target.is_dir():
+            files = sorted(p for p in target.rglob("*") if p.is_file())
+            assert files, f"{path} has no files"
+            target = files[0]
+        probes.append(str(target.relative_to(ROOT)))
+    vcs = shutil.which("git")
+    assert vcs, "git is required"
+    out = subprocess.run(  # noqa: S603 -- fixed check-attr subcommand on repository paths; no shell.
+        [vcs, "check-attr", "linguist-generated", "--", *probes],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    unmarked = [line.split(":")[0] for line in out.splitlines() if not line.endswith(": true")]
+    assert unmarked == [], f"add a linguist-generated pattern to .gitattributes for: {unmarked}"
