@@ -30,7 +30,7 @@ Add `--all-features` to `rust-lint-crate` / `rust-fix-crate` when touching featu
 - `mise run rust-lint` — full-workspace fmt check + clippy on lib/bins/tests/examples (skips benches). Run before commit or when the user asks for full lint.
 - `mise run rust-test` — all crates, all integration binaries.
 - `mise run rust-bench` — all Criterion targets.
-- `mise run all-lint`, `mise run all-test`, `mise run all-ci` — cross-language full gates.
+- `mise run all` — the cross-language gate; it runs exactly what CI runs on a pull request.
 
 ## Path → package mapping
 

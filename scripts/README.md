@@ -10,6 +10,21 @@ These are Python because they inspect *all three* language surfaces (Rust,
 PyO3, wasm-bindgen/TypeScript) and their generated artifacts, which no single
 toolchain sees at once.
 
+This file is the map of every gate in the repository: the convention it
+enforces, the task that runs it, and its tier.
+
+| Tier | Runs in | Locally |
+| --- | --- | --- |
+| PR | `.github/workflows/checks.yml` on every pull request | `mise run all` |
+| Nightly | `.github/workflows/full-checks.yml` | `mise run all --full` |
+| Release | `.github/workflows/release.yml` | `mise run all --release` |
+| Local | by hand, when the area changes | the task named in the row |
+
+`mise run all` runs one stage per `checks.yml` job (`pre-commit-run`,
+`gen-check`, `rust-test`, `python-test`, `wasm-test`, `ui-check`,
+`all-audit`); `scripts/tests/test_gate_parity.py` keeps the two equal.
+Generated files are refreshed by one command, `mise run gen-write`.
+
 ## Running them
 
 `scripts/` is an importable package (`scripts/__init__.py`), so the multi-module
@@ -23,8 +38,8 @@ uv run python -m scripts.golden.quantlib.generate --family pricing --product all
 Single-file scripts run by path:
 
 ```bash
-uv run python scripts/check_loc.py 800
-uv run python scripts/generation_digest.py --verbose
+uv run --no-sync python scripts/check_loc.py --full
+uv run --no-sync python scripts/generation_digest.py --verbose
 ```
 
 Prefer the `mise` task that owns a script (listed below) — the tasks pass the
@@ -32,57 +47,79 @@ exact arguments CI uses. Checkers that touch no compiled extension are invoked
 with `uv run --no-sync` so a plain `uv run` does not trigger a ~20 minute PyO3
 rebuild; keep that flag when adding static checkers to a task.
 
-The unit tests for these scripts live in [`tests/`](tests/) and run under
-pytest; several `mise` tasks run them immediately before the script itself.
-`tests/test_generate_core_reference_data.py` covers the generator at
-`finstack-quant/core/build/generate_reference_data.py` and is driven by
-`mise run gen-check`.
-
 ## Documentation contract checkers
 
 `AGENTS.md` requires every public callable with caller-supplied inputs to
 document each input. These enforce that on each host surface.
 
-| Script | Enforces | Driven by |
+| Script | Enforces | Task (tier) |
 | --- | --- | --- |
-| `check_methodology_coverage.py` | Exact source ownership and record linkage for the [audited crates](../docs/decisions/financial/README.md). `--verify-source` checks audited hashes; `--write` regenerates the readable source map. This is documentation coverage, not numerical certification. | `uv run --no-sync python scripts/check_methodology_coverage.py --verify-source` |
-| `check_public_api_input_docs.py` | Rust `# Arguments` coverage for every publicly reachable function, associated function, trait method, and constructor. Builds rustdoc JSON via `cargo public-api`, which needs the nightly toolchain `mise.toml` provisions. | `mise run rust-doc` |
-| `check_python_api_input_docs.py` | Substantive summaries plus argument/return/raises/example sections on public classes and callables in `.pyi` stubs and pure-Python modules. NumPy- and Google-style sections both parse. | `mise run python-lint`, `mise run python-doc` |
-| `check_pyo3_doc_placeholders.py` | Rejects placeholder prose left in public PyO3 runtime doc comments under `finstack-quant-py/src/bindings/`. | `mise run python-lint`, `mise run python-doc` |
-| `check_wasm_api_input_docs.py` | `@param` coverage in the Rust doc comments under `finstack-quant-wasm/src/api/` attached to `#[wasm_bindgen]` exports — the text wasm-bindgen copies into the generated TypeScript declarations. The comment must precede the attribute or it is dropped. The hand-written facade declaration `finstack-quant-wasm/index.d.ts` is checked separately by `npm run docs:check`. | `mise run wasm-doc` |
-| `check_deprecated_annotations.py` | Legacy annotation-format checks: every `#[deprecated]` carries `since = "X.Y.Z"`, a replacement or retention rationale, and a planned removal release. Bare annotations fail. These checks do not implement ADR 0004's development replacement policy; [reconciliation is pending](../docs/decisions/FOLLOW_UPS.md#reconciliation-items). | `mise run rust-doc` |
-| `run_python_stub_doctests.py` | Extracts `>>>` examples from `.pyi` and module docstrings and executes them against the compiled `finstack_quant` package, since stubs are not importable. | `mise run python-test --doctest` (via `finstack-quant-py/tests/test_stub_doctests.py`) |
+| `check_methodology_coverage.py` | Exact source ownership and record linkage for the [audited crates](../docs/decisions/financial/README.md). `--verify-source` checks audited hashes; `--write` regenerates the readable source map. This is documentation coverage, not numerical certification. | manual: `uv run --no-sync python scripts/check_methodology_coverage.py --verify-source` |
+| `check_public_api_input_docs.py` | Rust `# Arguments` coverage for every publicly reachable function, associated function, trait method, and constructor. Builds rustdoc JSON via `cargo public-api`, which needs the nightly toolchain `mise.toml` provisions. | `rust-doc` (nightly) |
+| `check_python_api_input_docs.py` | Substantive summaries plus argument/return/raises/example sections on public classes and callables in `.pyi` stubs and pure-Python modules. NumPy- and Google-style sections both parse. | `python-lint` (PR, through pre-commit) |
+| `check_pyo3_doc_placeholders.py` | Rejects placeholder prose left in public PyO3 runtime doc comments under `finstack-quant-py/src/bindings/`. | `python-lint` (PR, through pre-commit) |
+| `check_wasm_api_input_docs.py` | `@param` coverage in the Rust doc comments under `finstack-quant-wasm/src/api/` attached to `#[wasm_bindgen]` exports — the text wasm-bindgen copies into the generated TypeScript declarations. The comment must precede the attribute or it is dropped. | `wasm-doc` (nightly) |
+| `check_deprecated_annotations.py` | Legacy annotation-format checks: every `#[deprecated]` carries `since = "X.Y.Z"`, a replacement or retention rationale, and a planned removal release. Bare annotations fail. These checks do not implement ADR 0004's development replacement policy; [reconciliation is pending](../docs/decisions/FOLLOW_UPS.md#reconciliation-items). | `rust-doc` (nightly) |
+| `run_python_stub_doctests.py` | Extracts `>>>` examples from `.pyi` and module docstrings and executes them against the compiled `finstack_quant` package, since stubs are not importable. | `python-test --doctest` (nightly), via `finstack-quant-py/tests/test_stub_doctests.py` |
 
 ## Generated artifacts and wire contracts
 
 Rust serde types are the source of truth; JSON Schemas and TypeScript
 declarations are deterministic publication artifacts. These prove the artifacts
-match the types and that regeneration is idempotent.
+match the types and that regeneration is idempotent. `mise run gen-write`
+regenerates every one of them; `mise run gen-check` fails when one is stale.
 
-| Script | Purpose | Driven by |
+| Script | Purpose | Task (tier) |
 | --- | --- | --- |
-| `serde_audit/` | Package: audits public Rust contract types for effective `Serialize`/`Deserialize`/`JsonSchema` coverage. A conservative module-aware Rust lexer (`lexer.py`, `resolution.py`, `scanner.py`) resolves modules, re-exports, aliases and `cfg_attr` derives; `registries.py` holds the maintained contract set and reviewed exceptions; `report.py` is the CLI (`--check` fails on missing capabilities or stale exceptions, `--report` lists everything). | `mise run rust-check-schemas` |
-| `check_schema_residue.py` | Rejects obsolete or hand-maintained JSON/serde machinery: hand-written schema files, asymmetric optional wire adapters, non-canonical serde enum naming. | `mise run rust-check-schemas` |
-| `check_schema_generation.py` | Runs the built `gen_*` binaries directly (no `cargo run`). By default it checks that the registries own exactly the generated files on disk (missing artifacts, orphaned schemas or instrument fixtures), validates the `$ref` graph across registries, and regenerates the tree twice into temporary directories, comparing the two and the checked-in files byte-for-byte. `--write` regenerates every registry in place. `--bin-dir` overrides the default `target/debug`. | `mise run rust-check-schemas`, `mise run rust-gen-schemas` |
-| `check_generated_instrument_fixtures.py` | Validates canonical generated instrument fixtures against `finstack-quant/valuations/tests/instruments/coverage_manifest.toml`. | `mise run gen-check` |
-| `sync_generated_ts_index.py` | Writes (or with `--check`, verifies) the barrels for the schema-generated TypeScript types in `finstack-quant-wasm/types/generated/`: one `<crate>/index.ts` per crate and a root `index.ts` that re-exports each crate as a namespace. The per-crate modules themselves come from `finstack-quant-wasm/scripts/generate-contract-types.mjs`. | `mise run gen-write`, `mise run gen-check` |
-| `generation_digest.py` | Computes a stable SHA-256 over the generated artifacts named in the manifest. `--check-manifest` verifies that the file list still matches what is on disk; `gen-check` takes the digest before and after the verification pass and fails if it moved, so a "check" that quietly rewrote the workspace is caught. | `mise run gen-check` (`mise run all-ci` writes first via `gen-write`) |
+| `serde_audit/` | Package: audits public Rust contract types for effective `Serialize`/`Deserialize`/`JsonSchema` coverage. A conservative module-aware Rust lexer (`lexer.py`, `resolution.py`, `scanner.py`) resolves modules, re-exports, aliases and `cfg_attr` derives; `registries.py` holds the maintained contract set and reviewed exceptions; `report.py` is the CLI (`--check` fails on missing capabilities or stale exceptions, `--report` lists everything). | `gen-check` (PR) |
+| `check_schema_residue.py` | Rejects obsolete or hand-maintained JSON/serde machinery: hand-written schema files, asymmetric optional wire adapters, non-canonical serde enum naming. | `gen-check` (PR) |
+| `check_schema_generation.py` | Runs the built `gen_*` binaries directly (no `cargo run`). By default it checks that the registries own exactly the generated files on disk (missing artifacts, orphaned schemas or instrument fixtures), validates the `$ref` graph across registries, and regenerates the tree twice into temporary directories, comparing the two and the checked-in files byte-for-byte. `--write` regenerates every registry in place. `--bin-dir` overrides the default `target/debug`. | `gen-check` (PR); `--write` in `gen-write` |
+| `check_generated_instrument_fixtures.py` | Validates canonical generated instrument fixtures against `finstack-quant/valuations/tests/instruments/coverage_manifest.toml`. | `gen-check` (PR) |
+| `sync_generated_ts_index.py` | Writes (or with `--check`, verifies) the barrels for the schema-generated TypeScript types in `finstack-quant-wasm/types/generated/`: one `<crate>/index.ts` per crate and a root `index.ts` that re-exports each crate as a namespace. The per-crate modules themselves come from `finstack-quant-wasm/scripts/generate-contract-types.mjs`. | `gen-check` (PR); write in `gen-write` |
+| `generation_digest.py` | Computes a stable SHA-256 over the generated artifacts named in the manifest. `--check-manifest` verifies that the file list still matches what is on disk; `gen-check` takes the digest before and after the verification pass and fails if it moved, so a "check" that quietly rewrote the workspace is caught. | `gen-check` (PR); `--write-manifest` in `gen-write` |
 
-`generated-artifacts.txt` is the manifest of tracked generated files. It covers
-two trees: the generated instrument JSON examples under
-`finstack-quant/valuations/tests/instruments/json_examples/` and the
-schema-generated TypeScript declarations under
-`finstack-quant-wasm/types/generated/`. The per-crate JSON
+`generated-artifacts.txt` is the manifest of tracked generated files.
+`gen-write` rewrites it last (`generation_digest.py --write-manifest`), so a
+new generated file is picked up without a separate step. The per-crate JSON
 schema registries in `finstack-quant/*/schemas/` are not in it — their
-reproducibility is proved by `check_schema_generation.py` instead. Update the
-manifest with `generation_digest.py --write-manifest` when a new generated
-artifact is added.
+reproducibility is proved by `check_schema_generation.py` instead.
+
+These tests also pin generated files; `gen-write` refreshes each one:
+
+| Test | Pins | Task (tier) |
+| --- | --- | --- |
+| `finstack-quant/valuations/tests/registry_snapshot.rs` | `tests/data/registry_snapshot.json`: the models and metrics every instrument type registers | `rust-test` (PR) |
+| `finstack-quant-wasm/tests/facade/surface.test.mjs` | `finstack-quant-wasm/facade-surface.json`: the published facade's runtime surface, checked against the declaration | `wasm-test` (PR) |
+| `finstack-quant-ui/scripts/run-fixtures.mjs --check` | the UI native fixtures (`tests/**/cases.json` and friends) | `ui-check` (PR) |
+| `finstack-quant-ui/scripts/run-generators.mjs --check` | `finstack-quant-ui/src/generated/`, the registry manifests, the theme and provenance | `ui-check` (PR) |
+
+## WASM and UI checkers
+
+| Script | Enforces | Task (tier) |
+| --- | --- | --- |
+| `check_wasm_boundary.py` | WASM bindings serialize only through `crate::utils::to_js_value` and build errors only through `to_js_err` (no raw `serde_wasm_bindgen::to_value`, no string errors). | `wasm-lint` (PR, through pre-commit) |
+| `finstack-quant-wasm/scripts/check-exports-boundary.mjs` | The facade (`exports/**`) only re-exports: no arithmetic, and every function carries a comment saying what wasm-bindgen cannot express. | `wasm-lint` (PR, through pre-commit) |
+| `finstack-quant-wasm/scripts/check-typescript-docs.mjs` | JSDoc completeness of the published declarations. | `wasm-doc` (nightly) |
+| `finstack-quant-wasm/scripts/check-dts-docs.mjs` | The `WasmOwned` handle-disposal contract, as text. | `wasm-doc` (nightly) |
+| `finstack-quant-wasm/scripts/check-typescript-examples.mjs` | Every documented TypeScript/JavaScript sample type-checks. | `wasm-doc` (nightly) |
+| `finstack-quant-ui/scripts/check-tokens.mjs` | Colours, fonts and spacing come only from the theme tokens. | `ui-check` (PR) |
+| `finstack-quant-ui/scripts/check-registry.mjs` | Registry closures resolve, and domain components never import `@base-ui/*`. | `ui-check` (PR) |
+| `finstack-quant-ui/scripts/check-no-arithmetic.mjs` | No arithmetic in `registry/**` and `src/**` without a `// finstack-arith:` reason. | `ui-check` (PR) |
+| `finstack-quant-ui/scripts/check-worker-compose.mjs` | Worker services make one native call; no decision on a native result in JavaScript. | `ui-check` (PR) |
+| `finstack-quant-ui/scripts/coverage.mjs --check` | `finstack-quant-ui/facade-coverage.json` records every facade member the worker uses. | `ui-check` (PR) |
+| `docs-site/gen/check_{coverage,curriculum,links}.py` | Lesson coverage, curriculum dependencies and evidence, and links in the static export. | `docs-site-build` (local) |
+
+The WASM-side Rust tests `tests/boundary_signatures.rs` (exports take `JsValue`
+arguments), `tests/return_shapes.rs` (result shapes) and `tests/dts_contract.rs`
+(declared signatures) run under `rust-test` (PR).
 
 ## Benchmarks and regression gates
 
 These implement the portfolio-materialization acceptance record described in
 [`../benchmarks/MATERIALIZATION_BENCHMARKS.md`](../benchmarks/MATERIALIZATION_BENCHMARKS.md).
-The checked-in baselines live in `../benchmarks/materialization/`.
+The checked-in baselines live in `../benchmarks/materialization/`. They run by
+hand (local tier); `all-doc` runs `scripts/materialization_bench.sh doc-check`
+in the nightly tier.
 
 | Script | Purpose | Driven by |
 | --- | --- | --- |
@@ -126,12 +163,12 @@ without a QuantLib install.
 
 ## Release and packaging
 
-| Script | Purpose | Driven by |
+| Script | Purpose | Task (tier) |
 | --- | --- | --- |
-| `cargo_publish_checks.py` | Derives the crate publish order from internal dependencies, validates internal dependency versions, and dry-runs the first crate. | `mise run rust-publish-checks`, CI `Rust Publish Checks` |
-| `smoke_python_wheel.py` | Imports the installed `finstack_quant` wheel, walks every public subpackage, and exercises `Currency`/`Money`, `models.bs_price`, and `EuropeanPricer.price_gbm`. Runs against the built wheel on every release platform except linux-arm64. | `.github/workflows/build-artifacts.yml`, `finstack-quant-py/tests/test_smoke_python_wheel.py` |
+| `cargo_publish_checks.py` | Derives the crate publish order from internal dependencies, validates internal dependency versions, and dry-runs the first crate. | `rust-publish-checks` (release) |
+| `smoke_python_wheel.py` | Imports the installed `finstack_quant` wheel, walks every public subpackage, and exercises `Currency`/`Money`, `models.bs_price`, and `EuropeanPricer.price_gbm`. Runs against the built wheel on every release platform except linux-arm64. | `.github/workflows/build-artifacts.yml`; `finstack-quant-py/tests/test_smoke_python_wheel.py` (PR) |
 | `stamp_version.py` | Writes a SemVer version into the workspace `Cargo.toml`, every intra-workspace path dependency requirement, and the WASM `package.json` and lockfile. CI stamps nightly (`X.Y.Z-dev.N`), candidate, and release versions before building; maintainers use it to bump `master`. | `mise run stamp-version`, `.github/workflows/build-artifacts.yml`, `.github/workflows/release.yml` |
-| `check_release_upstream.py` | `check`: fails when a release-branch commit has no counterpart on `master` (same patch, `cherry-pick -x` trailer, or squash-merged `(#N)`). `missing`: lists the `master` commits a release candidate leaves out. | `mise run release-check-upstream`, `.github/workflows/pr.yml`, `.github/workflows/release.yml` |
+| `check_release_upstream.py` | `check`: fails when a release-branch commit has no counterpart on `master` (same patch, `cherry-pick -x` trailer, or squash-merged `(#N)`). `missing`: lists the `master` commits a release candidate leaves out. | `release-check-upstream`; `.github/workflows/pr.yml` (pull requests into `release/**`), `.github/workflows/release.yml` |
 
 ## Notebook examples
 
@@ -141,10 +178,11 @@ without a QuantLib install.
 
 ## Code health and hygiene
 
-| Script | Purpose | Driven by |
+| Script | Enforces | Task (tier) |
 | --- | --- | --- |
-| `check_loc.py` | Lists source files above a line limit (default 1000; positional override). Rust files are counted after stripping `#[test]` functions and `#[cfg(test)]` modules. `--ci` exits 1 on violations. | `uv run --no-sync python scripts/check_loc.py` |
-| `audit_hardcoded_assumptions.py` | Flags source lines carrying market-convention, rating-agency, regulatory, accounting, or product assumptions that belong in a data registry. Reviewed matches live in `hardcoded_assumptions_allowlist.json`. `--format {text,markdown,json}`, `--include-allowed`, `--fail-on-candidates`. | `python3 scripts/audit_hardcoded_assumptions.py` |
+| `check_loc.py` | The Rust source-file size rule: no hand-written Rust file under `src/` over 2000 lines, counted without tests (`#[cfg(test)]` items, `tests.rs`, `*_tests.rs`, `tests/`) and generated code; files over 1000 are summarised, `--full` lists them. | pre-commit `rust-loc` (PR) |
+| `check_single_path.py` | The one-public-path rule over rustdoc JSON (nightly toolchain): duplicate public paths, cross-crate re-exports, renames and globs; `--compare <base>` fails when a public item became unnameable. | by hand after making a module private (local) |
+| `audit_hardcoded_assumptions.py` | Flags source lines carrying market-convention, rating-agency, regulatory, accounting, or product assumptions that belong in a data registry. Reviewed matches live in `hardcoded_assumptions_allowlist.json`. `--format {text,markdown,json}`, `--include-allowed`, `--fail-on-candidates`. | `python3 scripts/audit_hardcoded_assumptions.py` (local) |
 | `ci_report.py` | Formats Rust (`nextest` JUnit + LCOV), Python (`pytest` JUnit + Cobertura), WASM (`wasm-test` log), and SonarQube (`.scannerwork/report-task.txt` + SonarQube Cloud API) results into GitHub Actions `$GITHUB_STEP_SUMMARY` Markdown tables and workflow annotations. | `.github/workflows/checks.yml`, `.github/workflows/full-checks.yml` |
 | `clean_workspace.py` | Removes build artifacts, virtualenvs, and caches. `--incremental` drops only Cargo incremental caches; `--wasm` drops only wasm-pack output and wasm32 target artifacts. | `mise run all-clean` |
 
@@ -156,12 +194,10 @@ are load-bearing, so they are tested like production code. Fixtures under
 exercising module visibility, glob re-export bridges, duplicate public paths,
 `cfg`-gated impls, and hidden items, plus `parser_cases.rs` for the lexer.
 
-```bash
-uv run pytest scripts/tests -q                  # all checker tests
-uv run pytest scripts/golden/quantlib/test_generate.py -q   # needs QuantLib
-```
+They run with the Python suite: `pyproject.toml` lists `scripts/tests` in
+pytest's `testpaths`, so `mise run python-test` (PR) runs them.
 
-Tasks and scripts that run the relevant tests before their checker:
-`mise run rust-check-schemas`, `mise run gen-check`, `mise run python-doc`,
-and every step of `scripts/materialization_bench.sh` that compares, seals or
-records.
+```bash
+uv run --no-sync pytest scripts/tests -q                         # just the checker tests
+uv run pytest scripts/golden/quantlib/test_generate.py -q        # needs QuantLib
+```

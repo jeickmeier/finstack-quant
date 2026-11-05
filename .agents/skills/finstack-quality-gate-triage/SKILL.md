@@ -34,8 +34,8 @@ Prefer repo tasks from `AGENTS.md` and `mise.toml`:
 - Rust: `mise run rust-lint`, `mise run rust-test`
 - Python: `mise run python-build`, `mise run python-lint`, `mise run python-test`, `mise run python-typecheck`
 - WASM: `mise run wasm-build`, `mise run wasm-lint`, `mise run wasm-test`
-- UI: `mise run ui-fmt`, `mise run ui-typecheck`, `mise run ui-test`
-- Broad gates: `mise run all-lint`, `mise run all-test`, `mise run all-ci`
+- UI: `mise run ui-fmt`, `mise run ui-check`
+- The gate (equals CI): `mise run all`; `mise run all --full` for the nightly tier
 - Pre-commit: `mise pre-commit-run` when the user is already running that gate
 
 Use targeted checks while iterating. Reserve broad checks for broad changes or final verification.

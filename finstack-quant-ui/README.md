@@ -73,11 +73,9 @@ To add an item (the gate that catches each omission is in brackets):
    inside its `registryDependencies` closure; visual items must reach
    `finstack-theme`, and a closure that reaches a stock shadcn component must
    contain `finstack-base` [`ui-check`: `check-registry`].
-3. Run `npm --prefix finstack-quant-ui run generate` [`ui-check`: generator
-   drift]. When that adds or removes a file under `src/generated/`, rewrite
-   the repository manifest from the repository root with
-   `uv run --no-sync python scripts/generation_digest.py --write-manifest`
-   [CI `gen-check` (`--check-manifest`); `ui-check` does not catch it].
+3. Run `mise run gen-write` from the repository root [`ui-check`: generator
+   drift]. It runs the UI generators and rewrites the repository manifest of
+   generated files, which CI `gen-check` verifies (`--check-manifest`).
 4. For a visual item, add
    `docs-site/src/components/registry-gallery/examples/<item>.tsx`;
    `scripts/gen-gallery.mjs` generates the gallery's example map
@@ -124,7 +122,8 @@ CI runs only `ui-check` (the Test UI job); the other gates are local.
 
 `npm run generate` runs `scripts/run-generators.mjs`: `gen`,
 `encoding-report`, `catalogue-docs`, `gen-registry`. The gallery artifacts
-come from `gen-gallery`, the last step of `mise run ui-fixtures`.
+come from `gen-gallery`, the last step of the native fixture run in
+`mise run gen-write`.
 `gen-registry` is the sole writer of final registry manifests, the default
 stylesheet and the compiled WASM version. It collects authored manifests and
 proposed root/theme content in memory, validates the complete dependency graph,
@@ -187,7 +186,8 @@ test-only oracle for the supported construct and boundary corpus.
 
 ## Native fixtures
 
-`mise run ui-fixtures` runs the forty native fixture generators under
+`mise run gen-write` (after building the WASM packages) runs the forty native
+fixture generators under
 `tests/**/generate.mjs` in dependency order (results → scenario application,
 horizon return, scenario templates, attribution, cashflows → details; loan yields; workout ladders; quote sets;
 portfolio → portfolio margin → portfolio workbench → primitive exposures; portfolio returns; Brinson; curves → market-browser → curve-query; cubes, calibration,
@@ -197,8 +197,8 @@ refreshes the gallery copies with `scripts/gen-gallery.mjs`. It needs
 `finstack-quant-wasm/pkg-node`, built by `mise run wasm-build-node` (dev) or
 `mise run wasm-pkg` (release). Generators load that package, read repository
 files and build source records through `scripts/fixture-inputs.mjs`, and write
-through `emit` in `scripts/fixture-output.mjs`. `mise run ui-fixtures --check`
-first verifies that every source a committed fixture records still has its
+through `emit` in `scripts/fixture-output.mjs`. The check mode
+(`run-fixtures.mjs --check`) first verifies that every source a committed fixture records still has its
 recorded SHA-256, then that the fixture matches a fresh regeneration, ignoring
 formatting and key order, and names the generator to rerun;
 `ui-check` runs that check before vitest. Fixtures record only the SHA-256 of the

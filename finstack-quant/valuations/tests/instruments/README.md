@@ -54,10 +54,10 @@ tag, serialized from that instrument's own `example()` provider:
 
 ```bash
 # Rewrite schemas, the schema index, and every canonical fixture
-cargo run -p finstack-quant-valuations --bin gen_schemas -- --write
+mise run gen-write
 
 # Fail on drift instead of rewriting
-cargo run -p finstack-quant-valuations --bin gen_schemas -- --check
+mise run gen-check
 ```
 
 The generator deletes fixtures whose tag no longer exists, so a stale file is a
@@ -185,7 +185,7 @@ cargo nextest run -p finstack-quant-valuations --test valuations instruments --r
 2. Use `crate::common::test_helpers` and `crate::test_support` rather than
    rebuilding curves inline.
 3. Register the instrument in `coverage_manifest.toml` and regenerate its
-   fixture with `gen_schemas -- --write`.
+   fixture with `mise run gen-write`.
 4. Give every expected value a provenance comment.
 5. Run `mise run rust-lint` and the targeted `cargo nextest run` filter before
    committing.

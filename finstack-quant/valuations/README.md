@@ -246,8 +246,8 @@ cargo nextest run -p finstack-quant-valuations --lib --test '*'
 cargo bench -p finstack-quant-valuations --bench bond_pricing
 
 # Schemas (regenerate after changing any public serde type)
-mise run rust-gen-schemas
-mise run rust-check-schemas
+mise run gen-write
+mise run gen-check
 ```
 
 Do not run `cargo test` directly — it would also run doc tests, which this

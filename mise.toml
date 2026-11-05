@@ -5,7 +5,8 @@
 #   mise tasks            list every task
 #
 # Tasks are named <domain>-<action>; domains are rust, python, wasm, ui,
-# docs-site and gen, and all-* fans out across rust, python and wasm.
+# docs-site and gen. `mise run all` is the gate (exactly what CI runs on a pull
+# request) and `mise run gen-write` regenerates every generated file.
 # *-fmt and *-fix mutate; *-lint and *-check are check-only.
 # Specialised workflows live in scripts/ (materialization benchmarks:
 # scripts/materialization_bench.sh; QuantLib goldens: scripts/golden/quantlib).
@@ -70,64 +71,33 @@ PYO3_PYTHON = '{% if env.PYO3_PYTHON is defined %}{{ env.PYO3_PYTHON }}{% elif o
 # ─────────────────────────────────────────────────────────────────
 
 [tasks.all]
-description = "Test and lint everything (rust + python + wasm)"
-run = [{ task = "all-test" }, { task = "all-lint" }]
-
-[tasks.all-build]
-description = "Build the Rust workspace, Python bindings and WASM package"
-depends = ["rust-build", "python-build", "wasm-build"]
-
-[tasks.all-test]
-description = "Run all tests (Rust + Python + WASM)"
-run = [{ task = "rust-test" }, { task = "python-test" }, { task = "wasm-test" }]
-
-[tasks.all-fmt]
-description = "Format Rust, Python and WASM; auto-fix Python and WASM"
-depends = ["rust-fmt", "python-fmt", "wasm-fmt"]
-
-[tasks.all-lint]
-description = "Lint Rust, Python and WASM and check generated artifacts (check-only)"
-depends = ["rust-lint", "python-lint", "wasm-lint", "wasm-doc", "gen-check"]
-
-[tasks.all-doc]
-# Doc examples run through the test tasks: rust-test, python-test and wasm-test
-# with --doctest.
-description = "Verify Rust, Python and WASM documentation (the release docs gate)"
-depends = ["rust-doc", "python-doc", "wasm-doc"]
-run = "scripts/materialization_bench.sh doc-check"
-
-[tasks.all-audit]
-description = "Audit dependencies: cargo deny, then OSV-Scanner over the Cargo, uv and npm lockfiles"
-run = [
-  { task = "rust-audit" },
-  # The default Maven pom.xml resolver warns on every run; this workspace has no Maven manifests.
-  "osv-scanner scan --experimental-disable-plugins=transitivedependency/pomxml --lockfile=Cargo.lock --lockfile=uv.lock --lockfile=finstack-quant-wasm/package-lock.json",
-]
-
-[tasks.all-ci]
-description = "Regenerate derived artifacts, then run the PR checks locally (--full adds the nightly tier, --release the release gates)"
+description = "The pre-PR gate: exactly what CI runs on a pull request (--full adds the nightly tier, --release the release gates)"
 usage = '''
 flag "--full" help="Also run the nightly tier: docs, doctests and the slow suites"
 flag "--release" help="Also run the nightly tier and the release gates (publish checks, semver)"
 '''
-depends = ["gen-write"]
-# Sequential on purpose, not `{ tasks = [...] }`: every stage below shells
-# out to Cargo against the same target directory (pre-commit's clippy,
-# gen-check's schema builds, all-test's nextest/maturin/wasm-pack), and
-# Cargo's build lock serializes them anyway. Running them in parallel only
-# made the queued stages wait invisibly on that lock — the terminal sat on
-# the last printed line (e.g. the nextest summary) with no hint of which
-# stage was actually running — while the differing feature/profile sets
-# (--all-features clippy vs nextest vs maturin vs wasm32) thrashed the
-# shared fingerprints. Sequential stages keep output attributable and
-# progress continuous; total work is unchanged.
+# One stage per job of .github/workflows/checks.yml, which runs the same tasks
+# split across runners (scripts/tests/test_gate_parity.py keeps the two equal);
+# full-checks.yml is `--full`. The only local/CI difference is CI's per-test
+# time cap (NEXTEST_PROFILE=ci).
+#
+# The Lint stage may format (pre-commit runs the *-fmt tasks); nothing here
+# regenerates. After touching a generator or a wire type, run
+# `mise run gen-write` first.
+#
+# The cargo stages run one after another, not as `{ tasks = [...] }`: they
+# share one target directory, so Cargo's build lock serializes them anyway and
+# parallel stages only queue invisibly behind it. gen-check's `nextest --no-run`
+# is the first full test build; rust-test reuses it. wasm-test builds the dev
+# web and Node packages ui-check imports. ui-check (the longest stage) and
+# all-audit take no Cargo lock, so python-test, the last Cargo build, runs
+# beside them.
 run = [
   { task = "pre-commit-run" },
   { task = "gen-check" },
-  { task = "all-test" },
-  # ui-check's Vitest needs the dev web and Node WASM packages all-test builds.
-  { task = "ui-check" },
-  { task = "all-audit" },
+  { task = "rust-test" },
+  { task = "wasm-test" },
+  { tasks = ["python-test", "ui-check", "all-audit"] },
   '''
   if [ "${usage_full:-false}" = "true" ] || [ "${usage_release:-false}" = "true" ]; then
     mise run all-doc
@@ -148,6 +118,30 @@ run = [
       --baseline-rev "$baseline"
   fi
   ''',
+]
+
+[tasks.all-build]
+description = "Build the Rust workspace, Python bindings and WASM package"
+depends = ["rust-build", "python-build", "wasm-build"]
+
+[tasks.all-fmt]
+description = "Format Rust, Python and WASM; auto-fix Python and WASM"
+depends = ["rust-fmt", "python-fmt", "wasm-fmt"]
+
+[tasks.all-doc]
+# The nightly docs stage of `mise run all --full`. Doc examples run through
+# the test tasks with --doctest.
+description = "Verify Rust and WASM documentation (the nightly docs stage)"
+hide = true
+depends = ["rust-doc", "wasm-doc"]
+run = "scripts/materialization_bench.sh doc-check"
+
+[tasks.all-audit]
+description = "Audit dependencies: cargo deny, then OSV-Scanner over the Cargo, uv and npm lockfiles"
+run = [
+  { task = "rust-audit" },
+  # The default Maven pom.xml resolver warns on every run; this workspace has no Maven manifests.
+  "osv-scanner scan --experimental-disable-plugins=transitivedependency/pomxml --lockfile=Cargo.lock --lockfile=uv.lock --lockfile=finstack-quant-wasm/package-lock.json",
 ]
 
 [tasks.all-clean]
@@ -348,42 +342,40 @@ cargo bench -p "${usage_package?}" --bench "${usage_bench?}" -- \
 '''
 
 [tasks.rust-gen-schemas]
-# The rust-test build already holds every gen_* binary, so this reuses it.
-description = "Regenerate the JSON schemas from Rust types"
+# The schema step of gen-write. The rust-test build already holds every gen_*
+# binary, so this reuses it.
+description = "Regenerate the JSON schemas from Rust types (a step of gen-write)"
+hide = true
 run = [
   "cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --no-run",
   "uv run --no-sync python scripts/check_schema_generation.py --write",
 ]
 
 [tasks.rust-check-schemas]
-description = "Verify the JSON schemas, serde coverage and schema contracts match the Rust types"
+description = "Verify the JSON schemas and serde coverage match the Rust types (a stage of gen-check)"
+hide = true
 run = [{ tasks = ["rust-check-schema-registry", "rust-check-schema-residue", "rust-check-serde-audit"] }]
 
 [tasks.rust-check-serde-audit]
 description = "Verify every public wire type carries the serde and schema derives its contract needs"
 hide = true
-run = [
-  "uv run --no-sync pytest scripts/tests/test_serde_audit.py -q",
-  "uv run --no-sync python -m scripts.serde_audit --check",
-]
+run = "uv run --no-sync python -m scripts.serde_audit --check"
 
 [tasks.rust-check-schema-residue]
 description = "Fail on retired JSON/serde patterns in production and direct-consumer sources"
 hide = true
-run = [
-  "uv run --no-sync pytest scripts/tests/test_check_schema_residue.py -q",
-  "uv run --no-sync python scripts/check_schema_residue.py",
-]
+run = "uv run --no-sync python scripts/check_schema_residue.py"
 
 [tasks.rust-check-schema-registry]
-description = "Regenerate the schema registries in clean-room trees and run the schema-contract tests"
+description = "Regenerate the schema registries in clean-room trees and compare them with the checked-in bytes"
 hide = true
 run = [
-  # Locally the rust-test build holds every gen_* binary (a no-op right after
-  # rust-test). CI's Generated artifacts job has no test build, so it builds
-  # the bins plus gen-check's generate_contracts example: an example build
-  # turns on dev-dependency features, so building the two apart compiles the
-  # workspace twice.
+  # Build the gen_* binaries. Locally that is the test build, which rust-test
+  # then reuses (in `mise run all`, gen-check runs before rust-test). CI's
+  # Generated artifacts job runs no tests, so it builds the bins plus
+  # gen-check's generate_contracts example: an example build turns on
+  # dev-dependency features, so building the two apart compiles the
+  # workspace twice. The schema-contract tests run in rust-test.
   '''
   if [ -n "${CI:-}" ]; then
     cargo build --workspace --exclude finstack-quant-py --bins --example generate_contracts
@@ -391,35 +383,9 @@ run = [
     cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --no-run
   fi
   ''',
-  "uv run --no-sync pytest scripts/tests/test_check_schema_generation.py -q",
   # Runs the gen_* binaries: inventory, $ref graph, and two clean-room trees
   # compared with each other and with the checked-in bytes.
   "uv run --no-sync python scripts/check_schema_generation.py",
-  # Schema-contract tests. Skipped in CI, where Test Rust's `rust-test` runs them.
-  """
-  if [ -n "${CI:-}" ]; then
-    echo "CI: schema-contract tests run in rust-test"
-    exit 0
-  fi
-  cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' \
-    --no-fail-fast -E '\
-    (binary_id(finstack-quant-analytics::analytics) & test(/schema_contract::/)) | \
-    (binary_id(finstack-quant-covenants::covenants) & test(/schema_contract::/)) | \
-    (binary_id(finstack-quant-cashflows::cashflows) & test(/schema_roundtrip::/)) | \
-    (binary_id(finstack-quant-portfolio::portfolio) & test(/materialization_schema/)) | \
-    (binary_id(finstack-quant-portfolio::portfolio) & test(/portfolio_schema_contract::/)) | \
-    (binary_id(finstack-quant-margin::margin) & test(/schema_parity/)) | \
-    (binary_id(finstack-quant-attribution::attribution) & test(/attribution::schema_contract::/)) | \
-    (binary_id(finstack-quant-calibration::calibration) & test(/schema_parity/)) | \
-    (binary_id(finstack-quant-statements::statements) & test(/schema_contract/)) | \
-    (binary_id(finstack-quant-statements-analytics::statements_analytics) & test(/analysis_schema_contract::/)) | \
-    (binary_id(finstack-quant-scenarios::scenarios) & test(/schema_contract/)) | \
-    (binary_id(finstack-quant-factor::factor) & test(/schema_contract::/)) | \
-    (binary_id(finstack-quant-models::models) & test(/model_schema_contract::/)) | \
-    (binary_id(finstack-quant-valuations::valuations) & test(/schema_parity/)) | \
-    (package(finstack-quant-valuations) & kind(lib) & test(/test_instrument_schema_union_parity/)) | \
-    (binary_id(finstack-quant-valuations::valuations) & test(/schema_audit/))'
-  """,
 ]
 
 # ─────────────────────────────────────────────────────────────────
@@ -427,10 +393,18 @@ run = [
 # ─────────────────────────────────────────────────────────────────
 
 [tasks.gen-write]
-description = "Regenerate checked-in reference data, schemas and TypeScript bindings"
+# The one regeneration command: every checked-in generated file, in dependency
+# order. Each artifact's check lives where its inputs are built: gen-check
+# (schemas, contract types, reference data, fixtures), rust-test (the registry
+# snapshot), wasm-test (the facade surface) and ui-check (UI files, fixtures).
+description = "Regenerate every checked-in generated file (schemas, fixtures, TypeScript bindings, UI files, facade surface, registry snapshot)"
 run = [
   "uv run --no-project python finstack-quant/core/build/generate_reference_data.py",
   { task = "rust-gen-schemas" },
+  # The pinned registry snapshot. The run writes the file and passes; the
+  # snapshot is embedded with include_str!, so the next rust-test rebuilds the
+  # binary and checks the new bytes.
+  "UPDATE_REGISTRY_SNAPSHOT=1 cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' -E 'binary_id(finstack-quant-valuations::valuations) & test(standard_registries_match_the_pinned_snapshot)'",
   # `cargo run` cannot select the workspace, so build, then run the binary.
   '''
   cargo build --workspace --exclude finstack-quant-py --example generate_contracts
@@ -438,7 +412,17 @@ run = [
   ''',
   "node finstack-quant-wasm/scripts/generate-contract-types.mjs",
   "uv run --no-sync python scripts/sync_generated_ts_index.py",
+  # The facade surface and the UI read the built WASM packages.
+  { task = "wasm-build" },
+  { task = "wasm-build-node" },
+  # The test writes plain JSON.stringify output; Prettier gives the committed form.
+  "UPDATE_FACADE_SURFACE=1 node --test finstack-quant-wasm/tests/facade/surface.test.mjs",
+  "finstack-quant-wasm/node_modules/.bin/prettier --log-level warn --write finstack-quant-wasm/facade-surface.json",
+  "npm --prefix finstack-quant-wasm run docs:sync",
   "npm --prefix finstack-quant-ui run generate",
+  { task = "ui-fixtures" },
+  # Last, so every file written above is listed.
+  "uv run --no-sync python scripts/generation_digest.py --write-manifest",
 ]
 
 [tasks.gen-check]
@@ -446,15 +430,13 @@ description = "Fail if any generated artifact drifts from its source"
 # The checks only read the workspace; the digest taken around them catches
 # one that writes. They run sequentially, not with `--jobs`: rust-check-schemas
 # and gen-check-contracts both invoke Cargo against the same target directory,
-# so in parallel they just queue invisibly on Cargo's build lock (see all-ci).
+# so in parallel they just queue invisibly on Cargo's build lock (see `all`).
 run = """
 set -eu
-uv run --no-sync pytest scripts/tests/test_generation_digest.py -q
 uv run --no-sync python scripts/generation_digest.py --check-manifest
 before_digest=$(uv run --no-sync python scripts/generation_digest.py)
 mise run rust-check-schemas
 mise run gen-check-contracts
-mise run gen-check-ui
 mise run gen-check-sources
 after_digest=$(uv run --no-sync python scripts/generation_digest.py)
 test "$before_digest" = "$after_digest" \
@@ -475,17 +457,11 @@ uv run --no-sync python scripts/sync_generated_ts_index.py --check \
   || (echo 'Generated TypeScript index is out of date'; exit 1)
 '''
 
-[tasks.gen-check-ui]
-description = "Verify the UI files generated from the contracts"
-hide = true
-run = "npm --prefix finstack-quant-ui run generate -- --check"
-
 [tasks.gen-check-sources]
 description = "Verify the core reference data and the generated instrument fixtures"
 hide = true
 run = '''
 set -eu
-uv run --no-sync pytest scripts/tests/test_generate_core_reference_data.py -q
 uv run --no-project python finstack-quant/core/build/generate_reference_data.py --check
 uv run --no-sync python scripts/check_generated_instrument_fixtures.py \
   || (echo 'Generated instrument fixtures do not match the registry manifest'; exit 1)
@@ -562,28 +538,6 @@ run = [
 [tasks.python-typecheck]
 description = "Type-check the Python package with ty"
 run = "uv run --no-sync ty check finstack-quant-py/finstack_quant"
-
-[tasks.python-doc]
-description = "Enforce complete Python IntelliSense documentation"
-run = [
-  "uv run --no-sync pytest scripts/tests/test_check_python_api_input_docs.py scripts/tests/test_check_pyo3_doc_placeholders.py -q",
-  "uv run --no-sync python scripts/check_python_api_input_docs.py",
-  "uv run --no-sync python scripts/check_pyo3_doc_placeholders.py",
-]
-
-[tasks.phase-gate]
-description = "Run the phase-end gates in two overlapping lanes (--full ignores the diff, --base REF picks the diff base)"
-usage = '''
-flag "--full" help="Run every gate regardless of the diff"
-flag "--dry-run" help="Print the plan without running gates"
-flag "--base <ref>" default="master" help="Diff base used to select gates"
-'''
-run = '''
-set --
-[ "${usage_full:-false}" = "true" ] && set -- "$@" --full
-[ "${usage_dry_run:-false}" = "true" ] && set -- "$@" --dry-run
-exec scripts/phase_gate.sh "$@" --base "${usage_base:-master}"
-'''
 
 [tasks.python-examples]
 description = "Run every example notebook; fail on errors, warnings or stderr"
@@ -679,13 +633,13 @@ description = "Format UI/TS code (prettier --write)"
 run = "npm --prefix finstack-quant-ui run format"
 
 [tasks.ui-typecheck]
-description = "Type-check the UI package with tsc"
+description = "Type-check the UI package with tsc (iteration; the gate is ui-check)"
 run = "npm --prefix finstack-quant-ui run typecheck"
 
 [tasks.ui-test]
 # Needs finstack-quant-wasm/pkg and pkg-node (wasm-build + wasm-build-node, or
 # wasm-pkg); the preflight names a missing one.
-description = "Run the UI Vitest tests"
+description = "Run the UI Vitest tests (iteration; the gate is ui-check)"
 run = "npm --prefix finstack-quant-ui run test --"
 
 [tasks.ui-check]
@@ -697,7 +651,8 @@ run = "npm --prefix finstack-quant-ui run check"
 [tasks.ui-fixtures]
 # Needs the Node WASM package (finstack-quant-wasm/pkg-node): wasm-build-node
 # (also run by wasm-test) or wasm-pkg.
-description = "Regenerate the native UI fixtures in dependency order (--check verifies the committed ones)"
+description = "Regenerate the native UI fixtures in dependency order (a step of gen-write; --check verifies the committed ones)"
+hide = true
 usage = 'flag "--check" help="Verify every committed fixture matches a fresh regeneration instead of writing"'
 run = '''
 set -e

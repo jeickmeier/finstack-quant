@@ -4,8 +4,9 @@ name: Full checks
 # SonarQube scan, documentation and every doc example, and the ignored Rust and
 # slow Python suites. nightly.yml and release.yml call it with
 # `secrets: inherit` (SONAR_TOKEN); dispatch it on any branch with
-# `gh workflow run full-checks.yml --ref <branch>`. `mise run all-ci --full`
-# runs it locally, without coverage.
+# `gh workflow run full-checks.yml --ref <branch>`. `mise run all --full`
+# runs it locally, without coverage; scripts/tests/test_gate_parity.py keeps the
+# two equal.
 #
 # No workflow-level `concurrency`: as a called workflow it would share the
 # caller's group and cancel or deadlock the caller's run.

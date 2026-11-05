@@ -37,8 +37,8 @@ mise run wasm-doc                                 # docs:check plus the Rust-sid
 ```
 
 Prefer the npm script or the `mise` task over invoking a file directly — they pass
-the argument set CI uses. `mise run wasm-doc` is a dependency of both
-`mise run all-lint` and `mise run all-doc`.
+the argument set CI uses. `mise run wasm-doc` runs in the nightly tier
+(`mise run all --full`, through `all-doc`).
 
 Exit codes are uniform: `0` clean, `1` contract violation, `2` usage error
 (passing `--write` and `--check` together).
@@ -155,7 +155,7 @@ npm --prefix finstack-quant-wasm run docs:check        # includes it
 ## Adding a checker
 
 - Add it to the `docs:check` chain in `package.json`; it then reaches
-  `mise run wasm-doc`, `all-lint`, and `all-doc` with no further wiring.
+  `mise run wasm-doc` and the nightly tier with no further wiring.
 - Honour the exit-code contract: 0 / 1 / 2 as above. Print failures to stderr,
   one per line, prefixed with `path:line:` where a position exists.
 - Support `--declaration=<path>` (or the equivalent) so the tooling tests can

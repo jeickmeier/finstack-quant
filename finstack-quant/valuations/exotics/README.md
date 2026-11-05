@@ -121,7 +121,7 @@ it:
 | JSON tag | `with_instrument_json_registry!` in `../json_loader.rs`, category `"commodity"`. Current tags: `commodity_forward`, `commodity_swap`, `commodity_spot_option`, `commodity_asian_option`, `commodity_swaption`, `commodity_spread_option` |
 | Metrics | `register_<name>_metrics` in the leaf's `metrics/`, called from `register_metrics` in `../exotics/family.rs` |
 | Metric traits | Options that use the finite-difference greeks path implement `crate::metrics::HasExpiry` and `HasDayCount` — see `commodity_spot_option/traits.rs` |
-| Schemas | `mise run rust-gen-schemas`, verified by `mise run rust-check-schemas` |
+| Schemas | `mise run gen-write`, verified by `mise run gen-check` |
 
 ## Tests and benches
 

@@ -20,7 +20,7 @@ Release Prep Progress:
 - [ ] Phase 7: Final verification & tagging
 ```
 
-After each phase, run `mise run all-ci` to confirm nothing is broken before proceeding.
+After each phase, run `mise run all` to confirm nothing is broken before proceeding.
 
 ## Phase 1: Dead code audit
 
@@ -264,8 +264,8 @@ cargo deny check
 # Python security audit (bandit)
 uv run --no-sync bandit -r finstack-quant-py -c pyproject.toml
 
-# Lint all components (no auto-fix — must pass clean)
-mise run all-lint
+# The gate: lint, generated files and tests on every surface (must pass clean)
+mise run all
 ```
 
 ### 6c. Rust toolchain verification
@@ -342,13 +342,13 @@ Create `RELEASE_NOTES_X.Y.Z.md` following the established template (see `RELEASE
 ### 7a. Full test suite
 
 ```bash
-mise run all-test
+mise run all --full
 ```
 
 ### 7b. CI and release gates
 
 ```bash
-mise run all-ci --release
+mise run all --release
 ```
 
 ### 7c. Pre-release checklist
@@ -418,11 +418,9 @@ After completing the audit, produce a release readiness report:
 ### Quality gates
 | Check | Status |
 |-------|--------|
-| `mise run all-ci --release` | pass/fail |
-| `mise run all-lint` | pass/fail |
+| `mise run all --release` | pass/fail |
 | `cargo deny check` | pass/fail |
 | `bandit -r finstack-quant-py` | pass/fail |
-| `mise run all-test` | pass/fail |
 | MSRV check | pass/fail |
 | Publish dry-run | pass/fail |
 | Semver checks | pass/fail |

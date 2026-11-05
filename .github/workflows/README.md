@@ -52,21 +52,26 @@ per-test time cap, which is CI-only; reproduce it with
 
 ### checks.yml
 
-The fast tier. `prime-cache` runs first as the single writer of the mise
-cache, and saves it only on `master`; pull requests and tags only restore it.
-Every other job reads it with `cache_save: false`, since concurrent
-`actions/cache/save` calls race on the shared `mise.toml`-derived key. The
-other jobs then run in parallel, and each fails the run on its own:
+The fast tier, and `mise run all` split across runners: each job below runs
+one stage of `mise run all`, and `scripts/tests/test_gate_parity.py` fails if
+the two disagree. What each stage enforces is in
+[`../../scripts/README.md`](../../scripts/README.md). `prime-cache` runs first
+as the single writer of the mise cache, and saves it only on `master`; pull
+requests and tags only restore it. Every other job reads it with
+`cache_save: false`, since concurrent `actions/cache/save` calls race on the
+shared `mise.toml`-derived key. The other jobs then run in parallel, and each
+fails the run on its own:
 
-| Job | Command | Notes |
-| --- | --- | --- |
-| Supply-chain Security | `mise run all-audit` | `cargo deny check` (advisories, licenses, bans), then OSV-Scanner over `Cargo.lock`, `uv.lock` and `finstack-quant-wasm/package-lock.json`, filtered by `osv-scanner.toml`. Gates nothing else. |
-| Lint | `mise run pre-commit-run` | `SKIP: cargo-deny,osv-scanner`, which the supply-chain job owns. Clippy covers lib/bins/tests/examples (`--all-features`), not Criterion benches. |
-| Generated artifacts | `mise run gen-check` | Non-mutating drift check of the JSON schemas, WASM contract types, UI registry and other generated sources, so a generated file left stale fails the run. Builds the `gen_*` binaries and the `generate_contracts` example. |
-| Test Rust | `mise run rust-test` | The fast nextest lib and integration targets, uninstrumented (no doctests, no `#[ignore]`d tests), under `NEXTEST_PROFILE=ci`; writes a Job Summary from nextest's `junit.xml`. |
-| Test Python | `mise run python-test` | maturin dev build, then the fast pytest suite (`-m 'not slow and not doctest'`) without coverage; writes a Job Summary from `coverage/python/junit.xml`. |
-| Test WASM | `mise run wasm-test` | wasm-bindgen tests plus the Node facade suite and JSDoc sync check (the documented code samples run under `--doctest`); writes a Job Summary of the test results. |
-| Test UI | `mise run ui-check` | The component registry's generator drift, native fixture drift (`ui-fixtures --check`), Prettier, token and registry-closure checks, tsc and Vitest, against the dev web and Node WASM packages (`mise run wasm-build` and `wasm-build-node`, after `mise run ui-sync`); restores Test WASM's Rust cache read-only. |
+- **Supply-chain Security** (`all-audit`) gates nothing else.
+- **Lint** (`pre-commit-run`) runs every hook, as locally.
+- **Generated artifacts** (`gen-check`) builds the `gen_*` binaries and the
+  `generate_contracts` example rather than the test profile.
+- **Test Rust** (`rust-test`) runs under `NEXTEST_PROFILE=ci`. **Test Rust**,
+  **Test Python** (`python-test`) and **Test WASM** (`wasm-test`) write Job
+  Summaries with `scripts/ci_report.py`.
+- **Test UI** (`ui-check`) builds the dev web and Node WASM packages first
+  (`wasm-build`, `wasm-build-node`, after `ui-sync`) and restores Test WASM's
+  Rust cache read-only.
 
 The tier's budget is under 15 minutes wall clock on a warm `master` cache. The
 `ci` nextest profile (`.config/nextest.toml`) reports a test as slow at 20 s
@@ -103,16 +108,22 @@ gh workflow run full-checks.yml --ref <branch>
 ```
 
 Its `prime-cache` job restores the mise cache read-only; `checks.yml`'s
-`prime-cache` is the single writer. The jobs:
+`prime-cache` is the single writer. Every job except coverage and SonarQube is
+one step of `mise run all --full`:
 
-| Job | Command | Notes |
-| --- | --- | --- |
-| Rust coverage | `mise run rust-test --coverage` | The fast nextest lib and integration targets under `cargo llvm-cov`; writes a Job Summary from nextest's `junit.xml` and `coverage/rust/lcov.info`, and uploads `coverage/rust/lcov.info`. |
-| Python coverage | `mise run python-test --coverage` | The fast pytest suite with coverage; writes a Job Summary from `coverage/python/{junit.xml,coverage.xml}` and uploads `coverage/python/coverage.xml`. |
-| SonarQube | `SonarSource/sonarqube-scan-action` | `master` only, after both coverage jobs, so it is skipped in a release run and on a dispatched branch. Scan only: it imports the two coverage artifacts, runs no tests and no clippy (`sonar.rust.clippy.enabled=false`; Lint owns clippy), and writes the Quality Gate and project measures to the Job Summary. |
-| Documentation | `mise run all-doc`, then `rust-test`, `python-test` and `wasm-test` with `--doctest` | Strict rustdoc, the public-API input-doc and deprecation contracts, the Python and WASM documentation contracts, and the benchmark documents; then the Rust doctests, the Python stub and module doctests, and the WASM documented code samples. Installs nightly for `cargo public-api`. |
-| Test ignored Rust suite | `mise run rust-test --slow` | The `#[ignore]`d suite, outside the `ci` nextest profile's per-test cap. |
-| Test slow Python suite | `mise run python-test --slow` | Golden pricing comparisons and Monte Carlo. |
+- **Rust coverage** (`rust-test --coverage`) and **Python coverage**
+  (`python-test --coverage`) are CI-only; they upload `coverage/rust/lcov.info`
+  and `coverage/python/coverage.xml`.
+- **SonarQube** (`SonarSource/sonarqube-scan-action`) runs on `master` only,
+  after both coverage jobs, so it is skipped in a release run and on a
+  dispatched branch. It only scans: it imports the two coverage artifacts, runs
+  no tests and no clippy (`sonar.rust.clippy.enabled=false`), and writes the
+  Quality Gate to the Job Summary.
+- **Documentation** (`all-doc`, then `rust-test`, `python-test` and
+  `wasm-test` with `--doctest`) installs nightly for `cargo public-api`.
+- **Test ignored Rust suite** (`rust-test --slow`) runs outside the `ci`
+  nextest profile's per-test cap; **Test slow Python suite**
+  (`python-test --slow`) runs the golden pricing comparisons and Monte Carlo.
 
 Rust coverage and Documentation own the `coverage-rust` and `docs` rust-cache
 keys, saved only on `master`. The other jobs restore a fast-tier key read-only:
@@ -266,17 +277,15 @@ task cannot be reproduced locally at all.
 
 Local equivalents:
 
-- `mise run all-ci` regenerates derived artifacts first, then runs the fast
-  tier: `pre-commit-run`, `gen-check`, the fast tests on all three surfaces,
-  `ui-check` against the WASM packages those tests build, and `all-audit`.
-  Native UI fixtures are verified by `ui-check`, not regenerated by
-  `gen-write`; run `mise run ui-fixtures` after a WASM rebuild. GitHub CI uses
-  `gen-check` as a non-mutating drift gate so uncommitted generated files fail
-  the Generated artifacts job.
-- `mise run all-ci --full` adds the full tier without coverage: `all-doc`;
+- `mise run all` is the fast tier: `pre-commit-run`, `gen-check`, the fast
+  tests on all three surfaces, `ui-check` against the WASM packages those tests
+  build, and `all-audit`. It never regenerates; run `mise run gen-write` first
+  when a generator or wire type changed, so a stale generated file fails here
+  as it would in the Generated artifacts job.
+- `mise run all --full` adds the full tier without coverage: `all-doc`;
   `rust-test`, `python-test` and `wasm-test` with `--doctest`; and
   `rust-test --slow` and `python-test --slow`.
-- `mise run all-ci --release` is `--full` plus the release gates:
+- `mise run all --release` is `--full` plus the release gates:
   `rust-publish-checks` and `cargo semver-checks check-release` against the
   previous release tag.
 - Benchmarks are not run in CI. Use `mise run rust-bench` or

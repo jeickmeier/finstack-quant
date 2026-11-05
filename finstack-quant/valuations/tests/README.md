@@ -168,7 +168,7 @@ Schema and fixture drift is gated separately, because it depends on generated
 artifacts rather than on test code:
 
 ```bash
-mise run rust-check-schemas   # includes schema_audit and integration schema_parity
+mise run gen-check
 mise run gen-check            # schemas, fixtures, and bindings are idempotent
 ```
 
@@ -177,7 +177,7 @@ mise run gen-check            # schemas, fixtures, and bindings are idempotent
 **New instrument** — create `instruments/<name>/`, add the `#[path = ...] mod`
 entry to [`instruments.rs`](instruments.rs), register the tag in
 `instruments/coverage_manifest.toml`, and regenerate its canonical fixture with
-`cargo run -p finstack-quant-valuations --bin gen_schemas -- --write`. See
+`mise run gen-write`. See
 [`instruments/README.md`](instruments/README.md).
 
 **New calibration / metrics / market / cashflows test** — add the file to the

@@ -370,7 +370,8 @@ mise run wasm-doc     # JSDoc/TypeScript documentation gates + tsc declaration c
 mise run rust-test    # workspace nextest, including this crate's dts_contract suite
 ```
 
-`mise run all-lint` includes `wasm-lint`, `wasm-doc`, and `gen-check`. The four test
+`mise run all` runs `wasm-lint` (through pre-commit) and `wasm-test`; `wasm-doc` runs in
+the nightly tier, `mise run all --full`. The four test
 layers, what each one catches, and how to run them individually are documented in
 [`tests/README.md`](tests/README.md).
 

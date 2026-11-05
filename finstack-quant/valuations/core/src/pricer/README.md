@@ -275,7 +275,7 @@ The remaining steps live outside this directory:
 `with_instrument_json_registry!` in `../instruments/json_loader.rs`, the
 `register_<name>_metrics` hook called from the family's `family.rs`, tests
 under `../../tests/instruments/<name>/`, and
-`mise run rust-gen-schemas` when the public JSON shape changes. See
+`mise run gen-write` when the public JSON shape changes. See
 [`../instruments/README.md`](../instruments/README.md).
 
 ## Errors
@@ -365,8 +365,8 @@ mise run rust-test
 mise run rust-lint
 
 # Regenerate after changing any public serde type reachable from a key.
-mise run rust-gen-schemas
-mise run rust-check-schemas
+mise run gen-write
+mise run gen-check
 ```
 
 The CI-critical tests are

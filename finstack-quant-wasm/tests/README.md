@@ -233,8 +233,8 @@ mise run rust-test    # workspace nextest, including this crate's dts_contract
 mise run wasm-lint    # prettier + eslint + the to_js_value serializer check
 ```
 
-`mise run all-lint` includes `wasm-lint` and `wasm-doc`; CI runs `wasm-test`
-and `rust-test` as separate jobs.
+`mise run all` runs `wasm-lint` (through pre-commit), `rust-test` and `wasm-test`;
+CI runs them as separate jobs, and `wasm-doc` in the nightly tier.
 
 ## See also
 

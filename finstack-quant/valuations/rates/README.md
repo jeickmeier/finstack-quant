@@ -160,7 +160,7 @@ Other steps:
   registered there with the documented default Hull-White parameters
   (`DEFAULT_KAPPA`, `DEFAULT_SIGMA`); production risk should re-register on a
   cloned registry with parameters calibrated to co-terminal Europeans.
-- `mise run rust-gen-schemas`, verified by `mise run rust-check-schemas`.
+- `mise run gen-write`, verified by `mise run gen-check`.
 
 ## Tests and benches
 

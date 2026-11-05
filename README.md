@@ -326,8 +326,8 @@ Python list. Ten registry domains publish schemas today (`attribution`, `calibra
 `valuations`). Their Python and WASM schema namespaces mirror domain ownership, with the
 factor registry at `models.factor.schema`.
 
-Regenerate with `mise run rust-gen-schemas`; check for drift with
-`mise run rust-check-schemas`.
+Regenerate with `mise run gen-write`; check for drift with
+`mise run gen-check`.
 
 ## Notebook curriculum
 
@@ -401,29 +401,25 @@ are written for POSIX shells.
 
 ## Common commands
 
-`mise.toml` defines tasks named `<domain>-<action>`. `all-*` fans out across
-all three languages, `rust-*` / `python-*` / `wasm-*` are per-language, and the
-rest are narrower (`gen-*`, `ui-*`, `docs-site-*`, `wheel-*`, `pre-commit-run`).
-`*-fmt` tasks mutate; `*-lint` tasks are check-only. Run `mise tasks` for the
-full list.
+`mise.toml` defines tasks named `<domain>-<action>`. `rust-*` / `python-*` /
+`wasm-*` / `ui-*` are per-surface, `gen-*` covers generated files, and `all`
+is the gate. `*-fmt` tasks mutate; `*-lint` tasks are check-only. Run
+`mise tasks` for the full list; [`scripts/README.md`](scripts/README.md) maps
+every checker to the convention it enforces and the stage that runs it.
 
 | Command | Purpose |
 |---|---|
-| `mise run all` | Run the complete test and lint gates without a separate preliminary build |
-| `mise run all-build` | Explicitly build Rust, Python, and WASM artifacts |
-| `mise run all-lint` | Lint Rust, Python, and WASM (check-only) |
+| `mise run all` | The pre-PR gate: exactly what CI runs on a pull request; `--full` adds the nightly tier (docs, doctests, slow suites) without coverage, `--release` the release gates |
+| `mise run gen-write` | Regenerate every generated file: schemas, fixtures, TypeScript bindings and declarations, UI files, the facade surface and the registry snapshot |
+| `mise run gen-check` | Fail if any generated file is stale (non-mutating) |
 | `mise run all-fmt` | Format Rust, Python, and WASM; auto-fix Python and WASM (mutating) |
+| `mise run all-build` | Explicitly build Rust, Python, and WASM artifacts |
 | `mise run rust-fix` | Apply clippy --fix across the Rust workspace (mutating) |
-| `mise run all-test` | Run Rust, Python, and WASM tests |
-| `mise run all-ci` | Regenerate derived artifacts, then run the PR checks (the fast CI tier) locally; `--full` adds the nightly full tier without coverage, `--release` the full tier plus the release gates |
 | `mise run rust-build` | Build the Rust workspace excluding the binding crates |
 | `mise run rust-test` | Run native Rust tests via `cargo nextest`; `--doctest` runs only the doctests |
 | `mise run rust-lint` | `cargo fmt --check` plus clippy with `-D warnings` across the workspace |
 | `mise run rust-doc` | Build workspace docs and enforce input docs |
 | `mise run rust-bench` | Run Criterion benchmarks with reduced measurement timing |
-| `mise run gen-write` | Regenerate checked-in schemas, fixtures, and TypeScript bindings |
-| `mise run rust-gen-schemas` | Regenerate typed JSON schemas from Rust types |
-| `mise run rust-check-schemas` | Verify JSON schemas match Rust types |
 | `mise run python-build` | Build the Python extension in place (dev profile) |
 | `mise run python-build -- --release` | Build the Python extension in release mode |
 | `mise run python-test` | Build the dev extension, then run fast Python tests |
@@ -436,8 +432,7 @@ full list.
 | `mise run wasm-test` | Run wasm-bindgen and Node facade tests |
 | `mise run wasm-test-built` | Rerun Node facade tests against the already built WASM package |
 | `mise run ui-fmt` | Format the UI package with Prettier (mutating) |
-| `mise run ui-typecheck` | Type-check the UI package with `tsc` |
-| `mise run ui-test` | Run the UI Vitest suite |
+| `mise run ui-check` | The UI gate: generator and fixture drift, formatting, registry and token rules, `tsc`, and Vitest |
 | `mise run docs-site-install` | Install everything the docs site needs, from a fresh clone |
 | `mise run docs-site-dev` | Serve the docs site at <http://localhost:3000> |
 | `mise run docs-site-build` | Execute every lesson and notebook, check the evidence, and export the static site |
@@ -463,7 +458,7 @@ at link time. CI sets `CARGO_INCREMENTAL=0` because its build cache does not
 restore `target/incremental`. `python3 scripts/clean_workspace.py --incremental`
 reclaims the incremental caches.
 
-Benchmarks are measurement tasks and stay outside `all-test`, nextest,
+Benchmarks are measurement tasks and stay outside `mise run all`, nextest,
 `rust-fix`, and `rust-lint`. `rust-fmt` still formats bench sources. CI does not
 run them; use `mise run rust-bench` or `mise run rust-bench-crate` to measure locally.
 `scripts/materialization_bench.sh` runs the portfolio materialization

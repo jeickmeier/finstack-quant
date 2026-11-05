@@ -87,8 +87,8 @@ schema-index summary, and the schema-parity check are all generated from it.
    register the pricer in that file's `register_pricers` and name the family
    as the second argument of `impl_instrument_base!`.
 6. Add tests under `../../tests/instruments/<name>/`, then regenerate schemas
-   when the public JSON shape changes: `mise run rust-gen-schemas`
-   (verify with `mise run rust-check-schemas`).
+   when the public JSON shape changes: `mise run gen-write`
+   (verify with `mise run gen-check`).
 
 ## Related
 

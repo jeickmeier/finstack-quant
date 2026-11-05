@@ -34,9 +34,8 @@ in place until the package directory is deleted.
 
 In `mise.toml`:
 
-- Remove `npm --prefix finstack-quant-ui run generate` from `[tasks.gen-write]`.
-- Remove the `[tasks.gen-check-ui]` task and its `gen-check-ui` entry in
-  `[tasks.gen-check]`.
+- Remove `npm --prefix finstack-quant-ui run generate` and
+  `{ task = "ui-fixtures" }` from `[tasks.gen-write]`.
 
 In `scripts/generation_digest.py`, remove every `finstack-quant-ui/...` path
 and `docs-site/content/docs/registry/instruments.mdx` from `DEFAULT_PATHS`
@@ -98,7 +97,7 @@ Then edit:
 
 Delete the `[tasks.ui-*]` block in `mise.toml`, from `ui-sync` through
 `ui-publish-check`, including the section header that introduces it, and the
-`{ task = "ui-check" }` entry in `all-ci`.
+`ui-check` entry in `[tasks.all]`.
 
 ## Delete the package
 
@@ -111,8 +110,8 @@ Update the remaining mentions:
 - `README.md`: the tree entry for `finstack-quant-ui/` and the
   "UI components and docs site" section. Keep the `docs-site/` description
   for the analyst reader.
-- `AGENTS.md`: the bullet that tells agents to regenerate UI native fixtures
-  with `mise run ui-fixtures` after a WASM rebuild.
+- `AGENTS.md`: the bullet about the UI native fixtures that `mise run gen-write`
+  regenerates.
 
 Search the tree for `finstack-quant-ui` and `ui-docs-install`. The OSV
 scan in `mise.toml` lists `Cargo.lock`, `uv.lock`, and
