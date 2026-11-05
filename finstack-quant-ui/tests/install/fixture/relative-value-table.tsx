@@ -1,4 +1,5 @@
 "use client";
+import type { ComponentProps } from "react";
 import { RelativeValueTable } from "@/components/finstack/statements/components/relative-value-table/relative-value-table";
 import type {
   CompanyMetrics,
@@ -16,7 +17,11 @@ export function InstalledItem() {
       <RelativeValueTable
         subject={subject as CompanyMetrics}
         universe={universe as CompanyMetrics[]}
-        defaultConfig={cases.full.config}
+        defaultConfig={
+          cases.full.config as unknown as ComponentProps<
+            typeof RelativeValueTable
+          >["defaultConfig"]
+        }
         onSubmit={() => {}}
         report={cases.full.report as unknown as RelativeValueReport}
       />

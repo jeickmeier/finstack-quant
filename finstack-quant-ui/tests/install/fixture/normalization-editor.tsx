@@ -1,4 +1,5 @@
 "use client";
+import type { ComponentProps } from "react";
 import { NormalizationEditor } from "@/components/finstack/statements/components/normalization-editor/normalization-editor";
 import type { NormalizationResult } from "@/workers/finstack-contract";
 
@@ -12,7 +13,11 @@ export function InstalledItem() {
     <>
       <p>Supplied valid fixture; standalone normalization editor.</p>
       <NormalizationEditor
-        defaultConfig={config}
+        defaultConfig={
+          config as unknown as ComponentProps<
+            typeof NormalizationEditor
+          >["defaultConfig"]
+        }
         nodeIds={["ebitda", "revenue"]}
         validate={passThrough}
         onSubmit={() => {}}
