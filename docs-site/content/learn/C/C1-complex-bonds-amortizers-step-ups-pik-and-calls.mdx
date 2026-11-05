@@ -202,7 +202,7 @@ The three cases change issuer asset coverage while holding volatility, debt barr
 from finstack_quant.models.credit import MertonModel,ToggleExerciseModel
 from finstack_quant.valuations.instruments import MertonMcConfig,PikMode,PikSchedule,BarrierCrossing
 # Merton MC supports a bullet fixed-rate bond; it does not support the amortizing 8NC3.
-toggle_bond=Bond.fixed("TOGGLE-BULLET",1_000_000.,.08,AS_OF,date(2030,1,15),"none","USD-OIS",currency="USD")
+toggle_bond=Bond.fixed("TOGGLE-BULLET",Money(1_000_000.,"USD"),.08,AS_OF,date(2030,1,15),"none","USD-OIS")
 toggle_rows=[]
 for asset_value in [900_000.,1_300_000.,1_800_000.]:
     config=(MertonMcConfig(MertonModel(asset_value,.25,800_000.,.04),.40)
@@ -229,8 +229,8 @@ The reconstruction preserves the published contract conventions. It compares the
 {/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="c1-exercise-contract" role="exercise" */}
 ```python exec id=c1-exercise-contract role=exercise
 # Start from the typed fixed-bond envelope and write every complex economic term.
-answer=json.loads(Bond.fixed("ANALYST-PIK-CALLABLE",1_000_000.,.08,AS_OF,date(2033,1,15),
-                            "short_front","USD-OIS",currency="USD").to_json())
+answer=json.loads(Bond.fixed("ANALYST-PIK-CALLABLE",Money(1_000_000.,"USD"),.08,AS_OF,date(2033,1,15),
+                            "short_front","USD-OIS").to_json())
 a=answer["instrument"]["spec"]
 coupon=a["cashflow_spec"]["fixed"];coupon.pop("rate")
 coupon.update({"initial_rate":"0.08","step_schedule":[["2029-01-15","0.0825"]],

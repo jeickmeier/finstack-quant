@@ -296,17 +296,17 @@ def build_cases() -> dict[str, Any]:
     swap = build_irs()
     rates_market = rates_cases._market_json()
     swap_result = swap.price(rates_market, "2024-01-15", metrics=["dv01"])
-    conventions_swap = ins.InterestRateSwap.from_conventions(
-        "IRS-CONV",
-        Money(10_000_000.0, USD),
-        "pay",
-        0.035,
-        "2025-01-15",
-        "2030-01-15",
-        "USD-SOFR",
-        "USD-OIS",
-        "USD-SOFR",
-    )
+    conventions_swap = ins.InterestRateSwap.from_conventions({
+        "id": "IRS-CONV",
+        "notional": Money(10_000_000.0, USD),
+        "side": "pay",
+        "fixed_rate": 0.035,
+        "start_date": "2025-01-15",
+        "maturity": "2030-01-15",
+        "index_id": "USD-SOFR",
+        "discount_curve_id": "USD-OIS",
+        "forward_curve_id": "USD-SOFR",
+    })
     swaption = ins.Swaption.example()
     cases["rates"] = {
         "market": rates_market,
@@ -330,14 +330,16 @@ def build_cases() -> dict[str, Any]:
     cds = ins.CreditDefaultSwap.example()
     index = ins.CdsIndex.from_preset(
         ins.CdsIndexParams.cdx_na_ig(42, 1, Bps(100.0)),
-        "CDX-IG-42",
-        Money(10_000_000.0, USD),
-        "pay",
-        "2024-03-20",
-        "2029-06-20",
-        0.4,
-        "USD-OIS",
-        "CDX.NA.IG.HAZARD",
+        {
+            "id": "CDX-IG-42",
+            "notional": Money(10_000_000.0, USD),
+            "side": "pay",
+            "start": "2024-03-20",
+            "end": "2029-06-20",
+            "recovery_rate": 0.4,
+            "discount_curve_id": "USD-OIS",
+            "credit_curve_id": "CDX.NA.IG.HAZARD",
+        },
     )
     tranche_params = ins.CdsTrancheParams.mezzanine_tranche(
         "CDX.NA.IG", 42, Money(10_000_000.0, USD), "2029-12-20", Bps(100.0)

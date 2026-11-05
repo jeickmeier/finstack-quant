@@ -349,17 +349,7 @@ class CdsIndex:
         """
         ...
     @staticmethod
-    def from_preset(
-        preset: CdsIndexParams,
-        id: str,
-        notional: Money,
-        side: Literal["pay", "receive"],
-        start: datetime.date | datetime.datetime | pd.Timestamp | str,
-        end: datetime.date | datetime.datetime | pd.Timestamp | str,
-        recovery_rate: float,
-        discount_curve_id: str,
-        credit_curve_id: str,
-    ) -> CdsIndex:
+    def from_preset(preset: CdsIndexParams, params: dict[str, Any] | str) -> CdsIndex:
         """
         Build an index trade from a standardized preset (mirrors Rust
         ``CdsIndex::from_preset``): the premium leg takes the preset's fixed
@@ -371,22 +361,20 @@ class CdsIndex:
         ----------
         preset : CdsIndexParams
             Index identity, coupon and convention (e.g. :meth:`CdsIndexParams.cdx_na_ig`).
-        id : str
-            Unique instrument identifier for the trade.
-        notional : Money
-            Index notional.
-        side : {"pay", "receive"}
-            ``"pay"`` buys protection, ``"receive"`` sells protection.
-        start : datetime.date | datetime.datetime | pd.Timestamp | str
-            Premium accrual start (typically the last IMM roll).
-        end : datetime.date | datetime.datetime | pd.Timestamp | str
-            Scheduled maturity (an IMM date).
-        recovery_rate : float
-            Assumed recovery as a fraction (``0.4`` = 40%).
-        discount_curve_id : str
-            Discount curve identifier.
-        credit_curve_id : str
-            Index hazard curve identifier.
+        params : dict[str, Any] | str
+            ``CdsTradeParams`` trade terms as a dict or JSON text. Every key is
+            required:
+
+            - ``id`` (str): unique instrument identifier for the trade.
+            - ``notional`` (Money | dict): index notional, a ``Money`` or its wire dict ``{"amount": "1000000", "currency": "USD"}``.
+            - ``side`` (str): ``"pay"`` buys protection, ``"receive"`` sells it.
+            - ``start`` (datetime.date | str): ISO 8601 date: premium accrual start (typically the last
+              IMM roll).
+            - ``end`` (datetime.date | str): ISO 8601 date: scheduled maturity (an IMM date).
+            - ``recovery_rate`` (float): assumed recovery as a fraction
+              (``0.4`` = 40%).
+            - ``discount_curve_id`` (str): discount curve identifier.
+            - ``credit_curve_id`` (str): index hazard curve identifier.
 
         Returns
         -------
@@ -396,7 +384,7 @@ class CdsIndex:
         Raises
         ------
         ValueError
-            If ``side`` is unknown, a date cannot be interpreted, or the preset
+            If ``params`` has a missing, unknown or malformed key, or the preset
             coupon is not representable.
 
         Examples
@@ -406,14 +394,16 @@ class CdsIndex:
         >>> from finstack_quant.valuations.instruments import CdsIndex, CdsIndexParams
         >>> idx = CdsIndex.from_preset(
         ...     CdsIndexParams.cdx_na_ig(42, 1, 100.0),
-        ...     "CDX-42-5Y",
-        ...     Money(10_000_000.0, Currency("USD")),
-        ...     "pay",
-        ...     "2024-03-20",
-        ...     "2029-06-20",
-        ...     0.4,
-        ...     "USD-OIS",
-        ...     "CDX.NA.IG.HAZARD",
+        ...     {
+        ...         "id": "CDX-42-5Y",
+        ...         "notional": Money(10_000_000.0, Currency("USD")),
+        ...         "side": "pay",
+        ...         "start": "2024-03-20",
+        ...         "end": "2029-06-20",
+        ...         "recovery_rate": 0.4,
+        ...         "discount_curve_id": "USD-OIS",
+        ...         "credit_curve_id": "CDX.NA.IG.HAZARD",
+        ...     },
         ... )
         >>> (idx.convention, idx.num_constituents, idx.index_factor)
         ('isda_na', 125, 1.0)

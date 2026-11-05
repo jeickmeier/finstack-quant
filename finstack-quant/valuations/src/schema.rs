@@ -723,9 +723,11 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::MarketDependencies;
     use crate::instruments::cashflow_export::{CurrencyLadder, InstrumentCashflowEnvelope};
     use crate::instruments::composite::{CompositeHistoryRow, CompositeRebalanceResult};
+    use crate::instruments::credit_derivatives::cds::CdsTradeParams;
     use crate::instruments::credit_derivatives::cds_index::CdsIndexParams;
     use crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
     use crate::instruments::fixed_income::asset_backed_facility::FacilityProjection;
+    use crate::instruments::fixed_income::bond::FloatingBondParams;
     use crate::instruments::fixed_income::bond::pricing::merton_mc::MertonMcResult;
     use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
         BondQuoteSet, BondWorkoutLadder,
@@ -737,7 +739,15 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         ScenarioGrid, ScenarioTable, SimulationDiagnostics, SimulationRun, StandardDealFamily,
         StandardDealParams, TrancheCashflows, TrancheMetrics,
     };
+    use crate::instruments::fx::fx_forward::FxForwardTradeDateParams;
+    use crate::instruments::fx::fx_option::FxOptionParams;
+    use crate::instruments::fx::fx_swap::FxSwapTradeDateParams;
+    use crate::instruments::fx::ndf::NdfTradeDateParams;
     use crate::instruments::json_loader::InstrumentJson;
+    use crate::instruments::rates::cap_floor::CapFloorParams;
+    use crate::instruments::rates::cms_swap::CmsSwapScheduleParams;
+    use crate::instruments::rates::irs::ConventionSwapParams;
+    use crate::instruments::rates::swaption::BermudanSwaptionParams;
     use crate::market::conventions::{
         CdsConventionSpec, InflationSwapConventions, IrFutureConventions, RateIndexConventions,
         SwaptionConventions, XccyConventions,
@@ -1288,6 +1298,96 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Component)
         .with_examples(examples::cds_index_params),
+        finstack_quant_core::schema_artifact!(
+            CdsTradeParams,
+            "common",
+            "cds_trade_params",
+            Input,
+            "Trade terms (id, notional, side, dates, recovery, curves) of a standard-convention CDS index trade."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::cds_trade_params),
+        finstack_quant_core::schema_artifact!(
+            FloatingBondParams,
+            "common",
+            "floating_bond_params",
+            Input,
+            "Identifier, notional, index, spread, dates, frequency, day count and curve of a floating-rate note."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::floating_bond_params),
+        finstack_quant_core::schema_artifact!(
+            FxForwardTradeDateParams,
+            "common",
+            "fx_forward_trade_date_params",
+            Input,
+            "Trade-date, tenor and spot-roll inputs of an FX forward built from its trade date."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::fx_forward_trade_date_params),
+        finstack_quant_core::schema_artifact!(
+            FxSwapTradeDateParams,
+            "common",
+            "fx_swap_trade_date_params",
+            Input,
+            "Trade-date, far tenor and spot-roll inputs of an FX swap built from its trade date."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::fx_swap_trade_date_params),
+        finstack_quant_core::schema_artifact!(
+            NdfTradeDateParams,
+            "common",
+            "ndf_trade_date_params",
+            Input,
+            "Trade-date, tenor, contract rate and fixing inputs of an NDF built from its trade date."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::ndf_trade_date_params),
+        finstack_quant_core::schema_artifact!(
+            FxOptionParams,
+            "common",
+            "fx_option_params",
+            Input,
+            "Pair, strike, expiry, notional, volatility surface, call/put and delta convention of a European FX option."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::fx_option_params),
+        finstack_quant_core::schema_artifact!(
+            CapFloorParams,
+            "common",
+            "cap_floor_params",
+            Input,
+            "Option type, notional, strike, schedule and curves of a standard cap, floor, caplet or floorlet."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::cap_floor_params),
+        finstack_quant_core::schema_artifact!(
+            CmsSwapScheduleParams,
+            "common",
+            "cms_swap_schedule_params",
+            Input,
+            "Schedule, CMS terms, funding leg, notional and curves of a CMS swap built from its schedule."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::cms_swap_schedule_params),
+        finstack_quant_core::schema_artifact!(
+            BermudanSwaptionParams,
+            "common",
+            "bermudan_swaption_params",
+            Input,
+            "Option type, notional, strike, underlying swap dates, exercise schedule and curves of a co-terminal Bermudan swaption."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::bermudan_swaption_params),
+        finstack_quant_core::schema_artifact!(
+            ConventionSwapParams,
+            "common",
+            "convention_swap_params",
+            Input,
+            "Identifier, notional, side, fixed rate, dates, rate index and curves of a vanilla swap built from market conventions."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::convention_swap_params),
         finstack_quant_core::schema_artifact!(
             CdsTrancheParams,
             "common",

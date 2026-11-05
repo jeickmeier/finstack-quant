@@ -2621,6 +2621,13 @@
             "bytes": 843
           },
           {
+            "path": "schemas/common/1/bermudan_swaption_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/bermudan_swaption_params.schema.json",
+            "type_name": "BermudanSwaptionParams",
+            "kind": "input",
+            "bytes": 4879
+          },
+          {
             "path": "schemas/common/1/bond_quote_input.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/bond_quote_input.schema.json",
             "type_name": "BondQuoteInput",
@@ -2633,6 +2640,13 @@
             "type_name": "BusinessDayConvention",
             "kind": "component",
             "bytes": 1989
+          },
+          {
+            "path": "schemas/common/1/cap_floor_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/cap_floor_params.schema.json",
+            "type_name": "CapFloorParams",
+            "kind": "input",
+            "bytes": 3670
           },
           {
             "path": "schemas/common/1/cds_convention_spec.schema.json",
@@ -2649,11 +2663,32 @@
             "bytes": 3032
           },
           {
+            "path": "schemas/common/1/cds_trade_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/cds_trade_params.schema.json",
+            "type_name": "CdsTradeParams",
+            "kind": "input",
+            "bytes": 3026
+          },
+          {
             "path": "schemas/common/1/cds_tranche_params.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/cds_tranche_params.schema.json",
             "type_name": "CdsTrancheParams",
             "kind": "component",
             "bytes": 1965
+          },
+          {
+            "path": "schemas/common/1/cms_swap_schedule_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/cms_swap_schedule_params.schema.json",
+            "type_name": "CmsSwapScheduleParams",
+            "kind": "input",
+            "bytes": 6676
+          },
+          {
+            "path": "schemas/common/1/convention_swap_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/convention_swap_params.schema.json",
+            "type_name": "ConventionSwapParams",
+            "kind": "input",
+            "bytes": 3200
           },
           {
             "path": "schemas/common/1/currency.schema.json",
@@ -2689,6 +2724,34 @@
             "type_name": "Diagnostic",
             "kind": "component",
             "bytes": 4367
+          },
+          {
+            "path": "schemas/common/1/floating_bond_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/floating_bond_params.schema.json",
+            "type_name": "FloatingBondParams",
+            "kind": "input",
+            "bytes": 2581
+          },
+          {
+            "path": "schemas/common/1/fx_forward_trade_date_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/fx_forward_trade_date_params.schema.json",
+            "type_name": "FxForwardTradeDateParams",
+            "kind": "input",
+            "bytes": 3792
+          },
+          {
+            "path": "schemas/common/1/fx_option_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/fx_option_params.schema.json",
+            "type_name": "FxOptionParams",
+            "kind": "input",
+            "bytes": 4399
+          },
+          {
+            "path": "schemas/common/1/fx_swap_trade_date_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/fx_swap_trade_date_params.schema.json",
+            "type_name": "FxSwapTradeDateParams",
+            "kind": "input",
+            "bytes": 3660
           },
           {
             "path": "schemas/common/1/id.schema.json",
@@ -2745,6 +2808,13 @@
             "type_name": "Money",
             "kind": "component",
             "bytes": 20481
+          },
+          {
+            "path": "schemas/common/1/ndf_trade_date_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/ndf_trade_date_params.schema.json",
+            "type_name": "NdfTradeDateParams",
+            "kind": "input",
+            "bytes": 3805
           },
           {
             "path": "schemas/common/1/oas_config.schema.json",
@@ -4791,6 +4861,14 @@
           },
           {
             "domain": "valuations",
+            "path": "schemas/common/1/bermudan_swaption_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/bermudan_swaption_params.schema.json",
+            "type_name": "BermudanSwaptionParams",
+            "kind": "input",
+            "bytes": 4879
+          },
+          {
+            "domain": "valuations",
             "path": "schemas/common/1/bond_quote_input.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/bond_quote_input.schema.json",
             "type_name": "BondQuoteInput",
@@ -4804,6 +4882,14 @@
             "type_name": "BusinessDayConvention",
             "kind": "component",
             "bytes": 1989
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/cap_floor_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/cap_floor_params.schema.json",
+            "type_name": "CapFloorParams",
+            "kind": "input",
+            "bytes": 3670
           },
           {
             "domain": "valuations",
@@ -4823,11 +4909,35 @@
           },
           {
             "domain": "valuations",
+            "path": "schemas/common/1/cds_trade_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/cds_trade_params.schema.json",
+            "type_name": "CdsTradeParams",
+            "kind": "input",
+            "bytes": 3026
+          },
+          {
+            "domain": "valuations",
             "path": "schemas/common/1/cds_tranche_params.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/cds_tranche_params.schema.json",
             "type_name": "CdsTrancheParams",
             "kind": "component",
             "bytes": 1965
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/cms_swap_schedule_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/cms_swap_schedule_params.schema.json",
+            "type_name": "CmsSwapScheduleParams",
+            "kind": "input",
+            "bytes": 6676
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/convention_swap_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/convention_swap_params.schema.json",
+            "type_name": "ConventionSwapParams",
+            "kind": "input",
+            "bytes": 3200
           },
           {
             "domain": "valuations",
@@ -4868,6 +4978,38 @@
             "type_name": "Diagnostic",
             "kind": "component",
             "bytes": 4367
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/floating_bond_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/floating_bond_params.schema.json",
+            "type_name": "FloatingBondParams",
+            "kind": "input",
+            "bytes": 2581
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/fx_forward_trade_date_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/fx_forward_trade_date_params.schema.json",
+            "type_name": "FxForwardTradeDateParams",
+            "kind": "input",
+            "bytes": 3792
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/fx_option_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/fx_option_params.schema.json",
+            "type_name": "FxOptionParams",
+            "kind": "input",
+            "bytes": 4399
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/fx_swap_trade_date_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/fx_swap_trade_date_params.schema.json",
+            "type_name": "FxSwapTradeDateParams",
+            "kind": "input",
+            "bytes": 3660
           },
           {
             "domain": "valuations",
@@ -4932,6 +5074,14 @@
             "type_name": "Money",
             "kind": "component",
             "bytes": 20481
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/ndf_trade_date_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/ndf_trade_date_params.schema.json",
+            "type_name": "NdfTradeDateParams",
+            "kind": "input",
+            "bytes": 3805
           },
           {
             "domain": "valuations",

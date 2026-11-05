@@ -20,7 +20,7 @@
 use crate::api::core::currency::JsCurrency;
 use crate::api::core::dates::JsDayCount;
 use crate::api::core::money::JsMoney;
-use crate::utils::input::{from_js_json, js_currency, js_f64, js_opt_string, js_string, json_text};
+use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
 use crate::utils::to_js_err;
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
@@ -366,61 +366,23 @@ impl JsFxForward {
     /// Build an at-market forward from a trade date and a standard FX tenor.
     ///
     /// Mirrors Rust `FxForward::from_trade_date`: spot is rolled from
-    /// `tradeDate` by the spot lag (CLS-consistent pair roll), then `tenor` is
-    /// added with the FX end-of-month rule. Omitted options take the Rust
-    /// defaults: the pair's standard spot lag, Modified Following, weekends-only
-    /// calendars and no end-of-month rule.
-    /// @param id - Unique instrument identifier.
-    /// @param baseCurrency - Base (foreign) currency ISO code; the notional currency.
-    /// @param quoteCurrency - Quote (domestic) currency ISO code.
-    /// @param tradeDate - Trade date as an ISO-8601 string (`"YYYY-MM-DD"`).
-    /// @param tenor - Standard FX tenor from spot (e.g. `Tenor.parse("3M")`).
-    /// @param notional - Notional in `baseCurrency`.
-    /// @param domesticDiscountCurveId - Quote-currency discount curve identifier.
-    /// @param foreignDiscountCurveId - Base-currency discount curve identifier.
-    /// @param options - Optional `{ base_calendar_id?, quote_calendar_id?, settlement_days?, business_day_convention?, end_of_month? }`; `business_day_convention` uses the serde names (e.g. `"modified_following"`).
+    /// `trade_date` by the spot lag (CLS-consistent pair roll), then `tenor` is
+    /// added with the FX end-of-month rule.
+    /// @param params - `FxForwardTradeDateParams` (plain object or JSON text): `id`; `base_currency` - base (foreign) ISO code, the notional currency; `quote_currency` - quote (domestic) ISO code; `trade_date` - ISO-8601 date; `tenor` - FX tenor object from spot (e.g. `{ count: 3, unit: "months" }`); `notional` - Money wire object `{ amount: "1000000", currency: "EUR" }` (decimal string amount) in `base_currency`; `domestic_discount_curve_id` / `foreign_discount_curve_id` - quote- and base-currency curves; Optional, omitted for the market default: `end_of_month` (boolean, preserve month-end; default `false`), `base_calendar_id` / `quote_calendar_id` (weekends only), `settlement_days` (the pair's standard T+N lag), `business_day_convention` (serde name, default `"modified_following"`).
     /// @returns The validated forward without a contract rate; chain `withForwardPoints` / `withForwardPips` to fix it.
-    /// @throws Error - Throws with kind `validation` if a currency, date or option is malformed, the currencies coincide, or the notional currency differs from `baseCurrency`; kind `not_found` if a calendar identifier is unknown.
-    #[allow(clippy::too_many_arguments)]
+    /// @throws Error - Throws with kind `validation` if `params` is malformed, the currencies coincide, or the notional currency differs from `base_currency`; kind `not_found` if a calendar identifier is unknown; kind `invalid_type` if `params` is not an object or JSON text.
     #[wasm_bindgen(js_name = fromTradeDate)]
     pub fn from_trade_date(
-        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        #[wasm_bindgen(js_name = "baseCurrency", unchecked_param_type = "string")]
-        base_currency: JsValue,
-        #[wasm_bindgen(js_name = "quoteCurrency", unchecked_param_type = "string")] quote_currency: JsValue,
-        #[wasm_bindgen(js_name = "tradeDate", unchecked_param_type = "string")] trade_date: JsValue,
-        tenor: &crate::api::core::dates::JsTenor,
-        notional: &crate::api::core::money::JsMoney,
-        #[wasm_bindgen(js_name = "domesticDiscountCurveId", unchecked_param_type = "string")]
-        domestic_discount_curve_id: JsValue,
-        #[wasm_bindgen(js_name = "foreignDiscountCurveId", unchecked_param_type = "string")]
-        foreign_discount_curve_id: JsValue,
-        #[wasm_bindgen(unchecked_optional_param_type = "FxForwardFromTradeDateOptions | null")]
-        options: Option<JsValue>,
+        #[wasm_bindgen(
+            unchecked_param_type = "generated.valuations.FxForwardTradeDateParams | JsonInput"
+        )]
+        params: JsValue,
     ) -> Result<JsFxForward, JsValue> {
-        let options: FromTradeDateOptions = match options.as_ref() {
-            Some(value) if !value.is_undefined() && !value.is_null() => {
-                from_js_json(value, "options")?
-            }
-            _ => FromTradeDateOptions::default(),
-        };
-        let inner = instruments::fx::fx_forward::FxForward::from_trade_date(
-            js_string(&id, "id")?,
-            js_currency(&base_currency, "baseCurrency")?,
-            js_currency(&quote_currency, "quoteCurrency")?,
-            js_date(&trade_date, "tradeDate")?,
-            tenor.inner,
-            notional.inner,
-            js_string(&domestic_discount_curve_id, "domesticDiscountCurveId")?,
-            js_string(&foreign_discount_curve_id, "foreignDiscountCurveId")?,
-            options.base_calendar_id,
-            options.quote_calendar_id,
-            options.settlement_days,
-            options.business_day_convention,
-            options.end_of_month,
-        )
-        .map_err(to_js_err)?;
-        Ok(JsFxForward { inner })
+        let params: instruments::fx::fx_forward::FxForwardTradeDateParams =
+            from_js_json(&params, "params")?;
+        instruments::fx::fx_forward::FxForward::from_trade_date(params)
+            .map(|inner| JsFxForward { inner })
+            .map_err(to_js_err)
     }
 
     /// Return a copy whose contract rate is `spotRate + forwardPoints`.
@@ -491,88 +453,23 @@ factories!(JsFxForward, "FxForward", instruments::fx::fx_forward::FxForward, {
         example as example,
 });
 
-/// Optional arguments of `FxForward.fromTradeDate`; omitted fields take the
-/// Rust `FxForward::from_trade_date` defaults.
-#[derive(serde::Deserialize, Default)]
-#[serde(deny_unknown_fields)]
-struct FromTradeDateOptions {
-    #[serde(default)]
-    base_calendar_id: Option<String>,
-    #[serde(default)]
-    quote_calendar_id: Option<String>,
-    #[serde(default)]
-    settlement_days: Option<u32>,
-    #[serde(default)]
-    business_day_convention: Option<finstack_quant_core::dates::BusinessDayConvention>,
-    #[serde(default)]
-    end_of_month: bool,
-}
-
 #[wasm_bindgen(js_class = FxOption)]
 impl JsFxOption {
     /// Build a European FX option with currency-derived OIS curves.
     ///
     /// Mirrors Rust `FxOption::european`: discount curves are `<QUOTE>-OIS`
-    /// (domestic) and `<BASE>-OIS` (foreign), with the EUR/USD and GBP/USD
-    /// underlying presets when they apply.
-    /// @param id - Unique instrument identifier.
-    /// @param baseCurrency - Base (foreign) currency ISO code; the notional currency.
-    /// @param quoteCurrency - Quote (domestic) currency ISO code.
-    /// @param strike - Strike, quote currency per unit of base currency.
-    /// @param expiry - Expiry date as an ISO-8601 string.
-    /// @param notional - Notional in `baseCurrency`.
-    /// @param volSurfaceId - FX volatility surface identifier.
-    /// @param optionType - `"call"` or `"put"` on the base currency.
-    /// @param deltaConventionKind - `"spot"`, `"forward"`, `"premium_adjusted_spot"` or `"premium_adjusted_forward"`.
-    /// @param premiumCurrency - ISO code of the premium currency (base or quote).
-    /// @param venue - Non-empty market venue or quoting-source identifier.
+    /// (domestic) and `<BASE>-OIS` (foreign) and the model day count is ACT/365F.
+    /// @param params - `FxOptionParams` (plain object or JSON text), every key required: `id`; `base_currency` - base (foreign) ISO code, the notional currency; `quote_currency` - quote (domestic) ISO code; `strike` - quote currency per unit of base currency; `expiry` - ISO-8601 date; `notional` - Money wire object `{ amount: "1000000", currency: "EUR" }` (decimal string amount) in `base_currency`; `vol_surface_id`; `option_type` - `"call"` or `"put"` on the base currency; `delta_convention` - `{ kind, premium_currency, venue }` with `kind` one of `"spot"`, `"forward"`, `"premium_adjusted_spot"`, `"premium_adjusted_forward"`, `premium_currency` the base or quote ISO code and `venue` a non-empty quoting-source identifier.
     /// @returns The validated option.
-    /// @throws Error - Throws with kind `validation` if a code, date or enum is malformed, the currencies coincide, the premium currency is neither leg, the venue is blank, or the notional is not positive.
-    #[allow(clippy::too_many_arguments)]
+    /// @throws Error - Throws with kind `validation` if `params` is malformed, the currencies coincide, the premium currency is neither leg, the venue is blank, or the notional is not positive; kind `invalid_type` if `params` is not an object or JSON text.
     pub fn european(
-        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        #[wasm_bindgen(js_name = "baseCurrency", unchecked_param_type = "string")]
-        base_currency: JsValue,
-        #[wasm_bindgen(js_name = "quoteCurrency", unchecked_param_type = "string")] quote_currency: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] expiry: JsValue,
-        notional: &crate::api::core::money::JsMoney,
-        #[wasm_bindgen(js_name = "volSurfaceId", unchecked_param_type = "string")]
-        vol_surface_id: JsValue,
-        #[wasm_bindgen(js_name = "optionType", unchecked_param_type = "'call' | 'put'")]
-        option_type: JsValue,
-        #[wasm_bindgen(
-            js_name = "deltaConventionKind",
-            unchecked_param_type = "'spot' | 'forward' | 'premium_adjusted_spot' | 'premium_adjusted_forward'"
-        )]
-        delta_convention_kind: JsValue,
-        #[wasm_bindgen(js_name = "premiumCurrency", unchecked_param_type = "string")]
-        premium_currency: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] venue: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.valuations.FxOptionParams | JsonInput")]
+        params: JsValue,
     ) -> Result<JsFxOption, JsValue> {
-        let delta_convention = instruments::fx::fx_option::FxDeltaConvention::new(
-            js_string(&delta_convention_kind, "deltaConventionKind")?
-                .parse()
-                .map_err(to_js_err)?,
-            js_currency(&premium_currency, "premiumCurrency")?,
-            js_string(&venue, "venue")?,
-        )
-        .map_err(to_js_err)?;
-        let inner = instruments::fx::fx_option::FxOption::european(
-            js_string(&id, "id")?,
-            js_currency(&base_currency, "baseCurrency")?,
-            js_currency(&quote_currency, "quoteCurrency")?,
-            js_f64(&strike, "strike")?,
-            js_date(&expiry, "expiry")?,
-            notional.inner,
-            js_string(&vol_surface_id, "volSurfaceId")?,
-            js_string(&option_type, "optionType")?
-                .parse()
-                .map_err(to_js_err)?,
-            delta_convention,
-        )
-        .map_err(to_js_err)?;
-        Ok(JsFxOption { inner })
+        let params: instruments::fx::fx_option::FxOptionParams = from_js_json(&params, "params")?;
+        instruments::fx::fx_option::FxOption::european(params)
+            .map(|inner| JsFxOption { inner })
+            .map_err(to_js_err)
     }
 
     /// Implied volatility that reproduces `targetPrice`.

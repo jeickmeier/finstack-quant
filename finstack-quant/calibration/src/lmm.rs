@@ -361,16 +361,18 @@ mod tests {
                 .collect(),
         );
         let mut swaption = BermudanSwaption::new(
-            "BERM-LMM-CAL",
-            OptionType::Call,
-            Money::from((10_000_000_i64, Currency::USD)),
-            0.03,
-            swap_start,
-            swap_end,
-            schedule,
-            "D",
-            "D",
-            "USD-SWPNVOL",
+            finstack_quant_valuations_rates::swaption::BermudanSwaptionParams {
+                id: "BERM-LMM-CAL".into(),
+                option_type: OptionType::Call,
+                notional: Money::from((10_000_000_i64, Currency::USD)),
+                strike: 0.03,
+                underlying_start_date: swap_start,
+                underlying_maturity: swap_end,
+                exercise_schedule: schedule,
+                discount_curve_id: "D".into(),
+                forward_curve_id: "D".into(),
+                vol_surface_id: "USD-SWPNVOL".into(),
+            },
         )
         .expect("Bermudan swaption");
         swaption.underlying_fixed_leg.frequency = Tenor::annual();

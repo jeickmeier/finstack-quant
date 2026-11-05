@@ -194,26 +194,36 @@ pub struct InterestRateSwap {
 }
 
 /// Parameters for constructing a vanilla IRS from market conventions.
-#[derive(Debug, Clone)]
-pub struct ConventionSwapParams<'a> {
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ConventionSwapParams {
     /// Unique instrument identifier.
     pub id: InstrumentId,
-    /// Notional principal amount.
+    /// Notional principal amount; its currency is the payment currency.
     pub notional: Money,
-    /// Pay or receive fixed.
+    /// `pay` or `receive` the fixed leg.
     pub side: PayReceive,
     /// Fixed coupon rate (as a decimal, e.g. 0.03 = 3%).
     pub fixed_rate: f64,
     /// Effective (start) date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub start_date: Date,
     /// Maturity (end) date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub maturity: Date,
     /// Rate index identifier used to resolve conventions (e.g. `"USD-SOFR"`).
-    pub index_id: &'a str,
+    pub index_id: IndexId,
     /// Discount curve identifier.
-    pub discount_curve_id: &'a str,
+    pub discount_curve_id: CurveId,
     /// Forward projection curve identifier.
-    pub forward_curve_id: &'a str,
+    pub forward_curve_id: CurveId,
 }
 
 impl InterestRateSwap {
@@ -222,7 +232,7 @@ impl InterestRateSwap {
     /// This is the preferred way to construct standard swaps. Conventions
     /// (day counts, frequencies, calendars, lags) are resolved from the
     /// registered rate index, matching QuantLib `MakeVanillaSwap` ergonomics.
-    pub fn from_conventions(params: ConventionSwapParams<'_>) -> finstack_quant_core::Result<Self> {
+    pub fn from_conventions(params: ConventionSwapParams) -> finstack_quant_core::Result<Self> {
         let ConventionSwapParams {
             id,
             notional,
@@ -234,12 +244,11 @@ impl InterestRateSwap {
             discount_curve_id,
             forward_curve_id,
         } = params;
-        let conv = IrsLegConventions::from_rate_index(index_id)?;
+        let conv = IrsLegConventions::from_rate_index(index_id.as_str())?;
         let registry = ConventionRegistry::try_global().map_err(|_| {
             finstack_quant_core::Error::Validation("ConventionRegistry not initialized.".into())
         })?;
-        let idx = IndexId::new(index_id);
-        let rate_conv = registry.require_rate_index(&idx)?;
+        let rate_conv = registry.require_rate_index(&index_id)?;
 
         let compounding = overnight_conventions::compounding_from_conventions(rate_conv)?;
 
@@ -248,7 +257,7 @@ impl InterestRateSwap {
             .notional(notional)
             .side(side)
             .fixed_leg(FixedLegSpec {
-                discount_curve_id: CurveId::new(discount_curve_id),
+                discount_curve_id: discount_curve_id.clone(),
                 rate: finstack_quant_core::decimal::f64_to_decimal(fixed_rate)?,
                 frequency: conv.fixed_frequency,
                 day_count: conv.fixed_day_count,
@@ -262,8 +271,8 @@ impl InterestRateSwap {
                 end_of_month: false,
             })
             .float_leg(FloatLegSpec {
-                discount_curve_id: CurveId::new(discount_curve_id),
-                forward_curve_id: CurveId::new(forward_curve_id),
+                discount_curve_id,
+                forward_curve_id,
                 spread_bp: Decimal::ZERO,
                 frequency: conv.float_frequency,
                 day_count: conv.float_day_count,
@@ -830,9 +839,9 @@ mod tests {
             fixed_rate: 0.04,
             start_date: Date::from_calendar_date(2025, time::Month::January, 13).expect("start"),
             maturity: Date::from_calendar_date(2030, time::Month::January, 13).expect("end"),
-            index_id: "USD-SOFR-OIS",
-            discount_curve_id: "USD-OIS",
-            forward_curve_id: "USD-SOFR-OIS",
+            index_id: IndexId::new("USD-SOFR-OIS"),
+            discount_curve_id: CurveId::new("USD-OIS"),
+            forward_curve_id: CurveId::new("USD-SOFR-OIS"),
         })
         .expect("OIS swap from conventions");
 
@@ -850,9 +859,9 @@ mod tests {
             fixed_rate: 0.04,
             start_date: Date::from_calendar_date(2025, time::Month::January, 13).expect("start"),
             maturity: Date::from_calendar_date(2030, time::Month::January, 13).expect("end"),
-            index_id: "USD-SOFR-OIS",
-            discount_curve_id: "USD-SOFR-OIS",
-            forward_curve_id: "USD-SOFR-OIS",
+            index_id: "USD-SOFR-OIS".into(),
+            discount_curve_id: "USD-SOFR-OIS".into(),
+            forward_curve_id: "USD-SOFR-OIS".into(),
         })
         .expect("single-curve OIS");
         let deps =

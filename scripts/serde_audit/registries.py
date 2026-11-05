@@ -174,12 +174,6 @@ RUNTIME_RESULT_EXCEPTIONS = (
         ("CarryResult",),
     ),
     *_runtime_exception(
-        "valuations-rates",
-        "src/cms_swap/types.rs",
-        ("FundingLegSpec",),
-        "runtime-spec",
-    ),
-    *_runtime_exception(
         "models",
         "src/trees/short_rate_tree/tree.rs",
         ("TreeCalibrationResult",),

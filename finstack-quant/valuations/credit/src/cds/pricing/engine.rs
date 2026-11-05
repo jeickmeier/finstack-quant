@@ -698,16 +698,18 @@ mod cds_hazard_reprice_cache_tests {
         valuation_convention: CdsValuationConvention,
     ) -> finstack_quant_core::Result<CreditDefaultSwap> {
         let mut cds = CreditDefaultSwap::new_isda(
-            InstrumentId::new("CACHE-TEST-CDS"),
-            Money::from((10_000_000_i64, Currency::USD)),
-            PayReceive::Pay,
             CdsConvention::IsdaNa,
             Decimal::new(10_000, 2),
-            date!(2024 - 12 - 20),
-            date!(2030 - 03 - 20),
-            0.40,
-            CurveId::new("USD-OIS"),
-            CurveId::new("TEST-CREDIT"),
+            crate::cds::CdsTradeParams {
+                id: InstrumentId::new("CACHE-TEST-CDS"),
+                notional: Money::from((10_000_000_i64, Currency::USD)),
+                side: PayReceive::Pay,
+                start: date!(2024 - 12 - 20),
+                end: date!(2030 - 03 - 20),
+                recovery_rate: 0.40,
+                discount_curve_id: CurveId::new("USD-OIS"),
+                credit_curve_id: CurveId::new("TEST-CREDIT"),
+            },
         )?;
         cds.valuation_convention = valuation_convention;
         Ok(cds)
@@ -829,16 +831,18 @@ mod cds_review_regression_tests {
         convention: CdsValuationConvention,
     ) -> finstack_quant_core::Result<CreditDefaultSwap> {
         let mut cds = CreditDefaultSwap::new_isda(
-            InstrumentId::new("CDS-REVIEW"),
-            Money::from((10_000_000_i64, Currency::USD)),
-            PayReceive::Pay,
             CdsConvention::IsdaNa,
             Decimal::from(100),
-            start,
-            end,
-            0.4,
-            CurveId::new("USD-OIS"),
-            CurveId::new("CREDIT"),
+            crate::cds::CdsTradeParams {
+                id: InstrumentId::new("CDS-REVIEW"),
+                notional: Money::from((10_000_000_i64, Currency::USD)),
+                side: PayReceive::Pay,
+                start,
+                end,
+                recovery_rate: 0.4,
+                discount_curve_id: CurveId::new("USD-OIS"),
+                credit_curve_id: CurveId::new("CREDIT"),
+            },
         )?;
         cds.valuation_convention = convention;
         cds.protection_leg.settlement_delay = 0;

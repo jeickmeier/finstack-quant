@@ -24,8 +24,8 @@ use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
 use super::convert::{
-    attributes_from_py, bps_value_from_py, enum_from_str, enum_to_py_string, instrument_expiry,
-    money_from_py, money_to_py, opt_repr, opt_serde_to_py, rate_from_py, stub_kind_from_py,
+    attributes_from_py, enum_from_str, enum_to_py_string, instrument_expiry, money_from_py,
+    money_to_py, opt_repr, opt_serde_to_py, rate_from_py, stub_kind_from_py,
 };
 use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
 
@@ -64,25 +64,21 @@ instrument_pricing_methods!(
 impl PyBond {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.fixed")]
     #[staticmethod]
-    #[pyo3(signature = (id, notional, coupon_rate, issue_date, maturity, stub, discount_curve_id, *, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, coupon_rate, issue_date, maturity, stub, discount_curve_id, *, currency=None)"
+        text_signature = "(id, notional, coupon_rate, issue_date, maturity, stub, discount_curve_id)"
     )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
     fn fixed(
         id: &str,
-        notional: &Bound<'_, PyAny>,
+        notional: PyRef<'_, PyMoney>,
         coupon_rate: &Bound<'_, PyAny>,
         issue_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         stub: &Bound<'_, PyAny>,
         discount_curve_id: &str,
-        currency: Option<&str>,
     ) -> PyResult<Self> {
         let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
             id,
-            money_from_py(notional, currency, "notional")?,
+            notional.inner,
             rate_from_py(coupon_rate, "coupon_rate")?,
             py_to_date(issue_date)?,
             py_to_date(maturity)?,
@@ -106,26 +102,22 @@ impl PyBond {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.with_convention")]
     #[staticmethod]
-    #[pyo3(signature = (id, notional, coupon_rate, issue_date, maturity, convention, discount_curve_id, *, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, coupon_rate, issue_date, maturity, convention, discount_curve_id, *, currency=None)"
+        text_signature = "(id, notional, coupon_rate, issue_date, maturity, convention, discount_curve_id)"
     )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
     fn with_convention(
         id: &str,
-        notional: &Bound<'_, PyAny>,
+        notional: PyRef<'_, PyMoney>,
         coupon_rate: &Bound<'_, PyAny>,
         issue_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         convention: &str,
         discount_curve_id: &str,
-        currency: Option<&str>,
     ) -> PyResult<Self> {
         let inner =
             finstack_quant_valuations::instruments::fixed_income::bond::Bond::with_convention(
                 id,
-                money_from_py(notional, currency, "notional")?,
+                notional.inner,
                 rate_from_py(coupon_rate, "coupon_rate")?,
                 py_to_date(issue_date)?,
                 py_to_date(maturity)?,
@@ -141,77 +133,32 @@ impl PyBond {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.floating")]
     #[staticmethod]
-    #[pyo3(signature = (id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, discount_curve_id, *, currency = None))]
-    #[pyo3(
-        text_signature = "(id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, discount_curve_id, *, currency=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn floating(
-        id: &str,
-        notional: &Bound<'_, PyAny>,
-        forward_curve_id: &str,
-        spread_bp: &Bound<'_, PyAny>,
-        issue_date: &Bound<'_, PyAny>,
-        maturity: &Bound<'_, PyAny>,
-        frequency: PyRef<'_, PyTenor>,
-        day_count: PyRef<'_, PyDayCount>,
-        discount_curve_id: &str,
-        currency: Option<&str>,
-    ) -> PyResult<Self> {
-        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating(
-            id,
-            money_from_py(notional, currency, "notional")?,
-            forward_curve_id,
-            bps_value_from_py(spread_bp, "spread_bp")?,
-            py_to_date(issue_date)?,
-            py_to_date(maturity)?,
-            frequency.inner,
-            day_count.inner,
-            discount_curve_id,
-        )
-        .map_err(core_to_py)?;
-        Ok(Self { inner })
+    #[pyo3(text_signature = "(params)")]
+    fn floating(params: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let params = spec_from_py::<
+            finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams,
+        >(params.py(), params, "FloatingBondParams")?;
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating(params)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.floating_with_convention")]
     #[staticmethod]
-    #[pyo3(signature = (id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, convention, discount_curve_id, *, currency = None))]
-    #[pyo3(
-        text_signature = "(id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, convention, discount_curve_id, *, currency=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn floating_with_convention(
-        id: &str,
-        notional: &Bound<'_, PyAny>,
-        forward_curve_id: &str,
-        spread_bp: &Bound<'_, PyAny>,
-        issue_date: &Bound<'_, PyAny>,
-        maturity: &Bound<'_, PyAny>,
-        frequency: PyRef<'_, PyTenor>,
-        day_count: PyRef<'_, PyDayCount>,
-        convention: &str,
-        discount_curve_id: &str,
-        currency: Option<&str>,
-    ) -> PyResult<Self> {
-        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating_with_convention(
-            id,
-            money_from_py(notional, currency, "notional")?,
-            forward_curve_id,
-            bps_value_from_py(spread_bp, "spread_bp")?,
-            py_to_date(issue_date)?,
-            py_to_date(maturity)?,
-            frequency.inner,
-            day_count.inner,
+    #[pyo3(text_signature = "(params, convention)")]
+    fn floating_with_convention(params: &Bound<'_, PyAny>, convention: &str) -> PyResult<Self> {
+        let params = spec_from_py::<
+            finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams,
+        >(params.py(), params, "FloatingBondParams")?;
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating_with_convention(
+            params,
             enum_from_str::<finstack_quant_valuations::instruments::BondConvention>(
                 convention,
                 "convention",
             )?,
-            discount_curve_id,
         )
-        .map_err(core_to_py)?;
-        Ok(Self { inner })
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.zero_coupon")]

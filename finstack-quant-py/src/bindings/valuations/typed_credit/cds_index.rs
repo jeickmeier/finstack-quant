@@ -18,7 +18,7 @@ use rust_decimal::prelude::ToPrimitive;
 use super::super::convert::enum_from_str;
 use super::super::convert::{
     attributes_from_py, bool_repr, date_repr, dated_money_from_py, enum_to_py_string, float_repr,
-    money_from_py, money_repr, money_to_py, opt_repr, typed_list_from_py,
+    money_repr, money_to_py, opt_repr, typed_list_from_py,
 };
 use super::super::typed_legs::{PyPremiumLegSpec, PyProtectionLegSpec};
 use super::super::typed_macros::{
@@ -260,35 +260,20 @@ impl PyCdsIndex {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.from_preset")]
     #[staticmethod]
-    #[pyo3(
-        text_signature = "(preset, id, notional, side, start, end, recovery_rate, discount_curve_id, credit_curve_id)"
-    )]
-    // PyO3 binding: the argument list mirrors the Rust constructor one-for-one.
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(text_signature = "(preset, params)")]
     fn from_preset(
         preset: PyRef<'_, PyCdsIndexParams>,
-        id: &str,
-        notional: &Bound<'_, PyAny>,
-        side: &str,
-        start: &Bound<'_, PyAny>,
-        end: &Bound<'_, PyAny>,
-        recovery_rate: f64,
-        discount_curve_id: &str,
-        credit_curve_id: &str,
+        params: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
-        let inner = finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::from_preset(
+        let params = crate::bindings::module_utils::spec_from_py::<
+            finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams,
+        >(params.py(), params, "CdsTradeParams")?;
+        finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::from_preset(
             &preset.inner,
-            InstrumentId::new(id.to_string()),
-            money_from_py(notional, None, "notional")?,
-            enum_from_str(side, "side")?,
-            py_to_date(start)?,
-            py_to_date(end)?,
-            recovery_rate,
-            CurveId::new(discount_curve_id.to_string()),
-            CurveId::new(credit_curve_id.to_string()),
+            params,
         )
-        .map_err(core_to_py)?;
-        Ok(Self { inner })
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.par_spread")]

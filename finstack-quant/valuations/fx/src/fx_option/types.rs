@@ -213,6 +213,35 @@ pub struct FxOption {
     pub attributes: Attributes,
 }
 
+/// Inputs of [`FxOption::european`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FxOptionParams {
+    /// Unique instrument identifier.
+    pub id: InstrumentId,
+    /// Base (foreign) currency: the notional currency.
+    pub base_currency: Currency,
+    /// Quote (domestic) currency: the strike and PV currency.
+    pub quote_currency: Currency,
+    /// Strike exchange rate, quote currency per unit of base currency.
+    pub strike: f64,
+    /// Expiry date; the cash payoff settles on this date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub expiry: Date,
+    /// Notional in `base_currency`.
+    pub notional: Money,
+    /// FX volatility surface identifier.
+    pub vol_surface_id: CurveId,
+    /// `call` or `put` on the base currency.
+    pub option_type: OptionType,
+    /// Delta quoting convention: kind, premium currency (base or quote) and venue.
+    pub delta_convention: FxDeltaConvention,
+}
+
 // FxOption uses both domestic and foreign curves for Garman-Kohlhagen pricing
 impl FxOption {
     /// Validate FX option currency invariants.
@@ -286,23 +315,32 @@ impl FxOption {
 
     /// Create a European FX option on a pair with standard conventions.
     ///
+    /// The model day count is ACT/365F and the discount curves are
+    /// `<QUOTE>-OIS` (domestic) and `<BASE>-OIS` (foreign).
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Identifier, currency pair, strike, expiry, notional,
+    ///   volatility surface, call/put and delta convention; see
+    ///   [`FxOptionParams`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the builder fails validation.
-    #[allow(clippy::too_many_arguments)]
-    pub fn european(
-        id: impl Into<InstrumentId>,
-        base_currency: Currency,
-        quote_currency: Currency,
-        strike: f64,
-        expiry: Date,
-        notional: Money,
-        vol_surface_id: impl Into<CurveId>,
-        option_type: OptionType,
-        delta_convention: FxDeltaConvention,
-    ) -> finstack_quant_core::Result<Self> {
+    pub fn european(params: FxOptionParams) -> finstack_quant_core::Result<Self> {
+        let FxOptionParams {
+            id,
+            base_currency,
+            quote_currency,
+            strike,
+            expiry,
+            notional,
+            vol_surface_id,
+            option_type,
+            delta_convention,
+        } = params;
         Self::builder()
-            .id(id.into())
+            .id(id)
             .base_currency(base_currency)
             .quote_currency(quote_currency)
             .strike(strike)
@@ -313,7 +351,7 @@ impl FxOption {
             .notional(notional)
             .domestic_discount_curve_id(CurveId::new(format!("{quote_currency}-OIS")))
             .foreign_discount_curve_id(CurveId::new(format!("{base_currency}-OIS")))
-            .vol_surface_id(vol_surface_id.into())
+            .vol_surface_id(vol_surface_id)
             .attributes(Attributes::new())
             .build()
     }

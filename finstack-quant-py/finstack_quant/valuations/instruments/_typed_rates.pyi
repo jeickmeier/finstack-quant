@@ -29,19 +29,19 @@ class InterestRateSwap:
 
     Examples
     --------
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import InterestRateSwap
-    >>> swap = InterestRateSwap.from_conventions(
-    ...     "IRS-5Y",
-    ...     10_000_000.0,
-    ...     "pay",
-    ...     0.035,
-    ...     "2025-01-15",
-    ...     "2030-01-15",
-    ...     "USD-SOFR",
-    ...     "USD-OIS",
-    ...     "USD-SOFR",
-    ...     currency="USD",
-    ... )
+    >>> swap = InterestRateSwap.from_conventions({
+    ...     "id": "IRS-5Y",
+    ...     "notional": Money(10_000_000.0, "USD"),
+    ...     "side": "pay",
+    ...     "fixed_rate": 0.035,
+    ...     "start_date": "2025-01-15",
+    ...     "maturity": "2030-01-15",
+    ...     "index_id": "USD-SOFR",
+    ...     "discount_curve_id": "USD-OIS",
+    ...     "forward_curve_id": "USD-SOFR",
+    ... })
     >>> (swap.side, swap.float_leg.reset_lag_days)
     ('pay', 0)
     """
@@ -69,19 +69,7 @@ class InterestRateSwap:
         """
         ...
     @staticmethod
-    def from_conventions(
-        id: str,
-        notional: Money | float,
-        side: Literal["pay", "receive"],
-        fixed_rate: float | Rate,
-        start_date: datetime.date | datetime.datetime | pd.Timestamp | str,
-        maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
-        index_id: str,
-        discount_curve_id: str,
-        forward_curve_id: str,
-        *,
-        currency: str | None = None,
-    ) -> InterestRateSwap:
+    def from_conventions(params: dict[str, Any] | str) -> InterestRateSwap:
         """
         Create a vanilla swap from registered rate-index conventions.
 
@@ -92,27 +80,21 @@ class InterestRateSwap:
 
         Parameters
         ----------
-        id : str
-            Unique instrument identifier.
-        notional : Money | float
-            Notional shared by both legs; a bare number is tagged with ``currency``.
-        side : str
-            ``"pay"`` pays fixed / receives floating; ``"receive"`` the opposite.
-        fixed_rate : float | Rate
-            Fixed coupon as a decimal (``0.03`` = 3%) or a ``Rate``.
-        start_date : datetime.date | datetime.datetime | pd.Timestamp | str
-            Effective date (ISO 8601 strings accepted).
-        maturity : datetime.date | datetime.datetime | pd.Timestamp | str
-            Maturity date.
-        index_id : str
-            Registered rate index (e.g. ``"USD-SOFR"``, ``"USD-SOFR-3M"``,
-            ``"EUR-EURIBOR-6M"``).
-        discount_curve_id : str
-            Discount curve identifier for both legs.
-        forward_curve_id : str
-            Projection curve identifier for the floating leg.
-        currency : str, optional
-            ISO-4217 code applied when ``notional`` is a bare number.
+        params : dict[str, Any] | str
+            ``ConventionSwapParams`` as a dict or JSON text. Every key is
+            required:
+
+            - ``id`` (str): unique instrument identifier.
+            - ``notional`` (Money | dict): notional shared by both legs, a
+              ``Money`` or its wire dict ``{"amount": "1000000", "currency": "USD"}``.
+            - ``side`` (str): ``"pay"`` pays fixed / receives floating;
+              ``"receive"`` the opposite.
+            - ``fixed_rate`` (float): fixed coupon as a decimal (``0.03`` = 3%).
+            - ``start_date`` / ``maturity`` (datetime.date | str): ISO 8601 dates.
+            - ``index_id`` (str): registered rate index (e.g. ``"USD-SOFR"``,
+              ``"USD-SOFR-3M"``, ``"EUR-EURIBOR-6M"``).
+            - ``discount_curve_id`` (str): discount curve for both legs.
+            - ``forward_curve_id`` (str): projection curve of the floating leg.
 
         Returns
         -------
@@ -122,27 +104,24 @@ class InterestRateSwap:
         Raises
         ------
         ValueError
-            If ``side`` is unknown, ``index_id`` is not registered, a bare
-            ``notional`` has no ``currency``, or validation fails.
-        TypeError
-            If ``fixed_rate``/``notional`` has an unsupported type or a date cannot
-            be interpreted.
+            If ``params`` has a missing, unknown or malformed key, ``index_id``
+            is not registered, or validation fails.
 
         Examples
         --------
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import InterestRateSwap
-        >>> swap = InterestRateSwap.from_conventions(
-        ...     "IRS-5Y",
-        ...     10_000_000.0,
-        ...     "pay",
-        ...     0.035,
-        ...     "2025-01-15",
-        ...     "2030-01-15",
-        ...     "USD-SOFR",
-        ...     "USD-OIS",
-        ...     "USD-SOFR",
-        ...     currency="USD",
-        ... )
+        >>> swap = InterestRateSwap.from_conventions({
+        ...     "id": "IRS-5Y",
+        ...     "notional": Money(10_000_000.0, "USD"),
+        ...     "side": "pay",
+        ...     "fixed_rate": 0.035,
+        ...     "start_date": "2025-01-15",
+        ...     "maturity": "2030-01-15",
+        ...     "index_id": "USD-SOFR",
+        ...     "discount_curve_id": "USD-OIS",
+        ...     "forward_curve_id": "USD-SOFR",
+        ... })
         >>> (swap.side, swap.float_leg.reset_lag_days)
         ('pay', 0)
         """

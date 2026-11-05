@@ -57,7 +57,7 @@
 
 mod types;
 
-pub use types::{FxForward, FxForwardBuilder};
+pub use types::{FxForward, FxForwardBuilder, FxForwardTradeDateParams};
 
 /// Metrics submodule for FX forward risk measures.
 pub(crate) mod metrics;

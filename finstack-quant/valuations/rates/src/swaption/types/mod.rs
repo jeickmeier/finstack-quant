@@ -11,6 +11,6 @@ mod bermudan;
 mod definitions;
 mod swaption;
 
-pub use bermudan::BermudanSwaption;
+pub use bermudan::{BermudanSwaption, BermudanSwaptionParams};
 pub use definitions::{BermudanSchedule, BermudanType, CashSettlementMethod};
 pub use swaption::{GreekInputs, Swaption, SwaptionBuilder};

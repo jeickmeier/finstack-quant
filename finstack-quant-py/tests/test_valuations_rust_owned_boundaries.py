@@ -38,18 +38,17 @@ from finstack_quant.valuations.instruments import (
 
 
 def _frn(spread_bp: float | Bps) -> Bond:
-    return Bond.floating(
-        "FRN",
-        1_000_000.0,
-        "USD-SOFR-3M",
-        spread_bp,
-        "2024-01-01",
-        "2029-01-01",
-        Tenor.quarterly(),
-        DayCount.ACT_360,
-        "USD-OIS",
-        currency="USD",
-    )
+    return Bond.floating({
+        "id": "FRN",
+        "notional": Money(1_000_000.0, "USD"),
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": spread_bp,
+        "issue_date": "2024-01-01",
+        "maturity": "2029-01-01",
+        "frequency": Tenor.quarterly(),
+        "day_count": DayCount.ACT_360,
+        "discount_curve_id": "USD-OIS",
+    })
 
 
 def _spread_bp(bond: Bond) -> object:
@@ -74,9 +73,10 @@ def _spread_bp(bond: Bond) -> object:
 
 
 def test_bond_floating_rejects_fractional_basis_points_like_wasm_bps() -> None:
-    with pytest.raises(ValueError, match=r"whole number"):
+    # `spread_bp` is the Rust `Bps` wire form: an integer basis-point quote.
+    with pytest.raises(ValueError, match=r"FloatingBondParams"):
         _frn(125.4)
-    assert float(_spread_bp(_frn(125.0))) == 125.0
+    assert float(_spread_bp(_frn(125))) == 125.0
     # A Bps object hands over its exact Rust value (no decimal round trip).
     assert float(_spread_bp(_frn(Bps(29)))) == 29.0
 

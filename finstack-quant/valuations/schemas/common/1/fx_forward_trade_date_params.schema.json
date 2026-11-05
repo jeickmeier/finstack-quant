@@ -1,0 +1,112 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/common/1/fx_forward_trade_date_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Trade-date, tenor and spot-roll inputs of an FX forward built from its trade date.",
+  "examples": [
+    {
+      "base_calendar_id": "target2",
+      "base_currency": "EUR",
+      "domestic_discount_curve_id": "USD-OIS",
+      "end_of_month": false,
+      "foreign_discount_curve_id": "EUR-OIS",
+      "id": "EURUSD-FWD-3M",
+      "notional": {
+        "amount": "1000000",
+        "currency": "EUR"
+      },
+      "quote_calendar_id": "usny",
+      "quote_currency": "USD",
+      "tenor": {
+        "count": 3,
+        "unit": "months"
+      },
+      "trade_date": "2025-01-15"
+    }
+  ],
+  "properties": {
+    "base_calendar_id": {
+      "description": "Base-currency holiday calendar id; `None` uses weekends only.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "base_currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Base (foreign) currency: the numerator of the quote and the notional currency."
+    },
+    "business_day_convention": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Business-day convention rolling the maturity on the joint calendar.\n`None` selects Modified Following, the ISDA FX settlement convention."
+    },
+    "domestic_discount_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Quote-currency (domestic) discount curve identifier."
+    },
+    "end_of_month": {
+      "default": false,
+      "description": "Preserve month-end: a month-end spot date gives a month-end maturity.\nDefaults to `false`.",
+      "type": "boolean"
+    },
+    "foreign_discount_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Base-currency (foreign) discount curve identifier."
+    },
+    "id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Unique instrument identifier."
+    },
+    "notional": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Notional in `base_currency`."
+    },
+    "quote_calendar_id": {
+      "description": "Quote-currency holiday calendar id; `None` uses weekends only.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "quote_currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Quote (domestic) currency: the denominator of the quote and the PV currency."
+    },
+    "settlement_days": {
+      "description": "T+N spot lag in business days (typically 2, or 1 for USD/CAD). `None`\nselects the pair's market-standard lag from\n[`finstack_quant_core::dates::fx::fx_standard_settlement_days`].",
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "tenor": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Calendar tenor from spot to maturity, e.g. `3M`."
+    },
+    "trade_date": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Trade date from which the spot date is rolled."
+    }
+  },
+  "required": [
+    "id",
+    "base_currency",
+    "quote_currency",
+    "trade_date",
+    "tenor",
+    "notional",
+    "domestic_discount_curve_id",
+    "foreign_discount_curve_id"
+  ],
+  "title": "FxForwardTradeDateParams",
+  "type": "object"
+}

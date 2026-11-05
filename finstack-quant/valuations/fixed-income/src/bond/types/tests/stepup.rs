@@ -21,17 +21,17 @@ fn test_bond_dated_cashflows_include_floating_cfkind() {
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2026, Month::July, 1).expect("Valid test date");
 
-    let frn = Bond::floating(
-        "FRN-CFKIND-TEST",
-        Money::from((1_000_000_i64, Currency::USD)),
-        "USD-LIBOR-3M",
-        200,
-        issue,
+    let frn = Bond::floating(crate::bond::FloatingBondParams {
+        id: "FRN-CFKIND-TEST".into(),
+        notional: Money::from((1_000_000_i64, Currency::USD)),
+        forward_curve_id: "USD-LIBOR-3M".into(),
+        spread_bp: 200.into(),
+        issue_date: issue,
         maturity,
-        Tenor::quarterly(),
-        DayCount::Act365F,
-        "USD-OIS",
-    )
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act365F,
+        discount_curve_id: "USD-OIS".into(),
+    })
     .unwrap();
 
     let disc = DiscountCurve::builder("USD-OIS")

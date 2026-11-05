@@ -137,22 +137,24 @@ fn test_bermudan_pricer_cached_model_sets_measure() {
     let swap_end = date!(2030 - 01 - 01);
     let first_exercise = date!(2026 - 01 - 01);
     let swaption = BermudanSwaption::new(
-        "BERM-CACHED",
-        OptionType::Call,
-        Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
-            .expect("valid money fixture"),
-        0.03,
-        swap_start,
-        swap_end,
-        BermudanSchedule::co_terminal(
-            first_exercise,
-            swap_end,
-            finstack_quant_core::dates::Tenor::semi_annual(),
-        )
-        .expect("valid Bermudan schedule"),
-        "USD_OIS",
-        "USD_OIS",
-        "USD-SWPNVOL",
+        finstack_quant_valuations::instruments::rates::swaption::BermudanSwaptionParams {
+            id: "BERM-CACHED".into(),
+            option_type: OptionType::Call,
+            notional: Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
+                .expect("valid money fixture"),
+            strike: 0.03,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
+            exercise_schedule: BermudanSchedule::co_terminal(
+                first_exercise,
+                swap_end,
+                finstack_quant_core::dates::Tenor::semi_annual(),
+            )
+            .expect("valid Bermudan schedule"),
+            discount_curve_id: "USD_OIS".into(),
+            forward_curve_id: "USD_OIS".into(),
+            vol_surface_id: "USD-SWPNVOL".into(),
+        },
     )
     .expect("valid literal strike");
 
@@ -187,22 +189,24 @@ fn test_bermudan_pricer_expired_returns_zero() {
     let swap_end = date!(2030 - 01 - 01);
     let first_exercise = date!(2026 - 01 - 01);
     let swaption = BermudanSwaption::new(
-        "BERM-EXPIRED",
-        OptionType::Put,
-        Money::new(2_000_000.0, finstack_quant_core::currency::Currency::USD)
-            .expect("valid money fixture"),
-        0.04,
-        swap_start,
-        swap_end,
-        BermudanSchedule::co_terminal(
-            first_exercise,
-            swap_end,
-            finstack_quant_core::dates::Tenor::semi_annual(),
-        )
-        .expect("valid Bermudan schedule"),
-        "USD_OIS",
-        "USD_OIS",
-        "USD-SWPNVOL",
+        finstack_quant_valuations::instruments::rates::swaption::BermudanSwaptionParams {
+            id: "BERM-EXPIRED".into(),
+            option_type: OptionType::Put,
+            notional: Money::new(2_000_000.0, finstack_quant_core::currency::Currency::USD)
+                .expect("valid money fixture"),
+            strike: 0.04,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
+            exercise_schedule: BermudanSchedule::co_terminal(
+                first_exercise,
+                swap_end,
+                finstack_quant_core::dates::Tenor::semi_annual(),
+            )
+            .expect("valid Bermudan schedule"),
+            discount_curve_id: "USD_OIS".into(),
+            forward_curve_id: "USD_OIS".into(),
+            vol_surface_id: "USD-SWPNVOL".into(),
+        },
     )
     .expect("valid literal strike");
 
@@ -220,22 +224,24 @@ fn test_bermudan_tree_pricer_rejects_mixed_curves() {
     let swap_end = date!(2030 - 01 - 01);
     let first_exercise = date!(2026 - 01 - 01);
     let swaption = BermudanSwaption::new(
-        "BERM-MIXED",
-        OptionType::Call,
-        Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
-            .expect("valid money fixture"),
-        0.03,
-        swap_start,
-        swap_end,
-        BermudanSchedule::co_terminal(
-            first_exercise,
-            swap_end,
-            finstack_quant_core::dates::Tenor::semi_annual(),
-        )
-        .expect("valid Bermudan schedule"),
-        "USD_OIS",
-        "USD-SOFR-3M",
-        "USD-SWPNVOL",
+        finstack_quant_valuations::instruments::rates::swaption::BermudanSwaptionParams {
+            id: "BERM-MIXED".into(),
+            option_type: OptionType::Call,
+            notional: Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
+                .expect("valid money fixture"),
+            strike: 0.03,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
+            exercise_schedule: BermudanSchedule::co_terminal(
+                first_exercise,
+                swap_end,
+                finstack_quant_core::dates::Tenor::semi_annual(),
+            )
+            .expect("valid Bermudan schedule"),
+            discount_curve_id: "USD_OIS".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            vol_surface_id: "USD-SWPNVOL".into(),
+        },
     )
     .expect("valid literal strike");
 

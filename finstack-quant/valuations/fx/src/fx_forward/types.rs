@@ -130,6 +130,55 @@ pub struct FxForward {
 
 finstack_quant_valuations_core::validate_on_deserialize!(FxForward);
 
+/// Inputs of [`FxForward::from_trade_date`].
+///
+/// Omitted optional fields take the market defaults: the pair's standard spot
+/// lag, Modified Following and weekends-only calendars.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FxForwardTradeDateParams {
+    /// Unique instrument identifier.
+    pub id: InstrumentId,
+    /// Base (foreign) currency: the numerator of the quote and the notional currency.
+    pub base_currency: Currency,
+    /// Quote (domestic) currency: the denominator of the quote and the PV currency.
+    pub quote_currency: Currency,
+    /// Trade date from which the spot date is rolled.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub trade_date: Date,
+    /// Calendar tenor from spot to maturity, e.g. `3M`.
+    pub tenor: Tenor,
+    /// Notional in `base_currency`.
+    pub notional: Money,
+    /// Quote-currency (domestic) discount curve identifier.
+    pub domestic_discount_curve_id: CurveId,
+    /// Base-currency (foreign) discount curve identifier.
+    pub foreign_discount_curve_id: CurveId,
+    /// Base-currency holiday calendar id; `None` uses weekends only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_calendar_id: Option<String>,
+    /// Quote-currency holiday calendar id; `None` uses weekends only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quote_calendar_id: Option<String>,
+    /// T+N spot lag in business days (typically 2, or 1 for USD/CAD). `None`
+    /// selects the pair's market-standard lag from
+    /// [`finstack_quant_core::dates::fx::fx_standard_settlement_days`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement_days: Option<u32>,
+    /// Business-day convention rolling the maturity on the joint calendar.
+    /// `None` selects Modified Following, the ISDA FX settlement convention.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub business_day_convention: Option<finstack_quant_core::dates::BusinessDayConvention>,
+    /// Preserve month-end: a month-end spot date gives a month-end maturity.
+    /// Defaults to `false`.
+    #[serde(default)]
+    pub end_of_month: bool,
+}
+
 impl FxForward {
     /// Validate the FX forward parameters.
     ///
@@ -199,41 +248,39 @@ impl FxForward {
 
     /// Construct an FX forward from trade date and tenor using joint calendar spot roll.
     ///
+    /// Spot is `trade_date` rolled forward by the T+N spot lag on the joint
+    /// base/quote calendar (CLS-consistent: a USD holiday on an intermediate
+    /// day does not delay a USD pair's spot); maturity is spot plus `tenor`
+    /// under the FX end-of-month rule. The forward has no contract rate; chain
+    /// [`Self::with_forward_points`] or [`Self::with_forward_pips`] to fix one.
+    ///
     /// # Arguments
     ///
-    /// * `id` - Instrument identifier
-    /// * `base_currency` - Foreign currency (numerator)
-    /// * `quote_currency` - Domestic currency (denominator)
-    /// * `trade_date` - Trade date
-    /// * `tenor` - Calendar tenor from spot to maturity (for example, 3M).
-    /// * `notional` - Notional in base currency
-    /// * `domestic_discount_curve_id` - Quote currency discount curve
-    /// * `foreign_discount_curve_id` - Base currency discount curve
-    /// * `base_calendar_id` - Optional base currency calendar
-    /// * `quote_calendar_id` - Optional quote currency calendar
-    /// * `settlement_days` - T+N spot lag in business days (typically 2, or 1 for
-    ///   USD/CAD). `None` selects the pair's market-standard lag from
-    ///   [`finstack_quant_core::dates::fx::fx_standard_settlement_days`].
-    /// * `business_day_convention` - Business day convention used to roll the
-    ///   maturity on the joint calendar. `None` selects Modified Following,
-    ///   the ISDA FX settlement convention (and the `FxSpot` builder default).
-    /// * `end_of_month` - Preserve month-end when the spot date is month-end.
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_trade_date(
-        id: impl Into<InstrumentId>,
-        base_currency: Currency,
-        quote_currency: Currency,
-        trade_date: Date,
-        tenor: Tenor,
-        notional: Money,
-        domestic_discount_curve_id: impl Into<CurveId>,
-        foreign_discount_curve_id: impl Into<CurveId>,
-        base_calendar_id: Option<String>,
-        quote_calendar_id: Option<String>,
-        settlement_days: Option<u32>,
-        business_day_convention: Option<finstack_quant_core::dates::BusinessDayConvention>,
-        end_of_month: bool,
-    ) -> finstack_quant_core::Result<Self> {
+    /// * `params` - Identifier, currency pair, trade date, tenor, notional,
+    ///   curves and the optional spot-roll conventions; see
+    ///   [`FxForwardTradeDateParams`] for each field's default.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a calendar id is unknown, the dates cannot be
+    /// rolled, or the forward fails validation (same currencies, notional not
+    /// in `base_currency`).
+    pub fn from_trade_date(params: FxForwardTradeDateParams) -> finstack_quant_core::Result<Self> {
+        let FxForwardTradeDateParams {
+            id,
+            base_currency,
+            quote_currency,
+            trade_date,
+            tenor,
+            notional,
+            domestic_discount_curve_id,
+            foreign_discount_curve_id,
+            base_calendar_id,
+            quote_calendar_id,
+            settlement_days,
+            business_day_convention,
+            end_of_month,
+        } = params;
         use finstack_quant_core::dates::fx::{
             add_fx_standard_tenor, fx_spot_date, fx_standard_settlement_days,
         };
@@ -263,13 +310,13 @@ impl FxForward {
         )?;
 
         Self::builder()
-            .id(id.into())
+            .id(id)
             .base_currency(base_currency)
             .quote_currency(quote_currency)
             .maturity(maturity)
             .notional(notional)
-            .domestic_discount_curve_id(domestic_discount_curve_id.into())
-            .foreign_discount_curve_id(foreign_discount_curve_id.into())
+            .domestic_discount_curve_id(domestic_discount_curve_id)
+            .foreign_discount_curve_id(foreign_discount_curve_id)
             .base_calendar_id_opt(base_calendar_id.map(Into::into))
             .quote_calendar_id_opt(quote_calendar_id.map(Into::into))
             .attributes(Attributes::new())

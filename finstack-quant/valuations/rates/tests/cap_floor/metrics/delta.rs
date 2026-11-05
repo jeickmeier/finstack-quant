@@ -154,19 +154,19 @@ fn test_cap_delta_finite() {
 #[test]
 fn same_day_caplet_has_zero_stochastic_delta() {
     let as_of = date!(2024 - 03 - 01);
-    let caplet = CapFloor::new(
-        "SAME-DAY-FIXED-DELTA",
-        RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.05,
-        as_of,
-        date!(2024 - 06 - 01),
-        None,
-        DayCount::Act360,
-        "USD_OIS",
-        "USD_LIBOR_3M",
-        "USD_CAP_VOL",
-    )
+    let caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "SAME-DAY-FIXED-DELTA".into(),
+        rate_option_type: RateOptionType::Caplet,
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        strike: 0.05,
+        start_date: as_of,
+        maturity: date!(2024 - 06 - 01),
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD_OIS".into(),
+        forward_curve_id: "USD_LIBOR_3M".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    })
     .expect("caplet");
     let market = MarketContext::new()
         .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
@@ -452,19 +452,19 @@ fn test_caplet_delta() {
 #[test]
 fn compounded_sofr_delta_matches_parallel_forward_finite_difference() {
     let as_of = date!(2024 - 12 - 02);
-    let mut caplet = CapFloor::new(
-        "SOFR-DELTA",
-        RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.04,
-        date!(2025 - 01 - 02),
-        date!(2025 - 04 - 02),
-        None,
-        DayCount::Act360,
-        "USD_OIS",
-        "USD-SOFR-OIS",
-        "USD_CAP_VOL",
-    )
+    let mut caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "SOFR-DELTA".into(),
+        rate_option_type: RateOptionType::Caplet,
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        strike: 0.04,
+        start_date: date!(2025 - 01 - 02),
+        maturity: date!(2025 - 04 - 02),
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD_OIS".into(),
+        forward_curve_id: "USD-SOFR-OIS".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    })
     .expect("caplet");
     caplet.vol_type = CapFloorVolType::Normal;
     caplet.overnight_coupon = Some(OvernightCouponConvention {

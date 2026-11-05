@@ -16,6 +16,7 @@ import pickle
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.core.money import Money
 from finstack_quant.portfolio import (
     CandidatePosition,
     Constraint,
@@ -52,14 +53,7 @@ AS_OF = dt.date(2025, 1, 15)
 
 def _bond(bond_id: str = "B1") -> Bond:
     return Bond.fixed(
-        bond_id,
-        1_000_000.0,
-        0.05,
-        dt.date(2024, 1, 15),
-        dt.date(2034, 1, 15),
-        "none",
-        "USD-OIS",
-        currency="USD",
+        bond_id, Money(1_000_000.0, "USD"), 0.05, dt.date(2024, 1, 15), dt.date(2034, 1, 15), "none", "USD-OIS"
     )
 
 

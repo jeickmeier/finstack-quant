@@ -1341,19 +1341,19 @@ mod tests {
     fn test_cap_floor_defaults_when_optional_fields_omitted() {
         use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
-        let option = CapFloor::new(
-            InstrumentId::new("IROPT-DEFAULTS"),
-            RateOptionType::Cap,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.03,
-            Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date"),
-            Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date"),
-            Some(Tenor::quarterly()),
-            DayCount::Act360,
-            CurveId::new("USD-OIS"),
-            CurveId::new("USD-SOFR-3M"),
-            CurveId::new("USD-CAPFLOOR-VOL"),
-        )
+        let option = CapFloor::new(crate::instruments::rates::cap_floor::CapFloorParams {
+            id: InstrumentId::new("IROPT-DEFAULTS"),
+            rate_option_type: RateOptionType::Cap,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.03,
+            start_date: Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date"),
+            maturity: Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date"),
+            frequency: Some(Tenor::quarterly()),
+            day_count: DayCount::Act360,
+            discount_curve_id: CurveId::new("USD-OIS"),
+            forward_curve_id: CurveId::new("USD-SOFR-3M"),
+            vol_surface_id: CurveId::new("USD-CAPFLOOR-VOL"),
+        })
         .expect("valid strike");
         let mut json = serde_json::to_value(InstrumentJson::CapFloor(option))
             .expect("CapFloor JSON serialization should succeed");

@@ -198,21 +198,27 @@ fn test_bermudan_swaption_schedule_and_conversion() {
     let first_ex = date!(2026 - 01 - 01);
 
     let swaption = BermudanSwaption::new(
-        "BERM-TEST",
-        OptionType::Call,
-        finstack_quant_core::money::Money::new(
-            1_000_000.0,
-            finstack_quant_core::currency::Currency::USD,
-        )
-        .expect("valid money fixture"),
-        0.03,
-        swap_start,
-        swap_end,
-        BermudanSchedule::co_terminal(first_ex, swap_end, Tenor::semi_annual())
+        finstack_quant_valuations::instruments::rates::swaption::BermudanSwaptionParams {
+            id: "BERM-TEST".into(),
+            option_type: OptionType::Call,
+            notional: finstack_quant_core::money::Money::new(
+                1_000_000.0,
+                finstack_quant_core::currency::Currency::USD,
+            )
+            .expect("valid money fixture"),
+            strike: 0.03,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
+            exercise_schedule: BermudanSchedule::co_terminal(
+                first_ex,
+                swap_end,
+                Tenor::semi_annual(),
+            )
             .expect("valid Bermudan schedule"),
-        "USD-OIS",
-        "USD-SOFR-3M",
-        "USD-SWPNVOL",
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            vol_surface_id: "USD-SWPNVOL".into(),
+        },
     )
     .expect("valid literal strike");
 
@@ -232,20 +238,22 @@ fn test_bermudan_builder_helpers_and_time_accessors() {
     let schedule = BermudanSchedule::co_terminal(first_ex, swap_end, Tenor::semi_annual()).unwrap();
 
     let berm = BermudanSwaption::new(
-        "BERM-BUILDER",
-        OptionType::Put,
-        finstack_quant_core::money::Money::new(
-            2_000_000.0,
-            finstack_quant_core::currency::Currency::USD,
-        )
-        .expect("valid money fixture"),
-        0.031,
-        swap_start,
-        swap_end,
-        schedule.clone(),
-        "USD-OIS",
-        "USD-SOFR-3M",
-        "USD-SWPNVOL",
+        finstack_quant_valuations::instruments::rates::swaption::BermudanSwaptionParams {
+            id: "BERM-BUILDER".into(),
+            option_type: OptionType::Put,
+            notional: finstack_quant_core::money::Money::new(
+                2_000_000.0,
+                finstack_quant_core::currency::Currency::USD,
+            )
+            .expect("valid money fixture"),
+            strike: 0.031,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
+            exercise_schedule: schedule.clone(),
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            vol_surface_id: "USD-SWPNVOL".into(),
+        },
     )
     .unwrap()
     .with_fixed_frequency(Tenor::annual())

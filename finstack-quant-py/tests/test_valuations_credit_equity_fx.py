@@ -236,14 +236,16 @@ class TestCdsIndex:
         assert preset == CdsIndexParams("CDX.NA.IG", 42, 1, Bps(100.0), num_constituents=125)
         index = CdsIndex.from_preset(
             preset,
-            "CDX-IG-42-5Y",
-            Money(10_000_000.0, USD),
-            "pay",
-            "2024-03-20",
-            "2029-06-20",
-            0.4,
-            "USD-OIS",
-            "CDX.NA.IG.HAZARD",
+            {
+                "id": "CDX-IG-42-5Y",
+                "notional": Money(10_000_000.0, USD),
+                "side": "pay",
+                "start": "2024-03-20",
+                "end": "2029-06-20",
+                "recovery_rate": 0.4,
+                "discount_curve_id": "USD-OIS",
+                "credit_curve_id": "CDX.NA.IG.HAZARD",
+            },
         )
         assert index.index_name == "CDX.NA.IG"
         assert index.series == 42
@@ -559,11 +561,7 @@ class TestEquityOption:
         assert option.vol_surface_id == "EQUITY-VOL"
         assert option.quantity == 100.0
         assert option.currency == "USD"
-        custom = EquityOption.european(
-            "AAPL-C2", "AAPL", 200.0, "2025-06-20", 100.0, USD, "call", spot_id="AAPL", div_yield_id=None
-        )
-        assert custom.spot_id == "AAPL"
-        assert custom.div_yield_id is None
+        assert option.div_yield_id == "EQUITY-DIVYIELD"
         put = EquityOption.european("AAPL-P", "AAPL", 180.0, "2025-06-20", 100.0, "USD", "put")
         assert put.option_type == "put"
         assert put.settlement == "cash"
@@ -605,9 +603,17 @@ class TestFxForward:
         assert 1.10 < forward < 1.13
 
     def test_from_trade_date_and_forward_points(self) -> None:
-        fwd = FxForward.from_trade_date(
-            "EURUSD-3M", "EUR", "USD", "2025-01-15", "3M", 1_000_000.0, "USD-OIS", "EUR-OIS"
-        )
+        fwd = FxForward.from_trade_date({
+            "id": "EURUSD-3M",
+            "base_currency": "EUR",
+            "quote_currency": "USD",
+            "trade_date": "2025-01-15",
+            "tenor": Tenor.parse("3M"),
+            "notional": Money(1_000_000.0, "EUR"),
+            "domestic_discount_curve_id": "USD-OIS",
+            "foreign_discount_curve_id": "EUR-OIS",
+            "end_of_month": False,
+        })
         assert fwd.contract_rate is None
         assert fwd.maturity > datetime.date(2025, 4, 10)
         with_points = fwd.with_forward_points(1.10, 0.0025)
@@ -632,19 +638,17 @@ class TestFxOption:
         assert opt.notional.currency == EUR
 
     def test_european_and_pricing(self) -> None:
-        opt = FxOption.european(
-            "EURUSD-CALL",
-            "EUR",
-            "USD",
-            1.12,
-            "2025-06-15",
-            1_000_000.0,
-            "EURUSD-VOL",
-            "call",
-            "spot",
-            "USD",
-            "desk",
-        )
+        opt = FxOption.european({
+            "id": "EURUSD-CALL",
+            "base_currency": "EUR",
+            "quote_currency": "USD",
+            "strike": 1.12,
+            "expiry": "2025-06-15",
+            "notional": Money(1_000_000.0, "EUR"),
+            "vol_surface_id": "EURUSD-VOL",
+            "option_type": "call",
+            "delta_convention": {"kind": "spot", "premium_currency": "USD", "venue": "desk"},
+        })
         assert opt.domestic_discount_curve_id == "USD-OIS"
         assert opt.foreign_discount_curve_id == "EUR-OIS"
         market = _fx_market()

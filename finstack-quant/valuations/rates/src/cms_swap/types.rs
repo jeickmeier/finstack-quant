@@ -237,6 +237,60 @@ pub enum FundingLeg {
     },
 }
 
+/// Inputs of [`CmsSwap::from_schedule`].
+///
+/// Both legs share one schedule (short-front stub, Modified Following, no
+/// payment lag) generated from `start_date`, `maturity` and `cms_frequency`
+/// on the `index_id` convention's calendar.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CmsSwapScheduleParams {
+    /// Unique instrument identifier.
+    pub id: InstrumentId,
+    /// Inclusive schedule start date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub start_date: Date,
+    /// Final payment date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub maturity: Date,
+    /// Payment and fixing frequency of both the CMS and funding schedules.
+    pub cms_frequency: Tenor,
+    /// Reference swap tenor of the CMS rate (e.g. 10Y); month- or year-based.
+    pub cms_tenor: Tenor,
+    /// Additive spread on the CMS rate in basis points (10 = 10bp).
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub cms_spread_bp: Decimal,
+    /// Fixed or floating funding leg; its schedule is generated from the same
+    /// start, maturity and CMS frequency.
+    pub funding_leg: FundingLegSpec,
+    /// Notional; its currency is the payment currency.
+    pub notional: Money,
+    /// Day count of the CMS-leg accrual fractions.
+    pub day_count: DayCount,
+    /// Rate-index convention-registry key (e.g. `USD-SOFR-OIS`) supplying the
+    /// calendar and reset lag; stored as the reference-swap index.
+    pub index_id: IndexId,
+    /// `pay` or `receive` the CMS leg.
+    pub side: finstack_quant_valuations_core::instruments::PayReceive,
+    /// Discount curve for present values.
+    pub discount_curve_id: CurveId,
+    /// Forward curve projecting the reference swap's floating rates.
+    pub forward_curve_id: CurveId,
+    /// Swaption volatility surface for the CMS convexity adjustment.
+    pub vol_surface_id: CurveId,
+}
+
 impl CmsSwap {
     /// Reference swap observed by this instrument's CMS fixings.
     pub fn reference_swap(&self) -> CmsReferenceSwap<'_> {
@@ -330,41 +384,31 @@ impl CmsSwap {
     ///
     /// # Arguments
     ///
-    /// * `id` - Trade identifier stored on the swap and used in results and serialization.
-    /// * `start_date` - Inclusive schedule or accrual start date in the instrument calendar
-    /// * `maturity` - Final payment or expiry date of the instrument being constructed
-    /// * `cms_frequency` - Payment and fixing frequency used to generate both the CMS and
-    ///   funding schedules.
-    /// * `cms_tenor` - Reference swap tenor for the CMS rate (e.g. 10Y); must be month- or
-    ///   year-based.
-    /// * `cms_spread_bp` - Additive spread on the CMS rate in basis points (e.g. `10` = 10bp).
-    /// * `funding_leg` - Fixed or floating other leg; its schedule is generated from the same
-    ///   start, maturity, and CMS frequency.
-    /// * `notional` - Trade notional amount in the instrument currency's major units
-    /// * `day_count` - Day-count convention for CMS-leg accrual fractions.
-    /// * `index_id` - Rate-index convention-registry key (e.g. `USD-SOFR-OIS`) supplying the
-    ///   calendar and reset lag used to build both schedules; stored as the reference-swap index.
-    /// * `side` - Trade side (buy/sell or pay/receive) controlling sign conventions
-    /// * `discount_curve_id` - Identifier of the discount curve used for present-value calculations.
-    /// * `forward_curve_id` - Identifier of the forward curve used to project floating rates.
-    /// * `vol_surface_id` - Identifier of the volatility surface used for option pricing.
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_schedule(
-        id: impl Into<InstrumentId>,
-        start_date: Date,
-        maturity: Date,
-        cms_frequency: Tenor,
-        cms_tenor: Tenor,
-        cms_spread_bp: Decimal,
-        funding_leg: FundingLegSpec,
-        notional: Money,
-        day_count: DayCount,
-        index_id: IndexId,
-        side: finstack_quant_valuations_core::instruments::PayReceive,
-        discount_curve_id: impl Into<CurveId>,
-        forward_curve_id: impl Into<CurveId>,
-        vol_surface_id: impl Into<CurveId>,
-    ) -> finstack_quant_core::Result<Self> {
+    /// * `params` - Identifier, schedule, CMS terms, funding leg, notional,
+    ///   side and curve ids; see [`CmsSwapScheduleParams`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `index_id` has no registered rate-index
+    /// convention, the schedule produces no periods, or the swap fails
+    /// validation.
+    pub fn from_schedule(params: CmsSwapScheduleParams) -> finstack_quant_core::Result<Self> {
+        let CmsSwapScheduleParams {
+            id,
+            start_date,
+            maturity,
+            cms_frequency,
+            cms_tenor,
+            cms_spread_bp,
+            funding_leg,
+            notional,
+            day_count,
+            index_id,
+            side,
+            discount_curve_id,
+            forward_curve_id,
+            vol_surface_id,
+        } = params;
         use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
         use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
 
@@ -459,7 +503,7 @@ impl CmsSwap {
         };
 
         CmsSwap::builder()
-            .id(id.into())
+            .id(id)
             .notional(notional)
             .side(side)
             .cms_tenor(cms_tenor)
@@ -470,9 +514,9 @@ impl CmsSwap {
             .cms_spread_bp(cms_spread_bp)
             .index_id_opt(Some(index_id))
             .funding_leg(funding_leg)
-            .discount_curve_id(discount_curve_id.into())
-            .forward_curve_id(forward_curve_id.into())
-            .vol_surface_id(vol_surface_id.into())
+            .discount_curve_id(discount_curve_id)
+            .forward_curve_id(forward_curve_id)
+            .vol_surface_id(vol_surface_id)
             .build()
             .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))
     }
@@ -674,10 +718,19 @@ impl CmsSwap {
 }
 
 /// Simplified funding leg specification for [`CmsSwap::from_schedule`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "type")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum FundingLegSpec {
     /// Fixed rate funding leg.
     Fixed {
         /// Fixed coupon rate as a decimal annual rate (0.03 = 3%).
+        #[serde(with = "finstack_quant_core::wire::decimal")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DecimalWire")
+        )]
         rate: Decimal,
         /// Day count convention.
         day_count: DayCount,
@@ -685,6 +738,11 @@ pub enum FundingLegSpec {
     /// Floating rate funding leg.
     Floating {
         /// Additive spread over the floating index in basis points (10 = 10bp).
+        #[serde(with = "finstack_quant_core::wire::decimal")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DecimalWire")
+        )]
         spread_bp: Decimal,
         /// Day count convention.
         day_count: DayCount,

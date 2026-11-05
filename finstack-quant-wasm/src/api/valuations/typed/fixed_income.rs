@@ -16,9 +16,9 @@
 use super::data::JsMertonMcConfig;
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
-use crate::api::core::types::{JsBps, JsRate};
+use crate::api::core::types::JsRate;
 use crate::api::valuations::pricing::parse_market;
-use crate::utils::input::{js_f64, js_string};
+use crate::utils::input::{from_js_json, js_f64, js_string};
 use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::StubKind;
@@ -179,109 +179,71 @@ impl JsBond {
     /// business-day convention come from the notional currency: USD
     /// UsCorporate (T+1, usny), EUR EurCorporate (T+2, target2), GBP
     /// UkGilt (T+1), JPY Jgb (T+2). Unmapped currencies throw.
-    /// @param id - Unique instrument identifier.
-    /// @param notional - Principal amount of the bond.
-    /// @param forwardCurveId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
-    /// @param spreadBp - Spread over the index in whole basis points
-    /// (`Bps` rejects fractional values; use `Bond.fromJson` for sub-bp
-    /// margins, which preserves the exact decimal spread).
-    /// @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
-    /// @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
-    /// @param frequency - Payment frequency (e.g. `Tenor.quarterly()`).
-    /// @param dayCount - Day count convention (e.g. `DayCount.act360()`).
-    /// @param discountCurveId - Discount curve identifier used for pricing.
+    /// @param params - `FloatingBondParams` (plain object or JSON text), every key
+    /// required: `id`; `notional` - Money wire object
+    /// `{ amount: "1000000", currency: "USD" }` (decimal string amount), the
+    /// coupon and redemption currency; `forward_curve_id` - index projection curve
+    /// (e.g. `"USD-SOFR-3M"`); `spread_bp` - spread over the index in whole
+    /// basis points (an integer; use `Bond.fromJson` for sub-bp margins);
+    /// `issue_date` / `maturity` - ISO-8601 dates; `frequency` - coupon tenor
+    /// object (e.g. `{ count: 3, unit: "months" }`); `day_count` - accrual day
+    /// count label (e.g. `"act_360"`);
+    /// `discount_curve_id` - pricing curve.
     /// @returns The validated floating-rate note.
-    /// @throws If the notional currency has no mapped settlement convention
-    /// or validation fails.
-    #[allow(clippy::too_many_arguments)]
+    /// @throws Error - Throws with kind `validation` if `params` is malformed,
+    /// the notional currency has no mapped settlement convention, or bond
+    /// validation fails, and kind `invalid_type` if `params` is not an object or
+    /// JSON text.
     pub fn floating(
-        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        notional: &JsMoney,
-        #[wasm_bindgen(js_name = "forwardCurveId", unchecked_param_type = "string")]
-        forward_curve_id: JsValue,
-        #[wasm_bindgen(js_name = "spreadBp")] spread_bp: &JsBps,
-        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
-        frequency: &JsTenor,
-        #[wasm_bindgen(js_name = "dayCount")] day_count: &JsDayCount,
-        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
-        discount_curve_id: JsValue,
+        #[wasm_bindgen(
+            unchecked_param_type = "generated.valuations.FloatingBondParams | JsonInput"
+        )]
+        params: JsValue,
     ) -> Result<JsBond, JsValue> {
-        let id: &str = &js_string(&id, "id")?;
-        let forward_curve_id: &str = &js_string(&forward_curve_id, "forwardCurveId")?;
-        let issue_date = js_date(&issue_date, "issueDate")?;
-        let maturity = js_date(&maturity, "maturity")?;
-        let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
-        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating(
-            id,
-            notional.inner,
-            forward_curve_id,
-            spread_bp.inner,
-            issue_date,
-            maturity,
-            frequency.inner,
-            day_count.inner,
-            discount_curve_id,
-        )
-        .map_err(to_js_err)?;
-        Ok(JsBond { inner })
+        let params: finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams =
+            from_js_json(&params, "params")?;
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating(params)
+            .map(|inner| JsBond { inner })
+            .map_err(to_js_err)
     }
 
     /// Create a floating-rate bond (FRN) from a named market convention preset.
     ///
     /// Mirrors Rust `Bond::floating_with_convention`: calendar, business-day
-    /// convention, settlement lag and stub rule come from the preset; the
-    /// coupon is `forward index + spreadBp`.
-    /// @param id - Unique instrument identifier.
-    /// @param notional - Principal amount of the bond.
-    /// @param forwardCurveId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
-    /// @param spreadBp - Spread over the index in whole basis points.
-    /// @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
-    /// @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
-    /// @param frequency - Payment frequency (e.g. `Tenor.quarterly()`).
-    /// @param dayCount - Day count convention (e.g. `DayCount.act360()`).
+    /// convention and settlement lag come from the preset; the coupon is
+    /// `forward index + spread_bp`.
+    /// @param params - `FloatingBondParams` (plain object or JSON text) with the
+    /// same keys as `Bond.floating`: `id`, `notional` (Money wire object),
+    /// `forward_curve_id`, `spread_bp` (integer basis points), `issue_date`,
+    /// `maturity`, `frequency`, `day_count` and `discount_curve_id`.
     /// @param convention - Bond convention preset: `us_treasury`, `us_agency`,
     /// `german_bund`, `uk_gilt`, `french_oat`, `jgb`, `us_corporate`, or
     /// `eur_corporate`.
-    /// @param discountCurveId - Discount curve identifier used for pricing.
     /// @returns The validated floating-rate note.
-    /// @throws Error - Throws with kind `validation` if `convention` is not a
-    /// known preset, a date is malformed, or bond validation fails.
-    #[allow(clippy::too_many_arguments)]
+    /// @throws Error - Throws with kind `validation` if `params` is malformed,
+    /// `convention` is not a known preset, or bond validation fails, and kind
+    /// `invalid_type` for a wrong argument type.
     #[wasm_bindgen(js_name = floatingWithConvention)]
     pub fn floating_with_convention(
-        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        notional: &JsMoney,
-        #[wasm_bindgen(js_name = "forwardCurveId", unchecked_param_type = "string")]
-        forward_curve_id: JsValue,
-        #[wasm_bindgen(js_name = "spreadBp")] spread_bp: &JsBps,
-        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
-        frequency: &JsTenor,
-        #[wasm_bindgen(js_name = "dayCount")] day_count: &JsDayCount,
+        #[wasm_bindgen(
+            unchecked_param_type = "generated.valuations.FloatingBondParams | JsonInput"
+        )]
+        params: JsValue,
         #[wasm_bindgen(
             unchecked_param_type = "| 'us_treasury' | 'us_agency' | 'german_bund' | 'uk_gilt' | 'french_oat' | 'jgb' | 'us_corporate' | 'eur_corporate'"
         )]
         convention: JsValue,
-        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
-        discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
-        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating_with_convention(
-            js_string(&id, "id")?,
-            notional.inner,
-            js_string(&forward_curve_id, "forwardCurveId")?,
-            spread_bp.inner,
-            js_date(&issue_date, "issueDate")?,
-            js_date(&maturity, "maturity")?,
-            frequency.inner,
-            day_count.inner,
+        let params: finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams =
+            from_js_json(&params, "params")?;
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating_with_convention(
+            params,
             js_string(&convention, "convention")?
                 .parse::<finstack_quant_valuations::instruments::BondConvention>()
                 .map_err(to_js_err)?,
-            js_string(&discount_curve_id, "discountCurveId")?,
         )
-        .map_err(to_js_err)?;
-        Ok(JsBond { inner })
+        .map(|inner| JsBond { inner })
+        .map_err(to_js_err)
     }
 
     /// Create a zero-coupon bond that pays `notional` at maturity.

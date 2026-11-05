@@ -116,18 +116,17 @@ def test_swap_from_legs_prices_on_start_date_without_fixings() -> None:
 
 
 def test_swap_from_conventions_prices_on_start_date_without_fixings() -> None:
-    swap = InterestRateSwap.from_conventions(
-        "IRS-5Y-CONV",
-        10_000_000.0,
-        "pay",
-        0.035,
-        AS_OF,
-        END,
-        "USD-SOFR",
-        "USD-OIS",
-        "USD-SOFR",
-        currency="USD",
-    )
+    swap = InterestRateSwap.from_conventions({
+        "id": "IRS-5Y-CONV",
+        "notional": Money(10_000_000.0, "USD"),
+        "side": "pay",
+        "fixed_rate": 0.035,
+        "start_date": AS_OF,
+        "maturity": END,
+        "index_id": "USD-SOFR",
+        "discount_curve_id": "USD-OIS",
+        "forward_curve_id": "USD-SOFR",
+    })
     assert swap.side == "pay"
     assert swap.float_leg.reset_lag_days == 0
     assert swap.float_leg.compounding != "simple"
@@ -305,7 +304,7 @@ def test_leg_spec_repr_is_python_style() -> None:
 
 
 def test_bond_fixed_accepts_floats_strings_and_with_convention_takes_a_stub() -> None:
-    bond = Bond.fixed("BOND-STR", 1_000_000.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS", currency="USD")
+    bond = Bond.fixed("BOND-STR", Money(1_000_000.0, "USD"), 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS")
     assert bond.issue_date == datetime.date(2024, 1, 15)
     assert bond.maturity == datetime.date(2034, 1, 15)
     assert bond.notional.amount == pytest.approx(1_000_000.0)
@@ -321,16 +320,16 @@ def test_bond_fixed_accepts_floats_strings_and_with_convention_takes_a_stub() ->
     )
     assert typed.to_dict()["cashflow_spec"] == bond.to_dict()["cashflow_spec"]
     bund = Bond.with_convention(
-        "BUND", 1_000_000.0, 0.025, "2024-01-15", "2034-01-15", "german_bund", "EUR-OIS", currency="EUR"
+        "BUND", Money(1_000_000.0, "EUR"), 0.025, "2024-01-15", "2034-01-15", "german_bund", "EUR-OIS"
     ).with_stub("long_back")
     assert bund.settlement_days == 2
     assert bund.to_dict()["cashflow_spec"]["fixed"]["stub"] == "long_back"
-    with pytest.raises(ValueError, match=r"needs a currency"):
-        Bond.fixed("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS")
+    with pytest.raises(TypeError, match=r"notional"):
+        Bond.fixed("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS")  # type: ignore[arg-type]
     with pytest.raises(ValueError, match=r"unknown variant `martian`"):
-        Bond.with_convention("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "martian", "USD-OIS", currency="USD")
+        Bond.with_convention("X", Money(1.0, "USD"), 0.05, "2024-01-15", "2034-01-15", "martian", "USD-OIS")
     with pytest.raises(TypeError):
-        Bond.fixed("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS", currency="USD", convention="uk_gilt")
+        Bond.fixed("X", Money(1.0, "USD"), 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS", convention="uk_gilt")
 
 
 def test_bond_constructors_and_examples() -> None:
@@ -339,35 +338,35 @@ def test_bond_constructors_and_examples() -> None:
         is False
     )
     gilt = Bond.with_convention(
-        "GILT", 1_000_000.0, 0.04, "2024-01-01", "2034-01-01", "uk_gilt", "GBP-OIS", currency="GBP"
+        "GILT", Money(1_000_000.0, "GBP"), 0.04, "2024-01-01", "2034-01-01", "uk_gilt", "GBP-OIS"
     )
     assert gilt.settlement_days == 1
-    frn = Bond.floating(
-        "FRN",
-        1000.0,
-        "USD-SOFR-3M",
-        125.0,
-        "2024-01-01",
-        "2029-01-01",
-        Tenor.quarterly(),
-        DayCount.ACT_360,
-        "USD-OIS",
-        currency="USD",
-    )
+    frn = Bond.floating({
+        "id": "FRN",
+        "notional": Money(1000.0, "USD"),
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": 125,
+        "issue_date": "2024-01-01",
+        "maturity": "2029-01-01",
+        "frequency": Tenor.quarterly(),
+        "day_count": DayCount.ACT_360,
+        "discount_curve_id": "USD-OIS",
+    })
     assert frn.has_floating_coupons
     assert frn.cashflow_spec["floating"]["rate_spec"]["forward_curve_id"] == "USD-SOFR-3M"
     frn_eur = Bond.floating_with_convention(
-        "FRN-EUR",
-        1000.0,
-        "EUR-EURIBOR-3M",
-        Bps(80),
-        "2024-01-01",
-        "2029-01-01",
-        Tenor.quarterly(),
-        DayCount.ACT_360,
+        {
+            "id": "FRN-EUR",
+            "notional": Money(1000.0, "EUR"),
+            "forward_curve_id": "EUR-EURIBOR-3M",
+            "spread_bp": Bps(80),
+            "issue_date": "2024-01-01",
+            "maturity": "2029-01-01",
+            "frequency": Tenor.quarterly(),
+            "day_count": DayCount.ACT_360,
+            "discount_curve_id": "EUR-OIS",
+        },
         "eur_corporate",
-        "EUR-OIS",
-        currency="EUR",
     )
     assert frn_eur.settlement_days == 2
     assert Bond.example().discount_curve_id == "USD-TREASURY"
@@ -478,7 +477,7 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
 
 
 def test_bond_getters_and_pricing_helpers() -> None:
-    bond = Bond.fixed("BOND-GETTERS", 1_000_000.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS", currency="USD")
+    bond = Bond.fixed("BOND-GETTERS", Money(1_000_000.0, "USD"), 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS")
     assert isinstance(bond.notional, Money)
     assert isinstance(bond.issue_date, datetime.date)
     assert bond.credit_curve_id is None

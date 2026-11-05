@@ -99,9 +99,9 @@ fn linked_rate_replay_reprices_bumped_swaps_with_bumped_discounting()
             fixed_rate,
             start_date: start,
             maturity,
-            index_id: "USD-SOFR-3M",
-            discount_curve_id: "USD-OIS",
-            forward_curve_id: "USD-SOFR-3M",
+            index_id: "USD-SOFR-3M".into(),
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
         })?;
         swap.fixed_leg.business_day_convention = convention.market_business_day_convention;
         swap.float_leg.business_day_convention = convention.market_business_day_convention;

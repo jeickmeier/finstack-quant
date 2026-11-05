@@ -577,33 +577,33 @@ fn test_single_period_cap_matches_caplet_with_resolved_lags() {
     let strike = 0.05;
     let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
-    let cap = CapFloor::new(
-        "ONE_PERIOD_CAP",
-        RateOptionType::Cap,
+    let cap = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "ONE_PERIOD_CAP".into(),
+        rate_option_type: RateOptionType::Cap,
         notional,
         strike,
-        start,
-        end,
-        Some(Tenor::quarterly()),
-        DayCount::Act360,
-        "USD_OIS",
-        "USD-SOFR-OIS",
-        "USD_CAP_VOL",
-    )
+        start_date: start,
+        maturity: end,
+        frequency: Some(Tenor::quarterly()),
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD_OIS".into(),
+        forward_curve_id: "USD-SOFR-OIS".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    })
     .expect("valid strike");
-    let caplet = CapFloor::new(
-        "ONE_PERIOD_CAPLET",
-        RateOptionType::Caplet,
+    let caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "ONE_PERIOD_CAPLET".into(),
+        rate_option_type: RateOptionType::Caplet,
         notional,
         strike,
-        start,
-        end,
-        None,
-        DayCount::Act360,
-        "USD_OIS",
-        "USD-SOFR-OIS",
-        "USD_CAP_VOL",
-    )
+        start_date: start,
+        maturity: end,
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD_OIS".into(),
+        forward_curve_id: "USD-SOFR-OIS".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    })
     .expect("valid literal strike");
 
     let market = MarketContext::new()

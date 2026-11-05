@@ -78,22 +78,22 @@ fn test_ndf_example() {
 fn test_ndf_from_trade_date() {
     let trade_date = Date::from_calendar_date(2024, Month::January, 15).expect("valid date");
 
-    let ndf = Ndf::from_trade_date(
-        "USDCNY-3M",
-        Currency::CNY,
-        Currency::USD,
+    let ndf = Ndf::from_trade_date(finstack_quant_valuations_fx::ndf::NdfTradeDateParams {
+        id: "USDCNY-3M".into(),
+        base_currency: Currency::CNY,
+        settlement_currency: Currency::USD,
         trade_date,
-        Tenor::parse("3M").expect("valid tenor"),
-        Money::new(10_000_000.0, Currency::CNY).expect("valid money fixture"),
-        7.25,
-        "USD-OIS",
-        None,
-        None,
-        2, // T+2 spot
-        2, // T-2 fixing before maturity
-        BusinessDayConvention::ModifiedFollowing,
-        false,
-    )
+        tenor: Tenor::parse("3M").expect("valid tenor"),
+        notional: Money::new(10_000_000.0, Currency::CNY).expect("valid money fixture"),
+        contract_rate: 7.25,
+        domestic_discount_curve_id: "USD-OIS".into(),
+        base_calendar_id: None,
+        settlement_calendar_id: None,
+        settlement_days: 2,
+        fixing_offset_days: 2,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        end_of_month: false,
+    })
     .expect("should build");
 
     // Check that fixing date is before maturity

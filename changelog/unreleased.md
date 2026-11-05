@@ -2,6 +2,38 @@
 
 ## Itemized changes
 
+### Valuations: instrument convenience constructors take one params object
+
+Every instrument convenience constructor with more than seven inputs takes one
+serde params struct (`deny_unknown_fields`, each a new `valuations` input
+schema), and the hosts take the same object: a dict or JSON text in Python
+(typed `Money`, `Currency`, `Tenor`, `DayCount`, `Bps` and `datetime.date`
+values may sit inside it), a plain object or JSON text in WASM, typed
+`generated.valuations.<Type> | JsonInput`. Inside a params object `notional` is
+the `Money` wire form `{"amount": "1000000", "currency": "USD"}`, a tenor
+`{"count": 3, "unit": "months"}`, a day count its label (`"act_360"`) and a
+`spread_bp` an integer. One route per input: `Bond.fixed` and
+`Bond.with_convention` lose the `currency=` keyword (the notional is a `Money`);
+`FxForward.from_trade_date` and `FxOption.european` no longer take a bare float
+notional; `FxForward.from_trade_date` reads `business_day_convention` by its
+serde name only (no case or whitespace folding);
+`EquityOption.european` drops its market-data id keywords (it binds the Rust
+`european` default ids; use `EquityOption.builder()` for others). Instrument
+wire forms and results are unchanged. Old → new:
+
+- Rust `CdsIndex::from_preset(&preset, id, notional, side, start, end, recovery_rate, discount_curve_id, credit_curve_id)` → `CdsIndex::from_preset(&preset, CdsTradeParams { .. })` (new `cds::CdsTradeParams`, shared with the crate-internal `CreditDefaultSwap::new_isda(convention, coupon_bp, params)`)
+- Rust `Bond::floating(id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, discount_curve_id)` → `Bond::floating(FloatingBondParams { .. })`; `Bond::floating_with_convention(.., convention, discount_curve_id)` → `Bond::floating_with_convention(FloatingBondParams { .. }, convention)`
+- Rust `FxForward::from_trade_date(13 args)` → `FxForward::from_trade_date(FxForwardTradeDateParams { .. })`; `FxSwap::from_trade_date(13 args)` → `FxSwap::from_trade_date(FxSwapTradeDateParams { .. })`; `Ndf::from_trade_date(14 args)` → `Ndf::from_trade_date(NdfTradeDateParams { .. })`; `FxOption::european(9 args)` → `FxOption::european(FxOptionParams { .. })`. The three trade-date structs are separate because their spot conventions differ: `FxForward` defaults `settlement_days` and `business_day_convention` (`Option`), `FxSwap` and `Ndf` require them, and `Ndf` names a `settlement_calendar_id` and adds `fixing_offset_days`.
+- Rust `CapFloor::new(11 args)` → `CapFloor::new(CapFloorParams { .. })` (`frequency` may be omitted on the wire); `CmsSwap::from_schedule(14 args)` → `CmsSwap::from_schedule(CmsSwapScheduleParams { .. })` (`FundingLegSpec` is now serde, tagged by `type`); `BermudanSwaption::new(10 args)` → `BermudanSwaption::new(BermudanSwaptionParams { .. })` (the swap dates are `underlying_start_date` / `underlying_maturity`, as on `BermudanSwaption`; `swap_start` / `swap_end` are retired wire keys)
+- Rust `ConventionSwapParams<'a>` loses its lifetime: `index_id` is an `IndexId` and the curve ids are `CurveId`s; it is now serde
+- Python `Bond.fixed(id, notional, coupon_rate, issue_date, maturity, stub, discount_curve_id, *, currency=None)` → `Bond.fixed(id, notional: Money, coupon_rate, issue_date, maturity, stub, discount_curve_id)`; the same for `Bond.with_convention(.., convention, discount_curve_id)`
+- Python `Bond.floating(id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, discount_curve_id, *, currency=None)` → `Bond.floating(params)`; `Bond.floating_with_convention(.., convention, discount_curve_id, *, currency=None)` → `Bond.floating_with_convention(params, convention)`; WASM `Bond.floating(id, notional, forwardCurveId, spreadBp, issueDate, maturity, frequency, dayCount, discountCurveId)` → `Bond.floating(params)`, `Bond.floatingWithConvention(.., convention, discountCurveId)` → `Bond.floatingWithConvention(params, convention)`
+- Python `CdsIndex.from_preset(preset, id, notional, side, start, end, recovery_rate, discount_curve_id, credit_curve_id)` → `CdsIndex.from_preset(preset, params)`; WASM `CdsIndex.fromPreset(preset, id, notional, side, start, end, recoveryRate, discountCurveId, creditCurveId)` → `CdsIndex.fromPreset(preset, params)`
+- Python `FxForward.from_trade_date(id, base_currency, quote_currency, trade_date, tenor, notional, domestic_discount_curve_id, foreign_discount_curve_id, *, base_calendar_id=None, quote_calendar_id=None, settlement_days=None, business_day_convention=None, end_of_month=False)` → `FxForward.from_trade_date(params)`; WASM `FxForward.fromTradeDate(id, baseCurrency, quoteCurrency, tradeDate, tenor, notional, domesticDiscountCurveId, foreignDiscountCurveId, options?)` → `FxForward.fromTradeDate(params)` (the private `FromTradeDateOptions` is removed)
+- Python `FxOption.european(id, base_currency, quote_currency, strike, expiry, notional, vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)` → `FxOption.european(params)` with `delta_convention` as the `FxDeltaConvention` serde object `{"kind", "premium_currency", "venue"}`; WASM `FxOption.european(id, …, deltaConventionKind, premiumCurrency, venue)` → `FxOption.european(params)`
+- Python `InterestRateSwap.from_conventions(id, notional, side, fixed_rate, start_date, maturity, index_id, discount_curve_id, forward_curve_id, *, currency=None)` → `InterestRateSwap.from_conventions(params)`; WASM `InterestRateSwap.fromConventions(id, notional, side, fixedRate, startDate, maturity, indexId, discountCurveId, forwardCurveId)` → `InterestRateSwap.fromConventions(params)`
+- Python `EquityOption.european(id, ticker, strike, expiry, quantity, currency, option_type, *, discount_curve_id="USD-OIS", spot_id="EQUITY-SPOT", vol_surface_id="EQUITY-VOL", div_yield_id="EQUITY-DIVYIELD")` → `EquityOption.european(id, ticker, strike, expiry, quantity, currency, option_type)` (the WASM twin already had this shape)
+
 ### Python: params dicts accept `Tenor` and `DayCount` objects
 
 Every Python params object (dict passed to a binding that reads a Rust serde

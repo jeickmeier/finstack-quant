@@ -215,7 +215,6 @@ impl JsEquityOption {
     /// @param optionType - Option type: `call` (right to buy the underlying) or `put` (right to sell it).
     /// @returns The validated option.
     /// @throws Error - Throws with kind `validation` if `expiry` or `optionType` is malformed or the option fails validation, and kind `invalid_type` for a wrong argument type.
-    #[allow(clippy::too_many_arguments)]
     pub fn european(
         #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
         #[wasm_bindgen(unchecked_param_type = "string")] ticker: JsValue,

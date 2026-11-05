@@ -233,6 +233,65 @@ pub struct CreditDefaultSwap {
     pub attributes: Attributes,
 }
 
+/// Trade terms of a standard-convention CDS or CDS index trade.
+///
+/// The convention-driven schedule terms (day count, frequency, stub,
+/// business-day convention, calendar and settlement lag) are not part of this
+/// bundle: [`crate::cds_index::CdsIndex::from_preset`] takes them from the
+/// preset's regional ISDA convention.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_core::currency::Currency;
+/// use finstack_quant_core::money::Money;
+/// use finstack_quant_core::types::{CurveId, InstrumentId};
+/// use finstack_quant_valuations_core::instruments::PayReceive;
+/// use finstack_quant_valuations_credit::cds::CdsTradeParams;
+/// use time::macros::date;
+///
+/// let params = CdsTradeParams {
+///     id: InstrumentId::new("CDX-IG-42"),
+///     notional: Money::from((10_000_000_i64, Currency::USD)),
+///     side: PayReceive::Pay,
+///     start: date!(2024 - 03 - 20),
+///     end: date!(2029 - 06 - 20),
+///     recovery_rate: 0.40,
+///     discount_curve_id: CurveId::new("USD-OIS"),
+///     credit_curve_id: CurveId::new("CDX.NA.IG.HAZARD"),
+/// };
+/// assert_eq!(params.recovery_rate, 0.40);
+/// ```
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CdsTradeParams {
+    /// Unique instrument identifier.
+    pub id: InstrumentId,
+    /// Contract notional; its currency is the premium and protection currency.
+    pub notional: Money,
+    /// Protection direction: `pay` buys protection (pays premium), `receive` sells it.
+    pub side: PayReceive,
+    /// Premium accrual start (effective) date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub start: Date,
+    /// Scheduled maturity date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub end: Date,
+    /// Assumed recovery as a decimal fraction of par in `[0, 1]` (0.40 = 40%).
+    pub recovery_rate: f64,
+    /// Discount curve identifier for both legs.
+    pub discount_curve_id: finstack_quant_core::types::CurveId,
+    /// Hazard (credit) curve identifier for the protection leg.
+    pub credit_curve_id: finstack_quant_core::types::CurveId,
+}
+
 impl CreditDefaultSwap {
     /// Return the CDS par spread implied by an immutable market snapshot.
     ///
@@ -311,25 +370,36 @@ impl CreditDefaultSwap {
 
     /// Create a new CDS with standard ISDA conventions using explicit inputs.
     ///
-    /// Internal helper used by synthetic CDS creation in `cds_option` and
-    /// `cds_index`. For the public API, use [`builder()`](Self::builder).
+    /// Internal helper used by synthetic CDS creation in `cds_option`. The
+    /// premium-leg schedule terms and the protection settlement delay come from
+    /// `convention`; the trade terms come from `params`. For the public API,
+    /// use [`builder()`](Self::builder).
+    ///
+    /// # Arguments
+    ///
+    /// * `convention` - Regional ISDA convention supplying day count,
+    ///   frequency, stub, business-day convention, calendar and settlement lag.
+    /// * `coupon_bp` - Running premium coupon in basis points (100 = 1%).
+    /// * `params` - Trade id, notional, side, dates, recovery and curve ids.
     ///
     /// # Errors
     ///
     /// Returns an error if validation fails (e.g., recovery rate out of bounds).
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_isda(
-        id: impl Into<InstrumentId>,
-        notional: Money,
-        side: PayReceive,
         convention: CdsConvention,
         coupon_bp: Decimal,
-        start: finstack_quant_core::dates::Date,
-        end: finstack_quant_core::dates::Date,
-        recovery_rate: f64,
-        discount_curve_id: impl Into<finstack_quant_core::types::CurveId>,
-        credit_curve_id: impl Into<finstack_quant_core::types::CurveId>,
+        params: CdsTradeParams,
     ) -> finstack_quant_core::Result<Self> {
+        let CdsTradeParams {
+            id,
+            notional,
+            side,
+            start,
+            end,
+            recovery_rate,
+            discount_curve_id,
+            credit_curve_id,
+        } = params;
         let spec = convention.get_spec()?;
         let day_count = spec.day_count;
         let frequency = spec.frequency;
@@ -337,7 +407,7 @@ impl CreditDefaultSwap {
         let stub = spec.stub;
 
         let cds = Self {
-            id: id.into(),
+            id,
             notional,
             side,
             convention,
@@ -351,10 +421,10 @@ impl CreditDefaultSwap {
                 calendar_id: Some(spec.calendar_id.as_str().into()),
                 day_count,
                 coupon_bp,
-                discount_curve_id: discount_curve_id.into(),
+                discount_curve_id,
             },
             protection_leg: ProtectionLegSpec {
-                credit_curve_id: credit_curve_id.into(),
+                credit_curve_id,
                 recovery_rate,
                 settlement_delay: spec.settlement_days,
             },
@@ -723,16 +793,18 @@ mod tests {
     #[test]
     fn new_isda_applies_standard_convention_fields() {
         let cds = CreditDefaultSwap::new_isda(
-            InstrumentId::new("CDS-CORP-5Y"),
-            Money::from((10_000_000_i64, Currency::USD)),
-            PayReceive::Pay,
             CdsConvention::IsdaNa,
             Decimal::try_from(100.0).expect("valid spread_bp"),
-            date!(2025 - 03 - 20),
-            date!(2030 - 03 - 20),
-            0.40,
-            "USD-OIS",
-            "CORP-HAZARD",
+            crate::cds::CdsTradeParams {
+                id: InstrumentId::new("CDS-CORP-5Y"),
+                notional: Money::from((10_000_000_i64, Currency::USD)),
+                side: PayReceive::Pay,
+                start: date!(2025 - 03 - 20),
+                end: date!(2030 - 03 - 20),
+                recovery_rate: 0.40,
+                discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+                credit_curve_id: finstack_quant_core::types::CurveId::new("CORP-HAZARD"),
+            },
         )
         .expect("ISDA CDS constructor should succeed");
 

@@ -165,24 +165,24 @@ model-consistent spread while preserving the selected model. Explicit
 ### Floating-rate notes
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, FloatingBondParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::Bps;
+use finstack_quant_core::types::{Bps, CurveId, InstrumentId};
 use time::macros::date;
 
-let frn = Bond::floating(
-    "FRN-001",
-    Money::new(1_000_000.0, Currency::USD)?,
-    "USD-SOFR-3M",
-    Bps::new(200),
-    date!(2025 - 01 - 01),
-    date!(2030 - 01 - 01),
-    Tenor::quarterly(),
-    DayCount::Act360,
-    "USD-OIS",
-)?;
+let frn = Bond::floating(FloatingBondParams {
+    id: InstrumentId::new("FRN-001"),
+    notional: Money::new(1_000_000.0, Currency::USD)?,
+    forward_curve_id: CurveId::new("USD-SOFR-3M"),
+    spread_bp: Bps::new(200),
+    issue_date: date!(2025 - 01 - 01),
+    maturity: date!(2030 - 01 - 01),
+    frequency: Tenor::quarterly(),
+    day_count: DayCount::Act360,
+    discount_curve_id: CurveId::new("USD-OIS"),
+})?;
 ```
 
 Reset lag and fixing calendar default from the index id when it is a known

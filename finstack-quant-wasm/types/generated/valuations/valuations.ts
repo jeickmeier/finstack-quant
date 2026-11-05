@@ -3773,6 +3773,36 @@ export type CashflowType =
   | "mark_to_market"
   | "other";
 /**
+ * Simplified funding leg specification for [`CmsSwap::from_schedule`].
+ */
+export type FundingLegSpec =
+  | {
+      /**
+       * Day count convention.
+       */
+      day_count: DayCount;
+      /**
+       * Fixed coupon rate as a decimal annual rate (0.03 = 3%).
+       */
+      rate: DecimalWire;
+      type: "fixed";
+    }
+  | {
+      /**
+       * Day count convention.
+       */
+      day_count: DayCount;
+      /**
+       * Forward curve for floating rate projection.
+       */
+      forward_curve_id: Id;
+      /**
+       * Additive spread over the floating index in basis points (10 = 10bp).
+       */
+      spread_bp: DecimalWire;
+      type: "floating";
+    };
+/**
  * Rounding modes supported by the library.
  *
  * The variants mirror the most common conventions found in pricing engines.
@@ -17646,6 +17676,52 @@ export interface BasketPricingConfig {
   fx_policy: FxConversionPolicy;
 }
 /**
+ * Option type, notional, strike, underlying swap dates, exercise schedule and curves of a co-terminal Bermudan swaption.
+ */
+export interface BermudanSwaptionParams {
+  /**
+   * Discount curve for both legs.
+   */
+  discount_curve_id: Id;
+  /**
+   * Exercise dates.
+   */
+  exercise_schedule: BermudanSchedule;
+  /**
+   * Projection curve of the floating leg.
+   */
+  forward_curve_id: Id;
+  /**
+   * Unique instrument identifier.
+   */
+  id: Id;
+  /**
+   * Swap notional; its currency is the payment currency.
+   */
+  notional: Money;
+  /**
+   * `call` for a payer (right to pay fixed), `put` for a receiver (right
+   * to receive fixed).
+   */
+  option_type: OptionType;
+  /**
+   * Fixed rate of the underlying swap as a decimal (0.03 = 3%).
+   */
+  strike: number;
+  /**
+   * Maturity of the underlying swap (co-terminal for every exercise).
+   */
+  underlying_maturity: DateWire;
+  /**
+   * Effective date of the underlying swap.
+   */
+  underlying_start_date: DateWire;
+  /**
+   * Swaption volatility cube.
+   */
+  vol_surface_id: Id;
+}
+/**
  * Every price, yield and spread quote of a bond, solved from any one of them.
  */
 export interface BondQuoteSet {
@@ -17833,6 +17909,57 @@ export interface CalendarYearLadderRow {
    * Calendar year of the grouped cashflows (Gregorian, as on `Date::year`).
    */
   year: number;
+}
+/**
+ * Option type, notional, strike, schedule and curves of a standard cap, floor, caplet or floorlet.
+ */
+export interface CapFloorParams {
+  /**
+   * Accrual day count of each period.
+   */
+  day_count: DayCount;
+  /**
+   * Discount curve for payments.
+   */
+  discount_curve_id: Id;
+  /**
+   * Projection curve of the underlying rate index.
+   */
+  forward_curve_id: Id;
+  /**
+   * Payment frequency generating the period schedule. `None` infers a
+   * single period spanning `[start_date, maturity]` (the caplet/floorlet
+   * convention).
+   */
+  frequency?: Tenor | null;
+  /**
+   * Unique instrument identifier.
+   */
+  id: Id;
+  /**
+   * Final payment date.
+   */
+  maturity: DateWire;
+  /**
+   * Notional; its currency is the payment currency.
+   */
+  notional: Money;
+  /**
+   * `cap`, `floor`, `caplet` or `floorlet`.
+   */
+  rate_option_type: RateOptionType;
+  /**
+   * Accrual start of the first period.
+   */
+  start_date: DateWire;
+  /**
+   * Strike as a decimal rate (0.03 = 3%).
+   */
+  strike: number;
+  /**
+   * Cap/floor volatility surface.
+   */
+  vol_surface_id: Id;
 }
 /**
  * Single-row enriched cashflow view.
@@ -18029,6 +18156,43 @@ export interface CdsIndexParams {
   version: number;
 }
 /**
+ * Trade terms (id, notional, side, dates, recovery, curves) of a standard-convention CDS index trade.
+ */
+export interface CdsTradeParams {
+  /**
+   * Hazard (credit) curve identifier for the protection leg.
+   */
+  credit_curve_id: Id;
+  /**
+   * Discount curve identifier for both legs.
+   */
+  discount_curve_id: Id;
+  /**
+   * Scheduled maturity date.
+   */
+  end: DateWire;
+  /**
+   * Unique instrument identifier.
+   */
+  id: Id;
+  /**
+   * Contract notional; its currency is the premium and protection currency.
+   */
+  notional: Money;
+  /**
+   * Assumed recovery as a decimal fraction of par in `[0, 1]` (0.40 = 40%).
+   */
+  recovery_rate: number;
+  /**
+   * Protection direction: `pay` buys protection (pays premium), `receive` sells it.
+   */
+  side: PayReceive;
+  /**
+   * Premium accrual start (effective) date.
+   */
+  start: DateWire;
+}
+/**
  * Attachment, detachment, notional and coupon of a CDS index tranche.
  */
 export interface CdsTrancheParams {
@@ -18064,6 +18228,69 @@ export interface CdsTrancheParams {
    * Index series
    */
   series: number;
+}
+/**
+ * Schedule, CMS terms, funding leg, notional and curves of a CMS swap built from its schedule.
+ */
+export interface CmsSwapScheduleParams {
+  /**
+   * Payment and fixing frequency of both the CMS and funding schedules.
+   */
+  cms_frequency: Tenor;
+  /**
+   * Additive spread on the CMS rate in basis points (10 = 10bp).
+   */
+  cms_spread_bp: DecimalWire;
+  /**
+   * Reference swap tenor of the CMS rate (e.g. 10Y); month- or year-based.
+   */
+  cms_tenor: Tenor;
+  /**
+   * Day count of the CMS-leg accrual fractions.
+   */
+  day_count: DayCount;
+  /**
+   * Discount curve for present values.
+   */
+  discount_curve_id: Id;
+  /**
+   * Forward curve projecting the reference swap's floating rates.
+   */
+  forward_curve_id: Id;
+  /**
+   * Fixed or floating funding leg; its schedule is generated from the same
+   * start, maturity and CMS frequency.
+   */
+  funding_leg: FundingLegSpec;
+  /**
+   * Unique instrument identifier.
+   */
+  id: Id;
+  /**
+   * Rate-index convention-registry key (e.g. `USD-SOFR-OIS`) supplying the
+   * calendar and reset lag; stored as the reference-swap index.
+   */
+  index_id: Id;
+  /**
+   * Final payment date.
+   */
+  maturity: DateWire;
+  /**
+   * Notional; its currency is the payment currency.
+   */
+  notional: Money;
+  /**
+   * `pay` or `receive` the CMS leg.
+   */
+  side: PayReceive;
+  /**
+   * Inclusive schedule start date.
+   */
+  start_date: DateWire;
+  /**
+   * Swaption volatility surface for the CMS convexity adjustment.
+   */
+  vol_surface_id: Id;
 }
 /**
  * Complete primitive decomposition with path, net, and gross views.
@@ -19010,6 +19237,47 @@ export interface InstrumentEnvelope {
    * Required v1 instrument contract marker.
    */
   schema: InstrumentSchema;
+}
+/**
+ * Identifier, notional, side, fixed rate, dates, rate index and curves of a vanilla swap built from market conventions.
+ */
+export interface ConventionSwapParams {
+  /**
+   * Discount curve identifier.
+   */
+  discount_curve_id: Id;
+  /**
+   * Fixed coupon rate (as a decimal, e.g. 0.03 = 3%).
+   */
+  fixed_rate: number;
+  /**
+   * Forward projection curve identifier.
+   */
+  forward_curve_id: Id;
+  /**
+   * Unique instrument identifier.
+   */
+  id: Id;
+  /**
+   * Rate index identifier used to resolve conventions (e.g. `"USD-SOFR"`).
+   */
+  index_id: Id;
+  /**
+   * Maturity (end) date.
+   */
+  maturity: DateWire;
+  /**
+   * Notional principal amount; its currency is the payment currency.
+   */
+  notional: Money;
+  /**
+   * `pay` or `receive` the fixed leg.
+   */
+  side: PayReceive;
+  /**
+   * Effective (start) date.
+   */
+  start_date: DateWire;
 }
 /**
  * Tree price and Greeks of a convertible bond.
@@ -20157,6 +20425,206 @@ export interface TrancheAccrualPeriod {
   start: DateWire;
 }
 /**
+ * Identifier, notional, index, spread, dates, frequency, day count and curve of a floating-rate note.
+ */
+export interface FloatingBondParams {
+  /**
+   * Accrual day count of the floating coupons, e.g. `act360`.
+   */
+  day_count: DayCount;
+  /**
+   * Discount curve identifier for pricing.
+   */
+  discount_curve_id: Id;
+  /**
+   * Forward (projection) curve of the coupon index, e.g. `USD-SOFR-3M`.
+   */
+  forward_curve_id: Id;
+  /**
+   * Coupon payment and reset frequency, e.g. `3M`.
+   */
+  frequency: Tenor;
+  /**
+   * Unique identifier for the bond.
+   */
+  id: Id;
+  /**
+   * Issue date: start of the first coupon period.
+   */
+  issue_date: DateWire;
+  /**
+   * Maturity date: end of the last coupon period and redemption date.
+   */
+  maturity: DateWire;
+  /**
+   * Principal amount; its currency is the coupon and redemption currency.
+   */
+  notional: Money;
+  /**
+   * Spread over the index in integer basis points (200 = 2%).
+   */
+  spread_bp: number;
+}
+/**
+ * Trade-date, tenor and spot-roll inputs of an FX forward built from its trade date.
+ */
+export interface FxForwardTradeDateParams {
+  /**
+   * Base-currency holiday calendar id; `None` uses weekends only.
+   */
+  base_calendar_id?: string | null;
+  /**
+   * Base (foreign) currency: the numerator of the quote and the notional currency.
+   */
+  base_currency: Currency;
+  /**
+   * Business-day convention rolling the maturity on the joint calendar.
+   * `None` selects Modified Following, the ISDA FX settlement convention.
+   */
+  business_day_convention?: BusinessDayConvention | null;
+  /**
+   * Quote-currency (domestic) discount curve identifier.
+   */
+  domestic_discount_curve_id: Id;
+  /**
+   * Preserve month-end: a month-end spot date gives a month-end maturity.
+   * Defaults to `false`.
+   */
+  end_of_month?: boolean;
+  /**
+   * Base-currency (foreign) discount curve identifier.
+   */
+  foreign_discount_curve_id: Id;
+  /**
+   * Unique instrument identifier.
+   */
+  id: Id;
+  /**
+   * Notional in `base_currency`.
+   */
+  notional: Money;
+  /**
+   * Quote-currency holiday calendar id; `None` uses weekends only.
+   */
+  quote_calendar_id?: string | null;
+  /**
+   * Quote (domestic) currency: the denominator of the quote and the PV currency.
+   */
+  quote_currency: Currency;
+  /**
+   * T+N spot lag in business days (typically 2, or 1 for USD/CAD). `None`
+   * selects the pair's market-standard lag from
+   * [`finstack_quant_core::dates::fx::fx_standard_settlement_days`].
+   */
+  settlement_days?: number | null;
+  /**
+   * Calendar tenor from spot to maturity, e.g. `3M`.
+   */
+  tenor: Tenor;
+  /**
+   * Trade date from which the spot date is rolled.
+   */
+  trade_date: DateWire;
+}
+/**
+ * Pair, strike, expiry, notional, volatility surface, call/put and delta convention of a European FX option.
+ */
+export interface FxOptionParams {
+  /**
+   * Base (foreign) currency: the notional currency.
+   */
+  base_currency: Currency;
+  /**
+   * Delta quoting convention: kind, premium currency (base or quote) and venue.
+   */
+  delta_convention: FxDeltaConvention;
+  /**
+   * Expiry date; the cash payoff settles on this date.
+   */
+  expiry: DateWire;
+  /**
+   * Unique instrument identifier.
+   */
+  id: Id;
+  /**
+   * Notional in `base_currency`.
+   */
+  notional: Money;
+  /**
+   * `call` or `put` on the base currency.
+   */
+  option_type: OptionType;
+  /**
+   * Quote (domestic) currency: the strike and PV currency.
+   */
+  quote_currency: Currency;
+  /**
+   * Strike exchange rate, quote currency per unit of base currency.
+   */
+  strike: number;
+  /**
+   * FX volatility surface identifier.
+   */
+  vol_surface_id: Id;
+}
+/**
+ * Trade-date, far tenor and spot-roll inputs of an FX swap built from its trade date.
+ */
+export interface FxSwapTradeDateParams {
+  /**
+   * Base-currency holiday calendar id; `None` uses weekends only.
+   */
+  base_calendar_id?: string | null;
+  /**
+   * Base (foreign) currency: the numerator of the quote and the notional currency.
+   */
+  base_currency: Currency;
+  /**
+   * Business-day convention rolling the far date on the joint calendar.
+   */
+  business_day_convention: BusinessDayConvention;
+  /**
+   * Quote-currency (domestic) discount curve identifier.
+   */
+  domestic_discount_curve_id: Id;
+  /**
+   * Preserve month-end: a month-end near date gives a month-end far date.
+   */
+  end_of_month: boolean;
+  /**
+   * Calendar tenor from the near date to the far date, e.g. `6M`.
+   */
+  far_tenor: Tenor;
+  /**
+   * Base-currency (foreign) discount curve identifier.
+   */
+  foreign_discount_curve_id: Id;
+  /**
+   * Unique instrument identifier.
+   */
+  id: Id;
+  /**
+   * Notional in `base_currency`, exchanged on both legs.
+   */
+  notional: Money;
+  /**
+   * Quote-currency holiday calendar id; `None` uses weekends only.
+   */
+  quote_calendar_id?: string | null;
+  /**
+   * Quote (domestic) currency: the denominator of the quote.
+   */
+  quote_currency: Currency;
+  /**
+   * T+N spot lag in business days from trade date to near date (2 in most markets).
+   */
+  settlement_days: number;
+  /**
+   * Trade date from which the near (spot) date is rolled.
+   */
+  trade_date: DateWire;
+}
+/**
  * Market conventions of one inflation-swap market.
  */
 export interface InflationSwapConventions {
@@ -20515,6 +20983,68 @@ export interface MetricMetadata {
    * Native unit family; undeclared custom and calculator-dependent units are unknown.
    */
   unit: MetricUnit;
+}
+/**
+ * Trade-date, tenor, contract rate and fixing inputs of an NDF built from its trade date.
+ */
+export interface NdfTradeDateParams {
+  /**
+   * Base-currency holiday calendar id; `None` uses weekends only.
+   */
+  base_calendar_id?: string | null;
+  /**
+   * Restricted (non-deliverable) currency: the numerator and notional currency.
+   */
+  base_currency: Currency;
+  /**
+   * Business-day convention rolling the maturity on the joint calendar.
+   */
+  business_day_convention: BusinessDayConvention;
+  /**
+   * Contract forward rate, base currency per unit of settlement currency.
+   */
+  contract_rate: number;
+  /**
+   * Settlement-currency discount curve identifier.
+   */
+  domestic_discount_curve_id: Id;
+  /**
+   * Preserve month-end: a month-end spot date gives a month-end maturity.
+   */
+  end_of_month: boolean;
+  /**
+   * Joint business days from fixing to maturity (typically 2); a negative
+   * value places the fixing after maturity's unadjusted date.
+   */
+  fixing_offset_days: number;
+  /**
+   * Unique instrument identifier.
+   */
+  id: Id;
+  /**
+   * Notional in `base_currency`.
+   */
+  notional: Money;
+  /**
+   * Settlement-currency holiday calendar id; `None` uses weekends only.
+   */
+  settlement_calendar_id?: string | null;
+  /**
+   * Convertible settlement currency (typically USD): the denominator.
+   */
+  settlement_currency: Currency;
+  /**
+   * T+N spot lag in business days (typically 2).
+   */
+  settlement_days: number;
+  /**
+   * Calendar tenor from spot to maturity, e.g. `3M`.
+   */
+  tenor: Tenor;
+  /**
+   * Trade date from which the spot date is rolled.
+   */
+  trade_date: DateWire;
 }
 /**
  * Structured-credit OAS solver configuration: paths, stochastic dimensions and seed.

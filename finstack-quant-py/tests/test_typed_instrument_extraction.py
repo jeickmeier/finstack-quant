@@ -101,17 +101,17 @@ def _fixed_bond() -> Bond:
 
 
 def _frn() -> Bond:
-    return Bond.floating(
-        "FRN1",
-        Money(1_000_000.0, Currency("USD")),
-        "USD-SOFR-3M",
-        Bps(150),
-        datetime.date(2024, 3, 15),
-        datetime.date(2029, 1, 15),
-        Tenor.quarterly(),
-        DayCount.ACT_360,
-        "USD-OIS",
-    )
+    return Bond.floating({
+        "id": "FRN1",
+        "notional": Money(1_000_000.0, Currency("USD")),
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": Bps(150),
+        "issue_date": datetime.date(2024, 3, 15),
+        "maturity": datetime.date(2029, 1, 15),
+        "frequency": Tenor.quarterly(),
+        "day_count": DayCount.ACT_360,
+        "discount_curve_id": "USD-OIS",
+    })
 
 
 def _snapshot(value: object) -> object:

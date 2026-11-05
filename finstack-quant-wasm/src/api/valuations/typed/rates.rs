@@ -3,9 +3,7 @@
 
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
-use crate::utils::input::js_f64;
 use crate::utils::to_js_err;
-use crate::utils::wire::{js_date, js_wire};
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
@@ -550,47 +548,18 @@ impl JsInterestRateSwap {
     /// Mirrors Rust `InterestRateSwap::from_conventions`: payment frequency,
     /// day counts, calendar, business-day convention, reset and payment lags
     /// all come from the rate-index convention registry.
-    /// @param id - Unique instrument identifier.
-    /// @param notional - Notional shared by both legs.
-    /// @param side - Fixed-leg direction: `pay` (pay fixed, receive floating) or `receive`.
-    /// @param fixedRate - Fixed coupon as a decimal (`0.035` = 3.5%).
-    /// @param startDate - Effective date as an ISO-8601 string.
-    /// @param maturity - Maturity date as an ISO-8601 string.
-    /// @param indexId - Rate index whose conventions apply, e.g. `"USD-SOFR"`.
-    /// @param discountCurveId - Discount curve identifier used for both legs.
-    /// @param forwardCurveId - Forward curve identifier projecting the floating leg.
+    /// @param params - `ConventionSwapParams` (plain object or JSON text), every key required: `id`; `notional` - Money wire object `{ amount: "1000000", currency: "USD" }` (decimal string amount) shared by both legs; `side` - fixed-leg direction, `"pay"` (pay fixed) or `"receive"`; `fixed_rate` - decimal coupon (`0.035` = 3.5%); `start_date` / `maturity` - ISO-8601 dates; `index_id` - rate index whose conventions apply (e.g. `"USD-SOFR"`); `discount_curve_id` - both legs; `forward_curve_id` - floating-leg projection.
     /// @returns The validated swap.
-    /// @throws Error - Throws with kind `not_found` if `indexId` has no registered conventions, kind `validation` if `side` or a date is malformed or the swap fails validation, and kind `invalid_type` for a wrong argument type.
-    #[allow(clippy::too_many_arguments)]
+    /// @throws Error - Throws with kind `not_found` if `index_id` has no registered conventions, kind `validation` if `params` is malformed or the swap fails validation, and kind `invalid_type` if `params` is not an object or JSON text.
     #[wasm_bindgen(js_name = fromConventions)]
     pub fn from_conventions(
-        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        notional: &JsMoney,
-        #[wasm_bindgen(unchecked_param_type = "'pay' | 'receive'")] side: JsValue,
-        #[wasm_bindgen(js_name = "fixedRate", unchecked_param_type = "number")] fixed_rate: JsValue,
-        #[wasm_bindgen(js_name = "startDate", unchecked_param_type = "string")] start_date: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
-        #[wasm_bindgen(js_name = "indexId", unchecked_param_type = "string")] index_id: JsValue,
-        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
-        discount_curve_id: JsValue,
-        #[wasm_bindgen(js_name = "forwardCurveId", unchecked_param_type = "string")]
-        forward_curve_id: JsValue,
+        #[wasm_bindgen(
+            unchecked_param_type = "generated.valuations.ConventionSwapParams | JsonInput"
+        )]
+        params: JsValue,
     ) -> Result<JsInterestRateSwap, JsValue> {
-        let index_id = crate::utils::input::js_string(&index_id, "indexId")?;
-        let discount_curve_id =
-            crate::utils::input::js_string(&discount_curve_id, "discountCurveId")?;
-        let forward_curve_id = crate::utils::input::js_string(&forward_curve_id, "forwardCurveId")?;
-        let params = finstack_quant_valuations::instruments::rates::irs::ConventionSwapParams {
-            id: super::arg::id(&id, "id")?,
-            notional: notional.inner,
-            side: js_wire(&side, "side")?,
-            fixed_rate: js_f64(&fixed_rate, "fixedRate")?,
-            start_date: js_date(&start_date, "startDate")?,
-            maturity: js_date(&maturity, "maturity")?,
-            index_id: &index_id,
-            discount_curve_id: &discount_curve_id,
-            forward_curve_id: &forward_curve_id,
-        };
+        let params: finstack_quant_valuations::instruments::rates::irs::ConventionSwapParams =
+            crate::utils::input::from_js_json(&params, "params")?;
         finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::from_conventions(
             params,
         )

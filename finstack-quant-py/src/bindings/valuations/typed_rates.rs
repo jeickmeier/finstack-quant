@@ -72,41 +72,16 @@ instrument_pricing_methods!(
 impl PyInterestRateSwap {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.from_conventions")]
     #[staticmethod]
-    #[pyo3(signature = (id, notional, side, fixed_rate, start_date, maturity, index_id, discount_curve_id, forward_curve_id, *, currency = None))]
-    #[pyo3(
-        text_signature = "(id, notional, side, fixed_rate, start_date, maturity, index_id, discount_curve_id, forward_curve_id, *, currency=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn from_conventions(
-        id: &str,
-        notional: &Bound<'_, PyAny>,
-        side: &str,
-        fixed_rate: &Bound<'_, PyAny>,
-        start_date: &Bound<'_, PyAny>,
-        maturity: &Bound<'_, PyAny>,
-        index_id: &str,
-        discount_curve_id: &str,
-        forward_curve_id: &str,
-        currency: Option<&str>,
-    ) -> PyResult<Self> {
-        let params = finstack_quant_valuations::instruments::rates::irs::ConventionSwapParams {
-            id: InstrumentId::new(id.to_string()),
-            notional: money_from_py(notional, currency, "notional")?,
-            side: enum_from_str(side, "side")?,
-            fixed_rate: extract_rate_decimal(fixed_rate, "fixed_rate")?,
-            start_date: py_to_date(start_date)?,
-            maturity: py_to_date(maturity)?,
-            index_id,
-            discount_curve_id,
-            forward_curve_id,
-        };
-        let inner =
-            finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::from_conventions(
-                params,
-            )
-            .map_err(core_to_py)?;
-        Ok(Self { inner })
+    #[pyo3(text_signature = "(params)")]
+    fn from_conventions(params: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let params = crate::bindings::module_utils::spec_from_py::<
+            finstack_quant_valuations::instruments::rates::irs::ConventionSwapParams,
+        >(params.py(), params, "ConventionSwapParams")?;
+        finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::from_conventions(
+            params,
+        )
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.example")]

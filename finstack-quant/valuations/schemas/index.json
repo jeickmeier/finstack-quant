@@ -10,6 +10,15 @@
       "type_name": "Attributes"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/common/1/bermudan_swaption_params.schema.json",
+      "bytes": 4879,
+      "kind": "input",
+      "path": "schemas/common/1/bermudan_swaption_params.schema.json",
+      "summary": "Option type, notional, strike, underlying swap dates, exercise schedule and curves of a co-terminal Bermudan swaption.",
+      "title": "BermudanSwaptionParams",
+      "type_name": "BermudanSwaptionParams"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/common/1/bond_quote_input.schema.json",
       "bytes": 3919,
       "kind": "input",
@@ -26,6 +35,15 @@
       "summary": "Business-day adjustment convention.",
       "title": "Business Day Convention",
       "type_name": "BusinessDayConvention"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/common/1/cap_floor_params.schema.json",
+      "bytes": 3670,
+      "kind": "input",
+      "path": "schemas/common/1/cap_floor_params.schema.json",
+      "summary": "Option type, notional, strike, schedule and curves of a standard cap, floor, caplet or floorlet.",
+      "title": "CapFloorParams",
+      "type_name": "CapFloorParams"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/cds_convention_spec.schema.json",
@@ -46,6 +64,15 @@
       "type_name": "CdsIndexParams"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/common/1/cds_trade_params.schema.json",
+      "bytes": 3026,
+      "kind": "input",
+      "path": "schemas/common/1/cds_trade_params.schema.json",
+      "summary": "Trade terms (id, notional, side, dates, recovery, curves) of a standard-convention CDS index trade.",
+      "title": "CdsTradeParams",
+      "type_name": "CdsTradeParams"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/common/1/cds_tranche_params.schema.json",
       "bytes": 1965,
       "kind": "component",
@@ -53,6 +80,24 @@
       "summary": "Attachment, detachment, notional and coupon of a CDS index tranche.",
       "title": "CdsTrancheParams",
       "type_name": "CdsTrancheParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/common/1/cms_swap_schedule_params.schema.json",
+      "bytes": 6676,
+      "kind": "input",
+      "path": "schemas/common/1/cms_swap_schedule_params.schema.json",
+      "summary": "Schedule, CMS terms, funding leg, notional and curves of a CMS swap built from its schedule.",
+      "title": "CmsSwapScheduleParams",
+      "type_name": "CmsSwapScheduleParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/common/1/convention_swap_params.schema.json",
+      "bytes": 3200,
+      "kind": "input",
+      "path": "schemas/common/1/convention_swap_params.schema.json",
+      "summary": "Identifier, notional, side, fixed rate, dates, rate index and curves of a vanilla swap built from market conventions.",
+      "title": "ConventionSwapParams",
+      "type_name": "ConventionSwapParams"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -98,6 +143,42 @@
       "summary": "One structured finding emitted while loading a persisted contract.",
       "title": "Diagnostic",
       "type_name": "Diagnostic"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/common/1/floating_bond_params.schema.json",
+      "bytes": 2581,
+      "kind": "input",
+      "path": "schemas/common/1/floating_bond_params.schema.json",
+      "summary": "Identifier, notional, index, spread, dates, frequency, day count and curve of a floating-rate note.",
+      "title": "FloatingBondParams",
+      "type_name": "FloatingBondParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/common/1/fx_forward_trade_date_params.schema.json",
+      "bytes": 3818,
+      "kind": "input",
+      "path": "schemas/common/1/fx_forward_trade_date_params.schema.json",
+      "summary": "Trade-date, tenor and spot-roll inputs of an FX forward built from its trade date.",
+      "title": "FxForwardTradeDateParams",
+      "type_name": "FxForwardTradeDateParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/common/1/fx_option_params.schema.json",
+      "bytes": 4399,
+      "kind": "input",
+      "path": "schemas/common/1/fx_option_params.schema.json",
+      "summary": "Pair, strike, expiry, notional, volatility surface, call/put and delta convention of a European FX option.",
+      "title": "FxOptionParams",
+      "type_name": "FxOptionParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/common/1/fx_swap_trade_date_params.schema.json",
+      "bytes": 3660,
+      "kind": "input",
+      "path": "schemas/common/1/fx_swap_trade_date_params.schema.json",
+      "summary": "Trade-date, far tenor and spot-roll inputs of an FX swap built from its trade date.",
+      "title": "FxSwapTradeDateParams",
+      "type_name": "FxSwapTradeDateParams"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -170,6 +251,15 @@
       "summary": "Currency-tagged monetary amount.",
       "title": "Money",
       "type_name": "Money"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/common/1/ndf_trade_date_params.schema.json",
+      "bytes": 3805,
+      "kind": "input",
+      "path": "schemas/common/1/ndf_trade_date_params.schema.json",
+      "summary": "Trade-date, tenor, contract rate and fixing inputs of an NDF built from its trade date.",
+      "title": "NdfTradeDateParams",
+      "type_name": "NdfTradeDateParams"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",

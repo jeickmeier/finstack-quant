@@ -873,46 +873,24 @@ impl JsCdsIndex {
     ///
     /// Mirrors Rust `CdsIndex::from_preset`: the preset supplies the index
     /// name, series, version, running coupon and regional ISDA convention;
-    /// the remaining arguments are the trade terms.
-    /// @param preset - `CdsIndexParams` preset, e.g. from `valuations.instruments.cdsIndexParamsCdxNaIg`.
-    /// @param id - Unique instrument identifier.
-    /// @param notional - Index notional on which the premium and protection legs are computed.
-    /// @param side - Protection direction: `pay` (buy protection) or `receive`.
-    /// @param start - Effective date as an ISO-8601 string.
-    /// @param end - Maturity date as an ISO-8601 string.
-    /// @param recoveryRate - Assumed recovery as a decimal fraction of par (`0.4` = 40%).
-    /// @param discountCurveId - Discount curve identifier.
-    /// @param creditCurveId - Index hazard curve identifier.
+    /// `params` supplies the trade terms.
+    /// @param preset - `CdsIndexParams` preset (plain object or JSON text), e.g. from `valuations.instruments.cdsIndexParamsCdxNaIg`.
+    /// @param params - `CdsTradeParams` (plain object or JSON text), every key required: `id`; `notional` - Money wire object `{ amount: "10000000", currency: "USD" }` (decimal string amount) on which both legs are computed; `side` - `"pay"` (buy protection) or `"receive"`; `start` / `end` - ISO-8601 effective and maturity dates; `recovery_rate` - decimal fraction of par (`0.4` = 40%); `discount_curve_id`; `credit_curve_id` - index hazard curve.
     /// @returns The validated index swap.
-    /// @throws Error - Throws with kind `validation` if `preset`, `side` or a date is malformed or the instrument fails validation, and kind `invalid_type` for a wrong argument type.
-    #[allow(clippy::too_many_arguments)]
+    /// @throws Error - Throws with kind `validation` if `preset` or `params` is malformed or the instrument fails validation, and kind `invalid_type` if an argument is not an object or JSON text.
     #[wasm_bindgen(js_name = fromPreset)]
     pub fn from_preset(
-        #[wasm_bindgen(unchecked_param_type = "generated.valuations.CdsIndexParams | string")]
+        #[wasm_bindgen(unchecked_param_type = "generated.valuations.CdsIndexParams | JsonInput")]
         preset: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        notional: &JsMoney,
-        #[wasm_bindgen(unchecked_param_type = "'pay' | 'receive'")] side: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] start: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] end: JsValue,
-        #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
-        recovery_rate: JsValue,
-        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
-        discount_curve_id: JsValue,
-        #[wasm_bindgen(js_name = "creditCurveId", unchecked_param_type = "string")] credit_curve_id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.valuations.CdsTradeParams | JsonInput")]
+        params: JsValue,
     ) -> Result<JsCdsIndex, JsValue> {
         let preset: finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexParams =
             from_js_json(&preset, "preset")?;
+        let params: finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams =
+            from_js_json(&params, "params")?;
         finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex::from_preset(
-            &preset,
-            js_string(&id, "id")?,
-            notional.inner,
-            js_wire(&side, "side")?,
-            js_date(&start, "start")?,
-            js_date(&end, "end")?,
-            js_f64(&recovery_rate, "recoveryRate")?,
-            js_string(&discount_curve_id, "discountCurveId")?,
-            js_string(&credit_curve_id, "creditCurveId")?,
+            &preset, params,
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)

@@ -1,0 +1,106 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/common/1/fx_swap_trade_date_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Trade-date, far tenor and spot-roll inputs of an FX swap built from its trade date.",
+  "examples": [
+    {
+      "base_calendar_id": "target2",
+      "base_currency": "EUR",
+      "business_day_convention": "modified_following",
+      "domestic_discount_curve_id": "USD-OIS",
+      "end_of_month": false,
+      "far_tenor": {
+        "count": 6,
+        "unit": "months"
+      },
+      "foreign_discount_curve_id": "EUR-OIS",
+      "id": "EURUSD-SWAP-6M",
+      "notional": {
+        "amount": "1000000",
+        "currency": "EUR"
+      },
+      "quote_calendar_id": "usny",
+      "quote_currency": "USD",
+      "settlement_days": 2,
+      "trade_date": "2025-01-15"
+    }
+  ],
+  "properties": {
+    "base_calendar_id": {
+      "description": "Base-currency holiday calendar id; `None` uses weekends only.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "base_currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Base (foreign) currency: the numerator of the quote and the notional currency."
+    },
+    "business_day_convention": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+      "description": "Business-day convention rolling the far date on the joint calendar."
+    },
+    "domestic_discount_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Quote-currency (domestic) discount curve identifier."
+    },
+    "end_of_month": {
+      "description": "Preserve month-end: a month-end near date gives a month-end far date.",
+      "type": "boolean"
+    },
+    "far_tenor": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Calendar tenor from the near date to the far date, e.g. `6M`."
+    },
+    "foreign_discount_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Base-currency (foreign) discount curve identifier."
+    },
+    "id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Unique instrument identifier."
+    },
+    "notional": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Notional in `base_currency`, exchanged on both legs."
+    },
+    "quote_calendar_id": {
+      "description": "Quote-currency holiday calendar id; `None` uses weekends only.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "quote_currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Quote (domestic) currency: the denominator of the quote."
+    },
+    "settlement_days": {
+      "description": "T+N spot lag in business days from trade date to near date (2 in most markets).",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "trade_date": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Trade date from which the near (spot) date is rolled."
+    }
+  },
+  "required": [
+    "id",
+    "base_currency",
+    "quote_currency",
+    "trade_date",
+    "far_tenor",
+    "notional",
+    "domestic_discount_curve_id",
+    "foreign_discount_curve_id",
+    "settlement_days",
+    "business_day_convention",
+    "end_of_month"
+  ],
+  "title": "FxSwapTradeDateParams",
+  "type": "object"
+}

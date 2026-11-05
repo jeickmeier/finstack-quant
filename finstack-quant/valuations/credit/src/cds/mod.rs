@@ -141,5 +141,6 @@ pub(crate) mod metrics;
 pub mod pricing;
 mod types;
 
+pub use types::CdsTradeParams;
 pub use types::CreditDefaultSwap;
 pub use types::CreditDefaultSwapBuilder;

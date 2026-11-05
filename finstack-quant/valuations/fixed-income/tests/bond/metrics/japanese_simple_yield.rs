@@ -233,15 +233,17 @@ fn quote_engine_japanese_simple_yield_rejects_frn() {
         .unwrap();
     let market = MarketContext::new().insert(disc).insert(fwd);
     let bond = Bond::floating(
-        "FRN-SIMPLE",
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        "USD-SOFR-3M",
-        150,
-        as_of,
-        date!(2027 - 01 - 01),
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "USD-OIS",
+        finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
+            id: "FRN-SIMPLE".into(),
+            notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: 150.into(),
+            issue_date: as_of,
+            maturity: date!(2027 - 01 - 01),
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        },
     )
     .unwrap();
 
