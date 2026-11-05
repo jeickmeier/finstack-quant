@@ -321,9 +321,7 @@ impl PyCalibrationStep {
     #[pyo3(
         text_signature = "(id, base_date, discount_curve_id, currency, quote_set=None, vol_surface_id=None, **params)"
     )]
-    #[allow(clippy::too_many_arguments)]
     fn swaption_vol(
-        py: Python<'_>,
         id: &str,
         base_date: &Bound<'_, PyAny>,
         discount_curve_id: &str,
@@ -332,6 +330,7 @@ impl PyCalibrationStep {
         vol_surface_id: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
+        let py = base_date.py();
         let f = fields(vec![
             (
                 "vol_surface_id",

@@ -497,9 +497,7 @@ fn scenario_diff(
 #[pyo3(
     text_signature = "(base, comparison, target_metric, period, drivers, baseline_label, comparison_label)"
 )]
-#[allow(clippy::too_many_arguments)]
 fn variance_bridge(
-    py: Python<'_>,
     base: &Bound<'_, PyAny>,
     comparison: &Bound<'_, PyAny>,
     target_metric: &str,
@@ -508,6 +506,7 @@ fn variance_bridge(
     baseline_label: &str,
     comparison_label: &str,
 ) -> PyResult<PyBridgeChart> {
+    let py = base.py();
     let base = extract_results_ref(base)?.into_owned();
     let comparison = extract_results_ref(comparison)?.into_owned();
     let period = parse_period_id(period)?;

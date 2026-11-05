@@ -13,7 +13,7 @@ use time::macros::date;
 
 fn swaption_fixture() -> std::result::Result<CalibrationEnvelope, Box<dyn std::error::Error>> {
     Ok(serde_json::from_str(include_str!(
-        "../../examples/market_bootstrap/07_swaption_vol_surface.json"
+        "../../../examples/market_bootstrap/07_swaption_vol_surface.json"
     ))?)
 }
 

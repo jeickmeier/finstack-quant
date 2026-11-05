@@ -297,9 +297,7 @@ impl PyCdsQuote {
     #[doc = pydoc!("finstack_quant.calibration._quotes", "CdsQuote.par_spread")]
     #[staticmethod]
     #[pyo3(text_signature = "(id, entity, currency, doc_clause, pillar, spread_bp, recovery_rate)")]
-    #[allow(clippy::too_many_arguments)]
     fn par_spread(
-        py: Python<'_>,
         id: &str,
         entity: &str,
         currency: &Bound<'_, PyAny>,
@@ -308,6 +306,7 @@ impl PyCdsQuote {
         spread_bp: &Bound<'_, PyAny>,
         recovery_rate: f64,
     ) -> PyResult<Self> {
+        let py = currency.py();
         CdsQuote::par_spread(
             id,
             entity,

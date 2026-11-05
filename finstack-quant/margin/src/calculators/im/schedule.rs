@@ -25,8 +25,6 @@ use std::borrow::Cow;
 
 /// Asset class for schedule-based IM calculation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "json-schema", schemars(with = "ScheduleAssetClassWire"))]
 pub enum ScheduleAssetClass {
     /// Interest rate derivatives
     InterestRate,
@@ -78,38 +76,30 @@ impl<'de> serde::Deserialize<'de> for ScheduleAssetClass {
     }
 }
 
-/// Schema of the [`ScheduleAssetClass`] wire string: a built-in class name or
-/// `custom_<name>`. Describes the hand-written serde impls; never serialized.
+/// The wire string the hand-written serde impls read and write: a built-in
+/// class name or `custom_<name>`.
 #[cfg(feature = "json-schema")]
-#[derive(schemars::JsonSchema)]
-#[schemars(untagged, rename = "ScheduleAssetClass")]
-#[allow(dead_code)]
-enum ScheduleAssetClassWire {
-    /// One of the built-in asset classes.
-    BuiltIn(BuiltInScheduleAssetClass),
-    /// A user-defined class, `custom_` followed by lowercase ASCII letters,
-    /// digits or underscores.
-    Custom(#[schemars(regex(pattern = r"^custom_[a-z0-9_]+$"))] String),
-}
+impl schemars::JsonSchema for ScheduleAssetClass {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("ScheduleAssetClass")
+    }
 
-/// Built-in [`ScheduleAssetClass`] spellings.
-#[cfg(feature = "json-schema")]
-#[derive(schemars::JsonSchema)]
-#[schemars(rename_all = "snake_case")]
-#[allow(dead_code)]
-enum BuiltInScheduleAssetClass {
-    /// `interest_rate`.
-    InterestRate,
-    /// `credit`.
-    Credit,
-    /// `equity`.
-    Equity,
-    /// `commodity`.
-    Commodity,
-    /// `fx`.
-    Fx,
-    /// `other`.
-    Other,
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "description": "A built-in schedule asset class, or a user-defined `custom_<name>` class.",
+            "anyOf": [
+                {
+                    "type": "string",
+                    "enum": ["interest_rate", "credit", "equity", "commodity", "fx", "other"]
+                },
+                {
+                    "description": "A user-defined class: `custom_` followed by lowercase ASCII letters, digits or underscores.",
+                    "type": "string",
+                    "pattern": "^custom_[a-z0-9_]+$"
+                }
+            ]
+        })
+    }
 }
 
 impl std::fmt::Display for ScheduleAssetClass {

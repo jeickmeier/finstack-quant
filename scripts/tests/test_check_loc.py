@@ -38,7 +38,6 @@ def test_excludes_test_files_and_generated_sources(tmp_path: Path) -> None:
     """Sibling test files, `tests/` directories and generated code are not source."""
     for rel in (
         "finstack-quant/core/src/money/tests.rs",
-        "finstack-quant/core/src/money/types_tests.rs",
         "finstack-quant/core/src/tests/helpers.rs",
         "finstack-quant/core/src/generated/iso.rs",
         "finstack-quant/core/tests/integration.rs",

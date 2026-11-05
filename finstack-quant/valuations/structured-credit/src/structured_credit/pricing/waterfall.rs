@@ -3,7 +3,7 @@
 //! This module contains pure functions for executing waterfall distributions.
 //! All type definitions are in `types::waterfall`.
 
-use super::coverage_tests::{TestContext, TestResult};
+use super::coverage::{TestContext, TestResult};
 use crate::structured_credit::types::{
     AfcSpec, AllocationMode, AssetPool, CoverageRules, CoverageTestAction, CoverageTestSpec,
     DiversionRecord, EquityHistory, FundingSource, LiveCollateral, PaymentCalculation,

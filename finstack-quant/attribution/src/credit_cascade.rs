@@ -85,17 +85,24 @@ impl Default for CreditFactorDetailOptions {
 ///
 /// * `model` - Calibrated credit-factor model whose valuation date and stable
 ///   serialized contents determine the traceability identifier.
-#[allow(clippy::expect_used)] // CreditFactorModel has no non-serializable fields
-pub(crate) fn credit_factor_model_id(model: &CreditFactorModel) -> String {
+///
+/// # Errors
+///
+/// Returns `Error::Internal` if the model fails to serialize.
+pub(crate) fn credit_factor_model_id(model: &CreditFactorModel) -> Result<String> {
     const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
     const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
-    let json = serde_json::to_string(model).expect("CreditFactorModel is always serializable");
+    let json = serde_json::to_string(model).map_err(|error| {
+        finstack_quant_core::Error::Internal(format!(
+            "credit factor model did not serialize: {error}"
+        ))
+    })?;
     let mut hash: u64 = FNV_OFFSET;
     for b in json.as_bytes() {
         hash ^= u64::from(*b);
         hash = hash.wrapping_mul(FNV_PRIME);
     }
-    format!("{}/{:016x}", model.as_of, hash)
+    Ok(format!("{}/{:016x}", model.as_of, hash))
 }
 
 /// Threshold above which an adder step's absolute P&L is considered large
@@ -702,7 +709,7 @@ pub(crate) fn build_credit_factor_attribution(
     }
 
     Ok(CreditFactorAttribution {
-        model_id: credit_factor_model_id(model),
+        model_id: credit_factor_model_id(model)?,
         generic_pnl,
         levels,
         adder_pnl_total: adder_pnl,

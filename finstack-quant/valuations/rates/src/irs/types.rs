@@ -540,7 +540,6 @@ impl InterestRateSwap {
     /// - **Float leg:** Quarterly, ACT/360, Modified Following
     /// - **Reset lag:** T-2
     /// - **Calendar:** USNY
-    #[allow(clippy::expect_used)]
     pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
@@ -557,7 +556,7 @@ impl InterestRateSwap {
             .side(PayReceive::Pay)
             .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
-                rate: Decimal::try_from(0.04_f64).expect("valid literal"),
+                rate: Decimal::new(4, 2),
                 frequency: Tenor::semi_annual(),
                 day_count: DayCount::Thirty360,
                 business_day_convention: BusinessDayConvention::ModifiedFollowing,

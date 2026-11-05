@@ -96,7 +96,14 @@ repos:
         name: Rust source-file size limit (check_loc.py)
         entry: uv run --no-sync python scripts/check_loc.py --ci
         language: system
-        files: (\.rs|scripts/check_loc\.py)$
+        files: (\.rs|scripts/check_loc\.py|scripts/rust_source\.py)$
+        pass_filenames: false
+
+      - id: rust-lint-suppressions
+        name: Rust forbidden lint suppressions (check_lint_suppressions.py)
+        entry: uv run --no-sync python scripts/check_lint_suppressions.py --report
+        language: system
+        files: (\.rs|scripts/check_lint_suppressions\.py|scripts/rust_source\.py)$
         pass_filenames: false
 
       - id: python-lint

@@ -102,6 +102,7 @@ pub mod seed;
 pub mod simulate;
 
 #[cfg(test)]
+#[path = "tests/process_params_serialization.rs"]
 mod mc_process_params_serialization;
 
 /// Reject a non-finite or non-positive volatility before a convenience pricer runs.

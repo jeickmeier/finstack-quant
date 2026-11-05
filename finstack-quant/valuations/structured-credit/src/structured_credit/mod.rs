@@ -55,7 +55,7 @@ pub use types::{
 
 pub use pricing::execute_waterfall;
 
-pub use pricing::coverage_tests::{TestContext, TestResult};
+pub use pricing::coverage::{TestContext, TestResult};
 pub use pricing::waterfall::WaterfallContext;
 pub use pricing::{
     CoverageTestBreach, CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource,

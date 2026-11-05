@@ -30,7 +30,7 @@ fn calibrate(input: &str) -> std::result::Result<Arc<MarketContext>, Box<dyn std
 
 fn joint_swap_fixture() -> std::result::Result<Value, Box<dyn std::error::Error>> {
     let mut input: Value = serde_json::from_str(include_str!(
-        "../../examples/market_bootstrap/02_usd_3m_forward_curve.json"
+        "../../../examples/market_bootstrap/02_usd_3m_forward_curve.json"
     ))?;
     input["plan"]["quote_sets"]["sofr_3m_quotes"] = json!(["FWD-1Y", "FWD-2Y", "FWD-5Y"]);
     let quotes = input["market_data"]
@@ -127,7 +127,7 @@ fn linked_rate_replay_reprices_bumped_swaps_with_bumped_discounting()
 fn single_ois_quote_replay_composes_and_preserves_zero_shock_identity()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let source = calibrate(include_str!(
-        "../../examples/market_bootstrap/01_usd_discount.json"
+        "../../../examples/market_bootstrap/01_usd_discount.json"
     ))?;
     let provider = CachedRecalibrationProvider::default();
     let bump = |market: Arc<MarketContext>, bp: f64| {

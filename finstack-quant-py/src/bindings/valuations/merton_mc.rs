@@ -392,10 +392,7 @@ impl PyMertonMcCalibrationSpec {
     #[pyo3(
         text_signature = "(target, parameter, low_paths=None, max_iterations=None, tolerance_pv=None, bracket=None, seed=None)"
     )]
-    // PyO3 binding: the argument list mirrors the Rust struct fields.
-    #[allow(clippy::too_many_arguments)]
     fn new(
-        py: Python<'_>,
         target: &Bound<'_, PyAny>,
         parameter: &str,
         low_paths: Option<usize>,
@@ -404,6 +401,7 @@ impl PyMertonMcCalibrationSpec {
         bracket: Option<(f64, f64)>,
         seed: Option<u64>,
     ) -> PyResult<Self> {
+        let py = target.py();
         let target = match target.extract::<String>() {
             Ok(text) => serde_json::from_str(&text)
                 .map_err(|e| crate::errors::serde_json_to_py(e, "invalid BondQuoteInput"))?,

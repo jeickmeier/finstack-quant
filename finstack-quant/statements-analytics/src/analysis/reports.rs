@@ -20,7 +20,7 @@ use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, 
 use finstack_quant_statements::evaluator::StatementResult;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Write as FmtWrite};
+use std::fmt;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) enum Alignment {
@@ -59,7 +59,6 @@ impl TableBuilder {
         self.rows.push(cells);
     }
 
-    #[allow(clippy::expect_used)] // write! to String is infallible
     pub fn build(&self) -> String {
         if self.headers.is_empty() {
             return String::new();
@@ -75,7 +74,7 @@ impl TableBuilder {
         for (i, header) in self.headers.iter().enumerate() {
             let width = widths[i];
             let aligned = self.align_text(header, width, self.alignment[i]);
-            write!(&mut output, " {} │", aligned).expect("writing to String cannot fail");
+            output.push_str(&format!(" {aligned} │"));
         }
         output.push('\n');
 
@@ -93,7 +92,7 @@ impl TableBuilder {
                         Alignment::Left
                     };
                     let aligned = self.align_text(cell, width, align);
-                    write!(&mut output, " {} │", aligned).expect("writing to String cannot fail");
+                    output.push_str(&format!(" {aligned} │"));
                 }
             }
             output.push('\n');

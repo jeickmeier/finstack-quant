@@ -85,11 +85,8 @@ impl PyAssetPool {
     #[pyo3(
         text_signature = "($self, bonds=None, term_loans=None, revolvers=None, call_exercise=None, put_exercise=None, overrides=None)"
     )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
     fn with_instruments(
-        &self,
-        py: Python<'_>,
+        slf: PyRef<'_, Self>,
         bonds: Option<Vec<PyRef<'_, PyBond>>>,
         term_loans: Option<Vec<PyRef<'_, PyTermLoan>>>,
         revolvers: Option<Vec<PyRef<'_, PyRevolvingCredit>>>,
@@ -97,6 +94,7 @@ impl PyAssetPool {
         put_exercise: Option<&Bound<'_, PyAny>>,
         overrides: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
+        let py = slf.py();
         let call_exercise: CallExercisePolicy = match call_exercise {
             Some(value) => tagged_enum_from_py(py, value, "policy", "call_exercise")?,
             None => CallExercisePolicy::default(),
@@ -129,7 +127,7 @@ impl PyAssetPool {
             put_exercise,
             overrides,
         };
-        let mut inner = self.inner.clone();
+        let mut inner = slf.inner.clone();
         inner.instruments = Some(collateral);
         Ok(Self { inner })
     }

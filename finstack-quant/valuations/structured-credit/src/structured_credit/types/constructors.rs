@@ -7,7 +7,7 @@ use super::{
     AssetPool, CreditModelConfig, DealType, MarketConditions, Metadata, PoolAsset,
     StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
-use crate::structured_credit::assumptions::{embedded_registry_or_panic, required_assumption};
+use crate::structured_credit::assumptions::embedded_registry;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
@@ -341,20 +341,18 @@ impl StructuredCredit {
     }
 }
 
-#[allow(clippy::expect_used)]
 fn deal_config_from_registry(
     profile_id: &str,
     closing_date: Date,
 ) -> finstack_quant_core::Result<DealConfig> {
-    let defaults =
-        required_assumption(embedded_registry_or_panic().constructor_defaults(profile_id));
+    let defaults = embedded_registry()?.constructor_defaults(profile_id)?;
+    let months = defaults.frequency.months().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "structured-credit profile {profile_id:?} has a frequency that is not a whole number of months"
+        ))
+    })?;
     Ok(DealConfig {
-        first_payment_date: closing_date.add_months(
-            defaults
-                .frequency
-                .months()
-                .expect("validated month-based frequency") as i32,
-        )?,
+        first_payment_date: closing_date.add_months(months as i32)?,
         frequency: defaults.frequency,
         prepayment_spec: defaults.prepayment_spec,
         default_spec: defaults.default_spec,
