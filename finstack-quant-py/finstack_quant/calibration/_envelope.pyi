@@ -1,7 +1,6 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/calibration/envelope.rs``."""
 
 from typing import Any
-from finstack_quant.core.currency import Currency
 from finstack_quant.calibration._config import CalibrationConfig
 from finstack_quant.calibration._quotes import (
     CdsQuote,
@@ -17,48 +16,55 @@ from finstack_quant.calibration._quotes import (
 class CalibrationStep:
     """One calibration step: a target kind, parameters, and a named quote set.
 
-    Each constructor corresponds to a Rust ``StepParams`` variant. Quote payloads
-    belong to ``CalibrationEnvelope.market_data`` and their IDs to ``plan.quote_sets``.
+    Each constructor corresponds to a Rust ``StepParams`` variant and takes the
+    step ``id``, a ``params`` dict (or JSON text) holding that variant's wire
+    fields, and an optional ``quote_set``. Quote payloads belong to
+    ``CalibrationEnvelope.market_data`` and their IDs to ``plan.quote_sets``.
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import CalibrationStep, RateQuote
-    >>> step = CalibrationStep.discount(
-    ...     "usd_ois",
-    ...     "USD",
-    ...     "2024-06-28",
-    ... )
+    >>> from finstack_quant.calibration import CalibrationStep
+    >>> step = CalibrationStep.discount("usd_ois", {"currency": "USD", "base_date": "2024-06-28"})
     >>> step.id
     'usd_ois'
 
     """
 
     @staticmethod
-    def discount(
-        id: str,
-        currency: str | Currency,
-        base_date: str,
-        quote_set: str | None = None,
-        curve_id: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
+    def discount(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
         """Build a discount-curve bootstrap step.
 
         Parameters
         ----------
         id : str
-            Unique step identifier; also the residual key in the result.
-        currency : str | Currency
-            ISO 4217 code of the curve currency.
-        base_date : str
-            Curve base (spot) date as an ISO date string.
+            Unique step identifier; also the residual key in the result and the default ``quote_set`` and
+            ``curve_id``.
+        params : dict[str, Any] | str
+            Wire fields of the ``discount`` step as a dict, or the same object as JSON text, keyed as in the
+            Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
+
+            - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
+              curve currency.
+            - ``base_date`` (str, required): Curve base (spot) date as an ISO-8601 date string
+              (``"YYYY-MM-DD"``).
+            - ``curve_id`` (str, optional, default ``id``): Identifier of the produced curve.
+            - ``method`` (str | dict, optional, default ``"bootstrap"``): Calibration method: ``"bootstrap"``
+              or ``{"global_solve": {"use_analytical_jacobian": bool}}``.
+            - ``interpolation`` (str, optional, default ``"log_linear"``): Discount-factor interpolation:
+              ``"linear"``, ``"log_linear"``, ``"monotone_convex"``, ``"cubic_hermite"`` or
+              ``"piecewise_quadratic_forward"``.
+            - ``extrapolation`` (str, optional, default ``"flat_forward"``): Extrapolation policy:
+              ``"flat_zero"``, ``"flat_forward"`` or ``"none"``.
+            - ``pricing_discount_id`` (str | None, optional, default ``None``): Separate discount curve used
+              to price the quotes; ``None`` uses ``curve_id``.
+            - ``pricing_forward_id`` (str | None, optional, default ``None``): Forward curve used to price the
+              quotes, if any.
+            - ``conventions`` (dict, optional, default both ``None``): Step-level rates conventions
+              ``{"curve_day_count": ..., "ois_compounding": ...}``; both entries default to ``None`` (the
+              quote conventions apply).
+
         quote_set : str | None, default None
-            Name of a quote set declared on the plan; defaults to ``id``.
-        curve_id : str | None, default None
-            Identifier of the produced curve; defaults to ``id``.
-        params : Any
-            Extra ``StepParams`` fields such as ``interpolation``; names and
-            units follow the Rust step schema.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -68,55 +74,51 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If a parameter is unknown to the Rust step schema or has the wrong shape.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
-        >>> from finstack_quant.calibration import CalibrationStep, RateQuote
-        >>> CalibrationStep.discount(
-        ...     "usd_ois",
-        ...     "USD",
-        ...     "2024-06-28",
-        ... ).kind
+        >>> from finstack_quant.calibration import CalibrationStep
+        >>> step = CalibrationStep.discount("usd_ois", {"currency": "USD", "base_date": "2024-06-28"})
+        >>> step.kind
         'discount'
 
         """
 
     @staticmethod
-    def forward(
-        id: str,
-        currency: str | Currency,
-        base_date: str,
-        tenor_years: float,
-        discount_curve_id: str,
-        quote_set: str | None = None,
-        curve_id: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
-        """Build a projection (forward) curve bootstrap step.
+    def forward(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+        """Build a projection (forward) curve calibration step.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        currency : str | Currency
-            ISO 4217 code of the curve currency.
-        base_date : str
-            Curve base date as an ISO date string.
-        tenor_years : float
-            Index tenor in years (``0.25`` for a 3M index).
-        discount_curve_id : str
-            Identifier of the discount curve solved in an earlier step.
+            Unique step identifier; also the residual key in the result and the default ``quote_set`` and
+            ``curve_id``.
+        params : dict[str, Any] | str
+            Wire fields of the ``forward`` step as a dict, or the same object as JSON text, keyed as in the
+            Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
+
+            - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
+              curve currency.
+            - ``base_date`` (str, required): Curve base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
+            - ``tenor_years`` (float, required): Index accrual tenor in years (``0.25`` for a 3M index).
+            - ``discount_curve_id`` (str, required): Identifier of the discount curve solved in an earlier
+              step.
+            - ``curve_id`` (str, optional, default ``id``): Identifier of the produced curve.
+            - ``method`` (dict, optional, default ``global_solve`` with a finite-difference Jacobian):
+              Calibration method; forward curves require ``global_solve`` (``"bootstrap"`` is rejected).
+            - ``interpolation`` (str, optional, default ``"cubic_hermite"``): Forward-rate interpolation:
+              ``"linear"``, ``"log_linear"``, ``"monotone_convex"``, ``"cubic_hermite"`` or
+              ``"piecewise_quadratic_forward"``; ``"monotone_convex"`` is rejected.
+            - ``conventions`` (dict, optional, default both ``None``): Step-level rates conventions
+              ``{"curve_day_count": ..., "ois_compounding": ...}``; both entries default to ``None`` (the
+              quote conventions apply).
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        curve_id : str | None, default None
-            Identifier of the produced curve; defaults to ``id``.
-        params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
-            ``target_expiries`` are ACT/365F years from ``base_date``;
-            ``fixed_day_count`` controls coupon accrual fractions only.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -126,63 +128,65 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous or a parameter is unknown.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
-        >>> from finstack_quant.calibration import CalibrationStep, RateQuote
-        >>> CalibrationStep.forward(
-        ...     "usd_3m",
-        ...     "USD",
-        ...     "2024-06-28",
-        ...     0.25,
-        ...     "usd_ois",
-        ... ).kind
+        >>> from finstack_quant.calibration import CalibrationStep
+        >>> params = {
+        ...     "currency": "USD",
+        ...     "base_date": "2024-06-28",
+        ...     "tenor_years": 0.25,
+        ...     "discount_curve_id": "usd_ois",
+        ... }
+        >>> step = CalibrationStep.forward("usd_3m", params)
+        >>> step.kind
         'forward'
 
         """
 
     @staticmethod
-    def hazard(
-        id: str,
-        entity: str,
-        currency: str | Currency,
-        base_date: str,
-        discount_curve_id: str,
-        recovery_rate: float,
-        seniority: str | None = None,
-        quote_set: str | None = None,
-        curve_id: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
+    def hazard(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
         """Build a credit hazard-curve bootstrap step.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        entity : str
-            Reference entity identifier.
-        currency : str | Currency
-            ISO 4217 code of the contract currency.
-        base_date : str
-            Curve base date as an ISO date string.
-        discount_curve_id : str
-            Identifier of the discount curve solved in an earlier step.
-        recovery_rate : float
-            Assumed recovery as a decimal fraction of notional.
-        seniority : str | None, default None
-            Debt seniority tier recorded on the curve. ``None`` uses the Rust
-            authoring default ``CalibrationStep::DEFAULT_HAZARD_SENIORITY``
-            (``"senior"``).
+            Unique step identifier; also the residual key in the result and the default ``quote_set`` and
+            ``curve_id``.
+        params : dict[str, Any] | str
+            Wire fields of the ``hazard`` step as a dict, or the same object as JSON text, keyed as in the
+            Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
+
+            - ``entity`` (str, required): Reference entity identifier.
+            - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
+              contract currency.
+            - ``base_date`` (str, required): Curve base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
+            - ``discount_curve_id`` (str, required): Identifier of the discount curve solved in an earlier
+              step.
+            - ``recovery_rate`` (float, required): Assumed recovery as a decimal fraction of notional in ``[0,
+              1)``.
+            - ``seniority`` (str | None, optional, default ``"senior"``): Debt seniority recorded on the
+              curve: ``"senior_secured"``, ``"senior"``, ``"subordinated"`` or ``"junior"``. Omitted or
+              ``None`` uses the Rust authoring default ``CalibrationStep::DEFAULT_HAZARD_SENIORITY``.
+            - ``curve_id`` (str, optional, default ``id``): Identifier of the produced curve.
+            - ``notional`` (float, optional, default ``1.0``): Notional of the synthetic CDS repriced during
+              calibration.
+            - ``method`` (str | dict, optional, default ``"bootstrap"``): Calibration method: ``"bootstrap"``
+              or ``{"global_solve": {"use_analytical_jacobian": bool}}``.
+            - ``par_interp`` (str, optional, default ``"linear"``): Interpolation of reported par spreads:
+              ``"linear"`` or ``"log_linear"``.
+            - ``doc_clause`` (str | None, optional, default ``None``): CDS documentation-clause assertion;
+              when set it must match the quote conventions.
+            - ``cds_valuation_convention`` (str | None, optional, default ``None``): Synthetic-CDS valuation
+              policy: ``"isda_dirty"``, ``"bloomberg_cdsw_clean"``, ``"bloomberg_cdsw_clean_full_premium"`` or
+              ``"quant_lib_isda_parity"``.
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        curve_id : str | None, default None
-            Identifier of the produced curve; defaults to ``id``.
-        params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -192,68 +196,65 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous, ``recovery_rate`` is outside [0, 1),
-            or a parameter is unknown.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
-        >>> from finstack_quant.calibration import CalibrationStep, CdsQuote
-        >>> CalibrationStep.hazard(
-        ...     "acme_hz",
-        ...     "ACME",
-        ...     "USD",
-        ...     "2024-06-28",
-        ...     "usd_ois",
-        ...     0.4,
-        ... ).kind
+        >>> from finstack_quant.calibration import CalibrationStep
+        >>> params = {
+        ...     "entity": "ACME",
+        ...     "currency": "USD",
+        ...     "base_date": "2024-06-28",
+        ...     "discount_curve_id": "usd_ois",
+        ...     "recovery_rate": 0.4,
+        ... }
+        >>> step = CalibrationStep.hazard("acme_hz", params)
+        >>> step.kind
         'hazard'
 
         """
 
     @staticmethod
-    def inflation(
-        id: str,
-        currency: str | Currency,
-        base_date: str,
-        discount_curve_id: str,
-        index: str,
-        observation_lag: str,
-        base_cpi: float,
-        quote_set: str | None = None,
-        curve_id: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
+    def inflation(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
         """Build an inflation-curve bootstrap step.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        currency : str | Currency
-            ISO 4217 code of the curve currency.
-        base_date : str
-            Valuation and calibration-instrument start date as an ISO date string.
-            The curve's reference CPI date is this date minus ``observation_lag``.
-        discount_curve_id : str
-            Identifier of the discount curve solved in an earlier step.
-        index : str
-            Inflation index identifier, for example ``"US-CPI-U"``.
-        observation_lag : str
-            Whole-month observation lag, for example ``"3M"``, up to 255 months.
-            No lag accepts ``""``, ``"none"``, ``"0"``, ``"0M"``, or ``"0D"``;
-            parsing is case-insensitive. Calibration rejects nonzero day lags.
-        base_cpi : float
-            Contractual reference CPI at the start date, in index points, after
-            observation lag and monthly interpolation. Supplied index fixings must
-            reproduce this level, including their seasonality adjustment.
+            Unique step identifier; also the residual key in the result and the default ``quote_set`` and
+            ``curve_id``.
+        params : dict[str, Any] | str
+            Wire fields of the ``inflation`` step as a dict, or the same object as JSON text, keyed as in the
+            Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
+
+            - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
+              curve currency.
+            - ``base_date`` (str, required): Valuation and calibration-instrument start date as an ISO-8601
+              date string (``"YYYY-MM-DD"``). The curve's reference CPI date is this date minus
+              ``observation_lag``.
+            - ``discount_curve_id`` (str, required): Identifier of the discount curve solved in an earlier
+              step.
+            - ``index`` (str, required): Inflation index identifier, for example ``"USA-CPI-U"``.
+            - ``observation_lag`` (str, required): Whole-month observation lag, for example ``"3M"``, up to
+              255 months. No lag accepts ``""``, ``"none"``, ``"0"``, ``"0M"`` or ``"0D"`` (case-insensitive);
+              nonzero day lags are rejected.
+            - ``base_cpi`` (float, required): Contractual reference CPI at the start date in index points,
+              after observation lag and monthly interpolation; supplied index fixings must reproduce it,
+              including seasonality.
+            - ``curve_id`` (str, optional, default ``id``): Identifier of the produced curve.
+            - ``notional`` (float, optional, default ``1.0``): Notional of the synthetic inflation swaps
+              repriced during calibration.
+            - ``method`` (str | dict, optional, default ``"bootstrap"``): Calibration method: ``"bootstrap"``
+              or ``{"global_solve": {"use_analytical_jacobian": bool}}``.
+            - ``interpolation`` (str, optional, default ``"linear"``): CPI interpolation: ``"linear"``,
+              ``"log_linear"``, ``"monotone_convex"``, ``"cubic_hermite"`` or
+              ``"piecewise_quadratic_forward"``.
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        curve_id : str | None, default None
-            Identifier of the produced curve; defaults to ``id``.
-        params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -263,51 +264,60 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous or a parameter is unknown.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
-        >>> from finstack_quant.calibration import CalibrationStep, RateQuote
-        >>> CalibrationStep.inflation(
-        ...     "us_cpi",
-        ...     "USD",
-        ...     "2024-06-28",
-        ...     "usd_ois",
-        ...     "US-CPI-U",
-        ...     "3M",
-        ...     310.0,
-        ... ).kind
+        >>> from finstack_quant.calibration import CalibrationStep
+        >>> params = {
+        ...     "currency": "USD",
+        ...     "base_date": "2024-06-28",
+        ...     "discount_curve_id": "usd_ois",
+        ...     "index": "USA-CPI-U",
+        ...     "observation_lag": "3M",
+        ...     "base_cpi": 310.0,
+        ... }
+        >>> step = CalibrationStep.inflation("us_cpi", params)
+        >>> step.kind
         'inflation'
 
         """
 
     @staticmethod
-    def vol_surface(
-        id: str,
-        base_date: str,
-        underlying_ticker: str,
-        quote_set: str | None = None,
-        vol_surface_id: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
-        """Build an option volatility-surface fit step.
+    def vol_surface(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+        """Build an equity/FX SABR volatility-surface fit step from option vol quotes.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        base_date : str
-            Surface base date as an ISO date string.
-        underlying_ticker : str
-            Underlying ticker the surface belongs to.
+            Unique step identifier; also the residual key in the result and the default ``quote_set`` and
+            ``vol_surface_id``.
+        params : dict[str, Any] | str
+            Wire fields of the ``vol_surface`` step as a dict, or the same object as JSON text, keyed as in
+            the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
+
+            - ``base_date`` (str, required): Surface base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
+            - ``underlying_ticker`` (str, required): Underlying identifier the quotes reference.
+            - ``vol_surface_id`` (str, optional, default ``id``): Identifier of the produced surface.
+            - ``discount_curve_id`` (str | None, optional, default ``None``): Discount curve used for
+              forwards.
+            - ``beta`` (float, optional, default ``0.5``): SABR beta.
+            - ``target_expiries`` (list[float], optional, default ``[]``): Expiry grid of the published
+              surface in years.
+            - ``target_strikes`` (list[float], optional, default ``[]``): Strike grid of the published surface
+              in price units.
+            - ``spot_override`` (float | None, optional, default ``None``): Spot price used instead of the
+              market scalar.
+            - ``dividend_yield_override`` (float | None, optional, default ``None``): Continuous dividend
+              yield as a decimal.
+            - ``expiry_extrapolation`` (str, optional, default ``"error"``): Total-variance fill outside the
+              calibrated expiries: ``"error"`` or ``"clamp"``.
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        vol_surface_id : str | None, default None
-            Identifier of the produced surface; defaults to ``id``.
-        params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -317,48 +327,66 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous or a parameter is unknown.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
+        TypeError
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
-        >>> from finstack_quant.calibration import CalibrationStep, VolQuote
-        >>> CalibrationStep.vol_surface(
-        ...     "spx_vol",
-        ...     "2024-06-28",
-        ...     "SPX",
-        ... ).kind
+        >>> from finstack_quant.calibration import CalibrationStep
+        >>> params = {
+        ...     "base_date": "2024-06-28",
+        ...     "underlying_ticker": "SPX",
+        ... }
+        >>> step = CalibrationStep.vol_surface("spx_vol", params)
+        >>> step.kind
         'vol_surface'
 
         """
 
     @staticmethod
-    def swaption_vol(
-        id: str,
-        base_date: str,
-        discount_curve_id: str,
-        currency: str | Currency,
-        quote_set: str | None = None,
-        vol_surface_id: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
-        """Build a swaption volatility-cube fit step.
+    def swaption_vol(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+        """Build a swaption volatility-cube (SABR) fit step.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        base_date : str
-            Surface base date as an ISO date string.
-        discount_curve_id : str
-            Identifier of the discount curve solved in an earlier step.
-        currency : str | Currency
-            ISO 4217 code of the swaption currency.
+            Unique step identifier; also the residual key in the result and the default ``quote_set`` and
+            ``vol_surface_id``.
+        params : dict[str, Any] | str
+            Wire fields of the ``swaption_vol`` step as a dict, or the same object as JSON text, keyed as in
+            the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
+
+            - ``base_date`` (str, required): Surface base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
+            - ``discount_curve_id`` (str, required): Identifier of the discount curve solved in an earlier
+              step.
+            - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
+              swaption currency.
+            - ``vol_surface_id`` (str, optional, default ``id``): Identifier of the produced surface.
+            - ``forward_id`` (str | None, optional, default ``None``): Forward curve, if different from the
+              discount curve.
+            - ``swap_index`` (str | None, optional, default ``None``): Floating index whose conventions define
+              the underlying swaps; when omitted every quote must carry ``float_leg_conventions.index``.
+            - ``vol_convention`` (str | dict, optional, default ``"lognormal"``): Quoting convention:
+              ``"normal"``, ``"lognormal"`` or ``{"shifted_lognormal": ...}``.
+            - ``sabr_beta`` (float, optional, default ``0.5``): SABR beta (``0.0`` normal-like, ``1.0``
+              lognormal).
+            - ``sabr_extrapolation`` (str, optional, default ``"error"``): SABR-parameter extrapolation across
+              the expiry-tenor grid: ``"error"`` or ``"clamp"``.
+            - ``allow_sabr_missing_bucket_fallback`` (bool, optional, default ``False``): Allow a nearby
+              bucket to stand in for a missing SABR grid corner.
+            - ``target_expiries`` (list[float], optional, default ``[]``): Option expiries in ACT/365F years
+              from ``base_date``.
+            - ``target_tenors`` (list[float], optional, default ``[]``): Underlying swap tenors in years.
+            - ``fixed_day_count`` (str | None, optional, default ``None``): Fixed-leg coupon accrual day count
+              only; option expiry and variance always use ACT/365F.
+            - ``calendar_id`` (str | None, optional, default ``None``): Holiday calendar for date adjustments.
+            - ``vol_tolerance`` (float | None, optional, default ``None`` (0.0015)): Maximum absolute error of
+              any fitted volatility, in the quote's volatility units.
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        vol_surface_id : str | None, default None
-            Identifier of the produced surface; defaults to ``id``.
-        params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -368,57 +396,65 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous or a parameter is unknown.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
-        >>> from finstack_quant.calibration import CalibrationStep, VolQuote
-        >>> CalibrationStep.swaption_vol(
-        ...     "usd_swpn",
-        ...     "2024-06-28",
-        ...     "usd_ois",
-        ...     "USD",
-        ... ).kind
+        >>> from finstack_quant.calibration import CalibrationStep
+        >>> params = {
+        ...     "base_date": "2024-06-28",
+        ...     "discount_curve_id": "usd_ois",
+        ...     "currency": "USD",
+        ... }
+        >>> step = CalibrationStep.swaption_vol("usd_swpn", params)
+        >>> step.kind
         'swaption_vol'
 
         """
 
     @staticmethod
-    def base_correlation(
-        id: str,
-        index_id: str,
-        series: int,
-        maturity_years: float,
-        base_date: str,
-        discount_curve_id: str,
-        currency: str | Currency,
-        quote_set: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
+    def base_correlation(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
         """Build an index-tranche base-correlation bootstrap step.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        index_id : str
-            Credit index identifier, for example ``"CDX.NA.IG"``.
-        series : int
-            Index series number.
-        maturity_years : float
-            Tranche maturity in years.
-        base_date : str
-            Curve base date as an ISO date string.
-        discount_curve_id : str
-            Identifier of the discount curve solved in an earlier step.
-        currency : str | Currency
-            ISO 4217 code of the tranche currency.
+            Unique step identifier; also the residual key in the result and the default ``quote_set``.
+        params : dict[str, Any] | str
+            Wire fields of the ``base_correlation`` step as a dict, or the same object as JSON text, keyed as
+            in the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted.
+            Keys:
+
+            - ``index_id`` (str, required): Credit index identifier, for example ``"CDX.NA.IG"``.
+            - ``series`` (int, required): Index series number.
+            - ``maturity_years`` (float, required): Finite positive CDS tenor in years, a whole number of
+              months; quotes must resolve to the same convention maturity.
+            - ``base_date`` (str, required): Calibration base date as an ISO-8601 date string
+              (``"YYYY-MM-DD"``).
+            - ``discount_curve_id`` (str, required): Identifier of the discount curve solved in an earlier
+              step.
+            - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
+              tranche currency.
+            - ``detachment_points`` (list[float], optional, default ``[]``): Expected detachment points as
+              decimals in ``(0, 1]``; when non-empty every quote must match one point and every point must be
+              quoted.
+            - ``notional`` (float, optional, default ``1.0``): Notional of the synthetic tranches.
+            - ``frequency`` (dict | None, optional, default ``None``): Premium frequency as a tenor object
+              (convention default).
+            - ``day_count`` (str | None, optional, default ``None``): Premium accrual day count (convention
+              default).
+            - ``business_day_convention`` (str | None, optional, default ``None``): Schedule business-day
+              convention.
+            - ``calendar_id`` (str | None, optional, default ``None``): Holiday calendar for schedule
+              generation.
+            - ``roll_rule`` (str, optional, default ``"none"``): Coupon roll grid: ``"cds_imm"`` (20
+              Mar/Jun/Sep/Dec) or ``"none"``; ``"imm"`` is rejected.
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -428,49 +464,53 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous or a parameter is unknown.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
         >>> from finstack_quant.calibration import CalibrationStep
-        >>> CalibrationStep.base_correlation(
-        ...     "cdx_bc",
-        ...     "CDX.NA.IG",
-        ...     42,
-        ...     5.0,
-        ...     "2024-06-28",
-        ...     "usd_ois",
-        ...     "USD",
-        ...     quote_set="tranches",
-        ... ).kind
+        >>> params = {
+        ...     "index_id": "CDX.NA.IG",
+        ...     "series": 42,
+        ...     "maturity_years": 5.0,
+        ...     "base_date": "2024-06-28",
+        ...     "discount_curve_id": "usd_ois",
+        ...     "currency": "USD",
+        ... }
+        >>> step = CalibrationStep.base_correlation("cdx_bc", params)
+        >>> step.kind
         'base_correlation'
 
         """
 
     @staticmethod
-    def student_t(
-        id: str,
-        tranche_instrument_id: str,
-        base_correlation_curve_id: str,
-        quote_set: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
-        """Build a Student-t copula degrees-of-freedom fit step.
+    def student_t(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+        """Build a Student-t copula degrees-of-freedom fit step for one tranche.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        tranche_instrument_id : str
-            Identifier of the tranche instrument repriced during the fit.
-        base_correlation_curve_id : str
-            Identifier of the base-correlation curve solved in an earlier step.
+            Unique step identifier; also the residual key in the result and the default ``quote_set``.
+        params : dict[str, Any] | str
+            Wire fields of the ``student_t`` step as a dict, or the same object as JSON text, keyed as in the
+            Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
+
+            - ``tranche_instrument_id`` (str, required): Tranche instrument repriced during the fit; the
+              result is written to the scalar ``"{tranche_instrument_id}_STUDENT_T_DF"``.
+            - ``base_correlation_curve_id`` (str, required): Identifier of the base-correlation curve solved
+              in an earlier step.
+            - ``discount_curve_id`` (str | None, optional, default ``None``): Discount curve pricing the
+              tranche; ``None`` uses the only discount curve in the market.
+            - ``initial_df`` (float, optional, default ``5.0``): Starting degrees of freedom.
+            - ``df_bounds`` (list[float], optional, default ``[2.1, 50.0]``): Feasible ``[lower, upper]``
+              degrees of freedom (> 2).
+            - ``correlation`` (float, optional, default ``0.3``): Flat correlation of the tranche.
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -480,43 +520,49 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous or a parameter is unknown.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
+        TypeError
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
         >>> from finstack_quant.calibration import CalibrationStep
-        >>> CalibrationStep.student_t("t", "tr_0_3", "cdx_bc", quote_set="tranches").kind
+        >>> params = {
+        ...     "tranche_instrument_id": "tr_0_3",
+        ...     "base_correlation_curve_id": "cdx_bc",
+        ... }
+        >>> step = CalibrationStep.student_t("t", params)
+        >>> step.kind
         'student_t'
 
         """
 
     @staticmethod
-    def hull_white(
-        id: str,
-        curve_id: str,
-        currency: str | Currency,
-        base_date: str,
-        quote_set: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
-        """Build a Hull-White swaption calibration step.
+    def hull_white(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+        """Build a Hull-White one-factor swaption calibration step.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        curve_id : str
-            Identifier of the discount curve the model is fitted against.
-        currency : str | Currency
-            ISO 4217 code of the model currency.
-        base_date : str
-            Model base date as an ISO date string.
+            Unique step identifier; also the residual key in the result and the default ``quote_set``.
+        params : dict[str, Any] | str
+            Wire fields of the ``hull_white`` step as a dict, or the same object as JSON text, keyed as in the
+            Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
+
+            - ``curve_id`` (str, required): Discount curve the model is fitted against (must already exist).
+            - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
+              model currency.
+            - ``base_date`` (str, required): Model base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
+            - ``fit_tolerance`` (float, required): Finite positive maximum implied-quote error in the supplied
+              volatility units (decimal rate volatility for normal quotes, relative volatility for Black
+              quotes), separate from the solver tolerance.
+            - ``initial_kappa`` (float | None, optional, default ``None``): Initial mean-reversion guess.
+            - ``initial_sigma`` (float | None, optional, default ``None``): Initial short-rate volatility
+              guess.
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        params : Any
-            Extra ``StepParams`` fields following the Rust step schema. Required
-            ``fit_tolerance`` is a finite positive per-target tolerance in the
-            supplied volatility quote units, separate from solver tolerance.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -526,60 +572,62 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous, a parameter is unknown, or the required
-            ``fit_tolerance`` is missing, non-finite or non-positive.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
         >>> from finstack_quant.calibration import CalibrationStep
-        >>> CalibrationStep.hull_white(
-        ...     "hw", "usd_ois", "USD", "2024-06-28", quote_set="swaptions", fit_tolerance=1e-4
-        ... ).kind
+        >>> params = {
+        ...     "curve_id": "usd_ois",
+        ...     "currency": "USD",
+        ...     "base_date": "2024-06-28",
+        ...     "fit_tolerance": 0.0001,
+        ... }
+        >>> step = CalibrationStep.hull_white("hw", params)
+        >>> step.kind
         'hull_white'
 
         """
 
     @staticmethod
-    def cap_floor_hull_white(
-        id: str,
-        discount_curve_id: str,
-        forward_curve_id: str,
-        index_id: str,
-        currency: str | Currency,
-        base_date: str,
-        quote_set: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
-        """Build a Hull-White cap/floor calibration step.
+    def cap_floor_hull_white(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+        """Build a Hull-White one-factor cap/floor calibration step.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        discount_curve_id : str
-            Identifier of the discounting curve and output-key prefix. Scalar fits
-            write ``"{discount_curve_id}_CAPFLOOR_HW1F_KAPPA"`` and
-            ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA"``. Piecewise fits write the
-            same kappa scalar and the sigma series
-            ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA_SCHEDULE"``.
-        forward_curve_id : str
-            Identifier of the curve projecting the caplet forwards.
-        index_id : str
-            Term-rate index identifier, for example ``"EUR-EURIBOR-3M"``. Its
-            conventions determine settlement, fixing and payment dates, calendars,
-            and accrual fractions. Calibration rejects overnight indices.
-        currency : str | Currency
-            ISO 4217 code of the model currency; must match the index conventions.
-        base_date : str
-            Model base date as an ISO date string.
+            Unique step identifier; also the residual key in the result and the default ``quote_set``.
+        params : dict[str, Any] | str
+            Wire fields of the ``cap_floor_hull_white`` step as a dict, or the same object as JSON text, keyed
+            as in the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted.
+            Keys:
+
+            - ``discount_curve_id`` (str, required): Discounting curve and output-key prefix. Scalar fits
+              write ``"{discount_curve_id}_CAPFLOOR_HW1F_KAPPA"`` and
+              ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA"``; piecewise fits write the same kappa scalar and
+              the series ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA_SCHEDULE"``.
+            - ``forward_curve_id`` (str, required): Curve projecting the caplet forwards; equal to
+              ``discount_curve_id`` for single-curve.
+            - ``index_id`` (str, required): Term-rate index, for example ``"EUR-EURIBOR-3M"``, whose
+              conventions set the caplet dates and accruals; overnight indices are rejected.
+            - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
+              model currency; must match the index.
+            - ``base_date`` (str, required): Model base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
+            - ``fit_tolerance`` (float, required): Finite positive maximum implied-quote error in the supplied
+              volatility units, separate from the solver tolerance.
+            - ``volatility_mode`` (str, optional, default ``"scalar"``): ``"scalar"`` or ``"piecewise"``
+              sigma.
+            - ``fixed_kappa`` (float | None, optional, default ``None``): Fixed mean reversion; required for a
+              one-quote fit.
+            - ``initial_kappa`` (float | None, optional, default ``None``): Initial mean-reversion guess.
+            - ``initial_sigma`` (float | None, optional, default ``None``): Initial short-rate volatility
+              guess.
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        params : Any
-            Extra ``StepParams`` fields following the Rust step schema. Required
-            ``fit_tolerance`` is a finite positive per-target tolerance in the
-            supplied volatility quote units, separate from solver tolerance.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -589,53 +637,58 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous, a parameter is unknown, or the required
-            ``fit_tolerance`` is missing, non-finite or non-positive.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
         >>> from finstack_quant.calibration import CalibrationStep
-        >>> CalibrationStep.cap_floor_hull_white(
-        ...     "hw_cf",
-        ...     "eur_ois",
-        ...     "eur_3m",
-        ...     "EUR-EURIBOR-3M",
-        ...     "EUR",
-        ...     "2024-06-28",
-        ...     quote_set="caps",
-        ...     fit_tolerance=1e-4,
-        ... ).kind
+        >>> params = {
+        ...     "discount_curve_id": "eur_ois",
+        ...     "forward_curve_id": "eur_3m",
+        ...     "index_id": "EUR-EURIBOR-3M",
+        ...     "currency": "EUR",
+        ...     "base_date": "2024-06-28",
+        ...     "fit_tolerance": 0.0001,
+        ... }
+        >>> step = CalibrationStep.cap_floor_hull_white("hw_cf", params)
+        >>> step.kind
         'cap_floor_hull_white'
 
         """
 
     @staticmethod
-    def svi_surface(
-        id: str,
-        base_date: str,
-        underlying_ticker: str,
-        quote_set: str | None = None,
-        vol_surface_id: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
-        """Build an SVI volatility-surface fit step.
+    def svi_surface(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+        """Build an SVI volatility-surface fit step from option vol quotes.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        base_date : str
-            Surface base date as an ISO date string.
-        underlying_ticker : str
-            Underlying ticker the surface belongs to.
+            Unique step identifier; also the residual key in the result and the default ``quote_set`` and
+            ``vol_surface_id``.
+        params : dict[str, Any] | str
+            Wire fields of the ``svi_surface`` step as a dict, or the same object as JSON text, keyed as in
+            the Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
+
+            - ``base_date`` (str, required): Surface base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
+            - ``underlying_ticker`` (str, required): Underlying identifier the quotes reference.
+            - ``vol_surface_id`` (str, optional, default ``id``): Identifier of the produced surface.
+            - ``discount_curve_id`` (str | None, optional, default ``None``): Discount curve used for
+              forwards.
+            - ``target_expiries`` (list[float], optional, default ``[]``): Expiry grid of the published
+              surface in years.
+            - ``target_strikes`` (list[float], optional, default ``[]``): Strike grid of the published surface
+              in price units.
+            - ``spot_override`` (float | None, optional, default ``None``): Spot price used instead of the
+              market scalar.
+            - ``dividend_yield_override`` (float | None, optional, default ``None``): Continuous dividend
+              yield as a decimal; ``None`` reads the scalar ``"{underlying_ticker}-DIVYIELD"`` (or a
+              cash-dividend schedule when a discount curve is set).
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        vol_surface_id : str | None, default None
-            Identifier of the produced surface; defaults to ``id``.
-        params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -645,51 +698,59 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous or a parameter is unknown.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
+        TypeError
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
-        >>> from finstack_quant.calibration import CalibrationStep, VolQuote
-        >>> CalibrationStep.svi_surface(
-        ...     "spx_svi",
-        ...     "2024-06-28",
-        ...     "SPX",
-        ... ).kind
+        >>> from finstack_quant.calibration import CalibrationStep
+        >>> params = {
+        ...     "base_date": "2024-06-28",
+        ...     "underlying_ticker": "SPX",
+        ... }
+        >>> step = CalibrationStep.svi_surface("spx_svi", params)
+        >>> step.kind
         'svi_surface'
 
         """
 
     @staticmethod
-    def xccy_basis(
-        id: str,
-        currency: str | Currency,
-        base_date: str,
-        fx_spot: float,
-        domestic_discount_id: str,
-        quote_set: str | None = None,
-        curve_id: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
-        """Build a cross-currency basis discount-curve bootstrap step.
+    def xccy_basis(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+        """Build a cross-currency basis (foreign discount curve) bootstrap step.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        currency : str | Currency
-            ISO 4217 code of the foreign (solved) currency.
-        base_date : str
-            Curve base date as an ISO date string.
-        fx_spot : float
-            Spot FX rate quoted as foreign units per one domestic unit.
-        domestic_discount_id : str
-            Identifier of the domestic discount curve solved in an earlier step.
+            Unique step identifier; also the residual key in the result and the default ``quote_set`` and
+            ``curve_id``.
+        params : dict[str, Any] | str
+            Wire fields of the ``xccy_basis`` step as a dict, or the same object as JSON text, keyed as in the
+            Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
+
+            - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
+              foreign (solved) currency.
+            - ``base_date`` (str, required): Curve base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
+            - ``fx_spot`` (float, required): T+0 cash FX rate (domestic per foreign) used when a quote omits
+              ``spot_fx``.
+            - ``domestic_discount_id`` (str, required): Domestic discount curve solved in an earlier step.
+            - ``curve_id`` (str, optional, default ``id``): Identifier of the produced foreign curve.
+            - ``basis_spread_curve_id`` (str | None, optional, default ``None``): Identifier of the byproduct
+              basis-spread curve.
+            - ``method`` (str, optional, default ``"bootstrap"``): Sequential ``"bootstrap"``;
+              ``global_solve`` is rejected.
+            - ``interpolation`` (str, optional, default ``"log_linear"``): Discount-factor interpolation:
+              ``"linear"``, ``"log_linear"``, ``"monotone_convex"``, ``"cubic_hermite"`` or
+              ``"piecewise_quadratic_forward"``.
+            - ``extrapolation`` (str, optional, default ``"flat_forward"``): Extrapolation policy:
+              ``"flat_zero"``, ``"flat_forward"`` or ``"none"``.
+            - ``conventions`` (dict, optional, default both ``None``): Step-level rates conventions
+              ``{"curve_day_count": ..., "ois_compounding": ...}``; both entries default to ``None`` (the
+              quote conventions apply).
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        curve_id : str | None, default None
-            Identifier of the produced curve; defaults to ``id``.
-        params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -699,55 +760,52 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous or a parameter is unknown.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
         TypeError
-            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
         >>> from finstack_quant.calibration import CalibrationStep
-        >>> CalibrationStep.xccy_basis(
-        ...     "eur_xccy",
-        ...     "EUR",
-        ...     "2024-06-28",
-        ...     0.92,
-        ...     "usd_ois",
-        ...     quote_set="basis",
-        ... ).kind
+        >>> params = {
+        ...     "currency": "EUR",
+        ...     "base_date": "2024-06-28",
+        ...     "fx_spot": 1.08,
+        ...     "domestic_discount_id": "usd_ois",
+        ... }
+        >>> step = CalibrationStep.xccy_basis("eur_xccy", params)
+        >>> step.kind
         'xccy_basis'
 
         """
 
     @staticmethod
-    def parametric(
-        id: str,
-        base_date: str,
-        model: str | None = None,
-        quote_set: str | None = None,
-        curve_id: str | None = None,
-        **params: Any,
-    ) -> CalibrationStep:
-        """Build a parametric-curve fit step.
+    def parametric(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
+        """Build a parametric (Nelson-Siegel / Svensson) single-curve fit step.
 
         Parameters
         ----------
         id : str
-            Unique step identifier.
-        base_date : str
-            Curve base date as an ISO date string.
-        model : str | None, default None
-            Parametric family key: ``"ns"`` for Nelson-Siegel or ``"nss"``
-            for Nelson-Siegel-Svensson. ``None`` uses the Rust authoring
-            default ``CalibrationStep::DEFAULT_PARAMETRIC_MODEL`` (``"ns"``).
+            Unique step identifier; also the residual key in the result and the default ``quote_set`` and
+            ``curve_id``.
+        params : dict[str, Any] | str
+            Wire fields of the ``parametric`` step as a dict, or the same object as JSON text, keyed as in the
+            Rust ``StepParams`` schema. Values are JSON values; ``Currency`` wrappers are accepted. Keys:
+
+            - ``base_date`` (str, required): Curve base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
+            - ``curve_id`` (str, optional, default ``id``): Identifier of the single discount curve fitted;
+              every instrument discounts and projects on it.
+            - ``model`` (str | None, optional, default ``"ns"``): ``"ns"`` (Nelson-Siegel) or ``"nss"``
+              (Svensson). Omitted or ``None`` uses the Rust authoring default
+              ``CalibrationStep::DEFAULT_PARAMETRIC_MODEL``.
+            - ``initial_params`` (dict | None, optional, default ``None``): Initial guesses as a
+              ``NelsonSiegelModel`` object (``beta0``, ``beta1``, ``beta2``, ``tau`` for NS; plus ``beta3``,
+              ``tau1``, ``tau2`` for NSS). Fit acceptance uses the discount-curve tolerance in per-notional PV
+              units without a floor; ``discount_curve_id`` is not accepted.
+
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan.
-        curve_id : str | None, default None
-            Identifier of the produced curve; defaults to ``id``.
-        params : Any
-            Optional ``initial_params`` following the Rust step schema. Only
-            single-curve discount fitting is supported; ``discount_curve_id``
-            is not an accepted parameter. Fit acceptance honors the discount-curve
-            tolerance in per-notional PV units without an implicit floor.
+            Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
 
         Returns
         -------
@@ -757,16 +815,16 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous or a parameter is unknown.
+            If ``params`` is not an object, a required key is missing, a key is unknown to the Rust step
+            schema, or a value has the wrong shape or an unknown label.
+        TypeError
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
-        >>> from finstack_quant.calibration import CalibrationStep, RateQuote
-        >>> CalibrationStep.parametric(
-        ...     "ns",
-        ...     "2024-06-28",
-        ...     "ns",
-        ... ).kind
+        >>> from finstack_quant.calibration import CalibrationStep
+        >>> step = CalibrationStep.parametric("ns", {"base_date": "2024-06-28", "model": "ns"})
+        >>> step.kind
         'parametric'
 
         """
@@ -863,7 +921,7 @@ class CalibrationStep:
         --------
         >>> from finstack_quant.calibration import CalibrationStep, RateQuote
         >>> quotes = [RateQuote.deposit("D3M", "USD-SOFR-OIS", "3M", 0.052)]
-        >>> step = CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")
+        >>> step = CalibrationStep.discount("USD-OIS", {"currency": "USD", "base_date": "2026-05-08"})
         >>> CalibrationStep.from_json(step.to_json()).quote_set
         'USD-OIS'
         >>> CalibrationStep.from_json("{")
@@ -1034,7 +1092,7 @@ class CalibrationPlan:
         >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, CalibrationStep, RateQuote
         >>> quotes = [RateQuote.deposit("D3M", "USD-SOFR-OIS", "3M", 0.052)]
         >>> plan = CalibrationPlan(
-        ...     [CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")],
+        ...     [CalibrationStep.discount("USD-OIS", {"currency": "USD", "base_date": "2026-05-08"})],
         ...     quote_sets={"USD-OIS": [q.id for q in quotes]},
         ... )
         >>> restored = CalibrationPlan.from_json(plan.to_json())

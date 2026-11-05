@@ -6,7 +6,9 @@
 //! each constructor is a free function returning the serde wire object of the
 //! Rust type. Both hosts convert their arguments and call the same typed Rust
 //! constructors (`RateQuote::deposit`, `CdsQuote::par_spread`,
-//! `VolQuote::option_vol`, ...), which own the defaults and quote validation.
+//! `VolQuote::option_vol`, ...), which own the defaults and quote validation;
+//! quotes without a constructor (`cdsQuoteUpfront`, `cdsTrancheQuote`) are
+//! deserialized from their serde fields and checked with their `validate()`.
 
 use crate::utils::input::{
     from_js_json, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_string,
@@ -19,6 +21,7 @@ use finstack_quant_calibration::quotes::VolQuote;
 use finstack_quant_calibration::quotes::{CdsQuote, CdsTrancheQuote, XccyQuote};
 use finstack_quant_calibration::validation::RateBounds;
 use finstack_quant_core::currency::Currency;
+use serde_json::{Map, Value};
 use wasm_bindgen::prelude::*;
 
 fn js_pillar(value: &JsValue, label: &str) -> Result<Pillar, JsValue> {
@@ -211,45 +214,40 @@ pub fn cds_quote_par_spread(
 
 /// Build an upfront-plus-running-coupon CDS quote.
 ///
-/// Free-function twin of Python `CdsQuote.upfront` (Rust `CdsQuote::upfront`).
-/// @param id - Unique quote identifier.
-/// @param entity - Reference entity name.
-/// @param currency - ISO-4217 contract currency of the CDS convention.
-/// @param docClause - ISDA documentation clause: `"isda_na"`, `"isda_eu"`, `"cr14"`, `"mr14"`, `"mm14"` or `"xr14"`.
-/// @param pillar - Maturity pillar: tenor string (`"5Y"`), ISO-8601 date string, or pillar object.
-/// @param couponBp - Standard running coupon in basis points (for example `100.0`).
-/// @param upfrontPct - Upfront payment as a fraction of notional (`0.01` is 1%).
-/// @param recoveryRate - Assumed recovery rate as a decimal in `[0, 1)`.
+/// Free-function twin of Python `CdsQuote.upfront`. The object is the Rust
+/// `CdsQuote::CdsUpfront` variant without its `type` tag, which this function
+/// sets to `"cds_upfront"`; the quote is then checked with `CdsQuote::validate`.
+/// @param params - Object (or JSON text) holding every field of the variant, keyed by its snake_case serde name; all are required:
+///   - `id` (string): Unique quote identifier, the residual label.
+///   - `entity` (string): Reference entity name.
+///   - `convention` (object): CDS convention key `{ currency, doc_clause }`; `currency` is an upper-case ISO-4217 code and `doc_clause` one of `"cr14"`, `"mr14"`, `"mm14"`, `"xr14"`, `"isda_na"`, `"isda_eu"`, `"isda_as"`, `"isda_au"`, `"isda_nz"` or `"custom"`.
+///   - `pillar` (object): Maturity pillar in its serde form, a tenor `{ tenor: { count: 5, unit: "years" } }` (units `"days"`, `"weeks"`, `"months"`, `"years"`) or a date `{ date: "2029-06-20" }`.
+///   - `coupon_bp` (number): Standard running coupon in basis points (for example `100.0`).
+///   - `upfront_pct` (number): Upfront payment as a decimal fraction of notional (`0.01` is 1%), positive when the protection buyer pays.
+///   - `recovery_rate` (number): Assumed recovery rate as a decimal in `[0, 1)`.
 /// @returns A validated `CdsQuote` object with `type: "cds_upfront"`.
 ///
 /// # Errors
 ///
-/// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
-/// a `FinstackError` (`kind: "validation"`) if the convention, pillar or a numeric input is invalid.
+/// Throws a `TypeError` (`kind: "invalid_type"`) if `params` is neither an
+/// object nor JSON text or holds a non-finite number, and a `FinstackError`
+/// (`kind: "validation"`) if a field is missing, unknown or malformed (an
+/// unknown currency or doc clause, a bad pillar) or the quote fails validation.
 #[wasm_bindgen(js_name = cdsQuoteUpfront, unchecked_return_type = "generated.calibration.CdsQuote")]
-#[allow(clippy::too_many_arguments)]
 pub fn cds_quote_upfront(
-    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "string")] entity: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
-    #[wasm_bindgen(js_name = "docClause", unchecked_param_type = "string")] doc_clause: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "string | generated.calibration.Pillar")] pillar: JsValue,
-    #[wasm_bindgen(js_name = "couponBp", unchecked_param_type = "number")] coupon_bp: JsValue,
-    #[wasm_bindgen(js_name = "upfrontPct", unchecked_param_type = "number")] upfront_pct: JsValue,
-    #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
-    recovery_rate: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "Omit<Extract<generated.calibration.CdsQuote, { type: \"cds_upfront\" }>, \"type\"> | string"
+    )]
+    params: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let quote = CdsQuote::upfront(
-        js_string(&id, "id")?,
-        js_string(&entity, "entity")?,
-        &js_string(&currency, "currency")?,
-        &js_string(&doc_clause, "docClause")?,
-        js_pillar(&pillar, "pillar")?,
-        js_f64(&coupon_bp, "couponBp")?,
-        js_f64(&upfront_pct, "upfrontPct")?,
-        js_f64(&recovery_rate, "recoveryRate")?,
-    )
-    .map_err(to_js_err)?;
+    let mut fields: Map<String, Value> = from_js_json(&params, "params")?;
+    fields.insert("type".to_string(), Value::from("cds_upfront"));
+    let quote: CdsQuote = serde_json::from_value(Value::Object(fields)).map_err(|error| {
+        to_js_err(finstack_quant_core::Error::Validation(format!(
+            "params: {error}"
+        )))
+    })?;
+    quote.validate().map_err(to_js_err)?;
     to_js_value(&quote)
 }
 
@@ -506,7 +504,7 @@ pub fn xccy_quote(
     to_js_value(&quote)
 }
 
-/// Build a validated CDS index tranche quote using the canonical Rust constructor.
+/// Build a validated CDS index tranche quote from its serde fields (checked with `CdsTrancheQuote::validate`).
 ///
 /// # Arguments
 ///
@@ -524,19 +522,7 @@ pub fn xccy_quote(
 pub fn cds_tranche_quote(
     #[wasm_bindgen(unchecked_param_type = "generated.calibration.CdsTrancheQuote")] fields: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let fields: CdsTrancheQuote = from_js_json(&fields, "fields")?;
-    let quote = CdsTrancheQuote::new(
-        fields.id,
-        fields.index,
-        fields.series,
-        fields.attachment,
-        fields.detachment,
-        fields.maturity,
-        fields.upfront_pct,
-        fields.coupon_bp,
-        fields.convention.currency.as_ref(),
-        fields.convention.doc_clause.as_str(),
-    )
-    .map_err(to_js_err)?;
+    let quote: CdsTrancheQuote = from_js_json(&fields, "fields")?;
+    quote.validate().map_err(to_js_err)?;
     to_js_value(&quote)
 }

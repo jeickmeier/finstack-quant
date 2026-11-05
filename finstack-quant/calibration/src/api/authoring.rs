@@ -3,12 +3,13 @@
 //! The Python and WASM bindings expose one named constructor per quote type
 //! and per step kind (`RateQuote.deposit`, `CalibrationStep.discount`, ...).
 //! Quote constructors call the typed constructors here directly without a JSON
-//! round-trip; step constructors marshal their open-ended keyword overrides
-//! into [`CalibrationStep::from_wire_fields`].
+//! round-trip; step constructors pass the host's wire-field object to
+//! [`CalibrationStep::from_wire_fields`]. Quote types whose constructor would
+//! only restate the struct (`CdsQuote::CdsUpfront`, [`crate::quotes::CdsTrancheQuote`]) are
+//! built as literals (or deserialized) and checked with their `validate()`.
 
 use crate::api::schema::CalibrationStep;
 use crate::quotes::CdsQuote;
-use crate::quotes::CdsTrancheQuote;
 use crate::quotes::InflationQuote;
 use crate::quotes::RateQuote;
 use crate::quotes::VolQuote;
@@ -224,46 +225,6 @@ impl CdsQuote {
             convention: parse_cds_convention(currency, doc_clause)?,
             pillar,
             spread_bp,
-            recovery_rate,
-        };
-        quote.validate()?;
-        Ok(quote)
-    }
-
-    /// Build a validated upfront-plus-running-coupon CDS quote.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Unique quote identifier.
-    /// * `entity` - Reference entity name.
-    /// * `currency` - ISO-4217 contract currency code of the CDS convention.
-    /// * `doc_clause` - ISDA documentation clause (`"isda_na"`, `"isda_eu"`, `"cr14"`, `"mr14"`, `"mm14"`, `"xr14"`, ...).
-    /// * `pillar` - Maturity pillar as a tenor or calendar date.
-    /// * `coupon_bp` - Contractual standard running coupon in basis points (`25.0`, `100.0`, `500.0` or `1000.0`).
-    /// * `upfront_pct` - Upfront payment as a decimal fraction of notional (`0.01` for 1%).
-    /// * `recovery_rate` - Assumed recovery rate as a decimal in `[0, 1)`.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if `currency` or `doc_clause` cannot be parsed or the quote fails [`CdsQuote::validate`].
-    #[allow(clippy::too_many_arguments)]
-    pub fn upfront(
-        id: impl Into<QuoteId>,
-        entity: impl Into<String>,
-        currency: &str,
-        doc_clause: &str,
-        pillar: Pillar,
-        coupon_bp: f64,
-        upfront_pct: f64,
-        recovery_rate: f64,
-    ) -> Result<Self> {
-        let quote = Self::CdsUpfront {
-            id: id.into(),
-            entity: entity.into(),
-            convention: parse_cds_convention(currency, doc_clause)?,
-            pillar,
-            coupon_bp,
-            upfront_pct,
             recovery_rate,
         };
         quote.validate()?;
@@ -494,54 +455,6 @@ impl XccyQuote {
     }
 }
 
-impl CdsTrancheQuote {
-    /// Build a validated CDS index tranche quote.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Unique quote identifier.
-    /// * `index` - Credit index name (for example `"CDX.NA.IG"`).
-    /// * `series` - CDS index series number.
-    /// * `attachment` - Tranche attachment point as a decimal loss fraction in `[0, 1]`.
-    /// * `detachment` - Tranche detachment point as a decimal loss fraction in `[0, 1]`, strictly above `attachment`.
-    /// * `maturity` - Tranche maturity date.
-    /// * `upfront_pct` - Upfront payment as a decimal fraction of tranche notional (`|upfront_pct| <= 1`).
-    /// * `coupon_bp` - Contractual running coupon in basis points (> 0).
-    /// * `currency` - ISO-4217 contract currency code of the CDS convention.
-    /// * `doc_clause` - ISDA documentation clause (`"isda_na"`, `"cr14"`, ...).
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if `currency` or `doc_clause` cannot be parsed or the quote fails [`CdsTrancheQuote::validate`].
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        id: impl Into<QuoteId>,
-        index: impl Into<String>,
-        series: u16,
-        attachment: f64,
-        detachment: f64,
-        maturity: Date,
-        upfront_pct: f64,
-        coupon_bp: f64,
-        currency: &str,
-        doc_clause: &str,
-    ) -> Result<Self> {
-        let quote = Self {
-            id: id.into(),
-            index: index.into(),
-            series,
-            attachment,
-            detachment,
-            maturity,
-            upfront_pct,
-            coupon_bp,
-            convention: parse_cds_convention(currency, doc_clause)?,
-        };
-        quote.validate()?;
-        Ok(quote)
-    }
-}
-
 impl CalibrationStep {
     /// Seniority label of a hazard step authored without one.
     pub const DEFAULT_HAZARD_SENIORITY: &'static str = "senior";
@@ -614,6 +527,8 @@ impl CalibrationStep {
 mod tests {
     use super::*;
     use crate::api::schema::StepParams;
+    use crate::quotes::CdsTrancheQuote;
+    use finstack_quant_core::currency::Currency;
     use serde_json::json;
     use time::macros::date;
 
@@ -676,17 +591,19 @@ mod tests {
         .expect("par spread");
         assert_eq!(par.coupon_bp(), 80.0);
 
-        let upfront = CdsQuote::upfront(
-            "ACME-5Y-U",
-            "ACME",
-            "USD",
-            "isda_na",
-            "5Y".parse().expect("tenor"),
-            100.0,
-            0.01,
-            0.4,
-        )
-        .expect("upfront");
+        let upfront = CdsQuote::CdsUpfront {
+            id: "ACME-5Y-U".into(),
+            entity: "ACME".into(),
+            convention: CdsConventionKey {
+                currency: Currency::USD,
+                doc_clause: CdsDocClause::IsdaNa,
+            },
+            pillar: "5Y".parse().expect("tenor"),
+            coupon_bp: 100.0,
+            upfront_pct: 0.01,
+            recovery_rate: 0.4,
+        };
+        upfront.validate().expect("upfront");
         assert_eq!(upfront.coupon_bp(), 100.0);
         assert!(
             CdsQuote::par_spread(
@@ -792,23 +709,23 @@ mod tests {
             .is_err()
         );
 
-        let tranche = |attachment: f64| {
-            CdsTrancheQuote::new(
-                "IG-3-7",
-                "CDX.NA.IG",
-                42,
-                attachment,
-                0.07,
-                date!(2031 - 06 - 20),
-                0.01,
-                100.0,
-                "USD",
-                "isda_na",
-            )
+        let tranche = |attachment: f64| CdsTrancheQuote {
+            id: "IG-3-7".into(),
+            index: "CDX.NA.IG".into(),
+            series: 42,
+            attachment,
+            detachment: 0.07,
+            maturity: date!(2031 - 06 - 20),
+            upfront_pct: 0.01,
+            coupon_bp: 100.0,
+            convention: CdsConventionKey {
+                currency: Currency::USD,
+                doc_clause: CdsDocClause::IsdaNa,
+            },
         };
-        assert!(tranche(0.03).is_ok());
+        assert!(tranche(0.03).validate().is_ok());
         assert!(
-            tranche(0.08).is_err(),
+            tranche(0.08).validate().is_err(),
             "attachment above detachment must be rejected"
         );
     }

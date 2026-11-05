@@ -13,7 +13,7 @@ use crate::bindings::core::money::{decimal_to_py, money_from_amount};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
 use crate::bindings::macros::wire_methods;
-use crate::bindings::module_utils::{py_to_json_value, py_to_serde};
+use crate::bindings::module_utils::{py_to_json_value, py_to_serde, spec_from_py};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
@@ -29,6 +29,7 @@ use finstack_quant_calibration::quotes::XccyQuote;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::*;
+use serde_json::{Map, Value};
 
 /// Pillar from a tenor / ISO-date string, ``datetime.date``, or wire mapping.
 pub(crate) fn extract_pillar(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Pillar> {
@@ -322,33 +323,14 @@ impl PyCdsQuote {
 
     #[doc = pydoc!("finstack_quant.calibration._quotes", "CdsQuote.upfront")]
     #[staticmethod]
-    #[pyo3(
-        text_signature = "(id, entity, currency, doc_clause, pillar, coupon_bp, upfront_pct, recovery_rate)"
-    )]
-    #[allow(clippy::too_many_arguments)]
-    fn upfront(
-        py: Python<'_>,
-        id: &str,
-        entity: &str,
-        currency: &Bound<'_, PyAny>,
-        doc_clause: &str,
-        pillar: &Bound<'_, PyAny>,
-        coupon_bp: &Bound<'_, PyAny>,
-        upfront_pct: f64,
-        recovery_rate: f64,
-    ) -> PyResult<Self> {
-        CdsQuote::upfront(
-            id,
-            entity,
-            extract_currency(currency)?.as_ref(),
-            doc_clause,
-            extract_pillar(py, pillar)?,
-            extract_basis_points(coupon_bp, "coupon_bp")?,
-            upfront_pct,
-            recovery_rate,
-        )
-        .map(Self::from_inner)
-        .map_err(core_to_py)
+    #[pyo3(text_signature = "(params)")]
+    fn upfront(params: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let mut fields: Map<String, Value> =
+            spec_from_py(params.py(), params, "CdsQuote.upfront params")?;
+        fields.insert("type".to_string(), Value::from("cds_upfront"));
+        let quote: CdsQuote = from_value(Value::Object(fields), "CdsQuote.upfront params")?;
+        quote.validate().map_err(core_to_py)?;
+        Ok(Self::from_inner(quote))
     }
 
     /// Unique quote identifier.
@@ -509,7 +491,6 @@ impl PyVolQuote {
     #[staticmethod]
     #[pyo3(signature = (id, expiry, maturity, strike, vol, quote_type, convention = None))]
     #[pyo3(text_signature = "(id, expiry, maturity, strike, vol, quote_type, convention=None)")]
-    #[allow(clippy::too_many_arguments)]
     fn swaption_vol(
         id: &str,
         expiry: &Bound<'_, PyAny>,
@@ -867,7 +848,12 @@ wire_methods!(PyXccyQuote, XccyQuote, "XccyQuote", validate);
 /// Examples
 /// --------
 /// >>> from finstack_quant.calibration import CdsTrancheQuote
-/// >>> q = CdsTrancheQuote("IG-3-7", "CDX.NA.IG", 42, 0.03, 0.07, "2031-06-20", 0.01, 100.0, "USD", "isda_na")
+/// >>> q = CdsTrancheQuote({
+/// ...     "id": "IG-3-7", "index": "CDX.NA.IG", "series": 42,
+/// ...     "attachment": 0.03, "detachment": 0.07, "maturity": "2031-06-20",
+/// ...     "upfront_pct": 0.01, "coupon_bp": 100.0,
+/// ...     "convention": {"currency": "USD", "doc_clause": "isda_na"},
+/// ... })
 /// >>> q.id, q.attachment, q.detachment
 /// ('IG-3-7', 0.03, 0.07)
 #[pyclass(
@@ -885,36 +871,11 @@ pub struct PyCdsTrancheQuote {
 impl PyCdsTrancheQuote {
     #[doc = pydoc!("finstack_quant.calibration._quotes", "CdsTrancheQuote.__init__")]
     #[new]
-    #[pyo3(
-        text_signature = "(id, index, series, attachment, detachment, maturity, upfront_pct, coupon_bp, currency, doc_clause)"
-    )]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        id: &str,
-        index: &str,
-        series: u16,
-        attachment: f64,
-        detachment: f64,
-        maturity: &Bound<'_, PyAny>,
-        upfront_pct: f64,
-        coupon_bp: &Bound<'_, PyAny>,
-        currency: &Bound<'_, PyAny>,
-        doc_clause: &str,
-    ) -> PyResult<Self> {
-        CdsTrancheQuote::new(
-            id,
-            index,
-            series,
-            attachment,
-            detachment,
-            py_to_date(maturity)?,
-            upfront_pct,
-            extract_basis_points(coupon_bp, "coupon_bp")?,
-            extract_currency(currency)?.as_ref(),
-            doc_clause,
-        )
-        .map(|inner| Self { inner })
-        .map_err(core_to_py)
+    #[pyo3(text_signature = "(params)")]
+    fn new(params: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let inner: CdsTrancheQuote = spec_from_py(params.py(), params, "CdsTrancheQuote params")?;
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Unique quote identifier.

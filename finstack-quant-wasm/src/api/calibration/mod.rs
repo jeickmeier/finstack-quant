@@ -20,8 +20,7 @@
 //! # Submodules
 //!
 //! - `quotes`, `steps`: free-function twins of the Python quote, rate-bound
-//!   and step constructors, returning the plain serde objects (`fields` holds
-//!   their shared argument marshalling).
+//!   and step constructors, returning the plain serde objects.
 //! - `hull_white`: direct Hull-White one-factor calibrators on curve handles.
 //! - `result`: free-function twins of the Python `CalibrationResultEnvelope` methods.
 
@@ -31,7 +30,6 @@
 // allowance — keep the binding layer consistent.
 #![allow(clippy::result_large_err)]
 
-mod fields;
 mod hull_white;
 mod quotes;
 mod result;

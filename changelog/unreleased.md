@@ -2,6 +2,27 @@
 
 ## Itemized changes
 
+### Calibration: step constructors and CDS upfront/tranche quotes take one params object
+
+Every `CalibrationStep` constructor now takes the step id, one `params` object
+holding all wire fields of its `StepParams` variant (required and optional,
+keyed by their serde names), and an optional quote set. Python passes a dict or
+JSON text (a `Currency` value serializes to its code and a `datetime.date` to
+its ISO string; currency codes are upper-case, so `"usd"`, which the positional
+arguments accepted, is now rejected); WASM passes an object or JSON text. Python `**params`
+keyword overrides are gone. Omitted `curve_id` / `vol_surface_id` and
+`quote_set` still default to the id, a hazard `seniority` to `"senior"` and a
+`parametric` `model` to `"ns"`; missing or unknown fields raise `ValueError`
+(WASM `validation`). Rust `CdsQuote::upfront` and `CdsTrancheQuote::new` are
+removed: build the `CdsQuote::CdsUpfront { .. }` variant or the
+`CdsTrancheQuote { .. }` literal and call `validate()`. The step and quote
+objects produced are unchanged. Old → new:
+
+- `CalibrationStep.discount(id, currency, base_date, quote_set=None, curve_id=None, **params)` → `CalibrationStep.discount(id, params, quote_set=None)`; WASM `calibrationStepDiscount(id, currency, baseDate, quoteSet?, curveId?, params?)` → `calibrationStepDiscount(id, params, quoteSet?)`
+- likewise `forward`, `hazard`, `inflation`, `vol_surface`, `swaption_vol`, `base_correlation`, `student_t`, `hull_white`, `cap_floor_hull_white`, `svi_surface`, `xccy_basis` and `parametric` (WASM `calibrationStepForward` … `calibrationStepParametric`): every positional field moves into `params` under its snake_case name (`tenor_years`, `discount_curve_id`, `recovery_rate`, `fit_tolerance`, ...)
+- `CdsQuote.upfront(id, entity, currency, doc_clause, pillar, coupon_bp, upfront_pct, recovery_rate)` → `CdsQuote.upfront(params)` with `{id, entity, convention: {currency, doc_clause}, pillar: {tenor: {count, unit}} | {date}, coupon_bp, upfront_pct, recovery_rate}`; WASM `cdsQuoteUpfront(...8 args)` → `cdsQuoteUpfront(params)`
+- `CdsTrancheQuote(id, index, series, attachment, detachment, maturity, upfront_pct, coupon_bp, currency, doc_clause)` → `CdsTrancheQuote(params)` with the `CdsTrancheQuote` wire fields (`convention: {currency, doc_clause}`), the object WASM `cdsTrancheQuote` already takes
+
 ### Models: option pricers take one market object in Rust, Python and WASM
 
 The option market inputs travel as one object. Rust: `closed_form::bs_greeks`

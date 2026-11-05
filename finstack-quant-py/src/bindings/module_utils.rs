@@ -116,18 +116,23 @@ pub(crate) fn attach_submodule(
 ///
 /// Typed wrappers serialize through their canonical form, standalone or
 /// nested inside lists and dicts: ``to_dict`` when they carry one, otherwise
-/// the ``to_json`` every result and spec wrapper exposes. NumPy arrays and
-/// scalars serialize through ``tolist``. Objects with none of these keep the
-/// standard ``TypeError: Object of type ... is not JSON serializable``.
+/// the ``to_json`` every result and spec wrapper exposes. A ``datetime.date``
+/// serializes to its ISO-8601 string, the wire form of every date field (a
+/// ``datetime.datetime`` gives a timestamp string, which date fields reject).
+/// NumPy arrays and scalars serialize through ``tolist``. Objects with none of
+/// these keep the standard ``TypeError: Object of type ... is not JSON
+/// serializable``.
 fn typed_wrapper_json_hook<'py>(
     py: Python<'py>,
     json_mod: &Bound<'py, PyModule>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let globals = pyo3::types::PyDict::new(py);
     globals.set_item("json", json_mod)?;
+    globals.set_item("date", py.import("datetime")?.getattr("date")?)?;
     py.eval(
         c"lambda o: o.to_dict() if hasattr(o, 'to_dict') \
            else json.loads(o.to_json()) if hasattr(o, 'to_json') \
+           else o.isoformat() if isinstance(o, date) \
            else o.tolist() if hasattr(o, 'tolist') \
            else json.JSONEncoder().default(o)",
         Some(&globals),

@@ -2527,7 +2527,7 @@ vol_surface = { js = "calibration.calibrationStepVolSurface", reason = "Both hos
 xccy_basis = { js = "calibration.calibrationStepXccyBasis", reason = "Both hosts author plain CalibrationStep values through Rust CalibrationStep::from_wire_fields; the WASM constructor is a free function. Quote payloads live in envelope.market_data and their IDs in plan.quote_sets" }
 
 [parity.members."finstack_quant.calibration.CdsQuote"]
-renames = { par_spread = { js = "calibration.cdsQuoteParSpread", reason = "WASM quotes are plain objects; the constructor is a free function returning the CdsQuote object (Rust CdsQuote::par_spread)" }, upfront = { js = "calibration.cdsQuoteUpfront", reason = "WASM quotes are plain objects; the constructor is a free function returning the CdsQuote object (Rust CdsQuote::upfront)" } }
+renames = { par_spread = { js = "calibration.cdsQuoteParSpread", reason = "WASM quotes are plain objects; the constructor is a free function returning the CdsQuote object (Rust CdsQuote::par_spread)" }, upfront = { js = "calibration.cdsQuoteUpfront", reason = "WASM quotes are plain objects; the constructor is a free function returning the CdsQuote object (the Rust CdsQuote::CdsUpfront variant, checked with validate)" } }
 
 [parity.members."finstack_quant.calibration.InflationQuote"]
 renames = { inflation_swap = { js = "calibration.inflationQuoteInflationSwap", reason = "WASM quotes are plain objects; the constructor is a free function returning the InflationQuote object (Rust InflationQuote::inflation_swap)" }, yoy_inflation_swap = { js = "calibration.inflationQuoteYoyInflationSwap", reason = "WASM quotes are plain objects; the constructor is a free function returning the InflationQuote object (Rust InflationQuote::yoy_inflation_swap)" } }

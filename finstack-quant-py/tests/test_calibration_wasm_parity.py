@@ -54,16 +54,32 @@ BASE = "2026-05-08"
 
 QUOTES = {
     "xccy": lambda: XccyQuote("X5Y", "EUR-USD", "5Y", -12.0, 1.1),
-    "cds_tranche": lambda: CdsTrancheQuote(
-        "T", "CDX.NA.IG", 42, 0.03, 0.07, "2031-05-08", 0.0425, 100.0, "USD", "cr14"
-    ),
+    "cds_tranche": lambda: CdsTrancheQuote({
+        "id": "T",
+        "index": "CDX.NA.IG",
+        "series": 42,
+        "attachment": 0.03,
+        "detachment": 0.07,
+        "maturity": "2031-05-08",
+        "upfront_pct": 0.0425,
+        "coupon_bp": 100.0,
+        "convention": {"currency": "USD", "doc_clause": "cr14"},
+    }),
     "deposit": lambda: RateQuote.deposit("D3M", "USD-SOFR-OIS", "3M", 0.052),
     "fra": lambda: RateQuote.fra("F", "USD-SOFR-OIS", "3M", "6M", 0.05),
     "futures": lambda: RateQuote.futures("FUT", "CME:SR3", "2026-09-15", 96.5),
     "swap": lambda: RateQuote.swap("S5", "USD-SOFR-OIS", "5Y", 0.045),
     "swap_dated": lambda: RateQuote.swap("S5d", "USD-SOFR-OIS", "2031-05-08", 0.045, 0.001),
     "par_spread": lambda: CdsQuote.par_spread("ACME-5Y", "ACME", "USD", "isda_na", "5Y", 80.0, 0.4),
-    "upfront": lambda: CdsQuote.upfront("ACME-5Y-U", "ACME", "USD", "isda_na", "5Y", 100.0, 0.01, 0.4),
+    "upfront": lambda: CdsQuote.upfront({
+        "id": "ACME-5Y-U",
+        "entity": "ACME",
+        "convention": {"currency": "USD", "doc_clause": "isda_na"},
+        "pillar": {"tenor": {"count": 5, "unit": "years"}},
+        "coupon_bp": 100.0,
+        "upfront_pct": 0.01,
+        "recovery_rate": 0.4,
+    }),
     "option_vol": lambda: VolQuote.option_vol("O", "AAPL", "2027-05-08", 155.0, 0.28),
     "swaption_vol": lambda: VolQuote.swaption_vol("SV", "2027-05-08", "2032-05-08", 0.04, 0.0072, "normal"),
     "cap_floor_vol": lambda: VolQuote.cap_floor_vol("CF", "2027-05-08", 0.04, 0.0072, "normal", False),
@@ -73,27 +89,59 @@ QUOTES = {
     ),
 }
 
+RATES = {"currency": "USD", "base_date": BASE}
 STEPS = {
-    "discount": lambda: CalibrationStep.discount("USD-OIS", "USD", BASE),
+    "discount": lambda: CalibrationStep.discount("USD-OIS", RATES),
     "discount_named": lambda: CalibrationStep.discount(
-        "d2", "USD", BASE, quote_set="qs", curve_id="USD-OIS", interpolation="linear"
+        "d2", {**RATES, "curve_id": "USD-OIS", "interpolation": "linear"}, quote_set="qs"
     ),
-    "forward": lambda: CalibrationStep.forward("USD-SOFR-3M", "USD", BASE, 0.25, "USD-OIS"),
-    "hazard": lambda: CalibrationStep.hazard("ACME", "ACME", "USD", BASE, "USD-OIS", 0.4),
-    "inflation": lambda: CalibrationStep.inflation("USA-CPI", "USD", BASE, "USD-OIS", "USA-CPI-U", "3M", 310.0),
-    "vol_surface": lambda: CalibrationStep.vol_surface("AAPL-VOL", BASE, "AAPL"),
-    "swaption_vol": lambda: CalibrationStep.swaption_vol("USD-SWPT", BASE, "USD-OIS", "USD"),
+    "forward": lambda: CalibrationStep.forward(
+        "USD-SOFR-3M", {**RATES, "tenor_years": 0.25, "discount_curve_id": "USD-OIS"}
+    ),
+    "hazard": lambda: CalibrationStep.hazard(
+        "ACME", {**RATES, "entity": "ACME", "discount_curve_id": "USD-OIS", "recovery_rate": 0.4}
+    ),
+    "inflation": lambda: CalibrationStep.inflation(
+        "USA-CPI",
+        {
+            **RATES,
+            "discount_curve_id": "USD-OIS",
+            "index": "USA-CPI-U",
+            "observation_lag": "3M",
+            "base_cpi": 310.0,
+        },
+    ),
+    "vol_surface": lambda: CalibrationStep.vol_surface("AAPL-VOL", {"base_date": BASE, "underlying_ticker": "AAPL"}),
+    "swaption_vol": lambda: CalibrationStep.swaption_vol("USD-SWPT", {**RATES, "discount_curve_id": "USD-OIS"}),
     "base_correlation": lambda: CalibrationStep.base_correlation(
-        "CDX-CORR", "CDX.NA.IG", 42, 5.0, BASE, "USD-OIS", "USD"
+        "CDX-CORR",
+        {
+            **RATES,
+            "index_id": "CDX.NA.IG",
+            "series": 42,
+            "maturity_years": 5.0,
+            "discount_curve_id": "USD-OIS",
+        },
     ),
-    "student_t": lambda: CalibrationStep.student_t("T", "TRANCHE-1", "CDX.NA.IG_CORR"),
-    "hull_white": lambda: CalibrationStep.hull_white("HW", "USD-OIS", "USD", BASE, fit_tolerance=1e-4),
+    "student_t": lambda: CalibrationStep.student_t(
+        "T", {"tranche_instrument_id": "TRANCHE-1", "base_correlation_curve_id": "CDX.NA.IG_CORR"}
+    ),
+    "hull_white": lambda: CalibrationStep.hull_white("HW", {**RATES, "curve_id": "USD-OIS", "fit_tolerance": 1e-4}),
     "cap_floor_hull_white": lambda: CalibrationStep.cap_floor_hull_white(
-        "HWCF", "USD-OIS", "USD-SOFR-3M", "USD-SOFR-3M", "USD", BASE, fit_tolerance=1e-4
+        "HWCF",
+        {
+            **RATES,
+            "discount_curve_id": "USD-OIS",
+            "forward_curve_id": "USD-SOFR-3M",
+            "index_id": "USD-SOFR-3M",
+            "fit_tolerance": 1e-4,
+        },
     ),
-    "svi_surface": lambda: CalibrationStep.svi_surface("AAPL-SVI", BASE, "AAPL"),
-    "xccy_basis": lambda: CalibrationStep.xccy_basis("EUR-XCCY", "EUR", BASE, 1.1, "USD-OIS"),
-    "parametric": lambda: CalibrationStep.parametric("USD-NS", BASE),
+    "svi_surface": lambda: CalibrationStep.svi_surface("AAPL-SVI", {"base_date": BASE, "underlying_ticker": "AAPL"}),
+    "xccy_basis": lambda: CalibrationStep.xccy_basis(
+        "EUR-XCCY", {"currency": "EUR", "base_date": BASE, "fx_spot": 1.1, "domestic_discount_id": "USD-OIS"}
+    ),
+    "parametric": lambda: CalibrationStep.parametric("USD-NS", {"base_date": BASE}),
 }
 
 
@@ -131,7 +179,7 @@ def test_step_constructors_match_the_shared_golden(name: str) -> None:
 
 def test_step_constructors_reject_unknown_fields() -> None:
     with pytest.raises(ValueError, match="invalid discount step"):
-        CalibrationStep.discount("USD-OIS", "USD", BASE, bogus=1)
+        CalibrationStep.discount("USD-OIS", {**RATES, "bogus": 1})
 
 
 def test_validation_config_matches_the_shared_golden() -> None:
@@ -240,17 +288,16 @@ def test_checked_quote_constructors_reject_invalid_values() -> None:
         "maturity": "2031-05-08",
         "upfront_pct": 0.0425,
         "coupon_bp": 100.0,
-        "currency": "USD",
-        "doc_clause": "cr14",
+        "convention": {"currency": "USD", "doc_clause": "cr14"},
     }
-    invalid = [
+    invalid: list[dict[str, Any]] = [
         {"attachment": -0.01},
         {"detachment": 1.01},
         {"attachment": 0.07},
         {"upfront_pct": 4.25},
         {"coupon_bp": 0.0},
-        {"doc_clause": "bad_clause"},
-        {"currency": "NOT_CURRENCY"},
+        {"convention": {"currency": "USD", "doc_clause": "bad_clause"}},
+        {"convention": {"currency": "NOT_CURRENCY", "doc_clause": "cr14"}},
         {"maturity": "not-a-date"},
     ]
     invalid.extend(
@@ -259,10 +306,12 @@ def test_checked_quote_constructors_reject_invalid_values() -> None:
         for value in (math.nan, math.inf, -math.inf)
     )
     for patch in invalid:
+        # A non-finite float is not JSON, so the params object itself is rejected.
         with pytest.raises(
-            ValueError, match=r"attachment|detachment|upfront_pct|coupon_bp|currency|Currency|date|CDS doc clause"
+            ValueError,
+            match=r"attachment|detachment|upfront_pct|coupon_bp|NOT_CURRENCY|bad_clause|date|CdsTrancheQuote params",
         ):
-            CdsTrancheQuote(**(fields | patch))
+            CdsTrancheQuote(fields | patch)
 
 
 @pytest.mark.parametrize(("enabled", "limit"), [(False, 1), (True, 0), (True, 1), (True, None)])
