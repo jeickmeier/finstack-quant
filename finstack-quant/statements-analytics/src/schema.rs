@@ -61,11 +61,11 @@ use crate::{
     analysis::BridgeChart, analysis::CapexReconciliation, analysis::CapitalStructureSummary,
     analysis::CapitalStructureSummaryConfig, analysis::CeclConfig, analysis::CeclResult,
     analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions, analysis::CoverageFloorCheck,
-    analysis::CreditAssessment, analysis::DcfOptions, analysis::DcfSensitivityResult,
-    analysis::DependencyTree, analysis::DepreciationReconciliation,
+    analysis::CreditAssessment, analysis::DcfInputs, analysis::DcfOptions,
+    analysis::DcfSensitivityResult, analysis::DependencyTree, analysis::DepreciationReconciliation,
     analysis::DividendReconciliation, analysis::EclConfig, analysis::EffectiveTaxRateCheck,
     analysis::Explanation, analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
-    analysis::GoalSeekResult, analysis::GrowthRateConsistency,
+    analysis::GoalSeekResult, analysis::GoalSeekSpec, analysis::GrowthRateConsistency,
     analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboResult,
     analysis::LeverageRangeCheck, analysis::LiquidityRunwayCheck, analysis::PeerFilter,
     analysis::PeerSet, analysis::PeerStats, analysis::RatingPdMap, analysis::RegressionResult,
@@ -178,6 +178,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
+        DcfInputs,
+        "statements_analytics",
+        "dcf_inputs",
+        Input,
+        "Headline DCF assumptions: decimal WACC, terminal value, unlevered free cash flow node and optional net-debt override."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
         DcfOptions,
         "statements_analytics",
         "dcf_options",
@@ -271,6 +279,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "goal_seek_result",
         Output,
         "Outcome of a `goal_seek` solve."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        GoalSeekSpec,
+        "statements_analytics",
+        "goal_seek_spec",
+        Input,
+        "Target node, period and value, driver node and period, model write-back flag and optional bracket of a `goal_seek` solve."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

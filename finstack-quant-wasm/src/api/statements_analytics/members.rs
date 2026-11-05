@@ -2,14 +2,11 @@
 //! methods on plain-object analysis types.
 
 use super::parse_model;
-use crate::utils::input::{
-    from_js_json, js_f64, js_opt_f64, js_opt_string, js_string, js_string_seq, js_uint,
-};
+use crate::utils::input::{from_js_json, js_opt_string, js_string, js_string_seq, js_uint};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements_analytics::analysis as fa;
-use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 use wasm_bindgen::prelude::*;
 
 fn parse_periods(periods: &JsValue) -> Result<Vec<PeriodId>, JsValue> {
@@ -25,10 +22,7 @@ fn parse_periods(periods: &JsValue) -> Result<Vec<PeriodId>, JsValue> {
 /// is evaluated, the UFCF series is discounted at `wacc`, the terminal value
 /// is added, and the equity bridge turns enterprise value into equity value.
 /// @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency`.
-/// @param wacc - Weighted average cost of capital as a decimal (`0.10` = 10%).
-/// @param terminalValue - `TerminalValueSpec`, e.g. `{ type: "gordon_growth", stable_growth_rate: 0.02 }` (object or JSON).
-/// @param ufcfNode - Node holding unlevered free cash flow; omitted uses the Rust default `"ufcf"`.
-/// @param netDebtOverride - Flat net debt in model currency used instead of the model-derived equity bridge.
+/// @param inputs - Rust `DcfInputs` (object or JSON); an unknown key is rejected: `wacc` (required; weighted average cost of capital as a decimal, `0.10` = 10%), `terminal_value` (required `TerminalValueSpec`, e.g. `{ type: "gordon_growth", stable_growth_rate: 0.02 }`), `ufcf_node` (node holding unlevered free cash flow; omitted uses the Rust default `"ufcf"`) and `net_debt_override` (flat net debt in model currency used instead of the model-derived equity bridge; omitted derives it from the model).
 /// @param options - Optional Rust `DcfOptions`; every field is optional and a missing one takes its Rust default (`mid_year_convention`, `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `exit_multiple_metric_node`, ...). Unknown keys are rejected (object or JSON).
 /// @param market - Optional `MarketContext` state used for statement evaluation, not for WACC discounting (object or JSON).
 /// @param asOf - Optional ISO 8601 valuation date; required when `market` is supplied. With `market` it is also the statement visibility cutoff: an actual is hidden until its availability date, by default the period's exclusive end (the first day of the next period), so a quarter-end `"2025-03-31"` hides 2025Q1's actuals; pass `"2025-04-01"` or set the nodes' `availability_dates`. Only forecast periods ending after it are discounted.
@@ -42,22 +36,10 @@ fn parse_periods(periods: &JsValue) -> Result<Vec<PeriodId>, JsValue> {
 /// assumptions are inconsistent, or the valuation fails, and kind `not_found`
 /// if the UFCF or exit-multiple metric node is missing.
 #[wasm_bindgen(js_name = evaluateDcf, unchecked_return_type = "generated.statements_analytics.CorporateValuationResult")]
-#[allow(clippy::too_many_arguments)]
 pub fn evaluate_dcf(
     #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] wacc: JsValue,
-    #[wasm_bindgen(
-        js_name = "terminalValue",
-        unchecked_param_type = "generated.valuations.TerminalValueSpec | string"
-    )]
-    terminal_value: JsValue,
-    #[wasm_bindgen(js_name = "ufcfNode", unchecked_optional_param_type = "string | null")]
-    ufcf_node: Option<JsValue>,
-    #[wasm_bindgen(
-        js_name = "netDebtOverride",
-        unchecked_optional_param_type = "number | null"
-    )]
-    net_debt_override: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.DcfInputs | string")]
+    inputs: JsValue,
     #[wasm_bindgen(
         unchecked_optional_param_type = "generated.statements_analytics.DcfOptions | string | null"
     )]
@@ -67,10 +49,7 @@ pub fn evaluate_dcf(
     as_of: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let model = parse_model(&model)?;
-    let wacc = js_f64(&wacc, "wacc")?;
-    let terminal_value: TerminalValueSpec = from_js_json(&terminal_value, "terminalValue")?;
-    let ufcf_node = js_opt_string(ufcf_node.as_ref(), "ufcfNode")?;
-    let net_debt_override = js_opt_f64(net_debt_override.as_ref(), "netDebtOverride")?;
+    let inputs: fa::DcfInputs = from_js_json(&inputs, "inputs")?;
     let options: fa::DcfOptions =
         crate::utils::wire::js_opt_wire(options.as_ref(), "options")?.unwrap_or_default();
     let market: Option<finstack_quant_core::market_data::context::MarketContext> =
@@ -78,17 +57,8 @@ pub fn evaluate_dcf(
     let as_of = js_opt_string(as_of.as_ref(), "asOf")?
         .map(|date| crate::utils::parse_iso_date(&date))
         .transpose()?;
-    let result = fa::evaluate_dcf(
-        &model,
-        wacc,
-        terminal_value,
-        ufcf_node.as_deref().unwrap_or(fa::DEFAULT_UFCF_NODE),
-        net_debt_override,
-        &options,
-        market.as_ref(),
-        as_of,
-    )
-    .map_err(to_js_err)?;
+    let result =
+        fa::evaluate_dcf(&model, &inputs, &options, market.as_ref(), as_of).map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -189,7 +159,6 @@ pub fn scenario_diff(
 /// not parse, and kind `not_found` if the target or a driver is missing from
 /// either result at `period`.
 #[wasm_bindgen(js_name = varianceBridge, unchecked_return_type = "generated.statements_analytics.BridgeChart")]
-#[allow(clippy::too_many_arguments)]
 pub fn variance_bridge(
     #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] base: JsValue,
     #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] comparison: JsValue,

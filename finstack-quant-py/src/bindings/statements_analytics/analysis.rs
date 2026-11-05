@@ -667,7 +667,15 @@ fn backtest_forecast(actual: Vec<f64>, forecast: Vec<f64>) -> PyResult<PyForecas
 /// >>> _ = b.periods("2025Q1..Q1", None)
 /// >>> _ = b.value("revenue", [("2025Q1", 100.0)])
 /// >>> _ = b.compute("profit", "revenue * 0.5")
-/// >>> result = goal_seek(b.build(), "profit", "2025Q1", 60.0, "revenue", "2025Q1", True)
+/// >>> spec = {
+/// ...     "target_node": "profit",
+/// ...     "target_period": "2025Q1",
+/// ...     "target_value": 60.0,
+/// ...     "driver_node": "revenue",
+/// ...     "driver_period": "2025Q1",
+/// ...     "update_model": True,
+/// ... }
+/// >>> result = goal_seek(b.build(), spec)
 /// >>> round(result.solved_value, 6), result.model is None
 /// (120.0, False)
 /// >>> round(GoalSeekResult.from_json(result.to_json()).solved_value, 6)
@@ -785,86 +793,22 @@ impl PyGoalSeekResult {
     }
 }
 
-/// Find the driver value that makes a target node reach a target value.
-///
-/// Parameters
-/// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
-/// target_node : str
-///     Node to drive towards ``target_value``.
-/// target_period : str
-///     Period string for the target (e.g. ``"2025Q4"``).
-/// target_value : float
-///     Desired value for the target node.
-/// driver_node : str
-///     Node whose value is adjusted to reach the target.
-/// driver_period : str
-///     Period string for the driver.
-/// update_model : bool
-///     If ``True``, the result's ``model`` is a copy of ``model`` with the
-///     solved value written in; if ``False`` it is ``None``. Required, as in
-///     Rust and WASM.
-/// bounds : tuple[float, float] | None
-///     Optional search bracket ``(lo, hi)`` in the driver node's units.
-///
-/// Returns
-/// -------
-/// GoalSeekResult
-///     ``solved_value`` plus ``model`` (the updated ``FinancialModelSpec`` or
-///     ``None``) and the solve diagnostics ``residual``, ``tolerance``,
-///     ``evaluations`` and ``converged``. ``float(result)`` yields the solved
-///     value. The input model is never modified.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If a period does not parse, ``target_node`` or ``driver_node`` is
-///     missing, the solver fails to converge, the bracket does not contain a
-///     root, or the final objective residual exceeds 1e-9 times
-///     max(1, abs(target_value)).
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements import ModelBuilder
-/// >>> from finstack_quant.statements_analytics import goal_seek
-/// >>> b = ModelBuilder("m"); b.periods("2025Q1..Q1", None); b.value("revenue", [("2025Q1", 100.0)])
-/// >>> b.compute("profit", "revenue * 0.5")
-/// >>> round(goal_seek(b.build(), "profit", "2025Q1", 60.0, "revenue", "2025Q1", False).solved_value, 6)
-/// 120.0
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "goal_seek")]
 #[pyfunction]
-#[pyo3(signature = (model, target_node, target_period, target_value, driver_node, driver_period, update_model, bounds=None))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (model, spec))]
 fn goal_seek(
     py: Python<'_>,
     model: &Bound<'_, PyAny>,
-    target_node: &str,
-    target_period: &str,
-    target_value: f64,
-    driver_node: &str,
-    driver_period: &str,
-    update_model: bool,
-    bounds: Option<(f64, f64)>,
+    spec: &Bound<'_, PyAny>,
 ) -> PyResult<PyGoalSeekResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let tp = parse_period_id(target_period)?;
-    let dp = parse_period_id(driver_period)?;
-    let target_node = target_node.to_owned();
-    let driver_node = driver_node.to_owned();
+    let spec: finstack_quant_statements_analytics::analysis::GoalSeekSpec =
+        crate::bindings::module_utils::spec_from_py(py, spec, "GoalSeekSpec")?;
 
     py.detach(move || {
-        finstack_quant_statements_analytics::analysis::goal_seek(
-            &model,
-            &target_node,
-            tp,
-            target_value,
-            &driver_node,
-            dp,
-            update_model,
-            bounds,
-        )
-        .map(PyGoalSeekResult::from_inner)
-        .map_err(statements_to_py)
+        finstack_quant_statements_analytics::analysis::goal_seek(&model, &spec)
+            .map(PyGoalSeekResult::from_inner)
+            .map_err(statements_to_py)
     })
 }
 

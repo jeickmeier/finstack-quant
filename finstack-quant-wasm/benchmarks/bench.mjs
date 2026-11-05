@@ -909,7 +909,14 @@ async function main() {
   });
 
   benchTry('statements_analytics', 'goalSeek', 400, () => {
-    w.goalSeek(GOAL_SEEK_MODEL_JSON, 'ebitda', '2025Q1', 50000.0, 'revenue', '2025Q1', false);
+    w.goalSeek(GOAL_SEEK_MODEL_JSON, {
+      target_node: 'ebitda',
+      target_period: '2025Q1',
+      target_value: 50000.0,
+      driver_node: 'revenue',
+      driver_period: '2025Q1',
+      update_model: false,
+    });
   });
 
   benchTry('statements_analytics', 'dependencyTree', 2000, () => {

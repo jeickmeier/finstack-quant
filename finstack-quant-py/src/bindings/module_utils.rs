@@ -144,9 +144,9 @@ fn typed_wrapper_json_hook<'py>(
 ///
 /// A Python `str` is first parsed as JSON; when that fails it is treated as
 /// a **bare string value** (`serde_json::Value::String`). This is what
-/// externally-tagged serde enums expect for unit variants — e.g. the
-/// documented `attribute_pnl(..., method="parallel")` form, which previously
-/// raised `ValueError: invalid method JSON` (quant review M11).
+/// externally-tagged serde enums expect for unit variants — e.g. a bare
+/// `"parallel"` for a unit-variant method, which would otherwise raise
+/// `ValueError: invalid method JSON` (quant review M11).
 pub(crate) fn py_to_json_value<'py>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,

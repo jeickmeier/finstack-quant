@@ -491,48 +491,17 @@ impl JsModelBuilder {
     /// `ModelBuilder::add_bond_with_convention`). A failed call leaves
     /// the builder usable.
     ///
-    /// @param id - Unique instrument identifier.
-    /// @param notional - Principal as a `Money` wire object (`{amount, currency}`).
-    /// @param couponRate - Annual coupon rate as a decimal (`0.03` = 3%).
-    /// @param issueDate - ISO 8601 issue date.
-    /// @param maturityDate - ISO 8601 maturity date.
-    /// @param convention - Regional preset: `"us_treasury"`, `"us_agency"`, `"german_bund"`, `"uk_gilt"`, `"french_oat"`, `"jgb"`, `"us_corporate"` or `"eur_corporate"`; sets day count, coupon frequency and calendar.
-    /// @param discountCurveId - Identifier of the discount curve used for pricing.
-    /// @throws Error with kind `validation` if an argument is malformed, `convention` is unknown, the bond cannot be constructed, or the builder was consumed.
+    /// @param params - Rust `BondConventionParams` (object or JSON); every key is required and an unknown key is rejected: `id` (unique instrument identifier), `notional` (principal as a `Money` wire object `{amount, currency}`), `coupon_rate` (finite annual coupon as a decimal, `0.03` = 3%), `issue_date` and `maturity_date` (ISO 8601 dates, issue before maturity), `convention` (regional preset `"us_treasury"`, `"us_agency"`, `"german_bund"`, `"uk_gilt"`, `"french_oat"`, `"jgb"`, `"us_corporate"` or `"eur_corporate"`; sets day count, coupon frequency and calendar) and `discount_curve_id` (discount curve used for pricing).
+    /// @throws Error with kind `validation` if `params` is malformed, misses a key or carries an unknown one, `convention` is unknown, the bond cannot be constructed, or the builder was consumed.
     #[wasm_bindgen(js_name = addBondWithConvention)]
-    #[allow(clippy::too_many_arguments)]
     pub fn add_bond_with_convention(
         &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "generated.statements.Money | string")]
-        notional: JsValue,
-        #[wasm_bindgen(js_name = "couponRate", unchecked_param_type = "number")]
-        coupon_rate: JsValue,
-        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
-        #[wasm_bindgen(js_name = "maturityDate", unchecked_param_type = "string")]
-        maturity_date: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] convention: JsValue,
-        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
-        discount_curve_id: JsValue,
+        #[wasm_bindgen(
+            unchecked_param_type = "generated.statements.BondConventionParams | string"
+        )]
+        params: JsValue,
     ) -> Result<(), JsValue> {
-        let id = js_string(&id, "id")?;
-        let notional: Money = from_js_json(&notional, "notional")?;
-        let coupon_rate =
-            finstack_quant_core::types::Rate::from_decimal(js_f64(&coupon_rate, "couponRate")?)
-                .map_err(to_js_err)?;
-        let issue_date = js_date(&issue_date, "issueDate")?;
-        let maturity_date = js_date(&maturity_date, "maturityDate")?;
-        let convention: finstack_quant_valuations::instruments::BondConvention =
-            js_wire(&convention, "convention")?;
-        let params = BondConventionParams {
-            id,
-            notional,
-            coupon_rate,
-            issue_date,
-            maturity_date,
-            convention,
-            discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
-        };
+        let params: BondConventionParams = from_js_json(&params, "params")?;
         self.builder_mut()?
             .add_bond_with_convention(params)
             .map_err(to_js_err)?;
@@ -541,42 +510,19 @@ impl JsModelBuilder {
 
     /// Add a pay-fixed interest rate swap to the capital structure (US conventions).
     ///
-    /// Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::add_swap`).
-    /// A failed call leaves the builder usable.
+    /// Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::add_swap`):
+    /// semi-annual 30/360 fixed coupons, quarterly ACT/360 floating coupons,
+    /// Modified Following. A failed call leaves the builder usable.
     ///
-    /// @param id - Unique instrument identifier.
-    /// @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
-    /// @param fixedRate - Fixed leg rate as a decimal (`0.04` = 4%).
-    /// @param startDate - ISO 8601 effective date.
-    /// @param maturityDate - ISO 8601 maturity date.
-    /// @param discountCurveId - Identifier of the discount curve.
-    /// @param forwardCurveId - Identifier of the floating-leg forward curve.
-    /// @throws Error with kind `validation` if an argument is malformed, the swap cannot be constructed, or the builder was consumed.
+    /// @param params - Rust `SwapParams` (object or JSON); every key is required and an unknown key is rejected: `id` (unique instrument identifier), `notional` (swap notional as a `Money` wire object `{amount, currency}`), `fixed_rate` (fixed leg rate as a decimal, `0.04` = 4%), `start_date` and `maturity_date` (ISO 8601 dates, start before maturity), `discount_curve_id` (discount curve) and `forward_curve_id` (floating-leg forward curve).
+    /// @throws Error with kind `validation` if `params` is malformed, misses a key or carries an unknown one, the swap cannot be constructed, or the builder was consumed.
     #[wasm_bindgen(js_name = addSwap)]
-    #[allow(clippy::too_many_arguments)]
     pub fn add_swap(
         &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "generated.statements.Money | string")]
-        notional: JsValue,
-        #[wasm_bindgen(js_name = "fixedRate", unchecked_param_type = "number")] fixed_rate: JsValue,
-        #[wasm_bindgen(js_name = "startDate", unchecked_param_type = "string")] start_date: JsValue,
-        #[wasm_bindgen(js_name = "maturityDate", unchecked_param_type = "string")]
-        maturity_date: JsValue,
-        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
-        discount_curve_id: JsValue,
-        #[wasm_bindgen(js_name = "forwardCurveId", unchecked_param_type = "string")]
-        forward_curve_id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.SwapParams | string")]
+        params: JsValue,
     ) -> Result<(), JsValue> {
-        let params = SwapParams {
-            id: js_string(&id, "id")?,
-            notional: from_js_json(&notional, "notional")?,
-            fixed_rate: js_f64(&fixed_rate, "fixedRate")?,
-            start_date: js_date(&start_date, "startDate")?,
-            maturity_date: js_date(&maturity_date, "maturityDate")?,
-            discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
-            forward_curve_id: js_string(&forward_curve_id, "forwardCurveId")?,
-        };
+        let params: SwapParams = from_js_json(&params, "params")?;
         self.builder_mut()?.add_swap(params).map_err(to_js_err)?;
         Ok(())
     }
@@ -587,80 +533,19 @@ impl JsModelBuilder {
     /// `ModelBuilder::add_swap_with_conventions`). A failed call leaves
     /// the builder usable.
     ///
-    /// @param id - Unique instrument identifier.
-    /// @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
-    /// @param fixedRate - Fixed leg rate as a decimal (`0.04` = 4%).
-    /// @param startDate - ISO 8601 effective date.
-    /// @param maturityDate - ISO 8601 maturity date.
-    /// @param discountCurveId - Identifier of the discount curve.
-    /// @param forwardCurveId - Identifier of the floating-leg forward curve.
-    /// @param fixedFrequency - Fixed leg payment frequency as a tenor, e.g. `"1Y"`.
-    /// @param fixedDayCount - Fixed leg day-count convention, e.g. `"act_360"` or `"30_360"`.
-    /// @param floatFrequency - Floating leg payment and fixing frequency as a tenor, e.g. `"3M"`.
-    /// @param floatDayCount - Floating leg day-count convention, e.g. `"act_360"`.
-    /// @param businessDayConvention - Schedule roll convention, e.g. `"modified_following"`; omitted uses the Rust default, Modified Following.
-    /// @throws Error with kind `validation` if an argument is malformed, a tenor, day count or roll convention is unknown, the swap cannot be constructed, or the builder was consumed.
+    /// @param params - Rust `SwapParams` (object or JSON) with the keys `id`, `notional`, `fixed_rate`, `start_date`, `maturity_date`, `discount_curve_id` and `forward_curve_id`, as for `addSwap`.
+    /// @param conventions - Rust `SwapConventions` (object or JSON); an unknown key is rejected: `fixed_frequency` and `float_frequency` (tenor wire objects such as `{ count: 1, unit: "years" }`; `unit` is `"days"`, `"weeks"`, `"months"` or `"years"`), `fixed_day_count` and `float_day_count` (day-count labels such as `"act_360"` or `"30_360"`) and the optional `business_day_convention` (schedule roll, e.g. `"modified_following"`; omitted uses the Rust default, Modified Following).
+    /// @throws Error with kind `validation` if either object is malformed, misses a required key or carries an unknown one, a tenor, day count or roll convention is unknown, the swap cannot be constructed, or the builder was consumed.
     #[wasm_bindgen(js_name = addSwapWithConventions)]
-    #[allow(clippy::too_many_arguments)]
     pub fn add_swap_with_conventions(
         &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "generated.statements.Money | string")]
-        notional: JsValue,
-        #[wasm_bindgen(js_name = "fixedRate", unchecked_param_type = "number")] fixed_rate: JsValue,
-        #[wasm_bindgen(js_name = "startDate", unchecked_param_type = "string")] start_date: JsValue,
-        #[wasm_bindgen(js_name = "maturityDate", unchecked_param_type = "string")]
-        maturity_date: JsValue,
-        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
-        discount_curve_id: JsValue,
-        #[wasm_bindgen(js_name = "forwardCurveId", unchecked_param_type = "string")]
-        forward_curve_id: JsValue,
-        #[wasm_bindgen(js_name = "fixedFrequency", unchecked_param_type = "string")]
-        fixed_frequency: JsValue,
-        #[wasm_bindgen(js_name = "fixedDayCount", unchecked_param_type = "string")] fixed_day_count: JsValue,
-        #[wasm_bindgen(js_name = "floatFrequency", unchecked_param_type = "string")]
-        float_frequency: JsValue,
-        #[wasm_bindgen(js_name = "floatDayCount", unchecked_param_type = "string")] float_day_count: JsValue,
-        #[wasm_bindgen(
-            js_name = "businessDayConvention",
-            unchecked_optional_param_type = "string | null"
-        )]
-        business_day_convention: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.SwapParams | string")]
+        params: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.SwapConventions | string")]
+        conventions: JsValue,
     ) -> Result<(), JsValue> {
-        use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
-        let params = SwapParams {
-            id: js_string(&id, "id")?,
-            notional: from_js_json(&notional, "notional")?,
-            fixed_rate: js_f64(&fixed_rate, "fixedRate")?,
-            start_date: js_date(&start_date, "startDate")?,
-            maturity_date: js_date(&maturity_date, "maturityDate")?,
-            discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
-            forward_curve_id: js_string(&forward_curve_id, "forwardCurveId")?,
-        };
-        let fixed_frequency: Tenor = js_string(&fixed_frequency, "fixedFrequency")?
-            .parse()
-            .map_err(to_js_err)?;
-        let fixed_day_count: DayCount = js_string(&fixed_day_count, "fixedDayCount")?
-            .parse()
-            .map_err(to_js_err)?;
-        let float_frequency: Tenor = js_string(&float_frequency, "floatFrequency")?
-            .parse()
-            .map_err(to_js_err)?;
-        let float_day_count: DayCount = js_string(&float_day_count, "floatDayCount")?
-            .parse()
-            .map_err(to_js_err)?;
-        let business_day_convention =
-            match js_opt_string(business_day_convention.as_ref(), "businessDayConvention")? {
-                Some(label) => label.parse::<BusinessDayConvention>().map_err(to_js_err)?,
-                None => BusinessDayConvention::default(),
-            };
-        let conventions = SwapConventions {
-            fixed_frequency,
-            fixed_day_count,
-            float_frequency,
-            float_day_count,
-            business_day_convention,
-        };
+        let params: SwapParams = from_js_json(&params, "params")?;
+        let conventions: SwapConventions = from_js_json(&conventions, "conventions")?;
         self.builder_mut()?
             .add_swap_with_conventions(params, conventions)
             .map_err(to_js_err)?;

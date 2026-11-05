@@ -109,6 +109,15 @@
       "type_name": "CreditAssessment"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_inputs.schema.json",
+      "bytes": 4243,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/dcf_inputs.schema.json",
+      "summary": "Headline DCF assumptions: decimal WACC, terminal value, unlevered free cash flow node and optional net-debt override.",
+      "title": "DcfInputs",
+      "type_name": "DcfInputs"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
       "bytes": 8154,
       "kind": "input",
@@ -215,6 +224,15 @@
       "summary": "Outcome of a `goal_seek` solve.",
       "title": "GoalSeekResult",
       "type_name": "GoalSeekResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/goal_seek_spec.schema.json",
+      "bytes": 2180,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/goal_seek_spec.schema.json",
+      "summary": "Target node, period and value, driver node and period, model write-back flag and optional bracket of a `goal_seek` solve.",
+      "title": "GoalSeekSpec",
+      "type_name": "GoalSeekSpec"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/growth_rate_consistency.schema.json",

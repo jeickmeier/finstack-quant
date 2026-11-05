@@ -10192,27 +10192,21 @@ export interface StatementsAnalyticsNamespace {
   /**
    * Find the driver value that makes a target node reach a target value.
    *
-   * Returns the serde form of the Rust `GoalSeekResult`: `solved_value`, the
-   * solve diagnostics (`residual` and `tolerance` in the target node's units,
-   * `evaluations`, `converged`) and `model`, the input model with the solved
-   * driver written in when `update_model` is `true` and `null` otherwise. The
-   * input model is never
+   * Twin of Python `goal_seek` (Rust `goal_seek`). Returns the serde form of
+   * the Rust `GoalSeekResult`: `solved_value`, the solve diagnostics
+   * (`residual` and `tolerance` in the target node's units, `evaluations`,
+   * `converged`) and `model`, the input model with the solved driver written in
+   * when `update_model` is `true` and `null` otherwise. The input model is never
    * modified; pass `model` straight back as the `modelJson` of another call.
    *
    * # Errors
    *
-   * Rejects malformed `model_json`, invalid target or driver period identifiers,
-   * `bounds` that is not a two-number array, missing target or driver nodes or
-   * periods, non-finite or unordered bounds, model-evaluation or
+   * Rejects a malformed `modelJson` or `spec` (a missing or unknown key
+   * included), invalid target or driver period identifiers, missing target or
+   * driver nodes or periods, non-finite or unordered bounds, model-evaluation or
    * solver-convergence failures, or failure to serialize the result.
-   * @param modelJson - Financial-model specification JSON.
-   * @param targetNode - Statement node identifier whose value is driven toward the target.
-   * @param targetPeriod - Model period label in which the goal-seek target is evaluated.
-   * @param targetValue - Numeric target value the goal-seek routine attempts to reach.
-   * @param driverNode - Statement node identifier adjusted by the goal-seek routine.
-   * @param driverPeriod - Model period label of the adjustable goal-seek driver.
-   * @param updateModel - Whether the result carries the model with the solved driver value applied.
-   * @param bounds - Optional `[lower, upper]` search bracket for the driver, in the driver node's units.
+   * @param modelJson - Financial-model specification (object or JSON).
+   * @param spec - Rust `GoalSeekSpec` (object or JSON); an unknown key is rejected: `target_node` (node driven toward the target), `target_period` (period label of the target, e.g. `"2025Q4"`), `target_value` (finite target in the target node's units), `driver_node` (node the solve adjusts), `driver_period` (period label of the driver), `update_model` (whether the result carries the model with the solved driver applied) and the optional `bounds` (`[lower, upper]` search bracket in the driver node's units; omitted searches outward from the driver's current value). Every key except `bounds` is required.
    * @returns Solved driver value and the updated model (or `null`).
    */
   readonly goalSeek: typeof wasm.goalSeek;
@@ -10818,10 +10812,7 @@ export interface StatementsAnalyticsNamespace {
    * is evaluated, the UFCF series is discounted at `wacc`, the terminal value
    * is added, and the equity bridge turns enterprise value into equity value.
    * @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency`.
-   * @param wacc - Weighted average cost of capital as a decimal (`0.10` = 10%).
-   * @param terminalValue - `TerminalValueSpec`, e.g. `{ type: "gordon_growth", stable_growth_rate: 0.02 }` (object or JSON).
-   * @param ufcfNode - Node holding unlevered free cash flow; omitted uses the Rust default `"ufcf"`.
-   * @param netDebtOverride - Flat net debt in model currency used instead of the model-derived equity bridge.
+   * @param inputs - Rust `DcfInputs` (object or JSON); an unknown key is rejected: `wacc` (required; weighted average cost of capital as a decimal, `0.10` = 10%), `terminal_value` (required `TerminalValueSpec`, e.g. `{ type: "gordon_growth", stable_growth_rate: 0.02 }`), `ufcf_node` (node holding unlevered free cash flow; omitted uses the Rust default `"ufcf"`) and `net_debt_override` (flat net debt in model currency used instead of the model-derived equity bridge; omitted derives it from the model).
    * @param options - Optional Rust `DcfOptions`; every field is optional and a missing one takes its Rust default (`mid_year_convention`, `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `exit_multiple_metric_node`, ...). Unknown keys are rejected (object or JSON).
    * @param market - Optional `MarketContext` state used for statement evaluation, not for WACC discounting (object or JSON).
    * @param asOf - Optional ISO 8601 valuation date; required when `market` is supplied. With `market` it is also the statement visibility cutoff: an actual is hidden until its availability date, by default the period's exclusive end (the first day of the next period), so a quarter-end `"2025-03-31"` hides 2025Q1's actuals; pass `"2025-04-01"` or set the nodes' `availability_dates`. Only forecast periods ending after it are discounted.

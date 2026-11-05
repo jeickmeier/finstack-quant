@@ -106,7 +106,11 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
         "CorkscrewReport.status",
         "LeaseSpec.to_dataframe",
         "ScorecardReport.status",
+        "evaluate_dcf",
+        "goal_seek",
+        "run_corporate_analysis",
     ),
+    "finstack_quant.attribution": ("attribute_pnl", "attribute_pnl_many"),
     "finstack_quant.statements": (
         "RollupSpec",
         "CapitalStructureCashflows.get_component",

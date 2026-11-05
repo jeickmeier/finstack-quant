@@ -127,8 +127,10 @@ def test_bridge_reconciles_to_rust_equity_value_with_valuation_discounts() -> No
     builder.with_meta("currency", '"USD"')
     result = evaluate_dcf(
         builder.build(),
-        0.10,
-        TerminalValueSpec.gordon_growth(0.02),
+        {
+            "wacc": 0.10,
+            "terminal_value": TerminalValueSpec.gordon_growth(0.02),
+        },
         options={
             "equity_bridge": EquityBridge(total_debt=500.0, cash=100.0, minority_interest=50.0),
             "valuation_discounts": ValuationDiscounts(dlom=0.25),

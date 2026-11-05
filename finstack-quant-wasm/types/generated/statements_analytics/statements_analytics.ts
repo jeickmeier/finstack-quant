@@ -2191,6 +2191,30 @@ export interface CreditMapping {
   leverage_warn?: [number, number] | null;
 }
 /**
+ * Headline DCF assumptions: decimal WACC, terminal value, unlevered free cash flow node and optional net-debt override.
+ */
+export interface DcfInputs {
+  /**
+   * Flat net-debt amount in model currency used instead of the
+   * model-derived equity bridge; `None` (the default) derives net debt
+   * from the model's debt and cash.
+   */
+  net_debt_override?: number | null;
+  /**
+   * Terminal-value convention applied after the explicit forecast period.
+   */
+  terminal_value: TerminalValueSpec;
+  /**
+   * Node id containing monetary unlevered free cash flow for forecast
+   * periods (default [`DEFAULT_UFCF_NODE`], `"ufcf"`).
+   */
+  ufcf_node?: string;
+  /**
+   * Weighted average cost of capital as a decimal (`0.10` means `10%`).
+   */
+  wacc: number;
+}
+/**
  * Optional configuration for DCF valuation beyond the core WACC/terminal parameters.
  */
 export interface DcfOptions {
@@ -3134,6 +3158,46 @@ export interface GoalSeekResult {
    * units: `1e-9 * max(|target_value|, 1)`.
    */
   tolerance?: number;
+}
+/**
+ * Target node, period and value, driver node and period, model write-back flag and optional bracket of a `goal_seek` solve.
+ */
+export interface GoalSeekSpec {
+  /**
+   * Optional `(lower, upper)` bracket, in the driver node's units, that
+   * constrains the search; both ends must be finite and `lower < upper`.
+   * `None` (the default) searches outward from the driver's current value.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  bounds?: [number, number] | null;
+  /**
+   * Node identifier of the driver input the solve varies.
+   */
+  driver_node: string;
+  /**
+   * Period whose driver value the solve varies.
+   */
+  driver_period: PeriodId;
+  /**
+   * Node identifier of the target metric.
+   */
+  target_node: string;
+  /**
+   * Period in which the target is evaluated.
+   */
+  target_period: PeriodId;
+  /**
+   * Desired value of the target metric, in the target node's units; must
+   * be finite.
+   */
+  target_value: number;
+  /**
+   * When `true`, [`GoalSeekResult::model`] holds a copy of the model with
+   * the solved driver value written in; when `false` it is `None`.
+   */
+  update_model: boolean;
 }
 /**
  * Flags line items whose period-over-period growth exceeds configurable upper / lower bounds.

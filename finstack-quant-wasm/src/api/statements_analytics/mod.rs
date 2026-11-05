@@ -25,7 +25,7 @@ pub use comps::{
 };
 
 use crate::utils::input::{
-    from_js_json, js_bool, js_f64, js_f64_seq, js_opt_f64, js_opt_string, js_string, js_string_seq,
+    from_js_json, js_f64, js_f64_seq, js_opt_f64, js_opt_string, js_string, js_string_seq,
     json_text, opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
@@ -437,70 +437,34 @@ pub fn wacc(
 
 /// Find the driver value that makes a target node reach a target value.
 ///
-/// Returns the serde form of the Rust `GoalSeekResult`: `solved_value`, the
-/// solve diagnostics (`residual` and `tolerance` in the target node's units,
-/// `evaluations`, `converged`) and `model`, the input model with the solved
-/// driver written in when `update_model` is `true` and `null` otherwise. The
-/// input model is never
+/// Twin of Python `goal_seek` (Rust `goal_seek`). Returns the serde form of
+/// the Rust `GoalSeekResult`: `solved_value`, the solve diagnostics
+/// (`residual` and `tolerance` in the target node's units, `evaluations`,
+/// `converged`) and `model`, the input model with the solved driver written in
+/// when `update_model` is `true` and `null` otherwise. The input model is never
 /// modified; pass `model` straight back as the `modelJson` of another call.
 ///
 /// # Errors
 ///
-/// Rejects malformed `model_json`, invalid target or driver period identifiers,
-/// `bounds` that is not a two-number array, missing target or driver nodes or
-/// periods, non-finite or unordered bounds, model-evaluation or
+/// Rejects a malformed `modelJson` or `spec` (a missing or unknown key
+/// included), invalid target or driver period identifiers, missing target or
+/// driver nodes or periods, non-finite or unordered bounds, model-evaluation or
 /// solver-convergence failures, or failure to serialize the result.
-/// @param modelJson - Financial-model specification JSON.
-/// @param targetNode - Statement node identifier whose value is driven toward the target.
-/// @param targetPeriod - Model period label in which the goal-seek target is evaluated.
-/// @param targetValue - Numeric target value the goal-seek routine attempts to reach.
-/// @param driverNode - Statement node identifier adjusted by the goal-seek routine.
-/// @param driverPeriod - Model period label of the adjustable goal-seek driver.
-/// @param updateModel - Whether the result carries the model with the solved driver value applied.
-/// @param bounds - Optional `[lower, upper]` search bracket for the driver, in the driver node's units.
+/// @param modelJson - Financial-model specification (object or JSON).
+/// @param spec - Rust `GoalSeekSpec` (object or JSON); an unknown key is rejected: `target_node` (node driven toward the target), `target_period` (period label of the target, e.g. `"2025Q4"`), `target_value` (finite target in the target node's units), `driver_node` (node the solve adjusts), `driver_period` (period label of the driver), `update_model` (whether the result carries the model with the solved driver applied) and the optional `bounds` (`[lower, upper]` search bracket in the driver node's units; omitted searches outward from the driver's current value). Every key except `bounds` is required.
 /// @returns Solved driver value and the updated model (or `null`).
 #[wasm_bindgen(js_name = goalSeek, unchecked_return_type = "GoalSeekResult")]
-#[allow(clippy::too_many_arguments)]
 pub fn goal_seek(
     #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
-    #[wasm_bindgen(js_name = "targetNode", unchecked_param_type = "string")] target_node: JsValue,
-    #[wasm_bindgen(js_name = "targetPeriod", unchecked_param_type = "string")]
-    target_period: JsValue,
-    #[wasm_bindgen(js_name = "targetValue", unchecked_param_type = "number")] target_value: JsValue,
-    #[wasm_bindgen(js_name = "driverNode", unchecked_param_type = "string")] driver_node: JsValue,
-    #[wasm_bindgen(js_name = "driverPeriod", unchecked_param_type = "string")]
-    driver_period: JsValue,
-    #[wasm_bindgen(js_name = "updateModel", unchecked_param_type = "boolean")]
-    update_model: JsValue,
-    #[wasm_bindgen(unchecked_optional_param_type = "[number, number] | null")] bounds: Option<
-        JsValue,
-    >,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.GoalSeekSpec | string")]
+    spec: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let target_value = js_f64(&target_value, "targetValue")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let target_node: &str = &js_string(&target_node, "targetNode")?;
-    let target_period: &str = &js_string(&target_period, "targetPeriod")?;
-    let driver_node: &str = &js_string(&driver_node, "driverNode")?;
-    let driver_period: &str = &js_string(&driver_period, "driverPeriod")?;
-    let update_model = js_bool(&update_model, "updateModel")?;
-    let bounds: Option<(f64, f64)> = opt_json_text(bounds.as_ref(), "bounds")?
-        .map(|json| serde_json::from_str(&json).map_err(to_js_err))
-        .transpose()?;
     let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
-    let tp: finstack_quant_core::dates::PeriodId = target_period.parse().map_err(to_js_err)?;
-    let dp: finstack_quant_core::dates::PeriodId = driver_period.parse().map_err(to_js_err)?;
-
-    let result = finstack_quant_statements_analytics::analysis::goal_seek(
-        &model,
-        target_node,
-        tp,
-        target_value,
-        driver_node,
-        dp,
-        update_model,
-        bounds,
-    )
-    .map_err(to_js_err)?;
+    let spec: finstack_quant_statements_analytics::analysis::GoalSeekSpec =
+        from_js_json(&spec, "spec")?;
+    let result = finstack_quant_statements_analytics::analysis::goal_seek(&model, &spec)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 

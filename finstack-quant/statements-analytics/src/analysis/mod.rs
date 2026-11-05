@@ -58,7 +58,7 @@ pub use credit::{
     StatementsAdapter, capital_structure_summary, compute_credit_context, evaluate_covenants,
     forecast_breaches,
 };
-pub use goal_seek::{GoalSeekResult, goal_seek};
+pub use goal_seek::{GoalSeekResult, GoalSeekSpec, goal_seek};
 pub use introspection::{
     DependencyTracer, DependencyTree, Explanation, ExplanationStep, explain_formula,
     render_tree_ascii, render_tree_detailed,
@@ -74,9 +74,9 @@ pub use scenarios::{
 };
 pub use valuation::{
     CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions,
-    CorporateValuationResult, DEFAULT_UFCF_NODE, DcfOptions, DcfPeriodRow, DcfSensitivityResult,
-    ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche, WaccInputs,
-    dcf_sensitivity, evaluate_dcf, evaluate_lbo, run_corporate_analysis, wacc,
+    CorporateValuationResult, DEFAULT_UFCF_NODE, DcfInputs, DcfOptions, DcfPeriodRow,
+    DcfSensitivityResult, ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche,
+    WaccInputs, dcf_sensitivity, evaluate_dcf, evaluate_lbo, run_corporate_analysis, wacc,
 };
 
 pub use checks::{

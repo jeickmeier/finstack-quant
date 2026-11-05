@@ -107,10 +107,12 @@ beforeEach(() => {
       case "evaluateDcf":
         return native.evaluateDcf(
           arg.modelJson,
-          arg.wacc,
-          arg.terminalValue,
-          arg.ufcfNode,
-          arg.netDebtOverride,
+          {
+            wacc: arg.wacc,
+            terminal_value: arg.terminalValue,
+            ufcf_node: arg.ufcfNode,
+            net_debt_override: arg.netDebtOverride,
+          },
           arg.optionsJson,
           arg.marketJson,
           arg.asOf,
@@ -199,16 +201,15 @@ beforeEach(() => {
         }
       }
       case "goalSeek":
-        return native.goalSeek(
-          arg.modelJson,
-          arg.targetNode,
-          arg.targetPeriod,
-          arg.targetValue,
-          arg.driverNode,
-          arg.driverPeriod,
-          arg.updateModel,
-          arg.bounds,
-        );
+        return native.goalSeek(arg.modelJson, {
+          target_node: arg.targetNode,
+          target_period: arg.targetPeriod,
+          target_value: arg.targetValue,
+          driver_node: arg.driverNode,
+          driver_period: arg.driverPeriod,
+          update_model: arg.updateModel,
+          bounds: arg.bounds,
+        });
       default:
         throw new Error(`Unexpected worker call: ${method}`);
     }
@@ -829,7 +830,10 @@ it("values the current model with a native DCF, tornado and LBO in Valuation", a
     terminalValue,
   });
   const report = await screen.findByRole("region", { name: "DCF valuation" });
-  const expected = native.evaluateDcf(modelJson, 0.1, terminalValue);
+  const expected = native.evaluateDcf(modelJson, {
+    wacc: 0.1,
+    terminal_value: terminalValue,
+  });
   await waitFor(() =>
     expect(
       within(report)

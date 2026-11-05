@@ -128,9 +128,11 @@ def test_growth_terminal_rejects_annual_identifier_with_stub_dates() -> None:
     with pytest.raises(ValueError, match="complete contiguous history"):
         evaluate_dcf(
             json.dumps(model),
-            0.1,
-            '{"type":"gordon_growth","stable_growth_rate":0.02}',
-            net_debt_override=0.0,
+            {
+                "wacc": 0.1,
+                "terminal_value": {"type": "gordon_growth", "stable_growth_rate": 0.02},
+                "net_debt_override": 0.0,
+            },
         )
 
 
@@ -157,9 +159,11 @@ def test_growth_terminal_uses_full_year_across_annual_stub_identifiers() -> None
         }
         result = evaluate_dcf(
             json.dumps(model),
-            0.1,
-            '{"type":"gordon_growth","stable_growth_rate":0.02}',
-            net_debt_override=0.0,
+            {
+                "wacc": 0.1,
+                "terminal_value": {"type": "gordon_growth", "stable_growth_rate": 0.02},
+                "net_debt_override": 0.0,
+            },
         )
         return result.terminal_value_pv.amount
 

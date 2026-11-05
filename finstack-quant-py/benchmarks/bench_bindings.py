@@ -837,12 +837,14 @@ class TestStatementsAnalyticsBenchmarks:
         def _seek():
             return goal_seek(
                 _MODEL_JSON,
-                target_node="gross_profit",
-                target_period="2025Q1",
-                target_value=50.0,
-                driver_node="revenue",
-                driver_period="2025Q1",
-                update_model=False,
+                {
+                    "target_node": "gross_profit",
+                    "target_period": "2025Q1",
+                    "target_value": 50.0,
+                    "driver_node": "revenue",
+                    "driver_period": "2025Q1",
+                    "update_model": False,
+                },
             )
 
         benchmark.pedantic(_seek, rounds=10, warmup_rounds=1)
@@ -851,12 +853,14 @@ class TestStatementsAnalyticsBenchmarks:
         def _seek():
             return goal_seek(
                 _MODEL_SPEC,
-                target_node="gross_profit",
-                target_period="2025Q1",
-                target_value=50.0,
-                driver_node="revenue",
-                driver_period="2025Q1",
-                update_model=False,
+                {
+                    "target_node": "gross_profit",
+                    "target_period": "2025Q1",
+                    "target_value": 50.0,
+                    "driver_node": "revenue",
+                    "driver_period": "2025Q1",
+                    "update_model": False,
+                },
             )
 
         benchmark.pedantic(_seek, rounds=10, warmup_rounds=1)

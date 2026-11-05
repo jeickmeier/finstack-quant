@@ -2,6 +2,57 @@
 
 ## Itemized changes
 
+### Statements: capital-structure swap and convention-bond setters take the Rust params objects
+
+`ModelBuilder.add_swap`, `add_bond_with_convention` and
+`add_swap_with_conventions` take the serde forms of the Rust
+`SwapParams`, `BondConventionParams` and `SwapConventions` the Rust
+`ModelBuilder` already took (Python dict or JSON text, with `Money` and
+`datetime.date` values allowed inside; WASM object or JSON text). The three
+types are new `statements` schemas. Unknown keys are rejected; in
+`conventions` the tenors use their wire form `{"count": 1, "unit": "years"}`
+(not `"1Y"`), day counts their labels (`"act_360"`, a Python `DayCount` object
+is no longer accepted), and an omitted `business_day_convention` is Modified
+Following. The instruments added are unchanged. Old → new:
+
+- `add_swap(id, notional, fixed_rate, start_date, maturity_date, discount_curve_id, forward_curve_id)` → `add_swap(params)`; WASM `addSwap(...7 args)` → `addSwap(params)`
+- `add_bond_with_convention(id, notional, coupon_rate, issue_date, maturity_date, convention, discount_curve_id)` → `add_bond_with_convention(params)`; WASM `addBondWithConvention(...7 args)` → `addBondWithConvention(params)`
+- `add_swap_with_conventions(id, ..., forward_curve_id, fixed_frequency, fixed_day_count, float_frequency, float_day_count, business_day_convention=None)` → `add_swap_with_conventions(params, conventions)`; WASM `addSwapWithConventions(...12 args)` → `addSwapWithConventions(params, conventions)`
+
+### Statements analytics: DCF, goal seek and corporate analysis take one inputs object
+
+Rust `evaluate_dcf` takes `(model, &DcfInputs, &DcfOptions, market, as_of)`,
+where the new `DcfInputs { wacc, terminal_value, ufcf_node, net_debt_override }`
+holds the headline assumptions (`ufcf_node` defaults to `"ufcf"`,
+`net_debt_override` to `None`). Rust `goal_seek` takes `(model, &GoalSeekSpec)`
+with the new `GoalSeekSpec { target_node, target_period, target_value,
+driver_node, driver_period, update_model, bounds }` (`bounds` optional, every
+other field required). Both are new `statements_analytics` schemas. Python
+`run_corporate_analysis` takes the `CorporateAnalysisOptions` object WASM
+`runCorporateAnalysis` already took. Inside these objects a terminal value or
+check suite is a typed object or its dict, not JSON text. A NaN `wacc` or
+`target_value` in WASM is now a `TypeError` (`kind: "invalid_type"`) at the
+JSON boundary instead of a Rust `validation` error. Results are unchanged.
+Old → new:
+
+- Rust `evaluate_dcf(model, wacc, terminal_value, ufcf_node, net_debt_override, options, market, as_of)` → `evaluate_dcf(model, &DcfInputs { .. }, options, market, as_of)`; Python `evaluate_dcf(model, wacc, terminal_value, ufcf_node="ufcf", net_debt_override=None, options=None, market=None, as_of=None)` → `evaluate_dcf(model, inputs, options=None, market=None, as_of=None)`; WASM `evaluateDcf(model, wacc, terminalValue, ufcfNode?, netDebtOverride?, options?, market?, asOf?)` → `evaluateDcf(model, inputs, options?, market?, asOf?)`
+- Rust `goal_seek(model, target_node, target_period, target_value, driver_node, driver_period, update_model, bounds)` → `goal_seek(model, &GoalSeekSpec { .. })`; Python `goal_seek(model, target_node, target_period, target_value, driver_node, driver_period, update_model, bounds=None)` → `goal_seek(model, spec)`; WASM `goalSeek(modelJson, targetNode, targetPeriod, targetValue, driverNode, driverPeriod, updateModel, bounds?)` → `goalSeek(modelJson, spec)`
+- Python `run_corporate_analysis(model, wacc=None, terminal_value=None, net_debt_override=None, cfads_node=None, interest_coverage_node=None, check_suite=None, market=None, as_of=None, ltv_value_node=None)` → `run_corporate_analysis(model, options=None, market=None)`
+
+### Attribution: Python P&L attribution takes the `AttributionInputs` object
+
+Python `attribute_pnl` and `attribute_pnl_many` take the Rust
+`AttributionInputs` serde form (dict or JSON text) that WASM `attributePnlMany`
+takes, with the instrument (typed wrapper or envelope JSON) beside it. Inside
+the dict the markets are `MarketContext` objects or their serde dicts (not JSON
+text) and the dates `datetime.date` or ISO strings (a `datetime.datetime` or
+`pandas.Timestamp` is rejected); the opening model parameters and credit factor
+model are objects under `model_params_t0` and `credit_factor_model`, no longer
+JSON strings under `*_json`. Results are unchanged. Old → new:
+
+- `attribute_pnl(instrument, market_t0, market_t1, as_of_t0, as_of_t1, method, config=None, full_cross_attribution=False, model_params_t0_json=None, credit_factor_model_json=None, credit_factor_detail_options=None)` → `attribute_pnl(instrument, inputs)`
+- `attribute_pnl_many(instruments, market_t0, ..., credit_factor_detail_options=None)` → `attribute_pnl_many(inputs, instruments)` (the Rust and WASM argument order)
+
 ### Calibration: step constructors and CDS upfront/tranche quotes take one params object
 
 Every `CalibrationStep` constructor now takes the step id, one `params` object

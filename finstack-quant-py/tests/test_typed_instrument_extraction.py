@@ -291,8 +291,26 @@ def test_attribution_typed_equal_envelope(cls: type) -> None:
     t1 = datetime.date(2024, 1, 22)
     market_t1 = _market(t1, df_5y=0.81)
     _assert_same(
-        lambda: attribute_pnl(instrument, _market(), market_t1, AS_OF, t1, "parallel"),
-        lambda: attribute_pnl(envelope, _market(), market_t1, AS_OF, t1, "parallel"),
+        lambda: attribute_pnl(
+            instrument,
+            {
+                "market_t0": _market(),
+                "market_t1": market_t1,
+                "as_of_t0": AS_OF,
+                "as_of_t1": t1,
+                "method": "parallel",
+            },
+        ),
+        lambda: attribute_pnl(
+            envelope,
+            {
+                "market_t0": _market(),
+                "market_t1": market_t1,
+                "as_of_t0": AS_OF,
+                "as_of_t1": t1,
+                "method": "parallel",
+            },
+        ),
     )
 
 
@@ -300,8 +318,26 @@ def test_attribution_many_typed_equal_envelope() -> None:
     instruments = [_fixed_bond(), _frn()]
     t1 = datetime.date(2024, 1, 22)
     market_t1 = _market(t1, df_5y=0.81)
-    typed = attribute_pnl_many(instruments, _market(), market_t1, AS_OF, t1, "parallel")
-    via_json = attribute_pnl_many([i.to_json() for i in instruments], _market(), market_t1, AS_OF, t1, "parallel")
+    typed = attribute_pnl_many(
+        {
+            "market_t0": _market(),
+            "market_t1": market_t1,
+            "as_of_t0": AS_OF,
+            "as_of_t1": t1,
+            "method": "parallel",
+        },
+        instruments,
+    )
+    via_json = attribute_pnl_many(
+        {
+            "market_t0": _market(),
+            "market_t1": market_t1,
+            "as_of_t0": AS_OF,
+            "as_of_t1": t1,
+            "method": "parallel",
+        },
+        [i.to_json() for i in instruments],
+    )
     assert typed.equals(via_json)
 
 
@@ -324,8 +360,26 @@ def test_priced_scenario_horizon_attribution_typed_equal_envelope(make: Callable
             lambda: compute_horizon_return(envelope, _market(), AS_OF, shock),
         ),
         (
-            lambda: attribute_pnl(bond, _market(), market_t1, AS_OF, t1, "parallel"),
-            lambda: attribute_pnl(envelope, _market(), market_t1, AS_OF, t1, "parallel"),
+            lambda: attribute_pnl(
+                bond,
+                {
+                    "market_t0": _market(),
+                    "market_t1": market_t1,
+                    "as_of_t0": AS_OF,
+                    "as_of_t1": t1,
+                    "method": "parallel",
+                },
+            ),
+            lambda: attribute_pnl(
+                envelope,
+                {
+                    "market_t0": _market(),
+                    "market_t1": market_t1,
+                    "as_of_t0": AS_OF,
+                    "as_of_t1": t1,
+                    "method": "parallel",
+                },
+            ),
         ),
     ]:
         kind, _ = _assert_same(typed, via_json)

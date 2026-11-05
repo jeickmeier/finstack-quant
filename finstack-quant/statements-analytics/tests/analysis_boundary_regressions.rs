@@ -36,13 +36,15 @@ fn monetary_goal_seek_preserves_round_trip_and_currency() {
     let period = PeriodId::annual(2025);
     let solved = goal_seek(
         &model,
-        "profit",
-        period,
-        60.0,
-        "revenue",
-        period,
-        true,
-        Some((1.0, 200.0)),
+        &GoalSeekSpec {
+            target_node: "profit".to_string(),
+            target_period: period,
+            target_value: 60.0,
+            driver_node: "revenue".to_string(),
+            driver_period: period,
+            update_model: true,
+            bounds: Some((1.0, 200.0)),
+        },
     )
     .unwrap();
     assert!((solved.solved_value - 120.0).abs() < 1e-8);
@@ -253,12 +255,14 @@ fn dcf_opening_debt_is_available_on_the_inclusive_reporting_date() {
     ] {
         let result = evaluate_dcf(
             &model,
-            0.10,
-            TerminalValueSpec::GordonGrowth {
-                stable_growth_rate: 0.02,
+            &DcfInputs {
+                wacc: 0.10,
+                terminal_value: TerminalValueSpec::GordonGrowth {
+                    stable_growth_rate: 0.02,
+                },
+                ufcf_node: "ufcf".to_string(),
+                net_debt_override: None,
             },
-            "ufcf",
-            None,
             &DcfOptions::default(),
             None,
             Some(as_of),
@@ -269,12 +273,14 @@ fn dcf_opening_debt_is_available_on_the_inclusive_reporting_date() {
     let mixed = dcf_model(Currency::EUR);
     let result = evaluate_dcf(
         &mixed,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: None,
         },
-        "ufcf",
-        None,
         &DcfOptions::default(),
         None,
         Some(time::macros::date!(2024 - 12 - 31)),

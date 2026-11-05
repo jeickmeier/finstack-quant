@@ -121,16 +121,15 @@ test('goal seek rejects a discontinuity that brackets the target without reachin
   };
   assert.throws(
     () =>
-      statements_analytics.goalSeek(
-        JSON.stringify(m),
-        'target',
-        '2025Q4',
-        0.5,
-        'revenue',
-        '2025Q4',
-        true,
-        [-1, 1]
-      ),
+      statements_analytics.goalSeek(JSON.stringify(m), {
+        target_node: 'target',
+        target_period: '2025Q4',
+        target_value: 0.5,
+        driver_node: 'revenue',
+        driver_period: '2025Q4',
+        update_model: true,
+        bounds: [-1, 1],
+      }),
     /residual|target.*tolerance/i
   );
 });

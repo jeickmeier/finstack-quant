@@ -258,7 +258,6 @@ pub fn add_rent_roll(
 /// a lease fails validation, or a generated node identifier or formula is
 /// invalid.
 #[wasm_bindgen(js_name = addPropertyOperatingStatement, unchecked_return_type = "generated.statements.FinancialModelSpec")]
-#[allow(clippy::too_many_arguments)]
 pub fn add_property_operating_statement(
     #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
     #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.LeaseSpec[] | string")]

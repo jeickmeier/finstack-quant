@@ -1261,9 +1261,11 @@ public = [
     "validate_attribution_json",
     "validate_return_contribution_json",
 ]
-# Host-only defaults: attribute_pnl / attribute_pnl_many take
-# full_cross_attribution=False (Rust AttributionSpec field, no default) and
-# accept typed instruments / MarketContext / dates alongside JSON;
+# Host shape: attribute_pnl(instrument, inputs) / attribute_pnl_many(inputs,
+# instruments) take the AttributionInputs serde form (dict or JSON text; typed
+# MarketContext and datetime.date values inside it serialize through the json
+# hook) and keep the instrument positional because typed wrappers serialize to
+# the instrument envelope, not to AttributionSpec's bare InstrumentJson;
 # attribute_return_contribution accepts dict | JSON str | DataFrame (Rust
 # takes the typed spec).
 
@@ -1280,7 +1282,7 @@ status = "exists"
 
 [crates.statements.modules]
 adjustments      = { python = "finstack_quant.statements.adjustments",       status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }
-builder          = { python = "finstack_quant.statements.builder",           status = "missing", note = "Bindings are exported from finstack_quant.statements root. Canonical mutable setters preserve builder state on failure; Python add_bond/add_swap and their convention variants delegate to the same Rust setters. ModelBuilder::resolve_period_columns is a Rust-only import-validation seam used by Python from_dataframe to validate all input columns before mutating the builder. BondConventionParams, SwapParams, and SwapConventions are Rust-only grouped inputs for these mutation seams; hosts retain the canonical add_* authoring signatures." }
+builder          = { python = "finstack_quant.statements.builder",           status = "missing", note = "Bindings are exported from finstack_quant.statements root. Canonical mutable setters preserve builder state on failure; Python add_bond/add_swap and their convention variants delegate to the same Rust setters. ModelBuilder::resolve_period_columns is a Rust-only import-validation seam used by Python from_dataframe to validate all input columns before mutating the builder. add_swap, add_bond_with_convention and add_swap_with_conventions take the serde forms of BondConventionParams, SwapParams and SwapConventions (Python dict or JSON text, WASM plain object or JSON text), exactly as Rust does." }
 capital_structure = { python = "finstack_quant.statements.capital_structure", status = "missing", note = "Bindings are currently exported from finstack_quant.statements root. build_instrument_from_spec and calculate_period_flows are Rust-only runtime seams carrying canonical instrument semantics. CapitalStructureState, PrincipalClaim, and CapitalStructureState::set_period_principal_flows are crate-private allocation internals: principal_shortfall and principal_advance_payments retain dated claims so cash settlement and economic principal movements remain distinct. Hosts evaluate capital structures through Evaluator.evaluate_with_market; neither runtime state nor PrincipalClaim is a host wire type." }
 checks           = { python = "finstack_quant.statements.checks",            status = "missing", note = "Bindings are currently exported from finstack_quant.statements root. CheckSuite/CheckSuiteBuilder and the builtin-check constructors stay Rust-only; hosts attach suites via CheckSuiteSpec + Evaluator.with_checks" }
 dsl              = { python = "finstack_quant.statements.dsl",               status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }

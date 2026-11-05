@@ -40,12 +40,14 @@ class TestGoalSeek:
     def test_update_model_false_returns_none(self) -> None:
         outcome = goal_seek(
             _model_json(),
-            "gross_profit",
-            "2024Q1",
-            70_000.0,
-            "revenue",
-            "2024Q1",
-            update_model=False,
+            {
+                "target_node": "gross_profit",
+                "target_period": "2024Q1",
+                "target_value": 70_000.0,
+                "driver_node": "revenue",
+                "driver_period": "2024Q1",
+                "update_model": False,
+            },
         )
         assert outcome.solved_value > 100_000.0
         assert outcome.model is None
@@ -53,12 +55,14 @@ class TestGoalSeek:
     def test_update_model_true_returns_model(self) -> None:
         outcome = goal_seek(
             _model_json(),
-            "gross_profit",
-            "2024Q1",
-            70_000.0,
-            "revenue",
-            "2024Q1",
-            update_model=True,
+            {
+                "target_node": "gross_profit",
+                "target_period": "2024Q1",
+                "target_value": 70_000.0,
+                "driver_node": "revenue",
+                "driver_period": "2024Q1",
+                "update_model": True,
+            },
         )
         assert outcome.solved_value > 100_000.0
         assert isinstance(outcome.model, statements.FinancialModelSpec)
@@ -129,13 +133,15 @@ class TestEvaluateDcf:
             [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))],
         )
         b.with_meta("currency", '"USD"')
-        terminal = '{"type":"gordon_growth","stable_growth_rate":0.02}'
+        terminal = {"type": "gordon_growth", "stable_growth_rate": 0.02}
         with pytest.raises(ValueError, match="as_of"):
             evaluate_dcf(
                 b.build(),
-                0.10,
-                terminal,
-                net_debt_override=0.0,
+                {
+                    "wacc": 0.10,
+                    "terminal_value": terminal,
+                    "net_debt_override": 0.0,
+                },
                 market=MarketContext(),
             )
 

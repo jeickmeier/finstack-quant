@@ -15,25 +15,13 @@ from finstack_quant.attribution._return_contribution import ReturnContributionRe
 
 # Entry Points
 
-def attribute_pnl(
-    instrument: object,
-    market_t0: MarketContext | str,
-    market_t1: MarketContext | str,
-    as_of_t0: datetime.date | str,
-    as_of_t1: datetime.date | str,
-    method: str | dict[str, Any],
-    config: dict[str, Any] | str | None = None,
-    full_cross_attribution: bool = False,
-    model_params_t0_json: str | None = None,
-    credit_factor_model_json: str | None = None,
-    credit_factor_detail_options: Mapping[str, bool] | str | None = None,
-) -> PnlAttribution:
+def attribute_pnl(instrument: object, inputs: Mapping[str, Any] | str) -> PnlAttribution:
     """
     Run P&L attribution for a single instrument.
 
-    This is the main entry point. Accepts the instrument, two market
-    snapshots, valuation dates, and a method descriptor — typed objects or
-    their canonical JSON — and returns the typed attribution result. Use
+    This is the main entry point. Takes the instrument and the shared
+    attribution inputs (two market snapshots, valuation dates, method and
+    options) and returns the typed attribution result. Use
     :meth:`AttributionResultEnvelope.to_json` when you want the raw JSON envelope
     round-trip instead, :func:`attribute_pnl_many` for a book.
 
@@ -43,47 +31,52 @@ def attribute_pnl(
         Typed instrument wrapper from ``finstack_quant.valuations`` or a
         canonical v1 instrument envelope JSON string
         (``{"schema": "finstack_quant.instrument/1", "instrument": {...}}``).
-    market_t0 : MarketContext | str
-        Market snapshot at T₀ (typed ``MarketContext`` or its JSON).
-    market_t1 : MarketContext | str
-        Market snapshot at T₁ (typed ``MarketContext`` or its JSON).
-    as_of_t0 : datetime.date | datetime.datetime | pandas.Timestamp | str
-        Valuation date T₀; strings are ISO 8601 (``YYYY-MM-DD``).
-    as_of_t1 : datetime.date | datetime.datetime | pandas.Timestamp | str
-        Valuation date T₁ in the same forms; must not precede ``as_of_t0``.
-    method : str or dict[str, Any]
-        Attribution method — one of ``"parallel"``, ``"metrics_based"``,
-        ``{"taylor": {"include_gamma": True, ...}}``, or
-        ``{"waterfall": [...]}`` with factor tokens in application order
-        drawn from ``carry``, ``rates_curves``, ``credit_curves``,
-        ``inflation_curves``, ``correlations``, ``fx``, ``volatility``,
-        ``model_parameters``, ``market_scalars`` (the order must start with
-        ``carry``; :func:`default_waterfall_order` is the canonical full list).
-        Without ``config["metrics"]``, ``"metrics_based"`` prices the
-        default metric menu; when an instrument hazard curve has no
-        calibration recipe and that menu fails, the quote-space credit
-        metrics are dropped with a note in ``notes`` and credit-curve
-        P&L flows to the residual.
-    config : dict[str, Any] or str or None
-        Optional config overrides (``tolerance_abs``, ``tolerance_pct``,
-        ``metrics``, ``strict_validation``, ``rounding_scale``,
-        ``rate_bump_bp``, ``target_currency``, or
-        ``{"execution_policy": "parallel"}`` to opt into inner Rayon when the
-        caller is not already parallelizing at the portfolio/batch level).
-        Serial is the default.
-    full_cross_attribution : bool, default False
-        Compute every pairwise cross-factor term (parallel method only)
-        instead of the default seven economic pairs.
-    model_params_t0_json : str or None
-        Serialized opening ``ModelParamsSnapshot``. When omitted, model-
-        parameter P&L is isolated from the instrument's current snapshot.
-    credit_factor_model_json : str or None
-        Serialized ``CreditFactorModel``. When supplied, credit-factor
-        hierarchy detail is populated on the result.
-    credit_factor_detail_options : Mapping[str, bool] or str or None
-        ``CreditFactorDetailOptions`` (``include_per_issuer_adder``,
-        ``include_per_bucket_breakdown``) for that detail; omitted fields
-        keep their defaults (per-issuer adder off, per-bucket breakdown on).
+    inputs : Mapping[str, Any] or str
+        The Rust ``AttributionInputs`` serde form (the document WASM
+        ``attributePnlMany`` takes as ``inputs``; WASM ``attributePnl`` takes
+        the same keys plus ``instrument``), as a dict or JSON text. Unknown
+        keys raise ``ValueError``:
+
+        * ``market_t0`` (MarketContext | dict, required): market snapshot at
+          T₀, typed or as its serde form.
+        * ``market_t1`` (MarketContext | dict, required): market snapshot at
+          T₁.
+        * ``as_of_t0`` (datetime.date | str, required): valuation date T₀ as a
+          date or ISO ``YYYY-MM-DD`` (a ``datetime.datetime`` or
+          ``pandas.Timestamp`` is rejected; pass ``.date()``).
+        * ``as_of_t1`` (datetime.date | str, required): valuation date T₁ in
+          the same forms; must not precede ``as_of_t0``.
+        * ``method`` (str | dict, required): ``"parallel"``,
+          ``"metrics_based"``, ``{"taylor": {"include_gamma": True, ...}}``, or
+          ``{"waterfall": [...]}`` with factor tokens in application order
+          drawn from ``carry``, ``rates_curves``, ``credit_curves``,
+          ``inflation_curves``, ``correlations``, ``fx``, ``volatility``,
+          ``model_parameters``, ``market_scalars`` (the order must start with
+          ``carry``; :func:`default_waterfall_order` is the canonical full
+          list). Without ``config["metrics"]``, ``"metrics_based"`` prices the
+          default metric menu; when an instrument hazard curve has no
+          calibration recipe and that menu fails, the quote-space credit
+          metrics are dropped with a note in ``notes`` and credit-curve P&L
+          flows to the residual.
+        * ``config`` (dict, optional): config overrides (``tolerance_abs``,
+          ``tolerance_pct``, ``metrics``, ``strict_validation``,
+          ``rounding_scale``, ``rate_bump_bp``, ``target_currency``, or
+          ``{"execution_policy": "parallel"}`` to opt into inner Rayon when
+          the caller is not already parallelizing at the portfolio/batch
+          level). Serial is the default.
+        * ``full_cross_attribution`` (bool, default ``False``): compute every
+          pairwise cross-factor term (parallel method only) instead of the
+          default seven economic pairs.
+        * ``model_params_t0`` (dict, optional): opening ``ModelParamsSnapshot``
+          serde form. When omitted, model-parameter P&L is isolated from the
+          instrument's current snapshot.
+        * ``credit_factor_model`` (dict, optional): ``CreditFactorModel`` serde
+          form. When supplied, credit-factor hierarchy detail is populated on
+          the result.
+        * ``credit_factor_detail_options`` (dict, optional):
+          ``CreditFactorDetailOptions`` (``include_per_issuer_adder``,
+          ``include_per_bucket_breakdown``) for that detail; omitted fields
+          keep their defaults (per-issuer adder off, per-bucket breakdown on).
 
     Returns
     -------
@@ -94,8 +87,16 @@ def attribute_pnl(
     Examples
     --------
     >>> from finstack_quant.attribution import attribute_pnl
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> inputs = {
+    ...     "market_t0": MarketContext(),
+    ...     "market_t1": MarketContext(),
+    ...     "as_of_t0": "2025-01-15",
+    ...     "as_of_t1": "2025-01-16",
+    ...     "method": "parallel",
+    ... }
     >>> try:
-    ...     attribute_pnl("{}", "{}", "{}", "2025-01-15", "2025-01-16", "parallel")
+    ...     attribute_pnl("{}", inputs)
     ... except ValueError as exc:
     ...     "instrument envelope" in str(exc)
     True
@@ -103,9 +104,10 @@ def attribute_pnl(
     Raises
     ------
     ValueError
-        If ``method`` or ``config`` cannot be serialized, an input JSON or ISO
-        date is malformed, the FX provider cannot supply a coherent market
-        snapshot, or attribution validation, pricing, or result serialization fails.
+        If ``inputs`` is malformed (a missing or unknown key included), an
+        instrument JSON, method, config or ISO date cannot be parsed, the FX
+        provider cannot supply a coherent market snapshot, or attribution
+        validation, pricing, or result serialization fails.
     KeyError
         If a required curve, market item, calendar, or FX triangulation leg is
         unavailable.
@@ -115,52 +117,27 @@ def attribute_pnl(
     """
     ...
 
-def attribute_pnl_many(
-    instruments: list[object],
-    market_t0: MarketContext | str,
-    market_t1: MarketContext | str,
-    as_of_t0: datetime.date | str,
-    as_of_t1: datetime.date | str,
-    method: str | dict[str, Any],
-    config: dict[str, Any] | str | None = None,
-    full_cross_attribution: bool = False,
-    model_params_t0_json: str | None = None,
-    credit_factor_model_json: str | None = None,
-    credit_factor_detail_options: Mapping[str, bool] | str | None = None,
-) -> pd.DataFrame:
+def attribute_pnl_many(inputs: Mapping[str, Any] | str, instruments: list[object]) -> pd.DataFrame:
     """
     Run one attribution set-up against many instruments and tabulate.
 
     Every instrument shares the markets, dates, method and config; the batch
     runs in Rust (``attribute_pnl_many``) in input order and stops at the
-    first failing instrument.
+    first failing instrument. The argument order follows Rust and WASM
+    ``attributePnlMany``.
 
     Parameters
     ----------
+    inputs : Mapping[str, Any] or str
+        The Rust ``AttributionInputs`` serde form, dict or JSON text, with the
+        keys documented on :func:`attribute_pnl` (``market_t0``,
+        ``market_t1``, ``as_of_t0``, ``as_of_t1``, ``method`` and the optional
+        ``config``, ``full_cross_attribution``, ``model_params_t0``,
+        ``credit_factor_model`` and ``credit_factor_detail_options``), applied
+        to every instrument.
     instruments : list[object]
         Typed instrument wrappers or canonical instrument envelope JSON
         strings, in the row order wanted.
-    market_t0 : MarketContext | str
-        Market snapshot at T₀.
-    market_t1 : MarketContext | str
-        Market snapshot at T₁.
-    as_of_t0 : datetime.date | datetime.datetime | pandas.Timestamp | str
-        Valuation date T₀.
-    as_of_t1 : datetime.date | datetime.datetime | pandas.Timestamp | str
-        Valuation date T₁.
-    method : str or dict[str, Any]
-        Attribution method, as for :func:`attribute_pnl`.
-    config : dict[str, Any] or str or None
-        Config overrides, as for :func:`attribute_pnl`.
-    full_cross_attribution : bool, default False
-        Evaluate every pairwise cross-factor term (parallel method only).
-    model_params_t0_json : str or None
-        Serialized opening ``ModelParamsSnapshot`` applied to every instrument.
-    credit_factor_model_json : str or None
-        Serialized ``CreditFactorModel`` applied to every instrument.
-    credit_factor_detail_options : Mapping[str, bool] or str or None
-        ``CreditFactorDetailOptions`` for that detail; omitted fields keep
-        their defaults (per-issuer adder off, per-bucket breakdown on).
 
     Returns
     -------
@@ -174,9 +151,10 @@ def attribute_pnl_many(
     Raises
     ------
     ValueError
-        If any input cannot be parsed, an instrument's attribution fails
-        validation / pricing, the FX provider cannot supply a coherent market
-        snapshot, or a result mixes currencies across factors.
+        If ``inputs`` or an instrument cannot be parsed, an instrument's
+        attribution fails validation / pricing, the FX provider cannot supply
+        a coherent market snapshot, or a result mixes currencies across
+        factors.
     KeyError
         If a required curve, market item, calendar, or FX leg is missing.
     RuntimeError
@@ -185,11 +163,16 @@ def attribute_pnl_many(
     Examples
     --------
     >>> from finstack_quant.attribution import attribute_pnl_many
-    >>> try:
-    ...     attribute_pnl_many(["{}"], "{}", "{}", "2025-01-15", "2025-01-16", "parallel")
-    ... except ValueError as exc:
-    ...     "instrument envelope" in str(exc)
-    True
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> inputs = {
+    ...     "market_t0": MarketContext(),
+    ...     "market_t1": MarketContext(),
+    ...     "as_of_t0": "2025-01-15",
+    ...     "as_of_t1": "2025-01-16",
+    ...     "method": "parallel",
+    ... }
+    >>> list(attribute_pnl_many(inputs, []).columns[:3])
+    ['instrument_id', 'method', 't0']
     """
     ...
 
@@ -466,8 +449,8 @@ def default_waterfall_order() -> list[str]:
         Canonical snake-case factor tokens in the default waterfall order
         (``carry``, ``rates_curves``, ``credit_curves``, ``inflation_curves``,
         ``correlations``, ``fx``, ``volatility``, ``model_parameters``,
-        ``market_scalars``); pass a prefix or reordering to
-        ``attribute_pnl(method={"waterfall": [...]})``.
+        ``market_scalars``); pass a prefix or reordering as the ``method``
+        key ``{"waterfall": [...]}`` of the ``attribute_pnl`` inputs.
 
     Notes
     -----

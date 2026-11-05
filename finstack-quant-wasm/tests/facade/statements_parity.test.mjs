@@ -320,37 +320,31 @@ test('ModelBuilder capital-structure and registry steps build a valid model', ()
     '2030-01-15',
     'USD-OIS'
   );
-  builder.addBondWithConvention(
-    'BOND-2',
-    { amount: '1000000', currency: 'USD' },
-    0.03,
-    '2025-01-15',
-    '2030-01-15',
-    'us_treasury',
-    'USD-OIS'
-  );
-  builder.addSwap(
-    'SWAP-1',
-    { amount: '1000000', currency: 'USD' },
-    0.04,
-    '2025-01-15',
-    '2030-01-15',
-    'USD-OIS',
-    'USD-SOFR-3M'
-  );
-  builder.addSwapWithConventions(
-    'SWAP-2',
-    { amount: '1000000', currency: 'USD' },
-    0.04,
-    '2025-01-15',
-    '2030-01-15',
-    'USD-OIS',
-    'USD-SOFR-3M',
-    '1Y',
-    'act_360',
-    '3M',
-    'act_360'
-  );
+  builder.addBondWithConvention({
+    id: 'BOND-2',
+    notional: { amount: '1000000', currency: 'USD' },
+    coupon_rate: 0.03,
+    issue_date: '2025-01-15',
+    maturity_date: '2030-01-15',
+    convention: 'us_treasury',
+    discount_curve_id: 'USD-OIS',
+  });
+  const swap = (id) => ({
+    id,
+    notional: { amount: '1000000', currency: 'USD' },
+    fixed_rate: 0.04,
+    start_date: '2025-01-15',
+    maturity_date: '2030-01-15',
+    discount_curve_id: 'USD-OIS',
+    forward_curve_id: 'USD-SOFR-3M',
+  });
+  builder.addSwap(swap('SWAP-1'));
+  builder.addSwapWithConventions(swap('SWAP-2'), {
+    fixed_frequency: { count: 1, unit: 'years' },
+    fixed_day_count: 'act_360',
+    float_frequency: { count: 3, unit: 'months' },
+    float_day_count: 'act_360',
+  });
   const model = builder.build();
   registry.free();
   const ids = model.capital_structure.debt_instruments.map((instrument) => instrument.id);
@@ -380,30 +374,30 @@ test('ModelBuilder capital-structure and registry steps build a valid model', ()
   );
   assert.throws(
     () =>
-      bad.addBondWithConvention(
-        'B',
-        { amount: '1', currency: 'USD' },
-        0.01,
-        '2025-01-15',
-        '2030-01-15',
-        'martian',
-        'USD-OIS'
-      ),
+      bad.addBondWithConvention({
+        id: 'B',
+        notional: { amount: '1', currency: 'USD' },
+        coupon_rate: 0.01,
+        issue_date: '2025-01-15',
+        maturity_date: '2030-01-15',
+        convention: 'martian',
+        discount_curve_id: 'USD-OIS',
+      }),
     (e) => e.kind === 'validation'
   );
 
   // A capital-structure call rejected by Rust leaves the builder usable.
   assert.throws(
     () =>
-      bad.addSwap(
-        'SEK-SWAP',
-        { amount: '1000000', currency: 'SEK' },
-        0.03,
-        '2025-01-15',
-        '2030-01-15',
-        'SEK-OIS',
-        'SEK-STIBOR-3M'
-      ),
+      bad.addSwap({
+        id: 'SEK-SWAP',
+        notional: { amount: '1000000', currency: 'SEK' },
+        fixed_rate: 0.03,
+        start_date: '2025-01-15',
+        maturity_date: '2030-01-15',
+        discount_curve_id: 'SEK-OIS',
+        forward_curve_id: 'SEK-STIBOR-3M',
+      }),
     (e) => /no standard rates calendar/.test(e.message)
   );
   bad.periods('2025Q1..Q2');

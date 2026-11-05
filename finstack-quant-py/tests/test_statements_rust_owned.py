@@ -131,7 +131,17 @@ EXIT_MULTIPLE = {"type": "exit_multiple", "terminal_metric": 999.0, "multiple": 
 
 
 def test_goal_seek_returns_the_rust_result_with_one_update_model_owner() -> None:
-    updated = goal_seek(goal_seek_model(), "profit", "2025Q1", 60.0, "revenue", "2025Q1", True)
+    updated = goal_seek(
+        goal_seek_model(),
+        {
+            "target_node": "profit",
+            "target_period": "2025Q1",
+            "target_value": 60.0,
+            "driver_node": "revenue",
+            "driver_period": "2025Q1",
+            "update_model": True,
+        },
+    )
     assert updated.solved_value == pytest.approx(120.0)
     assert updated.model is not None
     wire = json.loads(updated.to_json())
@@ -156,12 +166,32 @@ def test_goal_seek_returns_the_rust_result_with_one_update_model_owner() -> None
     assert GoalSeekResult.from_json(updated.to_json()).solved_value == pytest.approx(120.0)
     assert pickle.loads(pickle.dumps(updated)).solved_value == pytest.approx(120.0)  # noqa: S301 - trusted in-process round trip
 
-    bare = goal_seek(goal_seek_model(), "profit", "2025Q1", 60.0, "revenue", "2025Q1", False, (1.0, 200.0))
+    bare = goal_seek(
+        goal_seek_model(),
+        {
+            "target_node": "profit",
+            "target_period": "2025Q1",
+            "target_value": 60.0,
+            "driver_node": "revenue",
+            "driver_period": "2025Q1",
+            "update_model": False,
+            "bounds": (1.0, 200.0),
+        },
+    )
     assert bare.model is None
     assert json.loads(bare.to_json())["model"] is None
-    # update_model has no binding-invented default: Rust and WASM require it.
-    with pytest.raises(TypeError):
-        goal_seek(goal_seek_model(), "profit", "2025Q1", 60.0, "revenue", "2025Q1")  # type: ignore[call-arg]
+    # update_model has no binding-invented default: the Rust GoalSeekSpec requires it.
+    with pytest.raises(ValueError, match="update_model"):
+        goal_seek(
+            goal_seek_model(),
+            {
+                "target_node": "profit",
+                "target_period": "2025Q1",
+                "target_value": 60.0,
+                "driver_node": "revenue",
+                "driver_period": "2025Q1",
+            },
+        )
 
 
 def test_evaluate_lbo_takes_the_rust_lbo_config_and_runs_its_check_suite() -> None:
@@ -205,7 +235,15 @@ def test_dcf_sensitivity_takes_the_rust_dcf_options() -> None:
 
 
 def test_evaluate_dcf_exports_the_working_behind_enterprise_value() -> None:
-    result = evaluate_dcf(dcf_model(), 0.1, EXIT_MULTIPLE, "ufcf", 25.0)
+    result = evaluate_dcf(
+        dcf_model(),
+        {
+            "wacc": 0.1,
+            "terminal_value": EXIT_MULTIPLE,
+            "ufcf_node": "ufcf",
+            "net_debt_override": 25.0,
+        },
+    )
     assert result.wacc == 0.1
     rows = result.periods
     assert [row["period_id"] for row in rows] == ["2025", "2026"]
