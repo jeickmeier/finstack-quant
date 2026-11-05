@@ -42,7 +42,7 @@ and the closed world around them.
 | [`exotics/`](exotics/README.md) | `finstack-quant-valuations-exotics`: the exotics family (Asian, barrier, lookback options, range accruals, TARN, snowball) and the commodity family (forwards, futures, swaps, options), one `EXOTICS` registration static; re-exported as `instruments::exotics` and `instruments::commodity`; `Basket` stays here under `instruments::exotics::basket` |
 | [`fx/`](fx/README.md) | `finstack-quant-valuations-fx`: the FX family (spot, forwards, swaps, NDFs, listed futures, vanilla/barrier/digital/touch/variance/quanto options) with its `FX` registration static; re-exported as `instruments::fx` |
 | [`src/instruments/`](src/instruments/README.md) | The façade modules of the family crates; the umbrella-resident instruments — `exotics::basket` and `equity::real_estate` (both register with `STANDARD`); `composite`; `json_loader` (`InstrumentJson`, the closed world); the JSON cashflow-export entry points |
-| `src/pricer/` | `FAMILIES`, the `STANDARD` family and `STANDARD.pricers()`, and the JSON pricing entry points (`src/pricer/json.rs`, re-exported flat from `pricer`) |
+| `src/pricer/` | `FAMILIES`, the `STANDARD` family and `STANDARD.pricers()`, the JSON pricing entry points (`src/pricer/json.rs`) and the registry catalog (`src/pricer/catalog.rs`), both lifted flat into `pricer` |
 | `src/results.rs` | Core result façade; metrics are re-exported directly from the core crate |
 | `src/schema.rs` | Accessors and validators for the checked-in JSON Schema artifacts |
 | `src/bin/gen_schemas.rs` | `gen_schemas` binary that writes/checks [`schemas/`](schemas/README.md) |

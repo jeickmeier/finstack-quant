@@ -307,11 +307,21 @@ cargo clippy -p "${usage_package?}" --lib --tests --bins --examples $features --
 
 [tasks.rust-doc]
 # The doctests run through `rust-test --doctest`.
-description = "Build workspace docs and enforce the input-doc and deprecation contracts"
+description = "Build workspace docs and enforce the input-doc, deprecation and single-public-path contracts"
 run = [
   "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps",
   "uv run --no-sync python scripts/check_public_api_input_docs.py",
   "uv run --no-sync python scripts/check_deprecated_annotations.py",
+  # One public path per item (.agents/rules/rust/code-standards.md). Rustdoc
+  # JSON is nightly-only; its own target directory keeps the stable build warm.
+  '''
+  RUSTDOCFLAGS="-Z unstable-options --output-format json --document-private-items --document-hidden-items" \
+    CARGO_TARGET_DIR=target/rustdoc-json cargo +nightly doc --workspace --no-deps --lib \
+    --exclude finstack-quant-py --exclude finstack-quant-wasm --exclude finstack-quant-wasm-macros \
+    --exclude finstack-quant-valuations-macros --exclude finstack-quant-test-utils \
+    --exclude finstack-quant-valuations-test-support
+  uv run --no-sync python scripts/check_single_path.py target/rustdoc-json/doc target/rustdoc-json/single_path_report.md
+  ''',
 ]
 
 [tasks.rust-audit]

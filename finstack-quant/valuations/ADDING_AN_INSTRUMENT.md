@@ -87,12 +87,12 @@ containing `{}`; step 9 replaces it with the generated schema.
 ## 7. Persistence manifest
 
 Add an `[[instrument]]` entry to `tests/instruments/coverage_manifest.toml`:
-`tag`, `fixture` (`json_examples/<tag>.json`), `lossless`, `required_keys`,
-`no_market_dependencies` and a `rationale`. When the type does not implement
-`PartialEq`, set `lossless = false` and name the field that blocks it in
-`partial_eq_blocker` (`Type.field: NestedType`); the rationale must quote it.
-When it does, set `lossless = true` and add its arm to `typed_semantic_equality`
-in `tests/instruments/registry_coverage.rs`.
+`tag`, `required_keys`, `no_market_dependencies` and a `rationale`. Its fixture
+is `json_examples/<tag>.json`, which step 9 writes. When the type does not
+implement `PartialEq`, name the field that blocks it in `partial_eq_blocker`
+(`Type.field: NestedType`); the rationale must quote it. When it does, leave
+`partial_eq_blocker` out: `InstrumentJson::semantic_eq` then compares the
+round-tripped values automatically.
 
 `registry_coverage.rs` checks the manifest, the registry and the fixture
 directory against each other and enforces this grammar.
@@ -103,8 +103,7 @@ Add `tests/instruments/<name>/` covering construction, cashflows, pricing,
 metrics and validation (see `tests/instruments/README.md`), with a
 `#[path = ...] mod` entry in `tests/instruments.rs` when the directory is new.
 Every expected number needs provenance (`tests/instruments/README.md`,
-"Expected-value provenance"). Add the instrument's models to the expected table
-in `tests/instruments/common/pricer/registry.rs`.
+"Expected-value provenance").
 
 ## 9. Regenerate
 

@@ -2,6 +2,20 @@
 
 ## Itemized changes
 
+### Valuations: field-unit tables move to `results`; the registry catalog to its own file
+
+`valuations/src/pricer/json.rs` (2,800 lines) is split by concern. The result
+field-unit tables (`MetricFieldUnit`, `tranche_metric_field_units`,
+`tranche_solve_field_units`, `scenario_table_field_units`,
+`pool_report_field_units`, `bond_quote_set_field_units`,
+`simulation_field_units`, `equity_metrics_field_units` and their structs) move
+to valuations-core `results` and are reached as
+`finstack_quant_valuations::results::*` instead of `pricer::*`. The catalog
+(`list_models*`, `list_standard_metrics*`, `metrics_for_instrument`,
+`metric_metadata`, `MetricMetadata`, `MetricCoordinate`) moves to
+`pricer/catalog.rs` with its `pricer::` paths unchanged. Python and WASM
+names do not change.
+
 ### WASM: TypeScript declarations come from the Rust bindings
 
 The hand-written `index.d.ts` is gone. Every `#[wasm_bindgen]` export now types

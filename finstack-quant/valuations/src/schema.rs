@@ -745,11 +745,11 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::market::listed::ListedProductCoverage;
     use crate::metrics::risk::MarketHistory;
     use crate::metrics::risk::var_calculator::VarResult;
-    use crate::pricer::{
-        EquityMetricsFieldUnits, MetricFieldUnit, MetricMetadata, PoolReportFieldUnits,
-        ScenarioTableFieldUnits, SimulationFieldUnits, TrancheSolveFieldUnits,
+    use crate::pricer::MetricMetadata;
+    use crate::results::{
+        EquityMetricsFieldUnits, MetricFieldUnit, PoolReportFieldUnits, ScenarioTableFieldUnits,
+        SimulationFieldUnits, TrancheSolveFieldUnits, ValuationResult,
     };
-    use crate::results::ValuationResult;
     use finstack_quant_core::contract::{Diagnostic, ValidationReport};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};

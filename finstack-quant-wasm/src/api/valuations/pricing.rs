@@ -516,7 +516,7 @@ pub fn calendar_year_ladder_by_currency(
 /// @returns `TrancheSolveFieldUnits`: `breakeven_cdr` and `discount_margin`, each one `MetricFieldUnit`, and `oas`, one `MetricFieldUnit` per `OasResult` field in struct order.
 #[wasm_bindgen(js_name = trancheSolveFieldUnits, unchecked_return_type = "TrancheSolveFieldUnits")]
 pub fn tranche_solve_field_units() -> Result<JsValue, JsValue> {
-    to_js_value(&finstack_quant_valuations::pricer::tranche_solve_field_units())
+    to_js_value(&finstack_quant_valuations::results::tranche_solve_field_units())
 }
 
 /// Units of the scalar `TrancheMetrics` fields, in struct order.
@@ -531,7 +531,7 @@ pub fn tranche_metric_field_units(
     #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = crate::utils::input::js_currency(&currency, "currency")?;
-    to_js_value(&finstack_quant_valuations::pricer::tranche_metric_field_units(currency))
+    to_js_value(&finstack_quant_valuations::results::tranche_metric_field_units(currency))
 }
 
 /// Units of the `ScenarioCell` fields, the one place a host reads them from.
@@ -546,7 +546,7 @@ pub fn scenario_table_field_units(
     #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = crate::utils::input::js_currency(&currency, "currency")?;
-    to_js_value(&finstack_quant_valuations::pricer::scenario_table_field_units(currency))
+    to_js_value(&finstack_quant_valuations::results::scenario_table_field_units(currency))
 }
 
 /// Units of a structured-credit simulation's charted series, the one place a host reads them from.
@@ -562,7 +562,7 @@ pub fn simulation_field_units(
     #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = crate::utils::input::js_currency(&currency, "currency")?;
-    to_js_value(&finstack_quant_valuations::pricer::simulation_field_units(
+    to_js_value(&finstack_quant_valuations::results::simulation_field_units(
         currency,
     ))
 }
@@ -588,7 +588,7 @@ pub fn equity_metrics_field_units(
     #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = crate::utils::input::js_currency(&currency, "currency")?;
-    to_js_value(&finstack_quant_valuations::pricer::equity_metrics_field_units(currency))
+    to_js_value(&finstack_quant_valuations::results::equity_metrics_field_units(currency))
 }
 
 /// Units of the `BondQuoteSet` fields, in struct order, the one place a host reads them from.
@@ -602,7 +602,7 @@ pub fn bond_quote_set_field_units(
     #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = crate::utils::input::js_currency(&currency, "currency")?;
-    to_js_value(&finstack_quant_valuations::pricer::bond_quote_set_field_units(currency))
+    to_js_value(&finstack_quant_valuations::results::bond_quote_set_field_units(currency))
 }
 
 /// Units of the `PoolReport` fields, the one place a host reads them from.
@@ -617,9 +617,7 @@ pub fn pool_report_field_units(
     #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = crate::utils::input::js_currency(&currency, "currency")?;
-    to_js_value(&finstack_quant_valuations::pricer::pool_report_field_units(
-        currency,
-    ))
+    to_js_value(&finstack_quant_valuations::results::pool_report_field_units(currency))
 }
 
 /// List every pricing model key registered in the standard pricer registry.

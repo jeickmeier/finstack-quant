@@ -461,7 +461,7 @@ fn standard_deal_families(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 fn tranche_solve_field_units(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::tranche_solve_field_units(),
+        &finstack_quant_valuations::results::tranche_solve_field_units(),
     )
 }
 
@@ -475,7 +475,7 @@ fn tranche_metric_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::tranche_metric_field_units(currency),
+        &finstack_quant_valuations::results::tranche_metric_field_units(currency),
     )
 }
 
@@ -489,7 +489,7 @@ fn scenario_table_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::scenario_table_field_units(currency),
+        &finstack_quant_valuations::results::scenario_table_field_units(currency),
     )
 }
 
@@ -503,7 +503,7 @@ fn simulation_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::simulation_field_units(currency),
+        &finstack_quant_valuations::results::simulation_field_units(currency),
     )
 }
 
@@ -517,7 +517,7 @@ fn equity_metrics_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::equity_metrics_field_units(currency),
+        &finstack_quant_valuations::results::equity_metrics_field_units(currency),
     )
 }
 
@@ -531,7 +531,7 @@ fn bond_quote_set_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::bond_quote_set_field_units(currency),
+        &finstack_quant_valuations::results::bond_quote_set_field_units(currency),
     )
 }
 
@@ -545,7 +545,7 @@ fn pool_report_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::pool_report_field_units(currency),
+        &finstack_quant_valuations::results::pool_report_field_units(currency),
     )
 }
 

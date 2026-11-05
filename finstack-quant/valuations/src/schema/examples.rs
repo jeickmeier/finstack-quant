@@ -246,27 +246,27 @@ pub(super) fn currency_ladder() -> Result<Vec<Value>> {
 
 /// The tranche solvers' units.
 pub(super) fn tranche_solve_field_units() -> Result<Vec<Value>> {
-    example(&crate::pricer::tranche_solve_field_units())
+    example(&crate::results::tranche_solve_field_units())
 }
 
 /// The units of a USD scenario table's cells.
 pub(super) fn scenario_table_field_units() -> Result<Vec<Value>> {
-    example(&crate::pricer::scenario_table_field_units(Currency::USD))
+    example(&crate::results::scenario_table_field_units(Currency::USD))
 }
 
 /// The units of a USD equity tranche's metrics.
 pub(super) fn equity_metrics_field_units() -> Result<Vec<Value>> {
-    example(&crate::pricer::equity_metrics_field_units(Currency::USD))
+    example(&crate::results::equity_metrics_field_units(Currency::USD))
 }
 
 /// The units of a USD simulation's charted series.
 pub(super) fn simulation_field_units() -> Result<Vec<Value>> {
-    example(&crate::pricer::simulation_field_units(Currency::USD))
+    example(&crate::results::simulation_field_units(Currency::USD))
 }
 
 /// The unit of a tranche's CS01.
 pub(super) fn metric_field_unit() -> Result<Vec<Value>> {
-    let units = crate::pricer::tranche_metric_field_units(Currency::USD);
+    let units = crate::results::tranche_metric_field_units(Currency::USD);
     let unit = units
         .iter()
         .find(|unit| unit.field == "cs01")
@@ -380,7 +380,7 @@ pub(super) fn pool_report() -> Result<Vec<Value>> {
 
 /// The units of a USD pool report.
 pub(super) fn pool_report_field_units() -> Result<Vec<Value>> {
-    example(&crate::pricer::pool_report_field_units(Currency::USD))
+    example(&crate::results::pool_report_field_units(Currency::USD))
 }
 
 /// One quarterly interest payment on a senior floating-rate tranche.

@@ -27,9 +27,10 @@ globs:
   `#[doc(hidden)] pub` modules (such as `valuations_core::instruments::common_impl`)
   hold only family-internal helpers that other workspace crates need; a public
   type is defined in a visible module, never inside a hidden one and lifted out.
-  `scripts/check_single_path.py` (rustdoc JSON) measures this; run it with
-  `--compare <base JSON>` after making a module private, because a public item
-  left unnameable produces no compiler warning.
+  `scripts/check_single_path.py` (rustdoc JSON) enforces this and runs in
+  `rust-doc` (`mise run all --full`); run it with `--compare <base JSON>` after
+  making a module private, because a public item left unnameable produces no
+  compiler warning.
 - **File size: 1000 lines desired, 2000 lines maximum** (measured on Rust
   source lines under `src/`, excluding `#[cfg(test)]` items, `tests.rs` and
   generated files). Split a submodule out once it passes ~1000; 2000 is a hard

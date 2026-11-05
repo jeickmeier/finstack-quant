@@ -16,7 +16,7 @@ instruments/
 ├── common/                 # Parameter and registry contract tests (see common/README.md)
 ├── <instrument>/           # 48 directories: one per instrument, plus exotic_harness/
 ├── json_examples/          # 71 GENERATED canonical instrument fixtures (do not hand-edit)
-├── coverage_manifest.toml  # registry tag -> fixture path -> persistence policy
+├── coverage_manifest.toml  # registry tag -> persistence policy (fixture: json_examples/<tag>.json)
 │
 ├── registry_coverage.rs    # Every registry tag has a manifest entry, fixture, schema, and strict round-trip
 ├── serde_skip_guard.rs     # #[serde(skip)] is limited to documented derived-artifact caches
@@ -63,8 +63,10 @@ mise run gen-check
 The generator deletes fixtures whose tag no longer exists, so a stale file is a
 build-output problem, not a merge conflict to resolve by hand.
 
-`coverage_manifest.toml` maps each registry tag to its fixture path and its
-persistence policy. `registry_coverage.rs` asserts the manifest, the registry,
+`coverage_manifest.toml` maps each registry tag to its persistence policy; the
+tag's fixture is `json_examples/<tag>.json`. A tag whose Rust type lacks
+`PartialEq` names the blocking field in `partial_eq_blocker`; every other tag's
+round trip is also compared with `InstrumentJson::semantic_eq`. `registry_coverage.rs` asserts the manifest, the registry,
 and the directory agree exactly in both directions — a new instrument that is
 registered but not manifested, or manifested but not on disk, fails there.
 `scripts/check_generated_instrument_fixtures.py` (run by `mise run gen-check`)
