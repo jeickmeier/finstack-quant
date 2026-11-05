@@ -550,9 +550,9 @@ def test_documented_one_way_inventory_is_exact() -> None:
         "internal-registry-document": 1,
         "non-maintained-serde-output": 1,
         "runtime-result": 4,
-        "runtime-spec": 3,
+        "runtime-spec": 1,
     }
-    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 22
+    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 20
 
 
 def test_maintained_contract_capability_matrix_is_complete() -> None:

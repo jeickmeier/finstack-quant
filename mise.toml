@@ -407,7 +407,7 @@ run = [
 # order. Each artifact's check lives where its inputs are built: gen-check
 # (schemas, contract types, reference data, fixtures), rust-test (the registry
 # snapshot), wasm-test (the facade surface) and ui-check (UI files, fixtures).
-description = "Regenerate every checked-in generated file (schemas, fixtures, TypeScript bindings, UI files, facade surface, registry snapshot)"
+description = "Regenerate every checked-in generated file (schemas, fixtures, TypeScript bindings, UI files, facade surface, registry snapshot, schema parity golden)"
 run = [
   "uv run --no-project python finstack-quant/core/build/generate_reference_data.py",
   { task = "rust-gen-schemas" },
@@ -415,6 +415,12 @@ run = [
   # snapshot is embedded with include_str!, so the next rust-test rebuilds the
   # binary and checks the new bytes.
   "UPDATE_REGISTRY_SNAPSHOT=1 cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' -E 'binary_id(finstack-quant-valuations::valuations) & test(standard_registries_match_the_pinned_snapshot)'",
+  # The cross-host schema golden pins every published schema's identity and
+  # byte size; the Python binding embeds the schemas written above, so it is
+  # rebuilt first. The WASM facade suite checks the same golden.
+  { task = "python-build" },
+  "UPDATE_SCHEMA_PARITY_GOLDEN=1 uv run --no-sync pytest -q -p no:cacheprovider finstack-quant-py/tests/test_schema_wasm_parity.py -k cross_host_golden",
+  "finstack-quant-wasm/node_modules/.bin/prettier --log-level warn --write finstack-quant-wasm/tests/facade/schema_parity.golden.json",
   # `cargo run` cannot select the workspace, so build, then run the binary.
   '''
   cargo build --workspace --exclude finstack-quant-py --example generate_contracts
