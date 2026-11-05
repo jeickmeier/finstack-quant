@@ -41,6 +41,62 @@ async function localize(repo, item, graph, source, from) {
 }
 
 /**
+ * The gallery's shared fixtures for an isolated consumer. The module is kept as
+ * written, so each export keeps the JSON shape the examples navigate, but every
+ * type imported from outside the item's install closure becomes `any` and its
+ * import is dropped: those types belong to other items, and typing the fixtures
+ * against them is the docs-site build's check.
+ */
+async function localFixtures(repo, item, graph) {
+  const from = "fixtures.ts";
+  const source = await readFile(
+    path.join(repo, "docs-site/src/components/registry-gallery", from),
+    "utf8",
+  );
+  const closure = graph.closures.get(item.name);
+  const hasWasm = [...closure].some((name) =>
+    (graph.byName.get(name).dependencies ?? []).some((dependency) =>
+      dependency.startsWith("finstack-quant-wasm@"),
+    ),
+  );
+  const available = (specifier) => {
+    if (specifier.startsWith("@/")) {
+      const target = resolveInstalled(graph.owners, from, specifier);
+      return Boolean(target) && closure.has(graph.owners.get(target));
+    }
+    if (specifier.startsWith("finstack-quant-wasm")) return hasWasm;
+    return true;
+  };
+  const file = ts.createSourceFile(from, source, ts.ScriptTarget.Latest, true);
+  const erased = new Set();
+  const edits = [];
+  for (const statement of file.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const specifier = statement.moduleSpecifier.text;
+    if (available(specifier)) continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings))
+      throw Error(`${from}: only named imports can be erased (${specifier})`);
+    for (const element of bindings.elements) erased.add(element.name.text);
+    edits.push([statement.getStart(file), statement.getEnd(), ""]);
+  }
+  const leftmost = (name) =>
+    ts.isQualifiedName(name) ? leftmost(name.left) : name.text;
+  const visit = (node) => {
+    if (ts.isTypeReferenceNode(node) && erased.has(leftmost(node.typeName))) {
+      edits.push([node.getStart(file), node.getEnd(), "any"]);
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  let text = source;
+  for (const [start, end, replacement] of edits.sort((a, b) => b[0] - a[0]))
+    text = text.slice(0, start) + replacement + text.slice(end);
+  return text;
+}
+
+/**
  * Build the installed page body for one visual item: its fixture under
  * tests/install/fixture/<name>.tsx when one exists, otherwise its gallery example.
  * Unrelated gallery imports never enter its install closure.
@@ -80,6 +136,14 @@ export async function visualHarness(repo, item, graph) {
       "utf8",
     ),
   };
+  // The shared fixtures sit beside examples/ and read app/data.json, which the
+  // matrix copies for every visual item.
+  if (
+    ts
+      .preProcessFile(example.source, true, true)
+      .importedFiles.some(({ fileName }) => fileName === "../fixtures")
+  )
+    extra["fixtures.ts"] = await localFixtures(repo, item, graph);
   // An example that forwards a `presentation` prop wraps a chart: probe it through those public props.
   if (!/\bpresentation\?:/.test(example.source))
     return {

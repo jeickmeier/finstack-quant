@@ -317,8 +317,8 @@ async function installItem(index, item) {
     .flatMap((name) => graph.byName.get(name).dependencies ?? [])
     .some((name) => name.startsWith("finstack-quant-wasm@"));
   const key = cacheOn ? await itemKey(item, closure, needsWasm) : undefined;
-  const hit = cacheOn && cache.entries[item.name];
-  if (hit?.key === key) {
+  const hit = cacheOn ? cache.entries[item.name] : undefined;
+  if (hit && hit.key === key) {
     console.log(`[${index + 1}/${items.length}] ${item.name}: cached pass`);
     results.push({ ...hit.result, cached: true, durationMs: 0 });
     return;
