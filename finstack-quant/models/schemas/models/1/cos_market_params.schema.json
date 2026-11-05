@@ -21,13 +21,8 @@
   "additionalProperties": false,
   "description": "Option and market inputs of the COS Fourier pricers.",
   "properties": {
-    "div_yield": {
+    "dividend_yield": {
       "description": "Continuous dividend yield (decimal, annualized).",
-      "format": "double",
-      "type": "number"
-    },
-    "expiry": {
-      "description": "Time to expiry in years.",
       "format": "double",
       "type": "number"
     },
@@ -59,14 +54,19 @@
       "description": "Option strike.",
       "format": "double",
       "type": "number"
+    },
+    "time_to_expiry": {
+      "description": "Time to expiry in years.",
+      "format": "double",
+      "type": "number"
     }
   },
   "required": [
     "spot",
     "strike",
     "rate",
-    "div_yield",
-    "expiry",
+    "dividend_yield",
+    "time_to_expiry",
     "option_type"
   ],
   "title": "CosMarketParams",

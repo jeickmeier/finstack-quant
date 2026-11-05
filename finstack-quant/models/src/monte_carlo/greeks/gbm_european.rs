@@ -39,11 +39,11 @@ pub struct GbmEuropeanFdSpec {
     /// Continuously compounded risk-free rate (decimal, annualized).
     pub rate: f64,
     /// Continuous dividend yield (decimal, annualized).
-    pub div_yield: f64,
+    pub dividend_yield: f64,
     /// Annualized GBM volatility (decimal); must be strictly positive.
-    pub vol: f64,
+    pub volatility: f64,
     /// Time to expiry in years; also the uniform-grid horizon.
-    pub expiry: f64,
+    pub time_to_expiry: f64,
     /// Independent estimators; `None` uses the registry binding default.
     /// Each estimator uses two physical paths when the registry enables antithetics.
     #[serde(default)]
@@ -93,7 +93,7 @@ enum FdKind {
 ///
 /// # Errors
 ///
-/// Returns an error if registry defaults cannot be loaded, `vol` is not
+/// Returns an error if registry defaults cannot be loaded, `volatility` is not
 /// strictly positive, GBM or bump inputs fail validation, or a path
 /// simulation fails.
 pub fn finite_diff_delta(spec: GbmEuropeanFdSpec) -> Result<Estimate> {
@@ -136,8 +136,8 @@ fn run_gbm_fd(spec: GbmEuropeanFdSpec, kind: FdKind) -> Result<Estimate> {
     #[cfg(not(target_arch = "wasm32"))]
     let use_parallel = defaults.use_parallel;
 
-    crate::monte_carlo::require_positive_vol(spec.vol)?;
-    let time_grid = TimeGrid::uniform(spec.expiry, num_steps)?;
+    crate::monte_carlo::require_positive_vol(spec.volatility)?;
+    let time_grid = TimeGrid::uniform(spec.time_to_expiry, num_steps)?;
     let engine = McEngine::new(
         McEngineConfig::new(num_paths, time_grid)
             .parallel(use_parallel)
@@ -145,10 +145,14 @@ fn run_gbm_fd(spec: GbmEuropeanFdSpec, kind: FdKind) -> Result<Estimate> {
             .antithetic(defaults.antithetic),
     );
     let rng = PhiloxRng::new(seed);
-    let gbm = crate::monte_carlo::process::gbm::GbmParams::new(spec.rate, spec.div_yield, spec.vol)
-        .map(GbmProcess::new)?;
+    let gbm = crate::monte_carlo::process::gbm::GbmParams::new(
+        spec.rate,
+        spec.dividend_yield,
+        spec.volatility,
+    )
+    .map(GbmProcess::new)?;
     let disc = ExactGbm::new();
-    let discount_factor = flat_discount_factor(spec.rate, spec.expiry)?;
+    let discount_factor = flat_discount_factor(spec.rate, spec.time_to_expiry)?;
 
     let payoff = European::new(spec.option_type, spec.strike, 1.0, num_steps);
     let inputs = FiniteDiffInputs {
@@ -188,9 +192,9 @@ mod tests {
             spot: 100.0,
             strike: 100.0,
             rate: 0.05,
-            div_yield: 0.0,
-            vol: 0.2,
-            expiry: 1.0,
+            dividend_yield: 0.0,
+            volatility: 0.2,
+            time_to_expiry: 1.0,
             num_paths: Some(2_000),
             seed: Some(42),
             num_steps: Some(12),
@@ -237,9 +241,9 @@ mod tests {
             spot,
             strike,
             rate: 0.05,
-            div_yield: 0.0,
-            vol: 0.2,
-            expiry: 1.0,
+            dividend_yield: 0.0,
+            volatility: 0.2,
+            time_to_expiry: 1.0,
             num_paths: Some(8_000),
             seed: Some(7),
             num_steps: Some(1),
@@ -333,7 +337,7 @@ mod tests {
     #[test]
     fn finite_diff_delta_gbm_rejects_non_positive_vol() {
         let mut spec = atm_spec();
-        spec.vol = 0.0;
+        spec.volatility = 0.0;
         let err = finite_diff_delta(spec).expect_err("zero vol");
         assert!(
             err.to_string().contains("strictly positive volatility"),

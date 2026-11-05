@@ -842,13 +842,8 @@
       "default": null,
       "description": "Currency stamped on simulated payoffs; `None` uses the registry default."
     },
-    "div_yield": {
+    "dividend_yield": {
       "description": "Continuous dividend yield (decimal, annualized).",
-      "format": "double",
-      "type": "number"
-    },
-    "expiry": {
-      "description": "Time to expiry in years; also the uniform-grid horizon.",
       "format": "double",
       "type": "number"
     },
@@ -901,7 +896,12 @@
       "format": "double",
       "type": "number"
     },
-    "vol": {
+    "time_to_expiry": {
+      "description": "Time to expiry in years; also the uniform-grid horizon.",
+      "format": "double",
+      "type": "number"
+    },
+    "volatility": {
       "description": "Annualized GBM volatility (decimal); must be strictly positive.",
       "format": "double",
       "type": "number"
@@ -911,9 +911,9 @@
     "spot",
     "strike",
     "rate",
-    "div_yield",
-    "vol",
-    "expiry",
+    "dividend_yield",
+    "volatility",
+    "time_to_expiry",
     "option_type"
   ],
   "title": "GbmEuropeanFdSpec",

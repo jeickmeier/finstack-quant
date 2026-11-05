@@ -39,8 +39,8 @@ def test_cos_rejects_zero_terms() -> None:
                 "spot": 100.0,
                 "strike": 100.0,
                 "rate": 0.05,
-                "div_yield": 0.0,
-                "expiry": 1.0,
+                "dividend_yield": 0.0,
+                "time_to_expiry": 1.0,
                 "option_type": "call",
                 "n_terms": 0,
             },
@@ -59,8 +59,8 @@ def test_cos_invalid_prices_raise_value_error(invalid: float, is_call: bool) -> 
                 "spot": invalid,
                 "strike": 100.0,
                 "rate": 0.05,
-                "div_yield": 0.0,
-                "expiry": 1.0,
+                "dividend_yield": 0.0,
+                "time_to_expiry": 1.0,
                 "option_type": ("call" if is_call else "put"),
             },
             0.2,
@@ -71,8 +71,8 @@ def test_cos_invalid_prices_raise_value_error(invalid: float, is_call: bool) -> 
                 "spot": 100.0,
                 "strike": invalid,
                 "rate": 0.05,
-                "div_yield": 0.0,
-                "expiry": 1.0,
+                "dividend_yield": 0.0,
+                "time_to_expiry": 1.0,
                 "option_type": ("call" if is_call else "put"),
             },
             0.2,
@@ -82,14 +82,28 @@ def test_cos_invalid_prices_raise_value_error(invalid: float, is_call: bool) -> 
 def test_cos_rejects_invalid_process_parameters() -> None:
     with pytest.raises(ValueError, match="sigma"):
         vg_cos_price(
-            {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 1.0, "option_type": "call"},
+            {
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+            },
             -0.2,
             -0.1,
             0.2,
         )
     with pytest.raises(ValueError, match="lambda"):
         merton_jump_cos_price(
-            {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 1.0, "option_type": "call"},
+            {
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+            },
             0.2,
             -0.1,
             0.1,

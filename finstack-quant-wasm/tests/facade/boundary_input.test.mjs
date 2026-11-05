@@ -171,7 +171,14 @@ test('booleans are not coerced by truthiness', () => {
 });
 
 test('counts reject negatives, fractions and oversized values before Rust sizes anything', () => {
-  const cos = { spot: 100, strike: 100, rate: 0.05, div_yield: 0, expiry: 1, option_type: 'call' };
+  const cos = {
+    spot: 100,
+    strike: 100,
+    rate: 0.05,
+    dividend_yield: 0,
+    time_to_expiry: 1,
+    option_type: 'call',
+  };
   // `n_terms` travels inside the `CosMarketParams` object, so the Rust
   // deserializer rejects a non-count before any series is sized.
   const badCount = (error) => error.kind === 'validation' && /market: /.test(error.message);

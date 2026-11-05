@@ -605,9 +605,9 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
         spot: 100,
         strike: 100,
         rate: 0.05,
-        div_yield: 0,
-        vol: 0.2,
-        expiry: 1,
+        dividend_yield: 0,
+        volatility: 0.2,
+        time_to_expiry: 1,
         option_type: true,
       }),
     kind('validation')

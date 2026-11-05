@@ -182,7 +182,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/cos_market_params.schema.json",
-      "bytes": 1852,
+      "bytes": 1878,
       "kind": "input",
       "path": "schemas/models/1/cos_market_params.schema.json",
       "summary": "Option and market inputs of the COS Fourier pricers.",
@@ -335,7 +335,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/gbm_european_fd_spec.schema.json",
-      "bytes": 22536,
+      "bytes": 22576,
       "kind": "input",
       "path": "schemas/models/1/gbm_european_fd_spec.schema.json",
       "summary": "Inputs of the GBM European Monte Carlo finite-difference Greeks.",

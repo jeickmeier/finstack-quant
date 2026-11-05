@@ -5,7 +5,7 @@
 //! Variance Gamma, and Merton jump-diffusion characteristic functions.
 //!
 //! All rates are continuously compounded decimals; `vol` / `sigma` are
-//! annualized vols; `expiry` is time to expiry in years. The shared option and
+//! annualized vols; `time_to_expiry` is time to expiry in years. The shared option and
 //! market inputs travel as one `CosMarketParams` object (`market`).
 //!
 //! Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
@@ -22,7 +22,7 @@ use wasm_bindgen::prelude::*;
 ///
 /// Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
 /// Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.
-/// @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
+/// @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
 ///
 /// # Errors
@@ -38,7 +38,14 @@ use wasm_bindgen::prelude::*;
 /// @example
 /// ```javascript
 /// const call = models.bsCosPrice(
-///   { spot: 100, strike: 100, rate: 0.05, div_yield: 0.0, expiry: 1.0, option_type: "call" },
+///   {
+///     spot: 100,
+///     strike: 100,
+///     rate: 0.05,
+///     dividend_yield: 0.0,
+///     time_to_expiry: 1.0,
+///     option_type: "call",
+///   },
 ///   0.2,
 /// );
 /// // call ≈ 10.45, the Black-Scholes price
@@ -58,7 +65,7 @@ pub fn bs_cos_price(
 ///
 /// Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
 /// Madan-Carr-Chang (1998): see docs/REFERENCES.md#madan-carr-chang-1998.
-/// @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
+/// @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
 /// @param sigma - Positive finite volatility of the subordinated Brownian motion, as a decimal.
 /// @param theta - Finite annual log-return drift of the subordinated Brownian motion; its sign controls skew.
 /// @param nu - Positive finite variance rate of the Gamma time change, in years; larger values increase tail thickness.
@@ -92,7 +99,7 @@ pub fn vg_cos_price(
 ///
 /// Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
 /// Merton jump-diffusion (1976): see docs/REFERENCES.md#merton-1976-jump.
-/// @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
+/// @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
 /// @param sigma - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
 /// @param muJump - Mean log jump size in the Merton jump-diffusion model.
 /// @param sigmaJump - Standard deviation of log jump sizes in the Merton jump-diffusion model.

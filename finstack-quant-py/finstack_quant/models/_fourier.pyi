@@ -16,8 +16,8 @@ def bs_cos_price(
     market : dict or str
         Serde form of the Rust ``CosMarketParams``, as a dict or JSON text:
         ``spot`` and ``strike`` (float, the same price units); ``rate``
-        (continuously compounded risk-free rate, decimal); ``div_yield``
-        (continuous dividend yield, decimal); ``expiry`` (years);
+        (continuously compounded risk-free rate, decimal); ``dividend_yield``
+        (continuous dividend yield, decimal); ``time_to_expiry`` (years);
         ``option_type`` (``"call"`` or ``"put"``) are required; ``n_terms``
         (int, number of COS terms in ``1..=65536``) is optional and defaults
         to 128 when omitted or ``None``.
@@ -32,8 +32,8 @@ def bs_cos_price(
     Raises
     ------
     ValueError
-        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike``, ``expiry`` or ``vol`` is not finite and
-        positive, ``rate`` or ``div_yield`` is non-finite, or ``n_terms`` is
+        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike``, ``time_to_expiry`` or ``vol`` is not finite and
+        positive, ``rate`` or ``dividend_yield`` is non-finite, or ``n_terms`` is
         outside ``1..=65536``.
     RuntimeError
         If the inputs produce an invalid COS truncation range, a non-finite
@@ -44,7 +44,14 @@ def bs_cos_price(
     >>> from finstack_quant.models import bs_cos_price
     >>> round(
     ...     bs_cos_price(
-    ...         {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 1.0, "option_type": "call"},
+    ...         {
+    ...             "spot": 100.0,
+    ...             "strike": 100.0,
+    ...             "rate": 0.05,
+    ...             "dividend_yield": 0.0,
+    ...             "time_to_expiry": 1.0,
+    ...             "option_type": "call",
+    ...         },
     ...         0.2,
     ...     ),
     ...     4,
@@ -73,8 +80,8 @@ def vg_cos_price(
     market : dict or str
         Serde form of the Rust ``CosMarketParams``, as a dict or JSON text:
         ``spot`` and ``strike`` (float, the same price units); ``rate``
-        (continuously compounded risk-free rate, decimal); ``div_yield``
-        (continuous dividend yield, decimal); ``expiry`` (years);
+        (continuously compounded risk-free rate, decimal); ``dividend_yield``
+        (continuous dividend yield, decimal); ``time_to_expiry`` (years);
         ``option_type`` (``"call"`` or ``"put"``) are required; ``n_terms``
         (int, number of COS terms in ``1..=65536``) is optional and defaults
         to 128 when omitted or ``None``.
@@ -95,7 +102,7 @@ def vg_cos_price(
     Raises
     ------
     ValueError
-        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike`` or ``expiry`` is not finite and positive, a
+        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike`` or ``time_to_expiry`` is not finite and positive, a
         model input is non-finite, ``sigma`` or ``nu`` is not positive, the
         martingale condition ``1 - theta*nu - 0.5*sigma**2*nu > 0`` fails, or
         ``n_terms`` is outside ``1..=65536``.
@@ -109,7 +116,14 @@ def vg_cos_price(
     >>> from finstack_quant.models import vg_cos_price
     >>> round(
     ...     vg_cos_price(
-    ...         {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 1.0, "option_type": "call"},
+    ...         {
+    ...             "spot": 100.0,
+    ...             "strike": 100.0,
+    ...             "rate": 0.05,
+    ...             "dividend_yield": 0.0,
+    ...             "time_to_expiry": 1.0,
+    ...             "option_type": "call",
+    ...         },
     ...         0.2,
     ...         -0.1,
     ...         0.2,
@@ -141,8 +155,8 @@ def merton_jump_cos_price(
     market : dict or str
         Serde form of the Rust ``CosMarketParams``, as a dict or JSON text:
         ``spot`` and ``strike`` (float, the same price units); ``rate``
-        (continuously compounded risk-free rate, decimal); ``div_yield``
-        (continuous dividend yield, decimal); ``expiry`` (years);
+        (continuously compounded risk-free rate, decimal); ``dividend_yield``
+        (continuous dividend yield, decimal); ``time_to_expiry`` (years);
         ``option_type`` (``"call"`` or ``"put"``) are required; ``n_terms``
         (int, number of COS terms in ``1..=65536``) is optional and defaults
         to 128 when omitted or ``None``.
@@ -163,7 +177,7 @@ def merton_jump_cos_price(
     Raises
     ------
     ValueError
-        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike`` or ``expiry`` is not finite and positive, a
+        If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``strike`` or ``time_to_expiry`` is not finite and positive, a
         model input is non-finite, ``sigma``, ``sigma_jump`` or ``lambda_`` is
         negative, the jump compensator is non-finite, or ``n_terms`` is
         outside ``1..=65536``.
@@ -177,7 +191,14 @@ def merton_jump_cos_price(
     >>> from finstack_quant.models import merton_jump_cos_price
     >>> round(
     ...     merton_jump_cos_price(
-    ...         {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 1.0, "option_type": "call"},
+    ...         {
+    ...             "spot": 100.0,
+    ...             "strike": 100.0,
+    ...             "rate": 0.05,
+    ...             "dividend_yield": 0.0,
+    ...             "time_to_expiry": 1.0,
+    ...             "option_type": "call",
+    ...         },
     ...         0.2,
     ...         -0.1,
     ...         0.2,

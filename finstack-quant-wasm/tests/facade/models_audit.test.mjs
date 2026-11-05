@@ -20,8 +20,8 @@ test('COS rejects an empty expansion', () => {
         spot: 100,
         strike: 100,
         rate: 0.05,
-        div_yield: 0,
-        expiry: 1,
+        dividend_yield: 0,
+        time_to_expiry: 1,
         option_type: 'call',
         n_terms: 0,
       },
@@ -40,8 +40,8 @@ test('COS reports invalid market inputs as exceptions without a panic', () => {
               spot: invalid,
               strike: 100,
               rate: 0.05,
-              div_yield: 0,
-              expiry: 1,
+              dividend_yield: 0,
+              time_to_expiry: 1,
               option_type: isCall ? 'call' : 'put',
             },
             0.2
@@ -55,8 +55,8 @@ test('COS reports invalid market inputs as exceptions without a panic', () => {
               spot: 100,
               strike: invalid,
               rate: 0.05,
-              div_yield: 0,
-              expiry: 1,
+              dividend_yield: 0,
+              time_to_expiry: 1,
               option_type: isCall ? 'call' : 'put',
             },
             0.2
@@ -68,7 +68,14 @@ test('COS reports invalid market inputs as exceptions without a panic', () => {
   assert.throws(
     () =>
       facade.models.vgCosPrice(
-        { spot: 100, strike: 100, rate: 0.05, div_yield: 0, expiry: 1, option_type: 'call' },
+        {
+          spot: 100,
+          strike: 100,
+          rate: 0.05,
+          dividend_yield: 0,
+          time_to_expiry: 1,
+          option_type: 'call',
+        },
         -0.2,
         -0.1,
         0.2
@@ -78,7 +85,14 @@ test('COS reports invalid market inputs as exceptions without a panic', () => {
   assert.throws(
     () =>
       facade.models.mertonJumpCosPrice(
-        { spot: 100, strike: 100, rate: 0.05, div_yield: 0, expiry: 1, option_type: 'call' },
+        {
+          spot: 100,
+          strike: 100,
+          rate: 0.05,
+          dividend_yield: 0,
+          time_to_expiry: 1,
+          option_type: 'call',
+        },
         0.2,
         -0.1,
         0.1,

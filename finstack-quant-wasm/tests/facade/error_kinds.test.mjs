@@ -165,8 +165,8 @@ test('COS separates invalid inputs from a degenerate range', () => {
           spot: 100,
           strike: 100,
           rate: 0.05,
-          div_yield: 0,
-          expiry: 1,
+          dividend_yield: 0,
+          time_to_expiry: 1,
           option_type: 'call',
           n_terms: 0,
         },
@@ -177,7 +177,14 @@ test('COS separates invalid inputs from a degenerate range', () => {
   assert.throws(
     () =>
       models.bsCosPrice(
-        { spot: 100, strike: 100, rate: 0.05, div_yield: 0, expiry: 1, option_type: 'call' },
+        {
+          spot: 100,
+          strike: 100,
+          rate: 0.05,
+          dividend_yield: 0,
+          time_to_expiry: 1,
+          option_type: 'call',
+        },
         -0.2
       ),
     kind('validation')
@@ -185,7 +192,14 @@ test('COS separates invalid inputs from a degenerate range', () => {
   assert.throws(
     () =>
       models.bsCosPrice(
-        { spot: 100, strike: 100, rate: 0.05, div_yield: 0, expiry: 0, option_type: 'call' },
+        {
+          spot: 100,
+          strike: 100,
+          rate: 0.05,
+          dividend_yield: 0,
+          time_to_expiry: 0,
+          option_type: 'call',
+        },
         0.2
       ),
     kind('validation', /expiry must be finite and positive/)
@@ -194,7 +208,14 @@ test('COS separates invalid inputs from a degenerate range', () => {
   assert.throws(
     () =>
       models.bsCosPrice(
-        { spot: 100, strike: 100, rate: 0.05, div_yield: 0, expiry: 1e-320, option_type: 'call' },
+        {
+          spot: 100,
+          strike: 100,
+          rate: 0.05,
+          dividend_yield: 0,
+          time_to_expiry: 1e-320,
+          option_type: 'call',
+        },
         0.2
       ),
     kind('computation', /degenerate cumulant set/)

@@ -5712,7 +5712,7 @@ export interface ModelsMonteCarloNamespace {
    * The up and down valuations share each path's random draws; the estimate
    * is the mean of the per-path central differences and `stderr` is their
    * paired (common-random-number) standard error.
-   * @param spec - `GbmEuropeanFdSpec` object or JSON text: `spot` (spot level at time 0), `strike` (same units as `spot`), `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `vol` (annualized GBM volatility, decimal; positive), `expiry` (years) and `option_type` (`"call"` or `"put"`) are required; `num_paths` (paths per evaluation), `seed` (RNG seed, number or BigInt), `num_steps` (time-grid steps), `bump_size` (relative spot shock, 0.01 is 1% of spot) and `currency` (ISO-4217 code of the simulated payoffs) may be omitted or `null`, which uses the registry default.
+   * @param spec - `GbmEuropeanFdSpec` object or JSON text: `spot` (spot level at time 0), `strike` (same units as `spot`), `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `volatility` (annualized GBM volatility, decimal; positive), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`) are required; `num_paths` (paths per evaluation), `seed` (RNG seed, number or BigInt), `num_steps` (time-grid steps), `bump_size` (relative spot shock, 0.01 is 1% of spot) and `currency` (ISO-4217 code of the simulated payoffs) may be omitted or `null`, which uses the registry default.
    * @returns The `Estimate` object for delta (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    *
    * @example
@@ -5720,7 +5720,8 @@ export interface ModelsMonteCarloNamespace {
    * import init, { models } from "finstack-quant-wasm";
    * await init();
    * const delta = models.monteCarlo.finiteDiffDelta({
-   *   spot: 100, strike: 100, rate: 0.05, div_yield: 0.0, vol: 0.2, expiry: 1.0,
+   *   spot: 100, strike: 100, rate: 0.05,
+   *   dividend_yield: 0.0, volatility: 0.2, time_to_expiry: 1.0,
    *   option_type: "call", num_paths: 2000, seed: 42, num_steps: 16,
    * });
    * console.log(delta.mean, delta.stderr);
@@ -5738,7 +5739,7 @@ export interface ModelsMonteCarloNamespace {
    * The three stencil valuations share each path's random draws; the estimate
    * is the mean of the per-path second differences and `stderr` is their
    * paired (common-random-number) standard error.
-   * @param spec - `GbmEuropeanFdSpec` object or JSON text: `spot` (spot level at time 0), `strike` (same units as `spot`), `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `vol` (annualized GBM volatility, decimal; positive), `expiry` (years) and `option_type` (`"call"` or `"put"`) are required; `num_paths` (paths per evaluation), `seed` (RNG seed, number or BigInt), `num_steps` (time-grid steps), `bump_size` (relative spot shock, 0.01 is 1% of spot) and `currency` (ISO-4217 code of the simulated payoffs) may be omitted or `null`, which uses the registry default.
+   * @param spec - `GbmEuropeanFdSpec` object or JSON text: `spot` (spot level at time 0), `strike` (same units as `spot`), `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `volatility` (annualized GBM volatility, decimal; positive), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`) are required; `num_paths` (paths per evaluation), `seed` (RNG seed, number or BigInt), `num_steps` (time-grid steps), `bump_size` (relative spot shock, 0.01 is 1% of spot) and `currency` (ISO-4217 code of the simulated payoffs) may be omitted or `null`, which uses the registry default.
    * @returns The `Estimate` object for gamma (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    *
    * # Errors
@@ -6908,7 +6909,7 @@ export interface ModelsNamespace {
    *
    * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
    * Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.
-   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
+   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
    * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
    *
    * # Errors
@@ -6924,7 +6925,14 @@ export interface ModelsNamespace {
    * @example
    * ```javascript
    * const call = models.bsCosPrice(
-   *   { spot: 100, strike: 100, rate: 0.05, div_yield: 0.0, expiry: 1.0, option_type: "call" },
+   *   {
+   *     spot: 100,
+   *     strike: 100,
+   *     rate: 0.05,
+   *     dividend_yield: 0.0,
+   *     time_to_expiry: 1.0,
+   *     option_type: "call",
+   *   },
    *   0.2,
    * );
    * // call ≈ 10.45, the Black-Scholes price
@@ -6936,7 +6944,7 @@ export interface ModelsNamespace {
    *
    * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
    * Madan-Carr-Chang (1998): see docs/REFERENCES.md#madan-carr-chang-1998.
-   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
+   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
    * @param sigma - Positive finite volatility of the subordinated Brownian motion, as a decimal.
    * @param theta - Finite annual log-return drift of the subordinated Brownian motion; its sign controls skew.
    * @param nu - Positive finite variance rate of the Gamma time change, in years; larger values increase tail thickness.
@@ -6958,7 +6966,7 @@ export interface ModelsNamespace {
    *
    * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
    * Merton jump-diffusion (1976): see docs/REFERENCES.md#merton-1976-jump.
-   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `div_yield` (continuous dividend yield, decimal), `expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
+   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
    * @param sigma - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
    * @param muJump - Mean log jump size in the Merton jump-diffusion model.
    * @param sigmaJump - Standard deviation of log jump sizes in the Merton jump-diffusion model.

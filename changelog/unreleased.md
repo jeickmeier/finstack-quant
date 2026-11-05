@@ -20,8 +20,10 @@ with JSON schemas (`option_market_params`, `cos_market_params`,
 Python passes them as a dict or JSON text, WASM as the schema-typed object or
 JSON text. The `market` keys are `spot, strike, rate, dividend_yield,
 volatility, time_to_expiry, option_type` (`"call"`/`"put"`, replacing `is_call`);
-the COS `market` keeps `spot, strike, rate, div_yield, expiry, option_type`
-plus optional `n_terms`; Heston `params` are `r, q, v0, kappa, theta,
+the finite-difference Greek `spec` takes the same keys plus optional
+`num_paths, seed, num_steps, bump_size, currency`; the COS `market` takes
+them without `volatility` (each COS model passes its own) plus optional
+`n_terms`; Heston `params` are `r, q, v0, kappa, theta,
 sigma_v, rho`. A non-finite number inside one of these objects is rejected
 when the object is read (Python `ValueError`, WASM `TypeError`). Prices are
 unchanged. Old → new (WASM: the camelCase twin with the same arguments):

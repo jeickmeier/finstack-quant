@@ -65,9 +65,9 @@ pub struct CosMarketParams {
     /// Continuously-compounded risk-free rate.
     pub rate: f64,
     /// Continuous dividend yield (decimal, annualized).
-    pub div_yield: f64,
+    pub dividend_yield: f64,
     /// Time to expiry in years.
-    pub expiry: f64,
+    pub time_to_expiry: f64,
     /// Call or put payoff.
     pub option_type: OptionType,
     /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
@@ -92,8 +92,10 @@ pub struct CosMarketParams {
 /// Returns an error for invalid market inputs, a zero term count, a degenerate
 /// truncation range, or non-finite model evaluations or prices.
 pub fn bs_cos_price(market: CosMarketParams, vol: f64) -> Result<f64> {
-    if !market.div_yield.is_finite() {
-        return Err(invalid_input("Black-Scholes COS div_yield must be finite"));
+    if !market.dividend_yield.is_finite() {
+        return Err(invalid_input(
+            "Black-Scholes COS dividend_yield must be finite",
+        ));
     }
     if !vol.is_finite() || vol <= 0.0 {
         return Err(invalid_input(format!(
@@ -102,7 +104,7 @@ pub fn bs_cos_price(market: CosMarketParams, vol: f64) -> Result<f64> {
     }
     let cf = BlackScholesCf {
         r: market.rate,
-        q: market.div_yield,
+        q: market.dividend_yield,
         sigma: vol,
     };
     price_from_cf(&cf, market)
@@ -127,7 +129,7 @@ pub fn bs_cos_price(market: CosMarketParams, vol: f64) -> Result<f64> {
 /// Returns an error for invalid market/process inputs, a zero term count, a
 /// degenerate truncation range, or non-finite model evaluations or prices.
 pub fn vg_cos_price(market: CosMarketParams, sigma: f64, theta: f64, nu: f64) -> Result<f64> {
-    let cf = VarianceGammaCf::new(market.rate, market.div_yield, sigma, nu, theta)?;
+    let cf = VarianceGammaCf::new(market.rate, market.dividend_yield, sigma, nu, theta)?;
     price_from_cf(&cf, market)
 }
 
@@ -161,7 +163,7 @@ pub fn merton_jump_cos_price(
 ) -> Result<f64> {
     let cf = MertonJumpCf {
         r: market.rate,
-        q: market.div_yield,
+        q: market.dividend_yield,
         sigma,
         lambda,
         mu_j: mu_jump,
@@ -184,7 +186,7 @@ fn price_from_cf(cf: &dyn CharacteristicFunction, market: CosMarketParams) -> Re
         market.spot,
         market.strike,
         market.rate,
-        market.expiry,
+        market.time_to_expiry,
         market.option_type,
     )
 }
@@ -669,13 +671,13 @@ mod tests {
             spot: 100.0,
             strike: 100.0,
             rate: 0.05,
-            div_yield: 0.0,
-            expiry: 1.0,
+            dividend_yield: 0.0,
+            time_to_expiry: 1.0,
             option_type: OptionType::Call,
             n_terms: None,
         };
         let bad_carry = CosMarketParams {
-            div_yield: f64::NAN,
+            dividend_yield: f64::NAN,
             ..market
         };
         assert!(vg_cos_price(market, 0.2, -0.1, 0.2).is_ok());
@@ -965,8 +967,8 @@ mod tests {
             spot: 100.0,
             strike: 100.0,
             rate: 0.03,
-            div_yield: 0.0,
-            expiry: 1.0,
+            dividend_yield: 0.0,
+            time_to_expiry: 1.0,
             option_type: OptionType::Call,
             n_terms: Some(n_terms),
         };
@@ -1179,8 +1181,8 @@ mod tests {
                         spot,
                         strike,
                         rate,
-                        div_yield,
-                        expiry,
+                        dividend_yield: div_yield,
+                        time_to_expiry: expiry,
                         option_type,
                         n_terms,
                     };
@@ -1261,8 +1263,8 @@ mod tests {
                     spot: 100.0,
                     strike: 100.0,
                     rate: 0.05,
-                    div_yield: 0.0,
-                    expiry,
+                    dividend_yield: 0.0,
+                    time_to_expiry: expiry,
                     option_type: OptionType::Call,
                     n_terms,
                 },

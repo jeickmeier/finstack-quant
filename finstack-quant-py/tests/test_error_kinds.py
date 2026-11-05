@@ -134,8 +134,8 @@ class TestModels:
                     "spot": 100.0,
                     "strike": 100.0,
                     "rate": 0.05,
-                    "div_yield": 0.0,
-                    "expiry": 1.0,
+                    "dividend_yield": 0.0,
+                    "time_to_expiry": 1.0,
                     "option_type": "call",
                     "n_terms": 0,
                 },
@@ -143,7 +143,14 @@ class TestModels:
             )
         with pytest.raises(ValueError, match="volatility must be finite and strictly positive"):
             models.bs_cos_price(
-                {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 1.0, "option_type": "call"},
+                {
+                    "spot": 100.0,
+                    "strike": 100.0,
+                    "rate": 0.05,
+                    "dividend_yield": 0.0,
+                    "time_to_expiry": 1.0,
+                    "option_type": "call",
+                },
                 -0.2,
             )
 
@@ -153,7 +160,14 @@ class TestModels:
         # is an invalid input, a vanishing one collapses the truncation range.
         with pytest.raises(ValueError, match="expiry must be finite and positive"):
             models.bs_cos_price(
-                {"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.0, "expiry": 0.0, "option_type": "call"},
+                {
+                    "spot": 100.0,
+                    "strike": 100.0,
+                    "rate": 0.05,
+                    "dividend_yield": 0.0,
+                    "time_to_expiry": 0.0,
+                    "option_type": "call",
+                },
                 0.2,
             )
         with pytest.raises(RuntimeError, match="degenerate cumulant set"):
@@ -162,8 +176,8 @@ class TestModels:
                     "spot": 100.0,
                     "strike": 100.0,
                     "rate": 0.05,
-                    "div_yield": 0.0,
-                    "expiry": 1e-320,
+                    "dividend_yield": 0.0,
+                    "time_to_expiry": 1e-320,
                     "option_type": "call",
                 },
                 0.2,

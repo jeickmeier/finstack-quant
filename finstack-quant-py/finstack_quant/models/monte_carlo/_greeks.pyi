@@ -21,9 +21,9 @@ def finite_diff_delta(
         Serde form of the Rust ``GbmEuropeanFdSpec``, as a dict or JSON text.
         Required keys: ``spot`` (finite positive spot price; the down-bumped
         state must remain at least ``1e-12``); ``strike`` (same units as
-        ``spot``); ``rate`` and ``div_yield`` (continuously compounded
-        decimals); ``vol`` (annualized volatility, decimal, strictly
-        positive); ``expiry`` (years); ``option_type`` (``"call"`` or
+        ``spot``); ``rate`` and ``dividend_yield`` (continuously compounded
+        decimals); ``volatility`` (annualized volatility, decimal, strictly
+        positive); ``time_to_expiry`` (years); ``option_type`` (``"call"`` or
         ``"put"``). Optional keys, each defaulting to the registry value when
         omitted or ``None``: ``num_paths`` (paths per evaluation, default
         ``10_000``); ``seed`` (RNG seed, default ``42``); ``num_steps``
@@ -42,7 +42,7 @@ def finite_diff_delta(
     Raises
     ------
     ValueError
-        If ``spec`` has an unknown or missing key or a wrongly typed value, or ``vol`` is not strictly positive, ``spot`` or ``bump_size`` is
+        If ``spec`` has an unknown or missing key or a wrongly typed value, or ``volatility`` is not strictly positive, ``spot`` or ``bump_size`` is
         non-finite or non-positive, the symmetric down-bump falls below
         ``1e-12``, or another pricing input is invalid.
 
@@ -53,9 +53,9 @@ def finite_diff_delta(
     ...     "spot": 100,
     ...     "strike": 100,
     ...     "rate": 0.05,
-    ...     "div_yield": 0.0,
-    ...     "vol": 0.2,
-    ...     "expiry": 1.0,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
     ...     "option_type": "call",
     ...     "num_paths": 200,
     ...     "seed": 7,
@@ -82,9 +82,9 @@ def finite_diff_gamma(
         Serde form of the Rust ``GbmEuropeanFdSpec``, as a dict or JSON text.
         Required keys: ``spot`` (finite positive spot price; the down-bumped
         state must remain at least ``1e-12``); ``strike`` (same units as
-        ``spot``); ``rate`` and ``div_yield`` (continuously compounded
-        decimals); ``vol`` (annualized volatility, decimal, strictly
-        positive); ``expiry`` (years); ``option_type`` (``"call"`` or
+        ``spot``); ``rate`` and ``dividend_yield`` (continuously compounded
+        decimals); ``volatility`` (annualized volatility, decimal, strictly
+        positive); ``time_to_expiry`` (years); ``option_type`` (``"call"`` or
         ``"put"``). Optional keys, each defaulting to the registry value when
         omitted or ``None``: ``num_paths`` (paths per evaluation, default
         ``10_000``); ``seed`` (RNG seed, default ``42``); ``num_steps``
@@ -103,7 +103,7 @@ def finite_diff_gamma(
     Raises
     ------
     ValueError
-        If ``spec`` has an unknown or missing key or a wrongly typed value, or ``vol`` is not strictly positive, ``spot`` or ``bump_size`` is
+        If ``spec`` has an unknown or missing key or a wrongly typed value, or ``volatility`` is not strictly positive, ``spot`` or ``bump_size`` is
         non-finite or non-positive, the symmetric down-bump falls below
         ``1e-12``, or another pricing input is invalid.
 
@@ -114,9 +114,9 @@ def finite_diff_gamma(
     ...     "spot": 100,
     ...     "strike": 100,
     ...     "rate": 0.05,
-    ...     "div_yield": 0.0,
-    ...     "vol": 0.2,
-    ...     "expiry": 1.0,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
     ...     "option_type": "call",
     ...     "num_paths": 200,
     ...     "seed": 7,

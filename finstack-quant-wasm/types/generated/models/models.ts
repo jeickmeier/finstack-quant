@@ -2626,11 +2626,7 @@ export interface CosMarketParams {
   /**
    * Continuous dividend yield (decimal, annualized).
    */
-  div_yield: number;
-  /**
-   * Time to expiry in years.
-   */
-  expiry: number;
+  dividend_yield: number;
   /**
    * Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
    * [`CosConfig::default`].
@@ -2652,6 +2648,10 @@ export interface CosMarketParams {
    * Option strike.
    */
   strike: number;
+  /**
+   * Time to expiry in years.
+   */
+  time_to_expiry: number;
 }
 /**
  * Configuration for the deterministic credit factor-model calibrator.
@@ -4050,11 +4050,7 @@ export interface GbmEuropeanFdSpec {
   /**
    * Continuous dividend yield (decimal, annualized).
    */
-  div_yield: number;
-  /**
-   * Time to expiry in years; also the uniform-grid horizon.
-   */
-  expiry: number;
+  dividend_yield: number;
   /**
    * Independent estimators; `None` uses the registry binding default.
    * Each estimator uses two physical paths when the registry enables antithetics.
@@ -4085,9 +4081,13 @@ export interface GbmEuropeanFdSpec {
    */
   strike: number;
   /**
+   * Time to expiry in years; also the uniform-grid horizon.
+   */
+  time_to_expiry: number;
+  /**
    * Annualized GBM volatility (decimal); must be strictly positive.
    */
-  vol: number;
+  volatility: number;
 }
 /**
  * Geometric Brownian Motion parameters.

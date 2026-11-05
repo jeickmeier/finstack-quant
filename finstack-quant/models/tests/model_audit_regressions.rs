@@ -48,8 +48,8 @@ fn cos_requires_a_nonempty_expansion_and_reconciles_to_black_scholes() {
         spot: 100.0,
         strike: 100.0,
         rate: 0.05,
-        div_yield: 0.0,
-        expiry: 1.0,
+        dividend_yield: 0.0,
+        time_to_expiry: 1.0,
         option_type: OptionType::Call,
         n_terms: Some(0),
     };

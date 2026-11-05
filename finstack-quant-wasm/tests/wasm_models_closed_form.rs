@@ -242,7 +242,7 @@ fn quanto_option_price_rejects_non_finite_result() {
 #[wasm_bindgen_test]
 fn bs_cos_call_atm_is_positive() {
     let p = bs_cos_price(JsValue::from_str(
-            r#"{"spot": 100.0, "strike": 100.0, "rate": 0.05, "div_yield": 0.02, "expiry": 1.0, "option_type": "call"}"#,
+            r#"{"spot": 100.0, "strike": 100.0, "rate": 0.05, "dividend_yield": 0.02, "time_to_expiry": 1.0, "option_type": "call"}"#,
         ),
         JsValue::from(0.2),
     )
