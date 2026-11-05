@@ -23,7 +23,7 @@ cargo.binstall_native = true
 "github:wasm-bindgen/wasm-pack" = "0.15.0"
 # wasm-pack uses this only when it equals the `wasm-bindgen` crate in
 # Cargo.lock; otherwise it downloads its own. Bump it with the lockfile.
-"github:wasm-bindgen/wasm-bindgen" = "0.2.126"
+"github:wasm-bindgen/wasm-bindgen" = "0.2.130"
 # `wasm-opt` for the size-optimized web package (`wasm-pkg`).
 "aqua:WebAssembly/binaryen" = "130"
 uv = "0.10.11"
