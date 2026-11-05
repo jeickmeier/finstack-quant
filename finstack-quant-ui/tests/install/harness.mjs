@@ -97,6 +97,40 @@ async function localFixtures(repo, item, graph) {
 }
 
 /**
+ * `source` with every unannotated callback parameter typed `any`. A callback over a
+ * fixture whose type was erased to `any` has no contextual type, and the strict
+ * consumer would reject the implicit `any`; installed registry source stays strict.
+ */
+function anyParameters(from, source) {
+  const file = ts.createSourceFile(from, source, ts.ScriptTarget.Latest, true);
+  const edits = [];
+  const visit = (node) => {
+    if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+      const untyped = node.parameters.filter((parameter) => !parameter.type);
+      // `x => …` needs parentheses before its parameter can carry a type.
+      if (
+        untyped.length &&
+        !node
+          .getChildren(file)
+          .some((child) => child.kind === ts.SyntaxKind.OpenParenToken)
+      ) {
+        edits.push([untyped[0].getStart(file), "("]);
+        edits.push([untyped[0].getEnd(), ")"]);
+      }
+      for (const parameter of untyped)
+        edits.push([parameter.name.getEnd(), ": any"]);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  let text = source;
+  // Stable descending order: at one offset, ")" is applied before ": any" lands ahead of it.
+  for (const [at, insert] of edits.sort((a, b) => b[0] - a[0]))
+    text = text.slice(0, at) + insert + text.slice(at);
+  return text;
+}
+
+/**
  * Build the installed page body for one visual item: its fixture under
  * tests/install/fixture/<name>.tsx when one exists, otherwise its gallery example.
  * Unrelated gallery imports never enter its install closure.
@@ -142,8 +176,10 @@ export async function visualHarness(repo, item, graph) {
     ts
       .preProcessFile(example.source, true, true)
       .importedFiles.some(({ fileName }) => fileName === "../fixtures")
-  )
+  ) {
     extra["fixtures.ts"] = await localFixtures(repo, item, graph);
+    extra[from] = anyParameters(from, example.source);
+  }
   // An example that forwards a `presentation` prop wraps a chart: probe it through those public props.
   if (!/\bpresentation\?:/.test(example.source))
     return {
