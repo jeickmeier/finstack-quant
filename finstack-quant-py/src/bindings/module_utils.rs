@@ -117,11 +117,16 @@ pub(crate) fn attach_submodule(
 /// Typed wrappers serialize through their canonical form, standalone or
 /// nested inside lists and dicts:
 ///
-/// - `Tenor` and `DayCount` give their serde wire form (`{"count": 6,
-///   "unit": "months"}`, `"act_360"`), the form every tenor and day-count
-///   field takes; neither carries a ``to_json`` of its own.
+/// - `Tenor`, `DayCount` and the schedule enums (`BusinessDayConvention`,
+///   `StubKind`, `RollRule`, `FloatingLegCompounding`,
+///   `OvernightIndexConstraintApplication`, `FloatingRateFallback`,
+///   `FeeAccrualBasis`) give their serde wire form (`{"count": 6, "unit":
+///   "months"}`, `"act_360"`, `"short_front"`), the form those fields take;
+///   none carries a ``to_json`` of its own.
 /// - Wrappers with ``to_dict`` use it; the others use the ``to_json`` every
 ///   result and spec wrapper (and `Money`, `Currency`) exposes.
+/// - A ``decimal.Decimal`` gives its ``str``, the wire form of every exact
+///   decimal field (``"0.04"``, ``"200"``).
 /// - A ``datetime.date`` gives its ISO-8601 string, the wire form of every
 ///   date field (a ``datetime.datetime`` gives a timestamp string, which date
 ///   fields reject).
@@ -131,15 +136,39 @@ pub(crate) fn attach_submodule(
 /// JSON serializable``.
 #[pyfunction]
 fn json_default<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    use crate::bindings::cashflows::builder::specs::{
+        PyFeeAccrualBasis, PyFloatingLegCompounding, PyFloatingRateFallback,
+        PyOvernightIndexConstraintApplication, PyRollRule,
+    };
+    use crate::bindings::core::dates::calendar::PyBusinessDayConvention;
     use crate::bindings::core::dates::daycount::PyDayCount;
+    use crate::bindings::core::dates::schedule::PyStubKind;
     use crate::bindings::core::dates::tenor::PyTenor;
     use crate::bindings::pandas_utils::serde_to_py;
 
-    if let Ok(tenor) = obj.cast::<PyTenor>() {
-        return serde_to_py(py, &tenor.get().inner);
+    /// Return the serde wire form of the first matching frozen wrapper.
+    macro_rules! wire_of_wrapper {
+        ($($wrapper:ty),+ $(,)?) => {
+            $(
+                if let Ok(value) = obj.cast::<$wrapper>() {
+                    return serde_to_py(py, &value.get().inner);
+                }
+            )+
+        };
     }
-    if let Ok(day_count) = obj.cast::<PyDayCount>() {
-        return serde_to_py(py, &day_count.get().inner);
+    wire_of_wrapper!(
+        PyTenor,
+        PyDayCount,
+        PyBusinessDayConvention,
+        PyStubKind,
+        PyRollRule,
+        PyFloatingLegCompounding,
+        PyOvernightIndexConstraintApplication,
+        PyFloatingRateFallback,
+        PyFeeAccrualBasis,
+    );
+    if obj.is_instance(&py.import("decimal")?.getattr("Decimal")?)? {
+        return Ok(obj.str()?.into_any());
     }
     if obj.hasattr("to_dict")? {
         return obj.call_method0("to_dict");
@@ -242,6 +271,25 @@ pub(crate) fn spec_from_py<T: serde::de::DeserializeOwned + Send>(
             .map_err(|err| crate::errors::serde_json_to_py(err, &format!("invalid {label} JSON")));
     }
     py_to_serde(py, obj, label)
+}
+
+/// Read the keyword-only fields of a data-class constructor into its serde
+/// struct.
+///
+/// The constructor takes ``**fields``; the mapping (an empty one when no
+/// keyword was given) goes through [`py_to_serde`], so every field takes its
+/// wire form or a typed wrapper the [`json_default`] hook encodes, the Rust
+/// struct supplies the defaults, and its `deny_unknown_fields` rejects an
+/// unknown keyword (`ValueError` "invalid {label}: …").
+pub(crate) fn fields_from_py<T: serde::de::DeserializeOwned + Send>(
+    py: Python<'_>,
+    fields: Option<&Bound<'_, pyo3::types::PyDict>>,
+    label: &str,
+) -> PyResult<T> {
+    match fields {
+        Some(fields) => py_to_serde(py, fields.as_any(), label),
+        None => py_to_serde(py, pyo3::types::PyDict::new(py).as_any(), label),
+    }
 }
 
 /// [`spec_from_py`] for an optional argument: an omitted argument or `None`

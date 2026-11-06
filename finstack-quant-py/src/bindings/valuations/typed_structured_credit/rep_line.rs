@@ -2,9 +2,8 @@ use pyo3::prelude::*;
 
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
-use crate::bindings::valuations::convert::{money_from_py, money_to_py, opt_repr};
+use crate::bindings::date_utils::date_to_py;
+use crate::bindings::valuations::convert::{money_to_py, opt_repr};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::RepLine;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine")]
@@ -24,64 +23,12 @@ pub struct PyRepLine {
 impl PyRepLine {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.__init__")]
     #[new]
-    #[pyo3(signature = (id, balance, rate, maturity, seasoning_months, day_count, *, asset_type,
-                        spread_bp = None, forward_curve_id = None, index_floor_bp = None, cpr = None,
-                        cdr = None, recovery_rate = None, contractual_payment = None,
-                        amortization_term_months = None, io_months = None))]
     #[pyo3(
-        text_signature = "(id, balance, rate, maturity, seasoning_months, day_count, *, asset_type, \
-spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, recovery_rate=None, contractual_payment=None, amortization_term_months=None, io_months=None)"
+        signature = (**fields),
+        text_signature = "(*, id, balance, rate, maturity, seasoning_months, day_count, asset_type, spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, recovery_rate=None, contractual_payment=None, amortization_term_months=None, io_months=None)"
     )]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        py: Python<'_>,
-        id: &str,
-        balance: &Bound<'_, PyAny>,
-        rate: &Bound<'_, PyAny>,
-        maturity: &Bound<'_, PyAny>,
-        seasoning_months: u32,
-        day_count: PyRef<'_, PyDayCount>,
-        asset_type: &Bound<'_, PyAny>,
-        spread_bp: Option<&Bound<'_, PyAny>>,
-        forward_curve_id: Option<String>,
-        index_floor_bp: Option<f64>,
-        cpr: Option<f64>,
-        cdr: Option<f64>,
-        recovery_rate: Option<f64>,
-        contractual_payment: Option<PyRef<'_, PyMoney>>,
-        amortization_term_months: Option<u32>,
-        io_months: Option<u32>,
-    ) -> PyResult<Self> {
-        let maturity = py_to_date(maturity)?;
-        let balance = money_from_py(balance, "balance")?;
-        let rate = extract_rate_decimal(rate, "rate")?;
-        let spread_bp = spread_bp
-            .map(|value| extract_basis_points(value, "spread_bp"))
-            .transpose()?;
-        let mut inner = RepLine::new(
-            id,
-            balance,
-            rate,
-            maturity,
-            day_count.inner,
-            crate::bindings::module_utils::py_to_serde(py, asset_type, "asset_type")?,
-        );
-        inner.spread_bp = spread_bp;
-        inner.forward_curve_id = forward_curve_id;
-        inner.index_floor_bp = index_floor_bp;
-        inner.seasoning_months = seasoning_months;
-        if let Some(cpr) = cpr {
-            inner = inner.with_cpr(cpr);
-        }
-        if let Some(cdr) = cdr {
-            inner = inner.with_cdr(cdr);
-        }
-        if let Some(recovery_rate) = recovery_rate {
-            inner = inner.with_recovery_rate(recovery_rate);
-        }
-        inner.contractual_payment = contractual_payment.map(|money| money.inner);
-        inner.amortization_term_months = amortization_term_months;
-        inner.io_months = io_months;
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: RepLine = crate::bindings::module_utils::fields_from_py(py, fields, "RepLine")?;
         Ok(Self { inner })
     }
 

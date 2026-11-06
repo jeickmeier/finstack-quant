@@ -198,10 +198,20 @@ STATE = {
 GRADES = [("A", 0.01, 0.005), ("B", 0.10, 0.04), ("C", 1.0, 0.30)]
 TRANSITIONS = [[0.90, 0.08, 0.02], [0.10, 0.80, 0.10], [0.0, 0.0, 1.0]]
 GENERATOR = [[-0.10, 0.08, 0.02], [0.10, -0.20, 0.10], [0.0, 0.0, 0.0]]
+CLAIM_FIELDS = (
+    "id",
+    "seniority",
+    "priority",
+    "principal",
+    "accrued",
+    "penalties",
+    "collateral_haircut",
+    "collateral_value",
+)
 CLAIMS = [
-    ("secured", "senior_secured", 1, 100.0, 5.0, 0.0, 0.25, 60.0),
-    ("unsecured", "senior_unsecured", 2, 80.0, 0.0, 0.0, 0.0, None),
-    ("junior", "subordinated", 3, 50.0, 0.0, 1.0, 0.0, None),
+    dict(zip(CLAIM_FIELDS, ("secured", "senior_secured", 1, 100.0, 5.0, 0.0, 0.25, 60.0), strict=True)),
+    dict(zip(CLAIM_FIELDS, ("unsecured", "senior_unsecured", 2, 80.0, 0.0, 0.0, 0.0, None), strict=True)),
+    dict(zip(CLAIM_FIELDS, ("junior", "subordinated", 3, 50.0, 0.0, 1.0, 0.0, None), strict=True)),
 ]
 # The same workout model and scoring inputs are in `models_parity.test.mjs`.
 WORKOUT = {
@@ -310,15 +320,15 @@ def _master_scale() -> pd_models.MasterScale:
 
 def _profile() -> liquidity.LiquidityProfile:
     return liquidity.LiquidityProfile(
-        PROFILE["instrument_id"],
-        PROFILE["mid"],
-        PROFILE["bid"],
-        PROFILE["ask"],
-        PROFILE["avg_daily_volume"],
-        PROFILE["avg_trade_size"],
-        PROFILE["spread_volatility"],
-        PROFILE["spread_volatility_kind"],
-        PROFILE["observation_days"],
+        instrument_id=PROFILE["instrument_id"],
+        mid=PROFILE["mid"],
+        bid=PROFILE["bid"],
+        ask=PROFILE["ask"],
+        avg_daily_volume=PROFILE["avg_daily_volume"],
+        avg_trade_size=PROFILE["avg_trade_size"],
+        spread_volatility=PROFILE["spread_volatility"],
+        spread_volatility_kind=PROFILE["spread_volatility_kind"],
+        observation_days=PROFILE["observation_days"],
     )
 
 
@@ -535,7 +545,7 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             _json(scoring.credit_score_report({"model": "altman_z_score", "input": ALTMAN_Z})),
         ],
         "recovery_waterfall": lambda: _json(
-            recovery_waterfall.allocate_recovery(120.0, [recovery_waterfall.RecoveryClaim(*claim) for claim in CLAIMS])
+            recovery_waterfall.allocate_recovery(120.0, [recovery_waterfall.RecoveryClaim(**claim) for claim in CLAIMS])
         ),
         "migration.scale": lambda: [
             migration.RatingScale.standard().n_states,

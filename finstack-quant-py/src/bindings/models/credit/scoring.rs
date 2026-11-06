@@ -20,7 +20,13 @@ use crate::errors::{core_to_py, kinded_to_py};
 /// A frozen pyclass over one scoring input struct: a keyword-only constructor
 /// and one getter per Rust field, all decimal ratios.
 macro_rules! scoring_input {
-    ($py_type:ident, $rust_type:ident, $name:literal, [$($field:ident),+ $(,)?]) => {
+    (
+        $py_type:ident,
+        $rust_type:ident,
+        $name:literal,
+        $text_signature:literal,
+        [$($field:ident),+ $(,)?]
+    ) => {
         #[doc = pydoc!("finstack_quant.models.credit.scoring", $name)]
         #[pyclass(
             module = "finstack_quant.models.credit.scoring",
@@ -38,12 +44,14 @@ macro_rules! scoring_input {
         impl $py_type {
             #[doc = pydoc!("finstack_quant.models.credit.scoring", concat!($name, ".__init__"))]
             #[new]
-            #[pyo3(signature = (*, $($field),+))]
-            #[allow(clippy::too_many_arguments)]
-            fn new($($field: f64),+) -> Self {
-                Self {
-                    inner: $rust_type { $($field),+ },
-                }
+            #[pyo3(signature = (**fields), text_signature = $text_signature)]
+            fn new(
+                py: Python<'_>,
+                fields: Option<&Bound<'_, pyo3::types::PyDict>>,
+            ) -> PyResult<Self> {
+                Ok(Self {
+                    inner: crate::bindings::module_utils::fields_from_py(py, fields, $name)?,
+                })
             }
 
             $(
@@ -76,6 +84,7 @@ scoring_input!(
     PyAltmanZScoreInput,
     AltmanZScoreInput,
     "AltmanZScoreInput",
+    "(*, working_capital_to_total_assets, retained_earnings_to_total_assets, ebit_to_total_assets, market_equity_to_total_liabilities, sales_to_total_assets)",
     [
         working_capital_to_total_assets,
         retained_earnings_to_total_assets,
@@ -89,6 +98,7 @@ scoring_input!(
     PyAltmanZPrimeInput,
     AltmanZPrimeInput,
     "AltmanZPrimeInput",
+    "(*, working_capital_to_total_assets, retained_earnings_to_total_assets, ebit_to_total_assets, book_equity_to_total_liabilities, sales_to_total_assets)",
     [
         working_capital_to_total_assets,
         retained_earnings_to_total_assets,
@@ -102,6 +112,7 @@ scoring_input!(
     PyAltmanZDoublePrimeInput,
     AltmanZDoublePrimeInput,
     "AltmanZDoublePrimeInput",
+    "(*, working_capital_to_total_assets, retained_earnings_to_total_assets, ebit_to_total_assets, book_equity_to_total_liabilities)",
     [
         working_capital_to_total_assets,
         retained_earnings_to_total_assets,
@@ -114,6 +125,7 @@ scoring_input!(
     PyOhlsonOScoreInput,
     OhlsonOScoreInput,
     "OhlsonOScoreInput",
+    "(*, log_total_assets_adjusted, total_liabilities_to_total_assets, working_capital_to_total_assets, current_liabilities_to_current_assets, liabilities_exceed_assets, net_income_to_total_assets, funds_from_operations_to_total_liabilities, negative_net_income_two_years, net_income_change)",
     [
         log_total_assets_adjusted,
         total_liabilities_to_total_assets,
@@ -131,6 +143,7 @@ scoring_input!(
     PyZmijewskiInput,
     ZmijewskiInput,
     "ZmijewskiInput",
+    "(*, net_income_to_total_assets, total_liabilities_to_total_assets, current_assets_to_current_liabilities)",
     [
         net_income_to_total_assets,
         total_liabilities_to_total_assets,

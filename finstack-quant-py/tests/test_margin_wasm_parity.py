@@ -181,10 +181,30 @@ def frtb_sensitivities() -> FrtbSensitivities:
 def saccr_trades() -> list[SaCcrTrade]:
     return [
         SaCcrTrade(
-            "t1", "interest_rate", 1_000_000.0, "2025-01-15", "2030-01-15", "USD", "USD", 1.0, 1.0, 12_000.0, False
+            trade_id="t1",
+            asset_class="interest_rate",
+            notional=1_000_000.0,
+            start_date="2025-01-15",
+            end_date="2030-01-15",
+            underlier="USD",
+            hedging_set="USD",
+            direction=1.0,
+            supervisory_delta=1.0,
+            mtm=12_000.0,
+            is_option=False,
         ),
         SaCcrTrade(
-            "t2", "interest_rate", 500_000.0, "2025-01-15", "2027-01-15", "USD", "USD", -1.0, -1.0, -3_000.0, False
+            trade_id="t2",
+            asset_class="interest_rate",
+            notional=500_000.0,
+            start_date="2025-01-15",
+            end_date="2027-01-15",
+            underlier="USD",
+            hedging_set="USD",
+            direction=-1.0,
+            supervisory_delta=-1.0,
+            mtm=-3_000.0,
+            is_option=False,
         ),
     ]
 

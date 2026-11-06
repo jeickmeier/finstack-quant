@@ -147,7 +147,6 @@ pub fn lvar_bangia(
 /// Throws a JavaScript exception if an input violates the stated finiteness,
 /// sign, or range contract, calculation fails, or conversion fails.
 #[wasm_bindgen(js_name = almgrenChrissImpact, unchecked_return_type = "ImpactEstimate")]
-#[allow(clippy::too_many_arguments)]
 pub fn almgren_chriss_impact(
     #[wasm_bindgen(js_name = "positionSize", unchecked_param_type = "number")]
     position_size: JsValue,

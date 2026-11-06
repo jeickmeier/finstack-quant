@@ -767,7 +767,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json",
-      "bytes": 1556,
+      "bytes": 1589,
       "kind": "component",
       "path": "schemas/models/1/recovery_claim.schema.json",
       "summary": "A claim participating in a recovery waterfall.",
@@ -947,7 +947,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/trade_params.schema.json",
-      "bytes": 5814,
+      "bytes": 5889,
       "kind": "input",
       "path": "schemas/models/1/trade_params.schema.json",
       "summary": "Input parameters for a market impact calculation.",

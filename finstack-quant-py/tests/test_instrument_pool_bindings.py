@@ -89,7 +89,15 @@ def pool_deal(
         )
     )
     deal = StructuredCredit.new_standard(
-        "clo", StandardDealParams("POOL-DEAL", pool, tranches(48_600_000.0, 5_400_000.0), AS_OF, MATURITY, "USD-OIS")
+        "clo",
+        StandardDealParams(
+            id="POOL-DEAL",
+            pool=pool,
+            tranches=tranches(48_600_000.0, 5_400_000.0),
+            closing_date=AS_OF,
+            maturity=MATURITY,
+            discount_curve_id="USD-OIS",
+        ),
     )
     return StructuredCredit.from_json(json.dumps(_with_calendar(json.loads(deal.to_json()))))
 
@@ -251,7 +259,14 @@ def test_reinvestment_period_round_trips_but_is_rejected_for_instrument_collater
     with pytest.raises(ValueError, match="reinvestment_period is not supported for instrument collateral"):
         StructuredCredit.new_standard(
             "clo",
-            StandardDealParams("POOL-DEAL", pool, tranches(48_600_000.0, 5_400_000.0), AS_OF, MATURITY, "USD-OIS"),
+            StandardDealParams(
+                id="POOL-DEAL",
+                pool=pool,
+                tranches=tranches(48_600_000.0, 5_400_000.0),
+                closing_date=AS_OF,
+                maturity=MATURITY,
+                discount_curve_id="USD-OIS",
+            ),
         )
     with pytest.raises(ValueError, match="reinvestment_period"):
         AssetPool("P", "clo", Currency("USD")).with_reinvestment_period({"end": "2028-01-15"})

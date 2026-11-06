@@ -4447,10 +4447,11 @@ export interface LiquidityProfile {
   /**
    * Observation window in trading days for volume/spread statistics.
    *
-   * Defaults to 20 (one calendar month). Used to qualify the
-   * statistical reliability of ADV and spread estimates.
+   * Defaults to 20 (one calendar month) when omitted from the wire form.
+   * Used to qualify the statistical reliability of ADV and spread
+   * estimates.
    */
-  observation_days: number;
+  observation_days?: number;
   /**
    * Standard deviation of the bid-ask spread.
    *
@@ -4463,9 +4464,10 @@ export interface LiquidityProfile {
    */
   spread_volatility: number;
   /**
-   * Interpretation of [`Self::spread_volatility`]: relative or absolute.
+   * Interpretation of [`Self::spread_volatility`]: relative or absolute
+   * (`relative` when omitted from the wire form).
    */
-  spread_volatility_kind: SpreadVolatilityKind;
+  spread_volatility_kind?: SpreadVolatilityKind;
 }
 /**
  * Issuer-side economics of a liability management exercise.
@@ -5929,7 +5931,6 @@ export interface RecoveryClaim {
    * Caller-defined seniority label used for reporting.
    */
   seniority: string;
-  [k: string]: unknown;
 }
 /**
  * Result of allocating a distributable estate across claims.

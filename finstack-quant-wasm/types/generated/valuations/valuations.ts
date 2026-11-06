@@ -18222,8 +18222,9 @@ export interface CdsTrancheParams {
   notional: Money;
   /**
    * Realized (settled) loss as a decimal fraction of the original portfolio notional, in `[0.0, 1.0]`
+   * (`0.0` when omitted from the wire form).
    */
-  realized_loss: number;
+  realized_loss?: number;
   /**
    * Index series
    */
@@ -21116,6 +21117,41 @@ export interface OasResult {
    */
   price_std_error: number;
   [k: string]: unknown;
+}
+/**
+ * Account balances and performance tallies of a seasoned structured-credit pool.
+ */
+export interface PoolAccounts {
+  /**
+   * Collection account balance ([`AssetPool::collection_account`]).
+   */
+  collection_account?: Money | null;
+  /**
+   * Cumulative defaults to date ([`AssetPool::cumulative_defaults`]).
+   */
+  cumulative_defaults?: Money | null;
+  /**
+   * Cumulative voluntary prepayments ([`AssetPool::cumulative_prepayments`]).
+   */
+  cumulative_prepayments?: Money | null;
+  /**
+   * Cumulative recoveries on defaulted assets
+   * ([`AssetPool::cumulative_recoveries`]).
+   */
+  cumulative_recoveries?: Money | null;
+  /**
+   * Cumulative scheduled amortization
+   * ([`AssetPool::cumulative_scheduled_amortization`]).
+   */
+  cumulative_scheduled_amortization?: Money | null;
+  /**
+   * Excess spread account balance ([`AssetPool::excess_spread_account`]).
+   */
+  excess_spread_account?: Money | null;
+  /**
+   * Original (cut-off) pool balance ([`AssetPool::original_balance`]).
+   */
+  original_balance?: Money | null;
 }
 /**
  * Balance held by one obligor, industry or rating, as a row of a [`PoolReport`]

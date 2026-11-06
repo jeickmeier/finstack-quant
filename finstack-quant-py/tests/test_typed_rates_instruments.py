@@ -192,14 +192,22 @@ class TestInterestRateSwapTyped:
         start = datetime.date(2024, 1, 15)
         end = datetime.date(2029, 1, 15)
         fixed = FixedLegSpec(
-            "USD-OIS",
-            0.04,
-            Tenor.semi_annual(),
-            DayCount.THIRTY_360,
-            start,
-            end,
+            discount_curve_id="USD-OIS",
+            rate="0.04",
+            frequency=Tenor.semi_annual(),
+            day_count=DayCount.THIRTY_360,
+            start=start,
+            end=end,
         )
-        float_leg = FloatLegSpec("USD-OIS", "USD-SOFR-3M", 0.0, Tenor.quarterly(), DayCount.ACT_360, start, end)
+        float_leg = FloatLegSpec(
+            discount_curve_id="USD-OIS",
+            forward_curve_id="USD-SOFR-3M",
+            spread_bp="0",
+            frequency=Tenor.quarterly(),
+            day_count=DayCount.ACT_360,
+            start=start,
+            end=end,
+        )
         swap = (
             InterestRateSwap
             .builder()
@@ -218,7 +226,7 @@ class TestFixedLegSpecTyped:
         """Every keyword-only parameter name must match its text_signature."""
         leg = FixedLegSpec(
             discount_curve_id="USD-OIS",
-            rate=0.04,
+            rate="0.04",
             frequency=Tenor.semi_annual(),
             day_count=DayCount.THIRTY_360,
             start=datetime.date(2024, 1, 15),
@@ -235,12 +243,12 @@ class TestFixedLegSpecTyped:
     def test_every_business_day_convention_literal_value_accepted(self, business_day_convention: str) -> None:
         """Every value in the `business_day_convention` stub Literal must be a real accepted wire value."""
         leg = FixedLegSpec(
-            "USD-OIS",
-            0.04,
-            Tenor.semi_annual(),
-            DayCount.THIRTY_360,
-            datetime.date(2024, 1, 15),
-            datetime.date(2029, 1, 15),
+            discount_curve_id="USD-OIS",
+            rate="0.04",
+            frequency=Tenor.semi_annual(),
+            day_count=DayCount.THIRTY_360,
+            start=datetime.date(2024, 1, 15),
+            end=datetime.date(2029, 1, 15),
             business_day_convention=business_day_convention,
         )
         assert "0.04" in repr(leg)
@@ -249,12 +257,12 @@ class TestFixedLegSpecTyped:
     def test_every_stub_literal_value_accepted(self, stub: str) -> None:
         """Every value in the `stub` Literal (including `"none"`) must be a real accepted wire value."""
         leg = FixedLegSpec(
-            "USD-OIS",
-            0.04,
-            Tenor.semi_annual(),
-            DayCount.THIRTY_360,
-            datetime.date(2024, 1, 15),
-            datetime.date(2029, 1, 15),
+            discount_curve_id="USD-OIS",
+            rate="0.04",
+            frequency=Tenor.semi_annual(),
+            day_count=DayCount.THIRTY_360,
+            start=datetime.date(2024, 1, 15),
+            end=datetime.date(2029, 1, 15),
             stub=stub,
         )
         assert "0.04" in repr(leg)
@@ -265,13 +273,13 @@ class TestFloatLegSpecTyped:
     def test_every_business_day_convention_literal_value_accepted(self, business_day_convention: str) -> None:
         """Every value in the `business_day_convention` stub Literal must be a real accepted wire value."""
         leg = FloatLegSpec(
-            "USD-OIS",
-            "USD-SOFR-3M",
-            0.0,
-            Tenor.quarterly(),
-            DayCount.ACT_360,
-            datetime.date(2024, 1, 15),
-            datetime.date(2029, 1, 15),
+            discount_curve_id="USD-OIS",
+            forward_curve_id="USD-SOFR-3M",
+            spread_bp="0",
+            frequency=Tenor.quarterly(),
+            day_count=DayCount.ACT_360,
+            start=datetime.date(2024, 1, 15),
+            end=datetime.date(2029, 1, 15),
             business_day_convention=business_day_convention,
         )
         assert "spread_bp=0" in repr(leg)
@@ -280,13 +288,13 @@ class TestFloatLegSpecTyped:
     def test_every_stub_literal_value_accepted(self, stub: str) -> None:
         """Every value in the `stub` Literal (including `"none"`) must be a real accepted wire value."""
         leg = FloatLegSpec(
-            "USD-OIS",
-            "USD-SOFR-3M",
-            0.0,
-            Tenor.quarterly(),
-            DayCount.ACT_360,
-            datetime.date(2024, 1, 15),
-            datetime.date(2029, 1, 15),
+            discount_curve_id="USD-OIS",
+            forward_curve_id="USD-SOFR-3M",
+            spread_bp="0",
+            frequency=Tenor.quarterly(),
+            day_count=DayCount.ACT_360,
+            start=datetime.date(2024, 1, 15),
+            end=datetime.date(2029, 1, 15),
             stub=stub,
         )
         assert "spread_bp=0" in repr(leg)
@@ -296,7 +304,7 @@ class TestFloatLegSpecTyped:
         leg = FloatLegSpec(
             discount_curve_id="USD-OIS",
             forward_curve_id="USD-SOFR-3M",
-            spread_bp=0.0,
+            spread_bp="0",
             frequency=Tenor.quarterly(),
             day_count=DayCount.ACT_360,
             start=datetime.date(2024, 1, 15),

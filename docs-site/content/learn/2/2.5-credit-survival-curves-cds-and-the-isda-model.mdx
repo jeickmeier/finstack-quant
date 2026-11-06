@@ -213,7 +213,7 @@ from finstack_quant.calibration import calibrate
 from finstack_quant.valuations.instruments import CreditDefaultSwap,PremiumLegSpec,ProtectionLegSpec,price_instrument
 from _shared.analyst_book import calibration_envelope
 AS_OF = date(2025, 1, 15)
-premium=PremiumLegSpec('2025-03-20','2030-03-20',Tenor.quarterly(),DayCount.ACT_360,100.,'USD-OIS',calendar_id='usny',business_day_convention='following',roll_rule=RollRule.CDS_IMM)
+premium=PremiumLegSpec(start='2025-03-20', end='2030-03-20', frequency=Tenor.quarterly(), day_count=DayCount.ACT_360, coupon_bp="100", discount_curve_id='USD-OIS', calendar_id='usny', business_day_convention='following', roll_rule=RollRule.CDS_IMM)
 protection=ProtectionLegSpec('ACME-HZD',.4,3)
 cds=(CreditDefaultSwap.builder().id('TYPED-ACME-CDS').notional(Money(1_000_000,'USD')).side('pay')
  .convention('isda_na').premium_leg(premium).protection_leg(protection).build())

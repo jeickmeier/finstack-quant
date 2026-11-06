@@ -120,12 +120,12 @@ def _fx_market() -> MarketContext:
 
 def _cds_legs() -> tuple[PremiumLegSpec, ProtectionLegSpec]:
     premium = PremiumLegSpec(
-        datetime.date(2024, 3, 20),
-        datetime.date(2029, 6, 20),
-        Tenor.quarterly(),
-        DayCount.ACT_360,
-        100.0,
-        "USD-OIS",
+        start=datetime.date(2024, 3, 20),
+        end=datetime.date(2029, 6, 20),
+        frequency=Tenor.quarterly(),
+        day_count=DayCount.ACT_360,
+        coupon_bp="100",
+        discount_curve_id="USD-OIS",
         roll_rule=RollRule.CDS_IMM,
     )
     return premium, ProtectionLegSpec("CORP-HAZARD", 0.4, 3)
@@ -350,7 +350,16 @@ class TestCdsTranche:
         assert tranche.upfront[0] == datetime.date(2024, 6, 25)
         assert tranche.business_day_convention == "modified_following"
         with pytest.raises(ValueError, match="realized_loss"):
-            CdsTrancheParams("CDX.NA.IG", 42, 0.0, 3.0, Money(1.0, USD), "2029-12-20", 100.0, realized_loss=2.0)
+            CdsTrancheParams(
+                index_name="CDX.NA.IG",
+                series=42,
+                attach_pct=0.0,
+                detach_pct=3.0,
+                notional=Money(1.0, USD),
+                maturity="2029-12-20",
+                coupon_bp=100.0,
+                realized_loss=2.0,
+            )
 
 
 class TestConvertibleBond:

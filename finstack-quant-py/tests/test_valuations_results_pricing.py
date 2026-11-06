@@ -79,21 +79,21 @@ def _swap() -> InterestRateSwap:
     start = datetime.date(2024, 1, 17)
     end = datetime.date(2029, 1, 17)
     fixed = FixedLegSpec(
-        "USD-OIS",
-        0.04,
-        Tenor.semi_annual(),
-        DayCount.THIRTY_360,
-        start,
-        end,
+        discount_curve_id="USD-OIS",
+        rate="0.04",
+        frequency=Tenor.semi_annual(),
+        day_count=DayCount.THIRTY_360,
+        start=start,
+        end=end,
     )
     floating = FloatLegSpec(
-        "USD-OIS",
-        "USD-SOFR-3M",
-        0.0,
-        Tenor.quarterly(),
-        DayCount.ACT_360,
-        start,
-        end,
+        discount_curve_id="USD-OIS",
+        forward_curve_id="USD-SOFR-3M",
+        spread_bp="0",
+        frequency=Tenor.quarterly(),
+        day_count=DayCount.ACT_360,
+        start=start,
+        end=end,
     )
     return (
         InterestRateSwap
@@ -249,23 +249,23 @@ def test_validation_failure_raises_value_error() -> None:
         .side("pay")
         .fixed_leg(
             FixedLegSpec(
-                "USD-OIS",
-                0.04,
-                Tenor.semi_annual(),
-                DayCount.THIRTY_360,
-                start,
-                end,
+                discount_curve_id="USD-OIS",
+                rate="0.04",
+                frequency=Tenor.semi_annual(),
+                day_count=DayCount.THIRTY_360,
+                start=start,
+                end=end,
             )
         )
         .float_leg(
             FloatLegSpec(
-                "USD-OIS",
-                "USD-SOFR-3M",
-                0.0,
-                Tenor.quarterly(),
-                DayCount.ACT_360,
-                start,
-                end,
+                discount_curve_id="USD-OIS",
+                forward_curve_id="USD-SOFR-3M",
+                spread_bp="0",
+                frequency=Tenor.quarterly(),
+                day_count=DayCount.ACT_360,
+                start=start,
+                end=end,
             )
         )
         .build()

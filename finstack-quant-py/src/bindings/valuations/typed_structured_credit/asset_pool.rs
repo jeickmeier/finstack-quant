@@ -9,7 +9,7 @@ use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::errors::serde_json_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CallExercisePolicy, DealType, InstrumentCollateral, InstrumentExerciseOverride,
-    PutExercisePolicy, ReinvestmentPeriod,
+    PoolAccounts, PutExercisePolicy, ReinvestmentPeriod,
 };
 
 use super::super::convert::enum_from_str;
@@ -172,45 +172,20 @@ impl PyAssetPool {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.with_accounts")]
-    #[pyo3(signature = (*, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None, original_balance=None))]
     #[pyo3(
+        signature = (**accounts),
         text_signature = "($self, *, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None, original_balance=None)"
     )]
-    // PyO3 binding: one keyword per pool account field.
-    #[allow(clippy::too_many_arguments)]
     fn with_accounts(
         &self,
-        cumulative_defaults: Option<PyRef<'_, PyMoney>>,
-        cumulative_recoveries: Option<PyRef<'_, PyMoney>>,
-        cumulative_prepayments: Option<PyRef<'_, PyMoney>>,
-        cumulative_scheduled_amortization: Option<PyRef<'_, PyMoney>>,
-        collection_account: Option<PyRef<'_, PyMoney>>,
-        excess_spread_account: Option<PyRef<'_, PyMoney>>,
-        original_balance: Option<PyRef<'_, PyMoney>>,
-    ) -> Self {
-        let mut inner = self.inner.clone();
-        if let Some(value) = original_balance {
-            inner.original_balance = Some(value.inner);
-        }
-        if let Some(value) = cumulative_defaults {
-            inner.cumulative_defaults = value.inner;
-        }
-        if let Some(value) = cumulative_recoveries {
-            inner.cumulative_recoveries = value.inner;
-        }
-        if let Some(value) = cumulative_prepayments {
-            inner.cumulative_prepayments = value.inner;
-        }
-        if let Some(value) = cumulative_scheduled_amortization {
-            inner.cumulative_scheduled_amortization = value.inner;
-        }
-        if let Some(value) = collection_account {
-            inner.collection_account = value.inner;
-        }
-        if let Some(value) = excess_spread_account {
-            inner.excess_spread_account = value.inner;
-        }
-        Self { inner }
+        py: Python<'_>,
+        accounts: Option<&Bound<'_, pyo3::types::PyDict>>,
+    ) -> PyResult<Self> {
+        let accounts: PoolAccounts =
+            crate::bindings::module_utils::fields_from_py(py, accounts, "PoolAccounts")?;
+        Ok(Self {
+            inner: self.inner.clone().with_accounts(accounts),
+        })
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.from_json")]

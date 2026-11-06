@@ -99,9 +99,18 @@ def test_typed_constructors_require_the_fields_rust_requires() -> None:
     """No binding-invented Act/360 day count or 0% appraisal reduction (VALB-003)."""
     with pytest.raises(TypeError, match="appraisal_reduction_pct"):
         SpecialServicingSpec()  # type: ignore[call-arg]
-    with pytest.raises(TypeError, match="day_count"):
-        PoolAsset("L1", {"type": "first_lien_loan"}, usd(1_000_000.0), 0.08, MATURITY)  # type: ignore[call-arg]
-    loan = PoolAsset("L1", {"type": "first_lien_loan"}, usd(1_000_000.0), 0.08, MATURITY, day_count=DayCount.THIRTY_360)
+    with pytest.raises(ValueError, match="missing field `day_count`"):
+        PoolAsset(
+            id="L1", asset_type={"type": "first_lien_loan"}, balance=usd(1_000_000.0), rate=0.08, maturity=MATURITY
+        )  # type: ignore[call-arg]
+    loan = PoolAsset(
+        id="L1",
+        asset_type={"type": "first_lien_loan"},
+        balance=usd(1_000_000.0),
+        rate=0.08,
+        maturity=MATURITY,
+        day_count=DayCount.THIRTY_360,
+    )
     assert PoolAsset.from_json(loan.to_json()).to_json() == loan.to_json()
 
 
@@ -125,11 +134,11 @@ def test_penalty_and_event_accessors_follow_the_kind() -> None:
 def test_typed_specs_are_accepted_by_pool_asset_and_the_deal_prices() -> None:
     """A conduit CMBS assembled from typed terms only."""
     loan = PoolAsset(
-        "L1",
-        {"type": "commercial_mortgage", "ltv": None},
-        usd(10_000_000.0),
-        0.06,
-        MATURITY,
+        id="L1",
+        asset_type={"type": "commercial_mortgage", "ltv": None},
+        balance=usd(10_000_000.0),
+        rate=0.06,
+        maturity=MATURITY,
         day_count=DayCount.THIRTY_360,
         io_months=60,
         balloon=BalloonSpec(0.3, 24, extension_rate=0.07, loss_prob=0.1, severity_pct=40.0, workout_months=12),
@@ -139,11 +148,11 @@ def test_typed_specs_are_accepted_by_pool_asset_and_the_deal_prices() -> None:
     assert loan.balloon["extension_months"] == 24
     assert loan.prepayment_penalty == {"kind": "lockout", "through": "2026-01-15"}
     npl = PoolAsset(
-        "N1",
-        {"type": "commercial_mortgage", "ltv": None},
-        usd(2_000_000.0),
-        0.0,
-        MATURITY,
+        id="N1",
+        asset_type={"type": "commercial_mortgage", "ltv": None},
+        balance=usd(2_000_000.0),
+        rate=0.0,
+        maturity=MATURITY,
         day_count=DayCount.ACT_360,
         liquidation=LiquidationSpec(18, 65.0, carry_cost_pct=5.0),
     )

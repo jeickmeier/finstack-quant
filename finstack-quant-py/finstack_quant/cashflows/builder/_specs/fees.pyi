@@ -225,37 +225,42 @@ class FeeSpec:
 
     @staticmethod
     def periodic_bp(
-        base: FeeBase,
-        bp: Decimal | float | str,
-        frequency: Tenor | str,
-        day_count: DayCount,
+        *,
+        base: FeeBase | str | dict[str, Any],
+        bp: Decimal | str,
+        frequency: Tenor,
+        day_count: DayCount | str,
         calendar_id: str,
-        business_day_convention: BusinessDayConvention | str | None = None,
-        stub: StubKind | None = None,
-        accrual_basis: FeeAccrualBasis | None = None,
+        business_day_convention: BusinessDayConvention | str = "modified_following",
+        stub: StubKind | str = "short_front",
+        accrual_basis: FeeAccrualBasis | str = "point_in_time",
     ) -> FeeSpec:
         """
         Periodic fee quoted in basis points per annum, accrued over generated periods.
 
+        The keyword-only fields are the Rust ``FeeSpec::PeriodicBp`` variant:
+        Rust supplies the defaults below and rejects an unknown keyword.
+
         Parameters
         ----------
-        base : FeeBase
+        base : FeeBase | str | dict
             Economic balance the fee accrues against (drawn or undrawn).
-        bp : decimal.Decimal | float
-            Fee quote in basis points per annum.
-        frequency : Tenor | str
+        bp : decimal.Decimal | str
+            Fee quote in basis points per annum, as an exact decimal
+            (``"25"``); a ``float`` is rejected.
+        frequency : Tenor
             Accrual and payment frequency for the fee schedule.
-        day_count : DayCount
+        day_count : DayCount | str
             Day-count convention used to annualize the fee accrual.
         calendar_id : str
             Holiday calendar id used with *business_day_convention*.
-        business_day_convention : BusinessDayConvention | str, optional
+        business_day_convention : BusinessDayConvention | str
             Business-day convention applied to generated fee dates (default
-            Modified Following, the Rust wire default).
-        stub : StubKind, optional
-            Stub-handling rule for irregular periods (default short-front).
-        accrual_basis : FeeAccrualBasis, optional
-            How the outstanding balance is sampled (default point-in-time).
+            ``"modified_following"``).
+        stub : StubKind | str
+            Stub-handling rule for irregular periods (default ``"short_front"``).
+        accrual_basis : FeeAccrualBasis | str
+            How the outstanding balance is sampled (default ``"point_in_time"``).
 
         Returns
         -------
@@ -265,12 +270,11 @@ class FeeSpec:
         Raises
         ------
         TypeError
-            If *bp* is not a ``Decimal``, ``float``, or ``int``, or if a
-            convention argument is neither its documented wrapper nor a
-            string.
+            If a positional argument is passed, or a value is not
+            JSON-encodable (neither a wire value nor a typed wrapper).
         ValueError
-            If *bp* cannot be represented as a finite ``Decimal``, or a
-            tenor or business-day convention string is invalid.
+            If a required field is missing, a keyword is unknown, *bp* is not
+            an exact-decimal string, or a label is invalid.
 
         Examples
         --------
@@ -279,7 +283,7 @@ class FeeSpec:
         >>> from finstack_quant.core.money import Money
         >>> spec = FeeSpec.periodic_bp(
         ...     base=FeeBase.undrawn(commitment=Money(10_000_000.0, "USD")),
-        ...     bp=50,
+        ...     bp="50",
         ...     frequency=Tenor.quarterly(),
         ...     day_count=DayCount.ACT_360,
         ...     business_day_convention="modified_following",
@@ -484,7 +488,17 @@ class FeeSpec:
         --------
         >>> from finstack_quant.cashflows.builder import FeeBase, FeeSpec
         >>> from finstack_quant.core.dates import DayCount
-        >>> isinstance(FeeSpec.periodic_bp(FeeBase.DRAWN, 25, "3M", DayCount.ACT_360, "weekends_only").to_json(), str)
+        >>> from finstack_quant.core.dates import Tenor
+        >>> isinstance(
+        ...     FeeSpec.periodic_bp(
+        ...         base=FeeBase.DRAWN,
+        ...         bp="25",
+        ...         frequency=Tenor.parse("3M"),
+        ...         day_count=DayCount.ACT_360,
+        ...         calendar_id="weekends_only",
+        ...     ).to_json(),
+        ...     str,
+        ... )
         True
         """
         ...
@@ -513,7 +527,14 @@ class FeeSpec:
         --------
         >>> from finstack_quant.cashflows.builder import FeeBase, FeeSpec
         >>> from finstack_quant.core.dates import DayCount
-        >>> value = FeeSpec.periodic_bp(FeeBase.DRAWN, 25, "3M", DayCount.ACT_360, "weekends_only")
+        >>> from finstack_quant.core.dates import Tenor
+        >>> value = FeeSpec.periodic_bp(
+        ...     base=FeeBase.DRAWN,
+        ...     bp="25",
+        ...     frequency=Tenor.parse("3M"),
+        ...     day_count=DayCount.ACT_360,
+        ...     calendar_id="weekends_only",
+        ... )
         >>> FeeSpec.from_json(value.to_json()).to_json() == value.to_json()
         True
         """

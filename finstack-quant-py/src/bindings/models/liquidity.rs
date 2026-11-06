@@ -17,7 +17,7 @@ use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_models::liquidity::{
     self, AlmgrenChrissModel, ExecutionTrajectory, ImpactEstimate, KyleLambdaModel,
-    LiquidityProfile, LvarBangiaScalar, SpreadVolatilityKind, TradeParams,
+    LiquidityProfile, LvarBangiaScalar, TradeParams,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
@@ -44,51 +44,13 @@ impl PyLiquidityProfile {
 #[pymethods]
 impl PyLiquidityProfile {
     #[new]
-    #[pyo3(signature = (
-        instrument_id,
-        mid,
-        bid,
-        ask,
-        avg_daily_volume,
-        avg_trade_size,
-        spread_volatility,
-        spread_volatility_kind = None,
-        observation_days = None,
-    ))]
     #[pyo3(
-        text_signature = "(instrument_id, mid, bid, ask, avg_daily_volume, avg_trade_size, spread_volatility, spread_volatility_kind=None, observation_days=None)"
+        signature = (**fields),
+        text_signature = "(*, instrument_id, mid, bid, ask, avg_daily_volume, avg_trade_size, spread_volatility, spread_volatility_kind='relative', observation_days=20)"
     )]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        instrument_id: String,
-        mid: f64,
-        bid: f64,
-        ask: f64,
-        avg_daily_volume: f64,
-        avg_trade_size: f64,
-        spread_volatility: f64,
-        spread_volatility_kind: Option<&str>,
-        observation_days: Option<u32>,
-    ) -> PyResult<Self> {
-        let mut inner = LiquidityProfile::new(
-            instrument_id,
-            mid,
-            bid,
-            ask,
-            avg_daily_volume,
-            avg_trade_size,
-            spread_volatility,
-        )
-        .map_err(core_to_py)?;
-        if let Some(kind) = spread_volatility_kind {
-            inner = inner.with_spread_volatility_kind(
-                finstack_quant_core::wire::serde_parse::<SpreadVolatilityKind>(kind)
-                    .map_err(core_to_py)?,
-            );
-        }
-        if let Some(days) = observation_days {
-            inner = inner.with_observation_days(days).map_err(core_to_py)?;
-        }
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: LiquidityProfile =
+            crate::bindings::module_utils::fields_from_py(py, fields, "LiquidityProfile")?;
         Ok(Self { inner })
     }
 
@@ -757,7 +719,6 @@ fn lvar_bangia(
     temporary_impact_coef,
     reference_price = None,
 ))]
-#[allow(clippy::too_many_arguments)]
 fn almgren_chriss_impact(
     position_size: f64,
     avg_daily_volume: f64,

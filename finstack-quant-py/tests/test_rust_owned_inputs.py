@@ -75,13 +75,21 @@ def test_vol_quote_optional_fields_take_the_rust_authoring_defaults() -> None:
 
 
 def test_liquidity_profile_validates_observation_days_in_rust() -> None:
-    args = ("X", 100.0, 99.9, 100.1, 1e6, 1000.0, 0.1)
+    fields = {
+        "instrument_id": "X",
+        "mid": 100.0,
+        "bid": 99.9,
+        "ask": 100.1,
+        "avg_daily_volume": 1e6,
+        "avg_trade_size": 1000.0,
+        "spread_volatility": 0.1,
+    }
     with pytest.raises(ValueError, match="observation_days"):
-        liquidity.LiquidityProfile(*args, observation_days=0)
-    default = liquidity.LiquidityProfile(*args)
+        liquidity.LiquidityProfile(**fields, observation_days=0)
+    default = liquidity.LiquidityProfile(**fields)
     assert default.observation_days == 20
     assert default.spread_volatility_kind == "relative"
-    explicit = liquidity.LiquidityProfile(*args, spread_volatility_kind="absolute", observation_days=60)
+    explicit = liquidity.LiquidityProfile(**fields, spread_volatility_kind="absolute", observation_days=60)
     assert pickle.loads(pickle.dumps(explicit)) == explicit  # noqa: S301
 
 

@@ -57,8 +57,8 @@ pub use collateral::{
 };
 pub use pool::AssetPool;
 pub use pool::{
-    PoolAsset, PoolStats, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod,
-    RepLine, calculate_pool_stats,
+    PoolAccounts, PoolAsset, PoolStats, ReinvestmentAssumptions, ReinvestmentCriteria,
+    ReinvestmentPeriod, RepLine, calculate_pool_stats,
 };
 pub use pool_report::{PoolConcentrationEntry, PoolReport, pool_report};
 pub(crate) use pool_state::PoolState;

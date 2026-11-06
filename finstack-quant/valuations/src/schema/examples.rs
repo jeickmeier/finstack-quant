@@ -444,6 +444,15 @@ pub(super) fn simulation_diagnostics() -> Result<Vec<Value>> {
     example_from_json::<structured_credit::SimulationDiagnostics>(simulation_diagnostics_value())
 }
 
+/// Seasoned-pool account balances for `AssetPool::with_accounts`.
+pub(super) fn pool_accounts() -> Result<Vec<Value>> {
+    example(&structured_credit::PoolAccounts {
+        cumulative_defaults: Some(Money::new(8_000_000.0, Currency::USD)?),
+        collection_account: Some(Money::new(250_000.0, Currency::USD)?),
+        ..structured_credit::PoolAccounts::default()
+    })
+}
+
 /// The standard-constructor inputs of the canonical example CLO deal.
 pub(super) fn standard_deal_params() -> Result<Vec<Value>> {
     let deal = structured_credit::StructuredCredit::example()?;

@@ -573,21 +573,21 @@ class InterestRateSwapBuilder:
     >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import FixedLegSpec, FloatLegSpec, InterestRateSwap
     >>> fixed = FixedLegSpec(
-    ...     "USD-OIS",
-    ...     0.04,
-    ...     Tenor.semi_annual(),
-    ...     DayCount.THIRTY_360,
-    ...     "2025-01-15",
-    ...     "2030-01-15",
+    ...     discount_curve_id="USD-OIS",
+    ...     rate="0.04",
+    ...     frequency=Tenor.semi_annual(),
+    ...     day_count=DayCount.THIRTY_360,
+    ...     start="2025-01-15",
+    ...     end="2030-01-15",
     ... )
     >>> floating = FloatLegSpec(
-    ...     "USD-OIS",
-    ...     "USD-SOFR-3M",
-    ...     0.0,
-    ...     Tenor.quarterly(),
-    ...     DayCount.ACT_360,
-    ...     "2025-01-15",
-    ...     "2030-01-15",
+    ...     discount_curve_id="USD-OIS",
+    ...     forward_curve_id="USD-SOFR-3M",
+    ...     spread_bp="0",
+    ...     frequency=Tenor.quarterly(),
+    ...     day_count=DayCount.ACT_360,
+    ...     start="2025-01-15",
+    ...     end="2030-01-15",
     ... )
     >>> swap = (
     ...     InterestRateSwap
@@ -1483,21 +1483,21 @@ class SwaptionBuilder:
     >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import FixedLegSpec, FloatLegSpec, Swaption
     >>> fixed = FixedLegSpec(
-    ...     "USD-OIS",
-    ...     0.04,
-    ...     Tenor.semi_annual(),
-    ...     DayCount.THIRTY_360,
-    ...     "2025-01-15",
-    ...     "2030-01-15",
+    ...     discount_curve_id="USD-OIS",
+    ...     rate="0.04",
+    ...     frequency=Tenor.semi_annual(),
+    ...     day_count=DayCount.THIRTY_360,
+    ...     start="2025-01-15",
+    ...     end="2030-01-15",
     ... )
     >>> floating = FloatLegSpec(
-    ...     "USD-OIS",
-    ...     "USD-SOFR-3M",
-    ...     0.0,
-    ...     Tenor.quarterly(),
-    ...     DayCount.ACT_360,
-    ...     "2025-01-15",
-    ...     "2030-01-15",
+    ...     discount_curve_id="USD-OIS",
+    ...     forward_curve_id="USD-SOFR-3M",
+    ...     spread_bp="0",
+    ...     frequency=Tenor.quarterly(),
+    ...     day_count=DayCount.ACT_360,
+    ...     start="2025-01-15",
+    ...     end="2030-01-15",
     ... )
     >>> swaption = (
     ...     Swaption

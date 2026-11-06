@@ -6,6 +6,12 @@ import datetime
 from typing import Any
 from finstack_quant.core.dates import DayCount
 from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments._typed_structured_credit.specs import (
+    BalloonSpec,
+    LiquidationSpec,
+    PrepaymentPenalty,
+    SpecialServicingSpec,
+)
 
 class PoolAsset:
     """
@@ -28,11 +34,11 @@ class PoolAsset:
     >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import PoolAsset
     >>> loan = PoolAsset(
-    ...     "LOAN-1",
-    ...     {"type": "first_lien_loan"},
-    ...     Money(10_000_000.0, Currency("USD")),
-    ...     0.08,
-    ...     datetime.date(2031, 1, 15),
+    ...     id="LOAN-1",
+    ...     asset_type={"type": "first_lien_loan"},
+    ...     balance=Money(10_000_000.0, Currency("USD")),
+    ...     rate=0.08,
+    ...     maturity=datetime.date(2031, 1, 15),
     ...     day_count=DayCount.ACT_360,
     ...     rating="B",
     ...     balloon={"extension_prob": 0.3, "extension_months": 24},
@@ -43,13 +49,13 @@ class PoolAsset:
 
     def __init__(
         self,
+        *,
         id: str,
-        asset_type: dict[str, Any] | str,
+        asset_type: dict[str, Any],
         balance: Money,
         rate: float,
-        maturity: datetime.date,
-        *,
-        day_count: DayCount,
+        maturity: datetime.date | str,
+        day_count: DayCount | str,
         spread_bp: float | None = None,
         forward_curve_id: str | None = None,
         index_floor_bp: float | None = None,
@@ -58,10 +64,10 @@ class PoolAsset:
         obligor_id: str | None = None,
         defaulted: bool = False,
         recovery_amount: Money | None = None,
-        default_date: datetime.date | None = None,
+        default_date: datetime.date | str | None = None,
         purchase_price: Money | None = None,
-        acquisition_date: datetime.date | None = None,
-        origination_date: datetime.date | None = None,
+        acquisition_date: datetime.date | str | None = None,
+        origination_date: datetime.date | str | None = None,
         smm_override: float | None = None,
         mdr_override: float | None = None,
         recovery_rate: float | None = None,
@@ -71,20 +77,24 @@ class PoolAsset:
         io_months: int | None = None,
         market_price_pct: float | None = None,
         delinquency_buckets: list[Money] | None = None,
-        balloon: dict[str, Any] | str | None = None,
-        prepayment_penalty: dict[str, Any] | str | None = None,
-        special_servicing: dict[str, Any] | str | None = None,
+        balloon: BalloonSpec | dict[str, Any] | None = None,
+        prepayment_penalty: PrepaymentPenalty | dict[str, Any] | None = None,
+        special_servicing: SpecialServicingSpec | dict[str, Any] | None = None,
         noi: Money | None = None,
-        liquidation: dict[str, Any] | str | None = None,
+        liquidation: LiquidationSpec | dict[str, Any] | None = None,
     ) -> None:
         """
         Construct a collateral row from its contractual terms.
+
+        Every field is keyword-only: Rust reads the keywords as the
+        ``PoolAsset`` wire struct, supplies the defaults shown and rejects an
+        unknown keyword. Each field takes its wire value or the typed wrapper.
 
         Parameters
         ----------
         id : str
             Stable asset identifier, unique within the pool.
-        asset_type : dict[str, Any] | str
+        asset_type : dict[str, Any]
             ``AssetType`` serde object such as ``{"type": "first_lien_loan"}`` or
             ``{"type": "commercial_mortgage", "ltv": 0.6}``; the type decides
             whether the row amortizes (level pay) or pays as a bullet. The
@@ -94,10 +104,11 @@ class PoolAsset:
         rate : float
             Annual coupon as a decimal (``0.08`` = 8%). For floating rows the
             engine adds ``spread_bp`` to the ``forward_curve_id`` projection.
-        maturity : datetime.date
-            Contractual maturity (balloon date for commercial mortgages).
-        day_count : DayCount
-            Accrual convention of the row (keyword-only, required as in Rust).
+        maturity : datetime.date | str
+            Contractual maturity (balloon date for commercial mortgages), a
+            date or an ISO 8601 string.
+        day_count : DayCount | str
+            Accrual convention of the row (required as in Rust).
         spread_bp : float, optional
             Floating spread over ``forward_curve_id`` in basis points.
         forward_curve_id : str, optional
@@ -155,12 +166,12 @@ class PoolAsset:
         delinquency_buckets : list[Money], optional
             Seeded delinquent balances per bucket (30/60/90 ...); requires a
             ``credit_model.delinquency`` model on the deal.
-        balloon : dict[str, Any] | str, optional
+        balloon : BalloonSpec | dict[str, Any], optional
             ``BalloonSpec`` (``extension_prob`` decimal, ``extension_months``,
             optional ``extension_rate`` decimal, and ``loss_prob`` decimal,
             ``severity_pct`` percent, ``workout_months`` for the share that
             defaults at maturity) for balloon extension and workout.
-        prepayment_penalty : dict[str, Any] | str, optional
+        prepayment_penalty : PrepaymentPenalty | dict[str, Any], optional
             ``PrepaymentPenalty``: ``{"kind": "lockout", "through":
             "2025-12-31"}`` (no voluntary prepayment inside the window),
             ``{"kind": "fixed", "pct": 3.0, "through": "2026-01-01"}``,
@@ -169,11 +180,11 @@ class PoolAsset:
             "reinvestment_rate": 0.05, "discount_curve_id": "USD-OIS",
             "floor_pct": 1.0, "through": None}`` (the curve discounts the lost
             coupons and supplies the reinvestment rate when it is omitted).
-        special_servicing : dict[str, Any] | str, optional
+        special_servicing : SpecialServicingSpec | dict[str, Any], optional
             ``SpecialServicingSpec`` (``appraisal_reduction_pct`` percent).
         noi : Money, optional
             Annual net operating income of the property for the CMBS DSCR.
-        liquidation : dict[str, Any] | str, optional
+        liquidation : LiquidationSpec | dict[str, Any], optional
             ``LiquidationSpec`` for a non-performing loan
             (``months_to_resolution``, ``proceeds_pct`` and ``carry_cost_pct``
             percents, ``reperformance_prob`` decimal, optional
@@ -182,8 +193,12 @@ class PoolAsset:
         Raises
         ------
         ValueError
-            If a sub-spec does not match its serde shape, a date is invalid or
-            ``rating`` is not a known rating.
+            If a required field is missing, a keyword is unknown, a sub-spec
+            does not match its serde shape, a date is invalid or ``rating`` is
+            not a known rating.
+        TypeError
+            If a positional argument is passed, or a value is not
+            JSON-encodable (neither a wire value nor a typed wrapper).
         """
         ...
 

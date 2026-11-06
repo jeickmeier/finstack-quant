@@ -254,12 +254,12 @@ def test_tranche_structure_rep_line_and_asset_pool_contracts() -> None:
     assert pickle.loads(pickle.dumps(structure)).to_json() == structure.to_json()  # noqa: S301
 
     line = RepLine(
-        "LINE-1",
-        Money(80.0, Currency("USD")),
-        0.07,
-        "2031-01-15",
-        12,
-        DayCount.ACT_360,
+        id="LINE-1",
+        balance=Money(80.0, Currency("USD")),
+        rate=0.07,
+        maturity="2031-01-15",
+        seasoning_months=12,
+        day_count=DayCount.ACT_360,
         asset_type={"type": "first_lien_loan"},
         spread_bp=150.0,
     )

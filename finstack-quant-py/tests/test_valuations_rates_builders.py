@@ -11,6 +11,7 @@ ISO-string date acceptance, and builder ``__repr__``.
 from __future__ import annotations
 
 import datetime
+from decimal import Decimal
 import inspect
 import json
 import pickle
@@ -66,7 +67,7 @@ def _market() -> MarketContext:
 def _fixed_leg(**overrides: object) -> FixedLegSpec:
     kwargs: dict[str, object] = {
         "discount_curve_id": "USD-OIS",
-        "rate": 0.04,
+        "rate": "0.04",
         "frequency": Tenor.semi_annual(),
         "day_count": DayCount.THIRTY_360,
         "start": AS_OF,
@@ -80,7 +81,7 @@ def _float_leg(**overrides: object) -> FloatLegSpec:
     kwargs: dict[str, object] = {
         "discount_curve_id": "USD-OIS",
         "forward_curve_id": "USD-SOFR-3M",
-        "spread_bp": 0.0,
+        "spread_bp": "0",
         "frequency": Tenor.quarterly(),
         "day_count": DayCount.ACT_360,
         "start": AS_OF,
@@ -158,7 +159,7 @@ def test_compounding_keyword_accepts_string_and_dict() -> None:
 
 
 def test_removed_par_method_keyword_is_rejected() -> None:
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError, match="unknown field `par_method`"):
         _fixed_leg(par_method="discount_ratio")
 
 
@@ -261,7 +262,13 @@ def test_leg_specs_pickle_round_trip() -> None:
     fixed = _fixed_leg(calendar_id="usny", stub="none")
     floating = _float_leg(reset_lag_days=2, fixing_calendar_id="usny")
     premium = PremiumLegSpec(
-        "2024-03-20", "2029-06-20", Tenor.quarterly(), DayCount.ACT_360, 100.0, "USD-OIS", roll_rule=RollRule.CDS_IMM
+        start="2024-03-20",
+        end="2029-06-20",
+        frequency=Tenor.quarterly(),
+        day_count=DayCount.ACT_360,
+        coupon_bp="100",
+        discount_curve_id="USD-OIS",
+        roll_rule=RollRule.CDS_IMM,
     )
     protection = ProtectionLegSpec("ACME-HZD", 0.4, 3)
     for leg in (fixed, floating, premium, protection):
@@ -274,17 +281,26 @@ def test_leg_specs_pickle_round_trip() -> None:
     assert pickle.loads(pickle.dumps(protection)).settlement_delay == 3  # noqa: S301
 
 
-def test_leg_specs_accept_rate_and_bps_objects() -> None:
-    fixed = _fixed_leg(rate=Rate(0.04))
+def test_leg_spec_decimal_fields_take_exact_decimal_strings() -> None:
+    fixed = _fixed_leg(rate=Decimal("0.04"))
     assert fixed.rate == pytest.approx(0.04)
-    floating = _float_leg(spread_bp=Bps(25))
+    floating = _float_leg(spread_bp="25")
     assert floating.spread_bp == pytest.approx(25.0)
     premium = PremiumLegSpec(
-        AS_OF, END, Tenor.quarterly(), DayCount.ACT_360, Bps(100), "USD-OIS", roll_rule=RollRule.CDS_IMM
+        start=AS_OF,
+        end=END,
+        frequency=Tenor.quarterly(),
+        day_count=DayCount.ACT_360,
+        coupon_bp="100",
+        discount_curve_id="USD-OIS",
+        roll_rule=RollRule.CDS_IMM,
     )
     assert premium.coupon_bp == pytest.approx(100.0)
-    with pytest.raises(TypeError):
-        _fixed_leg(rate="4%")
+    # One spelling per value: a float, a ``Rate`` or a percent label is not the
+    # exact-decimal wire form.
+    for rate in (0.04, Rate(0.04), "4%"):
+        with pytest.raises(ValueError, match="invalid FixedLegSpec"):
+            _fixed_leg(rate=rate)
 
 
 def test_leg_specs_accept_iso_string_dates_and_stub_names() -> None:

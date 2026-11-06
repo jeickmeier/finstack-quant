@@ -434,7 +434,7 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
             .build()
         )
     deal = StructuredCredit.new_standard(
-        "clo", StandardDealParams("ANALYST-CLO", pool, TrancheStructure(notes), AS_OF, maturity, "USD-OIS")
+        "clo", StandardDealParams(id="ANALYST-CLO", pool=pool, tranches=TrancheStructure(notes), closing_date=AS_OF, maturity=maturity, discount_curve_id="USD-OIS")
     )
     payload = json.loads(deal.to_json())
     spec = payload["instrument"]["spec"]

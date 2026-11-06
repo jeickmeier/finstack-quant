@@ -629,12 +629,12 @@ class CreditDefaultSwapBuilder:
     ... )
     >>> from finstack_quant.cashflows.builder import RollRule
     >>> premium = PremiumLegSpec(
-    ...     datetime.date(2024, 3, 20),
-    ...     datetime.date(2029, 6, 20),
-    ...     Tenor.quarterly(),
-    ...     DayCount.ACT_360,
-    ...     100.0,
-    ...     "USD-OIS",
+    ...     start=datetime.date(2024, 3, 20),
+    ...     end=datetime.date(2029, 6, 20),
+    ...     frequency=Tenor.quarterly(),
+    ...     day_count=DayCount.ACT_360,
+    ...     coupon_bp="100",
+    ...     discount_curve_id="USD-OIS",
     ...     roll_rule=RollRule.CDS_IMM,
     ... )
     >>> protection = ProtectionLegSpec("ACME-CDS", 0.4, 3)

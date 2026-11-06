@@ -300,8 +300,9 @@ python_package = "finstack_quant.cashflows.builder"
 # credit-rate helpers annual_to_monthly_clamped / psa_cpr /
 # PSA_RAMP_MONTHS / PSA_TERMINAL_CPR / SDA_PEAK_CDR. The FloatingRateSpec
 # DEFAULT_GEARING / DEFAULT_GEARING_INCLUDES_SPREAD / DEFAULT_RESET_LAG_DAYS
-# constants and ScheduleParams::DEFAULT_STUB are Rust-only; the Python
-# constructor defaults read them.
+# constants and ScheduleParams::DEFAULT_STUB are Rust-only; the keyword-only
+# Python constructors (FloatingRateSpec, ScheduleParams, FeeSpec.periodic_bp)
+# read the Rust serde struct, whose defaults are those constants.
 note = "Typed CashFlowBuilder includes build_as_of / buildAsOf for explicit fixing cutoffs and matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM binds CashFlowSchedule / CashFlowBuilder as classes, and the spec types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",
@@ -921,7 +922,10 @@ public = [
 # presets and `Bond.with_stub` overrides a preset's stub (both hosts). Leg specs
 # carry to_json/from_json/to_dict/pickle and field getters. WASM binds the same
 # typed classes and builders (member parity is recorded in the [parity] ledger);
-# leg specs and the other sub-specs are plain objects there.
+# leg specs and the other sub-specs are plain objects there. The Python data-class
+# constructors (leg specs, CdsTrancheParams, PoolAsset, RepLine,
+# StandardDealParams) are keyword-only and read by Rust as the serde struct;
+# AssetPool.with_accounts reads the Rust PoolAccounts the same way.
 # Structured-credit collateral: RepLine requires an explicit AssetType JSON object.
 # Assets and representative lines are mutually exclusive and use one Rust engine.
 # Per-line CPR/CDR/recovery and seasoning survive normalization; explicit deal

@@ -298,7 +298,6 @@ pub fn hw1f_caplet_forward_rate_normal_vol(
 /// Throws an error if either required curve handle is missing or has the wrong type.
 /// Throws a `validation` error if `kappa` or `sigma` is out of range or
 /// `periods` is malformed.
-#[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = hw1fCapFloorPrice)]
 pub fn hw1f_cap_floor_price(
     #[wasm_bindgen(unchecked_param_type = "number")] kappa: JsValue,

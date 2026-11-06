@@ -1,0 +1,99 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/common/1/pool_accounts.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Account balances and performance tallies of a seasoned structured-credit pool.",
+  "examples": [
+    {
+      "collection_account": {
+        "amount": "250000",
+        "currency": "USD"
+      },
+      "cumulative_defaults": {
+        "amount": "8000000",
+        "currency": "USD"
+      }
+    }
+  ],
+  "properties": {
+    "collection_account": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Collection account balance ([`AssetPool::collection_account`])."
+    },
+    "cumulative_defaults": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Cumulative defaults to date ([`AssetPool::cumulative_defaults`])."
+    },
+    "cumulative_prepayments": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Cumulative voluntary prepayments ([`AssetPool::cumulative_prepayments`])."
+    },
+    "cumulative_recoveries": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Cumulative recoveries on defaulted assets\n([`AssetPool::cumulative_recoveries`])."
+    },
+    "cumulative_scheduled_amortization": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Cumulative scheduled amortization\n([`AssetPool::cumulative_scheduled_amortization`])."
+    },
+    "excess_spread_account": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Excess spread account balance ([`AssetPool::excess_spread_account`])."
+    },
+    "original_balance": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Original (cut-off) pool balance ([`AssetPool::original_balance`])."
+    }
+  },
+  "title": "PoolAccounts",
+  "type": "object"
+}

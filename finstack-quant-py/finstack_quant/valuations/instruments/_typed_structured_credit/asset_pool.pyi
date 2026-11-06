@@ -93,12 +93,12 @@ class AssetPool:
         >>> from finstack_quant.valuations.instruments import AssetPool, RepLine
         >>> pool = AssetPool("POOL-1", "abs", Currency("USD")).with_rep_lines([
         ...     RepLine(
-        ...         "LINE-1",
-        ...         Money(80_000_000.0, Currency("USD")),
-        ...         0.07,
-        ...         datetime.date(2031, 1, 15),
-        ...         12,
-        ...         DayCount.ACT_360,
+        ...         id="LINE-1",
+        ...         balance=Money(80_000_000.0, Currency("USD")),
+        ...         rate=0.07,
+        ...         maturity=datetime.date(2031, 1, 15),
+        ...         seasoning_months=12,
+        ...         day_count=DayCount.ACT_360,
         ...         asset_type={"type": "first_lien_loan"},
         ...     )
         ... ])
@@ -317,6 +317,9 @@ class AssetPool:
         Set the pool's historical tallies and cash accounts, returning a new
         pool (seasoned-deal inputs).
 
+        The keyword-only arguments are the Rust ``PoolAccounts`` fields; Rust
+        rejects an unknown keyword.
+
         Parameters
         ----------
         cumulative_defaults : Money, optional
@@ -343,9 +346,13 @@ class AssetPool:
         AssetPool
             A new pool with the supplied balances (the original is unchanged).
 
-        Notes
-        -----
-        This method does not raise.
+        Raises
+        ------
+        ValueError
+            If a keyword is not a ``PoolAccounts`` field or a value is not a
+            ``Money`` wire form.
+        TypeError
+            If a positional argument is passed.
 
         Examples
         --------

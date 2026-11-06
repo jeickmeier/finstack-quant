@@ -97,13 +97,13 @@ class StructuredCredit:
         >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
         >>> example = StructuredCredit.example()
         >>> params = StandardDealParams(
-        ...     example.id,
-        ...     example.pool,
-        ...     example.tranches,
-        ...     example.closing_date,
-        ...     example.maturity,
-        ...     example.discount_curve_id,
-        ...     example.calendar_id,
+        ...     id=example.id,
+        ...     pool=example.pool,
+        ...     tranches=example.tranches,
+        ...     closing_date=example.closing_date,
+        ...     maturity=example.maturity,
+        ...     discount_curve_id=example.discount_curve_id,
+        ...     calendar_id=example.calendar_id,
         ... )
         >>> StructuredCredit.new_standard("clo", params).id == example.id
         True

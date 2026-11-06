@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/cds_tranche_params.schema.json",
-      "bytes": 1965,
+      "bytes": 2008,
       "kind": "component",
       "path": "schemas/common/1/cds_tranche_params.schema.json",
       "summary": "Attachment, detachment, notional and coupon of a CDS index tranche.",
@@ -269,6 +269,15 @@
       "summary": "Structured-credit OAS solver configuration: paths, stochastic dimensions and seed.",
       "title": "OasConfig",
       "type_name": "OasConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/common/1/pool_accounts.schema.json",
+      "bytes": 2726,
+      "kind": "component",
+      "path": "schemas/common/1/pool_accounts.schema.json",
+      "summary": "Account balances and performance tallies of a seasoned structured-credit pool.",
+      "title": "PoolAccounts",
+      "type_name": "PoolAccounts"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",

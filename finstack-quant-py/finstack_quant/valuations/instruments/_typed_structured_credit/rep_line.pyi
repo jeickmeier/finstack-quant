@@ -21,12 +21,12 @@ class RepLine:
     >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import RepLine
     >>> line = RepLine(
-    ...     "LINE-1",
-    ...     Money(80_000_000.0, Currency("USD")),
-    ...     0.07,
-    ...     datetime.date(2031, 1, 15),
-    ...     12,
-    ...     DayCount.ACT_360,
+    ...     id="LINE-1",
+    ...     balance=Money(80_000_000.0, Currency("USD")),
+    ...     rate=0.07,
+    ...     maturity=datetime.date(2031, 1, 15),
+    ...     seasoning_months=12,
+    ...     day_count=DayCount.ACT_360,
     ...     asset_type={"type": "first_lien_loan"},
     ...     cpr=0.10,
     ...     cdr=0.02,
@@ -38,13 +38,13 @@ class RepLine:
 
     def __init__(
         self,
+        *,
         id: str,
         balance: Money,
         rate: float | Rate,
-        maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
+        maturity: datetime.date | str,
         seasoning_months: int,
-        day_count: DayCount,
-        *,
+        day_count: DayCount | str,
         asset_type: dict[str, Any],
         spread_bp: float | Bps | None = None,
         forward_curve_id: str | None = None,
@@ -59,6 +59,9 @@ class RepLine:
         """
         Aggregated representative line for pool modeling.
 
+        Every field is keyword-only: Rust reads the keywords as the
+        ``RepLine`` wire struct and rejects an unknown keyword.
+
         Parameters
         ----------
         id : str
@@ -68,11 +71,11 @@ class RepLine:
         rate : float | Rate
             Weighted average coupon as an annual decimal rate (e.g. ``0.07``
             = 7%).
-        maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
-            Weighted average maturity date (date-like or ISO-8601 string).
+        maturity : datetime.date | str
+            Weighted average maturity date (a date or an ISO-8601 string).
         seasoning_months : int
             Weighted average seasoning in months.
-        day_count : DayCount
+        day_count : DayCount | str
             Day count convention.
         asset_type : dict[str, Any]
             Canonical AssetType JSON object; specifies bullet or level-pay amortization.
@@ -110,10 +113,12 @@ class RepLine:
         Raises
         ------
         TypeError
-            If ``maturity`` is neither date-like nor a string, or ``rate`` /
-            ``spread_bp`` are not numbers / ``Rate`` / ``Bps``.
+            If a positional argument is passed, or a value is not
+            JSON-encodable (neither a wire value nor a typed wrapper).
         ValueError
-            If a string ``maturity`` is not valid ISO-8601.
+            If a required field is missing, a keyword is unknown, or a value
+            does not match its wire form (``maturity`` not ISO-8601, a
+            malformed ``asset_type``).
 
         Examples
         --------
@@ -123,12 +128,12 @@ class RepLine:
         >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import RepLine
         >>> line = RepLine(
-        ...     "LINE-1",
-        ...     Money(80_000_000.0, Currency("USD")),
-        ...     0.07,
-        ...     datetime.date(2031, 1, 15),
-        ...     12,
-        ...     DayCount.ACT_360,
+        ...     id="LINE-1",
+        ...     balance=Money(80_000_000.0, Currency("USD")),
+        ...     rate=0.07,
+        ...     maturity=datetime.date(2031, 1, 15),
+        ...     seasoning_months=12,
+        ...     day_count=DayCount.ACT_360,
         ...     asset_type={"type": "first_lien_loan"},
         ...     cpr=0.10,
         ...     cdr=0.02,
@@ -168,22 +173,22 @@ class RepLine:
         >>> from finstack_quant.valuations.instruments import RepLine
         >>> restored = RepLine.from_json(
         ...     RepLine(
-        ...         "LINE-1",
-        ...         Money(1.0, Currency("USD")),
-        ...         0.07,
-        ...         datetime.date(2031, 1, 15),
-        ...         12,
-        ...         DayCount.ACT_360,
+        ...         id="LINE-1",
+        ...         balance=Money(1.0, Currency("USD")),
+        ...         rate=0.07,
+        ...         maturity=datetime.date(2031, 1, 15),
+        ...         seasoning_months=12,
+        ...         day_count=DayCount.ACT_360,
         ...         asset_type={"type": "first_lien_loan"},
         ...     ).to_json()
         ... )
         >>> restored.to_json() == RepLine(
-        ...     "LINE-1",
-        ...     Money(1.0, Currency("USD")),
-        ...     0.07,
-        ...     datetime.date(2031, 1, 15),
-        ...     12,
-        ...     DayCount.ACT_360,
+        ...     id="LINE-1",
+        ...     balance=Money(1.0, Currency("USD")),
+        ...     rate=0.07,
+        ...     maturity=datetime.date(2031, 1, 15),
+        ...     seasoning_months=12,
+        ...     day_count=DayCount.ACT_360,
         ...     asset_type={"type": "first_lien_loan"},
         ... ).to_json()
         True

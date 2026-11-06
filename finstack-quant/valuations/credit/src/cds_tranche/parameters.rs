@@ -28,6 +28,8 @@ pub struct CdsTrancheParams {
     /// Running coupon in basis points
     pub coupon_bp: f64,
     /// Realized (settled) loss as a decimal fraction of the original portfolio notional, in `[0.0, 1.0]`
+    /// (`0.0` when omitted from the wire form).
+    #[serde(default)]
     pub realized_loss: f64,
 }
 
@@ -65,14 +67,24 @@ impl CdsTrancheParams {
     ///
     /// Returns an error if loss is outside the valid range [0.0, 1.0].
     pub fn with_realized_loss(mut self, loss: f64) -> Result<Self> {
-        if !(0.0..=1.0).contains(&loss) {
+        self.realized_loss = loss;
+        self.validate()?;
+        Ok(self)
+    }
+
+    /// Validate the tranche parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `realized_loss` is outside `[0.0, 1.0]`.
+    pub fn validate(&self) -> Result<()> {
+        if !(0.0..=1.0).contains(&self.realized_loss) {
             return Err(Error::Validation(format!(
                 "realized_loss must be in [0.0, 1.0], got {}",
-                loss
+                self.realized_loss
             )));
         }
-        self.realized_loss = loss;
-        Ok(self)
+        Ok(())
     }
 
     /// Create equity tranche parameters (0-3% typically)

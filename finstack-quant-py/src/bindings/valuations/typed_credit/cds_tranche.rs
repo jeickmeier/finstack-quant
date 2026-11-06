@@ -44,33 +44,14 @@ pub struct PyCdsTrancheParams {
 impl PyCdsTrancheParams {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheParams.__init__")]
     #[new]
-    #[pyo3(signature = (index_name, series, attach_pct, detach_pct, notional, maturity, coupon_bp, realized_loss=0.0))]
     #[pyo3(
-        text_signature = "(index_name, series, attach_pct, detach_pct, notional, maturity, coupon_bp, realized_loss=0.0)"
+        signature = (**fields),
+        text_signature = "(*, index_name, series, attach_pct, detach_pct, notional, maturity, coupon_bp, realized_loss=0.0)"
     )]
-    // PyO3 binding: the argument list mirrors the Rust constructor one-for-one.
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        index_name: &str,
-        series: u16,
-        attach_pct: f64,
-        detach_pct: f64,
-        notional: &Bound<'_, PyAny>,
-        maturity: &Bound<'_, PyAny>,
-        coupon_bp: &Bound<'_, PyAny>,
-        realized_loss: f64,
-    ) -> PyResult<Self> {
-        let inner = CdsTrancheParams::new(
-            index_name,
-            series,
-            attach_pct,
-            detach_pct,
-            money_from_py(notional, "notional")?,
-            py_to_date(maturity)?,
-            extract_basis_points(coupon_bp, "coupon_bp")?,
-        )
-        .with_realized_loss(realized_loss)
-        .map_err(core_to_py)?;
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: CdsTrancheParams =
+            crate::bindings::module_utils::fields_from_py(py, fields, "CdsTrancheParams")?;
+        inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
 

@@ -91,10 +91,14 @@ class AltmanZScoreInput:
         sales_to_total_assets : float
             Sales / total assets (X5).
 
-        Notes
-        -----
-        This constructor does not raise; the scoring function rejects a
-        non-finite ratio with ``ValueError``.
+        Raises
+        ------
+        ValueError
+            If a ratio is missing or a keyword is unknown (Rust reads the
+            keywords as the wire struct); the scoring function rejects a
+            non-finite ratio.
+        TypeError
+            If a positional argument is passed.
         """
         ...
 
@@ -301,10 +305,14 @@ class AltmanZPrimeInput:
         sales_to_total_assets : float
             Sales / total assets (X5).
 
-        Notes
-        -----
-        This constructor does not raise; the scoring function rejects a
-        non-finite ratio with ``ValueError``.
+        Raises
+        ------
+        ValueError
+            If a ratio is missing or a keyword is unknown (Rust reads the
+            keywords as the wire struct); the scoring function rejects a
+            non-finite ratio.
+        TypeError
+            If a positional argument is passed.
         """
         ...
 
@@ -507,10 +515,14 @@ class AltmanZDoublePrimeInput:
         book_equity_to_total_liabilities : float
             Book value of equity / book value of total liabilities (X4).
 
-        Notes
-        -----
-        This constructor does not raise; the scoring function rejects a
-        non-finite ratio with ``ValueError``.
+        Raises
+        ------
+        ValueError
+            If a ratio is missing or a keyword is unknown (Rust reads the
+            keywords as the wire struct); the scoring function rejects a
+            non-finite ratio.
+        TypeError
+            If a positional argument is passed.
         """
         ...
 
@@ -717,10 +729,14 @@ class OhlsonOScoreInput:
         net_income_change : float
             ``(NI_t - NI_t-1) / (|NI_t| + |NI_t-1|)`` (X9).
 
-        Notes
-        -----
-        This constructor does not raise; the scoring function rejects a
-        non-finite ratio with ``ValueError``.
+        Raises
+        ------
+        ValueError
+            If a ratio is missing or a keyword is unknown (Rust reads the
+            keywords as the wire struct); the scoring function rejects a
+            non-finite ratio.
+        TypeError
+            If a positional argument is passed.
         """
         ...
 
@@ -983,10 +999,14 @@ class ZmijewskiInput:
         current_assets_to_current_liabilities : float
             Current assets / current liabilities (current ratio).
 
-        Notes
-        -----
-        This constructor does not raise; the scoring function rejects a
-        non-finite ratio with ``ValueError``.
+        Raises
+        ------
+        ValueError
+            If a ratio is missing or a keyword is unknown (Rust reads the
+            keywords as the wire struct); the scoring function rejects a
+            non-finite ratio.
+        TypeError
+            If a positional argument is passed.
         """
         ...
 

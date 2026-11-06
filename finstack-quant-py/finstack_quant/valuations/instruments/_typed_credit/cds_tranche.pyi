@@ -1338,17 +1338,22 @@ class CdsTrancheParams:
 
     def __init__(
         self,
+        *,
         index_name: str,
         series: int,
         attach_pct: float,
         detach_pct: float,
         notional: Money,
-        maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
-        coupon_bp: float | Bps,
+        maturity: datetime.date | str,
+        coupon_bp: float,
         realized_loss: float = 0.0,
     ) -> None:
         """
         Describe a tranche on a credit index.
+
+        Every field is keyword-only: Rust reads the keywords as the
+        ``CdsTrancheParams`` wire struct, supplies ``realized_loss`` (0.0)
+        and rejects an unknown keyword.
 
         Parameters
         ----------
@@ -1362,9 +1367,10 @@ class CdsTrancheParams:
             Detachment point in percent (``7.0`` = 7%); must exceed ``attach_pct``.
         notional : Money
             Tranche notional.
-        maturity : datetime.date | datetime.datetime | pd.Timestamp | str
-            Scheduled maturity (an IMM date for standard tranches).
-        coupon_bp : float | Bps
+        maturity : datetime.date | str
+            Scheduled maturity (an IMM date for standard tranches), a date or
+            an ISO 8601 string.
+        coupon_bp : float
             Running coupon in basis points (``100.0`` = 1%).
         realized_loss : float, default 0.0
             Realized portfolio loss so far as a fraction of the original
@@ -1373,9 +1379,11 @@ class CdsTrancheParams:
         Raises
         ------
         ValueError
-            If ``realized_loss`` is outside ``[0, 1]`` or a date cannot be interpreted.
+            If a required field is missing, a keyword is unknown,
+            ``realized_loss`` is outside ``[0, 1]`` or a date string is invalid.
         TypeError
-            If ``coupon_bp`` is neither a number nor ``Bps``.
+            If a positional argument is passed, or a value is not
+            JSON-encodable (neither a wire value nor a typed wrapper).
 
         Examples
         --------
@@ -1383,7 +1391,13 @@ class CdsTrancheParams:
         >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import CdsTrancheParams
         >>> CdsTrancheParams(
-        ...     "CDX.NA.IG", 42, 7.0, 15.0, Money(5_000_000.0, Currency("USD")), "2029-12-20", 100.0
+        ...     index_name="CDX.NA.IG",
+        ...     series=42,
+        ...     attach_pct=7.0,
+        ...     detach_pct=15.0,
+        ...     notional=Money(5_000_000.0, Currency("USD")),
+        ...     maturity="2029-12-20",
+        ...     coupon_bp=100.0,
         ... ).coupon_bp
         100.0
         """

@@ -735,9 +735,9 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::fixed_income::convertible::{ConvertibleGreeks, ConvertibleSpotLadder};
     use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
-        BorrowingBaseReport, EquityMetrics, OasConfig, OasResult, PoolReport, PoolStats,
-        ScenarioGrid, ScenarioTable, SimulationDiagnostics, SimulationRun, StandardDealFamily,
-        StandardDealParams, TrancheCashflows, TrancheMetrics,
+        BorrowingBaseReport, EquityMetrics, OasConfig, OasResult, PoolAccounts, PoolReport,
+        PoolStats, ScenarioGrid, ScenarioTable, SimulationDiagnostics, SimulationRun,
+        StandardDealFamily, StandardDealParams, TrancheCashflows, TrancheMetrics,
     };
     use crate::instruments::fx::fx_forward::FxForwardTradeDateParams;
     use crate::instruments::fx::fx_option::FxOptionParams;
@@ -1199,6 +1199,15 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         )
         .with_packager(package_valuations_schema)
         .with_examples(examples::bond_quote_input),
+        finstack_quant_core::schema_artifact!(
+            PoolAccounts,
+            "common",
+            "pool_accounts",
+            Component,
+            "Account balances and performance tallies of a seasoned structured-credit pool."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::pool_accounts),
         finstack_quant_core::schema_artifact!(
             StandardDealParams,
             "common",

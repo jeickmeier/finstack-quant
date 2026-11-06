@@ -2,6 +2,57 @@
 
 ## Itemized changes
 
+### Python: data-class constructors are keyword-only and read by Rust
+
+A data-class constructor that builds one Rust serde struct now takes its
+fields as keyword-only arguments, and the Rust binding reads them as one
+mapping into the struct: the Rust struct supplies every default and its
+`deny_unknown_fields` rejects an unknown keyword. A missing or unknown field
+raises `ValueError` naming the missing or unknown field, a
+positional argument `TypeError`. Each field takes its serde wire form or a
+typed object the params hook writes as exactly that form; host conveniences
+are gone: an exact-decimal field (`spread_bp`, `rate`, `coupon_bp`, `bp`,
+`gearing`, the bp floors and caps) takes a `decimal.Decimal` or its string
+(`"0.045"`), not a `float`, `Rate` or `Bps`; a tenor field takes a `Tenor`,
+not `"3M"`; a date a `datetime.date` or an ISO string, not a
+`datetime.datetime` or `pd.Timestamp`; a `PoolAsset` sub-spec its typed class
+or dict, not JSON text. The params hook now also encodes `decimal.Decimal`
+and the schedule enums (`BusinessDayConvention`, `StubKind`, `RollRule`,
+`FloatingLegCompounding`, `OvernightIndexConstraintApplication`,
+`FloatingRateFallback`, `FeeAccrualBasis`) as their wire forms. Every
+`to_json()` built from the same inputs is unchanged. Rust defaults added:
+`LiquidityProfile.spread_volatility_kind` (`relative`) and `observation_days`
+(20), `CdsTrancheParams.realized_loss` (0.0); `RecoveryClaim` gains
+`deny_unknown_fields`; new `CdsTrancheParams::validate`.
+
+### Cashflows: `FloatingRateSpec`, `ScheduleParams` and `FeeSpec.periodic_bp` are keyword-only
+
+- Python `FloatingRateSpec("USD-SOFR-3M", Decimal("200"), "3M", ...)` → `FloatingRateSpec(forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency=Tenor.parse("3M"), ...)`
+- Python `ScheduleParams("3M", DayCount.ACT_360, "weekends_only", ...)` → `ScheduleParams(frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only", ...)`
+- Python `FeeSpec.periodic_bp(FeeBase.DRAWN, 25, "3M", DayCount.ACT_360, "weekends_only", ...)` → `FeeSpec.periodic_bp(base=FeeBase.DRAWN, bp="25", frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only", ...)` (the fields of the `periodic_bp` variant of the `FeeSpec` wire form)
+
+### Margin: `SaCcrTrade` is keyword-only
+
+- Python `SaCcrTrade("t1", "interest_rate", 1e6, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False)` → `SaCcrTrade(trade_id="t1", asset_class="interest_rate", notional=1e6, start_date="2025-01-01", end_date="2030-01-01", underlier="USD-SOFR", hedging_set="rates", direction=1.0, supervisory_delta=1.0, mtm=0.0, is_option=False)`
+
+### Models: `LiquidityProfile`, `RecoveryClaim` and the scoring inputs read their Rust struct
+
+- Python `LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)` → `LiquidityProfile(instrument_id="ACME", mid=100.0, bid=99.95, ask=100.05, avg_daily_volume=1e6, avg_trade_size=500.0, spread_volatility=0.0)`
+- Python `RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)` → `RecoveryClaim(id="SEN", seniority="secured", priority=1, principal=100.0, accrued=0.0, penalties=0.0, collateral_haircut=0.0)`
+- Python `AltmanZScoreInput`, `AltmanZPrimeInput`, `AltmanZDoublePrimeInput`, `OhlsonOScoreInput`, `ZmijewskiInput`: calls unchanged (already keyword-only); a missing ratio now raises `ValueError` instead of `TypeError`
+- Python `MertonModel.new_with_dynamics`, `almgren_chriss_impact`, `hw1f_cap_floor_price` and WASM `almgrenChrissImpact`, `hw1fCapFloorPrice`: unchanged (seven inputs)
+
+### Valuations: leg specs, `CdsTrancheParams` and the structured-credit inputs are keyword-only
+
+- Python `FixedLegSpec("USD-OIS", 0.04, Tenor.semi_annual(), DayCount.THIRTY_360, start, end)` → `FixedLegSpec(discount_curve_id="USD-OIS", rate="0.04", frequency=Tenor.semi_annual(), day_count=DayCount.THIRTY_360, start=start, end=end)`
+- Python `FloatLegSpec("USD-OIS", "USD-SOFR-3M", 0.0, Tenor.quarterly(), DayCount.ACT_360, start, end)` → `FloatLegSpec(discount_curve_id="USD-OIS", forward_curve_id="USD-SOFR-3M", spread_bp="0", frequency=Tenor.quarterly(), day_count=DayCount.ACT_360, start=start, end=end)`
+- Python `PremiumLegSpec(start, end, Tenor.quarterly(), DayCount.ACT_360, 100.0, "USD-OIS", roll_rule=RollRule.CDS_IMM)` → `PremiumLegSpec(start=start, end=end, frequency=Tenor.quarterly(), day_count=DayCount.ACT_360, coupon_bp="100", discount_curve_id="USD-OIS", roll_rule=RollRule.CDS_IMM)`
+- Python `CdsTrancheParams("CDX.NA.IG", 42, 3.0, 7.0, notional, "2029-12-20", 100.0)` → `CdsTrancheParams(index_name="CDX.NA.IG", series=42, attach_pct=3.0, detach_pct=7.0, notional=notional, maturity="2029-12-20", coupon_bp=100.0)`
+- Python `PoolAsset("L1", {"type": "first_lien_loan"}, balance, 0.08, maturity, day_count=...)` → `PoolAsset(id="L1", asset_type={"type": "first_lien_loan"}, balance=balance, rate=0.08, maturity=maturity, day_count=...)`
+- Python `RepLine("LINE-1", balance, 0.07, maturity, 12, DayCount.ACT_360, asset_type=...)` → `RepLine(id="LINE-1", balance=balance, rate=0.07, maturity=maturity, seasoning_months=12, day_count=DayCount.ACT_360, asset_type=...)`
+- Python `StandardDealParams("ABS-1", pool, tranches, closing, maturity, "USD-OIS")` → `StandardDealParams(id="ABS-1", pool=pool, tranches=tranches, closing_date=closing, maturity=maturity, discount_curve_id="USD-OIS")`
+- Python `AssetPool.with_accounts(...)`: keyword calls unchanged; the keywords are now the new Rust `PoolAccounts` struct (`valuations` schema `pool_accounts`), applied by the new `AssetPool::with_accounts(PoolAccounts)`
+
 ### Valuations: every Money input takes a `Money`; `FxOptionBuilder.delta_convention` takes the convention
 
 One route per value. In Python a money input is a `finstack_quant.core.money.Money`
