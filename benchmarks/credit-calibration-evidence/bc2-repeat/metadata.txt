@@ -1,0 +1,3 @@
+Repeat of the original BC2 pricing target only; calibration samples are in bc2.
+Starting commit: 4f1ebfa85a, uncommitted original BC2 prototype.
+10 samples, 1 s warmup, 10 s measurement, 10000 resamples, release profile.

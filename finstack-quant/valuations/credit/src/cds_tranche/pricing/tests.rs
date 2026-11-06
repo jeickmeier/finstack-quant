@@ -198,9 +198,10 @@ fn projected_schedule_matches_projection_rows_and_settlement_issue_date() {
         .build_projected_schedule(&tranche, &market, as_of)
         .expect("projected tranche schedule");
 
-    let (_, valuation_date, _, _) = pricer
+    let valuation_date = pricer
         .prepare_projection_inputs(&tranche, &market, as_of)
-        .expect("projection inputs");
+        .expect("projection inputs")
+        .valuation_date;
     let expected_flows: Vec<_> = pricer
         .project_discountable_rows(&tranche, &market, as_of)
         .expect("projected rows")
@@ -447,7 +448,7 @@ fn concentration_test_loss(pricer: &CdsTranchePricer, index: &CreditIndexData) -
     let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
     let capped = |cap| {
         pricer
-            .calculate_equity_tranche_capped_hetero(
+            .calculate_equity_tranche_capped(
                 cap,
                 0.3,
                 index,
@@ -477,7 +478,7 @@ fn heterogeneous_work_limit_preflights_large_pools() {
     let index = concentration_test_index(3_000, 0.8);
     let pricer = CdsTranchePricer::new();
     let error = pricer
-        .calculate_equity_tranche_capped_hetero(
+        .calculate_equity_tranche_capped(
             7.0,
             0.3,
             &index,
@@ -2617,7 +2618,7 @@ fn heterogeneous_tail_loss_matches_independent_state_enumeration_and_factor_grid
             0.58,
         ] {
             let actual = pricer
-                .calculate_equity_tranche_capped_hetero(
+                .calculate_equity_tranche_capped(
                     cap * 100.0,
                     rho,
                     &index,
@@ -2723,9 +2724,13 @@ fn credit_performance_numerical_baseline() {
             Date::from_calendar_date(2025 + years, Month::January, 1).expect("maturity");
         tranche.realized_loss = realized;
         let pricer = CdsTranchePricer::new();
-        let (_, _, periods, curve) = pricer
+        let inputs = pricer
             .prepare_projection_inputs(&tranche, &market, as_of)
             .expect("projection");
+        let periods = &inputs.periods;
+        let curve = inputs
+            .el_curve(&pricer, index.base_correlation_curve())
+            .expect("erosion curve");
         let raw: Vec<_> = [attach, detach]
             .into_iter()
             .map(|cap| {
@@ -2857,4 +2862,120 @@ fn credit_performance_numerical_baseline() {
             actual["name"]
         );
     }
+}
+
+#[test]
+fn prepared_tranche_snapshots_market_and_reuses_only_correlation_inputs() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let market = sample_market_context();
+    let tranche = sample_tranche();
+    for spec in [
+        CopulaSpec::Gaussian,
+        CopulaSpec::StudentT {
+            degrees_of_freedom: 6.0,
+        },
+    ] {
+        let pricer = CdsTranchePricer::with_copula(spec).expect("copula");
+        let prepared = pricer.prepare(&tranche, &market, as_of).expect("prepare");
+        let index = market.get_credit_index("CDX.NA.IG.42").expect("index");
+        let original = prepared
+            .price(index.base_correlation_curve())
+            .expect("original");
+        assert_eq!(
+            original.amount().to_bits(),
+            pricer
+                .price_tranche(&tranche, &market, as_of)
+                .expect("ordinary")
+                .amount()
+                .to_bits()
+        );
+        for rho in [0.25, 0.8, 0.02, 0.25] {
+            let curve = Arc::new(
+                BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
+                    .knots([(3.0, rho), (100.0, rho)])
+                    .build()
+                    .expect("trial"),
+            );
+            let trial_index = index
+                .to_builder()
+                .base_correlation_curve(Arc::clone(&curve))
+                .build()
+                .expect("trial index");
+            let trial_market = market
+                .clone()
+                .insert(Arc::clone(&curve))
+                .insert_credit_index("CDX.NA.IG.42", trial_index)
+                .expect("trial market");
+            assert_eq!(
+                prepared
+                    .price(&curve)
+                    .expect("prepared trial")
+                    .amount()
+                    .to_bits(),
+                pricer
+                    .price_tranche(&tranche, &trial_market, as_of)
+                    .expect("ordinary trial")
+                    .amount()
+                    .to_bits()
+            );
+        }
+        let hazard = Arc::new(
+            HazardCurve::builder("CDX.NA.IG.42")
+                .base_date(as_of)
+                .recovery_rate(0.4)
+                .knots([(1.0, 0.05), (10.0, 0.06)])
+                .build()
+                .expect("new hazard"),
+        );
+        let changed_index = index
+            .to_builder()
+            .index_credit_curve(Arc::clone(&hazard))
+            .build()
+            .expect("changed index");
+        let changed_market = market
+            .clone()
+            .insert(hazard)
+            .insert_credit_index("CDX.NA.IG.42", changed_index)
+            .expect("changed market");
+        assert_eq!(
+            prepared
+                .price(index.base_correlation_curve())
+                .expect("snapshot unchanged")
+                .amount()
+                .to_bits(),
+            original.amount().to_bits()
+        );
+        assert!(
+            (pricer
+                .price_tranche(&tranche, &changed_market, as_of)
+                .expect("changed valuation")
+                .amount()
+                - original.amount())
+            .abs()
+                > 100.0
+        );
+    }
+}
+
+#[test]
+fn prepared_wiped_tranche_preserves_upfront_without_requiring_credit_index() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (10.0, 0.6)])
+        .build()
+        .expect("discount");
+    let market = MarketContext::new().insert(discount);
+    let mut tranche = sample_tranche();
+    tranche.realized_loss = 0.08;
+    tranche.upfront = Some((as_of, Money::from((1000_i64, Currency::USD))));
+    let curve = BaseCorrelationCurve::builder("unused")
+        .knots([(3.0, 0.3), (100.0, 0.3)])
+        .build()
+        .expect("curve");
+    let pricer = CdsTranchePricer::new();
+    let prepared = pricer
+        .prepare(&tranche, &market, as_of)
+        .expect("no credit index needed");
+    assert_eq!(prepared.price(&curve).expect("upfront").amount(), 1000.0);
 }

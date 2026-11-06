@@ -415,6 +415,32 @@ fn bench_cds_tranche_heterogeneous(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_cds_tranche_prepared(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cds_tranche_prepared");
+    let market = create_market();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let tranche = create_tranche(3.0, 7.0, 5);
+    let pricer = CdsTranchePricer::new();
+    let prepared = pricer.prepare(&tranche, &market, as_of).unwrap();
+    let index = market.get_credit_index("CDX.NA.IG.42").unwrap();
+    let correlation = index.base_correlation_curve();
+    assert_eq!(
+        prepared.price(correlation).unwrap(),
+        pricer.price_tranche(&tranche, &market, as_of).unwrap()
+    );
+    group.bench_function("prepare_only_3_7", |b| {
+        b.iter(|| {
+            pricer
+                .prepare(black_box(&tranche), black_box(&market), black_box(as_of))
+                .unwrap()
+        })
+    });
+    group.bench_function("reuse_3_7", |b| {
+        b.iter(|| prepared.price(black_box(correlation)).unwrap())
+    });
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_cds_tranche_npv,
@@ -424,6 +450,7 @@ criterion_group!(
     bench_cds_tranche_par_spread,
     bench_cds_tranche_all_metrics,
     bench_cds_tranche_student_t_npv,
-    bench_cds_tranche_heterogeneous
+    bench_cds_tranche_heterogeneous,
+    bench_cds_tranche_prepared
 );
 criterion_main!(benches);

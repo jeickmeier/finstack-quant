@@ -1,13 +1,13 @@
 //! Copula selection, projected premium and protection schedules, discounting and
 //! settlement for `CdsTranchePricer`.
 
+use super::prepared::{PeriodTiming, PreparedProjection};
 use super::pricer::{
-    BESPOKE_SETTLEMENT_DAYS, CdsTranchePricer, DiscountAt, EffectiveStructure,
-    INDEX_SETTLEMENT_DAYS, PROBABILITY_CLIP, ProjectedDiscountedRow, ProjectionInputs,
+    BESPOKE_SETTLEMENT_DAYS, CdsTranchePricer, EffectiveStructure, INDEX_SETTLEMENT_DAYS,
+    PROBABILITY_CLIP, ProjectedDiscountedRow,
 };
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DateExt, HolidayCalendar, calendar_by_id_strict};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -15,6 +15,7 @@ use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::{Copula, CopulaSpec, GaussianCopula};
+use std::sync::Arc;
 
 impl CdsTranchePricer {
     /// Return the copula instance constructed for this pricer.
@@ -43,7 +44,7 @@ impl CdsTranchePricer {
     pub fn new() -> Self {
         Self {
             copula_spec: CopulaSpec::Gaussian,
-            copula: Box::new(GaussianCopula::new()),
+            copula: Arc::new(GaussianCopula::new()),
         }
     }
 
@@ -71,7 +72,7 @@ impl CdsTranchePricer {
             .map_err(|error| Error::Validation(error.to_string()))?;
         Ok(Self {
             copula_spec,
-            copula,
+            copula: Arc::from(copula),
         })
     }
 
@@ -108,23 +109,8 @@ impl CdsTranchePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        let discount_curve = market.get_discount(tranche.discount_curve_id.as_ref())?;
-        let wiped_out = tranche.realized_loss >= tranche.detach_pct / 100.0;
-        let net_pv = if wiped_out {
-            // A wiped-out tranche has no remaining premium/protection legs, but
-            // a separately contracted upfront can still be due.
-            if let Some((date, amount)) = tranche.upfront.filter(|(date, _)| *date >= as_of) {
-                let premium_sign = tranche.side.sign();
-                amount.amount() * premium_sign * discount_curve.df_between_dates(as_of, date)?
-            } else {
-                0.0
-            }
-        } else {
-            let rows = self.project_discountable_rows(tranche, market, as_of)?;
-            self.discount_projected_rows(&rows, discount_curve.as_ref(), as_of)?
-        };
-
-        Money::new(net_pv, tranche.notional.currency())
+        self.prepare_validated_tranche(tranche, market, as_of)?
+            .price_at_snapshot()
     }
 
     /// Build the projected premium/default schedule for the tranche.
@@ -157,14 +143,18 @@ impl CdsTranchePricer {
                 },
             );
         }
+        let inputs = self.prepare_projection_inputs(tranche, market, as_of)?;
+        let valuation_date = inputs.valuation_date;
         let flows = self
-            .project_discountable_rows(tranche, market, as_of)?
+            .project_prepared_rows(
+                &inputs,
+                inputs.index.base_correlation_curve(),
+                tranche.coupon_bp / BASIS_POINTS_PER_UNIT,
+                false,
+            )?
             .into_iter()
             .map(|row| row.cashflow)
             .collect();
-        // Same settlement date the projection inputs resolve; read directly so
-        // the expected-loss curve is integrated only once.
-        let valuation_date = self.calculate_settlement_date(tranche, market, as_of)?;
 
         finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
@@ -188,6 +178,7 @@ impl CdsTranchePricer {
         )
     }
 
+    #[cfg(test)]
     pub(super) fn project_discountable_rows(
         &self,
         tranche: &CdsTranche,
@@ -211,148 +202,13 @@ impl CdsTranchePricer {
         coupon: f64,
         include_tiny_premiums: bool,
     ) -> Result<Vec<ProjectedDiscountedRow>> {
-        let (_index_data_arc, _valuation_date, periods, el_curve) =
-            self.prepare_projection_inputs(tranche, market_ctx, as_of)?;
-
-        let tranche_notional = tranche.notional.amount();
-        let premium_sign = tranche.side.sign();
-        let protection_sign = -premium_sign;
-
-        let mut rows =
-            Vec::with_capacity(periods.len() * 2 + usize::from(tranche.upfront.is_some()));
-        let mut prev_el_fraction = self.calculate_prior_tranche_loss(tranche);
-        let mut prev_wd_fraction =
-            self.calculate_prior_tranche_writedown(tranche, _index_data_arc.recovery_rate());
-        for (i, period) in periods.iter().enumerate() {
-            let payment_date = period.payment_date;
-            let el_fraction = el_curve[i].el_fraction;
-            let wd_fraction = el_curve[i].wd_fraction;
-            let delta_el_fraction = (el_fraction - prev_el_fraction).max(0.0);
-            let delta_wd_fraction = (wd_fraction - prev_wd_fraction).max(0.0);
-            // Premium accrues on the notional surviving BOTH bottom-up loss
-            // erosion and top-down recovery writedown (senior amortization).
-            let outstanding_notional =
-                tranche_notional * (1.0 - prev_el_fraction - prev_wd_fraction).max(0.0);
-            let period_start = period.accrual_start;
-            let accrual_period = period.accrual_year_fraction;
-            let protection_start = period_start.max(as_of).min(period.accrual_end);
-            let prior_time = if protection_start <= as_of {
-                0.0
-            } else {
-                self.years_from_base(_index_data_arc.as_ref(), protection_start)?
-            };
-            let payment_time = if period.accrual_end <= as_of {
-                0.0
-            } else {
-                self.years_from_base(_index_data_arc.as_ref(), period.accrual_end)?
-            };
-            let remaining_accrual = tranche.day_count.year_fraction(
-                protection_start,
-                period.accrual_end,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?;
-
-            // Survival-weighted mean within-period default fraction.
-            //
-            // A name that defaults at τ ∈ [t_{i-1}, t_i] pays accrued premium
-            // only over [t_{i-1}, τ] and triggers the loss at τ. Both the
-            // accrual-on-default adjustment (Item 5) and the mid-period
-            // protection timing (Item 6) need E[(τ − t_{i-1}) / period | τ in
-            // period]. Default timing is NOT uniform — it follows the index
-            // hazard, so the survival-weighted mean is < 0.5 for a positive
-            // hazard. `within_period_default_fraction` integrates the
-            // piecewise-constant-hazard default density over the period,
-            // which is the discrete-model analogue of the single-name CDS
-            // pricer's analytic accrual-on-default integral. It degrades
-            // gracefully to 0.5 (the uniform limit) when λΔ → 0.
-            let default_fraction = self.within_period_default_fraction(
-                _index_data_arc.as_ref(),
-                prior_time,
-                payment_time,
-            );
-
-            // Premium reduction on the slice that defaults within the period.
-            //
-            // A name defaulting at the survival-weighted fraction `f` of the
-            // period pays accrued premium over `f·Δ` only, so the premium
-            // notional lost on the defaulted slice is `(1−f)·Δerosion`
-            // (ISDA accrual-on-default). Both the loss increment (bottom-up)
-            // and the recovery writedown increment (top-down) occur at
-            // default time, so they receive the same treatment.
-            let delta_erosion = delta_el_fraction + delta_wd_fraction;
-            let aod_adjustment =
-                (1.0 - default_fraction) * remaining_accrual * tranche_notional * delta_erosion;
-            let premium_amount =
-                coupon * (accrual_period * outstanding_notional - aod_adjustment).max(0.0);
-
-            if include_tiny_premiums || premium_amount.abs() > f64::EPSILON {
-                rows.push(ProjectedDiscountedRow {
-                    cashflow: CashFlow::new(
-                        payment_date,
-                        None,
-                        Money::new(premium_amount * premium_sign, tranche.notional.currency())?,
-                        CFKind::Fixed,
-                        accrual_period,
-                        Some(coupon),
-                    ),
-                    discount_at: DiscountAt::PaymentDate,
-                });
-            }
-
-            let default_amount = tranche_notional * delta_el_fraction;
-            if default_amount.abs() > f64::EPSILON {
-                rows.push(ProjectedDiscountedRow {
-                    cashflow: CashFlow::new(
-                        payment_date,
-                        None,
-                        Money::new(
-                            default_amount * protection_sign,
-                            tranche.notional.currency(),
-                        )?,
-                        CFKind::DefaultedNotional,
-                        0.0,
-                        None,
-                    ),
-                    // Discount the loss increment at the time the underlying
-                    // defaults actually occur, not the period end (ISDA
-                    // mid-period protection timing): the within-period loss
-                    // is discounted at the SURVIVAL-WEIGHTED mean default
-                    // time (Item 6) — `fraction` of the way through the
-                    // period — rather than the flat period midpoint, which
-                    // over-discounted the increment by assuming all loss
-                    // lands at the midpoint. The default fraction is < 0.5
-                    // for a positive hazard, so the loss is correctly
-                    // discounted slightly earlier than mid-period. The
-                    // fraction is measured on the hazard axis (a survival
-                    // quantity); the DF lookup itself happens on the
-                    // discount curve's axis in `discount_projected_rows`.
-                    discount_at: DiscountAt::WithinPeriod {
-                        start: protection_start,
-                        end: period.accrual_end,
-                        fraction: default_fraction,
-                    },
-                });
-            }
-
-            prev_el_fraction = el_fraction;
-            prev_wd_fraction = wd_fraction;
-        }
-
-        if let Some((date, amount)) = tranche.upfront.filter(|(date, _)| *date >= as_of) {
-            rows.push(ProjectedDiscountedRow {
-                cashflow: CashFlow::new(
-                    date,
-                    None,
-                    Money::new(amount.amount() * premium_sign, amount.currency())?,
-                    CFKind::Fee,
-                    0.0,
-                    None,
-                ),
-                discount_at: DiscountAt::PaymentDate,
-            });
-        }
-
-        Ok(rows)
+        let inputs = self.prepare_projection_inputs(tranche, market_ctx, as_of)?;
+        self.project_prepared_rows(
+            &inputs,
+            inputs.index.base_correlation_curve(),
+            coupon,
+            include_tiny_premiums,
+        )
     }
 
     /// Discount projected rows on the DISCOUNT curve's own time axis,
@@ -368,30 +224,7 @@ impl CdsTranchePricer {
     ) -> Result<f64> {
         let mut pv = 0.0;
         for row in rows {
-            let df = match row.discount_at {
-                DiscountAt::PaymentDate => {
-                    discount_curve.df_between_dates(as_of, row.cashflow.date)?
-                }
-                DiscountAt::WithinPeriod {
-                    start,
-                    end,
-                    fraction,
-                } => {
-                    // Interpolate the survival-weighted default date inside
-                    // the period in calendar days, then take the relative DF
-                    // from as_of on the discount curve's axis. The date is
-                    // clamped to [as_of, payment_date]: a stub period can
-                    // start before as_of, but the EL increment only covers
-                    // defaults occurring on or after the valuation date.
-                    let period_days = (end - start).whole_days().max(0);
-                    let offset_days = (fraction * period_days as f64).round() as i64;
-                    let mid = start
-                        .checked_add(time::Duration::days(offset_days))
-                        .unwrap_or(end)
-                        .clamp(as_of, end);
-                    discount_curve.df_between_dates(as_of, mid)?
-                }
-            };
+            let df = discount_curve.df_between_dates(as_of, row.discount_date(as_of))?;
             pv += row.cashflow.amount.amount() * df;
         }
         Ok(pv)
@@ -402,7 +235,7 @@ impl CdsTranchePricer {
         tranche: &CdsTranche,
         market_ctx: &MarketContext,
         as_of: Date,
-    ) -> Result<ProjectionInputs> {
+    ) -> Result<PreparedProjection> {
         let index_data_arc = market_ctx
             .get_credit_index(&tranche.credit_index_id)
             .map_err(|_| {
@@ -448,19 +281,63 @@ impl CdsTranchePricer {
             .map(|p| p.accrual_end)
             .filter(|date| *date > as_of)
             .collect();
-        let future_losses =
-            self.build_el_wd_curve(tranche, index_data_arc.as_ref(), &future_dates)?;
+        let losses = self.prepare_el_wd_curve(tranche, index_data_arc.as_ref(), &future_dates)?;
         let known_count = periods.iter().filter(|p| p.accrual_end <= as_of).count();
-        let mut el_curve = Vec::with_capacity(periods.len());
-        for _ in 0..known_count {
-            el_curve.push(super::pricer::ElWdPoint {
-                el_fraction: self.calculate_prior_tranche_loss(tranche),
-                wd_fraction: self
-                    .calculate_prior_tranche_writedown(tranche, index_data_arc.recovery_rate()),
+        let mut timing = Vec::with_capacity(periods.len());
+        for period in &periods {
+            let period_start = period.accrual_start;
+            let protection_start = period_start.max(as_of).min(period.accrual_end);
+            let prior_time = if protection_start <= as_of {
+                0.0
+            } else {
+                self.years_from_base(index_data_arc.as_ref(), protection_start)?
+            };
+            let payment_time = if period.accrual_end <= as_of {
+                0.0
+            } else {
+                self.years_from_base(index_data_arc.as_ref(), period.accrual_end)?
+            };
+            let remaining_accrual = tranche.day_count.year_fraction(
+                protection_start,
+                period.accrual_end,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?;
+
+            // Survival-weighted mean within-period default fraction.
+            //
+            // A name that defaults at τ ∈ [t_{i-1}, t_i] pays accrued premium
+            // only over [t_{i-1}, τ] and triggers the loss at τ. Both the
+            // accrual-on-default adjustment (Item 5) and the mid-period
+            // protection timing (Item 6) need E[(τ − t_{i-1}) / period | τ in
+            // period]. Default timing is NOT uniform — it follows the index
+            // hazard, so the survival-weighted mean is < 0.5 for a positive
+            // hazard. `within_period_default_fraction` integrates the
+            // piecewise-constant-hazard default density over the period,
+            // which is the discrete-model analogue of the single-name CDS
+            // pricer's analytic accrual-on-default integral. It degrades
+            // gracefully to 0.5 (the uniform limit) when λΔ → 0.
+            let default_fraction = self.within_period_default_fraction(
+                index_data_arc.as_ref(),
+                prior_time,
+                payment_time,
+            );
+
+            timing.push(PeriodTiming {
+                protection_start,
+                remaining_accrual,
+                default_fraction,
             });
         }
-        el_curve.extend(future_losses);
-        Ok((index_data_arc, valuation_date, periods, el_curve))
+        Ok(PreparedProjection {
+            tranche: tranche.clone(),
+            index: index_data_arc,
+            as_of,
+            valuation_date,
+            periods,
+            timing,
+            losses,
+            known_count,
+        })
     }
 
     /// Calculate the settlement date based on ISDA conventions.

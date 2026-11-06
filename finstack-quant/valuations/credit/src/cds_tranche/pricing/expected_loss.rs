@@ -1,22 +1,24 @@
 //! Expected tranche loss and the expected loss/write-down curve, with the
 //! equity-tranche capped expectations they are built from.
 
+#[cfg(test)]
+use super::pool::HomogeneousPool;
+use super::pool::PreparedPool;
 use super::pricer::{
     CdsTranchePricer, ElWdPoint, INTEGRATION_TOLERANCE, PROBABILITY_CLIP, PoolExposure,
 };
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::term_structures::CreditIndexData;
+use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, CreditIndexData};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::CopulaSpec;
 
 /// Pre-computed invariants for EL fraction evaluation (hoisted out of the date loop).
+#[derive(Clone, Copy)]
 struct ElInvariants {
     eff_attach: f64,
     eff_detach: f64,
     pool_factor: f64,
-    corr_attach: f64,
-    corr_detach: f64,
     orig_width: f64,
     prior_loss: f64,
     /// Fraction of tranche notional already written down from the top by
@@ -127,8 +129,6 @@ impl CdsTranchePricer {
                 eff_attach: 0.0,
                 eff_detach: 0.0,
                 pool_factor: 0.0,
-                corr_attach: 0.0,
-                corr_detach: 0.0,
                 orig_width: 0.0,
                 prior_loss: 0.0,
                 prior_wd: 0.0,
@@ -137,16 +137,6 @@ impl CdsTranchePricer {
                 maturity: tranche.maturity,
             });
         }
-        let corr_attach = self.smooth_correlation_boundary(
-            index_data
-                .base_correlation_curve()
-                .correlation(tranche.attach_pct),
-        );
-        let corr_detach = self.smooth_correlation_boundary(
-            index_data
-                .base_correlation_curve()
-                .correlation(tranche.detach_pct),
-        );
         let orig_width = (tranche.detach_pct - tranche.attach_pct) / 100.0;
         let prior_loss = self.calculate_prior_tranche_loss(tranche);
         let prior_wd = self.calculate_prior_tranche_writedown(tranche, index_data.recovery_rate());
@@ -154,8 +144,6 @@ impl CdsTranchePricer {
             eff_attach: eff.eff_attach,
             eff_detach: eff.eff_detach,
             pool_factor: eff.pool_factor,
-            corr_attach,
-            corr_detach,
             orig_width,
             prior_loss,
             prior_wd,
@@ -169,29 +157,15 @@ impl CdsTranchePricer {
     /// invariants (avoids redundant effective-structure and base-correlation
     /// lookups per date). Returns `(el_fraction, wd_fraction)` with
     /// `el + wd ≤ 1`.
-    fn el_wd_fraction_at_date(
+    fn el_wd_fraction_from_caps(
         &self,
         inv: &ElInvariants,
-        index_data: &CreditIndexData,
         date: Date,
+        [
+            (el_to_attach, rec_to_attach_cap),
+            (el_to_detach, rec_to_detach_cap),
+        ]: [(f64, f64); 2],
     ) -> Result<(f64, f64)> {
-        if inv.eff_detach <= inv.eff_attach || inv.orig_width <= 1e-9 {
-            return Ok((0.0, 0.0));
-        }
-        let (el_to_attach, rec_to_attach_cap) = self.calculate_equity_tranche_capped_pair(
-            inv.eff_attach * 100.0,
-            (1.0 - inv.eff_attach) * 100.0,
-            inv.corr_attach,
-            index_data,
-            date,
-        )?;
-        let (el_to_detach, rec_to_detach_cap) = self.calculate_equity_tranche_capped_pair(
-            inv.eff_detach * 100.0,
-            (1.0 - inv.eff_detach) * 100.0,
-            inv.corr_detach,
-            index_data,
-            date,
-        )?;
         // Base correlations are quoted for the tranche maturity, so the
         // tranchelet loss is only guaranteed non-negative there. Applying the
         // same pair of correlations at an earlier date is a model
@@ -311,46 +285,37 @@ impl CdsTranchePricer {
     /// clamped to maintain monotonicity. This prevents small arbitrage
     /// opportunities that can arise from base correlation model
     /// inconsistencies.
+    #[cfg(test)]
     pub(super) fn build_el_wd_curve(
         &self,
         tranche: &CdsTranche,
         index_data: &CreditIndexData,
         dates: &[Date],
     ) -> Result<Vec<ElWdPoint>> {
+        self.prepare_el_wd_curve(tranche, index_data, dates)?
+            .evaluate(self, index_data.base_correlation_curve())
+    }
+
+    pub(super) fn prepare_el_wd_curve(
+        &self,
+        tranche: &CdsTranche,
+        index_data: &CreditIndexData,
+        dates: &[Date],
+    ) -> Result<PreparedExpectedLoss> {
         let inv = self.el_invariants(tranche, index_data)?;
-        let mut curve = Vec::with_capacity(dates.len());
-        let mut prev_el = 0.0;
-        let mut prev_wd = 0.0;
-
-        for &date in dates {
-            let (mut el_fraction, mut wd_fraction) =
-                self.el_wd_fraction_at_date(&inv, index_data, date)?;
-
-            // Check for non-monotonic EL (indicates numerical issue or model limitation)
-            // This can happen due to base correlation model inconsistencies
-            if el_fraction < prev_el - 1e-6 {
-                tracing::debug!(
-                    "EL decreased from {:.6} to {:.6} at {:?} (Δ={:.6}) - enforcing monotonicity",
-                    prev_el,
-                    el_fraction,
-                    date,
-                    prev_el - el_fraction,
-                );
-            }
-            el_fraction = el_fraction.max(prev_el);
-            wd_fraction = wd_fraction.max(prev_wd);
-            // Joint cap after monotonicity repair.
-            wd_fraction = wd_fraction.min(1.0 - el_fraction);
-
-            curve.push(ElWdPoint {
-                el_fraction,
-                wd_fraction,
-            });
-            prev_el = el_fraction;
-            prev_wd = wd_fraction;
-        }
-
-        Ok(curve)
+        let pools = if inv.eff_detach <= inv.eff_attach || inv.orig_width <= 1e-9 {
+            Vec::new()
+        } else {
+            dates
+                .iter()
+                .map(|&date| PreparedPool::new(self, index_data, date))
+                .collect::<Result<Vec<_>>>()?
+        };
+        Ok(PreparedExpectedLoss {
+            inv,
+            dates: dates.to_vec(),
+            pools,
+        })
     }
 
     /// Shared engine for capped pool expectations `E[min(Σᵢ wᵢ·eᵢ·Bᵢ, cap)]`
@@ -381,56 +346,18 @@ impl CdsTranchePricer {
         maturity: Date,
         exposure: PoolExposure,
     ) -> Result<f64> {
-        // Heterogeneous path whenever issuer curves are present
-        if index_data.has_issuer_curves() {
-            self.calculate_equity_tranche_capped_hetero(
-                cap_pct,
-                correlation,
-                index_data,
-                maturity,
-                exposure,
-            )
-        } else {
-            let (count, default_prob, recovery) = self.homogeneous_pool(index_data, maturity)?;
-            self.homogeneous_capped_expectation(
-                cap_pct / 100.0,
-                count,
-                default_prob,
-                recovery,
-                self.smooth_correlation_boundary(correlation),
-                exposure,
-            )
-        }
-    }
-
-    /// Constituent count, default probability to `date` and recovery of a
-    /// homogeneous (index-curve) pool.
-    fn homogeneous_pool(
-        &self,
-        index_data: &CreditIndexData,
-        date: Date,
-    ) -> Result<(usize, f64, f64)> {
-        let t = self.years_from_base(index_data, date)?;
-        Ok((
-            usize::from(index_data.num_constituents()),
-            self.get_default_probability(index_data, t)?,
-            index_data.recovery_rate(),
-        ))
-    }
-
-    /// Conditional default probability `P(default | factors)` of a name with
-    /// unconditional `default_prob` under the pricer's copula at `correlation`.
-    fn conditional_pd(&self, default_prob: f64, correlation: f64) -> impl Fn(&[f64]) -> f64 + '_ {
-        let threshold = self.default_threshold_for_copula(default_prob);
-        move |factors| {
-            self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
-        }
+        PreparedPool::new(self, index_data, maturity)?.capped(
+            self,
+            cap_pct / 100.0,
+            self.smooth_correlation_boundary(correlation),
+            exposure,
+        )
     }
 
     /// Gaussian marginal identity, applicable only to valid finite pools.
     /// Invalid inputs still reach the checked conditional/integration path, so
     /// eliminating an integral cannot conceal its validation failures.
-    fn gaussian_cap_identity(
+    pub(super) fn gaussian_cap_identity(
         &self,
         cap: f64,
         count: usize,
@@ -459,6 +386,7 @@ impl CdsTranchePricer {
     }
 
     /// Shared uniform-pool engine with a constant recovery rate.
+    #[cfg(test)]
     pub(super) fn homogeneous_capped_expectation(
         &self,
         cap: f64,
@@ -468,63 +396,14 @@ impl CdsTranchePricer {
         correlation: f64,
         exposure: PoolExposure,
     ) -> Result<f64> {
-        let exposure = match exposure {
-            PoolExposure::Loss => 1.0 - base_recovery,
-            PoolExposure::Recovery => base_recovery,
-        };
-        if let Some(expected) =
-            self.gaussian_cap_identity(cap, count, default_prob, exposure, correlation)
-        {
-            return Ok(expected);
-        }
-        let conditional_p = self.conditional_pd(default_prob, correlation);
-        self.integrate_factors(&|factors| {
-            self.conditional_equity_tranche_capped(count, cap, conditional_p(factors), exposure)
-        })
-    }
-
-    /// Loss and recovery capped expectations at one correlation.
-    ///
-    /// Homogeneous pools share one conditional default distribution.
-    /// Issuer-curve paths keep two independent integrals.
-    fn calculate_equity_tranche_capped_pair(
-        &self,
-        loss_cap_pct: f64,
-        recovery_cap_pct: f64,
-        correlation: f64,
-        index_data: &CreditIndexData,
-        date: Date,
-    ) -> Result<(f64, f64)> {
-        if index_data.has_issuer_curves() {
-            return Ok((
-                self.calculate_equity_tranche_capped(
-                    loss_cap_pct,
-                    correlation,
-                    index_data,
-                    date,
-                    PoolExposure::Loss,
-                )?,
-                self.calculate_equity_tranche_capped(
-                    recovery_cap_pct,
-                    correlation,
-                    index_data,
-                    date,
-                    PoolExposure::Recovery,
-                )?,
-            ));
-        }
-        let (count, default_prob, recovery) = self.homogeneous_pool(index_data, date)?;
-        self.homogeneous_capped_pair(
-            loss_cap_pct / 100.0,
-            recovery_cap_pct / 100.0,
-            count,
-            default_prob,
-            recovery,
-            self.smooth_correlation_boundary(correlation),
+        HomogeneousPool::new(self, count, default_prob, base_recovery).capped(
+            self,
+            cap,
+            correlation,
+            exposure,
         )
     }
-
-    /// Shared constant-recovery homogeneous engine for a loss/recovery pair.
+    #[cfg(test)]
     fn homogeneous_capped_pair(
         &self,
         loss_cap: f64,
@@ -534,61 +413,82 @@ impl CdsTranchePricer {
         base_recovery: f64,
         correlation: f64,
     ) -> Result<(f64, f64)> {
-        let loss = self.gaussian_cap_identity(
+        HomogeneousPool::new(self, count, default_prob, base_recovery).pair(
+            self,
             loss_cap,
-            count,
-            default_prob,
-            1.0 - base_recovery,
-            correlation,
-        );
-        let recovery = self.gaussian_cap_identity(
             recovery_cap,
-            count,
-            default_prob,
-            base_recovery,
             correlation,
-        );
-        let conditional_p = self.conditional_pd(default_prob, correlation);
-        match (loss, recovery) {
-            (Some(loss), Some(recovery)) => return Ok((loss, recovery)),
-            (Some(loss), None) => {
-                return Ok((
-                    loss,
-                    self.integrate_factors(&|factors| {
-                        self.conditional_equity_tranche_capped(
-                            count,
-                            recovery_cap,
-                            conditional_p(factors),
-                            base_recovery,
-                        )
-                    })?,
-                ));
-            }
-            (None, Some(recovery)) => {
-                return Ok((
-                    self.integrate_factors(&|factors| {
-                        self.conditional_equity_tranche_capped(
-                            count,
-                            loss_cap,
-                            conditional_p(factors),
-                            1.0 - base_recovery,
-                        )
-                    })?,
-                    recovery,
-                ));
-            }
-            (None, None) => {}
+        )
+    }
+}
+
+pub(super) struct PreparedExpectedLoss {
+    inv: ElInvariants,
+    dates: Vec<Date>,
+    pools: Vec<PreparedPool>,
+}
+impl PreparedExpectedLoss {
+    pub(super) fn evaluate(
+        &self,
+        pricer: &CdsTranchePricer,
+        correlation: &BaseCorrelationCurve,
+    ) -> Result<Vec<ElWdPoint>> {
+        let inv = self.inv;
+        if inv.eff_detach <= inv.eff_attach || inv.orig_width <= 1e-9 {
+            return Ok(vec![
+                ElWdPoint {
+                    el_fraction: 0.0,
+                    wd_fraction: 0.0
+                };
+                self.dates.len()
+            ]);
         }
-        self.integrate_factors_pair(&|factors| {
-            self.conditional_equity_tranche_pair(
-                count,
-                loss_cap,
-                recovery_cap,
-                conditional_p(factors),
-                1.0 - base_recovery,
-                base_recovery,
-            )
-        })
+        // Preserve both established smoothing passes, including their rounding
+        // near boundaries. Preparation does not change the correlation model.
+        let corr_attach = pricer.smooth_correlation_boundary(
+            pricer.smooth_correlation_boundary(correlation.correlation(inv.attach_pct)),
+        );
+        let corr_detach = pricer.smooth_correlation_boundary(
+            pricer.smooth_correlation_boundary(correlation.correlation(inv.detach_pct)),
+        );
+        let mut curve = Vec::with_capacity(self.dates.len());
+        let mut prev_el = 0.0;
+        let mut prev_wd = 0.0;
+        for (&date, pool) in self.dates.iter().zip(&self.pools) {
+            let attachment = pool.pair(
+                pricer,
+                (inv.eff_attach * 100.0) / 100.0,
+                ((1.0 - inv.eff_attach) * 100.0) / 100.0,
+                corr_attach,
+            )?;
+            let detachment = pool.pair(
+                pricer,
+                (inv.eff_detach * 100.0) / 100.0,
+                ((1.0 - inv.eff_detach) * 100.0) / 100.0,
+                corr_detach,
+            )?;
+            let (mut el_fraction, mut wd_fraction) =
+                pricer.el_wd_fraction_from_caps(&inv, date, [attachment, detachment])?;
+            if el_fraction < prev_el - 1e-6 {
+                tracing::debug!(
+                    "EL decreased from {:.6} to {:.6} at {:?} (delta={:.6}) - enforcing monotonicity",
+                    prev_el,
+                    el_fraction,
+                    date,
+                    el_fraction - prev_el
+                );
+            }
+            el_fraction = el_fraction.max(prev_el);
+            wd_fraction = wd_fraction.max(prev_wd);
+            wd_fraction = wd_fraction.min(1.0 - el_fraction);
+            curve.push(ElWdPoint {
+                el_fraction,
+                wd_fraction,
+            });
+            prev_el = el_fraction;
+            prev_wd = wd_fraction;
+        }
+        Ok(curve)
     }
 }
 

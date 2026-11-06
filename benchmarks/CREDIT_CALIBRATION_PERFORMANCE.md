@@ -92,3 +92,55 @@ comparisons: capture `FQ_CREDIT_SNAPSHOT=/tmp/prior.json` with the existing
 `FQ_CREDIT_BITWISE_REFERENCE=/tmp/prior.json`. Snapshots encode floating-point
 bits as strings so JSON parsing does not alter the comparison. These are local
 same-build checks, not cross-platform bit-identity promises.
+
+## BC2: shared prepared tranche pricing
+
+The prepared pricing layer retains immutable pool/schedule/discount inputs and
+shares the pricer's validated copula through `Arc`. An initial version rebuilt
+that copula and regressed the heterogeneous control. That version, plus local
+slice/copy experiments, was not accepted. The retained shared-copula experiment
+measured 428.35 ms [426.25, 430.45]; its immediately subsequent BC1 executable
+control measured 445.32 ms [440.98, 449.72]. Earlier BC1 controls ranged from
+419.98 to 433.30 ms. These controls support removing the regression, not a claim
+that BC2 speeds up heterogeneous pricing. The final whole-calibration timing and scoped acceptance checks below passed.
+
+Evidence folders named `*-hetero-*` represent only the
+`cds_tranche_heterogeneous/npv_hetero/50` measurement. Other Criterion groups
+that the snapshot copier retained in `bc2-hetero-shared` and
+`bc1-hetero-final-control` are stale and must not be treated as measurements of
+those variants. All targeted runs use 20 samples, three seconds warmup, a
+20-second measurement target and 10,000 resamples. `bc2-repeat` is the original
+BC2 pricing repeat only. The original BC2 full calibration report reproduced
+BC1's complete JSON report exactly; the final shared-copula variant also passed the fixed-correlation bitwise gate
+and reproduced both complete calibration reports exactly.
+
+BC2 is accepted as a neutral preparation foundation. No financial outputs or
+solver work counts changed; generated numerical fixtures therefore remain
+unchanged. Means in milliseconds, with samples and confidence intervals in
+`credit-calibration-evidence/bc2-final`:
+
+| Workload | S0 quiet | BC1 | BC2 accepted |
+| --- | ---: | ---: | ---: |
+| Base correlation: isolated | 8239.613 | 4028.962 | 4047.698 |
+| Base correlation: full plan | 8315.811 | 4114.187 | 4118.397 |
+| Equity PV | 35.562 | 11.402 | 11.424 |
+| Thin-tranche PV | 47.451 | 24.475 | 24.514 |
+| Student-t control | 11.921 | 11.946 | 11.939 |
+| Heterogeneous control | 437.723 | 429.526 | 423.460 |
+| Preparation alone | — | — | 0.004636 |
+| Prepared reuse, 3–7% | — | — | 23.826 |
+
+The main price/calibration measurements include preparation. Reuse is labeled
+separately and is not used as evidence of an end-to-end speedup. Stored inputs
+are bounded by coupon count P: homogeneous pools use O(P) state; heterogeneous
+pools use O(P×N), including four f64 arrays (32×P×N bytes) plus schedule, pool
+headers and discount-date entries. Credit-index snapshots and validated copulas
+are shared through Arc. BC2 retains no trial results.
+
+Validation: scoped credit/calibration lint, 88 tranche tests with the BC1 bitwise
+reference, 15 base-correlation tests, 91 umbrella tranche tests, and the scoped
+public-input documentation check passed. One nextest process-leak report cleared
+on a focused rerun. No independent references or tolerances changed.
+
+Execution status: S0, BC1 and BC2 complete; BC3 in progress. Later slices remain
+pending. The fixed implementation plan is unchanged.
