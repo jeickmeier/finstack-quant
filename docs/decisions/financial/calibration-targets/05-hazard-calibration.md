@@ -27,7 +27,7 @@ Alternatives are log hazards/cumulative-hazard controls, direct spread bootstrap
 ## Evidence
 
 - Owning [hazard.rs](../../../../finstack-quant/calibration/src/targets/hazard.rs); [CDS construction](../calibration-framework/07-cds-materialization.md); [core survival](../core-market/hazard-survival.md).
-- [hazard_curve_tests.rs](../../../../finstack-quant/calibration/src/hazard_curve_tests.rs) includes rejection, distressed spread, smoothness and replay-tampering cases; selected par repricing uses the production CDS builder/pricer. [repricing_tests.rs](../../../../finstack-quant/calibration/src/repricing_tests.rs) checks report versus market-built CDS and upfront-to-par replay. Scan resolution/monotone survival tests are located inline. They are integration/invariant evidence, not external ISDA standard-model certification.
+- [tests/hazard_curve.rs](../../../../finstack-quant/calibration/src/tests/hazard_curve.rs) includes rejection, distressed spread, smoothness and replay-tampering cases; selected par repricing uses the production CDS builder/pricer. [tests/repricing.rs](../../../../finstack-quant/calibration/src/tests/repricing.rs) checks report versus market-built CDS and upfront-to-par replay. Scan resolution/monotone survival tests are located inline. They are integration/invariant evidence, not external ISDA standard-model certification.
 
 The ISDA model version label is provenance metadata, not approval.
 
