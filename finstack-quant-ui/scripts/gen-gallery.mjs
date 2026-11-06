@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { loadRegistry } from "shadcn/registry";
 import { checkGraph, visualTypes, workerRoles } from "./check-registry.mjs";
 import { emit, emitSource, sha256 } from "./fixture-output.mjs";
+import { sourceString } from "./source-string.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url)),
   repo = path.resolve(root, "..");
 const output = path.join(repo, "docs-site/src/components/registry-gallery");
@@ -197,7 +198,7 @@ const imports = nonvisual.map((item) => {
         ? target.slice(0, -extension.length)
         : target;
     });
-  return `${JSON.stringify(item.name)}:()=>Promise.all([${targets.map((target) => `import(${JSON.stringify("@/" + target)})`).join(",")}]).then(modules=>({name:${JSON.stringify(item.name)},modules:modules.length}))`;
+  return `${sourceString(item.name)}:()=>Promise.all([${targets.map((target) => `import(${sourceString("@/" + target)})`).join(",")}]).then(modules=>({name:${sourceString(item.name)},modules:modules.length}))`;
 });
 const exampleId = (name) =>
   name.replace(/(?:^|-)(\w)/g, (_, letter) => letter.toUpperCase());

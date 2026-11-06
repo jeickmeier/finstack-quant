@@ -27,6 +27,7 @@ import { serveLocalRegistry } from "./local-registry.mjs";
 import { serveExport } from "../tests/browser/static-server.mjs";
 import { verifyItem } from "../tests/install/browser.mjs";
 import { visualHarness } from "../tests/install/harness.mjs";
+import { sourceString } from "./source-string.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url)),
   repo = path.resolve(root, "..");
 const registry = await loadRegistry({ cwd: root }),
@@ -394,7 +395,7 @@ async function installItem(index, item) {
       const native = roles.get(item.name) === "host";
       await writeFile(
         path.join(consumer, "app/page.tsx"),
-        `"use client";import {InstalledItem} from "./harness";${native ? 'import {FinstackQueryProvider} from "@/hooks/shared/use-finstack/use-finstack";' : ""}export default function Page(){return <main className="finstack-surface" style={{padding:24,width:960}} data-installed-item={${JSON.stringify(item.name)}}><h1>{${JSON.stringify(item.name)}}</h1>${native ? "<FinstackQueryProvider>" : ""}<InstalledItem/>${native ? "</FinstackQueryProvider>" : ""}</main>}`,
+        `"use client";import {InstalledItem} from "./harness";${native ? 'import {FinstackQueryProvider} from "@/hooks/shared/use-finstack/use-finstack";' : ""}export default function Page(){return <main className="finstack-surface" style={{padding:24,width:960}} data-installed-item={${sourceString(item.name)}}><h1>{${sourceString(item.name)}}</h1>${native ? "<FinstackQueryProvider>" : ""}<InstalledItem/>${native ? "</FinstackQueryProvider>" : ""}</main>}`,
       );
     } else {
       const modules = (item.files ?? [])
@@ -415,7 +416,7 @@ async function installItem(index, item) {
         });
       await writeFile(
         path.join(consumer, "app/page.tsx"),
-        `"use client";import {useEffect,useState} from "react";export default function Page(){const [status,setStatus]=useState("Loading");useEffect(()=>{Promise.all([${modules.map((target) => `import(${JSON.stringify("@/" + target)})`).join(",")}]).then(()=>setStatus("Ready"),error=>setStatus(String(error)))},[]);return <main data-installed-item={${JSON.stringify(item.name)}}><h1>{${JSON.stringify(item.name)}}</h1><output aria-label="Import state">{status}</output></main>}`,
+        `"use client";import {useEffect,useState} from "react";export default function Page(){const [status,setStatus]=useState("Loading");useEffect(()=>{Promise.all([${modules.map((target) => `import(${sourceString("@/" + target)})`).join(",")}]).then(()=>setStatus("Ready"),error=>setStatus(String(error)))},[]);return <main data-installed-item={${sourceString(item.name)}}><h1>{${sourceString(item.name)}}</h1><output aria-label="Import state">{status}</output></main>}`,
       );
     }
     console.log(
